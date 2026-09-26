@@ -23,4 +23,11 @@ void main() {
     expect(jsonStrings(['a', 1, 'b', null]), ['a', 'b']);
     expect(jsonStrings(null), isEmpty);
   });
+
+  test('jsonString reads non-empty string values', () {
+    expect(jsonString({'id': 'abc'}, 'id'), 'abc');
+    expect(jsonString({'id': ''}, 'id'), isNull);
+    expect(jsonString({'id': 1}, 'id'), isNull);
+    expect(jsonString({'name': 'x'}, 'id'), isNull);
+  });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme.dart';
+import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 
@@ -54,6 +55,7 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
     final today = DateTime(now.year, now.month, now.day);
     final buckets = <String, List<Map<String, dynamic>>>{};
     for (final conversation in widget.conversations) {
+      if (jsonString(conversation, 'id') == null) continue;
       final title = (conversation['title'] as String? ?? '').toLowerCase();
       if (query.isNotEmpty && !title.contains(query)) continue;
       final updated = DateTime.tryParse(
@@ -223,8 +225,10 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                             'New conversation',
                         selected:
                             conversation['id'] == widget.selectedConversationId,
-                        onTap: () =>
-                            widget.onConversation(conversation['id'] as String),
+                        onTap: () {
+                          final id = jsonString(conversation, 'id');
+                          if (id != null) widget.onConversation(id);
+                        },
                       ),
                   ],
                 ],

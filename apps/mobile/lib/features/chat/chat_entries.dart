@@ -116,7 +116,7 @@ class ApprovalEntry extends ChatEntry {
   Map<String, Object?> get arguments {
     try {
       final decoded = jsonDecode(argumentsJson);
-      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, Object?>.from(decoded);
     } on FormatException {
       // Fall through to an empty argument list for malformed payloads.
     }

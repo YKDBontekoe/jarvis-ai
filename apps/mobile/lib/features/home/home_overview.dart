@@ -451,11 +451,12 @@ class _ActiveTask {
   final DateTime createdAt;
 
   static _ActiveTask? fromJson(dynamic value) {
-    if (value is! Map<String, dynamic>) return null;
-    final id = value['id'];
-    final title = value['title'];
-    final status = value['status'];
-    final createdAt = value['createdAt'];
+    if (value is! Map) return null;
+    final map = Map<String, dynamic>.from(value);
+    final id = map['id'];
+    final title = map['title'];
+    final status = map['status'];
+    final createdAt = map['createdAt'];
     if (id is! String ||
         id.isEmpty ||
         title is! String ||

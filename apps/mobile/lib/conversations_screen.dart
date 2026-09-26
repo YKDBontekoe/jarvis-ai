@@ -86,7 +86,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   }
 
   Future<void> _deleteConversation(Map<String, dynamic> conversation) async {
-    final id = conversation['id'] as String;
+    final id = jsonString(conversation, 'id');
+    if (id == null) return;
     final title = conversation['title'] as String? ?? 'this conversation';
     final confirmed = await showJarvisConfirm(
       context,
@@ -150,7 +151,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
             itemCount: _conversations.length,
             itemBuilder: (context, index) {
               final conversation = _conversations[index];
-              final id = conversation['id'] as String;
+              final id = jsonString(conversation, 'id');
+              if (id == null) return const SizedBox.shrink();
               final selected = id == widget.selectedConversationId;
               return ContentWidth(
                 child: SurfaceCard(

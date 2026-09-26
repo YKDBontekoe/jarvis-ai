@@ -99,11 +99,13 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   Future<void> _download(Map<String, dynamic> file) async {
+    final id = jsonString(file, 'id');
+    if (id == null) return;
     setState(() => _busy = true);
     try {
       await file_download.downloadAndOpen(
         widget.http,
-        file['id'] as String,
+        id,
         file['fileName'] as String? ?? 'jarvis-file',
       );
     } on DioException {
@@ -116,6 +118,8 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   Future<void> _delete(Map<String, dynamic> file) async {
+    final id = jsonString(file, 'id');
+    if (id == null) return;
     final confirmed = await showJarvisConfirm(
       context,
       title: 'Delete file?',
@@ -128,7 +132,7 @@ class _FilesScreenState extends State<FilesScreen> {
     if (!confirmed) return;
     setState(() => _busy = true);
     try {
-      await widget.http.delete('/api/v1/files/${file['id']}');
+      await widget.http.delete('/api/v1/files/$id');
       await _load();
     } on DioException {
       if (mounted) _showError('Jarvis could not delete this file.');

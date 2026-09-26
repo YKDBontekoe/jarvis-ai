@@ -11,3 +11,8 @@ List<String> jsonStrings(dynamic data) {
   if (data is! List) return const [];
   return [for (final item in data) if (item is String) item];
 }
+
+String? jsonString(Map<dynamic, dynamic> map, String key) {
+  final value = map[key];
+  return value is String && value.isNotEmpty ? value : null;
+}

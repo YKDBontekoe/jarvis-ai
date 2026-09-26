@@ -58,6 +58,16 @@ void main() {
       expect(approval.arguments, isEmpty);
     });
 
+    test('reads Map payloads that are not Map<String, dynamic>', () {
+      final approval = ApprovalEntry.fromJson(<dynamic, dynamic>{
+        'id': 'a3',
+        'toolName': 'SearchMemory',
+        'argumentsJson': '{"query":"hello"}',
+      })!;
+      expect(approval.id, 'a3');
+      expect(approval.arguments['query'], 'hello');
+    });
+
     test('rejects payloads without an id', () {
       expect(ApprovalEntry.fromJson({'toolName': 'x'}), isNull);
       expect(ApprovalEntry.fromJson('nope'), isNull);

@@ -61,7 +61,8 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
   }
 
   Future<void> _decide(Map<String, dynamic> approval, bool approved) async {
-    final id = approval['id'] as String;
+    final id = jsonString(approval, 'id');
+    if (id == null) return;
     final retrying = approval['status'] != 'pending';
     if (approved) {
       final confirmed = await showDialog<bool>(

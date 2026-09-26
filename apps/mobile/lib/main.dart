@@ -366,6 +366,7 @@ class _ChatScreenState extends State<ChatScreen> {
   int _homeRevision = 0;
   bool _showHome = true;
   int _realtimeGeneration = 0;
+  int _initGeneration = 0;
   EventsListener<RoomEvent>? _voiceEvents;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   List<Map<String, dynamic>> _recent = [];
@@ -424,15 +425,27 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _initialize() async {
+    final generation = ++_initGeneration;
+    bool stale() =>
+        !mounted ||
+        generation != _initGeneration ||
+        _signedOut ||
+        _signingOut;
     try {
+      if (stale()) return;
       if (_auth.enabled && await _auth.accessToken() == null) {
-        if (mounted) setState(() => _signedOut = true);
+        if (mounted && generation == _initGeneration) {
+          setState(() => _signedOut = true);
+        }
         return;
       }
+      if (stale()) return;
       await _enablePush();
+      if (stale()) return;
       final list = await _http.get<List<dynamic>>('/api/v1/conversations');
+      if (stale()) return;
       final items = jsonMaps(list.data);
-      late final String conversationId;
+      String? conversationId;
       if (items.isNotEmpty && items.first['id'] is String) {
         conversationId = items.first['id'] as String;
       } else {
@@ -440,24 +453,36 @@ class _ChatScreenState extends State<ChatScreen> {
           '/api/v1/conversations',
           data: const {'title': 'New conversation'},
         );
-        conversationId = created.data?['id'] as String;
+        final id = created.data?['id'];
+        conversationId = id is String ? id : null;
       }
+      if (conversationId == null || conversationId.isEmpty) {
+        throw const FormatException('Missing conversation ID.');
+      }
+      if (stale()) return;
       await _openConversation(conversationId, showHome: true);
+      if (stale()) return;
       if (Firebase.apps.isNotEmpty) {
         final initialPush = await FirebaseMessaging.instance
             .getInitialMessage();
-        if (initialPush != null) _handlePushPayload(initialPush.data);
+        if (initialPush != null && !stale()) {
+          _handlePushPayload(initialPush.data);
+        }
       }
-      if (mounted) setState(() => _error = null);
+      if (mounted && generation == _initGeneration) setState(() => _error = null);
     } on DioException catch (error) {
-      if (mounted) {
+      if (mounted && generation == _initGeneration) {
         setState(() {
           _error = _describeError(error);
           if (_isAuthExpired(error)) _signedOut = true;
         });
       }
+    } on FormatException {
+      if (mounted && generation == _initGeneration) {
+        setState(() => _error = 'Jarvis returned an invalid conversation.');
+      }
     } catch (error) {
-      if (mounted) {
+      if (mounted && generation == _initGeneration) {
         setState(() {
           _error = 'Could not connect to Jarvis: $error';
         });
@@ -477,6 +502,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _conversationId = conversationId;
         _connected = false;
+        _sending = false;
         _selectedDestination = 0;
         _showHome = showHome;
         _entries.clear();
@@ -539,8 +565,7 @@ class _ChatScreenState extends State<ChatScreen> {
   ) async {
     try {
       final response = await _http.get<List<dynamic>>('/api/v1/approvals');
-      return (response.data ?? [])
-          .whereType<Map<String, dynamic>>()
+      return jsonMaps(response.data)
           .where((item) => item['conversationId'] == conversationId)
           .map(ApprovalEntry.fromJson)
           .whereType<ApprovalEntry>()
@@ -1033,6 +1058,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_signingOut) return;
     _signingOut = true;
     _signedOut = true;
+    _initGeneration++;
     try {
     await _stopVoice();
     _realtimeGeneration++;
@@ -1069,6 +1095,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _signedOut = true;
         _connected = false;
+        _sending = false;
         _conversationId = null;
         _entries.clear();
       });
@@ -1089,7 +1116,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _enablePush() async {
-    if (Firebase.apps.isEmpty || kIsWeb) return;
+    if (_signedOut || _signingOut || Firebase.apps.isEmpty || kIsWeb) return;
     try {
       final messaging = FirebaseMessaging.instance;
       final settings = await messaging.requestPermission(
@@ -1247,7 +1274,9 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       return true;
     } finally {
-      if (mounted) setState(() => _sending = false);
+      if (mounted && _conversationId == conversationId) {
+        setState(() => _sending = false);
+      }
       _scrollToBottom();
     }
   }
@@ -1346,7 +1375,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (_voiceStarting || _sending) return;
     final conversationId = _conversationId;
-    if (conversationId == null) {
+    if (conversationId == null || !_connected) {
       setState(() => _error = 'Connect to Jarvis before starting voice.');
       return;
     }
@@ -1629,8 +1658,8 @@ class _ChatScreenState extends State<ChatScreen> {
       final response = await _http.get<List<dynamic>>('/api/v1/conversations');
       if (!mounted) return;
       setState(
-        () => _recent = (response.data ?? [])
-            .whereType<Map<String, dynamic>>()
+        () => _recent = jsonMaps(response.data)
+            .where((item) => item['id'] is String)
             .toList(),
       );
     } on DioException {
