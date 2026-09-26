@@ -1,0 +1,82 @@
+## Summary
+
+<!-- What does this pull request change, and why? Link to design notes or issues when helpful. -->
+
+## SemVer impact
+
+Jarvis uses [Semantic Versioning 2.0.0](https://semver.org/) for **release tags** (`vMAJOR.MINOR.PATCH`) that trigger the iOS IPA and backend GHCR deploy workflows.
+
+| Bump | When to choose it | Example tag |
+|------|-------------------|-------------|
+| **Major** | Breaking API, auth, database, or mobile contract changes; removals or incompatible config | `v2.0.0` |
+| **Minor** | Backward-compatible features or capabilities | `v1.3.0` |
+| **Patch** | Backward-compatible fixes, docs, CI, or dependency updates with no new capability | `v1.2.4` |
+| **None** | No user-facing release (refactor, tests, internal tooling only) | — |
+
+- [ ] **SemVer bump:** `major` / `minor` / `patch` / `none`
+- [ ] If releasing: I will tag `vX.Y.Z` on the merge commit (or document the intended tag below).
+- [ ] If mobile changes ship: `apps/mobile/pubspec.yaml` `version:` matches the intended **marketing** SemVer (`X.Y.Z+N`).
+
+**Intended release tag (if any):** `v` _e.g. 1.2.0_
+
+## Type of change
+
+- [ ] Feature (minor)
+- [ ] Bug fix (patch)
+- [ ] Breaking change (major)
+- [ ] Documentation only
+- [ ] CI / release pipeline
+- [ ] Dependency or infrastructure
+- [ ] Refactor (no SemVer release)
+
+## Scope
+
+### Backend / API
+
+- [ ] Not applicable
+- [ ] API or SignalR contract change
+- [ ] Database migration
+- [ ] Temporal workflow or worker behavior
+- [ ] Docker / Compose / production deploy
+- [ ] MCP, integrations, or auth
+
+### Mobile (Flutter)
+
+- [ ] Not applicable
+- [ ] UI / UX
+- [ ] OIDC, push, or LiveKit
+- [ ] Build or signing / AltStore source
+
+## Related issues
+
+<!-- Fixes #123, relates to #456 -->
+
+## How to test
+
+<!-- Commands, environments, and manual steps reviewers or release managers should run. -->
+
+```sh
+# Example
+dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
+python3 -m unittest discover -s tests/unit -p 'test_*.py'
+```
+
+### Checklist
+
+- [ ] Automated tests added or updated where behavior changed
+- [ ] `README.md` or ops docs updated if setup, secrets, or release steps changed
+- [ ] No secrets, tokens, or production `.env` files committed
+- [ ] Production Compose / GHCR image names unchanged unless intentional
+- [ ] AltStore `source.json` / IPA pipeline considered if iOS signing or version fields changed
+
+## Deployment / release notes
+
+<!-- What operators must do after merge: env vars, migrations, `docker compose pull`, new GitHub secrets, AltStore source URL, etc. -->
+
+## Screenshots / recordings
+
+<!-- Optional for UI changes -->
+
+## Reviewer notes
+
+<!-- Risks, follow-ups, or areas you want extra eyes on -->

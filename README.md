@@ -79,7 +79,7 @@ Run deterministic unit tests with:
 
 ```sh
 dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
-python3 -m unittest tests/unit/altstore/test_generate_source.py tests/unit/compose/test_production_images.py
+python3 -m unittest tests/unit/altstore/test_generate_source.py tests/unit/compose/test_production_images.py tests/unit/release/test_semver.py
 ```
 
 The model-agnostic behavioral evaluation cases live in [`evals/jarvis-core-v1.jsonl`](evals/jarvis-core-v1.jsonl), with isolated-run requirements documented in [`evals/README.md`](evals/README.md). Run them against a disposable Jarvis deployment through the normal API; inference still goes through the Codex CLI app-server.
@@ -187,7 +187,15 @@ Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit med
 
 ## GitHub Actions pipelines
 
-Tag `vX.Y.Z` (for example `v1.0.0`) to run both pipelines. You can also start either workflow from **Actions** with `workflow_dispatch`.
+Releases use [Semantic Versioning 2.0.0](https://semver.org/): git tags must be `vMAJOR.MINOR.PATCH` (for example `v1.2.0`). Tag a release commit to run both pipelines, or start either workflow from **Actions** with `workflow_dispatch`. Pull requests use [`.github/pull_request_template.md`](.github/pull_request_template.md), including the required SemVer impact section.
+
+| Change | SemVer bump | Example tag |
+|--------|-------------|---------------|
+| Breaking API, auth, DB, or mobile contract | Major | `v2.0.0` |
+| Backward-compatible feature | Minor | `v1.3.0` |
+| Backward-compatible fix or docs-only release | Patch | `v1.2.1` |
+
+Before tagging, align `apps/mobile/pubspec.yaml` with the marketing version (`version: X.Y.Z+N`). The iOS workflow rewrites the pubspec to `X.Y.Z` plus a monotonic iOS build number derived from the SemVer and run id. Validate a version locally with `python3 scripts/release/semver.py --validate 1.2.3` or compute the next tag with `python3 scripts/release/semver.py --bump patch --from-version 1.2.0`.
 
 ### iOS IPA and AltStore source
 

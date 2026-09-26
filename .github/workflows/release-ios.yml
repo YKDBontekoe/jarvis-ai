@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Marketing version such as 1.0.0. Defaults to the Flutter pubspec version.
+        description: SemVer marketing version (MAJOR.MINOR.PATCH). Defaults to apps/mobile/pubspec.yaml.
         required: false
         type: string
 
@@ -27,26 +27,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Resolve release version
+      - name: Validate release tag uses SemVer
+        if: github.ref_type == 'tag'
+        run: python3 scripts/release/semver.py --parse-tag "${GITHUB_REF_NAME}"
+
+      - name: Resolve SemVer release version
         id: version
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           set -euo pipefail
-          PUBSPEC_VERSION="$(python3 scripts/altstore/generate_source.py --print-pubspec-version)"
-          PUBSPEC_BUILD="$(python3 scripts/altstore/generate_source.py --print-pubspec-build)"
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-            TAG_NAME="${GITHUB_REF_NAME}"
-          else
-            VERSION="${INPUT_VERSION:-$PUBSPEC_VERSION}"
-            TAG_NAME="v${VERSION}"
-          fi
-          {
-            echo "version=${VERSION}"
-            echo "build=${PUBSPEC_BUILD}"
-            echo "tag=${TAG_NAME}"
-          } >> "${GITHUB_OUTPUT}"
+          python3 scripts/release/semver.py \
+            --ref-type "${GITHUB_REF_TYPE}" \
+            --ref-name "${GITHUB_REF_NAME}" \
+            --input-version "${INPUT_VERSION}" \
+            --run-number "${GITHUB_RUN_NUMBER}" \
+            --github-output
+
+      - name: Sync Flutter pubspec version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.version.outputs.build }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release/semver.py \
+            --write-pubspec \
+            --version "${VERSION}" \
+            --build "${BUILD}"
 
       - name: Import signing certificate
         uses: apple-actions/import-codesign-certs@v3
