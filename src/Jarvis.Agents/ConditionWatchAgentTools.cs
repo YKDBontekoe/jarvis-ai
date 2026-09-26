@@ -49,7 +49,7 @@ internal sealed class ConditionWatchAgentTools(IConditionWatchService watches, I
                 .Append(", every ").Append(watch.IntervalMinutes).Append(" min");
             if (watch.LastValue is { } lastValue)
                 result.Append(", last value ").Append(lastValue.ToString(CultureInfo.InvariantCulture))
-                    .Append(" at ").Append(watch.LastCheckedAt?.ToString("O", CultureInfo.InvariantCulture));
+                    .Append(" at ").Append(AgentText.Time(watch.LastCheckedAt));
             result.AppendLine();
         }
         return result.ToString();

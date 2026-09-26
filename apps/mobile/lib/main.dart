@@ -1346,10 +1346,14 @@ class _ChatScreenState extends State<ChatScreen> {
                   controller: _scroll,
                   padding: const EdgeInsets.fromLTRB(18, 20, 18, 24),
                   itemCount: _entries.length,
-                  itemBuilder: (context, index) => Center(
+                  itemBuilder: (context, index) => Align(
+                    alignment: Alignment.topCenter,
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 780),
-                      child: _entryView(_entries[index]),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: _entryView(_entries[index]),
+                      ),
                     ),
                   ),
                 ),

@@ -38,6 +38,7 @@ ThemeData buildJarvisTheme() {
       scrolledUnderElevation: 0,
       centerTitle: false,
       titleTextStyle: TextStyle(
+        color: Colors.white,
         fontSize: 18,
         fontWeight: FontWeight.w600,
         letterSpacing: -.2,
@@ -57,7 +58,11 @@ ThemeData buildJarvisTheme() {
       surfaceTintColor: Colors.transparent,
       indicatorColor: JarvisColors.accent.withValues(alpha: .18),
       labelTextStyle: WidgetStateProperty.all(
-        const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+        const TextStyle(
+          color: Color(0xffe6e6f0),
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     ),
     navigationRailTheme: NavigationRailThemeData(
@@ -69,7 +74,7 @@ ThemeData buildJarvisTheme() {
       backgroundColor: JarvisColors.surface,
       side: const BorderSide(color: JarvisColors.outline),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      labelStyle: const TextStyle(fontSize: 13),
+      labelStyle: const TextStyle(color: Color(0xffe6e6f0), fontSize: 13),
     ),
     dividerTheme: const DividerThemeData(color: JarvisColors.outline),
     snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),

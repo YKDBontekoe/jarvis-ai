@@ -42,7 +42,7 @@ internal sealed class FileAgentTools(IFileSearchService files, IFileRepository f
         {
             result.Append("- ").Append(AgentText.Limit(file.FileName, 200))
                 .Append(" (").Append(file.ContentType).Append(", ").Append(FormatSize(file.SizeBytes))
-                .Append(", uploaded ").Append(file.CreatedAt.ToString("O", CultureInfo.InvariantCulture))
+                .Append(", uploaded ").Append(AgentText.Time(file.CreatedAt))
                 .Append(", ").Append(file.ProcessingStatus).AppendLine(")");
         }
         if (items.Length > 30) result.Append("(").Append(items.Length - 30).AppendLine(" more not shown.)");

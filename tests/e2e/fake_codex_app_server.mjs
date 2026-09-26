@@ -93,7 +93,7 @@ function plan(prompt) {
 
   if (/\b(what|which).*(reminders|scheduled)\b|\blist .*reminders\b/.test(lower) && has('ListReminders')) {
     if (results.length === 0) return call('ListReminders', { includeFinished: false });
-    const items = [...last.matchAll(/due (\S+?): (.+?)(?:\\n|$)/g)].map(match => ({ due: match[1], title: match[2] }));
+    const items = [...last.matchAll(/due (\S+): (.+?)(?:\n|$)/g)].map(match => ({ due: match[1], title: match[2] }));
     if (items.length === 0) return text("You don't have any upcoming reminders.");
     return text(`You have **${items.length}** upcoming reminder${items.length === 1 ? '' : 's'}:\n\n` +
       '| When (UTC) | Reminder |\n| --- | --- |\n' +
@@ -119,7 +119,7 @@ function plan(prompt) {
 
   if (/what do you (know|remember) about me/.test(lower) && has('SearchMemory')) {
     if (results.length === 0) return call('SearchMemory', { query: 'user preferences facts' });
-    const items = [...last.matchAll(/\] (.+?)(?:\\n|$)/g)].map(match => match[1]);
+    const items = [...last.matchAll(/\] (.+?)(?:\n|$)/g)].map(match => match[1]);
     return text(items.length ? "Here's what I have saved about you:\n\n" + items.map(item => `- ${item}`).join('\n')
       : "I don't have anything saved about you yet. Tell me what you'd like me to remember!");
   }
@@ -163,8 +163,17 @@ function parseConversation(prompt) {
   const request = requestIndex >= 0 ? messages[requestIndex].content : '';
   const results = messages.slice(requestIndex + 1)
     .flatMap(message => message.content.split('\n').filter(line => line.startsWith('Jarvis tool result:')))
-    .map(line => line.slice('Jarvis tool result:'.length).trim());
+    .map(line => decodeResult(line.slice('Jarvis tool result:'.length).trim()));
   return { request, results, executingTask: prompt.includes('already scheduled background task') };
+}
+
+function decodeResult(value) {
+  try {
+    const decoded = JSON.parse(value);
+    return typeof decoded === 'string' ? decoded : JSON.stringify(decoded);
+  } catch {
+    return value;
+  }
 }
 
 function parseReminder(request) {

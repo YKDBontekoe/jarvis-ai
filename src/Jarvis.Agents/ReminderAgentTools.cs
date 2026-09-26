@@ -23,7 +23,7 @@ internal sealed partial class ReminderAgentTools(IReminderService reminders, ICu
         try
         {
             var reminder = await reminders.CreateAsync(currentUser.OwnerId, title, due, cancellationToken);
-            return $"Reminder scheduled (reminder ID {reminder.Id}) for {reminder.DueAt:O}: {reminder.Title}";
+            return $"Reminder scheduled (reminder ID {reminder.Id}) for {AgentText.Time(reminder.DueAt)}: {reminder.Title}";
         }
         catch (ArgumentException exception)
         {
@@ -48,7 +48,7 @@ internal sealed partial class ReminderAgentTools(IReminderService reminders, ICu
         foreach (var reminder in items.Take(MaxListedReminders))
         {
             result.Append("- [").Append(reminder.Status).Append("] reminder ID ").Append(reminder.Id)
-                .Append(" due ").Append(reminder.DueAt.ToString("O", CultureInfo.InvariantCulture))
+                .Append(" due ").Append(AgentText.Time(reminder.DueAt))
                 .Append(": ").AppendLine(AgentText.Limit(reminder.Title, 300));
         }
         if (items.Length > MaxListedReminders)

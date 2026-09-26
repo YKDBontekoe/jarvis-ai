@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Globalization;
 using System.Text;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Workflows;
@@ -45,7 +44,7 @@ internal sealed class TaskAgentTools(IJarvisTaskService tasks, ICurrentUser curr
         foreach (var task in items)
         {
             result.Append("- [").Append(task.Status).Append("] task ID ").Append(task.Id)
-                .Append(" created ").Append(task.CreatedAt.ToString("O", CultureInfo.InvariantCulture))
+                .Append(" created ").Append(AgentText.Time(task.CreatedAt))
                 .Append(": ").Append(AgentText.Limit(task.Title, 200));
             if (!string.IsNullOrWhiteSpace(task.Summary))
                 result.Append(" — ").Append(AgentText.Limit(task.Summary, 400));
