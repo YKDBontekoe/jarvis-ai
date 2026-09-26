@@ -804,6 +804,7 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
       if (event['type'] == 'task.completed' ||
+          event['type'] == 'task.failed' ||
           event['type'] == 'approval.required') {
         setState(() => _homeRevision++);
       }
@@ -854,7 +855,12 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       setState(() {
         _showHome = false;
-        _entries.add(MessageEntry(role: 'user', content: transcript));
+        final last = _entries.isEmpty ? null : _entries.last;
+        final duplicate =
+            last is MessageEntry && last.isUser && last.content == transcript;
+        if (!duplicate) {
+          _entries.add(MessageEntry(role: 'user', content: transcript));
+        }
       });
       _scrollToBottom();
     });
@@ -1024,6 +1030,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _onForegroundPush(RemoteMessage message) {
     if (mounted &&
         (message.data['type'] == 'task.completed' ||
+            message.data['type'] == 'task.failed' ||
             message.data['type'] == 'approval.required')) {
       setState(() => _homeRevision++);
     }

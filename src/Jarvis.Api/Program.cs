@@ -232,6 +232,7 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     ILogger<AgentRunCoordinator> logger,
     IConversationRunLock runLock,
     IJarvisTaskService tasks,
+    IJarvisTaskRepository taskRepository,
     CancellationToken ct) =>
 {
     var ownerId = currentUser.OwnerId;
@@ -241,6 +242,12 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     pending = await approvals.GetActionableAsync(approvalId, ownerId, ct);
     if (pending is null) return Results.Conflict(new { message = "This approval is already complete or being resumed." });
     if (await conversations.GetAsync(pending.ConversationId, ownerId, ct) is null) return Results.NotFound();
+    if (pending.TaskId is { } boundTaskId)
+    {
+        var task = await taskRepository.GetTaskAsync(boundTaskId, ownerId, ct);
+        if (task is null || task.Status != "needs_approval")
+            return Results.Conflict(new { message = "This approval is no longer attached to an active task." });
+    }
     ToolApprovalRecord? decided;
     if (pending.Status == "pending")
         decided = await approvals.DecideAsync(approvalId, ownerId, request.Approved, ct);
@@ -254,6 +261,21 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
 
     try
     {
+        if (pending.Status != "pending")
+        {
+            var messages = await conversations.GetMessagesAsync(decided.ConversationId, ct);
+            var last = messages.Count > 0 ? messages[^1] : null;
+            if (last is { Role: "assistant" })
+            {
+                if (decided.Approved == true)
+                    await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId, last.Content, ct);
+                else
+                    await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId, last.Content, ct);
+                await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
+                return Results.Ok(ToDto(last));
+            }
+        }
+
         var outcome = await coordinator.RunAsync(ownerId, decided.ConversationId,
             agent.ResumeReplyAsync(decided.ConversationId, decided.ToReply(), ct), null, ct, decided.TaskId);
         if (outcome.PendingApprovals.Count != 0)

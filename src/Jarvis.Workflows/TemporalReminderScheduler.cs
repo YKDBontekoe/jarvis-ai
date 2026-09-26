@@ -1,6 +1,5 @@
 using Jarvis.Application.Workflows;
 using Jarvis.Application.Files;
-using Jarvis.Application.Conversations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Temporalio.Api.Enums.V1;
@@ -177,7 +176,6 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
 
 public sealed class JarvisTaskService(
     IJarvisTaskRepository tasks,
-    IConversationStore conversations,
     TemporalReminderScheduler scheduler,
     ILogger<JarvisTaskService> logger) : IJarvisTaskService
 {
@@ -188,11 +186,7 @@ public sealed class JarvisTaskService(
         if (title.Length is < 1 or > 200) throw new ArgumentException("Task title must contain 1 to 200 characters.", nameof(title));
         if (prompt.Length is < 1 or > 32_000) throw new ArgumentException("Task instructions must contain 1 to 32,000 characters.", nameof(prompt));
 
-        var conversation = await conversations.CreateAsync(ownerId, title, cancellationToken);
-        var task = await tasks.CreateAsync(ownerId, title, prompt, conversation.Id, cancellationToken);
-        await conversations.AddMessageAsync(
-            new Jarvis.Domain.Conversations.Message(conversation.Id, "user", prompt, task.UserMessageId),
-            cancellationToken);
+        var task = await tasks.CreateWithConversationAsync(ownerId, title, prompt, cancellationToken);
         try
         {
             await scheduler.ScheduleTaskAsync(task, cancellationToken);

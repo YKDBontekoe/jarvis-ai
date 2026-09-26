@@ -116,6 +116,7 @@ public interface IPushDeviceRepository
 public interface IJarvisTaskRepository
 {
     Task<JarvisTaskRecord> CreateAsync(Guid ownerId, string title, string prompt, Guid conversationId, CancellationToken cancellationToken);
+    Task<JarvisTaskRecord> CreateWithConversationAsync(Guid ownerId, string title, string prompt, CancellationToken cancellationToken);
     Task<JarvisTaskRecord?> GetTaskAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<JarvisTaskRecord?> GetTaskByIdAsync(Guid id, CancellationToken cancellationToken);
     Task<JarvisTaskRecord?> GetTaskByConversationIdAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);

@@ -79,7 +79,9 @@ public sealed class ToolApprovalStore(JarvisDbContext db) : IToolApprovalStore
             x.Id == id && x.OwnerId == ownerId && (x.Status == "pending" ||
                 ((x.Status == "approved" || x.Status == "rejected") &&
                  (x.ResumeStatus == "pending" || x.ResumeStatus == "failed" ||
-                  (x.ResumeStatus == "running" && x.ResumeStartedAt < staleBefore)))), cancellationToken))?.ToRecord();
+                  (x.ResumeStatus == "running" && x.ResumeStartedAt < staleBefore)))) &&
+            (x.TaskId == null || db.Tasks.Any(task => task.Id == x.TaskId && task.Status == "needs_approval")),
+            cancellationToken))?.ToRecord();
     }
 
     public async Task<IReadOnlyList<ToolApprovalRecord>> ListActionableAsync(Guid ownerId, CancellationToken cancellationToken)
@@ -89,7 +91,8 @@ public sealed class ToolApprovalStore(JarvisDbContext db) : IToolApprovalStore
             (x.Status == "pending" ||
              ((x.Status == "approved" || x.Status == "rejected") &&
               (x.ResumeStatus == "pending" || x.ResumeStatus == "failed" ||
-               (x.ResumeStatus == "running" && x.ResumeStartedAt < staleBefore)))))
+               (x.ResumeStatus == "running" && x.ResumeStartedAt < staleBefore)))) &&
+            (x.TaskId == null || db.Tasks.Any(task => task.Id == x.TaskId && task.Status == "needs_approval")))
             .OrderBy(x => x.Status == "pending" ? 0 : 1).ThenBy(x => x.CreatedAt).Take(100)
             .ToListAsync(cancellationToken)).Select(x => x.ToRecord()).ToList();
     }

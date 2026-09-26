@@ -30,7 +30,9 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
 
   bool get _isReminder => widget.notificationType == 'reminder.due';
   bool get _isWatch => widget.notificationType.startsWith('watch.');
-  bool get _isTask => widget.notificationType == 'task.completed';
+  bool get _isTask =>
+      widget.notificationType == 'task.completed' ||
+      widget.notificationType == 'task.failed';
 
   @override
   void initState() {
@@ -42,7 +44,8 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
     try {
       final path = switch (widget.notificationType) {
         'reminder.due' => '/api/v1/reminders/${widget.sourceId}',
-        'task.completed' => '/api/v1/tasks/${widget.sourceId}',
+        'task.completed' ||
+        'task.failed' => '/api/v1/tasks/${widget.sourceId}',
         'watch.triggered' ||
         'watch.failed' => '/api/v1/watches/${widget.sourceId}',
         _ => null,
@@ -133,7 +136,7 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
     final status = item['status'] as String? ?? '';
     final detail = switch (widget.notificationType) {
       'reminder.due' => _date(item['dueAt']),
-      'task.completed' => item['summary'] as String? ?? '',
+      'task.completed' || 'task.failed' => item['summary'] as String? ?? '',
       'watch.triggered' || 'watch.failed' => _watchCondition(item),
       _ => '',
     };

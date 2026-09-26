@@ -416,6 +416,7 @@ class _RemindersScreenState extends State<RemindersScreen>
   IconData _notificationIcon(Object? type) => switch (type) {
     'reminder.due' => PhosphorIconsRegular.alarm,
     'task.completed' => PhosphorIconsRegular.checkCircle,
+    'task.failed' => PhosphorIconsRegular.warningCircle,
     'approval.required' => PhosphorIconsRegular.shieldCheck,
     'watch.triggered' || 'watch.failed' => PhosphorIconsRegular.pulse,
     _ => PhosphorIconsRegular.bell,

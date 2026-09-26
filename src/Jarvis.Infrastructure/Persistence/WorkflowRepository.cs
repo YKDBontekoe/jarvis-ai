@@ -1,5 +1,7 @@
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Workflows;
+using Jarvis.Domain.Conversations;
+using Jarvis.Domain.Approvals;
 using Jarvis.Domain.Audit;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
@@ -48,6 +50,23 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         db.Tasks.Add(task);
         AddAuditEvent(ownerId, "tasks", "task.created", "low", true, task.Id);
         await db.SaveChangesAsync(cancellationToken);
+        return task.ToRecord();
+    }
+
+    public async Task<JarvisTaskRecord> CreateWithConversationAsync(Guid ownerId, string title, string prompt,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var conversation = new Conversation(ownerId, title);
+        db.Conversations.Add(conversation);
+        var task = new JarvisTask(ownerId, title, prompt);
+        task.AttachConversation(conversation.Id);
+        db.Tasks.Add(task);
+        db.Messages.Add(new Message(conversation.Id, "user", prompt, task.UserMessageId));
+        conversation.Touch();
+        AddAuditEvent(ownerId, "tasks", "task.created", "low", true, task.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return task.ToRecord();
     }
 
@@ -133,11 +152,21 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
 
     public async Task FailAsync(Guid id, string summary, CancellationToken cancellationToken)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var task = await db.Tasks.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (task is null || task.Status is "completed" or "failed" or "cancelled") return;
         task.Fail(summary);
         AddAuditEvent(task.OwnerId, "temporal", "task.failed", "high", false, task.Id);
+        await CancelPendingApprovalsAsync(task.Id, task.OwnerId, cancellationToken);
+        if (!await db.Notifications.AnyAsync(x => x.Id == task.Id, cancellationToken))
+        {
+            var notification = new Notification(task.Id, task.OwnerId, "task.failed",
+                "Task failed", summary, task.Id);
+            db.Notifications.Add(notification);
+            await PushDeliveryQueue.QueueAsync(db, notification, cancellationToken);
+        }
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task<bool> CancelTaskAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
@@ -146,8 +175,18 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         if (task is null || task.Status is "completed" or "failed" or "cancelled") return false;
         task.Cancel();
         AddAuditEvent(ownerId, "tasks", "task.cancelled", "moderate", true, task.Id);
+        await CancelPendingApprovalsAsync(task.Id, ownerId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    private async Task CancelPendingApprovalsAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken)
+    {
+        var pending = await db.ToolApprovals.Where(x =>
+                x.TaskId == taskId && x.OwnerId == ownerId && x.Status == "pending")
+            .ToListAsync(cancellationToken);
+        foreach (var approval in pending)
+            approval.Cancel();
     }
 
     public async Task<ReminderRecord> CreateAsync(Guid ownerId, string title, DateTimeOffset dueAt, CancellationToken cancellationToken)

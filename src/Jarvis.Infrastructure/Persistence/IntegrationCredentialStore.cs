@@ -103,13 +103,16 @@ public sealed partial class IntegrationCredentialStore(JarvisDbContext db,
 
     public async Task<bool> DeleteAsync(Guid ownerId, string provider, CancellationToken cancellationToken)
     {
-        var credential = await db.IntegrationCredentials.SingleOrDefaultAsync(
-            x => x.OwnerId == ownerId && x.Provider == provider, cancellationToken);
+        if (!ProviderPattern().IsMatch(provider))
+            throw new ArgumentException("Provider must be a lowercase integration slug (letters, numbers, hyphens).", nameof(provider));
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var credential = await GetLockedAsync(ownerId, provider, cancellationToken);
         if (credential is null) return false;
         db.IntegrationCredentials.Remove(credential);
         db.AuditEvents.Add(new AuditEvent(ownerId, "integrations", "credentials.deleted", "moderate", true,
             metadataJson: JsonSerializer.Serialize(new { provider }, JsonOptions)));
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return true;
     }
 

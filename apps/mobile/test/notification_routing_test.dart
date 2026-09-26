@@ -12,6 +12,8 @@ void main() {
   test('approval notifications stay on the approvals screen', () {
     expect(opensApprovalScreen('approval.required'), isTrue);
     expect(opensTaskDetails('task.completed'), isTrue);
+    expect(opensTaskDetails('task.failed'), isTrue);
+    expect(opensNotificationDetails('task.failed'), isTrue);
     expect(opensApprovalScreen('watch.triggered'), isFalse);
   });
 }
