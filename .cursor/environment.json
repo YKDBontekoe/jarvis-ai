@@ -1,0 +1,11 @@
+{
+  "name": "Jarvis",
+  "user": "ubuntu",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "dockerd",
+      "command": "bash .cursor/dockerd.sh"
+    }
+  ]
+}
