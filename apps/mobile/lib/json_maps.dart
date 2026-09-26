@@ -6,3 +6,8 @@ List<Map<String, dynamic>> jsonMaps(dynamic data) {
   }
   return maps;
 }
+
+List<String> jsonStrings(dynamic data) {
+  if (data is! List) return const [];
+  return [for (final item in data) if (item is String) item];
+}

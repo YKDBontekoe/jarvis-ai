@@ -16,4 +16,10 @@ void main() {
     expect(opensNotificationDetails('task.failed'), isTrue);
     expect(opensApprovalScreen('watch.triggered'), isFalse);
   });
+
+  test('daily briefing notifications open the briefing screen', () {
+    expect(opensDailyBriefing('briefing.daily'), isTrue);
+    expect(opensDailyBriefing('reminder.due'), isFalse);
+    expect(opensNotificationDetails('briefing.daily'), isFalse);
+  });
 }

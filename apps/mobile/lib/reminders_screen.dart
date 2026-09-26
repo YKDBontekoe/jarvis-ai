@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'approvals_screen.dart';
+import 'daily_briefing_screen.dart';
 import 'notification_details_screen.dart';
 import 'notification_routing.dart';
 import 'json_maps.dart';
@@ -219,6 +220,14 @@ class _RemindersScreenState extends State<RemindersScreen>
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) => ApprovalsScreen(http: widget.http),
+        ),
+      );
+      return;
+    }
+    if (opensDailyBriefing(type)) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => DailyBriefingScreen(http: widget.http),
         ),
       );
       return;

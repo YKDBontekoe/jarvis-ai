@@ -18,4 +18,9 @@ void main() {
     expect(jsonMaps(null), isEmpty);
     expect(jsonMaps('x'), isEmpty);
   });
+
+  test('jsonStrings keeps string entries', () {
+    expect(jsonStrings(['a', 1, 'b', null]), ['a', 'b']);
+    expect(jsonStrings(null), isEmpty);
+  });
 }

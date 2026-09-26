@@ -397,7 +397,8 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     final endpoint = server['endpoint'] as String? ?? '';
     final tools =
         (server['allowedTools'] as List<dynamic>? ?? const <dynamic>[])
-            .cast<String>();
+            .whereType<String>()
+            .toList();
     final hasToken = _providers.any(
       (provider) =>
           provider['provider'] == id &&
@@ -506,7 +507,8 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     final slug = provider['provider'] as String? ?? '';
     final names =
         (provider['secretNames'] as List<dynamic>? ?? const <dynamic>[])
-            .cast<String>();
+            .whereType<String>()
+            .toList();
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
