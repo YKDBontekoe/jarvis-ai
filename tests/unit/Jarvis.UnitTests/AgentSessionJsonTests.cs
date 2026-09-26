@@ -51,4 +51,14 @@ public sealed class AgentSessionJsonTests
             """{"messages":[{"contents":[{"text":"User","$type":"text"}]},{"role":"user","contents":[{"text":"Still the user","$type":"text"}]}]}""",
             out _));
     }
+
+    [Fact]
+    public void RecoversAssistantTextOnlyForTheMatchingUserTurn()
+    {
+        const string session =
+            """{"stateBag":{"messages":[{"contents":[{"text":"Hello","$type":"text"}]},{"contents":[{"text":"Done.","$type":"text"}]}]}}""";
+        Assert.True(AgentSessionJson.TryGetCompletedAssistantTextAfterUser(session, "Hello", out var text));
+        Assert.Equal("Done.", text);
+        Assert.False(AgentSessionJson.TryGetCompletedAssistantTextAfterUser(session, "Something else", out _));
+    }
 }

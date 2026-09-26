@@ -287,7 +287,7 @@ public sealed class AgentToolTests
             Task.FromResult<IReadOnlyList<MemoryRecord>>(Items.ToArray());
         public Task<IReadOnlyList<MemoryRecord>> ListPinnedAsync(Guid ownerId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<MemoryRecord>>(Items.Where(item => item.IsPinned).ToArray());
-        public Task<MemoryRecord> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance,
+        public Task<MemoryRecord?> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance,
             float confidence, DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
     }

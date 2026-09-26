@@ -46,37 +46,67 @@ public static class AgentSessionJson
                 return false;
 
             var last = messages[messages.GetArrayLength() - 1];
-            if (last.TryGetProperty("role", out var role) &&
-                role.ValueKind == JsonValueKind.String &&
-                !string.Equals(role.GetString(), "assistant", StringComparison.OrdinalIgnoreCase))
+            if (IsRole(last, "user") || !TryGetPlainText(last, out text))
                 return false;
-            if (!last.TryGetProperty("contents", out var contents) || contents.ValueKind != JsonValueKind.Array)
-                return false;
-
-            var output = new StringBuilder();
-            foreach (var content in contents.EnumerateArray())
-            {
-                var type = content.TryGetProperty("$type", out var typeElement) ? typeElement.GetString() : null;
-                if (type is "functionCall" or "functionResult" or "functionApprovalRequest" or "toolApprovalRequest"
-                    or "toolApproval")
-                    return false;
-                if (content.TryGetProperty("text", out var textElement) &&
-                    (type is null or "text") &&
-                    textElement.ValueKind == JsonValueKind.String)
-                {
-                    output.Append(textElement.GetString());
-                    continue;
-                }
-                return false;
-            }
-
-            text = output.ToString();
-            return text.Length > 0;
+            return true;
         }
         catch (JsonException)
         {
             return false;
         }
+    }
+
+    public static bool TryGetCompletedAssistantTextAfterUser(string sessionJson, string userContent, out string text)
+    {
+        text = string.Empty;
+        if (string.IsNullOrEmpty(userContent) || !TryGetCompletedAssistantText(sessionJson, out text))
+            return false;
+        try
+        {
+            using var document = JsonDocument.Parse(sessionJson);
+            if (!TryFindMessages(document.RootElement, out var messages))
+                return false;
+            var previous = messages[messages.GetArrayLength() - 2];
+            if (IsRole(previous, "assistant") || !TryGetPlainText(previous, out var previousText))
+                return false;
+            return string.Equals(previousText, userContent, StringComparison.Ordinal);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsRole(JsonElement message, string role) =>
+        message.TryGetProperty("role", out var value) &&
+        value.ValueKind == JsonValueKind.String &&
+        string.Equals(value.GetString(), role, StringComparison.OrdinalIgnoreCase);
+
+    private static bool TryGetPlainText(JsonElement message, out string text)
+    {
+        text = string.Empty;
+        if (!message.TryGetProperty("contents", out var contents) || contents.ValueKind != JsonValueKind.Array)
+            return false;
+
+        var output = new StringBuilder();
+        foreach (var content in contents.EnumerateArray())
+        {
+            var type = content.TryGetProperty("$type", out var typeElement) ? typeElement.GetString() : null;
+            if (type is "functionCall" or "functionResult" or "functionApprovalRequest" or "toolApprovalRequest"
+                or "toolApproval")
+                return false;
+            if (content.TryGetProperty("text", out var textElement) &&
+                (type is null or "text") &&
+                textElement.ValueKind == JsonValueKind.String)
+            {
+                output.Append(textElement.GetString());
+                continue;
+            }
+            return false;
+        }
+
+        text = output.ToString();
+        return text.Length > 0;
     }
 
     private static int MetadataSortKey(string name) => name switch

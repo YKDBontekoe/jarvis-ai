@@ -112,6 +112,19 @@ public sealed class FileService(
         var file = await repository.GetAsync(id, ownerId, cancellationToken);
         if (file is null) return false;
         if (!await repository.MarkDeletingAsync(id, ownerId, cancellationToken)) return false;
+        try
+        {
+            await scheduler.CancelAsync(id, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "File {FileId} was marked deleting; Temporal will stop processing if the workflow is still running.", id);
+        }
         await objects.DeleteAsync(file.ObjectKey, cancellationToken);
         await repository.DeleteAsync(id, ownerId, cancellationToken);
         return true;

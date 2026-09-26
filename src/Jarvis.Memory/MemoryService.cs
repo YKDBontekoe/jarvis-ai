@@ -43,7 +43,7 @@ public sealed class MemoryService(IMemoryRepository repository) : IMemoryService
     public Task<IReadOnlyList<MemoryRecord>> ListPinnedAsync(Guid ownerId, CancellationToken cancellationToken) =>
         repository.ListPinnedAsync(ownerId, cancellationToken);
 
-    public async Task<MemoryRecord> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance,
+    public async Task<MemoryRecord?> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance,
         float confidence, DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken)
     {
         Validate(kind, content, importance, confidence);

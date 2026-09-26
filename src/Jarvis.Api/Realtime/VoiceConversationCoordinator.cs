@@ -50,9 +50,16 @@ public sealed class VoiceConversationCoordinator(
                 if (!ReferenceEquals(userMessage, lastMessage))
                     await conversations.AddMessageAsync(userMessage, cancellationToken);
 
+                var coordinator = services.GetRequiredService<AgentRunCoordinator>();
+                if (await coordinator.TryRecoverCompletedAssistantAsync(conversationId, transcript,
+                        cancellationToken) is { } recovered)
+                {
+                    await coordinator.PublishRecoveredAssistantAsync(conversationId, recovered, cancellationToken);
+                    return recovered.Content;
+                }
+
                 try
                 {
-                    var coordinator = services.GetRequiredService<AgentRunCoordinator>();
                     var agent = services.GetRequiredService<IJarvisAgent>();
                     var outcome = await coordinator.RunAsync(ownerId, conversationId,
                         agent.StreamReplyAsync(conversationId, userMessage, cancellationToken),

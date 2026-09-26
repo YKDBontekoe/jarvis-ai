@@ -29,8 +29,23 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
     public async Task CancelAsync(string workflowId, CancellationToken cancellationToken)
     {
         var client = await GetClientAsync(cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        await client.GetWorkflowHandle(workflowId).CancelAsync(new WorkflowCancelOptions());
+        Exception? last = null;
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await client.GetWorkflowHandle(workflowId).CancelAsync(new WorkflowCancelOptions());
+                return;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                last = exception;
+                if (attempt == 3) break;
+                await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), cancellationToken);
+            }
+        }
+        throw last!;
     }
 
     public async Task ScheduleAsync(Guid fileId, Guid ownerId, CancellationToken cancellationToken)
@@ -45,6 +60,9 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
             });
     }
 
+    public Task CancelAsync(Guid fileId, CancellationToken cancellationToken) =>
+        CancelAsync($"jarvis:file:{fileId:N}", cancellationToken);
+
     public async Task ScheduleTaskAsync(JarvisTaskRecord task, CancellationToken cancellationToken)
     {
         var client = await GetClientAsync(cancellationToken);
@@ -57,12 +75,8 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
             });
     }
 
-    public async Task CancelTaskAsync(string workflowId, CancellationToken cancellationToken)
-    {
-        var client = await GetClientAsync(cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        await client.GetWorkflowHandle(workflowId).CancelAsync(new WorkflowCancelOptions());
-    }
+    public async Task CancelTaskAsync(string workflowId, CancellationToken cancellationToken) =>
+        await CancelAsync(workflowId, cancellationToken);
 
     public async Task ScheduleAsync(ConditionWatchRecord watch, CancellationToken cancellationToken)
     {

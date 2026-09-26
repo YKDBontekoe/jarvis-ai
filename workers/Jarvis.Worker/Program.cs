@@ -271,7 +271,7 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
         var services = scope.ServiceProvider;
         var files = services.GetRequiredService<IFileRepository>();
         var file = await files.GetAsync(input.FileId, input.OwnerId, cancellationToken);
-        if (file is null) return;
+        if (file is null || file.ProcessingStatus == "deleting") return;
 
         if (!await files.SetProcessingStatusAsync(input.FileId, input.OwnerId, "processing", cancellationToken))
             return;

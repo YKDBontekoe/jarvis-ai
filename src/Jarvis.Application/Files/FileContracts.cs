@@ -33,6 +33,7 @@ public interface IFileSearchService
 public interface IFileProcessingScheduler
 {
     Task ScheduleAsync(Guid fileId, Guid ownerId, CancellationToken cancellationToken);
+    Task CancelAsync(Guid fileId, CancellationToken cancellationToken);
 }
 
 public interface IFileMalwareScanner

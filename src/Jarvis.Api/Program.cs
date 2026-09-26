@@ -194,6 +194,11 @@ api.MapPost("/conversations/{conversationId:guid}/messages", async (
         : new Message(conversationId, "user", content);
     if (!ReferenceEquals(userMessage, lastMessage))
         await store.AddMessageAsync(userMessage, ct);
+    if (await coordinator.TryRecoverCompletedAssistantAsync(conversationId, content, ct) is { } recovered)
+    {
+        await coordinator.PublishRecoveredAssistantAsync(conversationId, recovered, ct);
+        return Results.Ok(ToDto(recovered));
+    }
     try
     {
         var outcome = await coordinator.RunAsync(currentUser.OwnerId, conversationId,
@@ -242,6 +247,13 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     pending = await approvals.GetActionableAsync(approvalId, ownerId, ct);
     if (pending is null) return Results.Conflict(new { message = "This approval is already complete or being resumed." });
     if (await conversations.GetAsync(pending.ConversationId, ownerId, ct) is null) return Results.NotFound();
+    if (pending.Status == "pending")
+    {
+        var earlier = (await approvals.ListActionableAsync(ownerId, ct))
+            .FirstOrDefault(x => x.ConversationId == pending.ConversationId && x.Status == "pending");
+        if (earlier is not null && earlier.Id != pending.Id)
+            return Results.Conflict(new { message = "Decide the earlier pending tool call for this conversation first." });
+    }
     if (pending.TaskId is { } boundTaskId)
     {
         var task = await taskRepository.GetTaskAsync(boundTaskId, ownerId, ct);
@@ -808,6 +820,7 @@ api.MapPut("/memory/{id:guid}", async (Guid id, IMemoryService memory, IAuditEve
     if (await memory.GetAsync(id, currentUser.OwnerId, ct) is null) return Results.NotFound();
     var record = await memory.UpdateAsync(id, currentUser.OwnerId, request.Kind!, request.Content!, request.Importance,
         request.Confidence, request.ValidUntil, request.IsPinned, ct);
+    if (record is null) return Results.NotFound();
     await audit.AppendAsync(currentUser.OwnerId, "memory", "memory.updated", "moderate", true, null,
         JsonSerializer.Serialize(new { resourceId = id, kind = record.Kind }), ct);
     return Results.Ok(ToMemoryDto(record));

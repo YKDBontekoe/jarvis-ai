@@ -17,6 +17,40 @@ public sealed class AgentRunCoordinator(
     IHubContext<JarvisEventsHub> hub,
     ILogger<AgentRunCoordinator> logger)
 {
+    public async Task<Message?> TryRecoverCompletedAssistantAsync(Guid conversationId, string userContent,
+        CancellationToken cancellationToken)
+    {
+        var session = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
+        if (session is null ||
+            !AgentSessionJson.TryGetCompletedAssistantTextAfterUser(session, userContent, out var recovered))
+            return null;
+
+        var messages = await conversations.GetMessagesAsync(conversationId, cancellationToken);
+        var last = messages.Count > 0 ? messages[^1] : null;
+        if (last is { Role: "assistant" } && last.Content == recovered)
+            return last;
+        if (last is not { Role: "user" } || last.Content != userContent)
+            return null;
+
+        var assistant = new Message(conversationId, "assistant", recovered);
+        await conversations.AddMessageAsync(assistant, cancellationToken);
+        return assistant;
+    }
+
+    public async Task PublishRecoveredAssistantAsync(Guid conversationId, Message assistant,
+        CancellationToken cancellationToken)
+    {
+        var clients = hub.Clients.Group(JarvisEventsHub.GroupName(conversationId));
+        await clients.SendAsync("message.completed", new
+        {
+            id = assistant.Id,
+            role = assistant.Role,
+            content = assistant.Content,
+            createdAt = assistant.CreatedAt
+        }, cancellationToken);
+        await clients.SendAsync("agent.completed", new { conversationId }, cancellationToken);
+    }
+
     public async Task<AgentRunOutcome> RunAsync(Guid ownerId, Guid conversationId,
         IAsyncEnumerable<AgentStreamEvent> events, string? memorySource, CancellationToken cancellationToken,
         Guid? taskId = null, Guid? memorySourceId = null,

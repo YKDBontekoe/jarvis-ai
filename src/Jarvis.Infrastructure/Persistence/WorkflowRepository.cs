@@ -14,7 +14,10 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
     public async Task<PushDeviceRecord> RegisterAsync(Guid ownerId, string token, string platform,
         CancellationToken cancellationToken)
     {
-        var device = await db.PushDevices.SingleOrDefaultAsync(x => x.Token == token, cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var device = await db.PushDevices.FromSqlInterpolated(
+                $"SELECT * FROM push_devices WHERE \"Token\" = {token} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
         if (device is null)
         {
             device = new PushDevice(ownerId, token, platform);
@@ -30,6 +33,7 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
             else device.Refresh(platform);
         }
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return new PushDeviceRecord(device.Id, device.Platform, device.UpdatedAt);
     }
 
@@ -107,38 +111,45 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
 
     public async Task MarkRunningAsync(Guid id, CancellationToken cancellationToken)
     {
-        var task = await db.Tasks.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var task = await GetLockedTaskAsync(id, cancellationToken);
         if (task is null || task.Status is "running" or "completed" or "failed" or "cancelled") return;
         task.MarkRunning();
         AddAuditEvent(task.OwnerId, "temporal", "task.started", "low", true, task.Id);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task MarkTaskScheduleFailedAsync(Guid id, CancellationToken cancellationToken)
     {
-        var task = await db.Tasks.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var task = await GetLockedTaskAsync(id, cancellationToken);
         if (task is null || task.Status is "completed" or "failed" or "cancelled") return;
         task.Fail("Task could not be scheduled.");
         AddAuditEvent(task.OwnerId, "temporal", "task.schedule_failed", "high", false, task.Id);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task MarkNeedsApprovalAsync(Guid id, CancellationToken cancellationToken)
     {
-        var task = await db.Tasks.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var task = await GetLockedTaskAsync(id, cancellationToken);
         if (task is null || task.Status is "needs_approval" or "completed" or "failed" or "cancelled") return;
         task.MarkNeedsApproval();
         AddAuditEvent(task.OwnerId, "temporal", "task.approval_required", "high", true, task.Id);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task CompleteAndNotifyAsync(Guid id, string summary, CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var task = await db.Tasks.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var task = await GetLockedTaskAsync(id, cancellationToken);
         if (task is null || task.Status is "completed" or "failed" or "cancelled") return;
         task.Complete(summary);
         AddAuditEvent(task.OwnerId, "temporal", "task.completed", "low", true, task.Id);
+        await CancelPendingApprovalsAsync(task.Id, task.OwnerId, cancellationToken);
         if (!await db.Notifications.AnyAsync(x => x.Id == task.Id, cancellationToken))
         {
             var notification = new Notification(task.Id, task.OwnerId, "task.completed",
@@ -153,7 +164,7 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
     public async Task FailAsync(Guid id, string summary, CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var task = await db.Tasks.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var task = await GetLockedTaskAsync(id, cancellationToken);
         if (task is null || task.Status is "completed" or "failed" or "cancelled") return;
         task.Fail(summary);
         AddAuditEvent(task.OwnerId, "temporal", "task.failed", "high", false, task.Id);
@@ -171,12 +182,15 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
 
     public async Task<bool> CancelTaskAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
     {
-        var task = await db.Tasks.SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId, cancellationToken);
-        if (task is null || task.Status is "completed" or "failed" or "cancelled") return false;
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var task = await GetLockedTaskAsync(id, cancellationToken);
+        if (task is null || task.OwnerId != ownerId || task.Status is "completed" or "failed" or "cancelled")
+            return false;
         task.Cancel();
         AddAuditEvent(ownerId, "tasks", "task.cancelled", "moderate", true, task.Id);
         await CancelPendingApprovalsAsync(task.Id, ownerId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return true;
     }
 
@@ -221,11 +235,13 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
 
     public async Task<ReminderRecord?> CancelAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
     {
-        var reminder = await db.Reminders.SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId, cancellationToken);
-        if (reminder is null || reminder.Status != "pending") return null;
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var reminder = await GetLockedReminderAsync(id, cancellationToken);
+        if (reminder is null || reminder.OwnerId != ownerId || reminder.Status != "pending") return null;
         reminder.Cancel();
         AddAuditEvent(ownerId, "reminders", "reminder.cancelled", "low", true, reminder.Id);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return reminder.ToRecord();
     }
 
@@ -241,9 +257,8 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
     public async Task CompleteAndNotifyAsync(ReminderWorkflowInput input, CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var reminder = await db.Reminders.SingleOrDefaultAsync(
-            x => x.Id == input.ReminderId && x.OwnerId == input.OwnerId, cancellationToken);
-        if (reminder is null || reminder.Status != "pending") return;
+        var reminder = await GetLockedReminderAsync(input.ReminderId, cancellationToken);
+        if (reminder is null || reminder.OwnerId != input.OwnerId || reminder.Status != "pending") return;
 
         if (!await db.Notifications.AnyAsync(x => x.Id == input.ReminderId, cancellationToken))
         {
@@ -273,6 +288,14 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         await db.SaveChangesAsync(cancellationToken);
         return true;
     }
+
+    private Task<JarvisTask?> GetLockedTaskAsync(Guid id, CancellationToken cancellationToken) =>
+        db.Tasks.FromSqlInterpolated($"SELECT * FROM tasks WHERE \"Id\" = {id} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
+
+    private Task<Reminder?> GetLockedReminderAsync(Guid id, CancellationToken cancellationToken) =>
+        db.Reminders.FromSqlInterpolated($"SELECT * FROM reminders WHERE \"Id\" = {id} FOR UPDATE")
+            .SingleOrDefaultAsync(cancellationToken);
 
     private void AddAuditEvent(Guid ownerId, string tool, string action, string riskClass,
         bool success, Guid resourceId) =>
