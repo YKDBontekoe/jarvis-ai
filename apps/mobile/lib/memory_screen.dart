@@ -334,6 +334,13 @@ class _MemoryScreenState extends State<MemoryScreen> {
                   borderRadius: BorderRadius.circular(JarvisRadii.md),
                   borderSide: const BorderSide(color: JarvisColors.outline),
                 ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(JarvisRadii.md),
+                  borderSide: const BorderSide(
+                    color: JarvisColors.accent,
+                    width: 1.5,
+                  ),
+                ),
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: IconButton(
                   tooltip: 'Clear search',
@@ -517,6 +524,21 @@ class _MemoryScreenState extends State<MemoryScreen> {
         child: ChoiceChip(
           label: Text(label),
           selected: _selectedKind == value,
+          selectedColor: JarvisColors.accentSoft,
+          side: BorderSide(
+            color: _selectedKind == value
+                ? JarvisColors.accent.withValues(alpha: .35)
+                : JarvisColors.outline,
+          ),
+          labelStyle: TextStyle(
+            fontSize: 13,
+            fontWeight: _selectedKind == value
+                ? FontWeight.w600
+                : FontWeight.w500,
+            color: _selectedKind == value
+                ? JarvisColors.accentDeep
+                : JarvisColors.inkSoft,
+          ),
           onSelected: (_) {
             setState(() => _selectedKind = value);
             _load(query: _query.text.trim());

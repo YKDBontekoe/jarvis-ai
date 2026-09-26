@@ -325,6 +325,7 @@ class _VoiceHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(JarvisRadii.xl),
         gradient: const LinearGradient(

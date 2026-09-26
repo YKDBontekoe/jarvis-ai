@@ -160,7 +160,8 @@ ThemeData buildJarvisTheme() {
     fontWeight: FontWeight.w600,
     letterSpacing: -.1,
   );
-  final fieldBorder = OutlineInputBorder(
+  // Underline borders keep floating labels inside the filled, rounded field.
+  final fieldBorder = UnderlineInputBorder(
     borderRadius: BorderRadius.circular(JarvisRadii.md),
     borderSide: BorderSide.none,
   );
@@ -173,6 +174,8 @@ ThemeData buildJarvisTheme() {
     textTheme: text,
     scaffoldBackgroundColor: JarvisColors.canvas,
     splashFactory: InkSparkle.splashFactory,
+    hoverColor: JarvisColors.accent.withValues(alpha: .04),
+    highlightColor: JarvisColors.accent.withValues(alpha: .06),
     visualDensity: VisualDensity.standard,
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {
@@ -327,20 +330,16 @@ ThemeData buildJarvisTheme() {
     ),
     chipTheme: ChipThemeData(
       backgroundColor: JarvisColors.surface,
-      selectedColor: JarvisColors.ink,
-      secondarySelectedColor: JarvisColors.ink,
-      checkmarkColor: Colors.white,
+      selectedColor: JarvisColors.accentSoft,
+      secondarySelectedColor: JarvisColors.accentSoft,
+      checkmarkColor: JarvisColors.accent,
       side: const BorderSide(color: JarvisColors.outline),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
-      labelStyle: WidgetStateTextStyle.resolveWith(
-        (states) => TextStyle(
-          fontFamily: _fontFamily,
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          color: states.contains(WidgetState.selected)
-              ? Colors.white
-              : JarvisColors.inkSoft,
-        ),
+      labelStyle: const TextStyle(
+        fontFamily: _fontFamily,
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: JarvisColors.inkSoft,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       showCheckmark: false,
@@ -443,7 +442,7 @@ ThemeData buildJarvisTheme() {
       focusedErrorBorder: fieldBorder.copyWith(
         borderSide: const BorderSide(color: JarvisColors.danger, width: 1.5),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
     ),
     textSelectionTheme: TextSelectionThemeData(
       cursorColor: JarvisColors.accent,

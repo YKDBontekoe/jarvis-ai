@@ -1164,6 +1164,7 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= _wideLayoutWidth;
         final scaffold = Scaffold(
+          extendBodyBehindAppBar: destination == 2,
           appBar: showIndependentScaffold ? null : _appBar(destination),
           body: AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
@@ -1250,6 +1251,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   PreferredSizeWidget _appBar(int destination) => AppBar(
     toolbarHeight: 64,
+    backgroundColor: destination == 2 ? Colors.transparent : null,
     title: destination == 0
         ? const Row(
             mainAxisSize: MainAxisSize.min,
@@ -1304,7 +1306,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const JarvisOrb(size: 96),
+                    const JarvisOrb(size: 96, semanticLabel: 'Jarvis'),
                     const SizedBox(height: 32),
                     Text(
                       'Sign in to Jarvis',
@@ -1606,7 +1608,6 @@ class _ChatScreenState extends State<ChatScreen> {
                         ],
                       ),
                     ),
-                    _ConnectionPill(connected: _connected),
                   ],
                 ),
               ),

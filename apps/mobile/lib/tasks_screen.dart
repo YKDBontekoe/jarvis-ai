@@ -271,7 +271,7 @@ class _TasksScreenState extends State<TasksScreen> {
         Icons.bolt_rounded,
       ),
       (
-        'Needs you',
+        'Review',
         count((status) => status == 'needs_approval'),
         JarvisColors.warning,
         Icons.shield_outlined,

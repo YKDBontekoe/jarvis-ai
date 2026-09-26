@@ -13,11 +13,15 @@ class JarvisOrb extends StatefulWidget {
     this.animate = false,
     this.listening = false,
     this.glow = true,
+    this.semanticLabel,
     super.key,
   });
 
   final double size;
   final bool animate;
+
+  /// Announced as an image when set; otherwise the orb is decorative.
+  final String? semanticLabel;
 
   /// Adds expanding halo rings; implies [animate].
   final bool listening;
@@ -62,9 +66,7 @@ class _JarvisOrbState extends State<JarvisOrb>
   Widget build(BuildContext context) {
     final size = widget.size;
     final extent = widget.listening ? size * 1.9 : size;
-    return Semantics(
-      label: 'Jarvis',
-      image: true,
+    final orb = ExcludeSemantics(
       child: SizedBox.square(
         dimension: extent,
         child: AnimatedBuilder(
@@ -89,6 +91,9 @@ class _JarvisOrbState extends State<JarvisOrb>
         ),
       ),
     );
+    final label = widget.semanticLabel;
+    if (label == null) return orb;
+    return Semantics(container: true, image: true, label: label, child: orb);
   }
 
   Widget _halo(double size, double progress) => IgnorePointer(
@@ -590,10 +595,12 @@ Future<bool> showJarvisConfirm(
     builder: (dialogContext) => AlertDialog(
       icon: icon == null
           ? null
-          : IconBadge(
-              icon: icon,
-              size: 48,
-              color: destructive ? JarvisColors.danger : JarvisColors.accent,
+          : Align(
+              child: IconBadge(
+                icon: icon,
+                size: 48,
+                color: destructive ? JarvisColors.danger : JarvisColors.accent,
+              ),
             ),
       title: Text(title),
       content: Text(message),

@@ -66,10 +66,12 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          icon: const IconBadge(
-            icon: Icons.shield_outlined,
-            color: JarvisColors.warning,
-            size: 48,
+          icon: const Align(
+            child: IconBadge(
+              icon: Icons.shield_outlined,
+              color: JarvisColors.warning,
+              size: 48,
+            ),
           ),
           title: Text(
             retrying ? 'Retry approved tool call?' : 'Approve tool call?',
