@@ -66,6 +66,7 @@ abstract final class PhosphorIconsRegular {
   static const microphone = IconData(0xe326, fontFamily: 'PhosphorRegular');
   static const minusCircle = IconData(0xe32c, fontFamily: 'PhosphorRegular');
   static const notePencil = IconData(0xe34c, fontFamily: 'PhosphorRegular');
+  static const notebook = IconData(0xe34e, fontFamily: 'PhosphorRegular');
   static const notepad = IconData(0xe63e, fontFamily: 'PhosphorRegular');
   static const pauseCircle = IconData(0xe3a0, fontFamily: 'PhosphorRegular');
   static const pencilSimple = IconData(0xe3b4, fontFamily: 'PhosphorRegular');
@@ -99,14 +100,17 @@ abstract final class PhosphorIconsRegular {
 }
 
 abstract final class PhosphorIconsFill {
-  static const brain = IconData(0xe74e, fontFamily: 'PhosphorFill');
   static const chatCircle = IconData(0xe168, fontFamily: 'PhosphorFill');
   static const checkCircle = IconData(0xe184, fontFamily: 'PhosphorFill');
-  static const gearSix = IconData(0xe272, fontFamily: 'PhosphorFill');
   static const pushPin = IconData(0xe3e2, fontFamily: 'PhosphorFill');
   static const shieldCheck = IconData(0xe40c, fontFamily: 'PhosphorFill');
 }
 
 abstract final class PhosphorIconsBold {
+  static const chatCircle = IconData(0xe168, fontFamily: 'PhosphorBold');
+  static const gearSix = IconData(0xe272, fontFamily: 'PhosphorBold');
+  static const listChecks = IconData(0xeadc, fontFamily: 'PhosphorBold');
+  static const microphone = IconData(0xe326, fontFamily: 'PhosphorBold');
+  static const notebook = IconData(0xe34e, fontFamily: 'PhosphorBold');
   static const waveform = IconData(0xe802, fontFamily: 'PhosphorBold');
 }

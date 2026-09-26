@@ -234,7 +234,12 @@ class _TasksScreenState extends State<TasksScreen> {
         : RefreshIndicator(
             onRefresh: _load,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                4,
+                16,
+                32 + MediaQuery.paddingOf(context).bottom,
+              ),
               children: [
                 ContentWidth(
                   child: Column(

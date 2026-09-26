@@ -97,6 +97,20 @@ void main() {
     expect(result, isTrue);
   });
 
+  testWidgets('navigation keeps voice as a separate labelled button', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(const JarvisApp());
+    await tester.pumpAndSettle();
+    for (final label in ['Chat', 'Tasks', 'Memory', 'Settings']) {
+      expect(find.text(label), findsOneWidget);
+    }
+    expect(find.text('Voice'), findsNothing);
+    expect(find.bySemanticsLabel('Voice'), findsOneWidget);
+    semantics.dispose();
+  });
+
   testWidgets('floating navigation switches to settings', (tester) async {
     await tester.pumpWidget(const JarvisApp());
     await tester.pumpAndSettle();

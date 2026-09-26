@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 
 import 'package:dio/dio.dart';
@@ -1152,11 +1153,11 @@ class _ChatScreenState extends State<ChatScreen> {
   static const _fadeThrough = Interval(.5, 1, curve: Curves.easeOutCubic);
 
   static const _destinations = [
-    (PhosphorIconsRegular.chatCircle, PhosphorIconsFill.chatCircle, 'Chat'),
-    (PhosphorIconsRegular.checkCircle, PhosphorIconsFill.checkCircle, 'Tasks'),
-    (PhosphorIconsRegular.waveform, PhosphorIconsBold.waveform, 'Voice'),
-    (PhosphorIconsRegular.brain, PhosphorIconsFill.brain, 'Memory'),
-    (PhosphorIconsRegular.gearSix, PhosphorIconsFill.gearSix, 'Settings'),
+    (PhosphorIconsRegular.chatCircle, PhosphorIconsBold.chatCircle, 'Chat'),
+    (PhosphorIconsRegular.listChecks, PhosphorIconsBold.listChecks, 'Tasks'),
+    (PhosphorIconsRegular.microphone, PhosphorIconsBold.microphone, 'Voice'),
+    (PhosphorIconsRegular.notebook, PhosphorIconsBold.notebook, 'Memory'),
+    (PhosphorIconsRegular.gearSix, PhosphorIconsBold.gearSix, 'Settings'),
   ];
 
   @override
@@ -1170,6 +1171,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final wide = constraints.maxWidth >= _wideLayoutWidth;
         final scaffold = Scaffold(
           extendBodyBehindAppBar: destination == 2,
+          extendBody: !wide,
           appBar: showIndependentScaffold ? null : _appBar(destination),
           body: AnimatedSwitcher(
             duration: const Duration(milliseconds: 260),
@@ -1178,7 +1180,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: KeyedSubtree(
               key: ValueKey(destination),
               child: switch (destination) {
-                0 => _chatBody(),
+                0 => _chatBody(wide: wide),
                 1 => TasksScreen(http: _http),
                 2 => _voiceBody(),
                 3 => MemoryScreen(http: _http),
@@ -1188,7 +1190,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           bottomNavigationBar: wide
               ? null
-              : _TabBar(
+              : _GlassNavBar(
                   selectedIndex: destination,
                   onSelected: _selectDestination,
                   voiceActive: _voiceActive,
@@ -1392,7 +1394,7 @@ class _ChatScreenState extends State<ChatScreen> {
     ),
   );
 
-  Widget _chatBody() => SafeArea(
+  Widget _chatBody({required bool wide}) => SafeArea(
     child: Column(
       children: [
         if (_error != null)
@@ -1440,11 +1442,11 @@ class _ChatScreenState extends State<ChatScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 788),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
+              padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
               child: ChatComposer(
                 controller: _input,
                 onSend: () => unawaited(_send()),
-                onVoice: _conversationId == null
+                onVoice: _conversationId == null || !wide
                     ? null
                     : () => unawaited(_toggleVoice()),
                 sending: _busy,
@@ -1824,8 +1826,11 @@ class _ConnectionDot extends StatelessWidget {
   }
 }
 
-class _TabBar extends StatelessWidget {
-  const _TabBar({
+/// Floating frosted capsule for the main sections, with a detached voice
+/// button; the voice destination starts a session rather than just
+/// switching screens, so it is kept visually separate.
+class _GlassNavBar extends StatefulWidget {
+  const _GlassNavBar({
     required this.selectedIndex,
     required this.onSelected,
     required this.voiceActive,
@@ -1839,40 +1844,231 @@ class _TabBar extends StatelessWidget {
   final bool voiceStarting;
   final List<(IconData, IconData, String)> destinations;
 
+  static const voiceIndex = 2;
+
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: const BoxDecoration(
-      color: JarvisColors.surface,
-      border: Border(top: BorderSide(color: JarvisColors.outline)),
-    ),
-    child: SafeArea(
+  State<_GlassNavBar> createState() => _GlassNavBarState();
+}
+
+class _GlassNavBarState extends State<_GlassNavBar> {
+  static const _height = 62.0;
+  static const _inset = 5.0;
+
+  List<int> get _tabs => [
+    for (var i = 0; i < widget.destinations.length; i++)
+      if (i != _GlassNavBar.voiceIndex) i,
+  ];
+
+  late int _indicatorSlot = _slotFor(widget.selectedIndex) ?? 0;
+
+  int? _slotFor(int destination) {
+    final slot = _tabs.indexOf(destination);
+    return slot < 0 ? null : slot;
+  }
+
+  @override
+  void didUpdateWidget(_GlassNavBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _indicatorSlot = _slotFor(widget.selectedIndex) ?? _indicatorSlot;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tabs = _tabs;
+    final onVoice = widget.selectedIndex == _GlassNavBar.voiceIndex;
+    final (voiceIcon, _, voiceLabel) =
+        widget.destinations[_GlassNavBar.voiceIndex];
+    return SafeArea(
       top: false,
-      child: SizedBox(
-        height: 58,
-        child: Row(
-          children: [
-            for (final (index, (icon, selectedIcon, label))
-                in destinations.indexed)
-              Expanded(
-                child: _TabItem(
-                  icon: selectedIndex == index ? selectedIcon : icon,
-                  label: label,
-                  selected: selectedIndex == index,
-                  live: index == 2 && (voiceActive || voiceStarting),
-                  onTap: () => onSelected(index),
+      minimum: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+        child: Center(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _Glass(
+                    height: _height,
+                    child: LayoutBuilder(
+                      builder: (context, box) {
+                        final slot = (box.maxWidth - _inset * 2) / tabs.length;
+                        return Stack(
+                          children: [
+                            AnimatedPositioned(
+                              duration: const Duration(milliseconds: 340),
+                              curve: Curves.easeOutCubic,
+                              left: _inset + slot * _indicatorSlot,
+                              top: _inset,
+                              bottom: _inset,
+                              width: slot,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 200),
+                                opacity: onVoice ? 0 : 1,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: JarvisColors.ink.withValues(
+                                      alpha: .06,
+                                    ),
+                                    borderRadius: BorderRadius.circular(
+                                      _height / 2 - _inset,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(_inset),
+                              child: Row(
+                                children: [
+                                  for (final index in tabs)
+                                    Expanded(
+                                      child: _GlassTab(
+                                        destination: widget.destinations[index],
+                                        selected: widget.selectedIndex == index,
+                                        onTap: () => widget.onSelected(index),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
                 ),
+                const SizedBox(width: 10),
+                _VoiceButton(
+                  icon: voiceIcon,
+                  label: voiceLabel,
+                  size: _height,
+                  selected: onVoice,
+                  live: widget.voiceActive || widget.voiceStarting,
+                  onTap: () => widget.onSelected(_GlassNavBar.voiceIndex),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Translucent blurred surface shared by the navigation capsule and button.
+class _Glass extends StatelessWidget {
+  const _Glass({
+    required this.height,
+    required this.child,
+    this.width,
+    super.key,
+  });
+
+  final double height;
+  final double? width;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(height / 2);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0f111113),
+            blurRadius: 3,
+            offset: Offset(0, 1),
+          ),
+          BoxShadow(
+            color: Color(0x14111113),
+            blurRadius: 28,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            height: height,
+            width: width,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .78),
+              borderRadius: radius,
+              border: Border.all(
+                color: JarvisColors.ink.withValues(alpha: .07),
               ),
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassTab extends StatelessWidget {
+  const _GlassTab({
+    required this.destination,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final (IconData, IconData, String) destination;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, selectedIcon, label) = destination;
+    final color = selected ? JarvisColors.ink : JarvisColors.muted;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(selected ? selectedIcon : icon, size: 21, color: color),
+            const SizedBox(height: 2),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 10.5,
+                height: 1.2,
+                letterSpacing: -.05,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                color: color,
+              ),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.fade,
+                softWrap: false,
+              ),
+            ),
           ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
-class _TabItem extends StatelessWidget {
-  const _TabItem({
+class _VoiceButton extends StatelessWidget {
+  const _VoiceButton({
     required this.icon,
     required this.label,
+    required this.size,
     required this.selected,
     required this.live,
     required this.onTap,
@@ -1880,73 +2076,73 @@ class _TabItem extends StatelessWidget {
 
   final IconData icon;
   final String label;
+  final double size;
   final bool selected;
-
-  /// Marks the voice tab while a session is connecting or running.
   final bool live;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? JarvisColors.ink : JarvisColors.muted;
+    final filled = selected || live;
     return Semantics(
       button: true,
       selected: selected,
       label: label,
       excludeSemantics: true,
-      child: InkResponse(
-        onTap: onTap,
-        radius: 32,
-        highlightShape: BoxShape.rectangle,
-        containedInkWell: true,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 150),
-                  child: Icon(
-                    icon,
-                    key: ValueKey(icon),
-                    size: 23,
-                    color: color,
-                  ),
-                ),
-                if (live)
-                  Positioned(
-                    right: -3,
-                    top: -1,
-                    child: Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: JarvisColors.danger,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: JarvisColors.surface,
-                          width: 1.5,
+      child: Tooltip(
+        message: live ? 'Voice session' : 'Talk to Jarvis',
+        child: GestureDetector(
+          onTap: onTap,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                child: filled
+                    ? Container(
+                        key: const ValueKey('filled'),
+                        width: size,
+                        height: size,
+                        decoration: const BoxDecoration(
+                          color: JarvisColors.ink,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0x33111113),
+                              blurRadius: 20,
+                              offset: Offset(0, 8),
+                            ),
+                          ],
                         ),
+                        child: Icon(
+                          live ? PhosphorIconsBold.waveform : icon,
+                          size: 22,
+                          color: Colors.white,
+                        ),
+                      )
+                    : _Glass(
+                        key: const ValueKey('glass'),
+                        height: size,
+                        width: size,
+                        child: Icon(icon, size: 22, color: JarvisColors.ink),
                       ),
+              ),
+              if (live)
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: JarvisColors.danger,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.fade,
-              softWrap: false,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                letterSpacing: -.05,
-                color: color,
-              ),
-            ),
-          ],
+                ),
+            ],
+          ),
         ),
       ),
     );

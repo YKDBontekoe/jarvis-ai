@@ -404,7 +404,12 @@ class _MemoryScreenState extends State<MemoryScreen> {
                       : 'No memories yet. Add one to get started.',
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    10,
+                    16,
+                    32 + MediaQuery.paddingOf(context).bottom,
+                  ),
                   itemCount: _memories.length,
                   itemBuilder: (context, index) =>
                       ContentWidth(child: _memoryCard(_memories[index])),

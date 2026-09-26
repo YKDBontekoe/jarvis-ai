@@ -716,31 +716,32 @@ class _ChatComposerState extends State<ChatComposer> {
               ),
             ),
           ),
-          IconButton(
-            tooltip: widget.voiceActive ? 'Stop voice' : 'Talk to Jarvis',
-            onPressed: widget.voiceStarting || widget.sending
-                ? null
-                : widget.onVoice,
-            icon: widget.voiceStarting
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Icon(
-                    widget.voiceActive
-                        ? PhosphorIconsRegular.stop
-                        : PhosphorIconsRegular.microphone,
-                  ),
-            style: IconButton.styleFrom(
-              minimumSize: const Size(40, 40),
-              foregroundColor: widget.voiceActive
-                  ? JarvisColors.danger
-                  : JarvisColors.inkSoft,
-              backgroundColor: widget.voiceActive
-                  ? JarvisColors.dangerSoft
-                  : Colors.transparent,
+          if (widget.onVoice != null || widget.voiceActive)
+            IconButton(
+              tooltip: widget.voiceActive ? 'Stop voice' : 'Talk to Jarvis',
+              onPressed: widget.voiceStarting || widget.sending
+                  ? null
+                  : widget.onVoice,
+              icon: widget.voiceStarting
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      widget.voiceActive
+                          ? PhosphorIconsRegular.stop
+                          : PhosphorIconsRegular.microphone,
+                    ),
+              style: IconButton.styleFrom(
+                minimumSize: const Size(40, 40),
+                foregroundColor: widget.voiceActive
+                    ? JarvisColors.danger
+                    : JarvisColors.inkSoft,
+                backgroundColor: widget.voiceActive
+                    ? JarvisColors.dangerSoft
+                    : Colors.transparent,
+              ),
             ),
-          ),
           const SizedBox(width: 4),
           AnimatedScale(
             duration: const Duration(milliseconds: 160),
