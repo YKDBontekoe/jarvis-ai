@@ -91,6 +91,18 @@ function plan(prompt) {
       '\n\nYou can see or cancel it any time under *Settings → Reminders*.');
   }
 
+  if (/\bcancel\b.*\breminder\b/.test(lower) && has('CancelReminder')) {
+    if (results.length === 0) return call('ListReminders', { includeFinished: false });
+    if (results.length === 1) {
+      const words = lower.match(/[a-z]{4,}/g)?.filter(word => !['cancel', 'reminder', 'about', 'please'].includes(word)) ?? [];
+      const match = [...results[0].matchAll(/reminder ID ([0-9a-f-]{36}) due \S+: (.+)/g)]
+        .find(item => words.some(word => item[2].toLowerCase().includes(word.slice(0, 5))));
+      return match ? call('CancelReminder', { reminderId: match[1] }) :
+        text("I couldn't find a reminder matching that.");
+    }
+    return text(`Done — I cancelled that reminder.`);
+  }
+
   if (/\b(what|which).*(reminders|scheduled)\b|\blist .*reminders\b/.test(lower) && has('ListReminders')) {
     if (results.length === 0) return call('ListReminders', { includeFinished: false });
     const items = [...last.matchAll(/due (\S+): (.+?)(?:\n|$)/g)].map(match => ({ due: match[1], title: match[2] }));
@@ -110,7 +122,7 @@ function plan(prompt) {
   }
 
   if (/\bforget\b/.test(lower) && has('ForgetMemory')) {
-    if (results.length === 0) return call('SearchMemory', { query: request.replace(/.*forget( that| about)?\s*/i, '') });
+    if (results.length === 0) return call('SearchMemory', { query: keywords(request.replace(/.*forget/i, '')) });
     const id = results[0].match(/memory ID ([0-9a-f-]{36})/i)?.[1];
     if (results.length === 1) return id ? call('ForgetMemory', { memoryId: id }) :
       text("I couldn't find a saved memory matching that.");
@@ -165,6 +177,14 @@ function parseConversation(prompt) {
     .flatMap(message => message.content.split('\n').filter(line => line.startsWith('Jarvis tool result:')))
     .map(line => decodeResult(line.slice('Jarvis tool result:'.length).trim()));
   return { request, results, executingTask: prompt.includes('already scheduled background task') };
+}
+
+const STOP_WORDS = new Set(['the', 'that', 'about', 'which', 'what', 'where', 'who', 'you', 'your', 'and',
+  'for', 'with', 'please', 'my', 'me', 'go', 'to', 'is', 'are', 'was', 'do', 'does', 'did', 'it', 'of', 'in']);
+
+function keywords(value) {
+  const words = value.toLowerCase().match(/[a-z0-9-]+/g)?.filter(word => word.length > 1 && !STOP_WORDS.has(word)) ?? [];
+  return words.join(' ') || value.trim();
 }
 
 function decodeResult(value) {

@@ -4,7 +4,8 @@ Jarvis is a self-hosted personal assistant built as a modular .NET monolith with
 
 ## Current implementation
 
-- Flutter chat shell
+- Flutter chat shell with Markdown replies (tables, code blocks, links) and copy, a typing indicator, live tool-activity chips per reply, inline approve/decline cards for approval-gated tool calls, retry for messages that failed to send, a new-chat action, suggested prompts, Enter-to-send, and a navigation rail on wide screens
+- Agent tools for reminders (create, list, cancel), background tasks (create, list, cancel), condition watches (create, list, stop), memory (search, remember, and approval-gated forget), files (search, list), MCP server management, and an IANA time-zone clock; each turn also receives the current time in the owner's configured briefing time zone
 - Personal home screen with a time-based greeting, voice action, active task previews, and a shortcut to continue the current conversation; task details open from the preview, and the list refreshes on resume, task notifications, or pull to refresh
 - Approval review is available from Tasks and contextually from a task waiting for approval; task-specific review shows only that task's conversation approvals
 - Persistent primary navigation for Chat, Tasks, Voice, Memory, and Settings; reminders, approvals, files, watches, briefings, integrations, and audit log are grouped under Settings
@@ -81,6 +82,21 @@ dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
 ```
 
 The model-agnostic behavioral evaluation cases live in [`evals/jarvis-core-v1.jsonl`](evals/jarvis-core-v1.jsonl), with isolated-run requirements documented in [`evals/README.md`](evals/README.md). Run them against a disposable Jarvis deployment through the normal API; inference still goes through the Codex CLI app-server.
+
+Flutter widget tests run with `flutter test` from `apps/mobile`.
+
+To exercise the whole flow locally without a ChatGPT OAuth session, point the API and worker at the deterministic Codex app-server fixture in [`tests/e2e/fake_codex_app_server.mjs`](tests/e2e/fake_codex_app_server.mjs). It speaks the same app-server JSON-RPC subset, streams its output, and plans scripted multi-step tool calls (reminders, memory, approvals, clock, and background tasks). With PostgreSQL and a Temporal dev server running:
+
+```sh
+export ASPNETCORE_ENVIRONMENT=Development DOTNET_ENVIRONMENT=Development
+export ConnectionStrings__jarvis="Host=localhost;Database=jarvis;Username=jarvis;Password=jarvis"
+export Codex__ExecutablePath="$PWD/tests/e2e/fake_codex_app_server.mjs" Codex__EnableWebSearch=false
+dotnet run --project src/Jarvis.Api --no-launch-profile -- --urls http://localhost:5082 &
+dotnet run --project workers/Jarvis.Worker --no-launch-profile &
+(cd tests/e2e && npm ci && node local_fixture_flow.mjs)
+```
+
+`local_fixture_flow.mjs` checks streaming, tool events, approvals (approve and decline), memory, reminders, and a Temporal background task through the public HTTP and SignalR API. For the web app, run `flutter build web --profile` and serve `build/web` on `http://localhost:5137`, which is an allowed development CORS origin; release web builds require OIDC.
 
 PostgreSQL integration tests use Testcontainers and the same pgvector PostgreSQL image as the app. Run them on a machine with Docker available:
 
