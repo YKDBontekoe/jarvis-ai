@@ -92,7 +92,7 @@ public sealed class NotificationPushWorker(
                 .SingleOrDefaultAsync(x => x.Id == candidate.NotificationId, cancellationToken);
             var device = await db.PushDevices.AsNoTracking()
                 .SingleOrDefaultAsync(x => x.Id == candidate.DeviceId, cancellationToken);
-            if (notification is null || device is null)
+            if (notification is null || device is null || device.OwnerId != notification.OwnerId)
             {
                 await db.PushDeliveries.Where(x => x.NotificationId == candidate.NotificationId &&
                                                    x.DeviceId == candidate.DeviceId)

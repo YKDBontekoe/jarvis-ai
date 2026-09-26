@@ -191,6 +191,7 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
 public sealed class JarvisTaskService(
     IJarvisTaskRepository tasks,
     TemporalReminderScheduler scheduler,
+    ITaskRunAbort taskRunAbort,
     ILogger<JarvisTaskService> logger) : IJarvisTaskService
 {
     public async Task<JarvisTaskRecord> CreateAsync(Guid ownerId, string title, string prompt, CancellationToken cancellationToken)
@@ -225,6 +226,7 @@ public sealed class JarvisTaskService(
         var task = await tasks.GetTaskAsync(id, ownerId, cancellationToken);
         if (task is null || task.Status is "completed" or "failed" or "cancelled") return false;
         if (!await tasks.CancelTaskAsync(id, ownerId, cancellationToken)) return false;
+        taskRunAbort.Abort(id);
         try
         {
             await scheduler.CancelTaskAsync(task.WorkflowId, cancellationToken);

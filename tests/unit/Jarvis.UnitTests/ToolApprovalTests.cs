@@ -19,4 +19,24 @@ public sealed class ToolApprovalTests
         decided.Cancel();
         Assert.Equal("approved", decided.Status);
     }
+
+    [Fact]
+    public void AbortResume_stops_in_flight_decided_approvals()
+    {
+        var approval = new ToolApproval(Guid.CreateVersion7(), Guid.CreateVersion7(), "req", "call",
+            "CreateReminder", "{}");
+        approval.Decide(true);
+        approval.AbortResume();
+        Assert.Equal("approved", approval.Status);
+        Assert.Equal("cancelled", approval.ResumeStatus);
+
+        approval.AbortResume();
+        Assert.Equal("cancelled", approval.ResumeStatus);
+
+        var pending = new ToolApproval(Guid.CreateVersion7(), Guid.CreateVersion7(), "req-3", "call-3",
+            "CreateReminder", "{}");
+        pending.AbortResume();
+        Assert.Equal("pending", pending.Status);
+        Assert.Equal("not_started", pending.ResumeStatus);
+    }
 }

@@ -28,6 +28,7 @@ builder.Services.AddScoped<WorkerCurrentUser>();
 builder.Services.AddScoped<ICurrentUser>(services => services.GetRequiredService<WorkerCurrentUser>());
 builder.Services.AddScoped<IJarvisTaskRepository, WorkflowRepository>();
 builder.Services.AddScoped<IJarvisTaskService, JarvisTaskService>();
+builder.Services.AddSingleton<ITaskRunAbort, TaskRunAbort>();
 builder.Services.AddSingleton<TemporalReminderScheduler>();
 builder.Services.AddSingleton<IFileProcessingScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
 builder.Services.AddSingleton<IConditionWatchScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
@@ -154,11 +155,16 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
 
         services.GetRequiredService<WorkerCurrentUser>().SetOwner(task.OwnerId);
         await tasks.MarkRunningAsync(task.Id, cancellationToken);
+        task = await tasks.GetTaskByIdAsync(input.TaskId, cancellationToken);
+        if (task is null || task.Status is "completed" or "failed" or "cancelled") return false;
+        if (task.Status == "needs_approval") return true;
+
         var approvals = services.GetRequiredService<IToolApprovalStore>();
         if (await approvals.HasPendingForTaskAsync(task.Id, task.OwnerId, cancellationToken))
         {
             await tasks.MarkNeedsApprovalAsync(task.Id, cancellationToken);
-            return true;
+            task = await tasks.GetTaskByIdAsync(input.TaskId, cancellationToken);
+            return task is { Status: "needs_approval" };
         }
 
         var conversations = services.GetRequiredService<IConversationStore>();
@@ -200,12 +206,18 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
 
         if (approvalRequests.Count != 0)
         {
+            task = await tasks.GetTaskByIdAsync(input.TaskId, cancellationToken);
+            if (task is null || task.Status is "completed" or "failed" or "cancelled") return false;
             foreach (var request in approvalRequests)
                 await approvals.CreateAsync(task.OwnerId, task.ConversationId, request.RequestId,
                     request.ToolCallId, request.ToolName, request.ArgumentsJson, task.Id, cancellationToken);
             await tasks.MarkNeedsApprovalAsync(task.Id, cancellationToken);
-            return true;
+            task = await tasks.GetTaskByIdAsync(input.TaskId, cancellationToken);
+            return task is { Status: "needs_approval" };
         }
+
+        task = await tasks.GetTaskByIdAsync(input.TaskId, cancellationToken);
+        if (task is null || task.Status is "completed" or "failed" or "cancelled") return false;
 
         var result = answer.ToString();
         assistantMessage = new Message(task.ConversationId, "assistant", result, task.ResultMessageId);

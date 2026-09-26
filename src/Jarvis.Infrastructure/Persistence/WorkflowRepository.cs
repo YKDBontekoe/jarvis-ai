@@ -196,11 +196,17 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
 
     private async Task CancelPendingApprovalsAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken)
     {
-        var pending = await db.ToolApprovals.Where(x =>
-                x.TaskId == taskId && x.OwnerId == ownerId && x.Status == "pending")
+        var approvals = await db.ToolApprovals.Where(x =>
+                x.TaskId == taskId && x.OwnerId == ownerId &&
+                (x.Status == "pending" ||
+                 ((x.Status == "approved" || x.Status == "rejected") &&
+                  x.ResumeStatus != "completed" && x.ResumeStatus != "cancelled")))
             .ToListAsync(cancellationToken);
-        foreach (var approval in pending)
+        foreach (var approval in approvals)
+        {
             approval.Cancel();
+            approval.AbortResume();
+        }
     }
 
     public async Task<ReminderRecord> CreateAsync(Guid ownerId, string title, DateTimeOffset dueAt, CancellationToken cancellationToken)

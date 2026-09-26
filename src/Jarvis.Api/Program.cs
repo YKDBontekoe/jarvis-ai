@@ -88,6 +88,7 @@ builder.Services.AddScoped<IConditionWatchService, ConditionWatchService>();
 builder.Services.AddScoped<IDailyBriefingService, DailyBriefingService>();
 builder.Services.AddScoped<IJarvisTaskRepository, WorkflowRepository>();
 builder.Services.AddScoped<IJarvisTaskService, JarvisTaskService>();
+builder.Services.AddSingleton<ITaskRunAbort, TaskRunAbort>();
 builder.Services.AddJarvisAgent(builder.Configuration);
 builder.Services.AddScoped<McpToolHost>();
 builder.Services.AddScoped<AgentRunCoordinator>();
@@ -95,6 +96,7 @@ builder.Services.AddSingleton<VoiceConversationCoordinator>();
 builder.Services.AddHttpClient<LiveKitAgentDispatchClient>();
 builder.Services.AddHttpClient("firebase-messaging", client => client.Timeout = TimeSpan.FromSeconds(15));
 builder.Services.AddHostedService<NotificationPushWorker>();
+builder.Services.AddHostedService<NotificationRealtimeWorker>();
 builder.Services.AddSignalR();
 builder.Services.AddOpenApi();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
@@ -238,6 +240,7 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     IConversationRunLock runLock,
     IJarvisTaskService tasks,
     IJarvisTaskRepository taskRepository,
+    ITaskRunAbort taskRunAbort,
     CancellationToken ct) =>
 {
     var ownerId = currentUser.OwnerId;
@@ -271,25 +274,31 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     if (!await approvals.TryStartResumeAsync(approvalId, ownerId, ct))
         return Results.Conflict(new { message = "This approval is already being resumed." });
 
+    using var abort = CancellationTokenSource.CreateLinkedTokenSource(ct);
+    using var abortLease = decided.TaskId is { } resumeTaskId
+        ? taskRunAbort.Register(resumeTaskId, abort)
+        : null;
+    var runCt = abort.Token;
+
     try
     {
         if (pending.Status != "pending")
         {
-            var messages = await conversations.GetMessagesAsync(decided.ConversationId, ct);
+            var messages = await conversations.GetMessagesAsync(decided.ConversationId, runCt);
             var last = messages.Count > 0 ? messages[^1] : null;
             if (last is { Role: "assistant" })
             {
                 if (decided.Approved == true)
-                    await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId, last.Content, ct);
+                    await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId, last.Content, runCt);
                 else
-                    await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId, last.Content, ct);
+                    await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId, last.Content, runCt);
                 await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
                 return Results.Ok(ToDto(last));
             }
         }
 
         var outcome = await coordinator.RunAsync(ownerId, decided.ConversationId,
-            agent.ResumeReplyAsync(decided.ConversationId, decided.ToReply(), ct), null, ct, decided.TaskId);
+            agent.ResumeReplyAsync(decided.ConversationId, decided.ToReply(), runCt), null, runCt, decided.TaskId);
         if (outcome.PendingApprovals.Count != 0)
         {
             await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
@@ -298,20 +307,21 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
         if (decided.Approved == true)
         {
             await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId,
-                outcome.AssistantMessage?.Content ?? "The approved task step finished.", ct);
+                outcome.AssistantMessage?.Content ?? "The approved task step finished.", runCt);
         }
         else
         {
             await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId,
-                outcome.AssistantMessage?.Content ?? "The tool call was declined.", ct);
+                outcome.AssistantMessage?.Content ?? "The tool call was declined.", runCt);
         }
         await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
         return Results.Ok(ToDto(outcome.AssistantMessage!));
     }
-    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+    catch (OperationCanceledException)
     {
         await approvals.MarkResumeFailedAsync(approvalId, ownerId, CancellationToken.None);
-        throw;
+        if (ct.IsCancellationRequested) throw;
+        return Results.Conflict(new { message = "This task was cancelled." });
     }
     catch (Exception exception)
     {
