@@ -21,8 +21,6 @@ concurrency:
 jobs:
   release-ipa:
     runs-on: macos-latest
-    env:
-      BUNDLE_ID: com.example.jarvis_mobile
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,41 +53,6 @@ jobs:
             --version "${VERSION}" \
             --build "${BUILD}"
 
-      - name: Import signing certificate
-        uses: apple-actions/import-codesign-certs@v3
-        with:
-          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
-          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-
-      - name: Install provisioning profile
-        id: profile
-        env:
-          APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${APPLE_PROVISIONING_PROFILE_BASE64}" ]]; then
-            echo "APPLE_PROVISIONING_PROFILE_BASE64 is required." >&2
-            exit 1
-          fi
-          PROFILE_PATH="${RUNNER_TEMP}/profile.mobileprovision"
-          PROFILE_PLIST="${RUNNER_TEMP}/profile.plist"
-          export PROFILE_PATH
-          python3 -c "import base64,os,pathlib; pathlib.Path(os.environ['PROFILE_PATH']).write_bytes(base64.b64decode(os.environ['APPLE_PROVISIONING_PROFILE_BASE64']))"
-          security cms -D -i "${PROFILE_PATH}" > "${PROFILE_PLIST}"
-          PROFILE_UUID="$(/usr/libexec/PlistBuddy -c 'Print UUID' "${PROFILE_PLIST}")"
-          PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print Name' "${PROFILE_PLIST}")"
-          PROFILE_TEAM="$(/usr/libexec/PlistBuddy -c 'Print TeamIdentifier:0' "${PROFILE_PLIST}")"
-          TEAM_ID="${APPLE_TEAM_ID:-${PROFILE_TEAM}}"
-          mkdir -p "${HOME}/Library/MobileDevice/Provisioning Profiles"
-          cp "${PROFILE_PATH}" "${HOME}/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
-          /usr/libexec/PlistBuddy -c "Set :provisioningProfiles:${BUNDLE_ID} ${PROFILE_NAME}" apps/mobile/ios/ExportOptions.plist
-          /usr/libexec/PlistBuddy -c "Set :teamID ${TEAM_ID}" apps/mobile/ios/ExportOptions.plist
-          {
-            echo "name=${PROFILE_NAME}"
-            echo "team=${TEAM_ID}"
-          } >> "${GITHUB_OUTPUT}"
-
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -100,7 +63,7 @@ jobs:
         working-directory: apps/mobile
         run: flutter pub get
 
-      - name: Build signed IPA
+      - name: Build unsigned iOS app
         working-directory: apps/mobile
         env:
           JARVIS_API_URL: ${{ secrets.JARVIS_API_URL }}
@@ -112,8 +75,6 @@ jobs:
           JARVIS_FIREBASE_IOS_APP_ID: ${{ secrets.JARVIS_FIREBASE_IOS_APP_ID }}
           JARVIS_FIREBASE_IOS_BUNDLE_ID: ${{ secrets.JARVIS_FIREBASE_IOS_BUNDLE_ID }}
           JARVIS_FIREBASE_STORAGE_BUCKET: ${{ secrets.JARVIS_FIREBASE_STORAGE_BUCKET }}
-          PROFILE_NAME: ${{ steps.profile.outputs.name }}
-          TEAM_ID: ${{ steps.profile.outputs.team }}
           VERSION: ${{ steps.version.outputs.version }}
           BUILD: ${{ steps.version.outputs.build }}
         run: |
@@ -135,88 +96,30 @@ jobs:
           add_define JARVIS_FIREBASE_IOS_APP_ID "${JARVIS_FIREBASE_IOS_APP_ID}"
           add_define JARVIS_FIREBASE_IOS_BUNDLE_ID "${JARVIS_FIREBASE_IOS_BUNDLE_ID}"
           add_define JARVIS_FIREBASE_STORAGE_BUCKET "${JARVIS_FIREBASE_STORAGE_BUCKET}"
-          flutter build ipa --release \
+          flutter build ios --release --no-codesign \
             --build-name="${VERSION}" \
             --build-number="${BUILD}" \
-            --export-options-plist=ios/ExportOptions.plist \
-            ${DEFINES[@]+"${DEFINES[@]}"} \
-            -- \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM="${TEAM_ID}" \
-            PROVISIONING_PROFILE_SPECIFIER="${PROFILE_NAME}"
+            ${DEFINES[@]+"${DEFINES[@]}"}
 
-      - name: Stage IPA
-        id: ipa
+      - name: Package unsigned IPA
         run: |
           set -euo pipefail
-          IPA_PATH="$(find apps/mobile/build/ios/ipa -name '*.ipa' -type f | head -n 1)"
-          if [[ -z "${IPA_PATH}" ]]; then
-            echo "No IPA was produced." >&2
+          APP_PATH="apps/mobile/build/ios/iphoneos/Runner.app"
+          if [[ ! -d "${APP_PATH}" ]]; then
+            echo "Unsigned Runner.app was not produced at ${APP_PATH}" >&2
             exit 1
           fi
-          mkdir -p dist/altstore
-          cp "${IPA_PATH}" dist/Jarvis.ipa
-          echo "path=dist/Jarvis.ipa" >> "${GITHUB_OUTPUT}"
-
-      - name: Fetch previous AltStore source
-        env:
-          OWNER: ${{ github.repository_owner }}
-          REPO: ${{ github.event.repository.name }}
-        run: |
-          set -euo pipefail
-          OWNER_LOWER="$(echo "${OWNER}" | tr '[:upper:]' '[:lower:]')"
-          PAGES_URL="https://${OWNER_LOWER}.github.io/${REPO}/source.json"
-          if curl -fsSL "${PAGES_URL}" -o dist/altstore/previous-source.json; then
-            echo "Loaded previous source from ${PAGES_URL}"
-          else
-            rm -f dist/altstore/previous-source.json
-            echo "No previous source.json at ${PAGES_URL}"
-          fi
-
-      - name: Generate AltStore source.json
-        env:
-          OWNER: ${{ github.repository_owner }}
-          REPO: ${{ github.event.repository.name }}
-          VERSION: ${{ steps.version.outputs.version }}
-          BUILD: ${{ steps.version.outputs.build }}
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          set -euo pipefail
-          OWNER_LOWER="$(echo "${OWNER}" | tr '[:upper:]' '[:lower:]')"
-          DOWNLOAD_URL="https://github.com/${OWNER}/${REPO}/releases/download/${TAG}/Jarvis.ipa"
-          ICON_URL="https://${OWNER_LOWER}.github.io/${REPO}/icon.png"
-          WEBSITE="https://github.com/${OWNER}/${REPO}"
-          PREVIOUS_ARGS=()
-          if [[ -f dist/altstore/previous-source.json ]]; then
-            PREVIOUS_ARGS+=(--previous-source dist/altstore/previous-source.json)
-          fi
-          python3 scripts/altstore/generate_source.py \
-            --ipa dist/Jarvis.ipa \
-            --download-url "${DOWNLOAD_URL}" \
-            --icon-url "${ICON_URL}" \
-            --website "${WEBSITE}" \
-            --version "${VERSION}" \
-            --build-version "${BUILD}" \
-            --changelog "Jarvis ${VERSION}" \
-            --output dist/altstore/source.json \
-            "${PREVIOUS_ARGS[@]}"
-          rm -f dist/altstore/previous-source.json
-          cp altstore/icon.png dist/altstore/icon.png
+          mkdir -p dist
+          chmod +x scripts/ios/package_unsigned_ipa.sh
+          scripts/ios/package_unsigned_ipa.sh "${APP_PATH}" dist/Jarvis.ipa
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Jarvis ${{ steps.version.outputs.version }}
+          body: |
+            Unsigned `Jarvis.ipa` for [LiveContainer](https://github.com/LiveContainer/LiveContainer) (or similar loaders).
+            Download the IPA from this release and import it in LiveContainer on your device.
           generate_release_notes: true
-          files: |
-            dist/Jarvis.ipa
-            dist/altstore/source.json
-
-      - name: Publish AltStore source to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: dist/altstore
-          keep_files: false
-          commit_message: Update AltStore source for ${{ steps.version.outputs.tag }}
+          files: dist/Jarvis.ipa

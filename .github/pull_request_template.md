@@ -45,7 +45,7 @@ Jarvis uses [Semantic Versioning 2.0.0](https://semver.org/) for **release tags*
 - [ ] Not applicable
 - [ ] UI / UX
 - [ ] OIDC, push, or LiveKit
-- [ ] Build or signing / AltStore source
+- [ ] iOS build / unsigned IPA / LiveContainer
 
 ## Related issues
 
@@ -67,7 +67,7 @@ python3 -m unittest discover -s tests/unit -p 'test_*.py'
 - [ ] `README.md` or ops docs updated if setup, secrets, or release steps changed
 - [ ] No secrets, tokens, or production `.env` files committed
 - [ ] Production Compose / GHCR image names unchanged unless intentional
-- [ ] AltStore `source.json` / IPA pipeline considered if iOS signing or version fields changed
+- [ ] iOS release workflow / `Jarvis.ipa` packaging considered if mobile or version fields changed
 
 ## Deployment / release notes
 

@@ -197,23 +197,19 @@ Releases use [Semantic Versioning 2.0.0](https://semver.org/): git tags must be 
 
 Before tagging, align `apps/mobile/pubspec.yaml` with the marketing version (`version: X.Y.Z+N`). The iOS workflow rewrites the pubspec to `X.Y.Z` plus a monotonic iOS build number derived from the SemVer and run id. Validate a version locally with `python3 scripts/release/semver.py --validate 1.2.3` or compute the next tag with `python3 scripts/release/semver.py --bump patch --from-version 1.2.0`.
 
-### iOS IPA and AltStore source
+### iOS IPA (unsigned, LiveContainer)
 
-[`.github/workflows/release-ios.yml`](.github/workflows/release-ios.yml) signs the Flutter app on a macOS runner, attaches `Jarvis.ipa` to a GitHub Release, and publishes AltStore/SideStore `source.json`.
+[`.github/workflows/release-ios.yml`](.github/workflows/release-ios.yml) builds an **unsigned** release IPA on `macos-latest` and attaches `Jarvis.ipa` to the GitHub Release for the SemVer tag. No Apple signing certificates or provisioning profiles are required.
 
-1. Create an Ad Hoc provisioning profile for `com.example.jarvis_mobile` with Push Notifications / APNs enabled. The Apple team in the Xcode project is `7T8A8JY5Y2`; the profile and certificate must match that App ID, including the OIDC URL scheme `com.example.jarvis_mobile:/oauth2redirect`.
-2. Add these repository secrets:
+1. Add production Flutter `--dart-define` repository secrets when you need a non-local API and auth at build time: `JARVIS_API_URL`, `JARVIS_OIDC_ISSUER`, `JARVIS_OIDC_CLIENT_ID`, and optional Firebase iOS keys (`JARVIS_FIREBASE_*`).
+2. Tag `vX.Y.Z` or run the workflow manually. Download `Jarvis.ipa` from the release.
+3. Import the IPA in [LiveContainer](https://github.com/LiveContainer/LiveContainer) on your device (or copy the file via AirDrop, Files, or another transfer you already use with LiveContainer).
 
-   - `APPLE_CERTIFICATE_P12_BASE64` and `APPLE_CERTIFICATE_PASSWORD` (base64-encoded `.p12` distribution certificate)
-   - `APPLE_PROVISIONING_PROFILE_BASE64` (base64-encoded `.mobileprovision`)
-   - `APPLE_TEAM_ID` (optional if the profile already contains `7T8A8JY5Y2`)
-   - Production Flutter `--dart-define` values: `JARVIS_API_URL`, `JARVIS_OIDC_ISSUER`, `JARVIS_OIDC_CLIENT_ID`, and the iOS Firebase keys (`JARVIS_FIREBASE_API_KEY`, `JARVIS_FIREBASE_PROJECT_ID`, `JARVIS_FIREBASE_SENDER_ID`, `JARVIS_FIREBASE_IOS_APP_ID`, optional `JARVIS_FIREBASE_IOS_BUNDLE_ID` and `JARVIS_FIREBASE_STORAGE_BUCKET`)
-3. Enable GitHub Pages from the `gh-pages` branch after the first successful run.
-4. In AltStore or SideStore, add the source URL `https://<owner>.github.io/jarvis-ai/source.json`.
+Local packaging uses the same layout as CI: `flutter build ios --release --no-codesign` then [`scripts/ios/package_unsigned_ipa.sh`](scripts/ios/package_unsigned_ipa.sh).
 
-AltStore downloads `source.json` and the IPA without GitHub authentication. If this repository is private, make GitHub Pages public, or copy `source.json`, `icon.png`, and `Jarvis.ipa` to a public HTTPS path (for example Caddy on `JARVIS_DOMAIN`) and point the source `downloadURL` at that path. Release asset URLs such as `https://github.com/<owner>/jarvis-ai/releases/download/vX.Y.Z/Jarvis.ipa` only work for AltStore when those assets are publicly downloadable.
+Push notifications and some entitlements may be limited without a normal signed distribution profile; in-app chat, OIDC, and SignalR still depend on your configured `JARVIS_API_URL` and identity provider.
 
-The generator is [`scripts/altstore/generate_source.py`](scripts/altstore/generate_source.py). It prepends each new IPA onto any previously published source so version history stays intact. Run its tests with `python3 -m unittest tests/unit/altstore/test_generate_source.py`.
+Optional: [`scripts/altstore/generate_source.py`](scripts/altstore/generate_source.py) can still build AltStore-style `source.json` if you later ship a **signed** IPA to a public URL. The release workflow no longer publishes `source.json` or GitHub Pages, because unsigned builds are not suitable for AltStore/SideStore install.
 
 ### Backend GHCR images and SSH deploy
 
