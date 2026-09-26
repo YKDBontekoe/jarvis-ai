@@ -33,7 +33,7 @@ abstract final class PhosphorIconsRegular {
   );
   static const cloudSlash = IconData(0xe1b6, fontFamily: 'PhosphorRegular');
   static const code = IconData(0xe1bc, fontFamily: 'PhosphorRegular');
-  static const copy = IconData(0xe1ca, fontFamily: 'PhosphorRegular');
+  static const copySimple = IconData(0xe1cc, fontFamily: 'PhosphorRegular');
   static const dotsThree = IconData(0xe1fe, fontFamily: 'PhosphorRegular');
   static const eye = IconData(0xe220, fontFamily: 'PhosphorRegular');
   static const eyeSlash = IconData(0xe224, fontFamily: 'PhosphorRegular');

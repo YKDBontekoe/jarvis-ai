@@ -137,22 +137,22 @@ class _CopyButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => IconButton(
-    tooltip: copied ? 'Copied' : 'Copy reply',
-    visualDensity: VisualDensity.compact,
-    iconSize: 16,
-    style: IconButton.styleFrom(
-      foregroundColor: copied ? JarvisColors.success : JarvisColors.muted,
-      minimumSize: const Size(32, 32),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
-    ),
-    onPressed: onPressed,
-    icon: AnimatedSwitcher(
-      duration: const Duration(milliseconds: 180),
-      child: Icon(
-        copied ? PhosphorIconsRegular.check : PhosphorIconsRegular.copy,
-        key: ValueKey(copied),
+  Widget build(BuildContext context) => Tooltip(
+    message: copied ? 'Copied' : 'Copy reply',
+    child: TextButton.icon(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        foregroundColor: copied ? JarvisColors.success : JarvisColors.muted,
+        visualDensity: VisualDensity.compact,
+        minimumSize: const Size(0, 30),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
       ),
+      icon: Icon(
+        copied ? PhosphorIconsRegular.check : PhosphorIconsRegular.copySimple,
+        size: 15,
+      ),
+      label: Text(copied ? 'Copied' : 'Copy'),
     ),
   );
 }
