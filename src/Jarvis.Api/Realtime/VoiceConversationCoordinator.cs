@@ -42,8 +42,13 @@ public sealed class VoiceConversationCoordinator(
 
                 var runLock = services.GetRequiredService<IConversationRunLock>();
                 await using var lease = await runLock.AcquireAsync(conversationId, cancellationToken);
-                var userMessage = new Message(conversationId, "user", transcript);
-                await conversations.AddMessageAsync(userMessage, cancellationToken);
+                var existingMessages = await conversations.GetMessagesAsync(conversationId, cancellationToken);
+                var lastMessage = existingMessages.Count > 0 ? existingMessages[^1] : null;
+                var userMessage = lastMessage is { Role: "user" } && lastMessage.Content == transcript
+                    ? lastMessage
+                    : new Message(conversationId, "user", transcript);
+                if (!ReferenceEquals(userMessage, lastMessage))
+                    await conversations.AddMessageAsync(userMessage, cancellationToken);
 
                 try
                 {

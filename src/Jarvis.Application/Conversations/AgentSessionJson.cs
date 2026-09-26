@@ -91,10 +91,14 @@ public static class AgentSessionJson
     {
         if (element.ValueKind == JsonValueKind.Object)
         {
+            if (element.TryGetProperty("stateBag", out var stateBag) &&
+                TryFindMessages(stateBag, out messages))
+                return true;
             if (element.TryGetProperty("messages", out messages) && messages.ValueKind == JsonValueKind.Array)
                 return true;
             foreach (var property in element.EnumerateObject())
             {
+                if (property.Name is "stateBag" or "messages") continue;
                 if (TryFindMessages(property.Value, out messages)) return true;
             }
         }
