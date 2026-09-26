@@ -1,0 +1,127 @@
+name: Deploy backend
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Optional extra image tag in addition to the git SHA.
+        required: false
+        type: string
+      skip_deploy:
+        description: Build and push images without SSHing to the server.
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+  actions: write
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      prefix: ${{ steps.meta.outputs.prefix }}
+    steps:
+      - name: Image prefix
+        id: meta
+        run: echo "prefix=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "${GITHUB_OUTPUT}"
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: api
+            dockerfile: infra/compose/Dockerfile
+            build-args: PROJECT_PATH=src/Jarvis.Api/Jarvis.Api.csproj
+          - name: worker
+            dockerfile: infra/compose/Dockerfile
+            build-args: PROJECT_PATH=workers/Jarvis.Worker/Jarvis.Worker.csproj
+          - name: voice-worker
+            dockerfile: workers/voice/Dockerfile
+            build-args: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: docker-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ needs.prepare.outputs.prefix }}/${{ matrix.name }}
+          tags: |
+            type=raw,value=${{ github.sha }}
+            type=raw,value=${{ inputs.image_tag }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.image_tag != '' }}
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          build-args: ${{ matrix.build-args }}
+          tags: ${{ steps.docker-meta.outputs.tags }}
+          labels: ${{ steps.docker-meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy:
+    needs: [prepare, build]
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.skip_deploy != true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          GIT_SHA: ${{ github.sha }}
+          GIT_REF: ${{ github.ref }}
+          JARVIS_API_IMAGE: ${{ needs.prepare.outputs.prefix }}/api:${{ github.sha }}
+          JARVIS_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/worker:${{ github.sha }}
+          JARVIS_VOICE_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/voice-worker:${{ github.sha }}
+          DEPLOY_COMPOSE_FILES: ${{ vars.DEPLOY_COMPOSE_FILES }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          command_timeout: 30m
+          script_stop: true
+          envs: GHCR_TOKEN,GHCR_USER,GIT_SHA,GIT_REF,JARVIS_API_IMAGE,JARVIS_WORKER_IMAGE,JARVIS_VOICE_WORKER_IMAGE,DEPLOY_COMPOSE_FILES
+          script: |
+            set -euo pipefail
+            cd '${{ secrets.DEPLOY_PATH }}'
+            if [[ ! -d .git ]]; then
+              echo "DEPLOY_PATH is not a git checkout." >&2
+              exit 1
+            fi
+            git fetch --prune origin
+            git fetch --force origin "${GIT_SHA}" || git fetch --force origin "${GIT_REF}"
+            git checkout --detach "${GIT_SHA}"
+            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+            chmod +x scripts/deploy/remote-up.sh
+            scripts/deploy/remote-up.sh

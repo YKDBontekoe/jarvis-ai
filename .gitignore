@@ -15,6 +15,7 @@ apps/mobile/.packages
 # Local secrets and state
 .env
 infra/compose/.env
+infra/compose/.env.production
 .aspire/
 artifacts/
 **/node_modules/
