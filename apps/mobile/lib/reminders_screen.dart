@@ -1,8 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
+
 import 'approvals_screen.dart';
 import 'notification_details_screen.dart';
+import 'notification_routing.dart';
 import 'task_details_screen.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -211,9 +213,9 @@ class _RemindersScreenState extends State<RemindersScreen>
   Future<void> _openNotification(Map<String, dynamic> notification) async {
     await _markRead(notification);
     if (!mounted) return;
-    final type = notification['type'];
+    final type = notification['type'] as String?;
     final sourceId = notification['sourceId'] as String?;
-    if (type == 'approval.required') {
+    if (opensApprovalScreen(type)) {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) => ApprovalsScreen(http: widget.http),
@@ -221,7 +223,7 @@ class _RemindersScreenState extends State<RemindersScreen>
       );
       return;
     }
-    if (type == 'task.completed' && sourceId != null) {
+    if (opensTaskDetails(type) && sourceId != null) {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) =>
@@ -230,16 +232,12 @@ class _RemindersScreenState extends State<RemindersScreen>
       );
       return;
     }
-    if (sourceId == null ||
-        type is! String ||
-        (type != 'reminder.due' && type != 'task.completed')) {
-      return;
-    }
+    if (sourceId == null || !opensNotificationDetails(type)) return;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => NotificationDetailsScreen(
           http: widget.http,
-          notificationType: type,
+          notificationType: type!,
           sourceId: sourceId,
         ),
       ),

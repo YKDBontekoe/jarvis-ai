@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +24,7 @@ import 'tasks_screen.dart';
 import 'audit_screen.dart';
 import 'conversations_screen.dart';
 import 'notification_details_screen.dart';
+import 'notification_routing.dart';
 import 'condition_watches_screen.dart';
 import 'daily_briefing_screen.dart';
 import 'integrations_screen.dart';
@@ -106,6 +108,8 @@ class _AuthSession {
   final bool enabled;
   final _appAuth = const FlutterAppAuth();
   final _storage = const FlutterSecureStorage();
+  Future<String?>? _accessTokenInFlight;
+  var _generation = 0;
 
   String get _redirectUri => kIsWeb
       ? web_oidc.currentRedirectUri(_webOidcRedirectUri)
@@ -119,7 +123,21 @@ class _AuthSession {
     }
   }
 
-  Future<String?> accessToken() async {
+  Future<String?> accessToken() {
+    final existing = _accessTokenInFlight;
+    if (existing != null) return existing;
+    late final Future<String?> pending;
+    pending = _readOrRefreshAccessToken().whenComplete(() {
+      if (identical(_accessTokenInFlight, pending)) {
+        _accessTokenInFlight = null;
+      }
+    });
+    _accessTokenInFlight = pending;
+    return pending;
+  }
+
+  Future<String?> _readOrRefreshAccessToken() async {
+    final generation = _generation;
     if (!enabled) return null;
     _ensureConfigured();
     if (kIsWeb) {
@@ -130,11 +148,13 @@ class _AuthSession {
         _oidcScopes,
       );
       if (response != null) await _saveWebResponse(response, null);
+      if (generation != _generation) return null;
     }
     final expiration = int.tryParse(
       await _storage.read(key: 'token_expiration') ?? '',
     );
     final accessToken = await _storage.read(key: 'access_token');
+    if (generation != _generation) return null;
     if (accessToken != null &&
         expiration != null &&
         expiration > DateTime.now().millisecondsSinceEpoch + 30000) {
@@ -143,31 +163,66 @@ class _AuthSession {
 
     final refreshToken = await _storage.read(key: 'refresh_token');
     if (refreshToken == null) return null;
-    if (kIsWeb) {
-      final response = await web_oidc.refreshAuthorizationTokens(
-        _oidcIssuer,
-        _oidcClientId,
-        refreshToken,
+    try {
+      if (kIsWeb) {
+        final response = await web_oidc.refreshAuthorizationTokens(
+          _oidcIssuer,
+          _oidcClientId,
+          refreshToken,
+        );
+        if (generation != _generation) return null;
+        await _saveWebResponse(response, refreshToken);
+        if (generation != _generation) {
+          await _storage.deleteAll();
+          return null;
+        }
+        return response['access_token'] as String;
+      }
+      final response = await _appAuth.token(
+        TokenRequest(
+          _oidcClientId,
+          _redirectUri,
+          issuer: _oidcIssuer,
+          refreshToken: refreshToken,
+          scopes: _oidcScopes,
+        ),
       );
-      await _saveWebResponse(response, refreshToken);
-      return response['access_token'] as String;
+      if (generation != _generation) return null;
+      await _save(
+        response.accessToken,
+        response.refreshToken ?? refreshToken,
+        response.accessTokenExpirationDateTime,
+      );
+      if (generation != _generation) {
+        await _storage.deleteAll();
+        return null;
+      }
+      return response.accessToken;
+    } catch (error) {
+      if (_isInvalidGrantError(error)) {
+        await _storage.deleteAll();
+        return null;
+      }
+      rethrow;
     }
-    final response = await _appAuth.token(
-      TokenRequest(
-        _oidcClientId,
-        _redirectUri,
-        issuer: _oidcIssuer,
-        refreshToken: refreshToken,
-        scopes: _oidcScopes,
-      ),
-    );
-    await _save(
-      response.accessToken,
-      response.refreshToken ?? refreshToken,
-      response.accessTokenExpirationDateTime,
-    );
-    return response.accessToken;
   }
+
+  static bool _isInvalidGrantError(Object error) {
+    if (error is PlatformException) {
+      return _isInvalidGrant(error.code) || _isInvalidGrant(error.message);
+    }
+    if (error is DioException) {
+      final data = error.response?.data;
+      if (data is Map && _isInvalidGrant(data['error']?.toString())) {
+        return true;
+      }
+      return _isInvalidGrant(error.message);
+    }
+    return _isInvalidGrant(error.toString());
+  }
+
+  static bool _isInvalidGrant(String? value) =>
+      value != null && value.toLowerCase().contains('invalid_grant');
 
   Future<void> signIn() async {
     if (kIsWeb) {
@@ -196,7 +251,11 @@ class _AuthSession {
     );
   }
 
-  Future<void> signOut() => _storage.deleteAll();
+  Future<void> signOut() async {
+    _generation++;
+    _accessTokenInFlight = null;
+    await _storage.deleteAll();
+  }
 
   Future<void> _saveWebResponse(
     Map<String, dynamic> response,
@@ -290,6 +349,7 @@ class _ChatScreenState extends State<ChatScreen> {
   int _selectedDestination = 0;
   int _homeRevision = 0;
   bool _showHome = true;
+  int _realtimeGeneration = 0;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   List<Map<String, dynamic>> _recent = [];
   String? _pushToken;
@@ -366,14 +426,13 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         setState(() {
           _error = _describeError(error);
-          if (_auth.enabled) _signedOut = true;
+          if (_isAuthExpired(error)) _signedOut = true;
         });
       }
     } catch (error) {
       if (mounted) {
         setState(() {
           _error = 'Could not connect to Jarvis: $error';
-          if (_auth.enabled) _signedOut = true;
         });
       }
     }
@@ -383,6 +442,7 @@ class _ChatScreenState extends State<ChatScreen> {
     String conversationId, {
     bool showHome = false,
   }) async {
+    final generation = ++_realtimeGeneration;
     await _stopVoice();
     await _hub?.stop();
     _hub = null;
@@ -399,9 +459,16 @@ class _ChatScreenState extends State<ChatScreen> {
     final details = await _http.get<Map<String, dynamic>>(
       '/api/v1/conversations/$conversationId',
     );
+    if (!mounted ||
+        _conversationId != conversationId ||
+        _realtimeGeneration != generation) {
+      return;
+    }
     final records = details.data?['messages'] as List<dynamic>? ?? [];
     final approvals = await _loadConversationApprovals(conversationId);
-    if (mounted && _conversationId == conversationId) {
+    if (mounted &&
+        _conversationId == conversationId &&
+        _realtimeGeneration == generation) {
       setState(() {
         _entries.addAll(
           records.map((item) {
@@ -417,7 +484,10 @@ class _ChatScreenState extends State<ChatScreen> {
       _scrollToBottom(jump: true);
     }
     unawaited(_loadRecent());
-    await _connectRealtime();
+    if (_conversationId == conversationId &&
+        _realtimeGeneration == generation) {
+      await _connectRealtime(generation);
+    }
   }
 
   Future<List<ApprovalEntry>> _loadConversationApprovals(
@@ -492,11 +562,16 @@ class _ChatScreenState extends State<ChatScreen> {
     if (destination == 'sign_out') {
       unawaited(_signOut());
     } else if (page != null) {
-      unawaited(
-        Navigator.of(
-          context,
-        ).push<void>(MaterialPageRoute<void>(builder: (_) => page)),
-      );
+      unawaited(_openUtilityPage(destination, page));
+    }
+  }
+
+  Future<void> _openUtilityPage(String destination, Widget page) async {
+    await Navigator.of(
+      context,
+    ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
+    if (destination == 'approvals' && mounted) {
+      await _syncConversationApprovals();
     }
   }
 
@@ -530,8 +605,16 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _removePlaceholder() {
-    final index = _placeholderIndex;
-    if (index >= 0) _entries.removeAt(index);
+    final index = _entries.lastIndexWhere(
+      (entry) => entry is MessageEntry && !entry.isUser && entry.pending,
+    );
+    if (index < 0) return;
+    final message = _entries[index] as MessageEntry;
+    if (message.content.isEmpty) {
+      _entries.removeAt(index);
+    } else {
+      _entries[index] = message.copyWith(pending: false);
+    }
   }
 
   void _appendDelta(String delta) {
@@ -540,6 +623,8 @@ class _ChatScreenState extends State<ChatScreen> {
       _entries[_entries.length - 1] = last.copyWith(
         content: '${last.content}$delta',
       );
+    } else if (last is MessageEntry && !last.isUser && !last.pending) {
+      return;
     } else {
       _entries.add(
         MessageEntry(role: 'assistant', content: delta, pending: true),
@@ -555,6 +640,11 @@ class _ChatScreenState extends State<ChatScreen> {
     if (index >= 0) {
       _entries[index] = message;
     } else if (content.isNotEmpty) {
+      final last = _entries.isEmpty ? null : _entries.last;
+      if (last is MessageEntry && !last.isUser && last.content == content) {
+        _settleToolRuns();
+        return;
+      }
       _entries.add(message);
     }
     _settleToolRuns();
@@ -611,14 +701,46 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _connectRealtime() async {
+  Future<void> _syncConversationApprovals() async {
+    final conversationId = _conversationId;
+    if (conversationId == null) return;
+    final approvals = await _loadConversationApprovals(conversationId);
+    if (!mounted || _conversationId != conversationId) return;
+    setState(() {
+      _entries.removeWhere((entry) {
+        if (entry is! ApprovalEntry) return false;
+        if (entry.status != ApprovalStatus.pending &&
+            entry.status != ApprovalStatus.failed) {
+          return false;
+        }
+        return !approvals.any((approval) => approval.id == entry.id);
+      });
+      _addApprovals(approvals);
+    });
+  }
+
+  bool _hubIsCurrent(HubConnection hub, String conversationId, int generation) =>
+      mounted &&
+      !_signedOut &&
+      identical(_hub, hub) &&
+      _conversationId == conversationId &&
+      _realtimeGeneration == generation;
+
+  Future<void> _connectRealtime([int? generation]) async {
+    final expectedGeneration = generation ?? _realtimeGeneration;
     final conversationId = _conversationId;
     if (conversationId == null) return;
     final hub = HubConnectionBuilder()
         .withUrl(
           '$_apiBaseUrl/hubs/events',
           options: HttpConnectionOptions(
-            accessTokenFactory: () async => await _auth.accessToken() ?? '',
+            accessTokenFactory: () async {
+              final token = await _auth.accessToken();
+              if (_auth.enabled && (token == null || token.isEmpty)) {
+                throw StateError('Missing access token for realtime updates.');
+              }
+              return token ?? '';
+            },
           ),
         )
         .withAutomaticReconnect()
@@ -626,32 +748,49 @@ class _ChatScreenState extends State<ChatScreen> {
     hub.on('message.delta', (arguments) {
       final event = _payload(arguments);
       final delta = event?['delta'] as String? ?? '';
-      if (delta.isEmpty || !mounted) return;
+      if (delta.isEmpty || !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        return;
+      }
       setState(() {
         _showHome = false;
         _appendDelta(delta);
       });
       _scrollToBottom();
     });
+    hub.on('message.completed', (arguments) {
+      if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
+      final content = _payload(arguments)?['content'] as String? ?? '';
+      setState(() => _completeAssistant(content));
+      _scrollToBottom();
+    });
     hub.on('tool.started', (arguments) {
       final tool = _payload(arguments)?['tool'] as String?;
-      if (tool == null || !mounted) return;
+      if (tool == null || !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        return;
+      }
       setState(() => _toolEvent(tool));
       _scrollToBottom();
     });
     hub.on('tool.completed', (arguments) {
       final tool = _payload(arguments)?['tool'] as String?;
-      if (tool == null || !mounted) return;
+      if (tool == null || !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        return;
+      }
       setState(() => _toolEvent(tool, success: true));
     });
     hub.on('tool.failed', (arguments) {
       final tool = _payload(arguments)?['tool'] as String?;
-      if (tool == null || !mounted) return;
+      if (tool == null || !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        return;
+      }
       setState(() => _toolEvent(tool, success: false));
     });
     hub.on('tool.approval_required', (arguments) {
       final approval = ApprovalEntry.fromJson(_payload(arguments));
-      if (approval == null || !mounted) return;
+      if (approval == null ||
+          !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        return;
+      }
       setState(() {
         _showHome = false;
         _addApprovals([approval]);
@@ -660,19 +799,25 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     hub.on('notification.created', (arguments) {
       final event = _payload(arguments);
-      if (event == null || !mounted) return;
+      if (event == null ||
+          !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        return;
+      }
       if (event['type'] == 'task.completed' ||
           event['type'] == 'approval.required') {
         setState(() => _homeRevision++);
       }
       if (event['type'] != 'approval.required') return;
       final notificationId = event['notificationId'] as String?;
-      if (notificationId != null) _shownPushNotifications.add(notificationId);
       final approvalId = event['sourceId'] as String?;
       final inline = _entries.any(
         (entry) => entry is ApprovalEntry && entry.id == approvalId,
       );
       if (inline && _selectedDestination == 0 && !_showHome) return;
+      if (notificationId != null &&
+          !_shownPushNotifications.add(notificationId)) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -686,10 +831,12 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     });
     hub.on('agent.completed', (_) {
-      if (mounted) setState(_settleToolRuns);
+      if (_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        setState(_settleToolRuns);
+      }
     });
     hub.on('agent.failed', (arguments) {
-      if (!mounted) return;
+      if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
       final event = _payload(arguments);
       setState(() {
         _removePlaceholder();
@@ -701,7 +848,10 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     hub.on('voice.transcript', (arguments) {
       final transcript = _payload(arguments)?['text'] as String? ?? '';
-      if (transcript.isEmpty || !mounted) return;
+      if (transcript.isEmpty ||
+          !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        return;
+      }
       setState(() {
         _showHome = false;
         _entries.add(MessageEntry(role: 'user', content: transcript));
@@ -709,7 +859,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _scrollToBottom();
     });
     hub.on('voice.failed', (arguments) {
-      if (!mounted) return;
+      if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
       final event = _payload(arguments);
       setState(
         () => _error = event?['message'] as String? ?? 'Voice session failed.',
@@ -717,16 +867,16 @@ class _ChatScreenState extends State<ChatScreen> {
       unawaited(_stopVoice());
     });
     hub.onreconnecting(({error}) {
-      if (!mounted || _hub != hub) return;
+      if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
       unawaited(_stopVoice());
       setState(() => _connected = false);
     });
     hub.onreconnected(({connectionId}) {
-      if (!mounted || _hub != hub) return;
+      if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
       unawaited(_restoreRealtime(hub, conversationId));
     });
     hub.onclose(({error}) {
-      if (_hub != hub) return;
+      if (!identical(_hub, hub)) return;
       unawaited(_stopVoice());
       if (mounted) {
         setState(() {
@@ -735,14 +885,27 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     });
+    if (_conversationId != conversationId ||
+        _realtimeGeneration != expectedGeneration ||
+        _signedOut) {
+      await hub.stop();
+      return;
+    }
     _hub = hub;
     try {
       await hub.start();
+      if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        await hub.stop();
+        if (identical(_hub, hub)) _hub = null;
+        return;
+      }
       await hub.invoke('JoinConversation', args: [conversationId]);
-      if (mounted && _hub == hub) setState(() => _connected = true);
+      if (_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        setState(() => _connected = true);
+      }
     } catch (_) {
       await hub.stop();
-      if (_hub == hub) _hub = null;
+      if (identical(_hub, hub)) _hub = null;
       rethrow;
     }
   }
@@ -785,6 +948,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _signOut() async {
     await _stopVoice();
+    _realtimeGeneration++;
+    final hub = _hub;
+    _hub = null;
     final pushToken = _pushToken;
     if (pushToken != null) {
       try {
@@ -807,7 +973,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
     await _auth.signOut();
-    await _hub?.stop();
+    await hub?.stop();
     if (mounted) {
       setState(() {
         _signedOut = true;
@@ -883,15 +1049,11 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted) return;
     final type = data['type'] as String?;
     final sourceId = data['sourceId'] as String?;
-    if (type == 'approval.required') {
+    if (opensApprovalScreen(type)) {
       _openUtility('approvals');
       return;
     }
-    if (sourceId == null ||
-        (type != 'task.completed' &&
-            type != 'reminder.due' &&
-            type != 'watch.triggered' &&
-            type != 'watch.failed')) {
+    if (sourceId == null || !opensNotificationDetails(type)) {
       _openUtility('reminders');
       return;
     }
@@ -908,7 +1070,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Future<void> _send([String? text]) async {
+  Future<bool> _send([String? text]) async {
     final content = (text ?? _input.text).trim();
     final conversationId = _conversationId;
     if (content.isEmpty ||
@@ -916,7 +1078,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _busy ||
         _voiceActive ||
         _voiceStarting) {
-      return;
+      return false;
     }
     if (text == null) _input.clear();
     final userMessage = MessageEntry(role: 'user', content: content);
@@ -936,9 +1098,10 @@ class _ChatScreenState extends State<ChatScreen> {
         '/api/v1/conversations/$conversationId/messages',
         data: {'content': content},
       );
-      if (!mounted || _conversationId != conversationId) return;
+      if (!mounted || _conversationId != conversationId) return true;
       setState(() => _applyRunResult(response));
       unawaited(_loadRecent());
+      return true;
     } on DioException catch (error) {
       if (mounted && _conversationId == conversationId) {
         setState(() {
@@ -949,6 +1112,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _error = _describeError(error);
         });
       }
+      return true;
     } finally {
       if (mounted) setState(() => _sending = false);
       _scrollToBottom();
@@ -968,9 +1132,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _retry(MessageEntry message) async {
-    if (_busy) return;
+    if (_busy || _voiceActive || _voiceStarting) return;
     setState(() => _entries.remove(message));
-    await _send(message.content);
+    final sent = await _send(message.content);
+    if (!sent && mounted && !_entries.contains(message)) {
+      setState(() => _entries.add(message));
+    }
   }
 
   Future<void> _decide(ApprovalEntry approval, bool approved) async {
@@ -1109,6 +1276,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String _describeError(DioException error) {
     final status = error.response?.statusCode;
+    if (status == 401) {
+      return 'Your sign-in has expired. Sign in again to continue.';
+    }
     if (status == 502) {
       return 'Jarvis could not complete this request. Please try again.';
     }
@@ -1122,6 +1292,32 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (status != null) return 'Jarvis returned HTTP $status.';
     return 'Could not reach the Jarvis API at $_apiBaseUrl.';
+  }
+
+  bool _isAuthExpired(DioException error) =>
+      _auth.enabled && error.response?.statusCode == 401;
+
+  Future<void> _retryConnection() async {
+    final conversationId = _conversationId;
+    if (conversationId != null) {
+      try {
+        await _openConversation(conversationId, showHome: _showHome);
+        if (mounted) setState(() => _error = null);
+      } on DioException catch (error) {
+        if (mounted) {
+          setState(() {
+            _error = _describeError(error);
+            if (_isAuthExpired(error)) _signedOut = true;
+          });
+        }
+      } catch (error) {
+        if (mounted) {
+          setState(() => _error = 'Could not connect to Jarvis: $error');
+        }
+      }
+      return;
+    }
+    await _initialize();
   }
 
   void _scrollToBottom({bool jump = false}) {
@@ -1142,8 +1338,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _realtimeGeneration++;
     unawaited(_stopVoice());
-    _hub?.stop();
+    final hub = _hub;
+    _hub = null;
+    unawaited(hub?.stop());
     unawaited(_pushTokenSubscription?.cancel());
     unawaited(_pushOpenedSubscription?.cancel());
     unawaited(_pushForegroundSubscription?.cancel());
@@ -1485,7 +1684,7 @@ class _ChatScreenState extends State<ChatScreen> {
               actions: [
                 if (_conversationId == null || !_connected)
                   TextButton(
-                    onPressed: _initialize,
+                    onPressed: _retryConnection,
                     child: const Text('Retry'),
                   ),
                 TextButton(

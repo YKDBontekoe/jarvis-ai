@@ -62,10 +62,19 @@ class _MemoryScreenState extends State<MemoryScreen> {
               },
             );
       final records = response.data ?? [];
-      final entries = records.map((item) {
-        final record = item as Map<String, dynamic>;
-        return _searching ? record['memory'] as Map<String, dynamic> : record;
-      }).toList();
+      final entries = <Map<String, dynamic>>[];
+      for (final item in records) {
+        if (item is! Map) continue;
+        final record = Map<String, dynamic>.from(item);
+        if (_searching) {
+          final memory = record['memory'];
+          if (memory is Map) {
+            entries.add(Map<String, dynamic>.from(memory));
+          }
+        } else {
+          entries.add(record);
+        }
+      }
       if (mounted) setState(() => _memories = entries);
     } on DioException catch (error) {
       if (mounted) {
@@ -73,6 +82,13 @@ class _MemoryScreenState extends State<MemoryScreen> {
           () => _error = error.response?.statusCode == 401
               ? 'Your sign-in has expired. Sign in again to manage memory.'
               : 'Jarvis could not load memory. Check the API connection and try again.',
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Jarvis could not load memory. Check the API connection and try again.',
         );
       }
     } finally {
