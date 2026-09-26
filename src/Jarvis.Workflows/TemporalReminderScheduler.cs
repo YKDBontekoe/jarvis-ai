@@ -156,8 +156,22 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
     {
         var reminder = await reminders.GetAsync(id, ownerId, cancellationToken);
         if (reminder is null || reminder.Status != "pending") return null;
-        await scheduler.CancelAsync(reminder.WorkflowId, cancellationToken);
-        return await reminders.CancelAsync(id, ownerId, cancellationToken);
+        var cancelled = await reminders.CancelAsync(id, ownerId, cancellationToken);
+        if (cancelled is null) return null;
+        try
+        {
+            await scheduler.CancelAsync(reminder.WorkflowId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "Reminder {ReminderId} was cancelled in storage; Temporal will stop it if the workflow is still running.", id);
+        }
+        return cancelled;
     }
 }
 
@@ -202,8 +216,21 @@ public sealed class JarvisTaskService(
     {
         var task = await tasks.GetTaskAsync(id, ownerId, cancellationToken);
         if (task is null || task.Status is "completed" or "failed" or "cancelled") return false;
-        await scheduler.CancelTaskAsync(task.WorkflowId, cancellationToken);
-        return await tasks.CancelTaskAsync(id, ownerId, cancellationToken);
+        if (!await tasks.CancelTaskAsync(id, ownerId, cancellationToken)) return false;
+        try
+        {
+            await scheduler.CancelTaskAsync(task.WorkflowId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "Task {TaskId} was cancelled in storage; Temporal will stop it if the workflow is still running.", id);
+        }
+        return true;
     }
 
     public async Task CompleteAfterApprovalAsync(Guid? taskId, Guid ownerId, string summary, CancellationToken cancellationToken)
@@ -212,6 +239,28 @@ public sealed class JarvisTaskService(
         var task = await tasks.GetTaskAsync(taskId.Value, ownerId, cancellationToken);
         if (task is null || task.Status != "needs_approval") return;
         await scheduler.ResolveTaskApprovalAsync(task.WorkflowId, summary, cancellationToken);
+    }
+
+    public async Task FailAfterRejectedApprovalAsync(Guid? taskId, Guid ownerId, string summary, CancellationToken cancellationToken)
+    {
+        if (taskId is null) return;
+        var task = await tasks.GetTaskAsync(taskId.Value, ownerId, cancellationToken);
+        if (task is null || task.Status != "needs_approval") return;
+        await tasks.FailAsync(task.Id, summary, cancellationToken);
+        try
+        {
+            await scheduler.CancelTaskAsync(task.WorkflowId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "Task {TaskId} was marked failed after a rejected approval; Temporal will stop it if the workflow is still running.",
+                task.Id);
+        }
     }
 }
 

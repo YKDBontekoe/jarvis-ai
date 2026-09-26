@@ -137,6 +137,7 @@ public interface IJarvisTaskService
     Task<IReadOnlyList<JarvisTaskRecord>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<bool> CancelAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task CompleteAfterApprovalAsync(Guid? taskId, Guid ownerId, string summary, CancellationToken cancellationToken);
+    Task FailAfterRejectedApprovalAsync(Guid? taskId, Guid ownerId, string summary, CancellationToken cancellationToken);
 }
 
 public interface IReminderService

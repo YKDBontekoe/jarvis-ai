@@ -31,13 +31,10 @@ public sealed partial class IntegrationCredentialStore(JarvisDbContext db,
         CancellationToken cancellationToken)
     {
         Validate(provider, secrets);
-        var payload = JsonSerializer.Serialize(secrets, JsonOptions);
-        var protector = protectionProvider.CreateProtector("Jarvis.IntegrationCredentials.v1", ownerId.ToString("N"), provider);
-        var protectedPayload = protector.Protect(payload);
-        var secretNames = JsonSerializer.Serialize(secrets.Keys.OrderBy(name => name, StringComparer.Ordinal), JsonOptions);
-
-        var credential = await db.IntegrationCredentials.SingleOrDefaultAsync(
-            x => x.OwnerId == ownerId && x.Provider == provider, cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var credential = await GetLockedAsync(ownerId, provider, cancellationToken);
+        var protectedPayload = Protect(ownerId, provider, secrets);
+        var secretNames = SerializeSecretNames(secrets);
         if (credential is null)
             db.IntegrationCredentials.Add(new IntegrationCredential(ownerId, provider, protectedPayload, secretNames));
         else
@@ -46,6 +43,7 @@ public sealed partial class IntegrationCredentialStore(JarvisDbContext db,
         db.AuditEvents.Add(new AuditEvent(ownerId, "integrations", "credentials.saved", "moderate", true,
             metadataJson: JsonSerializer.Serialize(new { provider, secretCount = secrets.Count }, JsonOptions)));
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task SaveSecretAsync(Guid ownerId, string provider, string secretName, string value,

@@ -178,6 +178,16 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
             return false;
         }
 
+        var sessionJson = await conversations.GetAgentSessionAsync(task.ConversationId, cancellationToken);
+        if (sessionJson is not null &&
+            AgentSessionJson.TryGetCompletedAssistantText(sessionJson, out var recovered))
+        {
+            assistantMessage = new Message(task.ConversationId, "assistant", recovered, task.ResultMessageId);
+            await conversations.AddMessageAsync(assistantMessage, cancellationToken);
+            await tasks.CompleteAndNotifyAsync(task.Id, recovered, cancellationToken);
+            return false;
+        }
+
         var agent = services.GetRequiredService<IJarvisAgent>();
         var answer = new System.Text.StringBuilder();
         var approvalRequests = new List<AgentToolApprovalRequest>();
@@ -329,7 +339,8 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
 
         if (!file.ContentType.StartsWith("text/", StringComparison.Ordinal) && file.ContentType != "application/json")
             return string.Empty;
-        using var reader = new StreamReader(content, new UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: true,
+        using var reader = new StreamReader(content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false,
+            throwOnInvalidBytes: false), detectEncodingFromByteOrderMarks: true,
             bufferSize: 8192, leaveOpen: true);
         return reader.ReadToEnd();
     }

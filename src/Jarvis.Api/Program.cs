@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Security.Cryptography;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -16,6 +15,7 @@ using Jarvis.Application.Memory;
 using Jarvis.Application.Workflows;
 using Jarvis.Application.Files;
 using Jarvis.Application.Integrations;
+using Jarvis.Application.Security;
 using Jarvis.Domain.Conversations;
 using Jarvis.Infrastructure;
 using Jarvis.Infrastructure.Persistence;
@@ -187,8 +187,13 @@ api.MapPost("/conversations/{conversationId:guid}/messages", async (
         return Results.Conflict(new { message = "Long-running task sessions are managed from the Tasks section." });
 
     await using var runLease = await runLock.AcquireAsync(conversationId, ct);
-    var userMessage = new Message(conversationId, "user", content);
-    await store.AddMessageAsync(userMessage, ct);
+    var existingMessages = await store.GetMessagesAsync(conversationId, ct);
+    var lastMessage = existingMessages.Count > 0 ? existingMessages[^1] : null;
+    var userMessage = lastMessage is { Role: "user" } && lastMessage.Content == content
+        ? lastMessage
+        : new Message(conversationId, "user", content);
+    if (!ReferenceEquals(userMessage, lastMessage))
+        await store.AddMessageAsync(userMessage, ct);
     try
     {
         var outcome = await coordinator.RunAsync(currentUser.OwnerId, conversationId,
@@ -256,8 +261,16 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
             await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
             return Results.Accepted("/api/v1/approvals", outcome.PendingApprovals.Select(ToApprovalDto));
         }
-        await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId,
-            outcome.AssistantMessage?.Content ?? "The approved task step finished.", ct);
+        if (decided.Approved == true)
+        {
+            await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId,
+                outcome.AssistantMessage?.Content ?? "The approved task step finished.", ct);
+        }
+        else
+        {
+            await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId,
+                outcome.AssistantMessage?.Content ?? "The tool call was declined.", ct);
+        }
         await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
         return Results.Ok(ToDto(outcome.AssistantMessage!));
     }
@@ -612,9 +625,7 @@ api.MapPost("/voice/internal/{conversationId:guid}/transcript", async (Guid conv
 {
     var expectedSecret = configuration["Voice:WorkerSecret"];
     var suppliedSecret = httpRequest.Headers["X-Jarvis-Voice-Secret"].ToString();
-    if (string.IsNullOrWhiteSpace(expectedSecret) || string.IsNullOrWhiteSpace(suppliedSecret) ||
-        !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expectedSecret),
-            Encoding.UTF8.GetBytes(suppliedSecret)))
+    if (!SecretComparer.FixedTimeEquals(expectedSecret, suppliedSecret))
         return Results.Unauthorized();
     if (request.OwnerId == Guid.Empty || string.IsNullOrWhiteSpace(request.Transcript) ||
         request.Transcript.Length > 32_000)

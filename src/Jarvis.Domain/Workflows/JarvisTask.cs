@@ -56,7 +56,7 @@ public sealed class JarvisTask
 
     public void Complete(string summary)
     {
-        if (Status is "completed" or "cancelled") return;
+        if (Status is "completed" or "failed" or "cancelled") return;
         Status = "completed";
         Summary = summary;
         CompletedAt = DateTimeOffset.UtcNow;
@@ -64,7 +64,7 @@ public sealed class JarvisTask
 
     public void Fail(string summary)
     {
-        if (Status is "completed" or "cancelled") return;
+        if (Status is "completed" or "failed" or "cancelled") return;
         Status = "failed";
         Summary = summary;
         CompletedAt = DateTimeOffset.UtcNow;

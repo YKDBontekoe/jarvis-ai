@@ -55,7 +55,7 @@ public sealed class FileService(
         var id = Guid.CreateVersion7();
         var objectKey = $"{ownerId:D}/{id:D}";
         await objects.PutAsync(objectKey, content, normalizedType, cancellationToken);
-        var processingStatus = IsIndexable(normalizedType) ? "queued" : "uploaded";
+        var processingStatus = FileIndexing.IsIndexable(normalizedType) ? "queued" : "uploaded";
         var file = new StoredFile(id, ownerId, objectKey, safeName, normalizedType, length,
             sha256, DateTimeOffset.UtcNow, processingStatus);
         StoredFile stored;
@@ -126,9 +126,6 @@ public sealed class FileService(
             throw new ArgumentException("File name must contain 1 to 255 printable characters.", nameof(fileName));
         return normalized;
     }
-
-    private static bool IsIndexable(string contentType) =>
-        contentType == "application/pdf" || contentType == "application/json" || contentType.StartsWith("text/", StringComparison.Ordinal);
 
     private static long ResolveMaxUploadBytes(IConfiguration configuration)
     {

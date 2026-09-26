@@ -69,7 +69,7 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
         await using var database = CreateDbContext();
         var store = new ConversationStore(database);
         var conversation = await store.CreateAsync(Guid.CreateVersion7(), "Session verification", CancellationToken.None);
-        const string state = """{"stateBag":{"messages":[{"contents":[{"$type":"functionCall","name":"AddMcpServer","callId":"approval-1","arguments":{"name":"Verification"}}]}]}}""";
+        const string state = """{"stateBag":{"messages":[{"contents":[{"$id":"1","$type":"functionCall","name":"AddMcpServer","callId":"approval-1","arguments":{"name":"Verification"}}]}]}}""";
         await store.SaveAgentSessionAsync(conversation.Id, state, CancellationToken.None);
         database.ChangeTracker.Clear();
 
