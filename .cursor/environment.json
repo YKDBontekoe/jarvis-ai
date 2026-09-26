@@ -2,5 +2,10 @@
   "name": "Jarvis",
   "user": "ubuntu",
   "install": "bash .cursor/install.sh",
-  "start": "bash .cursor/start.sh"
+  "terminals": [
+    {
+      "name": "dockerd",
+      "command": "bash .cursor/dockerd.sh"
+    }
+  ]
 }
