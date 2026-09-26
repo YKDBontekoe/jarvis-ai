@@ -79,6 +79,7 @@ Run deterministic unit tests with:
 
 ```sh
 dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
+python3 -m unittest tests/unit/altstore/test_generate_source.py tests/unit/compose/test_production_images.py tests/unit/release/test_semver.py
 ```
 
 The model-agnostic behavioral evaluation cases live in [`evals/jarvis-core-v1.jsonl`](evals/jarvis-core-v1.jsonl), with isolated-run requirements documented in [`evals/README.md`](evals/README.md). Run them against a disposable Jarvis deployment through the normal API; inference still goes through the Codex CLI app-server.
@@ -169,11 +170,61 @@ docker compose --env-file infra/compose/.env.production \
   -f infra/compose/docker-compose.production.yml up --build -d
 ```
 
+`--build` compiles the API, Temporal worker, and voice worker on the host. After the GitHub Actions deploy pipeline is configured, prefer pulling the prebuilt GHCR images instead:
+
+```sh
+export JARVIS_API_IMAGE=ghcr.io/<owner>/jarvis-ai/api:<sha>
+export JARVIS_WORKER_IMAGE=ghcr.io/<owner>/jarvis-ai/worker:<sha>
+export JARVIS_VOICE_WORKER_IMAGE=ghcr.io/<owner>/jarvis-ai/voice-worker:<sha>
+scripts/deploy/remote-up.sh
+```
+
 Add `-f infra/compose/docker-compose.home-assistant.yml` to that command and set `HOME_ASSISTANT_MCP_URL` in the production env file to enable Home Assistant.
 
-Add `-f infra/compose/docker-compose.github.yml` and keep `--build` in the production command to enable GitHub.
+Add `-f infra/compose/docker-compose.github.yml` to enable GitHub. Host builds still need `--build` so the API image includes the pinned MCP server; GHCR images already include it.
 
-Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit media, plus outbound HTTPS for Codex OAuth/model access, Firebase FCM/OAuth, user-configured public condition-watch endpoints, Caddy certificate issuance, and ClamAV signature updates. The API applies EF migrations at startup after Postgres is healthy. Temporal owns a separate persistent Postgres database. MinIO creates a private bucket and a least-privilege user before the API starts. Keep the Compose environment file and Codex OAuth file private, and pin every third-party container image to an audited release or digest before deploying. This production topology has been configuration-validated; live service startup still requires pulling its container images and setting real OIDC, DNS, Firebase, APNs, and OAuth credentials.
+Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit media, plus outbound HTTPS for Codex OAuth/model access, Firebase FCM/OAuth, user-configured public condition-watch endpoints, Caddy certificate issuance, ClamAV signature updates, and GHCR pulls. The API applies EF migrations at startup after Postgres is healthy. Temporal owns a separate persistent Postgres database. MinIO creates a private bucket and a least-privilege user before the API starts. Keep the Compose environment file and Codex OAuth file private, and pin every third-party container image to an audited release or digest before deploying. This production topology has been configuration-validated; live service startup still requires pulling its container images and setting real OIDC, DNS, Firebase, APNs, and OAuth credentials.
+
+## GitHub Actions pipelines
+
+Releases use [Semantic Versioning 2.0.0](https://semver.org/): git tags must be `vMAJOR.MINOR.PATCH` (for example `v1.2.0`). Tag a release commit to run both pipelines, or start either workflow from **Actions** with `workflow_dispatch`. Pull requests use [`.github/pull_request_template.md`](.github/pull_request_template.md), including the required SemVer impact section.
+
+| Change | SemVer bump | Example tag |
+|--------|-------------|---------------|
+| Breaking API, auth, DB, or mobile contract | Major | `v2.0.0` |
+| Backward-compatible feature | Minor | `v1.3.0` |
+| Backward-compatible fix or docs-only release | Patch | `v1.2.1` |
+
+Before tagging, align `apps/mobile/pubspec.yaml` with the marketing version (`version: X.Y.Z+N`). The iOS workflow rewrites the pubspec to `X.Y.Z` plus a monotonic iOS build number derived from the SemVer and run id. Validate a version locally with `python3 scripts/release/semver.py --validate 1.2.3` or compute the next tag with `python3 scripts/release/semver.py --bump patch --from-version 1.2.0`.
+
+### iOS IPA (unsigned, LiveContainer)
+
+[`.github/workflows/release-ios.yml`](.github/workflows/release-ios.yml) builds an **unsigned** release IPA on `macos-latest` and attaches `Jarvis.ipa` to the GitHub Release for the SemVer tag. No Apple signing certificates or provisioning profiles are required.
+
+1. Add production Flutter `--dart-define` repository secrets when you need a non-local API and auth at build time: `JARVIS_API_URL`, `JARVIS_OIDC_ISSUER`, `JARVIS_OIDC_CLIENT_ID`, and optional Firebase iOS keys (`JARVIS_FIREBASE_*`).
+2. Tag `vX.Y.Z` or run the workflow manually. Download `Jarvis.ipa` from the release.
+3. Import the IPA in [LiveContainer](https://github.com/LiveContainer/LiveContainer) on your device (or copy the file via AirDrop, Files, or another transfer you already use with LiveContainer).
+
+Local packaging uses the same layout as CI: `flutter build ios --release --no-codesign` then [`scripts/ios/package_unsigned_ipa.sh`](scripts/ios/package_unsigned_ipa.sh).
+
+Push notifications and some entitlements may be limited without a normal signed distribution profile; in-app chat, OIDC, and SignalR still depend on your configured `JARVIS_API_URL` and identity provider.
+
+Optional: [`scripts/altstore/generate_source.py`](scripts/altstore/generate_source.py) can still build AltStore-style `source.json` if you later ship a **signed** IPA to a public URL. The release workflow no longer publishes `source.json` or GitHub Pages, because unsigned builds are not suitable for AltStore/SideStore install.
+
+### Backend GHCR images and SSH deploy
+
+[`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) builds `api`, `worker`, and `voice-worker` from the production Dockerfiles, pushes them to `ghcr.io/<owner>/jarvis-ai/<name>:<git-sha>` (plus the version tag and `latest` on `v*` tags), then SSHs to your server to pull those images and restart Compose. It does **not** run on every push to `main`.
+
+Server bootstrap:
+
+1. Clone this repository to a persistent path such as `/opt/jarvis`.
+2. Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, mode `0600`, and fill in real secrets. Set `JARVIS_API_IMAGE`, `JARVIS_WORKER_IMAGE`, and `JARVIS_VOICE_WORKER_IMAGE` to the GHCR names for this repo (the deploy job overrides the tag with the git SHA).
+3. Install Docker with the Compose plugin. The checkout must be able to `git fetch` this repository (SSH deploy key or HTTPS credentials).
+4. Add repository secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`, and optional `DEPLOY_PORT` (default `22`).
+5. Optional repository variable `DEPLOY_COMPOSE_FILES` lists extra Compose overlays relative to the repo root, for example `infra/compose/docker-compose.github.yml infra/compose/docker-compose.home-assistant.yml`.
+6. In GitHub → Packages, link the three container packages to this repository so `GITHUB_TOKEN` can push and the deploy job can pull. Keep packages private if the repo is private; the job logs into GHCR on the server with a short-lived token. For later manual pulls, `docker login ghcr.io` on the host with a PAT that has `read:packages`.
+
+`workflow_dispatch` accepts `skip_deploy` to build/push images without SSHing, and an optional extra `image_tag`. Production secrets stay in `.env.production` on the server and are never passed through GitHub Actions. `python3 -m unittest tests/unit/compose/test_production_images.py` checks that Compose interpolates the GHCR image variables.
 
 MCP tools are disabled unless configured. Set `Mcp__Servers__0__Name`, `Mcp__Servers__0__Transport`, and `Mcp__Servers__0__AllowedTools__0`; stdio servers also need `Mcp__Servers__0__Command` and optional arguments/environment, while Streamable HTTP servers need `Mcp__Servers__0__Endpoint` and optional headers. Tools are approval-required by default; add an exact tool name to `Mcp__Servers__0__AutoApprovedTools__0` only when unattended execution is intended. Stdio children receive a minimal environment by default. To inject an owner's encrypted integration credentials into a stdio child, set `Mcp__Servers__0__CredentialProvider`, map a child variable to a stored secret name under `CredentialEnvironmentVariables`, and store those values under the same provider slug. For Streamable HTTP, map headers with `CredentialHeaders`; sending mapped credentials requires HTTPS. Store the complete header value (including a `Bearer` scheme when required) in the encrypted credential record. The API opens a scoped MCP connection for each agent run and disposes it when the run finishes. Stored or configured transport values are scrubbed from MCP tool results and errors before those values can reach the model context.
 

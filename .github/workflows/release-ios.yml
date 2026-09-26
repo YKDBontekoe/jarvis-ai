@@ -1,0 +1,125 @@
+name: Release iOS IPA
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: SemVer marketing version (MAJOR.MINOR.PATCH). Defaults to apps/mobile/pubspec.yaml.
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-ios-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-ipa:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate release tag uses SemVer
+        if: github.ref_type == 'tag'
+        run: python3 scripts/release/semver.py --parse-tag "${GITHUB_REF_NAME}"
+
+      - name: Resolve SemVer release version
+        id: version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release/semver.py \
+            --ref-type "${GITHUB_REF_TYPE}" \
+            --ref-name "${GITHUB_REF_NAME}" \
+            --input-version "${INPUT_VERSION}" \
+            --run-number "${GITHUB_RUN_NUMBER}" \
+            --github-output
+
+      - name: Sync Flutter pubspec version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.version.outputs.build }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release/semver.py \
+            --write-pubspec \
+            --version "${VERSION}" \
+            --build "${BUILD}"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Dart/Flutter dependencies
+        working-directory: apps/mobile
+        run: flutter pub get
+
+      - name: Build unsigned iOS app
+        working-directory: apps/mobile
+        env:
+          JARVIS_API_URL: ${{ secrets.JARVIS_API_URL }}
+          JARVIS_OIDC_ISSUER: ${{ secrets.JARVIS_OIDC_ISSUER }}
+          JARVIS_OIDC_CLIENT_ID: ${{ secrets.JARVIS_OIDC_CLIENT_ID }}
+          JARVIS_FIREBASE_API_KEY: ${{ secrets.JARVIS_FIREBASE_API_KEY }}
+          JARVIS_FIREBASE_PROJECT_ID: ${{ secrets.JARVIS_FIREBASE_PROJECT_ID }}
+          JARVIS_FIREBASE_SENDER_ID: ${{ secrets.JARVIS_FIREBASE_SENDER_ID }}
+          JARVIS_FIREBASE_IOS_APP_ID: ${{ secrets.JARVIS_FIREBASE_IOS_APP_ID }}
+          JARVIS_FIREBASE_IOS_BUNDLE_ID: ${{ secrets.JARVIS_FIREBASE_IOS_BUNDLE_ID }}
+          JARVIS_FIREBASE_STORAGE_BUCKET: ${{ secrets.JARVIS_FIREBASE_STORAGE_BUCKET }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.version.outputs.build }}
+        run: |
+          set -euo pipefail
+          DEFINES=()
+          add_define() {
+            local name="$1"
+            local value="$2"
+            if [[ -n "${value}" ]]; then
+              DEFINES+=(--dart-define="${name}=${value}")
+            fi
+          }
+          add_define JARVIS_API_URL "${JARVIS_API_URL}"
+          add_define JARVIS_OIDC_ISSUER "${JARVIS_OIDC_ISSUER}"
+          add_define JARVIS_OIDC_CLIENT_ID "${JARVIS_OIDC_CLIENT_ID}"
+          add_define JARVIS_FIREBASE_API_KEY "${JARVIS_FIREBASE_API_KEY}"
+          add_define JARVIS_FIREBASE_PROJECT_ID "${JARVIS_FIREBASE_PROJECT_ID}"
+          add_define JARVIS_FIREBASE_SENDER_ID "${JARVIS_FIREBASE_SENDER_ID}"
+          add_define JARVIS_FIREBASE_IOS_APP_ID "${JARVIS_FIREBASE_IOS_APP_ID}"
+          add_define JARVIS_FIREBASE_IOS_BUNDLE_ID "${JARVIS_FIREBASE_IOS_BUNDLE_ID}"
+          add_define JARVIS_FIREBASE_STORAGE_BUCKET "${JARVIS_FIREBASE_STORAGE_BUCKET}"
+          flutter build ios --release --no-codesign \
+            --build-name="${VERSION}" \
+            --build-number="${BUILD}" \
+            ${DEFINES[@]+"${DEFINES[@]}"}
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          APP_PATH="apps/mobile/build/ios/iphoneos/Runner.app"
+          if [[ ! -d "${APP_PATH}" ]]; then
+            echo "Unsigned Runner.app was not produced at ${APP_PATH}" >&2
+            exit 1
+          fi
+          mkdir -p dist
+          chmod +x scripts/ios/package_unsigned_ipa.sh
+          scripts/ios/package_unsigned_ipa.sh "${APP_PATH}" dist/Jarvis.ipa
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Jarvis ${{ steps.version.outputs.version }}
+          body: |
+            Unsigned `Jarvis.ipa` for [LiveContainer](https://github.com/LiveContainer/LiveContainer) (or similar loaders).
+            Download the IPA from this release and import it in LiveContainer on your device.
+          generate_release_notes: true
+          files: dist/Jarvis.ipa

@@ -127,6 +127,7 @@ services:
     networks: [application]
 
   jarvis-api:
+    image: ${JARVIS_API_IMAGE:-ghcr.io/ykdbontekoe/jarvis-ai/api:latest}
     build:
       context: ../..
       dockerfile: infra/compose/Dockerfile
@@ -198,6 +199,7 @@ services:
     networks: [application, data]
 
   jarvis-worker:
+    image: ${JARVIS_WORKER_IMAGE:-ghcr.io/ykdbontekoe/jarvis-ai/worker:latest}
     build:
       context: ../..
       dockerfile: infra/compose/Dockerfile
@@ -244,6 +246,7 @@ services:
     networks: [application, data]
 
   jarvis-voice-worker:
+    image: ${JARVIS_VOICE_WORKER_IMAGE:-ghcr.io/ykdbontekoe/jarvis-ai/voice-worker:latest}
     build:
       context: ../..
       dockerfile: workers/voice/Dockerfile
