@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -242,24 +243,15 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
         IconButton(
           tooltip: 'Refresh watches',
           onPressed: _loading ? null : _load,
-          icon: const Icon(Icons.refresh_rounded),
+          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
         ),
-        const SizedBox(width: 8),
+        HeaderAction(
+          label: 'New watch',
+          icon: PhosphorIconsRegular.plus,
+          onPressed: _createWatch,
+          busy: _creating,
+        ),
       ],
-    ),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: _creating ? null : _createWatch,
-      icon: _creating
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-          : const Icon(Icons.add_alert_outlined),
-      label: const Text('New watch'),
     ),
     body: _loading && _watches.isEmpty
         ? const LoadingState()
@@ -267,7 +259,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
         ? ErrorState(message: _error!, onRetry: _load)
         : _watches.isEmpty
         ? const EmptyState(
-            icon: Icons.monitor_heart_outlined,
+            icon: PhosphorIconsRegular.pulse,
             title: 'No watches yet',
             message:
                 'No watches yet. Set a threshold and Jarvis will keep an eye on it.',
@@ -275,7 +267,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
         : RefreshIndicator(
             onRefresh: _load,
             child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 104),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
               itemCount: _watches.length,
               itemBuilder: (context, index) =>
                   ContentWidth(child: _watchCard(_watches[index])),
@@ -296,9 +288,8 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
         children: [
           IconBadge(
             icon: active
-                ? Icons.monitor_heart_outlined
-                : Icons.check_circle_outline_rounded,
-            color: active ? JarvisColors.success : JarvisColors.muted,
+                ? PhosphorIconsRegular.pulse
+                : PhosphorIconsRegular.checkCircle,
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -345,11 +336,14 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
                     runSpacing: 4,
                     children: [
                       _meta(
-                        Icons.timer_outlined,
+                        PhosphorIconsRegular.timer,
                         'Checks every ${watch['intervalMinutes']} min',
                       ),
                       if (lastValue != null)
-                        _meta(Icons.show_chart_rounded, 'latest $lastValue'),
+                        _meta(
+                          PhosphorIconsRegular.chartLine,
+                          'latest $lastValue',
+                        ),
                     ],
                   ),
                 ],
@@ -360,7 +354,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
             IconButton(
               tooltip: 'Stop watching',
               onPressed: () => _cancel(watch),
-              icon: const Icon(Icons.stop_circle_outlined, size: 22),
+              icon: const Icon(PhosphorIconsRegular.stopCircle, size: 22),
             ),
         ],
       ),

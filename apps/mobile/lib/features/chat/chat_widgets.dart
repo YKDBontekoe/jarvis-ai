@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../ui/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -79,12 +80,13 @@ class _MessageBubbleState extends State<MessageBubble> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             decoration: BoxDecoration(
-              gradient: message.failed ? null : JarvisColors.userBubbleGradient,
-              color: message.failed ? JarvisColors.dangerSoft : null,
+              color: message.failed
+                  ? JarvisColors.dangerSoft
+                  : JarvisColors.surfaceRaised,
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(22),
-                topRight: Radius.circular(22),
-                bottomLeft: Radius.circular(22),
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+                bottomLeft: Radius.circular(20),
                 bottomRight: Radius.circular(6),
               ),
               border: message.failed
@@ -92,16 +94,13 @@ class _MessageBubbleState extends State<MessageBubble> {
                       color: JarvisColors.danger.withValues(alpha: .35),
                     )
                   : null,
-              boxShadow: message.failed
-                  ? null
-                  : JarvisShadows.glow(JarvisColors.accent, strength: .22),
             ),
             child: SelectableText(
               message.content,
               style: TextStyle(
                 fontSize: 15.5,
                 height: 1.45,
-                color: message.failed ? JarvisColors.ink : Colors.white,
+                color: JarvisColors.ink,
               ),
             ),
           ),
@@ -118,7 +117,10 @@ class _MessageBubbleState extends State<MessageBubble> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                icon: const Icon(Icons.refresh_rounded, size: 16),
+                icon: const Icon(
+                  PhosphorIconsRegular.arrowsClockwise,
+                  size: 16,
+                ),
                 label: const Text('Not sent — tap to retry'),
               ),
             ),
@@ -148,7 +150,7 @@ class _CopyButton extends StatelessWidget {
     icon: AnimatedSwitcher(
       duration: const Duration(milliseconds: 180),
       child: Icon(
-        copied ? Icons.check_rounded : Icons.content_copy_rounded,
+        copied ? PhosphorIconsRegular.check : PhosphorIconsRegular.copy,
         key: ValueKey(copied),
       ),
     ),
@@ -171,7 +173,7 @@ class JarvisMarkdown extends StatelessWidget {
     );
     final sheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
       p: body,
-      listBullet: body.copyWith(color: JarvisColors.accent),
+      listBullet: body.copyWith(color: JarvisColors.muted),
       h1: const TextStyle(
         fontSize: 22,
         fontWeight: FontWeight.w700,
@@ -194,30 +196,28 @@ class JarvisMarkdown extends StatelessWidget {
       ),
       strong: const TextStyle(fontWeight: FontWeight.w700),
       a: const TextStyle(
-        color: JarvisColors.accent,
+        color: JarvisColors.ink,
         fontWeight: FontWeight.w500,
         decoration: TextDecoration.underline,
-        decorationColor: Color(0x665b50f0),
+        decorationColor: JarvisColors.outlineStrong,
       ),
       code: const TextStyle(
         fontFamily: 'monospace',
         fontSize: 13.5,
-        backgroundColor: JarvisColors.accentSoft,
-        color: JarvisColors.accentDeep,
+        backgroundColor: JarvisColors.surfaceMuted,
+        color: JarvisColors.ink,
       ),
       codeblockPadding: const EdgeInsets.all(16),
       codeblockDecoration: BoxDecoration(
-        color: const Color(0xfffafbfd),
+        color: JarvisColors.canvas,
         borderRadius: BorderRadius.circular(JarvisRadii.md),
         border: Border.all(color: JarvisColors.outline),
       ),
       blockquote: const TextStyle(color: JarvisColors.inkSoft, height: 1.55),
       blockquotePadding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
-      blockquoteDecoration: BoxDecoration(
-        color: JarvisColors.accentSoft.withValues(alpha: .6),
-        borderRadius: BorderRadius.circular(8),
-        border: const Border(
-          left: BorderSide(color: JarvisColors.accent, width: 3),
+      blockquoteDecoration: const BoxDecoration(
+        border: Border(
+          left: BorderSide(color: JarvisColors.outlineStrong, width: 2),
         ),
       ),
       tableHead: const TextStyle(
@@ -278,30 +278,22 @@ class _ToolChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final description = describeTool(step.tool);
     final (label, color) = switch (step.status) {
-      ToolStepStatus.running => (description.active, JarvisColors.accent),
+      ToolStepStatus.running => (description.active, JarvisColors.inkSoft),
       ToolStepStatus.completed => (description.done, JarvisColors.success),
       ToolStepStatus.failed => (description.failed, JarvisColors.danger),
     };
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
-      padding: const EdgeInsets.fromLTRB(8, 5, 10, 5),
+      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
       decoration: BoxDecoration(
         color: JarvisColors.surface,
-        borderRadius: BorderRadius.circular(40),
-        border: Border.all(color: color.withValues(alpha: .25)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: JarvisColors.outline),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: .12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(description.icon, size: 12, color: color),
-          ),
+          Icon(description.icon, size: 14, color: JarvisColors.inkSoft),
           const SizedBox(width: 7),
           Text(
             label,
@@ -318,12 +310,12 @@ class _ToolChip extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 1.6, color: color),
             ),
             ToolStepStatus.completed => Icon(
-              Icons.check_rounded,
+              PhosphorIconsRegular.check,
               size: 14,
               color: color,
             ),
             ToolStepStatus.failed => Icon(
-              Icons.close_rounded,
+              PhosphorIconsRegular.x,
               size: 14,
               color: color,
             ),
@@ -366,7 +358,7 @@ class ApprovalCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: JarvisColors.surface,
           borderRadius: BorderRadius.circular(JarvisRadii.lg),
-          border: Border.all(color: accent.withValues(alpha: .35)),
+          border: Border.all(color: JarvisColors.outline),
           boxShadow: decided ? null : JarvisShadows.soft,
         ),
         clipBehavior: Clip.antiAlias,
@@ -375,15 +367,18 @@ class ApprovalCard extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              color: accent.withValues(alpha: .08),
+              decoration: const BoxDecoration(
+                color: JarvisColors.canvas,
+                border: Border(bottom: BorderSide(color: JarvisColors.outline)),
+              ),
               child: Row(
                 children: [
                   Icon(
                     decided
                         ? (approval.status == ApprovalStatus.approved
-                              ? Icons.verified_user_rounded
-                              : Icons.block_rounded)
-                        : Icons.shield_outlined,
+                              ? PhosphorIconsFill.shieldCheck
+                              : PhosphorIconsRegular.prohibit)
+                        : PhosphorIconsRegular.shieldCheck,
                     color: accent,
                     size: 19,
                   ),
@@ -415,11 +410,7 @@ class ApprovalCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      IconBadge(
-                        icon: description.icon,
-                        size: 30,
-                        color: JarvisColors.inkSoft,
-                      ),
+                      IconBadge(icon: description.icon, size: 30),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -515,8 +506,8 @@ class ApprovalCard extends StatelessWidget {
                                   approval.retry ||
                                           approval.status ==
                                               ApprovalStatus.failed
-                                      ? Icons.refresh_rounded
-                                      : Icons.check_rounded,
+                                      ? PhosphorIconsRegular.arrowsClockwise
+                                      : PhosphorIconsRegular.check,
                                   size: 18,
                                 ),
                           label: Text(
@@ -592,7 +583,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
                         shape: BoxShape.circle,
                         color: Color.lerp(
                           JarvisColors.outlineStrong,
-                          JarvisColors.accent,
+                          JarvisColors.inkSoft,
                           _pulse((_controller.value + i * .18) % 1),
                         ),
                       ),
@@ -695,12 +686,9 @@ class _ChatComposerState extends State<ChatComposer> {
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: JarvisColors.surface,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: focused
-              ? JarvisColors.accent.withValues(alpha: .45)
-              : JarvisColors.outline,
-          width: focused ? 1.5 : 1,
+          color: focused ? JarvisColors.outlineStrong : JarvisColors.outline,
         ),
         boxShadow: JarvisShadows.floating,
       ),
@@ -740,11 +728,11 @@ class _ChatComposerState extends State<ChatComposer> {
                   )
                 : Icon(
                     widget.voiceActive
-                        ? Icons.stop_rounded
-                        : Icons.mic_none_rounded,
+                        ? PhosphorIconsRegular.stop
+                        : PhosphorIconsRegular.microphone,
                   ),
             style: IconButton.styleFrom(
-              minimumSize: const Size(44, 44),
+              minimumSize: const Size(40, 40),
               foregroundColor: widget.voiceActive
                   ? JarvisColors.danger
                   : JarvisColors.inkSoft,
@@ -769,13 +757,13 @@ class _ChatComposerState extends State<ChatComposer> {
                         color: Colors.white,
                       ),
                     )
-                  : const Icon(Icons.arrow_upward_rounded),
+                  : const Icon(PhosphorIconsRegular.arrowUp),
               style: IconButton.styleFrom(
-                minimumSize: const Size(44, 44),
+                minimumSize: const Size(40, 40),
                 backgroundColor: JarvisColors.ink,
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: widget.sending
-                    ? JarvisColors.accent
+                    ? JarvisColors.ink
                     : JarvisColors.surfaceRaised,
                 disabledForegroundColor: widget.sending
                     ? Colors.white
@@ -795,92 +783,73 @@ class SuggestionChips extends StatelessWidget {
   final ValueChanged<String>? onSelected;
 
   static const suggestions = [
-    (Icons.alarm_add_rounded, 'Remind me to stretch in 20 minutes'),
-    (Icons.psychology_outlined, 'What do you know about me?'),
-    (Icons.event_note_rounded, 'What reminders do I have?'),
+    (PhosphorIconsRegular.alarm, 'Remind me to stretch in 20 minutes'),
+    (PhosphorIconsRegular.brain, 'What do you know about me?'),
+    (PhosphorIconsRegular.calendarBlank, 'What reminders do I have?'),
     (
-      Icons.travel_explore_rounded,
+      PhosphorIconsRegular.globeSimple,
       'Research the best espresso grinders in the background',
     ),
   ];
 
-  static const _tints = [
-    JarvisColors.accent,
-    JarvisColors.rose,
-    JarvisColors.warning,
-    JarvisColors.sky,
-  ];
-
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final columns = constraints.maxWidth >= 440 ? 2 : 1;
-      const gap = 10.0;
-      final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
-      return Wrap(
-        spacing: gap,
-        runSpacing: gap,
-        children: [
-          for (final (index, (icon, text)) in suggestions.indexed)
-            SizedBox(
-              width: width,
-              child: _SuggestionCard(
-                icon: icon,
-                text: text,
-                tint: _tints[index % _tints.length],
-                onTap: onSelected == null ? null : () => onSelected!(text),
-              ),
-            ),
-        ],
-      );
-    },
+  Widget build(BuildContext context) => GroupedSection(
+    dividerIndent: 48,
+    children: [
+      for (final (icon, text) in suggestions)
+        _SuggestionRow(
+          icon: icon,
+          text: text,
+          onTap: onSelected == null ? null : () => onSelected!(text),
+        ),
+    ],
   );
 }
 
-class _SuggestionCard extends StatelessWidget {
-  const _SuggestionCard({
+class _SuggestionRow extends StatelessWidget {
+  const _SuggestionRow({
     required this.icon,
     required this.text,
-    required this.tint,
     required this.onTap,
   });
 
   final IconData icon;
   final String text;
-  final Color tint;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => Semantics(
     button: true,
     enabled: onTap != null,
-    child: SurfaceCard(
+    child: InkWell(
       onTap: onTap,
-      radius: JarvisRadii.md,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      child: Row(
-        children: [
-          IconBadge(icon: icon, color: tint, size: 34),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13.5,
-                height: 1.35,
-                fontWeight: FontWeight.w500,
-                color: JarvisColors.ink,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
+        child: Row(
+          children: [
+            Icon(icon, size: 19, color: JarvisColors.inkSoft),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Text(
+                text,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  height: 1.35,
+                  color: JarvisColors.ink,
+                  letterSpacing: -.1,
+                ),
               ),
             ),
-          ),
-          const Icon(
-            Icons.north_east_rounded,
-            size: 16,
-            color: JarvisColors.muted,
-          ),
-        ],
+            const SizedBox(width: 8),
+            const Icon(
+              PhosphorIconsRegular.arrowUpRight,
+              size: 15,
+              color: JarvisColors.muted,
+            ),
+          ],
+        ),
       ),
     ),
   );

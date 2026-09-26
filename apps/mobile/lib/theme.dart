@@ -1,73 +1,54 @@
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'ui/phosphor_icons.dart';
 
 class JarvisColors {
-  static const canvas = Color(0xfff6f7fb);
+  static const canvas = Color(0xfff8f8f9);
   static const background = canvas;
   static const surface = Color(0xffffffff);
-  static const surfaceMuted = Color(0xfff1f2f7);
-  static const surfaceRaised = Color(0xffeceef5);
-  static const outline = Color(0xffe6e8f0);
-  static const outlineStrong = Color(0xffd4d7e2);
+  static const surfaceMuted = Color(0xfff3f3f5);
+  static const surfaceRaised = Color(0xffececef);
+  static const outline = Color(0xffe8e8eb);
+  static const outlineStrong = Color(0xffd8d8dd);
 
-  static const ink = Color(0xff0e1020);
-  static const inkSoft = Color(0xff545a73);
-  static const muted = Color(0xff8a90a6);
+  static const ink = Color(0xff111113);
+  static const inkSoft = Color(0xff55555e);
+  static const muted = Color(0xff8e8e98);
 
-  static const accent = Color(0xff5b50f0);
-  static const accentDeep = Color(0xff4338ca);
-  static const accentSoft = Color(0xffeeedff);
-  static const violet = Color(0xff9d7bff);
+  static const accent = Color(0xff4f46e5);
+  static const accentDeep = Color(0xff3730a3);
+  static const accentSoft = Color(0xffeef0ff);
+  static const violet = Color(0xff8b7cf6);
   static const sky = Color(0xff38bdf8);
-  static const rose = Color(0xfff472b6);
+  static const rose = Color(0xfff0a6c8);
 
-  static const success = Color(0xff0fa968);
-  static const successSoft = Color(0xffe4f6ed);
-  static const warning = Color(0xffd98200);
-  static const warningSoft = Color(0xfffff3da);
-  static const danger = Color(0xffe5484d);
-  static const dangerSoft = Color(0xfffdecec);
-  static const info = Color(0xff2f7bf5);
-  static const infoSoft = Color(0xffe8f1ff);
-
-  static const userBubbleGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xff6a5cff), Color(0xff4f46e5)],
-  );
-
-  static const brandGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xff6a5cff), Color(0xff9d7bff), Color(0xff38bdf8)],
-  );
+  static const success = Color(0xff16a34a);
+  static const successSoft = Color(0xffeaf6ee);
+  static const warning = Color(0xffd97706);
+  static const warningSoft = Color(0xfffcf4e6);
+  static const danger = Color(0xffdc2626);
+  static const dangerSoft = Color(0xfffcebeb);
+  static const info = Color(0xff2563eb);
+  static const infoSoft = Color(0xffecf2fe);
 }
 
 class JarvisRadii {
-  static const sm = 10.0;
-  static const md = 14.0;
-  static const lg = 20.0;
-  static const xl = 28.0;
+  static const sm = 8.0;
+  static const md = 12.0;
+  static const lg = 16.0;
+  static const xl = 22.0;
 }
 
 class JarvisShadows {
   static const soft = [
-    BoxShadow(color: Color(0x0a0e1020), blurRadius: 2, offset: Offset(0, 1)),
-    BoxShadow(color: Color(0x0f0e1020), blurRadius: 24, offset: Offset(0, 8)),
+    BoxShadow(color: Color(0x08111113), blurRadius: 2, offset: Offset(0, 1)),
+    BoxShadow(color: Color(0x0a111113), blurRadius: 12, offset: Offset(0, 4)),
   ];
 
   static const floating = [
-    BoxShadow(color: Color(0x0d0e1020), blurRadius: 3, offset: Offset(0, 1)),
-    BoxShadow(color: Color(0x1a1c1d4a), blurRadius: 40, offset: Offset(0, 16)),
-  ];
-
-  static List<BoxShadow> glow(Color color, {double strength = .35}) => [
-    BoxShadow(
-      color: color.withValues(alpha: strength),
-      blurRadius: 24,
-      offset: const Offset(0, 10),
-    ),
+    BoxShadow(color: Color(0x0a111113), blurRadius: 2, offset: Offset(0, 1)),
+    BoxShadow(color: Color(0x10111113), blurRadius: 24, offset: Offset(0, 8)),
   ];
 }
 
@@ -82,33 +63,37 @@ TextTheme _textTheme() {
   return TextTheme(
     displaySmall: base.copyWith(
       fontSize: 34,
-      fontWeight: FontWeight.w700,
-      letterSpacing: -1.1,
+      fontWeight: FontWeight.w600,
+      letterSpacing: -1.2,
       height: 1.12,
     ),
     headlineMedium: base.copyWith(
-      fontSize: 30,
-      fontWeight: FontWeight.w700,
+      fontSize: 28,
+      fontWeight: FontWeight.w600,
       letterSpacing: -.9,
       height: 1.15,
     ),
     headlineSmall: base.copyWith(
-      fontSize: 24,
-      fontWeight: FontWeight.w700,
+      fontSize: 22,
+      fontWeight: FontWeight.w600,
       letterSpacing: -.6,
       height: 1.2,
     ),
     titleLarge: base.copyWith(
-      fontSize: 20,
-      fontWeight: FontWeight.w700,
+      fontSize: 18,
+      fontWeight: FontWeight.w600,
       letterSpacing: -.4,
     ),
     titleMedium: base.copyWith(
-      fontSize: 16,
+      fontSize: 15.5,
       fontWeight: FontWeight.w600,
-      letterSpacing: -.2,
+      letterSpacing: -.25,
     ),
-    titleSmall: base.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
+    titleSmall: base.copyWith(
+      fontSize: 14.5,
+      fontWeight: FontWeight.w500,
+      letterSpacing: -.15,
+    ),
     bodyLarge: base.copyWith(fontSize: 16, height: 1.5),
     bodyMedium: base.copyWith(fontSize: 14.5, height: 1.45),
     bodySmall: base.copyWith(
@@ -116,12 +101,13 @@ TextTheme _textTheme() {
       height: 1.4,
       color: JarvisColors.inkSoft,
     ),
-    labelLarge: base.copyWith(fontSize: 14.5, fontWeight: FontWeight.w600),
+    labelLarge: base.copyWith(fontSize: 14, fontWeight: FontWeight.w500),
     labelMedium: base.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600),
     labelSmall: base.copyWith(
       fontSize: 11,
-      fontWeight: FontWeight.w600,
-      letterSpacing: .6,
+      fontWeight: FontWeight.w500,
+      letterSpacing: .4,
+      color: JarvisColors.muted,
     ),
   );
 }
@@ -156,14 +142,13 @@ ThemeData buildJarvisTheme() {
   );
   const buttonText = TextStyle(
     fontFamily: _fontFamily,
-    fontSize: 14.5,
-    fontWeight: FontWeight.w600,
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
     letterSpacing: -.1,
   );
-  // Underline borders keep floating labels inside the filled, rounded field.
-  final fieldBorder = UnderlineInputBorder(
+  final fieldBorder = OutlineInputBorder(
     borderRadius: BorderRadius.circular(JarvisRadii.md),
-    borderSide: BorderSide.none,
+    borderSide: const BorderSide(color: JarvisColors.outline),
   );
 
   return ThemeData(
@@ -173,9 +158,16 @@ ThemeData buildJarvisTheme() {
     colorScheme: scheme,
     textTheme: text,
     scaffoldBackgroundColor: JarvisColors.canvas,
-    splashFactory: InkSparkle.splashFactory,
-    hoverColor: JarvisColors.accent.withValues(alpha: .04),
-    highlightColor: JarvisColors.accent.withValues(alpha: .06),
+    splashFactory: InkRipple.splashFactory,
+    splashColor: JarvisColors.ink.withValues(alpha: .04),
+    hoverColor: JarvisColors.ink.withValues(alpha: .03),
+    highlightColor: JarvisColors.ink.withValues(alpha: .04),
+    actionIconTheme: ActionIconThemeData(
+      backButtonIconBuilder: (_) =>
+          const Icon(PhosphorIconsRegular.arrowLeft, size: 22),
+      closeButtonIconBuilder: (_) =>
+          const Icon(PhosphorIconsRegular.x, size: 22),
+    ),
     visualDensity: VisualDensity.standard,
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {
@@ -197,18 +189,19 @@ ThemeData buildJarvisTheme() {
       systemOverlayStyle: SystemUiOverlayStyle.dark.copyWith(
         statusBarColor: Colors.transparent,
       ),
-      iconTheme: const IconThemeData(color: JarvisColors.ink, size: 22),
+      iconTheme: const IconThemeData(color: JarvisColors.ink, size: 20),
       actionsIconTheme: const IconThemeData(
         color: JarvisColors.inkSoft,
-        size: 22,
+        size: 20,
       ),
       titleTextStyle: text.titleLarge,
     ),
-    iconTheme: const IconThemeData(color: JarvisColors.inkSoft),
+    iconTheme: const IconThemeData(color: JarvisColors.inkSoft, size: 20),
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(
+        iconSize: 20,
         foregroundColor: JarvisColors.inkSoft,
-        highlightColor: JarvisColors.accent.withValues(alpha: .08),
+        highlightColor: JarvisColors.ink.withValues(alpha: .05),
       ),
     ),
     cardTheme: CardThemeData(
@@ -233,17 +226,17 @@ ThemeData buildJarvisTheme() {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(JarvisRadii.lg),
       ),
-      selectedColor: JarvisColors.accent,
-      selectedTileColor: JarvisColors.accentSoft,
+      selectedColor: JarvisColors.ink,
+      selectedTileColor: JarvisColors.surfaceMuted,
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: JarvisColors.accent,
+        backgroundColor: JarvisColors.ink,
         foregroundColor: Colors.white,
         disabledBackgroundColor: JarvisColors.surfaceRaised,
         disabledForegroundColor: JarvisColors.muted,
-        minimumSize: const Size(64, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 22),
+        minimumSize: const Size(64, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 18),
         shape: buttonShape,
         textStyle: buttonText,
         elevation: 0,
@@ -252,19 +245,20 @@ ThemeData buildJarvisTheme() {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: JarvisColors.ink,
-        minimumSize: const Size(64, 46),
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        side: const BorderSide(color: JarvisColors.outlineStrong),
+        backgroundColor: JarvisColors.surface,
+        minimumSize: const Size(64, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        side: const BorderSide(color: JarvisColors.outline),
         shape: buttonShape,
         textStyle: buttonText,
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: JarvisColors.accent,
+        foregroundColor: JarvisColors.ink,
         textStyle: buttonText,
         shape: buttonShape,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -298,11 +292,11 @@ ThemeData buildJarvisTheme() {
     ),
     navigationRailTheme: NavigationRailThemeData(
       backgroundColor: JarvisColors.surface,
-      indicatorColor: JarvisColors.accentSoft,
+      indicatorColor: JarvisColors.surfaceMuted,
       indicatorShape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(JarvisRadii.md),
       ),
-      selectedIconTheme: const IconThemeData(color: JarvisColors.accent),
+      selectedIconTheme: const IconThemeData(color: JarvisColors.ink),
       unselectedIconTheme: const IconThemeData(color: JarvisColors.muted),
       selectedLabelTextStyle: text.labelMedium?.copyWith(
         color: JarvisColors.ink,
@@ -330,9 +324,9 @@ ThemeData buildJarvisTheme() {
     ),
     chipTheme: ChipThemeData(
       backgroundColor: JarvisColors.surface,
-      selectedColor: JarvisColors.accentSoft,
-      secondarySelectedColor: JarvisColors.accentSoft,
-      checkmarkColor: JarvisColors.accent,
+      selectedColor: JarvisColors.surfaceRaised,
+      secondarySelectedColor: JarvisColors.surfaceRaised,
+      checkmarkColor: JarvisColors.ink,
       side: const BorderSide(color: JarvisColors.outline),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
       labelStyle: const TextStyle(
@@ -350,8 +344,8 @@ ThemeData buildJarvisTheme() {
       space: 1,
     ),
     progressIndicatorTheme: const ProgressIndicatorThemeData(
-      color: JarvisColors.accent,
-      linearTrackColor: JarvisColors.accentSoft,
+      color: JarvisColors.ink,
+      linearTrackColor: JarvisColors.surfaceRaised,
       circularTrackColor: Colors.transparent,
       borderRadius: BorderRadius.all(Radius.circular(4)),
     ),
@@ -359,7 +353,7 @@ ThemeData buildJarvisTheme() {
       thumbColor: WidgetStateProperty.all(Colors.white),
       trackColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
-            ? JarvisColors.accent
+            ? JarvisColors.ink
             : JarvisColors.outlineStrong,
       ),
       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
@@ -381,14 +375,14 @@ ThemeData buildJarvisTheme() {
       showDragHandle: true,
       dragHandleColor: JarvisColors.outlineStrong,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
     ),
     popupMenuTheme: PopupMenuThemeData(
       color: JarvisColors.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 8,
-      shadowColor: const Color(0x331c1d4a),
+      shadowColor: const Color(0x22111113),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(JarvisRadii.md),
         side: const BorderSide(color: JarvisColors.outline),
@@ -399,7 +393,7 @@ ThemeData buildJarvisTheme() {
       behavior: SnackBarBehavior.floating,
       backgroundColor: JarvisColors.ink,
       contentTextStyle: text.bodyMedium?.copyWith(color: Colors.white),
-      actionTextColor: const Color(0xffb9b2ff),
+      actionTextColor: Colors.white,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(JarvisRadii.md),
@@ -420,12 +414,12 @@ ThemeData buildJarvisTheme() {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: JarvisColors.surfaceMuted,
+      fillColor: JarvisColors.surface,
       hintStyle: text.bodyMedium?.copyWith(color: JarvisColors.muted),
       labelStyle: text.bodyMedium?.copyWith(color: JarvisColors.inkSoft),
       floatingLabelStyle: text.bodyMedium?.copyWith(
-        color: JarvisColors.accent,
-        fontWeight: FontWeight.w600,
+        color: JarvisColors.ink,
+        fontWeight: FontWeight.w500,
       ),
       helperStyle: text.bodySmall,
       prefixIconColor: JarvisColors.muted,
@@ -434,7 +428,7 @@ ThemeData buildJarvisTheme() {
       enabledBorder: fieldBorder,
       disabledBorder: fieldBorder,
       focusedBorder: fieldBorder.copyWith(
-        borderSide: const BorderSide(color: JarvisColors.accent, width: 1.5),
+        borderSide: const BorderSide(color: JarvisColors.ink, width: 1.2),
       ),
       errorBorder: fieldBorder.copyWith(
         borderSide: const BorderSide(color: JarvisColors.danger),
@@ -442,7 +436,7 @@ ThemeData buildJarvisTheme() {
       focusedErrorBorder: fieldBorder.copyWith(
         borderSide: const BorderSide(color: JarvisColors.danger, width: 1.5),
       ),
-      contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
     ),
     textSelectionTheme: TextSelectionThemeData(
       cursorColor: JarvisColors.accent,

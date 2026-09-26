@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 
 import 'features/chat/chat_widgets.dart';
 import 'theme.dart';
@@ -90,7 +91,7 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
         ? const LoadingState()
         : _error != null
         ? EmptyState(
-            icon: Icons.link_off_rounded,
+            icon: PhosphorIconsRegular.linkBreak,
             title: 'Nothing to show',
             message: _error,
           )
@@ -98,16 +99,10 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
   );
 
   IconData get _icon => _isReminder
-      ? Icons.alarm_rounded
+      ? PhosphorIconsRegular.alarm
       : _isWatch
-      ? Icons.monitor_heart_outlined
-      : Icons.task_alt_rounded;
-
-  Color get _color => _isReminder
-      ? JarvisColors.rose
-      : _isWatch
-      ? JarvisColors.success
-      : JarvisColors.accent;
+      ? PhosphorIconsRegular.pulse
+      : PhosphorIconsRegular.checkCircle;
 
   Widget _fact(IconData icon, String text) => Padding(
     padding: const EdgeInsets.only(top: 12),
@@ -152,7 +147,7 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                IconBadge(icon: _icon, color: _color, size: 52),
+                IconBadge(icon: _icon, size: 52),
                 const SizedBox(height: 18),
                 Text(title, style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 12),
@@ -170,19 +165,19 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
                 ],
                 if (_isWatch && item['lastValue'] != null) ...[
                   _fact(
-                    Icons.show_chart_rounded,
+                    PhosphorIconsRegular.chartLine,
                     'Latest value: ${item['lastValue']}',
                   ),
                   if ((item['lastCheckedAt'] as String?) != null)
                     _fact(
-                      Icons.update_rounded,
+                      PhosphorIconsRegular.clockCounterClockwise,
                       'Checked ${_date(item['lastCheckedAt'])}',
                     ),
                 ],
                 if ((_isTask || _isWatch) &&
                     (item['createdAt'] as String?) != null)
                   _fact(
-                    Icons.calendar_today_outlined,
+                    PhosphorIconsRegular.calendarBlank,
                     'Created ${_date(item['createdAt'])}',
                   ),
               ],

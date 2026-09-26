@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 import 'approvals_screen.dart';
 import 'features/chat/chat_widgets.dart';
 import 'theme.dart';
@@ -95,7 +96,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         IconButton(
           tooltip: 'Refresh task',
           onPressed: _loading ? null : _load,
-          icon: const Icon(Icons.refresh_rounded),
+          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
         ),
         const SizedBox(width: 8),
       ],
@@ -126,7 +127,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                 SurfaceCard(
                   child: Row(
                     children: [
-                      IconBadge(icon: style.icon, color: style.color, size: 48),
+                      IconBadge(icon: style.icon, size: 48),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
@@ -167,10 +168,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     onTap: () => _openApprovals(conversationId),
                     child: Row(
                       children: [
-                        const IconBadge(
-                          icon: Icons.shield_outlined,
-                          color: JarvisColors.warning,
-                        ),
+                        const IconBadge(icon: PhosphorIconsRegular.shieldCheck),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
@@ -189,7 +187,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                           ),
                         ),
                         const Icon(
-                          Icons.chevron_right_rounded,
+                          PhosphorIconsRegular.caretRight,
+                          size: 16,
                           color: JarvisColors.inkSoft,
                         ),
                       ],
@@ -241,21 +240,15 @@ class _TaskMessage extends StatelessWidget {
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      color: isUser ? JarvisColors.accentSoft : JarvisColors.surface,
-      borderColor: isUser
-          ? JarvisColors.accent.withValues(alpha: .15)
-          : JarvisColors.outline,
+      color: isUser ? JarvisColors.surfaceMuted : JarvisColors.surface,
+      borderColor: isUser ? JarvisColors.surfaceMuted : JarvisColors.outline,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               if (isUser)
-                const IconBadge(
-                  icon: Icons.person_outline_rounded,
-                  size: 26,
-                  color: JarvisColors.accent,
-                )
+                const IconBadge(icon: PhosphorIconsRegular.user, size: 26)
               else
                 const JarvisAvatar(size: 26),
               const SizedBox(width: 10),

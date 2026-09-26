@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -56,7 +57,7 @@ class _AuditScreenState extends State<AuditScreen> {
         IconButton(
           tooltip: 'Refresh audit log',
           onPressed: _loading ? null : _load,
-          icon: const Icon(Icons.refresh_rounded),
+          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
         ),
         const SizedBox(width: 8),
       ],
@@ -67,7 +68,7 @@ class _AuditScreenState extends State<AuditScreen> {
         ? ErrorState(message: _error!, onRetry: _load)
         : _events.isEmpty
         ? const EmptyState(
-            icon: Icons.fact_check_outlined,
+            icon: PhosphorIconsRegular.listChecks,
             title: 'No audited actions yet.',
             message:
                 'Approvals, tasks, reminders, files, and memory changes are recorded here.',
@@ -153,8 +154,8 @@ class _AuditRow extends StatelessWidget {
                     children: [
                       Icon(
                         success
-                            ? Icons.check_circle_outline_rounded
-                            : Icons.error_outline_rounded,
+                            ? PhosphorIconsRegular.checkCircle
+                            : PhosphorIconsRegular.warningCircle,
                         size: 17,
                         color: color,
                       ),

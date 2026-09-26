@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 import 'approvals_screen.dart';
 import 'notification_details_screen.dart';
 import 'task_details_screen.dart';
@@ -85,8 +86,8 @@ class _RemindersScreenState extends State<RemindersScreen>
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(JarvisRadii.md),
                   ),
-                  leading: const Icon(Icons.calendar_today_outlined),
-                  trailing: const Icon(Icons.expand_more_rounded),
+                  leading: const Icon(PhosphorIconsRegular.calendarBlank),
+                  trailing: const Icon(PhosphorIconsRegular.caretDown),
                   title: Text(
                     MaterialLocalizations.of(
                       context,
@@ -110,8 +111,8 @@ class _RemindersScreenState extends State<RemindersScreen>
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(JarvisRadii.md),
                   ),
-                  leading: const Icon(Icons.schedule_rounded),
-                  trailing: const Icon(Icons.expand_more_rounded),
+                  leading: const Icon(PhosphorIconsRegular.clock),
+                  trailing: const Icon(PhosphorIconsRegular.caretDown),
                   title: Text(selectedTime.format(context)),
                   onTap: () async {
                     final value = await showTimePicker(
@@ -184,7 +185,7 @@ class _RemindersScreenState extends State<RemindersScreen>
       cancelLabel: 'Keep',
       confirmLabel: 'Cancel reminder',
       destructive: true,
-      icon: Icons.notifications_off_outlined,
+      icon: PhosphorIconsRegular.bellSlash,
     );
     if (!confirmed) return;
     try {
@@ -275,9 +276,13 @@ class _RemindersScreenState extends State<RemindersScreen>
         IconButton(
           onPressed: _load,
           tooltip: 'Refresh',
-          icon: const Icon(Icons.refresh_rounded),
+          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
         ),
-        const SizedBox(width: 8),
+        HeaderAction(
+          label: 'New',
+          icon: PhosphorIconsRegular.plus,
+          onPressed: _createReminder,
+        ),
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(56),
@@ -307,7 +312,7 @@ class _RemindersScreenState extends State<RemindersScreen>
                             vertical: 1,
                           ),
                           decoration: BoxDecoration(
-                            color: JarvisColors.accent,
+                            color: JarvisColors.ink,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -329,11 +334,6 @@ class _RemindersScreenState extends State<RemindersScreen>
         ),
       ),
     ),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: _createReminder,
-      icon: const Icon(Icons.add_alert_outlined),
-      label: const Text('New reminder'),
-    ),
     body: _loading
         ? const LoadingState()
         : _error != null
@@ -349,12 +349,12 @@ class _RemindersScreenState extends State<RemindersScreen>
 
   Widget _buildReminders() => _reminders.isEmpty
       ? const EmptyState(
-          icon: Icons.alarm_rounded,
+          icon: PhosphorIconsRegular.alarm,
           title: 'No reminders yet.',
           message: 'Ask Jarvis to remind you, or create one here.',
         )
       : ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 104),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           itemCount: _reminders.length,
           itemBuilder: (context, index) {
             final reminder = _reminders[index];
@@ -369,9 +369,8 @@ class _RemindersScreenState extends State<RemindersScreen>
                   children: [
                     IconBadge(
                       icon: pending
-                          ? Icons.alarm_rounded
-                          : Icons.alarm_off_rounded,
-                      color: pending ? JarvisColors.rose : JarvisColors.muted,
+                          ? PhosphorIconsRegular.alarm
+                          : PhosphorIconsRegular.bellSlash,
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -407,7 +406,7 @@ class _RemindersScreenState extends State<RemindersScreen>
                       IconButton(
                         tooltip: 'Cancel reminder',
                         onPressed: () => _cancelReminder(reminder),
-                        icon: const Icon(Icons.close_rounded, size: 20),
+                        icon: const Icon(PhosphorIconsRegular.x, size: 20),
                       ),
                   ],
                 ),
@@ -417,21 +416,21 @@ class _RemindersScreenState extends State<RemindersScreen>
         );
 
   IconData _notificationIcon(Object? type) => switch (type) {
-    'reminder.due' => Icons.alarm_rounded,
-    'task.completed' => Icons.task_alt_rounded,
-    'approval.required' => Icons.shield_outlined,
-    'watch.triggered' || 'watch.failed' => Icons.monitor_heart_outlined,
-    _ => Icons.notifications_none_rounded,
+    'reminder.due' => PhosphorIconsRegular.alarm,
+    'task.completed' => PhosphorIconsRegular.checkCircle,
+    'approval.required' => PhosphorIconsRegular.shieldCheck,
+    'watch.triggered' || 'watch.failed' => PhosphorIconsRegular.pulse,
+    _ => PhosphorIconsRegular.bell,
   };
 
   Widget _buildNotifications() => _notifications.isEmpty
       ? const EmptyState(
-          icon: Icons.notifications_none_rounded,
+          icon: PhosphorIconsRegular.bell,
           title: 'No notifications yet.',
           message: 'Alerts from reminders, tasks, and watches will show here.',
         )
       : ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 104),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           itemCount: _notifications.length,
           itemBuilder: (context, index) {
             final notification = _notifications[index];
@@ -442,17 +441,12 @@ class _RemindersScreenState extends State<RemindersScreen>
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                 color: unread ? JarvisColors.surface : JarvisColors.canvas,
-                borderColor: unread
-                    ? JarvisColors.accent.withValues(alpha: .25)
-                    : JarvisColors.outline,
+                borderColor: JarvisColors.outline,
                 onTap: () => _openNotification(notification),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    IconBadge(
-                      icon: _notificationIcon(notification['type']),
-                      color: unread ? JarvisColors.accent : JarvisColors.muted,
-                    ),
+                    IconBadge(icon: _notificationIcon(notification['type'])),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(

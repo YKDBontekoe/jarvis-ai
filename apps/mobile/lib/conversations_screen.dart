@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -95,7 +96,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       cancelLabel: 'Keep conversation',
       confirmLabel: 'Delete',
       destructive: true,
-      icon: Icons.delete_outline_rounded,
+      icon: PhosphorIconsRegular.trash,
     );
     if (!confirmed) return;
     try {
@@ -124,25 +125,15 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         IconButton(
           onPressed: _loading || _creating ? null : _load,
           tooltip: 'Refresh',
-          icon: const Icon(Icons.refresh_rounded),
+          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
         ),
-        const SizedBox(width: 8),
+        HeaderAction(
+          label: 'New',
+          icon: PhosphorIconsRegular.notePencil,
+          onPressed: _createConversation,
+          busy: _creating,
+        ),
       ],
-    ),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: _creating ? null : _createConversation,
-      tooltip: 'New conversation',
-      icon: _creating
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-          : const Icon(Icons.edit_square, size: 20),
-      label: const Text('New conversation'),
     ),
     body: _loading
         ? const LoadingState()
@@ -150,12 +141,12 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         ? ErrorState(message: _error!, onRetry: _load)
         : _conversations.isEmpty
         ? const EmptyState(
-            icon: Icons.forum_outlined,
+            icon: PhosphorIconsRegular.chatsCircle,
             title: 'No conversations yet.',
             message: 'Start a new conversation and it will appear here.',
           )
         : ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 104),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             itemCount: _conversations.length,
             itemBuilder: (context, index) {
               final conversation = _conversations[index];
@@ -165,11 +156,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                 child: SurfaceCard(
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
-                  color: selected
-                      ? JarvisColors.accentSoft
-                      : JarvisColors.surface,
                   borderColor: selected
-                      ? JarvisColors.accent.withValues(alpha: .3)
+                      ? JarvisColors.outlineStrong
                       : JarvisColors.outline,
                   onTap: () => Navigator.of(
                     context,
@@ -178,11 +166,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                     children: [
                       IconBadge(
                         icon: selected
-                            ? Icons.chat_bubble_rounded
-                            : Icons.chat_bubble_outline_rounded,
-                        color: selected
-                            ? JarvisColors.accent
-                            : JarvisColors.inkSoft,
+                            ? PhosphorIconsFill.chatCircle
+                            : PhosphorIconsRegular.chatCircle,
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -210,18 +195,15 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 4),
                           child: Icon(
-                            Icons.check_circle_rounded,
+                            PhosphorIconsFill.checkCircle,
                             size: 20,
-                            color: JarvisColors.accent,
+                            color: JarvisColors.ink,
                           ),
                         ),
                       IconButton(
                         tooltip: 'Delete conversation',
                         onPressed: () => _deleteConversation(conversation),
-                        icon: const Icon(
-                          Icons.delete_outline_rounded,
-                          size: 20,
-                        ),
+                        icon: const Icon(PhosphorIconsRegular.trash, size: 20),
                       ),
                     ],
                   ),

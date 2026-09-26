@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'phosphor_icons.dart';
 
 import '../theme.dart';
 
@@ -119,14 +120,9 @@ class _JarvisOrbState extends State<JarvisOrb>
       boxShadow: widget.glow
           ? [
               BoxShadow(
-                color: JarvisColors.accent.withValues(alpha: .30),
-                blurRadius: size * .38,
-                offset: Offset(0, size * .12),
-              ),
-              BoxShadow(
-                color: JarvisColors.sky.withValues(alpha: .18),
-                blurRadius: size * .5,
-                offset: Offset(size * .1, -size * .04),
+                color: JarvisColors.accent.withValues(alpha: .16),
+                blurRadius: size * .4,
+                offset: Offset(0, size * .14),
               ),
             ]
           : null,
@@ -146,12 +142,12 @@ class _JarvisOrbState extends State<JarvisOrb>
                 gradient: SweepGradient(
                   transform: GradientRotation(rotation),
                   colors: const [
-                    Color(0xff5b50f0),
-                    Color(0xff9d7bff),
-                    Color(0xfff0a6e0),
-                    Color(0xff38bdf8),
-                    Color(0xff6a5cff),
-                    Color(0xff5b50f0),
+                    Color(0xff5a52e6),
+                    Color(0xff9a8cf5),
+                    Color(0xffe9bfe0),
+                    Color(0xff9ccdf2),
+                    Color(0xff6c63ea),
+                    Color(0xff5a52e6),
                   ],
                 ),
               ),
@@ -241,8 +237,8 @@ class SurfaceCard extends StatelessWidget {
 class IconBadge extends StatelessWidget {
   const IconBadge({
     required this.icon,
-    this.color = JarvisColors.accent,
-    this.size = 40,
+    this.color = JarvisColors.ink,
+    this.size = 36,
     super.key,
   });
 
@@ -255,10 +251,10 @@ class IconBadge extends StatelessWidget {
     width: size,
     height: size,
     decoration: BoxDecoration(
-      color: color.withValues(alpha: .11),
-      borderRadius: BorderRadius.circular(size * .32),
+      color: JarvisColors.surfaceMuted,
+      borderRadius: BorderRadius.circular(size * .28),
     ),
-    child: Icon(icon, size: size * .5, color: color),
+    child: Icon(icon, size: size * .52, color: color),
   );
 }
 
@@ -275,10 +271,10 @@ class StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(8, 4, 10, 4),
+    padding: const EdgeInsets.fromLTRB(7, 3, 9, 3),
     decoration: BoxDecoration(
-      color: color.withValues(alpha: .1),
-      borderRadius: BorderRadius.circular(40),
+      color: JarvisColors.surfaceMuted,
+      borderRadius: BorderRadius.circular(6),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
@@ -291,11 +287,11 @@ class StatusPill extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Color.lerp(color, JarvisColors.ink, .25),
-            height: 1.2,
+            fontWeight: FontWeight.w500,
+            color: JarvisColors.inkSoft,
+            height: 1.25,
           ),
         ),
       ],
@@ -310,47 +306,47 @@ StatusStyle statusStyle(String status) => switch (status) {
   'running' || 'processing' => (
     label: status == 'running' ? 'In progress' : 'Processing',
     color: JarvisColors.info,
-    icon: Icons.autorenew_rounded,
+    icon: PhosphorIconsRegular.hourglassMedium,
   ),
   'needs_approval' => (
     label: 'Needs approval',
     color: JarvisColors.warning,
-    icon: Icons.gpp_maybe_outlined,
+    icon: PhosphorIconsRegular.shieldWarning,
   ),
   'completed' || 'delivered' || 'indexed' || 'triggered' || 'sent' => (
     label: _titleCase(status),
     color: JarvisColors.success,
-    icon: Icons.check_circle_outline_rounded,
+    icon: PhosphorIconsRegular.checkCircle,
   ),
   'failed' || 'error' || 'rejected' => (
     label: _titleCase(status),
     color: JarvisColors.danger,
-    icon: Icons.error_outline_rounded,
+    icon: PhosphorIconsRegular.warningCircle,
   ),
   'cancelled' || 'canceled' || 'stopped' || 'expired' => (
     label: _titleCase(status),
     color: JarvisColors.muted,
-    icon: Icons.block_rounded,
+    icon: PhosphorIconsRegular.prohibit,
   ),
   'active' || 'pending' || 'scheduled' => (
     label: _titleCase(status),
     color: JarvisColors.accent,
-    icon: Icons.schedule_rounded,
+    icon: PhosphorIconsRegular.clock,
   ),
   'waiting' => (
     label: 'Waiting',
     color: JarvisColors.violet,
-    icon: Icons.pause_circle_outline_rounded,
+    icon: PhosphorIconsRegular.pauseCircle,
   ),
   'queued' => (
     label: 'Queued',
     color: JarvisColors.inkSoft,
-    icon: Icons.schedule_rounded,
+    icon: PhosphorIconsRegular.clock,
   ),
   _ => (
     label: status.isEmpty ? 'Unknown' : _titleCase(status),
     color: JarvisColors.inkSoft,
-    icon: Icons.circle_outlined,
+    icon: PhosphorIconsRegular.circle,
   ),
 };
 
@@ -407,31 +403,16 @@ class EmptyState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [Color(0xffe9e6ff), Color(0x00e9e6ff)],
-                      ),
-                    ),
-                  ),
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: JarvisColors.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: JarvisColors.outline),
-                      boxShadow: JarvisShadows.soft,
-                    ),
-                    child: Icon(icon, size: 28, color: JarvisColors.accent),
-                  ),
-                ],
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: JarvisColors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: JarvisColors.outline),
+                  boxShadow: JarvisShadows.soft,
+                ),
+                child: Icon(icon, size: 24, color: JarvisColors.inkSoft),
               ),
               const SizedBox(height: 18),
               Text(
@@ -466,14 +447,14 @@ class ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => EmptyState(
-    icon: Icons.cloud_off_rounded,
+    icon: PhosphorIconsRegular.cloudSlash,
     title: 'Something went wrong',
     message: message,
     action: onRetry == null
         ? null
         : OutlinedButton.icon(
             onPressed: onRetry,
-            icon: const Icon(Icons.refresh_rounded, size: 18),
+            icon: const Icon(PhosphorIconsRegular.arrowsClockwise, size: 18),
             label: const Text('Retry'),
           ),
   );
@@ -514,22 +495,22 @@ class InlineNotice extends StatelessWidget {
       NoticeTone.info => (
         JarvisColors.info,
         JarvisColors.infoSoft,
-        Icons.info_outline_rounded,
+        PhosphorIconsRegular.info,
       ),
       NoticeTone.warning => (
         JarvisColors.warning,
         JarvisColors.warningSoft,
-        Icons.error_outline_rounded,
+        PhosphorIconsRegular.warningCircle,
       ),
       NoticeTone.danger => (
         JarvisColors.danger,
         JarvisColors.dangerSoft,
-        Icons.error_outline_rounded,
+        PhosphorIconsRegular.warningCircle,
       ),
       NoticeTone.success => (
         JarvisColors.success,
         JarvisColors.successSoft,
-        Icons.check_circle_outline_rounded,
+        PhosphorIconsRegular.checkCircle,
       ),
     };
     return Padding(
@@ -621,4 +602,75 @@ Future<bool> showJarvisConfirm(
     ),
   );
   return confirmed ?? false;
+}
+
+/// Compact primary action for app bars, replacing floating action buttons.
+class HeaderAction extends StatelessWidget {
+  const HeaderAction({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.busy = false,
+    super.key,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(left: 4, right: 12),
+    child: FilledButton.icon(
+      onPressed: busy ? null : onPressed,
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(0, 34),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(JarvisRadii.sm + 2),
+        ),
+        textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500),
+      ),
+      icon: busy
+          ? const SizedBox.square(
+              dimension: 14,
+              child: CircularProgressIndicator(strokeWidth: 1.8),
+            )
+          : Icon(icon, size: 16),
+      label: Text(label),
+    ),
+  );
+}
+
+/// Rows grouped in one card, separated by inset hairlines.
+class GroupedSection extends StatelessWidget {
+  const GroupedSection({
+    required this.children,
+    this.dividerIndent = 16,
+    this.margin = EdgeInsets.zero,
+    super.key,
+  });
+
+  final List<Widget> children;
+  final double dividerIndent;
+  final EdgeInsetsGeometry margin;
+
+  @override
+  Widget build(BuildContext context) => SurfaceCard(
+    margin: margin,
+    padding: EdgeInsets.zero,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(JarvisRadii.lg),
+      child: Column(
+        children: [
+          for (final (index, child) in children.indexed) ...[
+            if (index > 0) Divider(indent: dividerIndent),
+            child,
+          ],
+        ],
+      ),
+    ),
+  );
 }

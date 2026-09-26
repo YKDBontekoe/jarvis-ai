@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'oidc_web_stub.dart'
@@ -1151,11 +1152,11 @@ class _ChatScreenState extends State<ChatScreen> {
   static const _fadeThrough = Interval(.5, 1, curve: Curves.easeOutCubic);
 
   static const _destinations = [
-    (Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Chat'),
-    (Icons.task_alt_outlined, Icons.task_alt_rounded, 'Tasks'),
-    (Icons.mic_none_rounded, Icons.graphic_eq_rounded, 'Voice'),
-    (Icons.psychology_outlined, Icons.psychology_rounded, 'Memory'),
-    (Icons.tune_outlined, Icons.tune_rounded, 'Settings'),
+    (PhosphorIconsRegular.chatCircle, PhosphorIconsFill.chatCircle, 'Chat'),
+    (PhosphorIconsRegular.checkCircle, PhosphorIconsFill.checkCircle, 'Tasks'),
+    (PhosphorIconsRegular.waveform, PhosphorIconsBold.waveform, 'Voice'),
+    (PhosphorIconsRegular.brain, PhosphorIconsFill.brain, 'Memory'),
+    (PhosphorIconsRegular.gearSix, PhosphorIconsFill.gearSix, 'Settings'),
   ];
 
   @override
@@ -1187,7 +1188,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           bottomNavigationBar: wide
               ? null
-              : _FloatingNavBar(
+              : _TabBar(
                   selectedIndex: destination,
                   onSelected: _selectDestination,
                   voiceActive: _voiceActive,
@@ -1260,7 +1261,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ? const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              JarvisAvatar(size: 28),
+              JarvisAvatar(size: 24),
               SizedBox(width: 10),
               Text('Jarvis'),
             ],
@@ -1274,7 +1275,9 @@ class _ChatScreenState extends State<ChatScreen> {
               ? null
               : () => setState(() => _showHome = !_showHome),
           icon: Icon(
-            _showHome ? Icons.chat_bubble_outline_rounded : Icons.home_outlined,
+            _showHome
+                ? PhosphorIconsRegular.chatCircle
+                : PhosphorIconsRegular.house,
             size: 21,
           ),
         ),
@@ -1282,13 +1285,16 @@ class _ChatScreenState extends State<ChatScreen> {
         IconButton(
           tooltip: 'New chat',
           onPressed: _busy ? null : _startNewChat,
-          icon: const Icon(Icons.edit_square, size: 20),
+          icon: const Icon(PhosphorIconsRegular.notePencil, size: 20),
         ),
       if (destination == 0)
         IconButton(
           tooltip: 'Conversations',
           onPressed: _busy ? null : _chooseConversation,
-          icon: const Icon(Icons.history_rounded, size: 22),
+          icon: const Icon(
+            PhosphorIconsRegular.clockCounterClockwise,
+            size: 22,
+          ),
         ),
       Padding(
         padding: const EdgeInsets.only(left: 6, right: 16),
@@ -1345,7 +1351,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Icon(Icons.login_rounded),
+                            : const Icon(PhosphorIconsRegular.signIn),
                         label: const Text(
                           'Continue with your identity provider',
                         ),
@@ -1356,7 +1362,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.lock_outline_rounded,
+                          PhosphorIconsRegular.lockSimple,
                           size: 14,
                           color: JarvisColors.muted,
                         ),
@@ -1541,8 +1547,8 @@ class _ChatScreenState extends State<ChatScreen> {
                             )
                           : Icon(
                               _voiceActive
-                                  ? Icons.stop_rounded
-                                  : Icons.mic_none_rounded,
+                                  ? PhosphorIconsRegular.stop
+                                  : PhosphorIconsRegular.microphone,
                             ),
                       label: Text(
                         _voiceActive ? 'End voice chat' : 'Start voice chat',
@@ -1555,15 +1561,15 @@ class _ChatScreenState extends State<ChatScreen> {
                       runSpacing: 8,
                       children: [
                         _VoiceHint(
-                          icon: Icons.record_voice_over_outlined,
+                          icon: PhosphorIconsRegular.waveform,
                           label: 'Interrupt anytime',
                         ),
                         _VoiceHint(
-                          icon: Icons.psychology_outlined,
+                          icon: PhosphorIconsRegular.brain,
                           label: 'Uses your memory',
                         ),
                         _VoiceHint(
-                          icon: Icons.shield_outlined,
+                          icon: PhosphorIconsRegular.shieldCheck,
                           label: 'Asks before acting',
                         ),
                       ],
@@ -1587,14 +1593,9 @@ class _ChatScreenState extends State<ChatScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SurfaceCard(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xfff1efff), Color(0xffffffff)],
-                ),
                 child: Row(
                   children: [
-                    const JarvisOrb(size: 52),
+                    const JarvisOrb(size: 44, glow: false),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -1621,22 +1622,19 @@ class _ChatScreenState extends State<ChatScreen> {
                 _settingsTile(
                   'Integrations',
                   'Manage MCP servers and credentials',
-                  Icons.hub_outlined,
-                  JarvisColors.accent,
+                  PhosphorIconsRegular.plugsConnected,
                   'integrations',
                 ),
                 _settingsTile(
                   'Approvals',
                   'Review actions Jarvis needs permission to run',
-                  Icons.shield_outlined,
-                  JarvisColors.warning,
+                  PhosphorIconsRegular.shieldCheck,
                   'approvals',
                 ),
                 _settingsTile(
                   'Morning briefing',
                   'Choose your daily briefing schedule and time zone',
-                  Icons.wb_sunny_outlined,
-                  const Color(0xffe8833a),
+                  PhosphorIconsRegular.sunHorizon,
                   'briefing',
                 ),
               ]),
@@ -1644,15 +1642,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 _settingsTile(
                   'Reminders and notifications',
                   'View scheduled reminders and alerts',
-                  Icons.notifications_none_rounded,
-                  JarvisColors.rose,
+                  PhosphorIconsRegular.bell,
                   'reminders',
                 ),
                 _settingsTile(
                   'Condition watches',
                   'Manage threshold alerts',
-                  Icons.monitor_heart_outlined,
-                  JarvisColors.success,
+                  PhosphorIconsRegular.pulse,
                   'watches',
                 ),
               ]),
@@ -1660,15 +1656,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 _settingsTile(
                   'Files',
                   'Browse uploaded documents',
-                  Icons.folder_open_outlined,
-                  JarvisColors.sky,
+                  PhosphorIconsRegular.folderOpen,
                   'files',
                 ),
                 _settingsTile(
                   'Audit log',
                   'Review Jarvis activity',
-                  Icons.fact_check_outlined,
-                  JarvisColors.inkSoft,
+                  PhosphorIconsRegular.listChecks,
                   'audit',
                 ),
               ]),
@@ -1676,9 +1670,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 _settingsGroup('Account', [
                   ListTile(
                     leading: const IconBadge(
-                      icon: Icons.logout_rounded,
+                      icon: PhosphorIconsRegular.signOut,
                       color: JarvisColors.danger,
-                      size: 38,
+                      size: 34,
                     ),
                     title: const Text(
                       'Sign out',
@@ -1705,7 +1699,7 @@ class _ChatScreenState extends State<ChatScreen> {
             title.toUpperCase(),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: JarvisColors.muted,
-              letterSpacing: 1,
+              letterSpacing: .8,
             ),
           ),
         ),
@@ -1714,7 +1708,7 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Column(
             children: [
               for (final (index, tile) in tiles.indexed) ...[
-                if (index > 0) const Divider(indent: 70, endIndent: 16),
+                if (index > 0) const Divider(indent: 64),
                 tile,
               ],
             ],
@@ -1728,14 +1722,14 @@ class _ChatScreenState extends State<ChatScreen> {
     String title,
     String subtitle,
     IconData icon,
-    Color color,
     String destination,
   ) => ListTile(
-    leading: IconBadge(icon: icon, color: color, size: 38),
+    leading: IconBadge(icon: icon, size: 34),
     title: Text(title),
     subtitle: Text(subtitle),
     trailing: const Icon(
-      Icons.chevron_right_rounded,
+      PhosphorIconsRegular.caretRight,
+      size: 16,
       color: JarvisColors.muted,
     ),
     onTap: () => _openUtility(destination),
@@ -1743,7 +1737,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _welcome() => HomeOverview(
     http: _http,
-    mark: const JarvisOrb(size: 64),
+    mark: const JarvisOrb(size: 48, glow: false),
     ready: _conversationId != null,
     voiceStarting: _voiceStarting,
     onTalk: _conversationId == null || _voiceStarting || _sending
@@ -1767,16 +1761,14 @@ class _ConnectionPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = connected ? JarvisColors.success : JarvisColors.muted;
     return Tooltip(
       message: connected ? 'Live updates connected' : 'Offline',
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.fromLTRB(8, 5, 10, 5),
         decoration: BoxDecoration(
-          color: connected
-              ? JarvisColors.successSoft
-              : JarvisColors.surfaceMuted,
+          color: JarvisColors.surface,
+          border: Border.all(color: JarvisColors.outline),
           borderRadius: BorderRadius.circular(40),
         ),
         child: Row(
@@ -1788,8 +1780,8 @@ class _ConnectionPill extends StatelessWidget {
               connected ? 'Live' : 'Offline',
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color.lerp(color, JarvisColors.ink, .3),
+                fontWeight: FontWeight.w500,
+                color: connected ? JarvisColors.inkSoft : JarvisColors.muted,
               ),
             ),
           ],
@@ -1832,8 +1824,8 @@ class _ConnectionDot extends StatelessWidget {
   }
 }
 
-class _FloatingNavBar extends StatelessWidget {
-  const _FloatingNavBar({
+class _TabBar extends StatelessWidget {
+  const _TabBar({
     required this.selectedIndex,
     required this.onSelected,
     required this.voiceActive,
@@ -1848,170 +1840,117 @@ class _FloatingNavBar extends StatelessWidget {
   final List<(IconData, IconData, String)> destinations;
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-    top: false,
-    minimum: const EdgeInsets.only(bottom: 10),
-    child: Center(
-      heightFactor: 1,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: Container(
-          height: 68,
-          margin: const EdgeInsets.fromLTRB(16, 2, 16, 0),
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          decoration: BoxDecoration(
-            color: JarvisColors.surface,
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: JarvisColors.outline),
-            boxShadow: JarvisShadows.floating,
-          ),
-          child: Row(
-            children: [
-              for (final (index, (icon, selectedIcon, label))
-                  in destinations.indexed)
-                Expanded(
-                  child: index == 2
-                      ? _VoiceNavButton(
-                          selected: selectedIndex == 2,
-                          active: voiceActive,
-                          starting: voiceStarting,
-                          label: label,
-                          onTap: () => onSelected(2),
-                        )
-                      : _NavItem(
-                          icon: selectedIndex == index ? selectedIcon : icon,
-                          label: label,
-                          selected: selectedIndex == index,
-                          onTap: () => onSelected(index),
-                        ),
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: const BoxDecoration(
+      color: JarvisColors.surface,
+      border: Border(top: BorderSide(color: JarvisColors.outline)),
+    ),
+    child: SafeArea(
+      top: false,
+      child: SizedBox(
+        height: 58,
+        child: Row(
+          children: [
+            for (final (index, (icon, selectedIcon, label))
+                in destinations.indexed)
+              Expanded(
+                child: _TabItem(
+                  icon: selectedIndex == index ? selectedIcon : icon,
+                  label: label,
+                  selected: selectedIndex == index,
+                  live: index == 2 && (voiceActive || voiceStarting),
+                  onTap: () => onSelected(index),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     ),
   );
 }
 
-class _NavItem extends StatelessWidget {
-  const _NavItem({
+class _TabItem extends StatelessWidget {
+  const _TabItem({
     required this.icon,
     required this.label,
     required this.selected,
+    required this.live,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
+
+  /// Marks the voice tab while a session is connecting or running.
+  final bool live;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    button: true,
-    selected: selected,
-    label: label,
-    excludeSemantics: true,
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            width: selected ? 48 : 40,
-            height: 30,
-            decoration: BoxDecoration(
-              color: selected ? JarvisColors.accentSoft : Colors.transparent,
-              borderRadius: BorderRadius.circular(40),
-            ),
-            child: Icon(
-              icon,
-              size: 22,
-              color: selected ? JarvisColors.accent : JarvisColors.muted,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.fade,
-            softWrap: false,
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-              color: selected ? JarvisColors.ink : JarvisColors.muted,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _VoiceNavButton extends StatelessWidget {
-  const _VoiceNavButton({
-    required this.selected,
-    required this.active,
-    required this.starting,
-    required this.label,
-    required this.onTap,
-  });
-
-  final bool selected;
-  final bool active;
-  final bool starting;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    button: true,
-    selected: selected,
-    label: label,
-    excludeSemantics: true,
-    child: Tooltip(
-      message: active ? 'End voice chat' : 'Voice',
-      child: Center(
-        child: GestureDetector(
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: active
-                  ? const LinearGradient(
-                      colors: [Color(0xfff06a6e), JarvisColors.danger],
-                    )
-                  : JarvisColors.brandGradient,
-              boxShadow: JarvisShadows.glow(
-                active ? JarvisColors.danger : JarvisColors.accent,
-                strength: .38,
-              ),
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-            child: starting
-                ? const Padding(
-                    padding: EdgeInsets.all(15),
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Icon(
-                    active ? Icons.graphic_eq_rounded : Icons.mic_rounded,
-                    color: Colors.white,
-                    size: 24,
+  Widget build(BuildContext context) {
+    final color = selected ? JarvisColors.ink : JarvisColors.muted;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 32,
+        highlightShape: BoxShape.rectangle,
+        containedInkWell: true,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 150),
+                  child: Icon(
+                    icon,
+                    key: ValueKey(icon),
+                    size: 23,
+                    color: color,
                   ),
-          ),
+                ),
+                if (live)
+                  Positioned(
+                    right: -3,
+                    top: -1,
+                    child: Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: JarvisColors.danger,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: JarvisColors.surface,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.fade,
+              softWrap: false,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                letterSpacing: -.05,
+                color: color,
+              ),
+            ),
+          ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _VoiceHint extends StatelessWidget {
@@ -2031,7 +1970,7 @@ class _VoiceHint extends StatelessWidget {
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 15, color: JarvisColors.accent),
+        Icon(icon, size: 15, color: JarvisColors.inkSoft),
         const SizedBox(width: 6),
         Text(
           label,
@@ -2057,17 +1996,17 @@ class _AmbientBackdrop extends StatelessWidget {
         Positioned(
           top: -120,
           left: -80,
-          child: _Blob(size: 360, color: Color(0x2e7c6cff)),
+          child: _Blob(size: 360, color: Color(0x1c7c6cff)),
         ),
         Positioned(
           bottom: -140,
           right: -100,
-          child: _Blob(size: 420, color: Color(0x2438bdf8)),
+          child: _Blob(size: 420, color: Color(0x1638bdf8)),
         ),
         Positioned(
           top: 180,
           right: -60,
-          child: _Blob(size: 220, color: Color(0x1ff472b6)),
+          child: _Blob(size: 220, color: Color(0x12f472b6)),
         ),
       ],
     ),

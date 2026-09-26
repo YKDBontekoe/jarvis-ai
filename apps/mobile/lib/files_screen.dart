@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 
 import 'file_download_stub.dart'
     if (dart.library.io) 'file_download_io.dart'
@@ -121,7 +122,7 @@ class _FilesScreenState extends State<FilesScreen> {
       cancelLabel: 'Keep',
       confirmLabel: 'Delete',
       destructive: true,
-      icon: Icons.delete_outline_rounded,
+      icon: PhosphorIconsRegular.trash,
     );
     if (!confirmed) return;
     setState(() => _busy = true);
@@ -156,23 +157,15 @@ class _FilesScreenState extends State<FilesScreen> {
         IconButton(
           onPressed: _load,
           tooltip: 'Refresh',
-          icon: const Icon(Icons.refresh_rounded),
+          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
         ),
-        const SizedBox(width: 8),
+        HeaderAction(
+          label: 'Upload',
+          icon: PhosphorIconsRegular.uploadSimple,
+          onPressed: _upload,
+          busy: _busy,
+        ),
       ],
-    ),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: _busy ? null : _upload,
-      icon: _busy
-          ? const SizedBox.square(
-              dimension: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-          : const Icon(Icons.upload_rounded),
-      label: const Text('Upload file'),
     ),
     body: _loading
         ? const LoadingState()
@@ -180,18 +173,18 @@ class _FilesScreenState extends State<FilesScreen> {
         ? ErrorState(message: _error!, onRetry: _load)
         : _files.isEmpty
         ? const EmptyState(
-            icon: Icons.folder_open_outlined,
+            icon: PhosphorIconsRegular.folderOpen,
             title: 'No files yet',
             message:
                 'Your files will be stored privately with Jarvis. PDFs and text are indexed so Jarvis can search them.',
           )
         : ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 104),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             itemCount: _files.length,
             itemBuilder: (context, index) {
               final file = _files[index];
               final name = file['fileName'] as String? ?? 'File';
-              final (icon, color) = _fileVisual(name);
+              final icon = _fileIcon(name);
               final status = file['processingStatus'] as String? ?? 'uploaded';
               return ContentWidth(
                 child: SurfaceCard(
@@ -200,7 +193,7 @@ class _FilesScreenState extends State<FilesScreen> {
                   onTap: _busy ? null : () => _download(file),
                   child: Row(
                     children: [
-                      IconBadge(icon: icon, color: color, size: 44),
+                      IconBadge(icon: icon, size: 44),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
@@ -232,14 +225,16 @@ class _FilesScreenState extends State<FilesScreen> {
                       ),
                       PopupMenuButton<String>(
                         enabled: !_busy,
-                        icon: const Icon(Icons.more_horiz_rounded),
+                        icon: const Icon(PhosphorIconsRegular.dotsThree),
                         onSelected: (action) =>
                             action == 'open' ? _download(file) : _delete(file),
                         itemBuilder: (context) => const [
                           PopupMenuItem(
                             value: 'open',
                             child: ListTile(
-                              leading: Icon(Icons.open_in_new_rounded),
+                              leading: Icon(
+                                PhosphorIconsRegular.arrowSquareOut,
+                              ),
                               title: Text('Download and open'),
                               contentPadding: EdgeInsets.zero,
                             ),
@@ -248,7 +243,7 @@ class _FilesScreenState extends State<FilesScreen> {
                             value: 'delete',
                             child: ListTile(
                               leading: Icon(
-                                Icons.delete_outline_rounded,
+                                PhosphorIconsRegular.trash,
                                 color: JarvisColors.danger,
                               ),
                               title: Text(
@@ -268,17 +263,13 @@ class _FilesScreenState extends State<FilesScreen> {
           ),
   );
 
-  (IconData, Color) _fileVisual(String name) =>
+  IconData _fileIcon(String name) =>
       switch (name.split('.').last.toLowerCase()) {
-        'pdf' => (Icons.picture_as_pdf_outlined, JarvisColors.danger),
-        'jpg' ||
-        'jpeg' ||
-        'png' ||
-        'webp' => (Icons.image_outlined, JarvisColors.violet),
-        'csv' => (Icons.table_chart_outlined, JarvisColors.success),
-        'json' => (Icons.data_object_rounded, JarvisColors.warning),
-        'md' || 'markdown' => (Icons.article_outlined, JarvisColors.info),
-        _ => (Icons.description_outlined, JarvisColors.inkSoft),
+        'pdf' => PhosphorIconsRegular.filePdf,
+        'jpg' || 'jpeg' || 'png' || 'webp' => PhosphorIconsRegular.fileImage,
+        'csv' => PhosphorIconsRegular.table,
+        'json' => PhosphorIconsRegular.bracketsCurly,
+        _ => PhosphorIconsRegular.fileText,
       };
 }
 

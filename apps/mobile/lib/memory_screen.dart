@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -178,7 +179,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
       cancelLabel: 'Keep',
       confirmLabel: 'Delete',
       destructive: true,
-      icon: Icons.delete_outline_rounded,
+      icon: PhosphorIconsRegular.trash,
     );
     if (!delete) return;
     try {
@@ -312,11 +313,15 @@ class _MemoryScreenState extends State<MemoryScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Memory')),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: _createMemory,
-      icon: const Icon(Icons.add_rounded),
-      label: const Text('Add memory'),
+    appBar: AppBar(
+      title: const Text('Memory'),
+      actions: [
+        HeaderAction(
+          label: 'Add',
+          icon: PhosphorIconsRegular.plus,
+          onPressed: _createMemory,
+        ),
+      ],
     ),
     body: Column(
       children: [
@@ -337,18 +342,18 @@ class _MemoryScreenState extends State<MemoryScreen> {
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(JarvisRadii.md),
                   borderSide: const BorderSide(
-                    color: JarvisColors.accent,
-                    width: 1.5,
+                    color: JarvisColors.ink,
+                    width: 1.2,
                   ),
                 ),
-                prefixIcon: const Icon(Icons.search_rounded),
+                prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass),
                 suffixIcon: IconButton(
                   tooltip: 'Clear search',
                   onPressed: () {
                     _query.clear();
                     _load();
                   },
-                  icon: const Icon(Icons.close_rounded, size: 20),
+                  icon: const Icon(PhosphorIconsRegular.x, size: 20),
                 ),
               ),
             ),
@@ -389,8 +394,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
               : _memories.isEmpty
               ? EmptyState(
                   icon: _searching
-                      ? Icons.search_off_rounded
-                      : Icons.psychology_outlined,
+                      ? PhosphorIconsRegular.magnifyingGlass
+                      : PhosphorIconsRegular.brain,
                   title: _searching
                       ? 'No matching memories.'
                       : 'No memories yet',
@@ -399,7 +404,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
                       : 'No memories yet. Add one to get started.',
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 104),
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
                   itemCount: _memories.length,
                   itemBuilder: (context, index) =>
                       ContentWidth(child: _memoryCard(_memories[index])),
@@ -415,20 +420,17 @@ class _MemoryScreenState extends State<MemoryScreen> {
     final isSuperseded =
         validUntil != null && !validUntil.isAfter(DateTime.now());
     final kind = memory['kind'] as String? ?? 'fact';
-    final (kindColor, kindIcon) = _kindStyle(kind);
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(16, 10, 6, 14),
-      borderColor: isPinned
-          ? JarvisColors.accent.withValues(alpha: .35)
-          : JarvisColors.outline,
+      borderColor: JarvisColors.outline,
       color: isSuperseded ? JarvisColors.canvas : JarvisColors.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              _KindTag(label: kind, color: kindColor, icon: kindIcon),
+              _KindTag(label: kind, icon: _kindIcon(kind)),
               if (isSuperseded) ...[
                 const SizedBox(width: 6),
                 const StatusPill(
@@ -443,11 +445,13 @@ class _MemoryScreenState extends State<MemoryScreen> {
                 visualDensity: VisualDensity.compact,
                 style: IconButton.styleFrom(
                   foregroundColor: isPinned
-                      ? JarvisColors.accent
+                      ? JarvisColors.ink
                       : JarvisColors.muted,
                 ),
                 icon: Icon(
-                  isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                  isPinned
+                      ? PhosphorIconsFill.pushPin
+                      : PhosphorIconsRegular.pushPin,
                   size: 19,
                 ),
               ),
@@ -455,13 +459,13 @@ class _MemoryScreenState extends State<MemoryScreen> {
                 tooltip: 'Edit memory',
                 onPressed: () => _editMemory(memory),
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.edit_outlined, size: 19),
+                icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 19),
               ),
               IconButton(
                 tooltip: 'Delete memory',
                 onPressed: () => _deleteMemory(memory),
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.delete_outline_rounded, size: 19),
+                icon: const Icon(PhosphorIconsRegular.trash, size: 19),
               ),
             ],
           ),
@@ -485,9 +489,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
               child: Row(
                 children: [
                   Icon(
-                    Icons.auto_awesome_rounded,
+                    PhosphorIconsRegular.sparkle,
                     size: 14,
-                    color: JarvisColors.violet,
+                    color: JarvisColors.muted,
                   ),
                   SizedBox(width: 6),
                   Text(
@@ -506,16 +510,16 @@ class _MemoryScreenState extends State<MemoryScreen> {
     );
   }
 
-  (Color, IconData) _kindStyle(String kind) => switch (kind) {
-    'preference' => (JarvisColors.rose, Icons.favorite_border_rounded),
-    'fact' => (JarvisColors.accent, Icons.lightbulb_outline_rounded),
-    'decision' => (JarvisColors.warning, Icons.gavel_rounded),
-    'project' => (JarvisColors.info, Icons.folder_outlined),
-    'event' => (const Color(0xffe8833a), Icons.event_outlined),
-    'relationship' => (JarvisColors.violet, Icons.people_outline_rounded),
-    'technical' => (const Color(0xff0e9aa7), Icons.code_rounded),
-    'routine' => (JarvisColors.success, Icons.repeat_rounded),
-    _ => (JarvisColors.inkSoft, Icons.notes_rounded),
+  IconData _kindIcon(String kind) => switch (kind) {
+    'preference' => PhosphorIconsRegular.heart,
+    'fact' => PhosphorIconsRegular.lightbulb,
+    'decision' => PhosphorIconsRegular.gavel,
+    'project' => PhosphorIconsRegular.folderSimple,
+    'event' => PhosphorIconsRegular.calendarBlank,
+    'relationship' => PhosphorIconsRegular.users,
+    'technical' => PhosphorIconsRegular.code,
+    'routine' => PhosphorIconsRegular.repeat,
+    _ => PhosphorIconsRegular.notepad,
   };
 
   Widget _kindFilter({required String label, required String? value}) =>
@@ -524,20 +528,16 @@ class _MemoryScreenState extends State<MemoryScreen> {
         child: ChoiceChip(
           label: Text(label),
           selected: _selectedKind == value,
-          selectedColor: JarvisColors.accentSoft,
+          selectedColor: JarvisColors.ink,
           side: BorderSide(
             color: _selectedKind == value
-                ? JarvisColors.accent.withValues(alpha: .35)
+                ? JarvisColors.ink
                 : JarvisColors.outline,
           ),
           labelStyle: TextStyle(
             fontSize: 13,
-            fontWeight: _selectedKind == value
-                ? FontWeight.w600
-                : FontWeight.w500,
-            color: _selectedKind == value
-                ? JarvisColors.accentDeep
-                : JarvisColors.inkSoft,
+            fontWeight: FontWeight.w500,
+            color: _selectedKind == value ? Colors.white : JarvisColors.inkSoft,
           ),
           onSelected: (_) {
             setState(() => _selectedKind = value);
@@ -548,37 +548,25 @@ class _MemoryScreenState extends State<MemoryScreen> {
 }
 
 class _KindTag extends StatelessWidget {
-  const _KindTag({
-    required this.label,
-    required this.color,
-    required this.icon,
-  });
+  const _KindTag({required this.label, required this.icon});
 
   final String label;
-  final Color color;
   final IconData icon;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(7, 4, 10, 4),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: .1),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 5),
-        Text(
-          label.isEmpty ? 'Other' : label[0].toUpperCase() + label.substring(1),
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Color.lerp(color, JarvisColors.ink, .25),
-          ),
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 14, color: JarvisColors.muted),
+      const SizedBox(width: 6),
+      Text(
+        label.isEmpty ? 'Other' : label[0].toUpperCase() + label.substring(1),
+        style: const TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w500,
+          color: JarvisColors.muted,
         ),
-      ],
-    ),
+      ),
+    ],
   );
 }

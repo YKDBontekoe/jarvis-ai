@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -67,11 +68,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         context: context,
         builder: (context) => AlertDialog(
           icon: const Align(
-            child: IconBadge(
-              icon: Icons.shield_outlined,
-              color: JarvisColors.warning,
-              size: 48,
-            ),
+            child: IconBadge(icon: PhosphorIconsRegular.shieldCheck, size: 48),
           ),
           title: Text(
             retrying ? 'Retry approved tool call?' : 'Approve tool call?',
@@ -165,7 +162,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         IconButton(
           onPressed: _load,
           tooltip: 'Refresh',
-          icon: const Icon(Icons.refresh_rounded),
+          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
         ),
         const SizedBox(width: 8),
       ],
@@ -176,7 +173,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         ? ErrorState(message: _error!, onRetry: _load)
         : _approvals.isEmpty
         ? const EmptyState(
-            icon: Icons.verified_user_outlined,
+            icon: PhosphorIconsRegular.shieldCheck,
             title: 'All clear',
             message: 'No tool calls are waiting for approval.',
           )
@@ -199,10 +196,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         children: [
           Row(
             children: [
-              const IconBadge(
-                icon: Icons.shield_outlined,
-                color: JarvisColors.warning,
-              ),
+              const IconBadge(icon: PhosphorIconsRegular.shieldCheck),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -259,7 +253,9 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Icon(
-                        pending ? Icons.check_rounded : Icons.refresh_rounded,
+                        pending
+                            ? PhosphorIconsRegular.check
+                            : PhosphorIconsRegular.arrowsClockwise,
                       ),
                 label: Text(pending ? 'Approve' : 'Retry resume'),
               ),

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 import 'task_details_screen.dart';
 import 'condition_watches_screen.dart';
 import 'approvals_screen.dart';
@@ -137,7 +138,7 @@ class _TasksScreenState extends State<TasksScreen> {
       cancelLabel: 'Keep task',
       confirmLabel: 'Cancel task',
       destructive: true,
-      icon: Icons.stop_circle_outlined,
+      icon: PhosphorIconsRegular.stopCircle,
     );
     if (!confirmed) return;
     try {
@@ -196,7 +197,7 @@ class _TasksScreenState extends State<TasksScreen> {
         IconButton(
           tooltip: 'Approvals',
           onPressed: _openApprovals,
-          icon: const Icon(Icons.shield_outlined),
+          icon: const Icon(PhosphorIconsRegular.shieldCheck),
         ),
         IconButton(
           tooltip: 'Condition watches',
@@ -205,29 +206,20 @@ class _TasksScreenState extends State<TasksScreen> {
               builder: (_) => ConditionWatchesScreen(http: widget.http),
             ),
           ),
-          icon: const Icon(Icons.monitor_heart_outlined),
+          icon: const Icon(PhosphorIconsRegular.pulse),
         ),
         IconButton(
           tooltip: 'Refresh tasks',
           onPressed: _loading ? null : _load,
-          icon: const Icon(Icons.refresh_rounded),
+          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
         ),
-        const SizedBox(width: 8),
+        HeaderAction(
+          label: 'New task',
+          icon: PhosphorIconsRegular.plus,
+          onPressed: _createTask,
+          busy: _creating,
+        ),
       ],
-    ),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: _creating ? null : _createTask,
-      icon: _creating
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-          : const Icon(Icons.add_rounded),
-      label: const Text('New task'),
     ),
     body: _loading && _tasks.isEmpty
         ? const LoadingState()
@@ -235,14 +227,14 @@ class _TasksScreenState extends State<TasksScreen> {
         ? ErrorState(message: _error!, onRetry: _load)
         : _tasks.isEmpty
         ? const EmptyState(
-            icon: Icons.task_alt_rounded,
+            icon: PhosphorIconsRegular.checkCircle,
             title: 'No tasks yet',
             message: 'No tasks yet. Give Jarvis something to work on.',
           )
         : RefreshIndicator(
             onRefresh: _load,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 104),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
               children: [
                 ContentWidth(
                   child: Column(
@@ -264,60 +256,42 @@ class _TasksScreenState extends State<TasksScreen> {
         .where((task) => test(task['status'] as String? ?? 'queued'))
         .length;
     final stats = [
-      (
-        'Active',
-        count(_activeStatuses.contains),
-        JarvisColors.info,
-        Icons.bolt_rounded,
-      ),
-      (
-        'Review',
-        count((status) => status == 'needs_approval'),
-        JarvisColors.warning,
-        Icons.shield_outlined,
-      ),
-      (
-        'Done',
-        count((status) => status == 'completed'),
-        JarvisColors.success,
-        Icons.check_rounded,
-      ),
+      ('Active', count(_activeStatuses.contains)),
+      ('Needs review', count((status) => status == 'needs_approval')),
+      ('Done', count((status) => status == 'completed')),
     ];
-    return Row(
-      children: [
-        for (final (index, (label, value, color, icon)) in stats.indexed) ...[
-          if (index > 0) const SizedBox(width: 10),
-          Expanded(
-            child: SurfaceCard(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-              radius: JarvisRadii.md,
-              child: Row(
-                children: [
-                  IconBadge(icon: icon, color: color, size: 30),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$value',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        Text(
-                          label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
+    return SurfaceCard(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            for (final (index, (label, value)) in stats.indexed) ...[
+              if (index > 0) const VerticalDivider(width: 1),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$value',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-        ],
-      ],
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -334,7 +308,7 @@ class _TasksScreenState extends State<TasksScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          IconBadge(icon: style.icon, color: style.color),
+          IconBadge(icon: style.icon),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -376,13 +350,14 @@ class _TasksScreenState extends State<TasksScreen> {
             IconButton(
               tooltip: 'Cancel task',
               onPressed: () => _cancel(task),
-              icon: const Icon(Icons.close_rounded, size: 20),
+              icon: const Icon(PhosphorIconsRegular.x, size: 20),
             )
           else
             const Padding(
               padding: EdgeInsets.all(10),
               child: Icon(
-                Icons.chevron_right_rounded,
+                PhosphorIconsRegular.caretRight,
+                size: 16,
                 color: JarvisColors.muted,
               ),
             ),

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -120,8 +121,8 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                       onPressed: () => setDialogState(() => obscure = !obscure),
                       icon: Icon(
                         obscure
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
+                            ? PhosphorIconsRegular.eye
+                            : PhosphorIconsRegular.eyeSlash,
                       ),
                     ),
                   ),
@@ -220,7 +221,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       message: 'Remove $secretName from $provider?',
       confirmLabel: 'Delete',
       destructive: true,
-      icon: Icons.key_off_outlined,
+      icon: PhosphorIconsRegular.key,
     );
     if (!confirmed) return;
     try {
@@ -240,7 +241,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       message: 'Delete all stored credentials for $provider?',
       confirmLabel: 'Delete all',
       destructive: true,
-      icon: Icons.delete_sweep_outlined,
+      icon: PhosphorIconsRegular.trash,
     );
     if (!confirmed) return;
     try {
@@ -257,18 +258,22 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Integrations')),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: () => _editSecret(),
-      icon: const Icon(Icons.add_rounded),
-      label: const Text('Add credential'),
+    appBar: AppBar(
+      title: const Text('Integrations'),
+      actions: [
+        HeaderAction(
+          label: 'Add',
+          icon: PhosphorIconsRegular.plus,
+          onPressed: () => _editSecret(),
+        ),
+      ],
     ),
     body: _loading
         ? const LoadingState()
         : RefreshIndicator(
             onRefresh: _load,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 104),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
               children: [
                 ContentWidth(
                   child: Column(
@@ -304,8 +309,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       const SectionHeader('Featured'),
       _featuredCard(
         title: 'Home Assistant',
-        icon: Icons.home_outlined,
-        color: const Color(0xff18bcf2),
+        icon: PhosphorIconsRegular.house,
         description:
             'Enable Home Assistant’s MCP Server integration, expose the entities Jarvis may use, and configure HOME_ASSISTANT_MCP_URL on the Jarvis host. Store a long-lived access token here; Jarvis adds the bearer scheme when connecting. Jarvis asks for approval before every Home Assistant action.',
         provider: 'home-assistant',
@@ -313,8 +317,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       const SizedBox(height: 12),
       _featuredCard(
         title: 'GitHub',
-        icon: Icons.code_rounded,
-        color: JarvisColors.ink,
+        icon: PhosphorIconsRegular.code,
         description:
             'Enable the GitHub MCP Compose overlay, then store a least-privilege personal access token here. Jarvis exposes repository, issue, and pull request tools; each operation asks for approval.',
         provider: 'github',
@@ -324,7 +327,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       for (final server in _managedServers) _managedServerCard(server),
       if (_connections.isEmpty)
         const _MutedLine(
-          icon: Icons.cloud_off_rounded,
+          icon: PhosphorIconsRegular.cloudSlash,
           text: 'No MCP servers are configured on this Jarvis host.',
         ),
       for (final connection in _connections) _connectionCard(connection),
@@ -332,7 +335,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       const SectionHeader('Stored credentials'),
       if (providers.isEmpty)
         const _MutedLine(
-          icon: Icons.key_outlined,
+          icon: PhosphorIconsRegular.key,
           text: 'No integration credentials yet.',
         ),
       for (final item in providers) _providerCard(item),
@@ -342,7 +345,6 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   Widget _featuredCard({
     required String title,
     required IconData icon,
-    required Color color,
     required String description,
     required String provider,
   }) {
@@ -359,7 +361,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         children: [
           Row(
             children: [
-              IconBadge(icon: icon, color: color, size: 44),
+              IconBadge(icon: icon, size: 44),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
@@ -386,7 +388,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
           OutlinedButton.icon(
             onPressed: () =>
                 _editSecret(provider: provider, secretName: 'token'),
-            icon: const Icon(Icons.key_outlined, size: 18),
+            icon: const Icon(PhosphorIconsRegular.key, size: 18),
             label: const Text('Set or rotate token'),
           ),
         ],
@@ -415,7 +417,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         children: [
           Row(
             children: [
-              const IconBadge(icon: Icons.hub_outlined),
+              const IconBadge(icon: PhosphorIconsRegular.plugsConnected),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -426,7 +428,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
               IconButton(
                 tooltip: 'Remove MCP server',
                 onPressed: () => _removeManagedServer(id, name),
-                icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                icon: const Icon(PhosphorIconsRegular.trash, size: 20),
               ),
             ],
           ),
@@ -474,7 +476,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               onPressed: () => _editSecret(provider: id, secretName: 'token'),
-              icon: const Icon(Icons.key_outlined, size: 18),
+              icon: const Icon(PhosphorIconsRegular.key, size: 18),
               label: Text(
                 hasToken ? 'Rotate bearer token' : 'Add bearer token',
               ),
@@ -492,7 +494,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       message: 'Remove $name and its stored credentials?',
       confirmLabel: 'Remove',
       destructive: true,
-      icon: Icons.hub_outlined,
+      icon: PhosphorIconsRegular.plugsConnected,
     );
     if (!confirmed) return;
     try {
@@ -518,10 +520,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         children: [
           Row(
             children: [
-              const IconBadge(
-                icon: Icons.lock_outline_rounded,
-                color: JarvisColors.violet,
-              ),
+              const IconBadge(icon: PhosphorIconsRegular.lockSimple),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -532,7 +531,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
               IconButton(
                 tooltip: 'Remove all credentials',
                 onPressed: () => _deleteProvider(slug),
-                icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                icon: const Icon(PhosphorIconsRegular.trash, size: 20),
               ),
             ],
           ),
@@ -541,7 +540,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
             ListTile(
               dense: true,
               contentPadding: const EdgeInsets.only(left: 4),
-              leading: const Icon(Icons.key_outlined, size: 19),
+              leading: const Icon(PhosphorIconsRegular.key, size: 19),
               title: Text(name),
               subtitle: const Text('Stored securely · value hidden'),
               trailing: Wrap(
@@ -550,13 +549,16 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                     tooltip: 'Replace value',
                     onPressed: () =>
                         _editSecret(provider: slug, secretName: name),
-                    icon: const Icon(Icons.edit_outlined, size: 19),
+                    icon: const Icon(
+                      PhosphorIconsRegular.pencilSimple,
+                      size: 19,
+                    ),
                   ),
                   IconButton(
                     tooltip: 'Delete value',
                     onPressed: () => _deleteSecret(slug, name),
                     icon: const Icon(
-                      Icons.remove_circle_outline_rounded,
+                      PhosphorIconsRegular.minusCircle,
                       size: 19,
                     ),
                   ),
@@ -575,25 +577,25 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     final issue = connection['issue'] as String?;
     final (icon, detail, label, color) = switch (state) {
       'connected' => (
-        Icons.check_circle_outline_rounded,
+        PhosphorIconsRegular.checkCircle,
         '$toolCount allowlisted tools available',
         'Connected',
         JarvisColors.success,
       ),
       'needs_credentials' => (
-        Icons.key_outlined,
+        PhosphorIconsRegular.key,
         'Owner credentials are required',
         'Needs token',
         JarvisColors.warning,
       ),
       'disabled' => (
-        Icons.block_rounded,
+        PhosphorIconsRegular.prohibit,
         'No tools are allowlisted',
         'Disabled',
         JarvisColors.muted,
       ),
       _ => (
-        Icons.error_outline_rounded,
+        PhosphorIconsRegular.warningCircle,
         issue == 'invalid_configuration'
             ? 'Configuration needs attention'
             : 'Server could not be reached',
@@ -606,7 +608,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Row(
         children: [
-          IconBadge(icon: icon, color: color),
+          IconBadge(icon: icon),
           const SizedBox(width: 14),
           Expanded(
             child: Column(

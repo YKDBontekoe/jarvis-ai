@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -125,20 +126,15 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
                       Container(
                         padding: const EdgeInsets.all(22),
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(JarvisRadii.xl),
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xfffff1dc), Color(0xffffe4e8)],
-                          ),
-                          border: Border.all(color: const Color(0x1fe8833a)),
+                          color: JarvisColors.surface,
+                          borderRadius: BorderRadius.circular(JarvisRadii.lg),
+                          border: Border.all(color: JarvisColors.outline),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const IconBadge(
-                              icon: Icons.wb_sunny_rounded,
-                              color: Color(0xffe8833a),
+                              icon: PhosphorIconsRegular.sunHorizon,
                               size: 44,
                             ),
                             const SizedBox(height: 18),
@@ -181,7 +177,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
                             ListTile(
                               title: const Text('Delivery time'),
                               subtitle: Text(_time.format(context)),
-                              trailing: const Icon(Icons.schedule_rounded),
+                              trailing: const Icon(PhosphorIconsRegular.clock),
                               onTap: _chooseTime,
                             ),
                           ],
@@ -197,7 +193,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
                           labelText: 'Time zone',
                           hintText: 'Europe/Amsterdam',
                           helperText: 'Use an IANA time zone identifier.',
-                          prefixIcon: Icon(Icons.public_rounded),
+                          prefixIcon: Icon(PhosphorIconsRegular.globeSimple),
                           fillColor: JarvisColors.surface,
                         ),
                       ),
@@ -214,7 +210,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Icon(Icons.check_rounded),
+                            : const Icon(PhosphorIconsRegular.check),
                         label: Text(_saving ? 'Saving' : 'Save briefing'),
                       ),
                       if (_error != null)
