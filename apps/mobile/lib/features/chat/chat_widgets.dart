@@ -617,6 +617,7 @@ class ChatComposer extends StatefulWidget {
     required this.sending,
     required this.voiceActive,
     required this.voiceStarting,
+    this.onAttach,
     this.hint = 'Ask Jarvis anything',
     super.key,
   });
@@ -627,6 +628,9 @@ class ChatComposer extends StatefulWidget {
   final bool sending;
   final bool voiceActive;
   final bool voiceStarting;
+
+  /// Opens extra actions (files, tasks, reminders); hidden when null.
+  final VoidCallback? onAttach;
   final String hint;
 
   @override
@@ -681,101 +685,144 @@ class _ChatComposerState extends State<ChatComposer> {
   @override
   Widget build(BuildContext context) {
     final focused = _focus.hasFocus;
+    final hasText = widget.controller.text.trim().isNotEmpty;
+    final showVoice =
+        widget.onVoice != null &&
+        !hasText &&
+        !widget.sending &&
+        !widget.voiceActive;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.fromLTRB(6, 4, 8, 8),
       decoration: BoxDecoration(
         color: JarvisColors.surface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(26),
         border: Border.all(
           color: focused ? JarvisColors.outlineStrong : JarvisColors.outline,
         ),
         boxShadow: JarvisShadows.floating,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: TextField(
-              controller: widget.controller,
-              focusNode: _focus,
-              enabled: _inputEnabled,
-              minLines: 1,
-              maxLines: 6,
-              textInputAction: TextInputAction.newline,
-              keyboardType: TextInputType.multiline,
-              style: const TextStyle(fontSize: 15.5, color: JarvisColors.ink),
-              decoration: InputDecoration(
-                hintText: widget.voiceActive ? 'Listening…' : widget.hint,
-                filled: false,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                contentPadding: const EdgeInsets.fromLTRB(16, 13, 8, 13),
+          TextField(
+            controller: widget.controller,
+            focusNode: _focus,
+            enabled: _inputEnabled,
+            minLines: 1,
+            maxLines: 6,
+            textInputAction: TextInputAction.newline,
+            keyboardType: TextInputType.multiline,
+            style: const TextStyle(fontSize: 16, color: JarvisColors.ink),
+            decoration: InputDecoration(
+              hintText: widget.voiceActive ? 'Listening…' : widget.hint,
+              hintStyle: const TextStyle(
+                fontSize: 16,
+                color: JarvisColors.muted,
               ),
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              contentPadding: const EdgeInsets.fromLTRB(12, 12, 8, 8),
             ),
           ),
-          if (widget.onVoice != null || widget.voiceActive)
-            IconButton(
-              tooltip: widget.voiceActive ? 'Stop voice' : 'Talk to Jarvis',
-              onPressed: widget.voiceStarting || widget.sending
-                  ? null
-                  : widget.onVoice,
-              icon: widget.voiceStarting
-                  ? const SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(
-                      widget.voiceActive
-                          ? PhosphorIconsRegular.stop
-                          : PhosphorIconsRegular.microphone,
-                    ),
-              style: IconButton.styleFrom(
-                minimumSize: const Size(40, 40),
-                foregroundColor: widget.voiceActive
-                    ? JarvisColors.danger
-                    : JarvisColors.inkSoft,
-                backgroundColor: widget.voiceActive
-                    ? JarvisColors.dangerSoft
-                    : Colors.transparent,
-              ),
-            ),
-          const SizedBox(width: 4),
-          AnimatedScale(
-            duration: const Duration(milliseconds: 160),
-            curve: Curves.easeOutBack,
-            scale: _canSend || widget.sending ? 1 : .9,
-            child: IconButton.filled(
-              tooltip: 'Send',
-              onPressed: _canSend ? widget.onSend : null,
-              icon: widget.sending
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(PhosphorIconsRegular.arrowUp),
-              style: IconButton.styleFrom(
-                minimumSize: const Size(40, 40),
-                backgroundColor: JarvisColors.ink,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: widget.sending
-                    ? JarvisColors.ink
-                    : JarvisColors.surfaceRaised,
-                disabledForegroundColor: widget.sending
-                    ? Colors.white
-                    : JarvisColors.muted,
-              ),
-            ),
+          Row(
+            children: [
+              if (widget.onAttach != null)
+                _ComposerIconButton(
+                  icon: PhosphorIconsRegular.plus,
+                  tooltip: 'More actions',
+                  onPressed: widget.onAttach,
+                ),
+              const Spacer(),
+              if (widget.voiceActive || widget.voiceStarting)
+                _ComposerIconButton(
+                  icon: PhosphorIconsRegular.stop,
+                  tooltip: 'Stop voice',
+                  danger: true,
+                  onPressed: widget.voiceStarting ? null : widget.onVoice,
+                )
+              else
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  transitionBuilder: (child, animation) =>
+                      ScaleTransition(scale: animation, child: child),
+                  child: showVoice
+                      ? IconButton.filled(
+                          key: const ValueKey('voice'),
+                          tooltip: 'Voice mode',
+                          onPressed: widget.onVoice,
+                          icon: const Icon(
+                            PhosphorIconsBold.waveform,
+                            size: 18,
+                          ),
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(38, 38),
+                            backgroundColor: JarvisColors.ink,
+                            foregroundColor: Colors.white,
+                          ),
+                        )
+                      : IconButton.filled(
+                          key: const ValueKey('send'),
+                          tooltip: 'Send',
+                          onPressed: _canSend ? widget.onSend : null,
+                          icon: widget.sending
+                              ? const SizedBox.square(
+                                  dimension: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(PhosphorIconsBold.arrowUp, size: 18),
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(38, 38),
+                            backgroundColor: JarvisColors.ink,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: widget.sending
+                                ? JarvisColors.ink
+                                : JarvisColors.surfaceRaised,
+                            disabledForegroundColor: widget.sending
+                                ? Colors.white
+                                : JarvisColors.muted,
+                          ),
+                        ),
+                ),
+            ],
           ),
         ],
       ),
     );
   }
+}
+
+class _ComposerIconButton extends StatelessWidget {
+  const _ComposerIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.danger = false,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: tooltip,
+    onPressed: onPressed,
+    icon: Icon(icon, size: 19),
+    style: IconButton.styleFrom(
+      minimumSize: const Size(38, 38),
+      foregroundColor: danger ? JarvisColors.danger : JarvisColors.ink,
+      backgroundColor: danger ? JarvisColors.dangerSoft : Colors.transparent,
+      shape: const CircleBorder(side: BorderSide(color: JarvisColors.outline)),
+    ),
+  );
 }
 
 class SuggestionChips extends StatelessWidget {
@@ -794,16 +841,25 @@ class SuggestionChips extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) => GroupedSection(
-    dividerIndent: 48,
-    children: [
-      for (final (icon, text) in suggestions)
-        _SuggestionRow(
-          icon: icon,
-          text: text,
-          onTap: onSelected == null ? null : () => onSelected!(text),
-        ),
-    ],
+  Widget build(BuildContext context) => SizedBox(
+    height: 104,
+    child: ListView.separated(
+      scrollDirection: Axis.horizontal,
+      clipBehavior: Clip.none,
+      itemCount: suggestions.length,
+      separatorBuilder: (_, _) => const SizedBox(width: 10),
+      itemBuilder: (context, index) {
+        final (icon, text) = suggestions[index];
+        return SizedBox(
+          width: 196,
+          child: _SuggestionRow(
+            icon: icon,
+            text: text,
+            onTap: onSelected == null ? null : () => onSelected!(text),
+          ),
+        );
+      },
+    ),
   );
 }
 
@@ -822,35 +878,27 @@ class _SuggestionRow extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     button: true,
     enabled: onTap != null,
-    child: InkWell(
+    child: SurfaceCard(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 13, 14, 13),
-        child: Row(
-          children: [
-            Icon(icon, size: 19, color: JarvisColors.inkSoft),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Text(
-                text,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.35,
-                  color: JarvisColors.ink,
-                  letterSpacing: -.1,
-                ),
-              ),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: JarvisColors.inkSoft),
+          const Spacer(),
+          Text(
+            text,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.3,
+              fontWeight: FontWeight.w500,
+              letterSpacing: -.15,
+              color: JarvisColors.ink,
             ),
-            const SizedBox(width: 8),
-            const Icon(
-              PhosphorIconsRegular.arrowUpRight,
-              size: 15,
-              color: JarvisColors.muted,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );

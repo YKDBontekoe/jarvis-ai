@@ -174,114 +174,172 @@ class _HomeOverviewState extends State<HomeOverview>
     final theme = Theme.of(context);
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-        children: [
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 620),
-              child: _Entrance(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      '$_today  ·  $_greeting',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: JarvisColors.muted,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'What do you need?',
-                      style: theme.textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 20),
-                    _VoiceHero(
-                      mark: widget.mark,
-                      onTalk: widget.onTalk,
-                      voiceStarting: widget.voiceStarting,
-                      onContinueConversation: widget.onContinueConversation,
-                    ),
-                    const SizedBox(height: 28),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4, bottom: 10),
-                      child: Text(
-                        widget.onSuggestion == null
-                            ? 'Or send a message below.'
-                            : 'Or try one of these:',
+      child: LayoutBuilder(
+        builder: (context, constraints) => ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            constraints.maxHeight > 700 ? 48 : 20,
+            20,
+            28,
+          ),
+          children: [
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620),
+                child: _Entrance(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(child: widget.mark),
+                      const SizedBox(height: 22),
+                      Text(
+                        '$_today  ·  $_greeting',
+                        textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: JarvisColors.muted,
                         ),
                       ),
-                    ),
-                    if (widget.onSuggestion != null)
-                      SuggestionChips(onSelected: widget.onSuggestion),
-                    const SizedBox(height: 28),
-                    SectionHeader(
-                      _tasks.isEmpty
-                          ? 'Active tasks'
-                          : 'Active tasks (${_tasks.length})',
-                      padding: const EdgeInsets.only(left: 4, bottom: 6),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          TextButton(
-                            onPressed: widget.onOpenTasks,
-                            child: const Text('View all'),
-                          ),
-                          IconButton(
-                            tooltip: 'Refresh active tasks',
-                            onPressed: widget.ready && !_loading ? _load : null,
-                            icon: const Icon(
-                              PhosphorIconsRegular.arrowsClockwise,
-                              size: 20,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (_loading)
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 12),
-                        child: LinearProgressIndicator(
-                          minHeight: 3,
-                          semanticsLabel: 'Loading active tasks',
+                      const SizedBox(height: 6),
+                      const Text(
+                        'What do you need?',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'InstrumentSerif',
+                          fontSize: 40,
+                          height: 1.1,
+                          letterSpacing: -.6,
+                          color: JarvisColors.ink,
                         ),
                       ),
-                    if (_error != null)
-                      InlineNotice(
-                        message: '$_error Pull down to retry.',
-                        tone: NoticeTone.danger,
-                        margin: const EdgeInsets.only(bottom: 12),
-                      ),
-                    if (!widget.ready)
-                      const _TasksPlaceholder(
-                        icon: PhosphorIconsRegular.wifiSlash,
-                        text: 'Connect to Jarvis to see your active tasks.',
-                      )
-                    else if (!_loading && _error == null && _tasks.isEmpty)
-                      const _TasksPlaceholder(
-                        icon: PhosphorIconsRegular.checkCircle,
-                        text: 'No active tasks. Start one from Tasks.',
-                      ),
-                    if (_tasks.isNotEmpty)
-                      GroupedSection(
-                        dividerIndent: 64,
+                      const SizedBox(height: 22),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 6,
+                        runSpacing: 6,
                         children: [
-                          for (final task in _tasks.take(3))
-                            _TaskRow(
-                              task: task,
-                              onTap: () => unawaited(_openTask(task)),
+                          FilledButton.icon(
+                            onPressed: widget.onTalk,
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(0, 44),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
+                              shape: const StadiumBorder(),
+                            ),
+                            icon: widget.voiceStarting
+                                ? const SizedBox.square(
+                                    dimension: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 1.8,
+                                    ),
+                                  )
+                                : const Icon(
+                                    PhosphorIconsRegular.waveform,
+                                    size: 18,
+                                  ),
+                            label: Text(
+                              widget.voiceStarting
+                                  ? 'Connecting…'
+                                  : 'Talk to Jarvis',
+                            ),
+                          ),
+                          if (widget.onContinueConversation != null)
+                            TextButton.icon(
+                              onPressed: widget.onContinueConversation,
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(0, 44),
+                                shape: const StadiumBorder(),
+                              ),
+                              icon: const Icon(
+                                PhosphorIconsRegular.arrowUpRight,
+                                size: 16,
+                              ),
+                              label: const Text('Continue conversation'),
                             ),
                         ],
                       ),
-                  ],
+                      const SizedBox(height: 36),
+                      if (widget.onSuggestion != null) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, bottom: 10),
+                          child: Text(
+                            'Or try one of these:',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: JarvisColors.muted,
+                            ),
+                          ),
+                        ),
+                        SuggestionChips(onSelected: widget.onSuggestion),
+                        const SizedBox(height: 28),
+                      ],
+                      SectionHeader(
+                        _tasks.isEmpty
+                            ? 'Active tasks'
+                            : 'Active tasks (${_tasks.length})',
+                        padding: const EdgeInsets.only(left: 4, bottom: 6),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextButton(
+                              onPressed: widget.onOpenTasks,
+                              child: const Text('View all'),
+                            ),
+                            IconButton(
+                              tooltip: 'Refresh active tasks',
+                              onPressed: widget.ready && !_loading
+                                  ? _load
+                                  : null,
+                              icon: const Icon(
+                                PhosphorIconsRegular.arrowsClockwise,
+                                size: 18,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_loading)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 12),
+                          child: LinearProgressIndicator(
+                            minHeight: 2,
+                            semanticsLabel: 'Loading active tasks',
+                          ),
+                        ),
+                      if (_error != null)
+                        InlineNotice(
+                          message: '$_error Pull down to retry.',
+                          tone: NoticeTone.danger,
+                          margin: const EdgeInsets.only(bottom: 12),
+                        ),
+                      if (!widget.ready)
+                        const _TasksPlaceholder(
+                          icon: PhosphorIconsRegular.wifiSlash,
+                          text: 'Connect to Jarvis to see your active tasks.',
+                        )
+                      else if (!_loading && _error == null && _tasks.isEmpty)
+                        const _TasksPlaceholder(
+                          icon: PhosphorIconsRegular.checkCircle,
+                          text: 'No active tasks. Start one from Tasks.',
+                        ),
+                      if (_tasks.isNotEmpty)
+                        GroupedSection(
+                          dividerIndent: 64,
+                          children: [
+                            for (final task in _tasks.take(3))
+                              _TaskRow(
+                                task: task,
+                                onTap: () => unawaited(_openTask(task)),
+                              ),
+                          ],
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -307,74 +365,6 @@ class _Entrance extends StatelessWidget {
     ),
     child: child,
   );
-}
-
-class _VoiceHero extends StatelessWidget {
-  const _VoiceHero({
-    required this.mark,
-    required this.onTalk,
-    required this.voiceStarting,
-    required this.onContinueConversation,
-  });
-
-  final Widget mark;
-  final VoidCallback? onTalk;
-  final bool voiceStarting;
-  final VoidCallback? onContinueConversation;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return SurfaceCard(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              mark,
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Hands-free', style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Talk naturally. Voice continues this conversation and uses what Jarvis remembers.',
-                      style: theme.textTheme.bodySmall?.copyWith(fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              FilledButton.icon(
-                onPressed: onTalk,
-                icon: voiceStarting
-                    ? const SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(strokeWidth: 1.8),
-                      )
-                    : const Icon(PhosphorIconsRegular.waveform, size: 18),
-                label: Text(voiceStarting ? 'Connecting…' : 'Talk to Jarvis'),
-              ),
-              if (onContinueConversation != null) ...[
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: onContinueConversation,
-                  child: const Text('Continue conversation'),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _TasksPlaceholder extends StatelessWidget {

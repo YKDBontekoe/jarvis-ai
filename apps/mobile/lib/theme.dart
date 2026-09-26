@@ -4,17 +4,17 @@ import 'package:flutter/services.dart';
 import 'ui/phosphor_icons.dart';
 
 class JarvisColors {
-  static const canvas = Color(0xfff8f8f9);
+  static const canvas = Color(0xfffaf9f6);
   static const background = canvas;
   static const surface = Color(0xffffffff);
-  static const surfaceMuted = Color(0xfff3f3f5);
-  static const surfaceRaised = Color(0xffececef);
-  static const outline = Color(0xffe8e8eb);
-  static const outlineStrong = Color(0xffd8d8dd);
+  static const surfaceMuted = Color(0xfff3f1ec);
+  static const surfaceRaised = Color(0xffebe8e2);
+  static const outline = Color(0xffe8e5df);
+  static const outlineStrong = Color(0xffd9d5cd);
 
-  static const ink = Color(0xff111113);
-  static const inkSoft = Color(0xff55555e);
-  static const muted = Color(0xff8e8e98);
+  static const ink = Color(0xff1c1b19);
+  static const inkSoft = Color(0xff5b5853);
+  static const muted = Color(0xff8f8b84);
 
   static const accent = Color(0xff4f46e5);
   static const accentDeep = Color(0xff3730a3);
@@ -38,6 +38,17 @@ class JarvisRadii {
   static const md = 12.0;
   static const lg = 16.0;
   static const xl = 22.0;
+}
+
+/// Editorial serif for greetings and hero headlines; everything else is Inter.
+class JarvisType {
+  static const serif = TextStyle(
+    fontFamily: 'InstrumentSerif',
+    color: JarvisColors.ink,
+    fontWeight: FontWeight.w400,
+    letterSpacing: -.4,
+    height: 1.1,
+  );
 }
 
 class JarvisShadows {
@@ -164,7 +175,7 @@ ThemeData buildJarvisTheme() {
     highlightColor: JarvisColors.ink.withValues(alpha: .04),
     actionIconTheme: ActionIconThemeData(
       backButtonIconBuilder: (_) =>
-          const Icon(PhosphorIconsRegular.arrowLeft, size: 22),
+          const _RoundIcon(PhosphorIconsRegular.arrowLeft),
       closeButtonIconBuilder: (_) =>
           const Icon(PhosphorIconsRegular.x, size: 22),
     ),
@@ -443,5 +454,26 @@ ThemeData buildJarvisTheme() {
       selectionColor: JarvisColors.accent.withValues(alpha: .18),
       selectionHandleColor: JarvisColors.accent,
     ),
+  );
+}
+
+/// Back/close glyph drawn on a soft white disc, matching the shell's round
+/// top bar buttons.
+class _RoundIcon extends StatelessWidget {
+  const _RoundIcon(this.icon);
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 36,
+    height: 36,
+    decoration: BoxDecoration(
+      color: JarvisColors.surface,
+      shape: BoxShape.circle,
+      border: Border.all(color: JarvisColors.outline),
+      boxShadow: JarvisShadows.soft,
+    ),
+    child: Icon(icon, size: 18, color: JarvisColors.ink),
   );
 }

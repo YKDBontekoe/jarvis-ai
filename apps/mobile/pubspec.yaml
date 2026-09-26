@@ -113,6 +113,9 @@ flutter:
           weight: 600
         - asset: assets/fonts/Inter-Bold.ttf
           weight: 700
+    - family: InstrumentSerif
+      fonts:
+        - asset: assets/fonts/InstrumentSerif-Regular.ttf
     - family: PhosphorRegular
       fonts:
         - asset: assets/fonts/Phosphor-Regular.ttf

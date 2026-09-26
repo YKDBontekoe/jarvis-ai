@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui' as ui;
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
 import 'package:dio/dio.dart';
@@ -29,6 +29,7 @@ import 'integrations_screen.dart';
 import 'features/chat/chat_entries.dart';
 import 'features/chat/chat_widgets.dart';
 import 'features/home/home_overview.dart';
+import 'features/shell/sidebar.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
 
@@ -289,6 +290,8 @@ class _ChatScreenState extends State<ChatScreen> {
   int _selectedDestination = 0;
   int _homeRevision = 0;
   bool _showHome = true;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+  List<Map<String, dynamic>> _recent = [];
   String? _pushToken;
   StreamSubscription<String>? _pushTokenSubscription;
   StreamSubscription<RemoteMessage>? _pushOpenedSubscription;
@@ -413,6 +416,7 @@ class _ChatScreenState extends State<ChatScreen> {
       });
       _scrollToBottom(jump: true);
     }
+    unawaited(_loadRecent());
     await _connectRealtime();
   }
 
@@ -934,6 +938,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       if (!mounted || _conversationId != conversationId) return;
       setState(() => _applyRunResult(response));
+      unawaited(_loadRecent());
     } on DioException catch (error) {
       if (mounted && _conversationId == conversationId) {
         setState(() {
@@ -1152,98 +1157,169 @@ class _ChatScreenState extends State<ChatScreen> {
   /// never overlap mid-transition.
   static const _fadeThrough = Interval(.5, 1, curve: Curves.easeOutCubic);
 
-  static const _destinations = [
-    (PhosphorIconsRegular.chatCircle, PhosphorIconsBold.chatCircle, 'Chat'),
-    (PhosphorIconsRegular.listChecks, PhosphorIconsBold.listChecks, 'Tasks'),
-    (PhosphorIconsRegular.microphone, PhosphorIconsBold.microphone, 'Voice'),
-    (PhosphorIconsRegular.notebook, PhosphorIconsBold.notebook, 'Memory'),
-    (PhosphorIconsRegular.gearSix, PhosphorIconsBold.gearSix, 'Settings'),
-  ];
-
   @override
   Widget build(BuildContext context) {
     if (_signedOut) return _signInScreen();
 
-    final destination = _selectedDestination;
-    final showIndependentScaffold = destination == 1 || destination == 3;
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= _wideLayoutWidth;
-        final scaffold = Scaffold(
-          extendBodyBehindAppBar: destination == 2,
-          extendBody: !wide,
-          appBar: showIndependentScaffold ? null : _appBar(destination),
+        final voice = _selectedDestination == 2;
+        final content = Scaffold(
+          extendBodyBehindAppBar: voice,
+          appBar: _topBar(wide: wide, voice: voice),
           body: AnimatedSwitcher(
             duration: const Duration(milliseconds: 260),
             switchInCurve: _fadeThrough,
             switchOutCurve: _fadeThrough,
             child: KeyedSubtree(
-              key: ValueKey(destination),
-              child: switch (destination) {
-                0 => _chatBody(wide: wide),
-                1 => TasksScreen(http: _http),
-                2 => _voiceBody(),
-                3 => MemoryScreen(http: _http),
-                _ => _settingsBody(),
-              },
+              key: ValueKey(voice),
+              child: voice ? _voiceBody() : _chatBody(),
             ),
           ),
-          bottomNavigationBar: wide
-              ? null
-              : _GlassNavBar(
-                  selectedIndex: destination,
-                  onSelected: _selectDestination,
-                  voiceActive: _voiceActive,
-                  voiceStarting: _voiceStarting,
-                  destinations: _destinations,
-                ),
         );
-        if (!wide) return scaffold;
+        final sidebar = _sidebar(wide: wide);
         return Scaffold(
-          body: Row(
-            children: [
-              NavigationRail(
-                selectedIndex: destination,
-                onDestinationSelected: _selectDestination,
-                labelType: NavigationRailLabelType.all,
-                groupAlignment: -.8,
-                minWidth: 88,
-                leading: Padding(
-                  padding: const EdgeInsets.only(top: 20, bottom: 26),
-                  child: Tooltip(
-                    message: 'New chat',
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: _busy ? null : _startNewChat,
-                      child: const JarvisAvatar(size: 40),
+          key: _scaffoldKey,
+          drawer: wide
+              ? null
+              : Drawer(
+                  width: math.min(330, constraints.maxWidth * .86),
+                  backgroundColor: JarvisColors.canvas,
+                  surfaceTintColor: Colors.transparent,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.horizontal(
+                      right: Radius.circular(28),
                     ),
                   ),
+                  child: sidebar,
                 ),
-                trailing: Expanded(
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 24),
-                      child: _ConnectionDot(connected: _connected),
-                    ),
-                  ),
-                ),
-                destinations: [
-                  for (final (icon, selected, label) in _destinations)
-                    NavigationRailDestination(
-                      icon: Icon(icon),
-                      selectedIcon: Icon(selected),
-                      label: Text(label),
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                    ),
-                ],
-              ),
-              const VerticalDivider(width: 1),
-              Expanded(child: scaffold),
-            ],
-          ),
+          onDrawerChanged: (open) {
+            if (open) unawaited(_loadRecent());
+          },
+          body: wide
+              ? Row(
+                  children: [
+                    SizedBox(width: 292, child: sidebar),
+                    const VerticalDivider(width: 1),
+                    Expanded(child: content),
+                  ],
+                )
+              : content,
         );
       },
+    );
+  }
+
+  Widget _sidebar({required bool wide}) => JarvisSidebar(
+    conversations: _recent,
+    selectedConversationId: _showHome ? null : _conversationId,
+    homeSelected: _showHome && _selectedDestination == 0,
+    connected: _connected,
+    onHome: () => _fromSidebar(() {
+      if (_selectedDestination != 0) _selectDestination(0);
+      setState(() => _showHome = true);
+    }),
+    onNewChat: () => _fromSidebar(_startNewChat),
+    onVoice: () => _fromSidebar(() => _selectDestination(2)),
+    onConversation: (id) => _fromSidebar(() async {
+      if (_selectedDestination != 0) _selectDestination(0);
+      if (id == _conversationId) {
+        setState(() => _showHome = false);
+        return;
+      }
+      try {
+        await _openConversation(id);
+      } on DioException catch (error) {
+        if (mounted) setState(() => _error = _describeError(error));
+      }
+    }),
+    onSeeAll: () => _fromSidebar(() => unawaited(_chooseConversation())),
+    onUtility: (destination) => _fromSidebar(() => _openUtility(destination)),
+    onSettings: () => _fromSidebar(_openSettings),
+  );
+
+  void _fromSidebar(VoidCallback action) {
+    final scaffold = _scaffoldKey.currentState;
+    if (scaffold?.isDrawerOpen ?? false) scaffold!.closeDrawer();
+    action();
+  }
+
+  Future<void> _loadRecent() async {
+    if (_conversationId == null) return;
+    try {
+      final response = await _http.get<List<dynamic>>('/api/v1/conversations');
+      if (!mounted) return;
+      setState(
+        () => _recent = (response.data ?? [])
+            .whereType<Map<String, dynamic>>()
+            .toList(),
+      );
+    } on DioException {
+      // The sidebar keeps its last known list while the API is unreachable.
+    }
+  }
+
+  void _openSettings() => unawaited(
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Settings')),
+          body: _settingsBody(),
+        ),
+      ),
+    ),
+  );
+
+  void _showQuickActions() {
+    Widget action(String title, String subtitle, IconData icon, String to) =>
+        ListTile(
+          leading: IconBadge(icon: icon),
+          title: Text(title),
+          subtitle: Text(subtitle),
+          onTap: () {
+            Navigator.pop(context);
+            _openUtility(to);
+          },
+        );
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        builder: (context) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                action(
+                  'Upload a file',
+                  'PDFs and text become searchable',
+                  PhosphorIconsRegular.paperclip,
+                  'files',
+                ),
+                action(
+                  'Start a background task',
+                  'Jarvis works on it and reports back',
+                  PhosphorIconsRegular.listChecks,
+                  'tasks',
+                ),
+                action(
+                  'Set a reminder',
+                  'Pick a date and time',
+                  PhosphorIconsRegular.bell,
+                  'reminders',
+                ),
+                action(
+                  'Add a memory',
+                  'Tell Jarvis something to remember',
+                  PhosphorIconsRegular.notebook,
+                  'memory',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1256,54 +1332,57 @@ class _ChatScreenState extends State<ChatScreen> {
     unawaited(_createAndOpenConversation());
   }
 
-  PreferredSizeWidget _appBar(int destination) => AppBar(
-    toolbarHeight: 64,
-    backgroundColor: destination == 2 ? Colors.transparent : null,
-    title: destination == 0
-        ? const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              JarvisAvatar(size: 24),
-              SizedBox(width: 10),
-              Text('Jarvis'),
-            ],
-          )
-        : Text(destination == 4 ? 'Settings' : 'Voice'),
-    actions: [
-      if (destination == 0 && _hasMessages)
-        IconButton(
-          tooltip: _showHome ? 'Continue conversation' : 'Home',
-          onPressed: _busy || _voiceStarting
-              ? null
-              : () => setState(() => _showHome = !_showHome),
-          icon: Icon(
-            _showHome
-                ? PhosphorIconsRegular.chatCircle
-                : PhosphorIconsRegular.house,
-            size: 21,
-          ),
+  PreferredSizeWidget _topBar({required bool wide, required bool voice}) =>
+      AppBar(
+        toolbarHeight: 64,
+        backgroundColor: voice ? Colors.transparent : null,
+        automaticallyImplyLeading: false,
+        leadingWidth: 64,
+        leading: voice
+            ? Center(
+                child: CircleIconButton(
+                  icon: PhosphorIconsRegular.x,
+                  tooltip: 'Close voice',
+                  onPressed: _voiceStarting
+                      ? null
+                      : () => _selectDestination(0),
+                ),
+              )
+            : wide
+            ? null
+            : Center(
+                child: CircleIconButton(
+                  icon: PhosphorIconsRegular.list,
+                  tooltip: 'Menu',
+                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                ),
+              ),
+        centerTitle: true,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              voice ? 'Voice' : 'Jarvis',
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -.3,
+              ),
+            ),
+            const SizedBox(width: 7),
+            _ConnectionDot(connected: _connected),
+          ],
         ),
-      if (destination == 0)
-        IconButton(
-          tooltip: 'New chat',
-          onPressed: _busy ? null : _startNewChat,
-          icon: const Icon(PhosphorIconsRegular.notePencil, size: 20),
-        ),
-      if (destination == 0)
-        IconButton(
-          tooltip: 'Conversations',
-          onPressed: _busy ? null : _chooseConversation,
-          icon: const Icon(
-            PhosphorIconsRegular.clockCounterClockwise,
-            size: 22,
-          ),
-        ),
-      Padding(
-        padding: const EdgeInsets.only(left: 6, right: 16),
-        child: _ConnectionPill(connected: _connected),
-      ),
-    ],
-  );
+        actions: [
+          if (!voice)
+            CircleIconButton(
+              icon: PhosphorIconsRegular.notePencil,
+              tooltip: 'New chat',
+              onPressed: _busy ? null : _startNewChat,
+            ),
+          const SizedBox(width: 12),
+        ],
+      );
 
   Widget _signInScreen() => Scaffold(
     body: Stack(
@@ -1323,7 +1402,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     Text(
                       'Sign in to Jarvis',
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineMedium,
+                      style: JarvisType.serif.copyWith(fontSize: 42),
                     ),
                     const SizedBox(height: 10),
                     Text(
@@ -1394,7 +1473,7 @@ class _ChatScreenState extends State<ChatScreen> {
     ),
   );
 
-  Widget _chatBody({required bool wide}) => SafeArea(
+  Widget _chatBody() => SafeArea(
     child: Column(
       children: [
         if (_error != null)
@@ -1446,9 +1525,10 @@ class _ChatScreenState extends State<ChatScreen> {
               child: ChatComposer(
                 controller: _input,
                 onSend: () => unawaited(_send()),
-                onVoice: _conversationId == null || !wide
+                onVoice: _conversationId == null
                     ? null
-                    : () => unawaited(_toggleVoice()),
+                    : () => _selectDestination(2),
+                onAttach: _showQuickActions,
                 sending: _busy,
                 voiceActive: _voiceActive,
                 voiceStarting: _voiceStarting,
@@ -1509,7 +1589,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             ? 'Listening'
                             : 'Talk to Jarvis',
                         key: ValueKey('$_voiceStarting$_voiceActive'),
-                        style: theme.textTheme.headlineMedium,
+                        style: JarvisType.serif.copyWith(fontSize: 40),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -1739,13 +1819,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _welcome() => HomeOverview(
     http: _http,
-    mark: const JarvisOrb(size: 48, glow: false),
+    mark: const JarvisOrb(size: 56),
     ready: _conversationId != null,
     voiceStarting: _voiceStarting,
     onTalk: _conversationId == null || _voiceStarting || _sending
         ? null
         : () => unawaited(_toggleVoice()),
-    onOpenTasks: () => _selectDestination(1),
+    onOpenTasks: () => _openUtility('tasks'),
     refreshRevision: _homeRevision,
     onContinueConversation: _hasMessages
         ? () => setState(() => _showHome = false)
@@ -1756,399 +1836,29 @@ class _ChatScreenState extends State<ChatScreen> {
   );
 }
 
-class _ConnectionPill extends StatelessWidget {
-  const _ConnectionPill({required this.connected});
-
-  final bool connected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: connected ? 'Live updates connected' : 'Offline',
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.fromLTRB(8, 5, 10, 5),
-        decoration: BoxDecoration(
-          color: JarvisColors.surface,
-          border: Border.all(color: JarvisColors.outline),
-          borderRadius: BorderRadius.circular(40),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _ConnectionDot(connected: connected, withTooltip: false),
-            const SizedBox(width: 6),
-            Text(
-              connected ? 'Live' : 'Offline',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: connected ? JarvisColors.inkSoft : JarvisColors.muted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _ConnectionDot extends StatelessWidget {
-  const _ConnectionDot({required this.connected, this.withTooltip = true});
+  const _ConnectionDot({required this.connected});
 
   final bool connected;
-  final bool withTooltip;
 
   @override
-  Widget build(BuildContext context) {
-    final dot = AnimatedContainer(
+  Widget build(BuildContext context) => Tooltip(
+    message: connected ? 'Live updates connected' : 'Offline',
+    child: AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: 8,
-      height: 8,
+      width: 7,
+      height: 7,
       decoration: BoxDecoration(
-        color: connected ? JarvisColors.success : JarvisColors.muted,
+        color: connected ? JarvisColors.success : JarvisColors.outlineStrong,
         shape: BoxShape.circle,
-        boxShadow: connected
-            ? [
-                BoxShadow(
-                  color: JarvisColors.success.withValues(alpha: .45),
-                  blurRadius: 6,
-                ),
-              ]
-            : null,
       ),
-    );
-    if (!withTooltip) return dot;
-    return Tooltip(
-      message: connected ? 'Live updates connected' : 'Offline',
-      child: dot,
-    );
-  }
+    ),
+  );
 }
 
 /// Floating frosted capsule for the main sections, with a detached voice
 /// button; the voice destination starts a session rather than just
 /// switching screens, so it is kept visually separate.
-class _GlassNavBar extends StatefulWidget {
-  const _GlassNavBar({
-    required this.selectedIndex,
-    required this.onSelected,
-    required this.voiceActive,
-    required this.voiceStarting,
-    required this.destinations,
-  });
-
-  final int selectedIndex;
-  final ValueChanged<int> onSelected;
-  final bool voiceActive;
-  final bool voiceStarting;
-  final List<(IconData, IconData, String)> destinations;
-
-  static const voiceIndex = 2;
-
-  @override
-  State<_GlassNavBar> createState() => _GlassNavBarState();
-}
-
-class _GlassNavBarState extends State<_GlassNavBar> {
-  static const _height = 62.0;
-  static const _inset = 5.0;
-
-  List<int> get _tabs => [
-    for (var i = 0; i < widget.destinations.length; i++)
-      if (i != _GlassNavBar.voiceIndex) i,
-  ];
-
-  late int _indicatorSlot = _slotFor(widget.selectedIndex) ?? 0;
-
-  int? _slotFor(int destination) {
-    final slot = _tabs.indexOf(destination);
-    return slot < 0 ? null : slot;
-  }
-
-  @override
-  void didUpdateWidget(_GlassNavBar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _indicatorSlot = _slotFor(widget.selectedIndex) ?? _indicatorSlot;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tabs = _tabs;
-    final onVoice = widget.selectedIndex == _GlassNavBar.voiceIndex;
-    final (voiceIcon, _, voiceLabel) =
-        widget.destinations[_GlassNavBar.voiceIndex];
-    return SafeArea(
-      top: false,
-      minimum: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-        child: Center(
-          heightFactor: 1,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _Glass(
-                    height: _height,
-                    child: LayoutBuilder(
-                      builder: (context, box) {
-                        final slot = (box.maxWidth - _inset * 2) / tabs.length;
-                        return Stack(
-                          children: [
-                            AnimatedPositioned(
-                              duration: const Duration(milliseconds: 340),
-                              curve: Curves.easeOutCubic,
-                              left: _inset + slot * _indicatorSlot,
-                              top: _inset,
-                              bottom: _inset,
-                              width: slot,
-                              child: AnimatedOpacity(
-                                duration: const Duration(milliseconds: 200),
-                                opacity: onVoice ? 0 : 1,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: JarvisColors.ink.withValues(
-                                      alpha: .06,
-                                    ),
-                                    borderRadius: BorderRadius.circular(
-                                      _height / 2 - _inset,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(_inset),
-                              child: Row(
-                                children: [
-                                  for (final index in tabs)
-                                    Expanded(
-                                      child: _GlassTab(
-                                        destination: widget.destinations[index],
-                                        selected: widget.selectedIndex == index,
-                                        onTap: () => widget.onSelected(index),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                _VoiceButton(
-                  icon: voiceIcon,
-                  label: voiceLabel,
-                  size: _height,
-                  selected: onVoice,
-                  live: widget.voiceActive || widget.voiceStarting,
-                  onTap: () => widget.onSelected(_GlassNavBar.voiceIndex),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Translucent blurred surface shared by the navigation capsule and button.
-class _Glass extends StatelessWidget {
-  const _Glass({
-    required this.height,
-    required this.child,
-    this.width,
-    super.key,
-  });
-
-  final double height;
-  final double? width;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(height / 2);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0f111113),
-            blurRadius: 3,
-            offset: Offset(0, 1),
-          ),
-          BoxShadow(
-            color: Color(0x14111113),
-            blurRadius: 28,
-            offset: Offset(0, 10),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: Container(
-            height: height,
-            width: width,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .78),
-              borderRadius: radius,
-              border: Border.all(
-                color: JarvisColors.ink.withValues(alpha: .07),
-              ),
-            ),
-            child: child,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GlassTab extends StatelessWidget {
-  const _GlassTab({
-    required this.destination,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final (IconData, IconData, String) destination;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final (icon, selectedIcon, label) = destination;
-    final color = selected ? JarvisColors.ink : JarvisColors.muted;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: label,
-      excludeSemantics: true,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(selected ? selectedIcon : icon, size: 21, color: color),
-            const SizedBox(height: 2),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 10.5,
-                height: 1.2,
-                letterSpacing: -.05,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                color: color,
-              ),
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.fade,
-                softWrap: false,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _VoiceButton extends StatelessWidget {
-  const _VoiceButton({
-    required this.icon,
-    required this.label,
-    required this.size,
-    required this.selected,
-    required this.live,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final double size;
-  final bool selected;
-  final bool live;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final filled = selected || live;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: label,
-      excludeSemantics: true,
-      child: Tooltip(
-        message: live ? 'Voice session' : 'Talk to Jarvis',
-        child: GestureDetector(
-          onTap: onTap,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                child: filled
-                    ? Container(
-                        key: const ValueKey('filled'),
-                        width: size,
-                        height: size,
-                        decoration: const BoxDecoration(
-                          color: JarvisColors.ink,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(0x33111113),
-                              blurRadius: 20,
-                              offset: Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          live ? PhosphorIconsBold.waveform : icon,
-                          size: 22,
-                          color: Colors.white,
-                        ),
-                      )
-                    : _Glass(
-                        key: const ValueKey('glass'),
-                        height: size,
-                        width: size,
-                        child: Icon(icon, size: 22, color: JarvisColors.ink),
-                      ),
-              ),
-              if (live)
-                Positioned(
-                  right: 4,
-                  top: 4,
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: JarvisColors.danger,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _VoiceHint extends StatelessWidget {
   const _VoiceHint({required this.icon, required this.label});
 

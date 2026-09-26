@@ -676,3 +676,50 @@ class GroupedSection extends StatelessWidget {
     ),
   );
 }
+
+/// Round, softly shadowed icon button used in the top bar.
+class CircleIconButton extends StatelessWidget {
+  const CircleIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.size = 40,
+    super.key,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: Semantics(
+      button: true,
+      enabled: onPressed != null,
+      label: tooltip,
+      excludeSemantics: true,
+      child: Material(
+        color: JarvisColors.surface,
+        shape: const CircleBorder(
+          side: BorderSide(color: JarvisColors.outline),
+        ),
+        shadowColor: const Color(0x14000000),
+        elevation: 1.5,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onPressed,
+          child: SizedBox.square(
+            dimension: size,
+            child: Icon(
+              icon,
+              size: 19,
+              color: onPressed == null ? JarvisColors.muted : JarvisColors.ink,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
