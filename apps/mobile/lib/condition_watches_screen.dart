@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 class ConditionWatchesScreen extends StatefulWidget {
@@ -35,7 +36,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
       final response = await widget.http.get<List<dynamic>>('/api/v1/watches');
       if (mounted) {
         setState(
-          () => _watches = (response.data ?? []).cast<Map<String, dynamic>>(),
+          () => _watches = jsonMaps(response.data),
         );
       }
     } on DioException {

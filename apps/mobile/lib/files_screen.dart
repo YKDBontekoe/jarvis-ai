@@ -7,6 +7,7 @@ import 'file_download_stub.dart'
     if (dart.library.io) 'file_download_io.dart'
     as file_download;
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 const _allowedExtensions = [
@@ -54,7 +55,7 @@ class _FilesScreenState extends State<FilesScreen> {
       final response = await widget.http.get<List<dynamic>>('/api/v1/files');
       if (mounted) {
         setState(
-          () => _files = (response.data ?? []).cast<Map<String, dynamic>>(),
+          () => _files = jsonMaps(response.data),
         );
       }
     } on DioException {

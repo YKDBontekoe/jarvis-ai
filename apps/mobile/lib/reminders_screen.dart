@@ -5,6 +5,7 @@ import 'ui/phosphor_icons.dart';
 import 'approvals_screen.dart';
 import 'notification_details_screen.dart';
 import 'notification_routing.dart';
+import 'json_maps.dart';
 import 'task_details_screen.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -44,9 +45,8 @@ class _RemindersScreenState extends State<RemindersScreen>
       ]);
       if (mounted) {
         setState(() {
-          _reminders = (responses[0].data ?? []).cast<Map<String, dynamic>>();
-          _notifications = (responses[1].data ?? [])
-              .cast<Map<String, dynamic>>();
+          _reminders = jsonMaps(responses[0].data);
+          _notifications = jsonMaps(responses[1].data);
         });
       }
     } on DioException {

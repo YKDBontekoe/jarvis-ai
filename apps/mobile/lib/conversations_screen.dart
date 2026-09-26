@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 typedef ConversationPickerResult = ({
@@ -47,8 +48,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       );
       if (mounted) {
         setState(
-          () => _conversations = (response.data ?? [])
-              .cast<Map<String, dynamic>>(),
+          () => _conversations = jsonMaps(response.data),
         );
       }
     } on DioException {

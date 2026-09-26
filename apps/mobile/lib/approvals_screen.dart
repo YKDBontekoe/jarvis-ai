@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 class ApprovalsScreen extends StatefulWidget {
@@ -41,8 +42,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
       );
       if (mounted) {
         setState(
-          () => _approvals = (response.data ?? [])
-              .cast<Map<String, dynamic>>()
+          () => _approvals = jsonMaps(response.data)
               .where(
                 (approval) =>
                     widget.conversationId == null ||

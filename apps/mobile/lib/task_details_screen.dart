@@ -4,6 +4,7 @@ import 'ui/phosphor_icons.dart';
 import 'approvals_screen.dart';
 import 'features/chat/chat_widgets.dart';
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 class TaskDetailsScreen extends StatefulWidget {
@@ -48,8 +49,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       if (!mounted) return;
       setState(() {
         _task = responses[0].data as Map<String, dynamic>?;
-        _messages = (responses[1].data as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>();
+        _messages = jsonMaps(responses[1].data);
       });
     } on DioException catch (error) {
       if (!mounted) return;

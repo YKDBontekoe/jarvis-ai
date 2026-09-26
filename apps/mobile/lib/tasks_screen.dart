@@ -5,6 +5,7 @@ import 'task_details_screen.dart';
 import 'condition_watches_screen.dart';
 import 'approvals_screen.dart';
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 class TasksScreen extends StatefulWidget {
@@ -38,7 +39,7 @@ class _TasksScreenState extends State<TasksScreen> {
       final response = await widget.http.get<List<dynamic>>('/api/v1/tasks');
       if (mounted) {
         setState(
-          () => _tasks = (response.data ?? []).cast<Map<String, dynamic>>(),
+          () => _tasks = jsonMaps(response.data),
         );
       }
     } on DioException {

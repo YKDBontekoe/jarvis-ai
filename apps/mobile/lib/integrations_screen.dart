@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 class IntegrationsScreen extends StatefulWidget {
@@ -40,15 +41,9 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _providers = (response.data ?? const <dynamic>[])
-            .cast<Map<String, dynamic>>()
-            .toList();
-        _connections = (connectionResponse.data ?? const <dynamic>[])
-            .cast<Map<String, dynamic>>()
-            .toList();
-        _managedServers = (serversResponse.data ?? const <dynamic>[])
-            .cast<Map<String, dynamic>>()
-            .toList();
+        _providers = jsonMaps(response.data);
+        _connections = jsonMaps(connectionResponse.data);
+        _managedServers = jsonMaps(serversResponse.data);
         _loading = false;
         _error = null;
       });

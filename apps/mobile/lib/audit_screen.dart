@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 class AuditScreen extends StatefulWidget {
@@ -37,7 +38,7 @@ class _AuditScreenState extends State<AuditScreen> {
       );
       if (mounted) {
         setState(
-          () => _events = (response.data ?? []).cast<Map<String, dynamic>>(),
+          () => _events = jsonMaps(response.data),
         );
       }
     } on DioException {
