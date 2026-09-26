@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../task_details_screen.dart';
+import '../chat/chat_widgets.dart';
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({
@@ -15,6 +16,7 @@ class HomeOverview extends StatefulWidget {
     required this.onOpenTasks,
     required this.refreshRevision,
     this.onContinueConversation,
+    this.onSuggestion,
     super.key,
   });
 
@@ -26,6 +28,9 @@ class HomeOverview extends StatefulWidget {
   final VoidCallback onOpenTasks;
   final int refreshRevision;
   final VoidCallback? onContinueConversation;
+
+  /// Sends a suggested prompt; hidden when null.
+  final ValueChanged<String>? onSuggestion;
 
   @override
   State<HomeOverview> createState() => _HomeOverviewState();
@@ -181,12 +186,18 @@ class _HomeOverviewState extends State<HomeOverview>
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Or send a message below.',
+                    widget.onSuggestion == null
+                        ? 'Or send a message below.'
+                        : 'Or try one of these:',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  if (widget.onSuggestion != null) ...[
+                    const SizedBox(height: 14),
+                    SuggestionChips(onSelected: widget.onSuggestion),
+                  ],
                   if (widget.onContinueConversation != null)
                     Center(
                       child: TextButton.icon(

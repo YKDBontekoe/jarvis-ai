@@ -24,7 +24,10 @@ import 'notification_details_screen.dart';
 import 'condition_watches_screen.dart';
 import 'daily_briefing_screen.dart';
 import 'integrations_screen.dart';
+import 'features/chat/chat_entries.dart';
+import 'features/chat/chat_widgets.dart';
 import 'features/home/home_overview.dart';
+import 'theme.dart';
 
 const _apiBaseUrl = String.fromEnvironment(
   'JARVIS_API_URL',
@@ -244,40 +247,9 @@ class JarvisApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     title: 'Jarvis',
     debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: const Color(0xff101117),
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xffa895ff),
-        brightness: Brightness.dark,
-      ),
-      useMaterial3: true,
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: const Color(0xff1c1e28),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(26),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 15,
-        ),
-      ),
-    ),
+    theme: buildJarvisTheme(),
     home: const ChatScreen(),
   );
-}
-
-class _Message {
-  const _Message({
-    required this.role,
-    required this.content,
-    this.pending = false,
-  });
-  final String role;
-  final String content;
-  final bool pending;
 }
 
 class ChatScreen extends StatefulWidget {
@@ -288,6 +260,8 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  static const _wideLayoutWidth = 840.0;
+
   final _auth = _AuthSession();
   final _http = Dio(
     BaseOptions(
@@ -298,7 +272,7 @@ class _ChatScreenState extends State<ChatScreen> {
   );
   final _input = TextEditingController();
   final _scroll = ScrollController();
-  final _messages = <_Message>[];
+  final _entries = <ChatEntry>[];
   HubConnection? _hub;
   Room? _voiceRoom;
   String? _conversationId;
@@ -312,13 +286,20 @@ class _ChatScreenState extends State<ChatScreen> {
   int _selectedDestination = 0;
   int _homeRevision = 0;
   bool _showHome = true;
-  String? _agentActivity;
-  bool _agentActivityBusy = false;
   String? _pushToken;
   StreamSubscription<String>? _pushTokenSubscription;
   StreamSubscription<RemoteMessage>? _pushOpenedSubscription;
   StreamSubscription<RemoteMessage>? _pushForegroundSubscription;
   final Set<String> _shownPushNotifications = {};
+
+  bool get _hasMessages => _entries.any((entry) => entry is MessageEntry);
+
+  bool get _busy =>
+      _sending ||
+      _entries.any(
+        (entry) =>
+            entry is ApprovalEntry && entry.status == ApprovalStatus.submitting,
+      );
 
   @override
   void initState() {
@@ -364,7 +345,7 @@ class _ChatScreenState extends State<ChatScreen> {
       } else {
         final created = await _http.post<Map<String, dynamic>>(
           '/api/v1/conversations',
-          data: const {'title': 'Chat with Jarvis'},
+          data: const {'title': 'New conversation'},
         );
         conversationId = created.data?['id'] as String;
       }
@@ -405,30 +386,47 @@ class _ChatScreenState extends State<ChatScreen> {
         _connected = false;
         _selectedDestination = 0;
         _showHome = showHome;
-        _messages.clear();
+        _entries.clear();
         _error = null;
-        _agentActivity = null;
-        _agentActivityBusy = false;
       });
     }
     final details = await _http.get<Map<String, dynamic>>(
       '/api/v1/conversations/$conversationId',
     );
     final records = details.data?['messages'] as List<dynamic>? ?? [];
-    if (mounted) {
+    final approvals = await _loadConversationApprovals(conversationId);
+    if (mounted && _conversationId == conversationId) {
       setState(() {
-        _messages.addAll(
+        _entries.addAll(
           records.map((item) {
             final message = item as Map<String, dynamic>;
-            return _Message(
+            return MessageEntry(
               role: message['role'] as String,
               content: message['content'] as String,
             );
           }),
         );
+        _entries.addAll(approvals);
       });
+      _scrollToBottom(jump: true);
     }
     await _connectRealtime();
+  }
+
+  Future<List<ApprovalEntry>> _loadConversationApprovals(
+    String conversationId,
+  ) async {
+    try {
+      final response = await _http.get<List<dynamic>>('/api/v1/approvals');
+      return (response.data ?? [])
+          .whereType<Map<String, dynamic>>()
+          .where((item) => item['conversationId'] == conversationId)
+          .map(ApprovalEntry.fromJson)
+          .whereType<ApprovalEntry>()
+          .toList();
+    } on DioException {
+      return const [];
+    }
   }
 
   Future<void> _chooseConversation() async {
@@ -506,6 +504,106 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _selectedDestination = index);
   }
 
+  Map<Object?, Object?>? _payload(List<Object?>? arguments) {
+    if (arguments == null || arguments.isEmpty) return null;
+    final value = arguments.first;
+    return value is Map<Object?, Object?> ? value : null;
+  }
+
+  /// Index of the trailing "thinking" placeholder, if one is showing.
+  int get _placeholderIndex {
+    if (_entries.isEmpty) return -1;
+    final last = _entries.last;
+    return last is MessageEntry &&
+            !last.isUser &&
+            last.pending &&
+            last.content.isEmpty
+        ? _entries.length - 1
+        : -1;
+  }
+
+  void _removePlaceholder() {
+    final index = _placeholderIndex;
+    if (index >= 0) _entries.removeAt(index);
+  }
+
+  void _appendDelta(String delta) {
+    final last = _entries.isEmpty ? null : _entries.last;
+    if (last is MessageEntry && !last.isUser && last.pending) {
+      _entries[_entries.length - 1] = last.copyWith(
+        content: '${last.content}$delta',
+      );
+    } else {
+      _entries.add(
+        MessageEntry(role: 'assistant', content: delta, pending: true),
+      );
+    }
+  }
+
+  void _completeAssistant(String content) {
+    final index = _entries.lastIndexWhere(
+      (entry) => entry is MessageEntry && !entry.isUser && entry.pending,
+    );
+    final message = MessageEntry(role: 'assistant', content: content);
+    if (index >= 0) {
+      _entries[index] = message;
+    } else if (content.isNotEmpty) {
+      _entries.add(message);
+    }
+    _settleToolRuns();
+  }
+
+  void _toolEvent(String tool, {bool? success}) {
+    final runIndex = _entries.lastIndexWhere((entry) => entry is ToolRunEntry);
+    final lastUser = _entries.lastIndexWhere(
+      (entry) => entry is MessageEntry && entry.isUser,
+    );
+    final lastApproval = _entries.lastIndexWhere(
+      (entry) => entry is ApprovalEntry,
+    );
+    final current =
+        runIndex > lastUser && runIndex > lastApproval && runIndex >= 0
+        ? _entries[runIndex] as ToolRunEntry
+        : null;
+    final updated = success == null
+        ? (current ?? const ToolRunEntry([])).started(tool)
+        : (current ?? const ToolRunEntry([])).finished(tool, success: success);
+    if (current != null) {
+      _entries[runIndex] = updated;
+    } else {
+      final placeholder = _placeholderIndex;
+      if (placeholder >= 0) {
+        _entries.insert(placeholder, updated);
+      } else {
+        _entries.add(updated);
+      }
+    }
+  }
+
+  void _settleToolRuns() {
+    for (var i = 0; i < _entries.length; i++) {
+      final entry = _entries[i];
+      if (entry is ToolRunEntry && entry.running) _entries[i] = entry.settle();
+    }
+  }
+
+  void _addApprovals(Iterable<ApprovalEntry> approvals) {
+    _removePlaceholder();
+    _settleToolRuns();
+    for (final approval in approvals) {
+      final existing = _entries.indexWhere(
+        (entry) => entry is ApprovalEntry && entry.id == approval.id,
+      );
+      if (existing >= 0) {
+        final current = _entries[existing] as ApprovalEntry;
+        if (current.status == ApprovalStatus.submitting) continue;
+        _entries[existing] = approval;
+      } else {
+        _entries.add(approval);
+      }
+    }
+  }
+
   Future<void> _connectRealtime() async {
     final conversationId = _conversationId;
     if (conversationId == null) return;
@@ -519,67 +617,43 @@ class _ChatScreenState extends State<ChatScreen> {
         .withAutomaticReconnect()
         .build();
     hub.on('message.delta', (arguments) {
-      if (arguments == null || arguments.isEmpty || !mounted) return;
-      final event = arguments.first as Map<Object?, Object?>;
-      final delta = event['delta'] as String? ?? '';
-      if (delta.isEmpty) return;
+      final event = _payload(arguments);
+      final delta = event?['delta'] as String? ?? '';
+      if (delta.isEmpty || !mounted) return;
       setState(() {
         _showHome = false;
-        if (_messages.isEmpty || !_messages.last.pending) {
-          _messages.add(
-            _Message(role: 'assistant', content: delta, pending: true),
-          );
-        } else {
-          final previous = _messages.removeLast();
-          _messages.add(
-            _Message(
-              role: 'assistant',
-              content: '${previous.content}$delta',
-              pending: true,
-            ),
-          );
-        }
+        _appendDelta(delta);
       });
       _scrollToBottom();
     });
     hub.on('tool.started', (arguments) {
-      if (arguments == null || arguments.isEmpty || !mounted) return;
-      final event = arguments.first as Map<Object?, Object?>;
-      final tool = event['tool'] as String? ?? '';
-      setState(() {
-        _agentActivity = _toolActivity(tool);
-        _agentActivityBusy = true;
-      });
+      final tool = _payload(arguments)?['tool'] as String?;
+      if (tool == null || !mounted) return;
+      setState(() => _toolEvent(tool));
+      _scrollToBottom();
     });
     hub.on('tool.completed', (arguments) {
-      if (arguments == null || arguments.isEmpty || !mounted) return;
-      final event = arguments.first as Map<Object?, Object?>;
-      final tool = event['tool'] as String? ?? '';
-      setState(() {
-        _agentActivity = 'Finished ${_toolName(tool)}';
-        _agentActivityBusy = false;
-      });
+      final tool = _payload(arguments)?['tool'] as String?;
+      if (tool == null || !mounted) return;
+      setState(() => _toolEvent(tool, success: true));
     });
     hub.on('tool.failed', (arguments) {
-      if (arguments == null || arguments.isEmpty || !mounted) return;
-      final event = arguments.first as Map<Object?, Object?>;
-      final tool = event['tool'] as String? ?? '';
-      setState(() {
-        _agentActivity = '${_toolName(tool)} failed';
-        _agentActivityBusy = false;
-      });
+      final tool = _payload(arguments)?['tool'] as String?;
+      if (tool == null || !mounted) return;
+      setState(() => _toolEvent(tool, success: false));
     });
-    hub.on('tool.approval_required', (_) {
-      if (mounted) {
-        setState(() {
-          _agentActivity = 'Waiting for your approval';
-          _agentActivityBusy = false;
-        });
-      }
+    hub.on('tool.approval_required', (arguments) {
+      final approval = ApprovalEntry.fromJson(_payload(arguments));
+      if (approval == null || !mounted) return;
+      setState(() {
+        _showHome = false;
+        _addApprovals([approval]);
+      });
+      _scrollToBottom();
     });
     hub.on('notification.created', (arguments) {
-      if (arguments == null || arguments.isEmpty || !mounted) return;
-      final event = arguments.first as Map<Object?, Object?>;
+      final event = _payload(arguments);
+      if (event == null || !mounted) return;
       if (event['type'] == 'task.completed' ||
           event['type'] == 'approval.required') {
         setState(() => _homeRevision++);
@@ -587,6 +661,11 @@ class _ChatScreenState extends State<ChatScreen> {
       if (event['type'] != 'approval.required') return;
       final notificationId = event['notificationId'] as String?;
       if (notificationId != null) _shownPushNotifications.add(notificationId);
+      final approvalId = event['sourceId'] as String?;
+      final inline = _entries.any(
+        (entry) => entry is ApprovalEntry && entry.id == approvalId,
+      );
+      if (inline && _selectedDestination == 0 && !_showHome) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -599,47 +678,32 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
     });
-    hub.on('agent.waiting_for_approval', (_) {
-      if (mounted) {
-        setState(() {
-          _agentActivity = 'Waiting for your approval';
-          _agentActivityBusy = false;
-        });
-      }
-    });
     hub.on('agent.completed', (_) {
-      if (mounted) {
-        setState(() {
-          _agentActivity = null;
-          _agentActivityBusy = false;
-        });
-      }
+      if (mounted) setState(_settleToolRuns);
     });
     hub.on('agent.failed', (arguments) {
       if (!mounted) return;
-      final event = arguments?.first as Map<Object?, Object?>?;
+      final event = _payload(arguments);
       setState(() {
-        _agentActivity = null;
-        _agentActivityBusy = false;
+        _removePlaceholder();
+        _settleToolRuns();
         _error =
             event?['message'] as String? ??
             'Jarvis could not complete this response.';
       });
     });
     hub.on('voice.transcript', (arguments) {
-      if (arguments == null || arguments.isEmpty || !mounted) return;
-      final event = arguments.first as Map<Object?, Object?>;
-      final transcript = event['text'] as String? ?? '';
-      if (transcript.isEmpty) return;
+      final transcript = _payload(arguments)?['text'] as String? ?? '';
+      if (transcript.isEmpty || !mounted) return;
       setState(() {
         _showHome = false;
-        _messages.add(_Message(role: 'user', content: transcript));
+        _entries.add(MessageEntry(role: 'user', content: transcript));
       });
       _scrollToBottom();
     });
     hub.on('voice.failed', (arguments) {
       if (!mounted) return;
-      final event = arguments?.first as Map<Object?, Object?>?;
+      final event = _payload(arguments);
       setState(
         () => _error = event?['message'] as String? ?? 'Voice session failed.',
       );
@@ -660,8 +724,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         setState(() {
           _connected = false;
-          _agentActivity = null;
-          _agentActivityBusy = false;
+          _settleToolRuns();
         });
       }
     });
@@ -743,9 +806,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _signedOut = true;
         _connected = false;
         _conversationId = null;
-        _messages.clear();
-        _agentActivity = null;
-        _agentActivityBusy = false;
+        _entries.clear();
       });
     }
   }
@@ -840,44 +901,132 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Future<void> _send() async {
-    final content = _input.text.trim();
+  Future<void> _send([String? text]) async {
+    final content = (text ?? _input.text).trim();
     final conversationId = _conversationId;
     if (content.isEmpty ||
         conversationId == null ||
-        _sending ||
+        _busy ||
         _voiceActive ||
         _voiceStarting) {
       return;
     }
-    _input.clear();
+    if (text == null) _input.clear();
+    final userMessage = MessageEntry(role: 'user', content: content);
     setState(() {
       _sending = true;
       _showHome = false;
+      _selectedDestination = 0;
       _error = null;
-      _messages.add(_Message(role: 'user', content: content));
+      _entries.add(userMessage);
+      _entries.add(
+        const MessageEntry(role: 'assistant', content: '', pending: true),
+      );
     });
     _scrollToBottom();
     try {
-      final response = await _http.post<Map<String, dynamic>>(
+      final response = await _http.post<dynamic>(
         '/api/v1/conversations/$conversationId/messages',
         data: {'content': content},
       );
-      final answer = response.data?['content'] as String? ?? '';
-      if (mounted) {
+      if (!mounted || _conversationId != conversationId) return;
+      setState(() => _applyRunResult(response));
+    } on DioException catch (error) {
+      if (mounted && _conversationId == conversationId) {
         setState(() {
-          if (_messages.isNotEmpty &&
-              _messages.last.role == 'assistant' &&
-              _messages.last.pending) {
-            _messages.removeLast();
-          }
-          _messages.add(_Message(role: 'assistant', content: answer));
+          _removePlaceholder();
+          _settleToolRuns();
+          final index = _entries.lastIndexOf(userMessage);
+          if (index >= 0) _entries[index] = userMessage.copyWith(failed: true);
+          _error = _describeError(error);
         });
       }
-    } on DioException catch (error) {
-      if (mounted) setState(() => _error = _describeError(error));
     } finally {
       if (mounted) setState(() => _sending = false);
+      _scrollToBottom();
+    }
+  }
+
+  void _applyRunResult(Response<dynamic> response) {
+    final data = response.data;
+    if (response.statusCode == 202 && data is List) {
+      _addApprovals(
+        data.map(ApprovalEntry.fromJson).whereType<ApprovalEntry>(),
+      );
+      return;
+    }
+    final content = data is Map ? data['content'] as String? ?? '' : '';
+    _completeAssistant(content);
+  }
+
+  Future<void> _retry(MessageEntry message) async {
+    if (_busy) return;
+    setState(() => _entries.remove(message));
+    await _send(message.content);
+  }
+
+  Future<void> _decide(ApprovalEntry approval, bool approved) async {
+    final conversationId = _conversationId;
+    if (conversationId == null || _busy) return;
+    void replace(ApprovalEntry Function(ApprovalEntry current) update) {
+      final index = _entries.indexWhere(
+        (entry) => entry is ApprovalEntry && entry.id == approval.id,
+      );
+      if (index >= 0) {
+        _entries[index] = update(_entries[index] as ApprovalEntry);
+      }
+    }
+
+    setState(() {
+      _error = null;
+      replace(
+        (current) => current.copyWith(
+          status: ApprovalStatus.submitting,
+          decision: approved,
+          clearError: true,
+        ),
+      );
+      _entries.add(
+        const MessageEntry(role: 'assistant', content: '', pending: true),
+      );
+    });
+    _scrollToBottom();
+    try {
+      final response = await _http.post<dynamic>(
+        '/api/v1/approvals/${approval.id}/decision',
+        data: {'approved': approved},
+      );
+      if (!mounted || _conversationId != conversationId) return;
+      setState(() {
+        replace(
+          (current) => current.copyWith(
+            status: approved ? ApprovalStatus.approved : ApprovalStatus.denied,
+          ),
+        );
+        _applyRunResult(response);
+      });
+      setState(() => _homeRevision++);
+    } on DioException catch (error) {
+      if (!mounted || _conversationId != conversationId) return;
+      final status = error.response?.statusCode;
+      setState(() {
+        _removePlaceholder();
+        _settleToolRuns();
+        replace(
+          (current) => status == 404
+              ? current.copyWith(
+                  status: ApprovalStatus.denied,
+                  error: 'This approval is no longer pending.',
+                )
+              : current.copyWith(
+                  status: ApprovalStatus.failed,
+                  error: status == 409
+                      ? 'This approval was already handled elsewhere.'
+                      : 'Jarvis could not finish this step. You can retry.',
+                ),
+        );
+      });
+    } finally {
       _scrollToBottom();
     }
   }
@@ -955,40 +1104,32 @@ class _ChatScreenState extends State<ChatScreen> {
     if (status == 502) {
       return 'Jarvis could not complete this request. Please try again.';
     }
+    if (status == 503) {
+      return 'A Jarvis service is temporarily unavailable. Please try again.';
+    }
+    if (status == 409) {
+      final data = error.response?.data;
+      final message = data is Map ? data['message'] as String? : null;
+      return message ?? 'Jarvis is busy with this conversation.';
+    }
     if (status != null) return 'Jarvis returned HTTP $status.';
     return 'Could not reach the Jarvis API at $_apiBaseUrl.';
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool jump = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) {
+      if (!_scroll.hasClients) return;
+      final target = _scroll.position.maxScrollExtent;
+      if (jump) {
+        _scroll.jumpTo(target);
+      } else {
         _scroll.animateTo(
-          _scroll.position.maxScrollExtent,
+          target,
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOut,
         );
       }
     });
-  }
-
-  String _toolName(String tool) {
-    final cleaned = tool.replaceAll(RegExp(r'Async$'), '').replaceAll('_', ' ');
-    return cleaned
-        .replaceAllMapped(
-          RegExp(r'([a-z])([A-Z])'),
-          (match) => '${match[1]} ${match[2]}',
-        )
-        .toLowerCase();
-  }
-
-  String _toolActivity(String tool) {
-    final name = _toolName(tool);
-    if (name.contains('memory')) return 'Searching memory';
-    if (name.contains('file')) return 'Searching files';
-    if (name.contains('reminder')) return 'Managing a reminder';
-    if (name.contains('task')) return 'Managing a task';
-    if (name.startsWith('browser ')) return 'Using the browser';
-    return 'Using $name';
   }
 
   @override
@@ -1004,234 +1145,249 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  static const _destinations = [
+    (Icons.chat_bubble_outline, Icons.chat_bubble, 'Chat'),
+    (Icons.checklist_outlined, Icons.checklist, 'Tasks'),
+    (Icons.mic_none_rounded, Icons.graphic_eq_rounded, 'Voice'),
+    (Icons.psychology_outlined, Icons.psychology, 'Memory'),
+    (Icons.settings_outlined, Icons.settings, 'Settings'),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    if (_signedOut) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const _JarvisMark(size: 56),
-              const SizedBox(height: 20),
-              const Text('Sign in to Jarvis', style: TextStyle(fontSize: 22)),
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                onPressed: _authBusy ? null : _signIn,
-                icon: _authBusy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.login),
-                label: const Text('Continue with your identity provider'),
-              ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Text(_error!),
-                ),
-            ],
-          ),
-        ),
-      );
-    }
+    if (_signedOut) return _signInScreen();
 
     final destination = _selectedDestination;
     final showIndependentScaffold = destination == 1 || destination == 3;
-    return Scaffold(
-      appBar: showIndependentScaffold
-          ? null
-          : AppBar(
-              titleSpacing: 20,
-              title: Text(
-                destination == 4
-                    ? 'Settings'
-                    : destination == 2
-                    ? 'Voice'
-                    : 'Jarvis',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              actions: [
-                if (destination == 0 && _messages.isNotEmpty)
-                  IconButton(
-                    tooltip: _showHome ? 'Continue conversation' : 'Home',
-                    onPressed: _sending || _voiceStarting
-                        ? null
-                        : () => setState(() => _showHome = !_showHome),
-                    icon: Icon(
-                      _showHome
-                          ? Icons.chat_bubble_outline
-                          : Icons.home_outlined,
-                      size: 21,
-                    ),
-                  ),
-                if (destination == 0)
-                  IconButton(
-                    tooltip: 'Conversations',
-                    onPressed: _sending ? null : _chooseConversation,
-                    icon: const Icon(Icons.forum_outlined, size: 21),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 4, right: 20),
-                  child: Center(
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: _connected
-                            ? const Color(0xff68d6a8)
-                            : const Color(0xff686a77),
-                        shape: BoxShape.circle,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= _wideLayoutWidth;
+        final scaffold = Scaffold(
+          appBar: showIndependentScaffold ? null : _appBar(destination),
+          body: switch (destination) {
+            0 => _chatBody(),
+            1 => TasksScreen(http: _http),
+            2 => _voiceBody(),
+            3 => MemoryScreen(http: _http),
+            _ => _settingsBody(),
+          },
+          bottomNavigationBar: wide
+              ? null
+              : NavigationBar(
+                  selectedIndex: destination,
+                  onDestinationSelected: _selectDestination,
+                  destinations: [
+                    for (final (icon, selected, label) in _destinations)
+                      NavigationDestination(
+                        icon: Icon(icon),
+                        selectedIcon: Icon(selected),
+                        label: label,
                       ),
+                  ],
+                ),
+        );
+        if (!wide) return scaffold;
+        return Scaffold(
+          body: Row(
+            children: [
+              NavigationRail(
+                selectedIndex: destination,
+                onDestinationSelected: _selectDestination,
+                labelType: NavigationRailLabelType.all,
+                groupAlignment: -.85,
+                leading: Padding(
+                  padding: const EdgeInsets.only(top: 18, bottom: 22),
+                  child: Tooltip(
+                    message: 'New chat',
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: _busy ? null : _startNewChat,
+                      child: const JarvisAvatar(size: 40),
                     ),
                   ),
                 ),
-              ],
-              backgroundColor: const Color(0xff101117),
-            ),
-      body: switch (destination) {
-        0 => _chatBody(),
-        1 => TasksScreen(http: _http),
-        2 => _voiceBody(),
-        3 => MemoryScreen(http: _http),
-        _ => _settingsBody(),
+                destinations: [
+                  for (final (icon, selected, label) in _destinations)
+                    NavigationRailDestination(
+                      icon: Icon(icon),
+                      selectedIcon: Icon(selected),
+                      label: Text(label),
+                    ),
+                ],
+              ),
+              const VerticalDivider(width: 1),
+              Expanded(child: scaffold),
+            ],
+          ),
+        );
       },
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: destination,
-        onDestinationSelected: _selectDestination,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Chat',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.checklist_outlined),
-            selectedIcon: Icon(Icons.checklist),
-            label: 'Tasks',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.mic_none_rounded),
-            selectedIcon: Icon(Icons.graphic_eq_rounded),
-            label: 'Voice',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.psychology_outlined),
-            selectedIcon: Icon(Icons.psychology),
-            label: 'Memory',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
-      ),
     );
   }
+
+  void _startNewChat() {
+    if (_selectedDestination != 0) setState(() => _selectedDestination = 0);
+    if (!_hasMessages && _conversationId != null) {
+      setState(() => _showHome = true);
+      return;
+    }
+    unawaited(_createAndOpenConversation());
+  }
+
+  PreferredSizeWidget _appBar(int destination) => AppBar(
+    titleSpacing: 20,
+    title: Text(switch (destination) {
+      4 => 'Settings',
+      2 => 'Voice',
+      _ => 'Jarvis',
+    }),
+    actions: [
+      if (destination == 0 && _hasMessages)
+        IconButton(
+          tooltip: _showHome ? 'Continue conversation' : 'Home',
+          onPressed: _busy || _voiceStarting
+              ? null
+              : () => setState(() => _showHome = !_showHome),
+          icon: Icon(
+            _showHome ? Icons.chat_bubble_outline : Icons.home_outlined,
+            size: 21,
+          ),
+        ),
+      if (destination == 0)
+        IconButton(
+          tooltip: 'New chat',
+          onPressed: _busy ? null : _startNewChat,
+          icon: const Icon(Icons.edit_square, size: 20),
+        ),
+      if (destination == 0)
+        IconButton(
+          tooltip: 'Conversations',
+          onPressed: _busy ? null : _chooseConversation,
+          icon: const Icon(Icons.forum_outlined, size: 21),
+        ),
+      Padding(
+        padding: const EdgeInsets.only(left: 4, right: 20),
+        child: Tooltip(
+          message: _connected ? 'Live updates connected' : 'Offline',
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: _connected
+                  ? JarvisColors.success
+                  : const Color(0xff686a77),
+              shape: BoxShape.circle,
+              boxShadow: _connected
+                  ? [
+                      BoxShadow(
+                        color: JarvisColors.success.withValues(alpha: .5),
+                        blurRadius: 8,
+                      ),
+                    ]
+                  : null,
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+
+  Widget _signInScreen() => Scaffold(
+    body: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const _JarvisMark(size: 56),
+          const SizedBox(height: 20),
+          const Text('Sign in to Jarvis', style: TextStyle(fontSize: 22)),
+          const SizedBox(height: 18),
+          FilledButton.icon(
+            onPressed: _authBusy ? null : _signIn,
+            icon: _authBusy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.login),
+            label: const Text('Continue with your identity provider'),
+          ),
+          if (_error != null)
+            Padding(padding: const EdgeInsets.all(20), child: Text(_error!)),
+        ],
+      ),
+    ),
+  );
 
   Widget _chatBody() => SafeArea(
     child: Column(
       children: [
         if (_error != null)
           MaterialBanner(
+            backgroundColor: JarvisColors.surfaceRaised,
             content: Text(_error!),
-            leading: const Icon(Icons.info_outline),
+            leading: const Icon(
+              Icons.info_outline,
+              color: JarvisColors.warning,
+            ),
             actions: [
-              TextButton(onPressed: _initialize, child: const Text('Retry')),
+              TextButton(
+                onPressed: () => setState(() => _error = null),
+                child: const Text('Dismiss'),
+              ),
+              if (_conversationId == null || !_connected)
+                TextButton(onPressed: _initialize, child: const Text('Retry')),
             ],
           ),
         Expanded(
-          child: _showHome || _messages.isEmpty
+          child: _showHome || _entries.isEmpty
               ? _welcome()
               : ListView.builder(
                   controller: _scroll,
                   padding: const EdgeInsets.fromLTRB(18, 20, 18, 24),
-                  itemCount: _messages.length,
-                  itemBuilder: (context, index) =>
-                      _MessageBubble(message: _messages[index]),
-                ),
-        ),
-        if (_agentActivity case final activity?)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
-            child: Row(
-              children: [
-                if (_agentActivityBusy)
-                  const SizedBox.square(
-                    dimension: 14,
-                    child: CircularProgressIndicator(strokeWidth: 1.8),
-                  )
-                else
-                  const Icon(Icons.check_circle_outline, size: 15),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    activity,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: .62),
-                      fontSize: 13,
+                  itemCount: _entries.length,
+                  itemBuilder: (context, index) => Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 780),
+                      child: _entryView(_entries[index]),
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _input,
-                  enabled: !_voiceActive && !_voiceStarting,
-                  minLines: 1,
-                  maxLines: 5,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _send(),
-                  decoration: const InputDecoration(hintText: 'Message Jarvis'),
-                ),
-              ),
-              const SizedBox(width: 9),
-              IconButton(
-                tooltip: _voiceActive ? 'Stop voice' : 'Talk to Jarvis',
-                onPressed: _voiceStarting || _sending ? null : _toggleVoice,
-                icon: _voiceStarting
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        _voiceActive
-                            ? Icons.stop_rounded
-                            : Icons.mic_none_rounded,
-                      ),
-                color: _voiceActive ? const Color(0xfff28b82) : null,
-                style: IconButton.styleFrom(minimumSize: const Size(48, 52)),
-              ),
-              const SizedBox(width: 4),
-              IconButton.filled(
-                onPressed: _sending || _voiceActive || _voiceStarting
+        ),
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 808),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+              child: ChatComposer(
+                controller: _input,
+                onSend: () => unawaited(_send()),
+                onVoice: _conversationId == null
                     ? null
-                    : _send,
-                icon: _sending
-                    ? const SizedBox(
-                        width: 19,
-                        height: 19,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.arrow_upward_rounded),
-                style: IconButton.styleFrom(minimumSize: const Size(52, 52)),
+                    : () => unawaited(_toggleVoice()),
+                sending: _busy,
+                voiceActive: _voiceActive,
+                voiceStarting: _voiceStarting,
               ),
-            ],
+            ),
           ),
         ),
       ],
     ),
   );
+
+  Widget _entryView(ChatEntry entry) => switch (entry) {
+    MessageEntry() => MessageBubble(
+      key: ObjectKey(entry),
+      message: entry,
+      onRetry: entry.failed ? () => unawaited(_retry(entry)) : null,
+    ),
+    ToolRunEntry() => ToolRunView(run: entry),
+    ApprovalEntry() => ApprovalCard(
+      approval: entry,
+      onDecide: (approved) => unawaited(_decide(entry, approved)),
+    ),
+  };
 
   Widget _voiceBody() => SafeArea(
     child: Center(
@@ -1284,57 +1440,79 @@ class _ChatScreenState extends State<ChatScreen> {
   );
 
   Widget _settingsBody() => SafeArea(
-    child: ListView(
-      children: [
-        _settingsTile(
-          'Integrations',
-          'Manage MCP servers and credentials',
-          Icons.hub_outlined,
-          'integrations',
+    child: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720),
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          children: [
+            _settingsSection('Assistant'),
+            _settingsTile(
+              'Integrations',
+              'Manage MCP servers and credentials',
+              Icons.hub_outlined,
+              'integrations',
+            ),
+            _settingsTile(
+              'Approvals',
+              'Review actions Jarvis needs permission to run',
+              Icons.gpp_maybe_outlined,
+              'approvals',
+            ),
+            _settingsTile(
+              'Morning briefing',
+              'Choose your daily briefing schedule and time zone',
+              Icons.wb_sunny_outlined,
+              'briefing',
+            ),
+            _settingsSection('Automations'),
+            _settingsTile(
+              'Reminders and notifications',
+              'View scheduled reminders and alerts',
+              Icons.notifications_none_outlined,
+              'reminders',
+            ),
+            _settingsTile(
+              'Condition watches',
+              'Manage threshold alerts',
+              Icons.monitor_heart_outlined,
+              'watches',
+            ),
+            _settingsSection('Data'),
+            _settingsTile(
+              'Files',
+              'Browse uploaded documents',
+              Icons.folder_open_outlined,
+              'files',
+            ),
+            _settingsTile(
+              'Audit log',
+              'Review Jarvis activity',
+              Icons.fact_check_outlined,
+              'audit',
+            ),
+            if (_auth.enabled)
+              ListTile(
+                leading: const Icon(Icons.logout),
+                title: const Text('Sign out'),
+                onTap: () => unawaited(_signOut()),
+              ),
+          ],
         ),
-        _settingsTile(
-          'Approvals',
-          'Review actions Jarvis needs permission to run',
-          Icons.gpp_maybe_outlined,
-          'approvals',
-        ),
-        _settingsTile(
-          'Reminders and notifications',
-          'View scheduled reminders and alerts',
-          Icons.notifications_none_outlined,
-          'reminders',
-        ),
-        _settingsTile(
-          'Condition watches',
-          'Manage threshold alerts',
-          Icons.monitor_heart_outlined,
-          'watches',
-        ),
-        _settingsTile(
-          'Morning briefing',
-          'Choose your daily briefing schedule',
-          Icons.wb_sunny_outlined,
-          'briefing',
-        ),
-        _settingsTile(
-          'Files',
-          'Browse uploaded documents',
-          Icons.folder_open_outlined,
-          'files',
-        ),
-        _settingsTile(
-          'Audit log',
-          'Review Jarvis activity',
-          Icons.fact_check_outlined,
-          'audit',
-        ),
-        if (_auth.enabled)
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Sign out'),
-            onTap: () => unawaited(_signOut()),
-          ),
-      ],
+      ),
+    ),
+  );
+
+  Widget _settingsSection(String title) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
+    child: Text(
+      title.toUpperCase(),
+      style: const TextStyle(
+        fontSize: 11.5,
+        letterSpacing: 1.1,
+        fontWeight: FontWeight.w600,
+        color: JarvisColors.muted,
+      ),
     ),
   );
 
@@ -1344,10 +1522,18 @@ class _ChatScreenState extends State<ChatScreen> {
     IconData icon,
     String destination,
   ) => ListTile(
-    leading: Icon(icon),
+    leading: Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: JarvisColors.accent.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, size: 20, color: JarvisColors.accent),
+    ),
     title: Text(title),
-    subtitle: Text(subtitle),
-    trailing: const Icon(Icons.chevron_right),
+    subtitle: Text(subtitle, style: const TextStyle(color: JarvisColors.muted)),
+    trailing: const Icon(Icons.chevron_right, color: JarvisColors.muted),
     onTap: () => _openUtility(destination),
   );
 
@@ -1361,43 +1547,13 @@ class _ChatScreenState extends State<ChatScreen> {
         : () => unawaited(_toggleVoice()),
     onOpenTasks: () => _selectDestination(1),
     refreshRevision: _homeRevision,
-    onContinueConversation: _messages.isEmpty
+    onContinueConversation: _hasMessages
+        ? () => setState(() => _showHome = false)
+        : null,
+    onSuggestion: _conversationId == null || _busy
         ? null
-        : () => setState(() => _showHome = false),
+        : (text) => unawaited(_send(text)),
   );
-}
-
-class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message});
-  final _Message message;
-
-  @override
-  Widget build(BuildContext context) {
-    final isUser = message.role == 'user';
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 680),
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: EdgeInsets.symmetric(
-          horizontal: isUser ? 16 : 3,
-          vertical: 12,
-        ),
-        decoration: isUser
-            ? BoxDecoration(
-                color: const Color(0xff282638),
-                borderRadius: BorderRadius.circular(20),
-              )
-            : null,
-        child: Text(
-          message.content.isEmpty && message.pending
-              ? 'Thinking…'
-              : message.content,
-          style: const TextStyle(fontSize: 16, height: 1.55),
-        ),
-      ),
-    );
-  }
 }
 
 class _JarvisMark extends StatelessWidget {
