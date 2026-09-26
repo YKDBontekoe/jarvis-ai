@@ -53,6 +53,19 @@ public sealed class FileRepository(JarvisDbContext db) : IFileRepository
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<bool> RequeueForProcessingAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
+        await db.Files.Where(x => x.Id == id && x.OwnerId == ownerId && x.ProcessingStatus != "deleting")
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(x => x.ProcessingStatus, "queued")
+                .SetProperty(x => x.ScheduleDispatchedAt, (DateTimeOffset?)null), cancellationToken) != 0;
+
+    public async Task<int> RequeueStaleProcessingAsync(DateTimeOffset olderThan, CancellationToken cancellationToken) =>
+        await db.Files.Where(x => x.ProcessingStatus == "processing" &&
+                x.ScheduleDispatchedAt != null && x.ScheduleDispatchedAt < olderThan)
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(x => x.ProcessingStatus, "queued")
+                .SetProperty(x => x.ScheduleDispatchedAt, (DateTimeOffset?)null), cancellationToken);
+
     public async Task<bool> MarkDeletingAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
         await db.Files.Where(x => x.Id == id && x.OwnerId == ownerId)
             .ExecuteUpdateAsync(update => update.SetProperty(x => x.ProcessingStatus, "deleting"), cancellationToken) != 0;
@@ -80,8 +93,11 @@ public sealed class FileContentRepository(JarvisDbContext db) : IFileContentRepo
     public async Task ReplaceChunksAsync(Guid fileId, Guid ownerId, IReadOnlyList<FileContentChunk> chunks,
         CancellationToken cancellationToken)
     {
-        if (!await db.Files.AnyAsync(x => x.Id == fileId && x.OwnerId == ownerId, cancellationToken))
+        var file = await db.Files.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Id == fileId && x.OwnerId == ownerId, cancellationToken);
+        if (file is null)
             throw new InvalidOperationException("The file no longer exists for this owner.");
+        if (file.ProcessingStatus == "deleting") return;
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await db.FileContentChunks.Where(x => x.FileId == fileId && x.OwnerId == ownerId)

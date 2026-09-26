@@ -12,7 +12,8 @@ public sealed class NotificationRealtimeWorker(
     ILogger<NotificationRealtimeWorker> logger) : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
-    private readonly HashSet<Guid> _published = [];
+    private DateTimeOffset _watermark = DateTimeOffset.MinValue;
+    private readonly HashSet<Guid> _publishedAtWatermark = [];
     private bool _seeded;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -42,27 +43,37 @@ public sealed class NotificationRealtimeWorker(
         var db = scope.ServiceProvider.GetRequiredService<JarvisDbContext>();
         if (!_seeded)
         {
-            var existing = await db.Notifications.AsNoTracking()
+            var latest = await db.Notifications.AsNoTracking()
                 .OrderByDescending(x => x.CreatedAt)
-                .Take(1_000)
-                .Select(x => x.Id)
-                .ToListAsync(cancellationToken);
-            foreach (var id in existing)
-                _published.Add(id);
+                .Select(x => x.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (latest != default)
+            {
+                _watermark = latest;
+                var ids = await db.Notifications.AsNoTracking()
+                    .Where(x => x.CreatedAt == latest)
+                    .Select(x => x.Id)
+                    .ToListAsync(cancellationToken);
+                foreach (var id in ids)
+                    _publishedAtWatermark.Add(id);
+            }
             _seeded = true;
             return;
         }
 
-        var since = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var watermark = _watermark;
         var rows = await db.Notifications.AsNoTracking()
-            .Where(x => x.CreatedAt >= since)
+            .Where(x => x.CreatedAt >= watermark)
             .OrderBy(x => x.CreatedAt)
+            .ThenBy(x => x.Id)
             .Take(200)
             .ToListAsync(cancellationToken);
 
         foreach (var notification in rows)
         {
-            if (_published.Contains(notification.Id)) continue;
+            if (notification.CreatedAt == _watermark && _publishedAtWatermark.Contains(notification.Id))
+                continue;
+
             await hub.Clients.Group(JarvisEventsHub.OwnerGroupName(notification.OwnerId))
                 .SendAsync("notification.created", new
                 {
@@ -83,7 +94,13 @@ public sealed class NotificationRealtimeWorker(
                         .SendAsync("tool.approval_required", ToApprovalEvent(approval), cancellationToken);
             }
 
-            _published.Add(notification.Id);
+            if (notification.CreatedAt > _watermark)
+            {
+                _watermark = notification.CreatedAt;
+                _publishedAtWatermark.Clear();
+            }
+
+            _publishedAtWatermark.Add(notification.Id);
         }
     }
 

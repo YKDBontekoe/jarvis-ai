@@ -56,7 +56,7 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
             new WorkflowOptions(id: $"jarvis:file:{fileId:N}", taskQueue: TaskQueue)
             {
                 IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
-                IdReusePolicy = WorkflowIdReusePolicy.RejectDuplicate
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
             });
     }
 

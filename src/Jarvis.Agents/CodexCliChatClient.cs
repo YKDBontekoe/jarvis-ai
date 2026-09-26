@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Channels;
+using Jarvis.Application.Conversations;
 using Microsoft.Extensions.AI;
 
 namespace Jarvis.Agents;
@@ -330,11 +331,16 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
             throw new InvalidOperationException($"Codex CLI requested an unknown Jarvis tool: {name}");
 
         var argumentsJson = root.GetProperty("argumentsJson").GetString() ?? "{}";
-        using var argumentsDocument = JsonDocument.Parse(argumentsJson);
-        if (argumentsDocument.RootElement.ValueKind != JsonValueKind.Object)
-            throw new InvalidOperationException("Codex CLI returned tool arguments that were not a JSON object.");
-        var arguments = JsonSerializer.Deserialize<Dictionary<string, object?>>(
-            argumentsDocument.RootElement.GetRawText(), JsonOptions) ?? [];
+        Dictionary<string, object?> arguments;
+        try
+        {
+            arguments = ToolCallArguments.Parse(argumentsJson);
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidOperationException("Codex CLI returned tool arguments that were not a JSON object.",
+                exception);
+        }
         return new ChatMessage(ChatRole.Assistant,
             [new FunctionCallContent(Guid.NewGuid().ToString("N"), name, arguments)]);
     }

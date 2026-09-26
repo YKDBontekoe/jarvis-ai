@@ -301,7 +301,7 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
             var isImage = file.ContentType is "image/jpeg" or "image/png" or "image/webp";
             var extracted = isImage
                 ? await ExtractImageTextAsync(services, file, buffer, cancellationToken)
-                : ExtractText(file, buffer, cancellationToken);
+                : await ExtractTextAsync(file, buffer, cancellationToken);
             if (string.IsNullOrWhiteSpace(extracted))
             {
                 if (!isImage)
@@ -325,6 +325,7 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            await TryRequeueAfterCancelAsync(files, input, CancellationToken.None);
             throw;
         }
         catch
@@ -334,7 +335,26 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
         }
     }
 
-    private static string ExtractText(StoredFile file, Stream content, CancellationToken cancellationToken)
+    private static async Task TryRequeueAfterCancelAsync(IFileRepository files, FileProcessingInput input,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var current = await files.GetAsync(input.FileId, input.OwnerId, cancellationToken);
+            if (current is null || current.ProcessingStatus == "deleting") return;
+            await files.RequeueForProcessingAsync(input.FileId, input.OwnerId, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Temporal still observes the cancellation; reconciliation will reclaim leftover processing rows.
+        }
+    }
+
+    private static async Task<string> ExtractTextAsync(StoredFile file, Stream content, CancellationToken cancellationToken)
     {
         if (file.ContentType == "application/pdf")
         {
@@ -354,7 +374,7 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
         using var reader = new StreamReader(content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false,
             throwOnInvalidBytes: false), detectEncodingFromByteOrderMarks: true,
             bufferSize: 8192, leaveOpen: true);
-        return reader.ReadToEnd();
+        return await reader.ReadToEndAsync(cancellationToken);
     }
 
     private static async Task<string> ExtractImageTextAsync(IServiceProvider services, StoredFile file,

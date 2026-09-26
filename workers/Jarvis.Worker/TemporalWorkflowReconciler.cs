@@ -34,12 +34,26 @@ internal sealed class TemporalWorkflowReconciler(
             var scheduler = services.GetRequiredService<TemporalReminderScheduler>();
 
             var fileRepository = services.GetRequiredService<IFileRepository>();
+            var fileScheduler = services.GetRequiredService<IFileProcessingScheduler>();
             var storage = services.GetRequiredService<IObjectStorage>();
             var deletingFiles = await fileRepository.ListDeletingAsync(cancellationToken);
             foreach (var file in deletingFiles)
                 await TryScheduleAsync("file deletion", file.Id,
                     async () =>
                     {
+                        try
+                        {
+                            await fileScheduler.CancelAsync(file.Id, cancellationToken);
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        catch (Exception exception)
+                        {
+                            logger.LogDebug(exception, "File processing workflow for {FileId} was already stopped.",
+                                file.Id);
+                        }
                         await storage.DeleteAsync(file.ObjectKey, cancellationToken);
                         await fileRepository.DeleteAsync(file.Id, file.OwnerId, cancellationToken);
                     }, cancellationToken);
@@ -108,8 +122,9 @@ internal sealed class TemporalWorkflowReconciler(
                             briefing.WorkflowId, cancellationToken);
                     }, cancellationToken);
 
+            await fileRepository.RequeueStaleProcessingAsync(DateTimeOffset.UtcNow.AddMinutes(-15),
+                cancellationToken);
             var files = await fileRepository.ListQueuedForProcessingAsync(cancellationToken);
-            var fileScheduler = services.GetRequiredService<IFileProcessingScheduler>();
             foreach (var file in files)
                 await TryScheduleAsync("file", file.Id,
                     async () =>

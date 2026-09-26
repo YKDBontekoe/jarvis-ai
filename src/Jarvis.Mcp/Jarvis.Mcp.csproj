@@ -4,4 +4,7 @@
     <ProjectReference Include="../Jarvis.Application/Jarvis.Application.csproj" />
     <PackageReference Include="ModelContextProtocol" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jarvis.UnitTests" />
+  </ItemGroup>
 </Project>

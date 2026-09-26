@@ -9,7 +9,8 @@ public sealed class PostgresConversationRunLock(string connectionString,
 {
     public async ValueTask<IAsyncDisposable> AcquireAsync(Guid conversationId, CancellationToken cancellationToken)
     {
-        var connection = new NpgsqlConnection(connectionString);
+        var builder = new NpgsqlConnectionStringBuilder(connectionString) { Pooling = false };
+        var connection = new NpgsqlConnection(builder.ConnectionString);
         await connection.OpenAsync(cancellationToken);
         try
         {

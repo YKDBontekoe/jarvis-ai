@@ -33,7 +33,7 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcp
     {
         var agent = await GetAgentAsync(conversationId, cancellationToken);
         var session = await LoadSessionAsync(agent, conversationId, cancellationToken);
-        var arguments = JsonSerializer.Deserialize<Dictionary<string, object?>>(approval.ArgumentsJson) ?? [];
+        var arguments = ToolCallArguments.Parse(approval.ArgumentsJson);
         var functionCall = new FunctionCallContent(approval.ToolCallId, approval.ToolName, arguments);
         var approvalRequest = new ToolApprovalRequestContent(approval.RequestId, functionCall);
         var response = approvalRequest.CreateResponse(approval.Approved,
