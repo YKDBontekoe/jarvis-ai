@@ -1,5 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
+
+import 'theme.dart';
+import 'ui/jarvis_ui.dart';
 
 class IntegrationsScreen extends StatefulWidget {
   const IntegrationsScreen({required this.http, super.key});
@@ -117,8 +121,8 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                       onPressed: () => setDialogState(() => obscure = !obscure),
                       icon: Icon(
                         obscure
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
+                            ? PhosphorIconsRegular.eye
+                            : PhosphorIconsRegular.eyeSlash,
                       ),
                     ),
                   ),
@@ -211,24 +215,15 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   }
 
   Future<void> _deleteSecret(String provider, String secretName) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete credential?'),
-        content: Text('Remove $secretName from $provider?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await showJarvisConfirm(
+      context,
+      title: 'Delete credential?',
+      message: 'Remove $secretName from $provider?',
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: PhosphorIconsRegular.key,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     try {
       await widget.http.delete<void>(
         '/api/v1/integrations/${Uri.encodeComponent(provider)}/credentials/${Uri.encodeComponent(secretName)}',
@@ -240,24 +235,15 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   }
 
   Future<void> _deleteProvider(String provider) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove integration credentials?'),
-        content: Text('Delete all stored credentials for $provider?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete all'),
-          ),
-        ],
-      ),
+    final confirmed = await showJarvisConfirm(
+      context,
+      title: 'Remove integration credentials?',
+      message: 'Delete all stored credentials for $provider?',
+      confirmLabel: 'Delete all',
+      destructive: true,
+      icon: PhosphorIconsRegular.trash,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     try {
       await widget.http.delete<void>(
         '/api/v1/integrations/${Uri.encodeComponent(provider)}/credentials',
@@ -272,122 +258,143 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Integrations')),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: () => _editSecret(),
-      icon: const Icon(Icons.add),
-      label: const Text('Add credential'),
+    appBar: AppBar(
+      title: const Text('Integrations'),
+      actions: [
+        HeaderAction(
+          label: 'Add',
+          icon: PhosphorIconsRegular.plus,
+          onPressed: () => _editSecret(),
+        ),
+      ],
     ),
     body: _loading
-        ? const Center(child: CircularProgressIndicator())
+        ? const LoadingState()
         : RefreshIndicator(
             onRefresh: _load,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
               children: [
-                const Text(
-                  'Secrets are encrypted before storage. Values stay hidden and are injected only into configured MCP connections.',
-                  style: TextStyle(height: 1.45),
-                ),
-                Card(
-                  margin: const EdgeInsets.only(top: 16),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Home Assistant',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Enable Home Assistant’s MCP Server integration, expose the entities Jarvis may use, and configure HOME_ASSISTANT_MCP_URL on the Jarvis host. Store a long-lived access token here; Jarvis adds the bearer scheme when connecting. Jarvis asks for approval before every Home Assistant action.',
-                          style: TextStyle(height: 1.4),
-                        ),
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          onPressed: () => _editSecret(
-                            provider: 'home-assistant',
-                            secretName: 'token',
-                          ),
-                          icon: const Icon(Icons.home_outlined),
-                          label: const Text('Set or rotate token'),
-                        ),
-                      ],
-                    ),
+                ContentWidth(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: _content(),
                   ),
                 ),
-                Card(
-                  margin: const EdgeInsets.only(top: 12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'GitHub',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Enable the GitHub MCP Compose overlay, then store a least-privilege personal access token here. Jarvis exposes repository, issue, and pull request tools; each operation asks for approval.',
-                          style: TextStyle(height: 1.4),
-                        ),
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          onPressed: () => _editSecret(
-                            provider: 'github',
-                            secretName: 'token',
-                          ),
-                          icon: const Icon(Icons.code_outlined),
-                          label: const Text('Set or rotate token'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'MCP connections',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                for (final server in _managedServers)
-                  _managedServerCard(server),
-                if (_connections.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text(
-                      'No MCP servers are configured on this Jarvis host.',
-                    ),
-                  ),
-                for (final connection in _connections)
-                  _connectionCard(connection),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ],
-                if (_providers.isEmpty) ...[
-                  const SizedBox(height: 48),
-                  const Icon(Icons.hub_outlined, size: 40),
-                  const SizedBox(height: 12),
-                  const Center(child: Text('No integration credentials yet.')),
-                ],
-                for (final item in _providers.where(
-                  (item) => !(item['provider'] as String? ?? '').startsWith(
-                    'jarvis-mcp-',
-                  ),
-                ))
-                  _providerCard(item),
               ],
             ),
           ),
   );
+
+  List<Widget> _content() {
+    final providers = _providers
+        .where(
+          (item) =>
+              !(item['provider'] as String? ?? '').startsWith('jarvis-mcp-'),
+        )
+        .toList();
+    return [
+      const InlineNotice(
+        tone: NoticeTone.info,
+        message:
+            'Secrets are encrypted before storage. Values stay hidden and are injected only into configured MCP connections.',
+      ),
+      if (_error != null)
+        InlineNotice(
+          message: _error!,
+          tone: NoticeTone.danger,
+          margin: const EdgeInsets.only(top: 12),
+        ),
+      const SizedBox(height: 24),
+      const SectionHeader('Featured'),
+      _featuredCard(
+        title: 'Home Assistant',
+        icon: PhosphorIconsRegular.house,
+        description:
+            'Enable Home Assistant’s MCP Server integration, expose the entities Jarvis may use, and configure HOME_ASSISTANT_MCP_URL on the Jarvis host. Store a long-lived access token here; Jarvis adds the bearer scheme when connecting. Jarvis asks for approval before every Home Assistant action.',
+        provider: 'home-assistant',
+      ),
+      const SizedBox(height: 12),
+      _featuredCard(
+        title: 'GitHub',
+        icon: PhosphorIconsRegular.code,
+        description:
+            'Enable the GitHub MCP Compose overlay, then store a least-privilege personal access token here. Jarvis exposes repository, issue, and pull request tools; each operation asks for approval.',
+        provider: 'github',
+      ),
+      const SizedBox(height: 28),
+      const SectionHeader('MCP connections'),
+      for (final server in _managedServers) _managedServerCard(server),
+      if (_connections.isEmpty)
+        const _MutedLine(
+          icon: PhosphorIconsRegular.cloudSlash,
+          text: 'No MCP servers are configured on this Jarvis host.',
+        ),
+      for (final connection in _connections) _connectionCard(connection),
+      const SizedBox(height: 28),
+      const SectionHeader('Stored credentials'),
+      if (providers.isEmpty)
+        const _MutedLine(
+          icon: PhosphorIconsRegular.key,
+          text: 'No integration credentials yet.',
+        ),
+      for (final item in providers) _providerCard(item),
+    ];
+  }
+
+  Widget _featuredCard({
+    required String title,
+    required IconData icon,
+    required String description,
+    required String provider,
+  }) {
+    final configured = _providers.any(
+      (item) =>
+          item['provider'] == provider &&
+          (item['secretNames'] as List<dynamic>? ?? const <dynamic>[]).contains(
+            'token',
+          ),
+    );
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconBadge(icon: icon, size: 44),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              StatusPill(
+                label: configured ? 'Token stored' : 'Not configured',
+                color: configured ? JarvisColors.success : JarvisColors.muted,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            description,
+            style: const TextStyle(
+              height: 1.5,
+              fontSize: 13.5,
+              color: JarvisColors.inkSoft,
+            ),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () =>
+                _editSecret(provider: provider, secretName: 'token'),
+            icon: const Icon(PhosphorIconsRegular.key, size: 18),
+            label: const Text('Set or rotate token'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _managedServerCard(Map<String, dynamic> server) {
     final id = server['id'] as String? ?? '';
@@ -402,76 +409,94 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
           (provider['secretNames'] as List<dynamic>? ?? const <dynamic>[])
               .contains('token'),
     );
-    return Card(
-      margin: const EdgeInsets.only(top: 8),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.hub_outlined),
-                const SizedBox(width: 10),
-                Expanded(
+    return SurfaceCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const IconBadge(icon: PhosphorIconsRegular.plugsConnected),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  name,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Remove MCP server',
+                onPressed: () => _removeManagedServer(id, name),
+                icon: const Icon(PhosphorIconsRegular.trash, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SelectableText(
+            endpoint,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 12.5,
+              color: JarvisColors.inkSoft,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final tool in tools)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: JarvisColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   child: Text(
-                    name,
-                    style: Theme.of(context).textTheme.titleMedium,
+                    tool,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      color: JarvisColors.inkSoft,
+                    ),
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Remove MCP server',
-                  onPressed: () => _removeManagedServer(id, name),
-                  icon: const Icon(Icons.delete_outline),
-                ),
-              ],
-            ),
-            SelectableText(
-              endpoint,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Allowed tools: ${tools.join(', ')}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Credential provider: $id',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            TextButton.icon(
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Credential provider: $id',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
               onPressed: () => _editSecret(provider: id, secretName: 'token'),
-              icon: const Icon(Icons.key_outlined),
+              icon: const Icon(PhosphorIconsRegular.key, size: 18),
               label: Text(
                 hasToken ? 'Rotate bearer token' : 'Add bearer token',
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Future<void> _removeManagedServer(String id, String name) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove MCP server?'),
-        content: Text('Remove $name and its stored credentials?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+    final confirmed = await showJarvisConfirm(
+      context,
+      title: 'Remove MCP server?',
+      message: 'Remove $name and its stored credentials?',
+      confirmLabel: 'Remove',
+      destructive: true,
+      icon: PhosphorIconsRegular.plugsConnected,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     try {
       await widget.http.delete<void>(
         '/api/v1/mcp-servers/${Uri.encodeComponent(id)}',
@@ -487,55 +512,60 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     final names =
         (provider['secretNames'] as List<dynamic>? ?? const <dynamic>[])
             .cast<String>();
-    return Card(
-      margin: const EdgeInsets.only(top: 12),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.hub_outlined),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    slug,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Remove all credentials',
-                  onPressed: () => _deleteProvider(slug),
-                  icon: const Icon(Icons.delete_outline),
-                ),
-              ],
-            ),
-            for (final name in names)
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.key_outlined, size: 19),
-                title: Text(name),
-                subtitle: const Text('Stored securely · value hidden'),
-                trailing: Wrap(
-                  children: [
-                    IconButton(
-                      tooltip: 'Replace value',
-                      onPressed: () =>
-                          _editSecret(provider: slug, secretName: name),
-                      icon: const Icon(Icons.edit_outlined),
-                    ),
-                    IconButton(
-                      tooltip: 'Delete value',
-                      onPressed: () => _deleteSecret(slug, name),
-                      icon: const Icon(Icons.remove_circle_outline),
-                    ),
-                  ],
+    return SurfaceCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const IconBadge(icon: PhosphorIconsRegular.lockSimple),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  slug,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
-          ],
-        ),
+              IconButton(
+                tooltip: 'Remove all credentials',
+                onPressed: () => _deleteProvider(slug),
+                icon: const Icon(PhosphorIconsRegular.trash, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          for (final name in names)
+            ListTile(
+              dense: true,
+              contentPadding: const EdgeInsets.only(left: 4),
+              leading: const Icon(PhosphorIconsRegular.key, size: 19),
+              title: Text(name),
+              subtitle: const Text('Stored securely · value hidden'),
+              trailing: Wrap(
+                children: [
+                  IconButton(
+                    tooltip: 'Replace value',
+                    onPressed: () =>
+                        _editSecret(provider: slug, secretName: name),
+                    icon: const Icon(
+                      PhosphorIconsRegular.pencilSimple,
+                      size: 19,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Delete value',
+                    onPressed: () => _deleteSecret(slug, name),
+                    icon: const Icon(
+                      PhosphorIconsRegular.minusCircle,
+                      size: 19,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -545,30 +575,83 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     final state = connection['state'] as String? ?? 'unavailable';
     final toolCount = connection['toolCount'] as int? ?? 0;
     final issue = connection['issue'] as String?;
-    final (icon, detail) = switch (state) {
+    final (icon, detail, label, color) = switch (state) {
       'connected' => (
-        Icons.check_circle_outline,
+        PhosphorIconsRegular.checkCircle,
         '$toolCount allowlisted tools available',
+        'Connected',
+        JarvisColors.success,
       ),
       'needs_credentials' => (
-        Icons.key_outlined,
+        PhosphorIconsRegular.key,
         'Owner credentials are required',
+        'Needs token',
+        JarvisColors.warning,
       ),
-      'disabled' => (Icons.block_outlined, 'No tools are allowlisted'),
+      'disabled' => (
+        PhosphorIconsRegular.prohibit,
+        'No tools are allowlisted',
+        'Disabled',
+        JarvisColors.muted,
+      ),
       _ => (
-        Icons.error_outline,
+        PhosphorIconsRegular.warningCircle,
         issue == 'invalid_configuration'
             ? 'Configuration needs attention'
             : 'Server could not be reached',
+        'Unavailable',
+        JarvisColors.danger,
       ),
     };
-    return Card(
-      margin: const EdgeInsets.only(top: 8),
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(name),
-        subtitle: Text(detail),
+    return SurfaceCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Row(
+        children: [
+          IconBadge(icon: icon),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 2),
+                Text(detail, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          StatusPill(label: label, color: color),
+        ],
       ),
     );
   }
+}
+
+class _MutedLine extends StatelessWidget {
+  const _MutedLine({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(JarvisRadii.lg),
+      border: Border.all(color: JarvisColors.outlineStrong),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, size: 20, color: JarvisColors.muted),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(color: JarvisColors.inkSoft),
+          ),
+        ),
+      ],
+    ),
+  );
 }

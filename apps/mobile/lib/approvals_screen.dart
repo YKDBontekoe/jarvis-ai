@@ -2,6 +2,10 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
+
+import 'theme.dart';
+import 'ui/jarvis_ui.dart';
 
 class ApprovalsScreen extends StatefulWidget {
   const ApprovalsScreen({required this.http, this.conversationId, super.key});
@@ -63,15 +67,35 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
+          icon: const Align(
+            child: IconBadge(icon: PhosphorIconsRegular.shieldCheck, size: 48),
+          ),
           title: Text(
             retrying ? 'Retry approved tool call?' : 'Approve tool call?',
           ),
-          content: Text(
-            '${retrying ? 'This tool call was approved, but Jarvis did not finish resuming it. Retrying may repeat the action if it completed before the interruption.\n\n' : 'Jarvis will run ${approval['toolName']} with these arguments:\n\n'}${_formatArguments(approval['argumentsJson'] as String?)}',
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  retrying
+                      ? 'This tool call was approved, but Jarvis did not finish resuming it. Retrying may repeat the action if it completed before the interruption.'
+                      : 'Jarvis will run ${approval['toolName']} with these arguments:',
+                ),
+                const SizedBox(height: 14),
+                _ArgumentsBlock(
+                  _formatArguments(approval['argumentsJson'] as String?),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
+              style: TextButton.styleFrom(
+                foregroundColor: JarvisColors.inkSoft,
+              ),
               child: const Text('Cancel'),
             ),
             FilledButton(
@@ -138,127 +162,133 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         IconButton(
           onPressed: _load,
           tooltip: 'Refresh',
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
         ),
+        const SizedBox(width: 8),
       ],
     ),
     body: _loading
-        ? const Center(child: CircularProgressIndicator())
+        ? const LoadingState()
         : _error != null
-        ? Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_error!),
-                TextButton(onPressed: _load, child: const Text('Retry')),
-              ],
-            ),
-          )
+        ? ErrorState(message: _error!, onRetry: _load)
         : _approvals.isEmpty
-        ? const Center(child: Text('No tool calls are waiting for approval.'))
+        ? const EmptyState(
+            icon: PhosphorIconsRegular.shieldCheck,
+            title: 'All clear',
+            message: 'No tool calls are waiting for approval.',
+          )
         : ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             itemCount: _approvals.length,
-            itemBuilder: (context, index) {
-              final approval = _approvals[index];
-              final busy = _processingId == approval['id'];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.gpp_maybe_outlined),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              approval['toolName'] as String? ?? 'Unknown tool',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (approval['status'] != 'pending') ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          'Decision recorded: ${approval['approved'] == true ? 'approved' : 'rejected'}. Jarvis needs to resume this call.',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Arguments',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: SelectableText(
-                          _formatArguments(
-                            approval['argumentsJson'] as String?,
-                          ),
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          if (approval['status'] == 'pending') ...[
-                            TextButton(
-                              onPressed: busy
-                                  ? null
-                                  : () => _decide(approval, false),
-                              child: const Text('Reject'),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          FilledButton.icon(
-                            onPressed: busy
-                                ? null
-                                : () => _decide(
-                                    approval,
-                                    approval['status'] == 'pending'
-                                        ? true
-                                        : approval['approved'] == true,
-                                  ),
-                            icon: busy
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.check),
-                            label: Text(
-                              approval['status'] == 'pending'
-                                  ? 'Approve'
-                                  : 'Retry resume',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+            itemBuilder: (context, index) =>
+                ContentWidth(child: _approvalCard(_approvals[index])),
           ),
+  );
+
+  Widget _approvalCard(Map<String, dynamic> approval) {
+    final busy = _processingId == approval['id'];
+    final pending = approval['status'] == 'pending';
+    return SurfaceCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevated: pending,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const IconBadge(icon: PhosphorIconsRegular.shieldCheck),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  approval['toolName'] as String? ?? 'Unknown tool',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              StatusPill(
+                label: pending ? 'Pending' : 'Needs resume',
+                color: pending ? JarvisColors.warning : JarvisColors.danger,
+              ),
+            ],
+          ),
+          if (!pending)
+            InlineNotice(
+              message:
+                  'Decision recorded: ${approval['approved'] == true ? 'approved' : 'rejected'}. Jarvis needs to resume this call.',
+              tone: NoticeTone.danger,
+              margin: const EdgeInsets.only(top: 12),
+            ),
+          const SizedBox(height: 16),
+          Text(
+            'ARGUMENTS',
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: JarvisColors.muted),
+          ),
+          const SizedBox(height: 8),
+          _ArgumentsBlock(
+            _formatArguments(approval['argumentsJson'] as String?),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (pending) ...[
+                OutlinedButton(
+                  onPressed: busy ? null : () => _decide(approval, false),
+                  child: const Text('Reject'),
+                ),
+                const SizedBox(width: 8),
+              ],
+              FilledButton.icon(
+                onPressed: busy
+                    ? null
+                    : () => _decide(
+                        approval,
+                        pending ? true : approval['approved'] == true,
+                      ),
+                icon: busy
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        pending
+                            ? PhosphorIconsRegular.check
+                            : PhosphorIconsRegular.arrowsClockwise,
+                      ),
+                label: Text(pending ? 'Approve' : 'Retry resume'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ArgumentsBlock extends StatelessWidget {
+  const _ArgumentsBlock(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: JarvisColors.canvas,
+      borderRadius: BorderRadius.circular(JarvisRadii.sm),
+      border: Border.all(color: JarvisColors.outline),
+    ),
+    child: SelectableText(
+      text,
+      style: const TextStyle(
+        fontFamily: 'monospace',
+        fontSize: 12.5,
+        height: 1.5,
+        color: JarvisColors.ink,
+      ),
+    ),
   );
 }

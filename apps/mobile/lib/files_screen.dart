@@ -1,10 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 
 import 'file_download_stub.dart'
     if (dart.library.io) 'file_download_io.dart'
     as file_download;
+import 'theme.dart';
+import 'ui/jarvis_ui.dart';
 
 const _allowedExtensions = [
   'pdf',
@@ -112,24 +115,16 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   Future<void> _delete(Map<String, dynamic> file) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete file?'),
-        content: Text('“${file['fileName']}” will be removed from Jarvis.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await showJarvisConfirm(
+      context,
+      title: 'Delete file?',
+      message: '“${file['fileName']}” will be removed from Jarvis.',
+      cancelLabel: 'Keep',
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: PhosphorIconsRegular.trash,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     setState(() => _busy = true);
     try {
       await widget.http.delete('/api/v1/files/${file['id']}');
@@ -162,70 +157,120 @@ class _FilesScreenState extends State<FilesScreen> {
         IconButton(
           onPressed: _load,
           tooltip: 'Refresh',
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
+        ),
+        HeaderAction(
+          label: 'Upload',
+          icon: PhosphorIconsRegular.uploadSimple,
+          onPressed: _upload,
+          busy: _busy,
         ),
       ],
     ),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: _busy ? null : _upload,
-      icon: _busy
-          ? const SizedBox.square(
-              dimension: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.upload_file_outlined),
-      label: const Text('Upload file'),
-    ),
     body: _loading
-        ? const Center(child: CircularProgressIndicator())
+        ? const LoadingState()
         : _error != null
-        ? Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_error!),
-                TextButton(onPressed: _load, child: const Text('Retry')),
-              ],
-            ),
-          )
+        ? ErrorState(message: _error!, onRetry: _load)
         : _files.isEmpty
-        ? const Center(
-            child: Padding(
-              padding: EdgeInsets.all(28),
-              child: Text('Your files will be stored privately with Jarvis.'),
-            ),
+        ? const EmptyState(
+            icon: PhosphorIconsRegular.folderOpen,
+            title: 'No files yet',
+            message:
+                'Your files will be stored privately with Jarvis. PDFs and text are indexed so Jarvis can search them.',
           )
         : ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             itemCount: _files.length,
             itemBuilder: (context, index) {
               final file = _files[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 10),
-                child: ListTile(
-                  leading: const Icon(Icons.insert_drive_file_outlined),
-                  title: Text(file['fileName'] as String? ?? 'File'),
-                  subtitle: Text(
-                    '${_formatSize(file['sizeBytes'])} · ${file['processingStatus'] ?? 'uploaded'}',
-                  ),
-                  trailing: PopupMenuButton<String>(
-                    enabled: !_busy,
-                    onSelected: (action) =>
-                        action == 'open' ? _download(file) : _delete(file),
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: 'open',
-                        child: Text('Download and open'),
+              final name = file['fileName'] as String? ?? 'File';
+              final icon = _fileIcon(name);
+              final status = file['processingStatus'] as String? ?? 'uploaded';
+              return ContentWidth(
+                child: SurfaceCard(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
+                  onTap: _busy ? null : () => _download(file),
+                  child: Row(
+                    children: [
+                      IconBadge(icon: icon, size: 44),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(
+                                context,
+                              ).textTheme.titleSmall?.copyWith(fontSize: 15),
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  _formatSize(file['sizeBytes']),
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                StatusPill.forStatus(status),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                      PopupMenuItem(value: 'delete', child: Text('Delete')),
+                      PopupMenuButton<String>(
+                        enabled: !_busy,
+                        icon: const Icon(PhosphorIconsRegular.dotsThree),
+                        onSelected: (action) =>
+                            action == 'open' ? _download(file) : _delete(file),
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: 'open',
+                            child: ListTile(
+                              leading: Icon(
+                                PhosphorIconsRegular.arrowSquareOut,
+                              ),
+                              title: Text('Download and open'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: ListTile(
+                              leading: Icon(
+                                PhosphorIconsRegular.trash,
+                                color: JarvisColors.danger,
+                              ),
+                              title: Text(
+                                'Delete',
+                                style: TextStyle(color: JarvisColors.danger),
+                              ),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
-                  onTap: _busy ? null : () => _download(file),
                 ),
               );
             },
           ),
   );
+
+  IconData _fileIcon(String name) =>
+      switch (name.split('.').last.toLowerCase()) {
+        'pdf' => PhosphorIconsRegular.filePdf,
+        'jpg' || 'jpeg' || 'png' || 'webp' => PhosphorIconsRegular.fileImage,
+        'csv' => PhosphorIconsRegular.table,
+        'json' => PhosphorIconsRegular.bracketsCurly,
+        _ => PhosphorIconsRegular.fileText,
+      };
 }
 
 String _contentTypeFor(String fileName) {

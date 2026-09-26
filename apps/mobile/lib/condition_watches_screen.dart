@@ -1,5 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
+
+import 'theme.dart';
+import 'ui/jarvis_ui.dart';
 
 class ConditionWatchesScreen extends StatefulWidget {
   const ConditionWatchesScreen({required this.http, super.key});
@@ -239,86 +243,130 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
         IconButton(
           tooltip: 'Refresh watches',
           onPressed: _loading ? null : _load,
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
+        ),
+        HeaderAction(
+          label: 'New watch',
+          icon: PhosphorIconsRegular.plus,
+          onPressed: _createWatch,
+          busy: _creating,
         ),
       ],
     ),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: _creating ? null : _createWatch,
-      icon: _creating
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.add_alert_outlined),
-      label: const Text('New watch'),
-    ),
     body: _loading && _watches.isEmpty
-        ? const Center(child: CircularProgressIndicator())
+        ? const LoadingState()
         : _error != null && _watches.isEmpty
-        ? Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_error!),
-                const SizedBox(height: 12),
-                OutlinedButton(onPressed: _load, child: const Text('Retry')),
-              ],
-            ),
-          )
+        ? ErrorState(message: _error!, onRetry: _load)
         : _watches.isEmpty
-        ? const Center(
-            child: Text(
-              'No watches yet. Set a threshold and Jarvis will keep an eye on it.',
-            ),
+        ? const EmptyState(
+            icon: PhosphorIconsRegular.pulse,
+            title: 'No watches yet',
+            message:
+                'No watches yet. Set a threshold and Jarvis will keep an eye on it.',
           )
         : RefreshIndicator(
             onRefresh: _load,
             child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
               itemCount: _watches.length,
-              itemBuilder: (context, index) {
-                final watch = _watches[index];
-                final active = watch['status'] == 'active';
-                final lastValue = watch['lastValue'];
-                return Card(
-                  child: ListTile(
-                    leading: Icon(
-                      active
-                          ? Icons.visibility_outlined
-                          : Icons.check_circle_outline,
-                    ),
-                    title: Text(watch['title'] as String? ?? 'Condition watch'),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(_condition(watch)),
-                          const SizedBox(height: 3),
-                          Text(
-                            active
-                                ? 'Checks every ${watch['intervalMinutes']} min${lastValue == null ? '' : ' · latest $lastValue'}'
-                                : (watch['status'] as String? ?? '').replaceAll(
-                                    '_',
-                                    ' ',
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    trailing: active
-                        ? IconButton(
-                            tooltip: 'Stop watching',
-                            onPressed: () => _cancel(watch),
-                            icon: const Icon(Icons.stop_circle_outlined),
-                          )
-                        : null,
-                  ),
-                );
-              },
+              itemBuilder: (context, index) =>
+                  ContentWidth(child: _watchCard(_watches[index])),
             ),
           ),
+  );
+
+  Widget _watchCard(Map<String, dynamic> watch) {
+    final status = watch['status'] as String? ?? '';
+    final active = status == 'active';
+    final lastValue = watch['lastValue'];
+    final style = statusStyle(status);
+    return SurfaceCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(16, 14, 6, 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IconBadge(
+            icon: active
+                ? PhosphorIconsRegular.pulse
+                : PhosphorIconsRegular.checkCircle,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        watch['title'] as String? ?? 'Condition watch',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleSmall?.copyWith(fontSize: 15),
+                      ),
+                    ),
+                    StatusPill(label: style.label, color: style.color),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: JarvisColors.canvas,
+                    borderRadius: BorderRadius.circular(JarvisRadii.sm),
+                    border: Border.all(color: JarvisColors.outline),
+                  ),
+                  child: Text(
+                    _condition(watch),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      color: JarvisColors.ink,
+                    ),
+                  ),
+                ),
+                if (active) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 14,
+                    runSpacing: 4,
+                    children: [
+                      _meta(
+                        PhosphorIconsRegular.timer,
+                        'Checks every ${watch['intervalMinutes']} min',
+                      ),
+                      if (lastValue != null)
+                        _meta(
+                          PhosphorIconsRegular.chartLine,
+                          'latest $lastValue',
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (active)
+            IconButton(
+              tooltip: 'Stop watching',
+              onPressed: () => _cancel(watch),
+              icon: const Icon(PhosphorIconsRegular.stopCircle, size: 22),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _meta(IconData icon, String text) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 15, color: JarvisColors.muted),
+      const SizedBox(width: 5),
+      Text(text, style: Theme.of(context).textTheme.bodySmall),
+    ],
   );
 }

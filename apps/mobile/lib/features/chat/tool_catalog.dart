@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../ui/phosphor_icons.dart';
 
 /// User-facing wording for Jarvis tools. Unknown tools (for example MCP tools)
 /// fall back to a humanized version of their name.
@@ -16,107 +17,107 @@ const _catalog = <String, ToolDescription>{
   'GetCurrentTime': ToolDescription(
     'Checking the time',
     'Checked the time',
-    Icons.schedule_rounded,
+    PhosphorIconsRegular.clock,
   ),
   'CreateReminder': ToolDescription(
     'Scheduling a reminder',
     'Scheduled a reminder',
-    Icons.alarm_add_rounded,
+    PhosphorIconsRegular.alarm,
   ),
   'ListReminders': ToolDescription(
     'Checking your reminders',
     'Checked your reminders',
-    Icons.alarm_rounded,
+    PhosphorIconsRegular.alarm,
   ),
   'CancelReminder': ToolDescription(
     'Cancelling a reminder',
     'Cancelled a reminder',
-    Icons.alarm_off_rounded,
+    PhosphorIconsRegular.bellSlash,
   ),
   'SearchMemory': ToolDescription(
     'Searching memory',
     'Searched memory',
-    Icons.psychology_outlined,
+    PhosphorIconsRegular.brain,
   ),
   'Remember': ToolDescription(
     'Saving to memory',
     'Saved to memory',
-    Icons.bookmark_add_outlined,
+    PhosphorIconsRegular.bookmarkSimple,
   ),
   'ForgetMemory': ToolDescription(
     'Forgetting a memory',
     'Forgot a memory',
-    Icons.bookmark_remove_outlined,
+    PhosphorIconsRegular.bookmarkSimple,
   ),
   'SearchFiles': ToolDescription(
     'Searching your files',
     'Searched your files',
-    Icons.find_in_page_outlined,
+    PhosphorIconsRegular.magnifyingGlass,
   ),
   'ListFiles': ToolDescription(
     'Checking your files',
     'Checked your files',
-    Icons.folder_open_outlined,
+    PhosphorIconsRegular.folderOpen,
   ),
   'CreateTask': ToolDescription(
     'Starting a background task',
     'Started a background task',
-    Icons.rocket_launch_outlined,
+    PhosphorIconsRegular.rocketLaunch,
   ),
   'ListTasks': ToolDescription(
     'Checking your tasks',
     'Checked your tasks',
-    Icons.checklist_rounded,
+    PhosphorIconsRegular.listChecks,
   ),
   'CancelTask': ToolDescription(
     'Cancelling a task',
     'Cancelled a task',
-    Icons.cancel_outlined,
+    PhosphorIconsRegular.xCircle,
   ),
   'CreateConditionWatch': ToolDescription(
     'Creating a watch',
     'Created a watch',
-    Icons.monitor_heart_outlined,
+    PhosphorIconsRegular.pulse,
   ),
   'ListConditionWatches': ToolDescription(
     'Checking your watches',
     'Checked your watches',
-    Icons.monitor_heart_outlined,
+    PhosphorIconsRegular.pulse,
   ),
   'CancelConditionWatch': ToolDescription(
     'Stopping a watch',
     'Stopped a watch',
-    Icons.heart_broken_outlined,
+    PhosphorIconsRegular.pulse,
   ),
   'ListMcpServers': ToolDescription(
     'Checking integrations',
     'Checked integrations',
-    Icons.hub_outlined,
+    PhosphorIconsRegular.plugsConnected,
   ),
   'DiscoverMcpServerTools': ToolDescription(
     'Discovering integration tools',
     'Discovered integration tools',
-    Icons.travel_explore_rounded,
+    PhosphorIconsRegular.globeSimple,
   ),
   'AddMcpServer': ToolDescription(
     'Adding an integration',
     'Added an integration',
-    Icons.add_link_rounded,
+    PhosphorIconsRegular.linkSimple,
   ),
   'UpdateMcpServer': ToolDescription(
     'Updating an integration',
     'Updated an integration',
-    Icons.link_rounded,
+    PhosphorIconsRegular.linkSimple,
   ),
   'RemoveMcpServer': ToolDescription(
     'Removing an integration',
     'Removed an integration',
-    Icons.link_off_rounded,
+    PhosphorIconsRegular.linkBreak,
   ),
   'RunCodingTask': ToolDescription(
     'Running a coding task',
     'Ran a coding task',
-    Icons.code_rounded,
+    PhosphorIconsRegular.code,
   ),
 };
 
@@ -142,8 +143,12 @@ ToolDescription describeTool(String tool) {
     return const ToolDescription(
       'Using the browser',
       'Used the browser',
-      Icons.language_rounded,
+      PhosphorIconsRegular.globeSimple,
     );
   }
-  return ToolDescription('Using $name', 'Used $name', Icons.extension_outlined);
+  return ToolDescription(
+    'Using $name',
+    'Used $name',
+    PhosphorIconsRegular.puzzlePiece,
+  );
 }

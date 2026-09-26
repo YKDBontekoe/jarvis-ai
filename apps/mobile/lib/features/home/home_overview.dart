@@ -2,8 +2,11 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import '../../ui/phosphor_icons.dart';
 
 import '../../task_details_screen.dart';
+import '../../theme.dart';
+import '../../ui/jarvis_ui.dart';
 import '../chat/chat_widgets.dart';
 
 class HomeOverview extends StatefulWidget {
@@ -138,138 +141,295 @@ class _HomeOverviewState extends State<HomeOverview>
     super.dispose();
   }
 
+  String get _today {
+    final now = DateTime.now();
+    const weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${weekdays[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
+  }
+
   @override
-  Widget build(BuildContext context) => RefreshIndicator(
-    onRefresh: _load,
-    child: LayoutBuilder(
-      builder: (context, constraints) => ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-        children: [
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    _greeting,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'What do you need?',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: constraints.maxHeight < 480 ? 24 : 40),
-                  Center(child: widget.mark),
-                  const SizedBox(height: 22),
-                  Center(
-                    child: FilledButton.icon(
-                      onPressed: widget.onTalk,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(200, 52),
-                      ),
-                      icon: widget.voiceStarting
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.mic_none_rounded),
-                      label: Text(
-                        widget.voiceStarting ? 'Connecting…' : 'Talk to Jarvis',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    widget.onSuggestion == null
-                        ? 'Or send a message below.'
-                        : 'Or try one of these:',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  if (widget.onSuggestion != null) ...[
-                    const SizedBox(height: 14),
-                    SuggestionChips(onSelected: widget.onSuggestion),
-                  ],
-                  if (widget.onContinueConversation != null)
-                    Center(
-                      child: TextButton.icon(
-                        onPressed: widget.onContinueConversation,
-                        icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                        label: const Text('Continue conversation'),
-                      ),
-                    ),
-                  const SizedBox(height: 28),
-                  Row(
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: LayoutBuilder(
+        builder: (context, constraints) => ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            constraints.maxHeight > 700 ? 48 : 20,
+            20,
+            28,
+          ),
+          children: [
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620),
+                child: _Entrance(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: Text(
-                          _tasks.isEmpty
-                              ? 'Active tasks'
-                              : 'Active tasks (${_tasks.length})',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+                      Center(child: widget.mark),
+                      const SizedBox(height: 22),
+                      Text(
+                        '$_today  ·  $_greeting',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: JarvisColors.muted,
                         ),
                       ),
-                      TextButton(
-                        onPressed: widget.onOpenTasks,
-                        child: const Text('View all'),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'What do you need?',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'InstrumentSerif',
+                          fontSize: 40,
+                          height: 1.1,
+                          letterSpacing: -.6,
+                          color: JarvisColors.ink,
+                        ),
                       ),
-                      IconButton(
-                        tooltip: 'Refresh active tasks',
-                        onPressed: widget.ready && !_loading ? _load : null,
-                        icon: const Icon(Icons.refresh, size: 20),
+                      const SizedBox(height: 22),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: widget.onTalk,
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(0, 44),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
+                              shape: const StadiumBorder(),
+                            ),
+                            icon: widget.voiceStarting
+                                ? const SizedBox.square(
+                                    dimension: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 1.8,
+                                    ),
+                                  )
+                                : const Icon(
+                                    PhosphorIconsRegular.waveform,
+                                    size: 18,
+                                  ),
+                            label: Text(
+                              widget.voiceStarting
+                                  ? 'Connecting…'
+                                  : 'Talk to Jarvis',
+                            ),
+                          ),
+                          if (widget.onContinueConversation != null)
+                            TextButton.icon(
+                              onPressed: widget.onContinueConversation,
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(0, 44),
+                                shape: const StadiumBorder(),
+                              ),
+                              icon: const Icon(
+                                PhosphorIconsRegular.arrowUpRight,
+                                size: 16,
+                              ),
+                              label: const Text('Continue conversation'),
+                            ),
+                        ],
                       ),
+                      const SizedBox(height: 36),
+                      if (widget.onSuggestion != null) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, bottom: 10),
+                          child: Text(
+                            'Or try one of these:',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: JarvisColors.muted,
+                            ),
+                          ),
+                        ),
+                        SuggestionChips(onSelected: widget.onSuggestion),
+                        const SizedBox(height: 28),
+                      ],
+                      SectionHeader(
+                        _tasks.isEmpty
+                            ? 'Active tasks'
+                            : 'Active tasks (${_tasks.length})',
+                        padding: const EdgeInsets.only(left: 4, bottom: 6),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextButton(
+                              onPressed: widget.onOpenTasks,
+                              child: const Text('View all'),
+                            ),
+                            IconButton(
+                              tooltip: 'Refresh active tasks',
+                              onPressed: widget.ready && !_loading
+                                  ? _load
+                                  : null,
+                              icon: const Icon(
+                                PhosphorIconsRegular.arrowsClockwise,
+                                size: 18,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_loading)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 12),
+                          child: LinearProgressIndicator(
+                            minHeight: 2,
+                            semanticsLabel: 'Loading active tasks',
+                          ),
+                        ),
+                      if (_error != null)
+                        InlineNotice(
+                          message: '$_error Pull down to retry.',
+                          tone: NoticeTone.danger,
+                          margin: const EdgeInsets.only(bottom: 12),
+                        ),
+                      if (!widget.ready)
+                        const _TasksPlaceholder(
+                          icon: PhosphorIconsRegular.wifiSlash,
+                          text: 'Connect to Jarvis to see your active tasks.',
+                        )
+                      else if (!_loading && _error == null && _tasks.isEmpty)
+                        const _TasksPlaceholder(
+                          icon: PhosphorIconsRegular.checkCircle,
+                          text: 'No active tasks. Start one from Tasks.',
+                        ),
+                      if (_tasks.isNotEmpty)
+                        GroupedSection(
+                          dividerIndent: 64,
+                          children: [
+                            for (final task in _tasks.take(3))
+                              _TaskRow(
+                                task: task,
+                                onTap: () => unawaited(_openTask(task)),
+                              ),
+                          ],
+                        ),
                     ],
                   ),
-                  if (_loading)
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 12),
-                      child: LinearProgressIndicator(
-                        semanticsLabel: 'Loading active tasks',
-                      ),
-                    ),
-                  if (_error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        '$_error Pull down to retry.',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ),
-                  if (!widget.ready)
-                    const Text('Connect to Jarvis to see your active tasks.')
-                  else if (!_loading && _error == null && _tasks.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Text('No active tasks. Start one from Tasks.'),
-                    ),
-                  for (final task in _tasks.take(3))
-                    Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: Icon(task.icon, color: task.color),
-                        title: Text(
-                          task.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(task.statusLabel),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => unawaited(_openTask(task)),
-                      ),
-                    ),
-                ],
+                ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Fades and lifts the home content in once when it first appears.
+class _Entrance extends StatelessWidget {
+  const _Entrance({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+    tween: Tween(begin: 0, end: 1),
+    duration: const Duration(milliseconds: 450),
+    curve: Curves.easeOutCubic,
+    builder: (context, value, child) => Opacity(
+      opacity: value,
+      child: Transform.translate(
+        offset: Offset(0, 12 * (1 - value)),
+        child: child,
+      ),
+    ),
+    child: child,
+  );
+}
+
+class _TasksPlaceholder extends StatelessWidget {
+  const _TasksPlaceholder({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(JarvisRadii.lg),
+      border: Border.all(color: JarvisColors.outline),
+      color: JarvisColors.surface,
+    ),
+    child: Row(
+      children: [
+        Icon(icon, size: 20, color: JarvisColors.muted),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(color: JarvisColors.inkSoft),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _TaskRow extends StatelessWidget {
+  const _TaskRow({required this.task, required this.onTap});
+
+  final _ActiveTask task;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+      child: Row(
+        children: [
+          IconBadge(icon: task.icon),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  task.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 5),
+                StatusPill(label: task.statusLabel, color: task.color),
+              ],
+            ),
+          ),
+          const Icon(
+            PhosphorIconsRegular.caretRight,
+            size: 16,
+            color: JarvisColors.muted,
           ),
         ],
       ),
@@ -329,15 +489,11 @@ class _ActiveTask {
   };
 
   IconData get icon => switch (status) {
-    'needs_approval' => Icons.gpp_maybe_outlined,
-    'running' => Icons.autorenew_rounded,
-    'waiting' => Icons.pause_circle_outline,
-    _ => Icons.schedule,
+    'needs_approval' => PhosphorIconsRegular.shieldWarning,
+    'running' => PhosphorIconsRegular.hourglassMedium,
+    'waiting' => PhosphorIconsRegular.pauseCircle,
+    _ => PhosphorIconsRegular.clock,
   };
 
-  Color get color => switch (status) {
-    'needs_approval' => const Color(0xffffcb6b),
-    'running' => const Color(0xff68d6a8),
-    _ => const Color(0xffa895ff),
-  };
+  Color get color => statusStyle(status).color;
 }

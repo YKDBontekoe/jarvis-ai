@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'oidc_web_stub.dart'
@@ -27,7 +29,9 @@ import 'integrations_screen.dart';
 import 'features/chat/chat_entries.dart';
 import 'features/chat/chat_widgets.dart';
 import 'features/home/home_overview.dart';
+import 'features/shell/sidebar.dart';
 import 'theme.dart';
+import 'ui/jarvis_ui.dart';
 
 const _apiBaseUrl = String.fromEnvironment(
   'JARVIS_API_URL',
@@ -286,6 +290,8 @@ class _ChatScreenState extends State<ChatScreen> {
   int _selectedDestination = 0;
   int _homeRevision = 0;
   bool _showHome = true;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+  List<Map<String, dynamic>> _recent = [];
   String? _pushToken;
   StreamSubscription<String>? _pushTokenSubscription;
   StreamSubscription<RemoteMessage>? _pushOpenedSubscription;
@@ -410,6 +416,7 @@ class _ChatScreenState extends State<ChatScreen> {
       });
       _scrollToBottom(jump: true);
     }
+    unawaited(_loadRecent());
     await _connectRealtime();
   }
 
@@ -931,6 +938,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       if (!mounted || _conversationId != conversationId) return;
       setState(() => _applyRunResult(response));
+      unawaited(_loadRecent());
     } on DioException catch (error) {
       if (mounted && _conversationId == conversationId) {
         setState(() {
@@ -1145,82 +1153,173 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  static const _destinations = [
-    (Icons.chat_bubble_outline, Icons.chat_bubble, 'Chat'),
-    (Icons.checklist_outlined, Icons.checklist, 'Tasks'),
-    (Icons.mic_none_rounded, Icons.graphic_eq_rounded, 'Voice'),
-    (Icons.psychology_outlined, Icons.psychology, 'Memory'),
-    (Icons.settings_outlined, Icons.settings, 'Settings'),
-  ];
+  /// Outgoing content fades out before incoming content fades in, so the two
+  /// never overlap mid-transition.
+  static const _fadeThrough = Interval(.5, 1, curve: Curves.easeOutCubic);
 
   @override
   Widget build(BuildContext context) {
     if (_signedOut) return _signInScreen();
 
-    final destination = _selectedDestination;
-    final showIndependentScaffold = destination == 1 || destination == 3;
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= _wideLayoutWidth;
-        final scaffold = Scaffold(
-          appBar: showIndependentScaffold ? null : _appBar(destination),
-          body: switch (destination) {
-            0 => _chatBody(),
-            1 => TasksScreen(http: _http),
-            2 => _voiceBody(),
-            3 => MemoryScreen(http: _http),
-            _ => _settingsBody(),
-          },
-          bottomNavigationBar: wide
-              ? null
-              : NavigationBar(
-                  selectedIndex: destination,
-                  onDestinationSelected: _selectDestination,
-                  destinations: [
-                    for (final (icon, selected, label) in _destinations)
-                      NavigationDestination(
-                        icon: Icon(icon),
-                        selectedIcon: Icon(selected),
-                        label: label,
-                      ),
-                  ],
-                ),
-        );
-        if (!wide) return scaffold;
-        return Scaffold(
-          body: Row(
-            children: [
-              NavigationRail(
-                selectedIndex: destination,
-                onDestinationSelected: _selectDestination,
-                labelType: NavigationRailLabelType.all,
-                groupAlignment: -.85,
-                leading: Padding(
-                  padding: const EdgeInsets.only(top: 18, bottom: 22),
-                  child: Tooltip(
-                    message: 'New chat',
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: _busy ? null : _startNewChat,
-                      child: const JarvisAvatar(size: 40),
-                    ),
-                  ),
-                ),
-                destinations: [
-                  for (final (icon, selected, label) in _destinations)
-                    NavigationRailDestination(
-                      icon: Icon(icon),
-                      selectedIcon: Icon(selected),
-                      label: Text(label),
-                    ),
-                ],
-              ),
-              const VerticalDivider(width: 1),
-              Expanded(child: scaffold),
-            ],
+        final voice = _selectedDestination == 2;
+        final content = Scaffold(
+          extendBodyBehindAppBar: voice,
+          appBar: _topBar(wide: wide, voice: voice),
+          body: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 260),
+            switchInCurve: _fadeThrough,
+            switchOutCurve: _fadeThrough,
+            child: KeyedSubtree(
+              key: ValueKey(voice),
+              child: voice ? _voiceBody() : _chatBody(),
+            ),
           ),
         );
+        final sidebar = _sidebar(wide: wide);
+        return Scaffold(
+          key: _scaffoldKey,
+          drawer: wide
+              ? null
+              : Drawer(
+                  width: math.min(330, constraints.maxWidth * .86),
+                  backgroundColor: JarvisColors.canvas,
+                  surfaceTintColor: Colors.transparent,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.horizontal(
+                      right: Radius.circular(28),
+                    ),
+                  ),
+                  child: sidebar,
+                ),
+          onDrawerChanged: (open) {
+            if (open) unawaited(_loadRecent());
+          },
+          body: wide
+              ? Row(
+                  children: [
+                    SizedBox(width: 292, child: sidebar),
+                    const VerticalDivider(width: 1),
+                    Expanded(child: content),
+                  ],
+                )
+              : content,
+        );
       },
+    );
+  }
+
+  Widget _sidebar({required bool wide}) => JarvisSidebar(
+    conversations: _recent,
+    selectedConversationId: _showHome ? null : _conversationId,
+    homeSelected: _showHome && _selectedDestination == 0,
+    connected: _connected,
+    onHome: () => _fromSidebar(() {
+      if (_selectedDestination != 0) _selectDestination(0);
+      setState(() => _showHome = true);
+    }),
+    onNewChat: () => _fromSidebar(_startNewChat),
+    onVoice: () => _fromSidebar(() => _selectDestination(2)),
+    onConversation: (id) => _fromSidebar(() async {
+      if (_selectedDestination != 0) _selectDestination(0);
+      if (id == _conversationId) {
+        setState(() => _showHome = false);
+        return;
+      }
+      try {
+        await _openConversation(id);
+      } on DioException catch (error) {
+        if (mounted) setState(() => _error = _describeError(error));
+      }
+    }),
+    onSeeAll: () => _fromSidebar(() => unawaited(_chooseConversation())),
+    onUtility: (destination) => _fromSidebar(() => _openUtility(destination)),
+    onSettings: () => _fromSidebar(_openSettings),
+  );
+
+  void _fromSidebar(VoidCallback action) {
+    final scaffold = _scaffoldKey.currentState;
+    if (scaffold?.isDrawerOpen ?? false) scaffold!.closeDrawer();
+    action();
+  }
+
+  Future<void> _loadRecent() async {
+    if (_conversationId == null) return;
+    try {
+      final response = await _http.get<List<dynamic>>('/api/v1/conversations');
+      if (!mounted) return;
+      setState(
+        () => _recent = (response.data ?? [])
+            .whereType<Map<String, dynamic>>()
+            .toList(),
+      );
+    } on DioException {
+      // The sidebar keeps its last known list while the API is unreachable.
+    }
+  }
+
+  void _openSettings() => unawaited(
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Settings')),
+          body: _settingsBody(),
+        ),
+      ),
+    ),
+  );
+
+  void _showQuickActions() {
+    Widget action(String title, String subtitle, IconData icon, String to) =>
+        ListTile(
+          leading: IconBadge(icon: icon),
+          title: Text(title),
+          subtitle: Text(subtitle),
+          onTap: () {
+            Navigator.pop(context);
+            _openUtility(to);
+          },
+        );
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        builder: (context) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                action(
+                  'Upload a file',
+                  'PDFs and text become searchable',
+                  PhosphorIconsRegular.paperclip,
+                  'files',
+                ),
+                action(
+                  'Start a background task',
+                  'Jarvis works on it and reports back',
+                  PhosphorIconsRegular.listChecks,
+                  'tasks',
+                ),
+                action(
+                  'Set a reminder',
+                  'Pick a date and time',
+                  PhosphorIconsRegular.bell,
+                  'reminders',
+                ),
+                action(
+                  'Add a memory',
+                  'Tell Jarvis something to remember',
+                  PhosphorIconsRegular.notebook,
+                  'memory',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1233,89 +1332,144 @@ class _ChatScreenState extends State<ChatScreen> {
     unawaited(_createAndOpenConversation());
   }
 
-  PreferredSizeWidget _appBar(int destination) => AppBar(
-    titleSpacing: 20,
-    title: Text(switch (destination) {
-      4 => 'Settings',
-      2 => 'Voice',
-      _ => 'Jarvis',
-    }),
-    actions: [
-      if (destination == 0 && _hasMessages)
-        IconButton(
-          tooltip: _showHome ? 'Continue conversation' : 'Home',
-          onPressed: _busy || _voiceStarting
-              ? null
-              : () => setState(() => _showHome = !_showHome),
-          icon: Icon(
-            _showHome ? Icons.chat_bubble_outline : Icons.home_outlined,
-            size: 21,
-          ),
+  PreferredSizeWidget _topBar({required bool wide, required bool voice}) =>
+      AppBar(
+        toolbarHeight: 64,
+        backgroundColor: voice ? Colors.transparent : null,
+        automaticallyImplyLeading: false,
+        leadingWidth: 64,
+        leading: voice
+            ? Center(
+                child: CircleIconButton(
+                  icon: PhosphorIconsRegular.x,
+                  tooltip: 'Close voice',
+                  onPressed: _voiceStarting
+                      ? null
+                      : () => _selectDestination(0),
+                ),
+              )
+            : wide
+            ? null
+            : Center(
+                child: CircleIconButton(
+                  icon: PhosphorIconsRegular.list,
+                  tooltip: 'Menu',
+                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                ),
+              ),
+        centerTitle: true,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              voice ? 'Voice' : 'Jarvis',
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -.3,
+              ),
+            ),
+            const SizedBox(width: 7),
+            _ConnectionDot(connected: _connected),
+          ],
         ),
-      if (destination == 0)
-        IconButton(
-          tooltip: 'New chat',
-          onPressed: _busy ? null : _startNewChat,
-          icon: const Icon(Icons.edit_square, size: 20),
-        ),
-      if (destination == 0)
-        IconButton(
-          tooltip: 'Conversations',
-          onPressed: _busy ? null : _chooseConversation,
-          icon: const Icon(Icons.forum_outlined, size: 21),
-        ),
-      Padding(
-        padding: const EdgeInsets.only(left: 4, right: 20),
-        child: Tooltip(
-          message: _connected ? 'Live updates connected' : 'Offline',
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: _connected
-                  ? JarvisColors.success
-                  : const Color(0xff686a77),
-              shape: BoxShape.circle,
-              boxShadow: _connected
-                  ? [
-                      BoxShadow(
-                        color: JarvisColors.success.withValues(alpha: .5),
-                        blurRadius: 8,
+        actions: [
+          if (!voice)
+            CircleIconButton(
+              icon: PhosphorIconsRegular.notePencil,
+              tooltip: 'New chat',
+              onPressed: _busy ? null : _startNewChat,
+            ),
+          const SizedBox(width: 12),
+        ],
+      );
+
+  Widget _signInScreen() => Scaffold(
+    body: Stack(
+      children: [
+        const Positioned.fill(child: _AmbientBackdrop()),
+        SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(28),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const JarvisOrb(size: 96, semanticLabel: 'Jarvis'),
+                    const SizedBox(height: 32),
+                    Text(
+                      'Sign in to Jarvis',
+                      textAlign: TextAlign.center,
+                      style: JarvisType.serif.copyWith(fontSize: 42),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Your private assistant for conversations, tasks, memory, and voice.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: JarvisColors.inkSoft,
                       ),
-                    ]
-                  : null,
+                    ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _authBusy ? null : _signIn,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: JarvisColors.ink,
+                          minimumSize: const Size.fromHeight(54),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(40),
+                          ),
+                        ),
+                        icon: _authBusy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(PhosphorIconsRegular.signIn),
+                        label: const Text(
+                          'Continue with your identity provider',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          PhosphorIconsRegular.lockSimple,
+                          size: 14,
+                          color: JarvisColors.muted,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Secured with OpenID Connect + PKCE',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: JarvisColors.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_error != null)
+                      InlineNotice(
+                        message: _error!,
+                        tone: NoticeTone.danger,
+                        margin: const EdgeInsets.only(top: 24),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-      ),
-    ],
-  );
-
-  Widget _signInScreen() => Scaffold(
-    body: Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const _JarvisMark(size: 56),
-          const SizedBox(height: 20),
-          const Text('Sign in to Jarvis', style: TextStyle(fontSize: 22)),
-          const SizedBox(height: 18),
-          FilledButton.icon(
-            onPressed: _authBusy ? null : _signIn,
-            icon: _authBusy
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.login),
-            label: const Text('Continue with your identity provider'),
-          ),
-          if (_error != null)
-            Padding(padding: const EdgeInsets.all(20), child: Text(_error!)),
-        ],
-      ),
+      ],
     ),
   );
 
@@ -1323,33 +1477,38 @@ class _ChatScreenState extends State<ChatScreen> {
     child: Column(
       children: [
         if (_error != null)
-          MaterialBanner(
-            backgroundColor: JarvisColors.surfaceRaised,
-            content: Text(_error!),
-            leading: const Icon(
-              Icons.info_outline,
-              color: JarvisColors.warning,
+          ContentWidth(
+            maxWidth: 808,
+            child: InlineNotice(
+              message: _error!,
+              margin: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+              actions: [
+                if (_conversationId == null || !_connected)
+                  TextButton(
+                    onPressed: _initialize,
+                    child: const Text('Retry'),
+                  ),
+                TextButton(
+                  onPressed: () => setState(() => _error = null),
+                  style: TextButton.styleFrom(
+                    foregroundColor: JarvisColors.inkSoft,
+                  ),
+                  child: const Text('Dismiss'),
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => setState(() => _error = null),
-                child: const Text('Dismiss'),
-              ),
-              if (_conversationId == null || !_connected)
-                TextButton(onPressed: _initialize, child: const Text('Retry')),
-            ],
           ),
         Expanded(
           child: _showHome || _entries.isEmpty
               ? _welcome()
               : ListView.builder(
                   controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(18, 20, 18, 24),
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
                   itemCount: _entries.length,
                   itemBuilder: (context, index) => Align(
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 780),
+                      constraints: const BoxConstraints(maxWidth: 760),
                       child: SizedBox(
                         width: double.infinity,
                         child: _entryView(_entries[index]),
@@ -1360,7 +1519,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 808),
+            constraints: const BoxConstraints(maxWidth: 788),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
               child: ChatComposer(
@@ -1368,7 +1527,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 onSend: () => unawaited(_send()),
                 onVoice: _conversationId == null
                     ? null
-                    : () => unawaited(_toggleVoice()),
+                    : () => _selectDestination(2),
+                onAttach: _showQuickActions,
                 sending: _busy,
                 voiceActive: _voiceActive,
                 voiceStarting: _voiceStarting,
@@ -1393,130 +1553,250 @@ class _ChatScreenState extends State<ChatScreen> {
     ),
   };
 
-  Widget _voiceBody() => SafeArea(
-    child: Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _JarvisMark(size: _voiceActive ? 96 : 76),
-            const SizedBox(height: 24),
-            Text(
-              _voiceStarting
-                  ? 'Connecting to Jarvis…'
-                  : _voiceActive
-                  ? 'Listening'
-                  : 'Talk to Jarvis',
-              style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              _voiceActive
-                  ? 'Speak naturally. You can interrupt at any time.'
-                  : 'Voice continues this conversation and its memory.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withValues(alpha: .62)),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 20),
-              Text(_error!, textAlign: TextAlign.center),
-            ],
-            const SizedBox(height: 28),
-            FilledButton.icon(
-              onPressed: _voiceStarting || _sending ? null : _toggleVoice,
-              icon: _voiceStarting
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(
-                      _voiceActive
-                          ? Icons.stop_rounded
-                          : Icons.mic_none_rounded,
+  Widget _voiceBody() {
+    final theme = Theme.of(context);
+    return Stack(
+      children: [
+        const Positioned.fill(child: _AmbientBackdrop()),
+        SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox.square(
+                      dimension: 240,
+                      child: Center(
+                        child: JarvisOrb(
+                          size: 128,
+                          animate: _voiceStarting,
+                          listening: _voiceActive,
+                        ),
+                      ),
                     ),
-              label: Text(_voiceActive ? 'End voice chat' : 'Start voice chat'),
+                    const SizedBox(height: 12),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 240),
+                      switchInCurve: _fadeThrough,
+                      switchOutCurve: _fadeThrough,
+                      child: Text(
+                        _voiceStarting
+                            ? 'Connecting to Jarvis…'
+                            : _voiceActive
+                            ? 'Listening'
+                            : 'Talk to Jarvis',
+                        key: ValueKey('$_voiceStarting$_voiceActive'),
+                        style: JarvisType.serif.copyWith(fontSize: 40),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      _voiceActive
+                          ? 'Speak naturally. You can interrupt at any time.'
+                          : 'Voice continues this conversation and its memory.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: JarvisColors.inkSoft,
+                      ),
+                    ),
+                    if (_error != null)
+                      InlineNotice(
+                        message: _error!,
+                        tone: NoticeTone.danger,
+                        margin: const EdgeInsets.only(top: 20),
+                      ),
+                    const SizedBox(height: 32),
+                    FilledButton.icon(
+                      onPressed: _voiceStarting || _sending
+                          ? null
+                          : _toggleVoice,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _voiceActive
+                            ? JarvisColors.danger
+                            : JarvisColors.ink,
+                        minimumSize: const Size(220, 56),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(40),
+                        ),
+                      ),
+                      icon: _voiceStarting
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              _voiceActive
+                                  ? PhosphorIconsRegular.stop
+                                  : PhosphorIconsRegular.microphone,
+                            ),
+                      label: Text(
+                        _voiceActive ? 'End voice chat' : 'Start voice chat',
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _VoiceHint(
+                          icon: PhosphorIconsRegular.waveform,
+                          label: 'Interrupt anytime',
+                        ),
+                        _VoiceHint(
+                          icon: PhosphorIconsRegular.brain,
+                          label: 'Uses your memory',
+                        ),
+                        _VoiceHint(
+                          icon: PhosphorIconsRegular.shieldCheck,
+                          label: 'Asks before acting',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
+          ),
         ),
-      ),
-    ),
-  );
+      ],
+    );
+  }
 
   Widget _settingsBody() => SafeArea(
-    child: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
-        child: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          children: [
-            _settingsSection('Assistant'),
-            _settingsTile(
-              'Integrations',
-              'Manage MCP servers and credentials',
-              Icons.hub_outlined,
-              'integrations',
-            ),
-            _settingsTile(
-              'Approvals',
-              'Review actions Jarvis needs permission to run',
-              Icons.gpp_maybe_outlined,
-              'approvals',
-            ),
-            _settingsTile(
-              'Morning briefing',
-              'Choose your daily briefing schedule and time zone',
-              Icons.wb_sunny_outlined,
-              'briefing',
-            ),
-            _settingsSection('Automations'),
-            _settingsTile(
-              'Reminders and notifications',
-              'View scheduled reminders and alerts',
-              Icons.notifications_none_outlined,
-              'reminders',
-            ),
-            _settingsTile(
-              'Condition watches',
-              'Manage threshold alerts',
-              Icons.monitor_heart_outlined,
-              'watches',
-            ),
-            _settingsSection('Data'),
-            _settingsTile(
-              'Files',
-              'Browse uploaded documents',
-              Icons.folder_open_outlined,
-              'files',
-            ),
-            _settingsTile(
-              'Audit log',
-              'Review Jarvis activity',
-              Icons.fact_check_outlined,
-              'audit',
-            ),
-            if (_auth.enabled)
-              ListTile(
-                leading: const Icon(Icons.logout),
-                title: const Text('Sign out'),
-                onTap: () => unawaited(_signOut()),
+    child: ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      children: [
+        ContentWidth(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SurfaceCard(
+                child: Row(
+                  children: [
+                    const JarvisOrb(size: 44, glow: false),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Your assistant',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _connected
+                                ? 'Live updates connected'
+                                : 'Offline — live updates paused',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-          ],
+              _settingsGroup('Assistant', [
+                _settingsTile(
+                  'Integrations',
+                  'Manage MCP servers and credentials',
+                  PhosphorIconsRegular.plugsConnected,
+                  'integrations',
+                ),
+                _settingsTile(
+                  'Approvals',
+                  'Review actions Jarvis needs permission to run',
+                  PhosphorIconsRegular.shieldCheck,
+                  'approvals',
+                ),
+                _settingsTile(
+                  'Morning briefing',
+                  'Choose your daily briefing schedule and time zone',
+                  PhosphorIconsRegular.sunHorizon,
+                  'briefing',
+                ),
+              ]),
+              _settingsGroup('Automations', [
+                _settingsTile(
+                  'Reminders and notifications',
+                  'View scheduled reminders and alerts',
+                  PhosphorIconsRegular.bell,
+                  'reminders',
+                ),
+                _settingsTile(
+                  'Condition watches',
+                  'Manage threshold alerts',
+                  PhosphorIconsRegular.pulse,
+                  'watches',
+                ),
+              ]),
+              _settingsGroup('Data', [
+                _settingsTile(
+                  'Files',
+                  'Browse uploaded documents',
+                  PhosphorIconsRegular.folderOpen,
+                  'files',
+                ),
+                _settingsTile(
+                  'Audit log',
+                  'Review Jarvis activity',
+                  PhosphorIconsRegular.listChecks,
+                  'audit',
+                ),
+              ]),
+              if (_auth.enabled)
+                _settingsGroup('Account', [
+                  ListTile(
+                    leading: const IconBadge(
+                      icon: PhosphorIconsRegular.signOut,
+                      color: JarvisColors.danger,
+                      size: 34,
+                    ),
+                    title: const Text(
+                      'Sign out',
+                      style: TextStyle(color: JarvisColors.danger),
+                    ),
+                    onTap: () => unawaited(_signOut()),
+                  ),
+                ]),
+            ],
+          ),
         ),
-      ),
+      ],
     ),
   );
 
-  Widget _settingsSection(String title) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
-    child: Text(
-      title.toUpperCase(),
-      style: const TextStyle(
-        fontSize: 11.5,
-        letterSpacing: 1.1,
-        fontWeight: FontWeight.w600,
-        color: JarvisColors.muted,
-      ),
+  Widget _settingsGroup(String title, List<Widget> tiles) => Padding(
+    padding: const EdgeInsets.only(top: 24),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
+          child: Text(
+            title.toUpperCase(),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: JarvisColors.muted,
+              letterSpacing: .8,
+            ),
+          ),
+        ),
+        SurfaceCard(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            children: [
+              for (final (index, tile) in tiles.indexed) ...[
+                if (index > 0) const Divider(indent: 64),
+                tile,
+              ],
+            ],
+          ),
+        ),
+      ],
     ),
   );
 
@@ -1526,30 +1806,26 @@ class _ChatScreenState extends State<ChatScreen> {
     IconData icon,
     String destination,
   ) => ListTile(
-    leading: Container(
-      width: 38,
-      height: 38,
-      decoration: BoxDecoration(
-        color: JarvisColors.accent.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Icon(icon, size: 20, color: JarvisColors.accent),
-    ),
+    leading: IconBadge(icon: icon, size: 34),
     title: Text(title),
-    subtitle: Text(subtitle, style: const TextStyle(color: JarvisColors.muted)),
-    trailing: const Icon(Icons.chevron_right, color: JarvisColors.muted),
+    subtitle: Text(subtitle),
+    trailing: const Icon(
+      PhosphorIconsRegular.caretRight,
+      size: 16,
+      color: JarvisColors.muted,
+    ),
     onTap: () => _openUtility(destination),
   );
 
   Widget _welcome() => HomeOverview(
     http: _http,
-    mark: const _JarvisMark(size: 76),
+    mark: const JarvisOrb(size: 56),
     ready: _conversationId != null,
     voiceStarting: _voiceStarting,
     onTalk: _conversationId == null || _voiceStarting || _sending
         ? null
         : () => unawaited(_toggleVoice()),
-    onOpenTasks: () => _selectDestination(1),
+    onOpenTasks: () => _openUtility('tasks'),
     refreshRevision: _homeRevision,
     onContinueConversation: _hasMessages
         ? () => setState(() => _showHome = false)
@@ -1560,9 +1836,94 @@ class _ChatScreenState extends State<ChatScreen> {
   );
 }
 
-class _JarvisMark extends StatelessWidget {
-  const _JarvisMark({required this.size});
+class _ConnectionDot extends StatelessWidget {
+  const _ConnectionDot({required this.connected});
+
+  final bool connected;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: connected ? 'Live updates connected' : 'Offline',
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: 7,
+      height: 7,
+      decoration: BoxDecoration(
+        color: connected ? JarvisColors.success : JarvisColors.outlineStrong,
+        shape: BoxShape.circle,
+      ),
+    ),
+  );
+}
+
+/// Floating frosted capsule for the main sections, with a detached voice
+/// button; the voice destination starts a session rather than just
+/// switching screens, so it is kept visually separate.
+class _VoiceHint extends StatelessWidget {
+  const _VoiceHint({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: JarvisColors.surface.withValues(alpha: .8),
+      borderRadius: BorderRadius.circular(40),
+      border: Border.all(color: JarvisColors.outline),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: JarvisColors.inkSoft),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w500,
+            color: JarvisColors.inkSoft,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Soft, blurred colour fields behind full-screen moments (sign-in, voice).
+class _AmbientBackdrop extends StatelessWidget {
+  const _AmbientBackdrop();
+
+  @override
+  Widget build(BuildContext context) => const IgnorePointer(
+    child: Stack(
+      children: [
+        Positioned(
+          top: -120,
+          left: -80,
+          child: _Blob(size: 360, color: Color(0x1c7c6cff)),
+        ),
+        Positioned(
+          bottom: -140,
+          right: -100,
+          child: _Blob(size: 420, color: Color(0x1638bdf8)),
+        ),
+        Positioned(
+          top: 180,
+          right: -60,
+          child: _Blob(size: 220, color: Color(0x12f472b6)),
+        ),
+      ],
+    ),
+  );
+}
+
+class _Blob extends StatelessWidget {
+  const _Blob({required this.size, required this.color});
+
   final double size;
+  final Color color;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -1570,20 +1931,7 @@ class _JarvisMark extends StatelessWidget {
     height: size,
     decoration: BoxDecoration(
       shape: BoxShape.circle,
-      gradient: const RadialGradient(
-        colors: [Color(0xffd6ceff), Color(0xff9585ef), Color(0xff554d85)],
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: const Color(0xff9585ef).withValues(alpha: .28),
-          blurRadius: size * .45,
-        ),
-      ],
-    ),
-    child: Icon(
-      Icons.blur_on_rounded,
-      size: size * .63,
-      color: const Color(0xff1b1830),
+      gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)]),
     ),
   );
 }

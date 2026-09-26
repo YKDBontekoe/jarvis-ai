@@ -1,8 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'ui/phosphor_icons.dart';
 import 'approvals_screen.dart';
 import 'notification_details_screen.dart';
 import 'task_details_screen.dart';
+import 'theme.dart';
+import 'ui/jarvis_ui.dart';
 
 class RemindersScreen extends StatefulWidget {
   const RemindersScreen({required this.http, super.key});
@@ -79,8 +82,12 @@ class _RemindersScreenState extends State<RemindersScreen>
                 ),
                 const SizedBox(height: 10),
                 ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.calendar_today_outlined),
+                  tileColor: JarvisColors.surfaceMuted,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(JarvisRadii.md),
+                  ),
+                  leading: const Icon(PhosphorIconsRegular.calendarBlank),
+                  trailing: const Icon(PhosphorIconsRegular.caretDown),
                   title: Text(
                     MaterialLocalizations.of(
                       context,
@@ -98,9 +105,14 @@ class _RemindersScreenState extends State<RemindersScreen>
                     }
                   },
                 ),
+                const SizedBox(height: 8),
                 ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.schedule),
+                  tileColor: JarvisColors.surfaceMuted,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(JarvisRadii.md),
+                  ),
+                  leading: const Icon(PhosphorIconsRegular.clock),
+                  trailing: const Icon(PhosphorIconsRegular.caretDown),
                   title: Text(selectedTime.format(context)),
                   onTap: () async {
                     final value = await showTimePicker(
@@ -166,24 +178,16 @@ class _RemindersScreenState extends State<RemindersScreen>
   }
 
   Future<void> _cancelReminder(Map<String, dynamic> reminder) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel reminder?'),
-        content: Text('“${reminder['title']}” will no longer notify you.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Cancel reminder'),
-          ),
-        ],
-      ),
+    final confirmed = await showJarvisConfirm(
+      context,
+      title: 'Cancel reminder?',
+      message: '“${reminder['title']}” will no longer notify you.',
+      cancelLabel: 'Keep',
+      confirmLabel: 'Cancel reminder',
+      destructive: true,
+      icon: PhosphorIconsRegular.bellSlash,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     try {
       await widget.http.delete('/api/v1/reminders/${reminder['id']}');
       await _load();
@@ -272,102 +276,224 @@ class _RemindersScreenState extends State<RemindersScreen>
         IconButton(
           onPressed: _load,
           tooltip: 'Refresh',
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
+        ),
+        HeaderAction(
+          label: 'New',
+          icon: PhosphorIconsRegular.plus,
+          onPressed: _createReminder,
         ),
       ],
-      bottom: TabBar(
-        controller: _tabs,
-        tabs: const [
-          Tab(text: 'Reminders'),
-          Tab(text: 'Notifications'),
-        ],
-      ),
-    ),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: _createReminder,
-      icon: const Icon(Icons.add_alert_outlined),
-      label: const Text('New reminder'),
-    ),
-    body: _loading
-        ? const Center(child: CircularProgressIndicator())
-        : _error != null
-        ? Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_error!),
-                TextButton(onPressed: _load, child: const Text('Retry')),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(56),
+        child: ContentWidth(
+          child: Container(
+            height: 44,
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: JarvisColors.surfaceRaised,
+              borderRadius: BorderRadius.circular(JarvisRadii.md),
+            ),
+            child: TabBar(
+              controller: _tabs,
+              tabs: [
+                const Tab(text: 'Reminders'),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Notifications'),
+                      if (_unreadCount > 0) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: JarvisColors.ink,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '$_unreadCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ],
             ),
-          )
+          ),
+        ),
+      ),
+    ),
+    body: _loading
+        ? const LoadingState()
+        : _error != null
+        ? ErrorState(message: _error!, onRetry: _load)
         : TabBarView(
             controller: _tabs,
             children: [_buildReminders(), _buildNotifications()],
           ),
   );
 
+  int get _unreadCount =>
+      _notifications.where((item) => item['readAt'] == null).length;
+
   Widget _buildReminders() => _reminders.isEmpty
-      ? const Center(child: Text('No reminders yet.'))
+      ? const EmptyState(
+          icon: PhosphorIconsRegular.alarm,
+          title: 'No reminders yet.',
+          message: 'Ask Jarvis to remind you, or create one here.',
+        )
       : ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 92),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           itemCount: _reminders.length,
           itemBuilder: (context, index) {
             final reminder = _reminders[index];
-            final pending = reminder['status'] == 'pending';
-            return Card(
-              margin: const EdgeInsets.only(bottom: 10),
-              child: ListTile(
-                leading: Icon(
-                  pending
-                      ? Icons.notifications_active_outlined
-                      : Icons.notifications_none,
-                ),
-                title: Text(reminder['title'] as String? ?? ''),
-                subtitle: Text(
-                  '${_formatDate(reminder['dueAt'])}\n${reminder['status']}',
-                ),
-                isThreeLine: true,
-                trailing: pending
-                    ? IconButton(
+            final status = reminder['status'] as String? ?? 'pending';
+            final pending = status == 'pending';
+            final style = statusStyle(status);
+            return ContentWidth(
+              child: SurfaceCard(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.fromLTRB(16, 14, 6, 14),
+                child: Row(
+                  children: [
+                    IconBadge(
+                      icon: pending
+                          ? PhosphorIconsRegular.alarm
+                          : PhosphorIconsRegular.bellSlash,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            reminder['title'] as String? ?? '',
+                            style: Theme.of(
+                              context,
+                            ).textTheme.titleSmall?.copyWith(fontSize: 15),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              StatusPill(
+                                label: style.label,
+                                color: style.color,
+                              ),
+                              Text(
+                                _formatDate(reminder['dueAt']),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (pending)
+                      IconButton(
                         tooltip: 'Cancel reminder',
                         onPressed: () => _cancelReminder(reminder),
-                        icon: const Icon(Icons.close),
-                      )
-                    : null,
+                        icon: const Icon(PhosphorIconsRegular.x, size: 20),
+                      ),
+                  ],
+                ),
               ),
             );
           },
         );
 
+  IconData _notificationIcon(Object? type) => switch (type) {
+    'reminder.due' => PhosphorIconsRegular.alarm,
+    'task.completed' => PhosphorIconsRegular.checkCircle,
+    'approval.required' => PhosphorIconsRegular.shieldCheck,
+    'watch.triggered' || 'watch.failed' => PhosphorIconsRegular.pulse,
+    _ => PhosphorIconsRegular.bell,
+  };
+
   Widget _buildNotifications() => _notifications.isEmpty
-      ? const Center(child: Text('No notifications yet.'))
+      ? const EmptyState(
+          icon: PhosphorIconsRegular.bell,
+          title: 'No notifications yet.',
+          message: 'Alerts from reminders, tasks, and watches will show here.',
+        )
       : ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 92),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           itemCount: _notifications.length,
           itemBuilder: (context, index) {
             final notification = _notifications[index];
             final unread = notification['readAt'] == null;
-            return Card(
-              margin: const EdgeInsets.only(bottom: 10),
-              child: ListTile(
+            final body = notification['body'] as String? ?? '';
+            return ContentWidth(
+              child: SurfaceCard(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                color: unread ? JarvisColors.surface : JarvisColors.canvas,
+                borderColor: JarvisColors.outline,
                 onTap: () => _openNotification(notification),
-                leading: Icon(
-                  unread
-                      ? Icons.notifications_active
-                      : Icons.notifications_none,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    IconBadge(icon: _notificationIcon(notification['type'])),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            notification['title'] as String? ?? '',
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(
+                                  fontSize: 15,
+                                  fontWeight: unread
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                ),
+                          ),
+                          if (body.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              body,
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                height: 1.4,
+                                color: JarvisColors.inkSoft,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 6),
+                          Text(
+                            _formatDate(notification['createdAt']),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: JarvisColors.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (unread)
+                      Container(
+                        margin: const EdgeInsets.only(top: 6, left: 8),
+                        width: 9,
+                        height: 9,
+                        decoration: const BoxDecoration(
+                          color: JarvisColors.accent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                  ],
                 ),
-                title: Text(notification['title'] as String? ?? ''),
-                subtitle: Text(
-                  '${notification['body'] as String? ?? ''}\n${_formatDate(notification['createdAt'])}',
-                ),
-                isThreeLine: true,
-                trailing: unread
-                    ? const Icon(
-                        Icons.circle,
-                        size: 9,
-                        color: Color(0xffa895ff),
-                      )
-                    : null,
               ),
             );
           },
