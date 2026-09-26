@@ -23,6 +23,7 @@ import 'files_screen.dart';
 import 'tasks_screen.dart';
 import 'audit_screen.dart';
 import 'conversations_screen.dart';
+import 'task_details_screen.dart';
 import 'notification_details_screen.dart';
 import 'notification_routing.dart';
 import 'json_maps.dart';
@@ -111,6 +112,17 @@ class _AuthSession {
   final _storage = const FlutterSecureStorage();
   Future<String?>? _accessTokenInFlight;
   var _generation = 0;
+  Future<void> _sessionLock = Future.value();
+
+  Future<T> _serialized<T>(Future<T> Function() action) {
+    final previous = _sessionLock;
+    final released = Completer<void>();
+    _sessionLock = released.future;
+    return previous
+        .catchError((_) {})
+        .then((_) => action())
+        .whenComplete(released.complete);
+  }
 
   String get _redirectUri => kIsWeb
       ? web_oidc.currentRedirectUri(_webOidcRedirectUri)
@@ -128,7 +140,7 @@ class _AuthSession {
     final existing = _accessTokenInFlight;
     if (existing != null) return existing;
     late final Future<String?> pending;
-    pending = _readOrRefreshAccessToken().whenComplete(() {
+    pending = _serialized(_readOrRefreshAccessToken).whenComplete(() {
       if (identical(_accessTokenInFlight, pending)) {
         _accessTokenInFlight = null;
       }
@@ -173,10 +185,7 @@ class _AuthSession {
         );
         if (generation != _generation) return null;
         await _saveWebResponse(response, refreshToken);
-        if (generation != _generation) {
-          await _storage.deleteAll();
-          return null;
-        }
+        if (generation != _generation) return null;
         return response['access_token'] as String;
       }
       final response = await _appAuth.token(
@@ -194,10 +203,7 @@ class _AuthSession {
         response.refreshToken ?? refreshToken,
         response.accessTokenExpirationDateTime,
       );
-      if (generation != _generation) {
-        await _storage.deleteAll();
-        return null;
-      }
+      if (generation != _generation) return null;
       return response.accessToken;
     } catch (error) {
       if (_isInvalidGrantError(error)) {
@@ -228,36 +234,42 @@ class _AuthSession {
       value != null && value.toLowerCase().contains('invalid_grant');
 
   Future<void> signIn() async {
-    if (kIsWeb) {
+    await _serialized(() async {
+      if (kIsWeb) {
+        _ensureConfigured();
+        await web_oidc.beginAuthorizationCode(
+          _oidcIssuer,
+          _oidcClientId,
+          _redirectUri,
+          _oidcScopes,
+        );
+        return;
+      }
       _ensureConfigured();
-      await web_oidc.beginAuthorizationCode(
-        _oidcIssuer,
-        _oidcClientId,
-        _redirectUri,
-        _oidcScopes,
+      final response = await _appAuth.authorizeAndExchangeCode(
+        AuthorizationTokenRequest(
+          _oidcClientId,
+          _redirectUri,
+          issuer: _oidcIssuer,
+          scopes: _oidcScopes,
+        ),
       );
-      return;
-    }
-    _ensureConfigured();
-    final response = await _appAuth.authorizeAndExchangeCode(
-      AuthorizationTokenRequest(
-        _oidcClientId,
-        _redirectUri,
-        issuer: _oidcIssuer,
-        scopes: _oidcScopes,
-      ),
-    );
-    await _save(
-      response.accessToken,
-      response.refreshToken,
-      response.accessTokenExpirationDateTime,
-    );
+      _generation++;
+      _accessTokenInFlight = null;
+      await _save(
+        response.accessToken,
+        response.refreshToken,
+        response.accessTokenExpirationDateTime,
+      );
+    });
   }
 
   Future<void> signOut() async {
-    _generation++;
-    _accessTokenInFlight = null;
-    await _storage.deleteAll();
+    await _serialized(() async {
+      _generation++;
+      _accessTokenInFlight = null;
+      await _storage.deleteAll();
+    });
   }
 
   Future<void> _saveWebResponse(
@@ -921,6 +933,7 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           _connected = false;
           _settleToolRuns();
+          _error ??= 'Realtime updates disconnected. Retry the connection.';
         });
       }
     });
@@ -981,9 +994,8 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted || _conversationId != conversationId) return;
       setState(() {
         _entries
-          ..removeWhere((entry) => entry is MessageEntry)
-          ..insertAll(
-            0,
+          ..clear()
+          ..addAll(
             jsonMaps(details.data?['messages'])
                 .where(
                   (message) =>
@@ -1104,6 +1116,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _registerPushToken(String token) async {
+    if (_signedOut || _signingOut) return;
     final platform = defaultTargetPlatform == TargetPlatform.iOS
         ? 'ios'
         : 'android';
@@ -1111,6 +1124,17 @@ class _ChatScreenState extends State<ChatScreen> {
       '/api/v1/push-devices',
       data: {'token': token, 'platform': platform},
     );
+    if (_signedOut || _signingOut) {
+      try {
+        await _http.delete<void>(
+          '/api/v1/push-devices',
+          data: {'token': token},
+        );
+      } on DioException {
+        // Sign-out already dropped local state; stale server rows expire at Firebase.
+      }
+      return;
+    }
     _pushToken = token;
   }
 
@@ -1149,6 +1173,17 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (opensDailyBriefing(type)) {
       _openUtility('briefing');
+      return;
+    }
+    if (opensTaskDetails(type) && sourceId != null) {
+      unawaited(
+        Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                TaskDetailsScreen(http: _http, taskId: sourceId),
+          ),
+        ),
+      );
       return;
     }
     if (sourceId == null || !opensNotificationDetails(type)) {
@@ -1350,6 +1385,13 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
       await room.localParticipant?.setMicrophoneEnabled(true);
+      if (_voiceRoom != room ||
+          !mounted ||
+          _conversationId != conversationId ||
+          _realtimeGeneration != generation) {
+        await _abandonVoiceRoom(room);
+        return;
+      }
       if (mounted) {
         setState(() {
           _voiceActive = true;
@@ -1828,6 +1870,20 @@ class _ChatScreenState extends State<ChatScreen> {
                     foregroundColor: JarvisColors.inkSoft,
                   ),
                   child: const Text('Dismiss'),
+                ),
+              ],
+            ),
+          )
+        else if (!_connected && _conversationId != null)
+          ContentWidth(
+            maxWidth: 808,
+            child: InlineNotice(
+              message: 'Realtime updates are offline.',
+              margin: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+              actions: [
+                TextButton(
+                  onPressed: _retryConnection,
+                  child: const Text('Retry'),
                 ),
               ],
             ),
