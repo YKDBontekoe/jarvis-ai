@@ -163,12 +163,14 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                   SurfaceCard(
                     margin: const EdgeInsets.only(top: 12),
                     padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-                    color: JarvisColors.warningSoft,
-                    borderColor: JarvisColors.warning.withValues(alpha: .25),
+                    borderColor: JarvisColors.outlineStrong,
                     onTap: () => _openApprovals(conversationId),
                     child: Row(
                       children: [
-                        const IconBadge(icon: PhosphorIconsRegular.shieldCheck),
+                        const IconBadge(
+                          icon: PhosphorIconsRegular.shieldWarning,
+                          color: JarvisColors.warning,
+                        ),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(

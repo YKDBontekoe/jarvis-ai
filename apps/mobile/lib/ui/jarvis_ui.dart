@@ -493,13 +493,13 @@ class InlineNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     final (fg, bg, icon) = switch (tone) {
       NoticeTone.info => (
-        JarvisColors.info,
-        JarvisColors.infoSoft,
+        JarvisColors.inkSoft,
+        JarvisColors.surfaceMuted,
         PhosphorIconsRegular.info,
       ),
       NoticeTone.warning => (
         JarvisColors.warning,
-        JarvisColors.warningSoft,
+        JarvisColors.surfaceMuted,
         PhosphorIconsRegular.warningCircle,
       ),
       NoticeTone.danger => (
@@ -509,7 +509,7 @@ class InlineNotice extends StatelessWidget {
       ),
       NoticeTone.success => (
         JarvisColors.success,
-        JarvisColors.successSoft,
+        JarvisColors.surfaceMuted,
         PhosphorIconsRegular.checkCircle,
       ),
     };
@@ -520,7 +520,9 @@ class InlineNotice extends StatelessWidget {
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(JarvisRadii.md),
-          border: Border.all(color: fg.withValues(alpha: .18)),
+          border: tone == NoticeTone.danger
+              ? Border.all(color: fg.withValues(alpha: .15))
+              : null,
         ),
         child: Row(
           children: [
