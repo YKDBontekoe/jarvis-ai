@@ -40,6 +40,12 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
     private const int MaxImageCount = 4;
     private static readonly TimeSpan ModelCatalogLifetime = TimeSpan.FromMinutes(5);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    // Prompt text is not HTML; keep '+', quotes-in-text, and non-ASCII readable while
+    // control characters and newlines stay escaped so a value cannot forge a role marker.
+    private static readonly JsonSerializerOptions PromptJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
     private static readonly HashSet<string> ModelClassNames = new(StringComparer.OrdinalIgnoreCase)
         { "fast", "standard", "reasoning", "coding", "vision", "realtime" };
     private readonly Dictionary<string, string> _modelClasses = (modelClasses ?? new Dictionary<string, string>())
@@ -333,7 +339,7 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
             [new FunctionCallContent(Guid.NewGuid().ToString("N"), name, arguments)]);
     }
 
-    private static PromptPayload BuildPrompt(IEnumerable<ChatMessage> messages, ChatOptions? options,
+    internal static PromptPayload BuildPrompt(IEnumerable<ChatMessage> messages, ChatOptions? options,
         IReadOnlyList<AIFunction> tools, bool enableWebSearch)
     {
         var prompt = new StringBuilder();
@@ -383,11 +389,11 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
                     prompt.Append("[Attached image ").Append(images.Count).AppendLine("]");
                 }
                 else if (content is FunctionCallContent call)
-                    prompt.Append("Jarvis tool request: ").Append(call.Name).Append(' ').AppendLine(JsonSerializer.Serialize(call.Arguments, JsonOptions));
+                    prompt.Append("Jarvis tool request: ").Append(call.Name).Append(' ').AppendLine(JsonSerializer.Serialize(call.Arguments, PromptJsonOptions));
                 else if (content is FunctionResultContent result)
-                    prompt.Append("Jarvis tool result: ").AppendLine(JsonSerializer.Serialize(result.Result, JsonOptions));
+                    prompt.Append("Jarvis tool result: ").AppendLine(JsonSerializer.Serialize(result.Result, PromptJsonOptions));
                 else
-                    prompt.Append(content.GetType().Name).Append(": ").AppendLine(JsonSerializer.Serialize(content, JsonOptions));
+                    prompt.Append(content.GetType().Name).Append(": ").AppendLine(JsonSerializer.Serialize(content, PromptJsonOptions));
                 if (prompt.Length > MaxPromptLength)
                     throw new InvalidOperationException("The conversation context exceeds the Codex CLI request size limit.");
             }
@@ -396,7 +402,7 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
         return new PromptPayload(prompt.ToString(), images);
     }
 
-    private sealed record PromptPayload(string Text, IReadOnlyList<string> Images);
+    internal sealed record PromptPayload(string Text, IReadOnlyList<string> Images);
 
     private async Task<AvailableModel[]> GetModelCatalogAsync(AppServerConnection rpc,
         CancellationToken cancellationToken)

@@ -5,4 +5,7 @@
     <ProjectReference Include="../Jarvis.Workflows/Jarvis.Workflows.csproj" />
     <PackageReference Include="Microsoft.Agents.AI" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jarvis.UnitTests" />
+  </ItemGroup>
 </Project>
