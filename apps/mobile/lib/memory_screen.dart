@@ -1,6 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import 'theme.dart';
+import 'ui/jarvis_ui.dart';
+
 const _memoryKinds = [
   'preference',
   'fact',
@@ -168,24 +171,16 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   Future<void> _deleteMemory(Map<String, dynamic> memory) async {
-    final delete = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete memory?'),
-        content: Text('Jarvis will forget “${memory['content']}”.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final delete = await showJarvisConfirm(
+      context,
+      title: 'Delete memory?',
+      message: 'Jarvis will forget “${memory['content']}”.',
+      cancelLabel: 'Keep',
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: Icons.delete_outline_rounded,
     );
-    if (delete != true) return;
+    if (!delete) return;
     try {
       await widget.http.delete('/api/v1/memory/${memory['id']}');
       if (mounted) await _load(query: _searching ? _query.text.trim() : null);
@@ -317,143 +312,204 @@ class _MemoryScreenState extends State<MemoryScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Jarvis memory')),
+    appBar: AppBar(title: const Text('Memory')),
     floatingActionButton: FloatingActionButton.extended(
       onPressed: _createMemory,
-      icon: const Icon(Icons.add),
+      icon: const Icon(Icons.add_rounded),
       label: const Text('Add memory'),
     ),
     body: Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: TextField(
-            controller: _query,
-            textInputAction: TextInputAction.search,
-            onSubmitted: (value) => _load(query: value.trim()),
-            decoration: InputDecoration(
-              hintText: 'Search what Jarvis remembers',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: IconButton(
-                tooltip: 'Clear search',
-                onPressed: () {
-                  _query.clear();
-                  _load();
-                },
-                icon: const Icon(Icons.close),
+        ContentWidth(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: TextField(
+              controller: _query,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (value) => _load(query: value.trim()),
+              decoration: InputDecoration(
+                hintText: 'Search what Jarvis remembers',
+                fillColor: JarvisColors.surface,
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(JarvisRadii.md),
+                  borderSide: const BorderSide(color: JarvisColors.outline),
+                ),
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: IconButton(
+                  tooltip: 'Clear search',
+                  onPressed: () {
+                    _query.clear();
+                    _load();
+                  },
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                ),
               ),
             ),
           ),
         ),
-        SizedBox(
-          height: 48,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            children: [
-              _kindFilter(label: 'All', value: null),
-              ..._memoryKinds.map(
-                (kind) => _kindFilter(
-                  label: kind[0].toUpperCase() + kind.substring(1),
-                  value: kind,
+        ContentWidth(
+          child: SizedBox(
+            height: 44,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                _kindFilter(label: 'All', value: null),
+                ..._memoryKinds.map(
+                  (kind) => _kindFilter(
+                    label: kind[0].toUpperCase() + kind.substring(1),
+                    value: kind,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         if (_error != null)
-          MaterialBanner(
-            content: Text(_error!),
-            leading: const Icon(Icons.info_outline),
-            actions: [TextButton(onPressed: _load, child: const Text('Retry'))],
+          ContentWidth(
+            child: InlineNotice(
+              message: _error!,
+              tone: NoticeTone.danger,
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              actions: [
+                TextButton(onPressed: _load, child: const Text('Retry')),
+              ],
+            ),
           ),
         Expanded(
           child: _loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const LoadingState()
               : _memories.isEmpty
-              ? Center(
-                  child: Text(
-                    _searching
-                        ? 'No matching memories.'
-                        : 'No memories yet. Add one to get started.',
-                  ),
+              ? EmptyState(
+                  icon: _searching
+                      ? Icons.search_off_rounded
+                      : Icons.psychology_outlined,
+                  title: _searching
+                      ? 'No matching memories.'
+                      : 'No memories yet',
+                  message: _searching
+                      ? 'Try a different phrase or clear the filter.'
+                      : 'No memories yet. Add one to get started.',
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 92),
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 104),
                   itemCount: _memories.length,
-                  itemBuilder: (context, index) {
-                    final memory = _memories[index];
-                    final isPinned = memory['isPinned'] as bool? ?? false;
-                    final validUntil = DateTime.tryParse(
-                      memory['validUntil'] as String? ?? '',
-                    );
-                    final isSuperseded =
-                        validUntil != null &&
-                        !validUntil.isAfter(DateTime.now());
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Chip(
-                                  label: Text(
-                                    memory['kind'] as String? ?? 'fact',
-                                  ),
-                                ),
-                                if (isSuperseded)
-                                  const Chip(label: Text('Superseded')),
-                                if (isPinned)
-                                  const Padding(
-                                    padding: EdgeInsets.only(left: 4),
-                                    child: Icon(Icons.push_pin, size: 17),
-                                  ),
-                                const Spacer(),
-                                IconButton(
-                                  tooltip: isPinned
-                                      ? 'Unpin memory'
-                                      : 'Pin memory',
-                                  onPressed: () => _togglePinned(memory),
-                                  icon: Icon(
-                                    isPinned
-                                        ? Icons.push_pin
-                                        : Icons.push_pin_outlined,
-                                  ),
-                                ),
-                                IconButton(
-                                  tooltip: 'Edit memory',
-                                  onPressed: () => _editMemory(memory),
-                                  icon: const Icon(Icons.edit_outlined),
-                                ),
-                                IconButton(
-                                  tooltip: 'Delete memory',
-                                  onPressed: () => _deleteMemory(memory),
-                                  icon: const Icon(Icons.delete_outline),
-                                ),
-                              ],
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.only(right: 12),
-                              child: Text(memory['content'] as String? ?? ''),
-                            ),
-                            if (memory['sourceType'] == 'conversation')
-                              const Padding(
-                                padding: EdgeInsets.only(top: 6),
-                                child: Text('Learned from a conversation'),
-                              ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                  itemBuilder: (context, index) =>
+                      ContentWidth(child: _memoryCard(_memories[index])),
                 ),
         ),
       ],
     ),
   );
+
+  Widget _memoryCard(Map<String, dynamic> memory) {
+    final isPinned = memory['isPinned'] as bool? ?? false;
+    final validUntil = DateTime.tryParse(memory['validUntil'] as String? ?? '');
+    final isSuperseded =
+        validUntil != null && !validUntil.isAfter(DateTime.now());
+    final kind = memory['kind'] as String? ?? 'fact';
+    final (kindColor, kindIcon) = _kindStyle(kind);
+    return SurfaceCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(16, 10, 6, 14),
+      borderColor: isPinned
+          ? JarvisColors.accent.withValues(alpha: .35)
+          : JarvisColors.outline,
+      color: isSuperseded ? JarvisColors.canvas : JarvisColors.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _KindTag(label: kind, color: kindColor, icon: kindIcon),
+              if (isSuperseded) ...[
+                const SizedBox(width: 6),
+                const StatusPill(
+                  label: 'Superseded',
+                  color: JarvisColors.muted,
+                ),
+              ],
+              const Spacer(),
+              IconButton(
+                tooltip: isPinned ? 'Unpin memory' : 'Pin memory',
+                onPressed: () => _togglePinned(memory),
+                visualDensity: VisualDensity.compact,
+                style: IconButton.styleFrom(
+                  foregroundColor: isPinned
+                      ? JarvisColors.accent
+                      : JarvisColors.muted,
+                ),
+                icon: Icon(
+                  isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                  size: 19,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Edit memory',
+                onPressed: () => _editMemory(memory),
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.edit_outlined, size: 19),
+              ),
+              IconButton(
+                tooltip: 'Delete memory',
+                onPressed: () => _deleteMemory(memory),
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.delete_outline_rounded, size: 19),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Text(
+              memory['content'] as String? ?? '',
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.5,
+                color: isSuperseded ? JarvisColors.inkSoft : JarvisColors.ink,
+                decoration: isSuperseded ? TextDecoration.lineThrough : null,
+                decorationColor: JarvisColors.muted,
+              ),
+            ),
+          ),
+          if (memory['sourceType'] == 'conversation')
+            const Padding(
+              padding: EdgeInsets.only(top: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 14,
+                    color: JarvisColors.violet,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'Learned from a conversation',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: JarvisColors.inkSoft,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  (Color, IconData) _kindStyle(String kind) => switch (kind) {
+    'preference' => (JarvisColors.rose, Icons.favorite_border_rounded),
+    'fact' => (JarvisColors.accent, Icons.lightbulb_outline_rounded),
+    'decision' => (JarvisColors.warning, Icons.gavel_rounded),
+    'project' => (JarvisColors.info, Icons.folder_outlined),
+    'event' => (const Color(0xffe8833a), Icons.event_outlined),
+    'relationship' => (JarvisColors.violet, Icons.people_outline_rounded),
+    'technical' => (const Color(0xff0e9aa7), Icons.code_rounded),
+    'routine' => (JarvisColors.success, Icons.repeat_rounded),
+    _ => (JarvisColors.inkSoft, Icons.notes_rounded),
+  };
 
   Widget _kindFilter({required String label, required String? value}) =>
       Padding(
@@ -467,4 +523,40 @@ class _MemoryScreenState extends State<MemoryScreen> {
           },
         ),
       );
+}
+
+class _KindTag extends StatelessWidget {
+  const _KindTag({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(7, 4, 10, 4),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: .1),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 5),
+        Text(
+          label.isEmpty ? 'Other' : label[0].toUpperCase() + label.substring(1),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color.lerp(color, JarvisColors.ink, .25),
+          ),
+        ),
+      ],
+    ),
+  );
 }

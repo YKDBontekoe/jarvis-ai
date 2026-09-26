@@ -1,6 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import 'theme.dart';
+import 'ui/jarvis_ui.dart';
+
 class DailyBriefingScreen extends StatefulWidget {
   const DailyBriefingScreen({required this.http, super.key});
 
@@ -95,7 +98,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
         final detail = body is Map<String, dynamic>
             ? body['detail'] as String? ??
                   (body['errors'] as Map<String, dynamic>?)?.values.firstOrNull
-                        ?.toString()
+                      ?.toString()
             : null;
         setState(() => _error = detail ?? 'Could not save briefing settings.');
       }
@@ -105,62 +108,132 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Morning briefing')),
-    body: _loading
-        ? const Center(child: CircularProgressIndicator())
-        : ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              const Text(
-                'A daily reminder with what is coming up in Jarvis: reminders due today and active tasks.',
-                style: TextStyle(height: 1.5),
-              ),
-              const SizedBox(height: 18),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Send a daily briefing'),
-                value: _enabled,
-                onChanged: (value) => setState(() => _enabled = value),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Delivery time'),
-                subtitle: Text(_time.format(context)),
-                trailing: const Icon(Icons.schedule),
-                onTap: _chooseTime,
-              ),
-              TextField(
-                controller: _zone,
-                textCapitalization: TextCapitalization.none,
-                autocorrect: false,
-                decoration: const InputDecoration(
-                  labelText: 'Time zone',
-                  hintText: 'Europe/Amsterdam',
-                  helperText: 'Use an IANA time zone identifier.',
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Morning briefing')),
+      body: _loading
+          ? const LoadingState()
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+              children: [
+                ContentWidth(
+                  maxWidth: 560,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(22),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(JarvisRadii.xl),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xfffff1dc), Color(0xffffe4e8)],
+                          ),
+                          border: Border.all(color: const Color(0x1fe8833a)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const IconBadge(
+                              icon: Icons.wb_sunny_rounded,
+                              color: Color(0xffe8833a),
+                              size: 44,
+                            ),
+                            const SizedBox(height: 18),
+                            Text(
+                              _time.format(context),
+                              style: theme.textTheme.displaySmall,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _enabled
+                                  ? 'Every day · ${_zone.text}'
+                                  : 'Briefing is off',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: JarvisColors.inkSoft,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            const Text(
+                              'A daily reminder with what is coming up in Jarvis: reminders due today and active tasks.',
+                              style: TextStyle(
+                                height: 1.5,
+                                color: JarvisColors.inkSoft,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SurfaceCard(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(
+                          children: [
+                            SwitchListTile.adaptive(
+                              title: const Text('Send a daily briefing'),
+                              value: _enabled,
+                              onChanged: (value) =>
+                                  setState(() => _enabled = value),
+                            ),
+                            const Divider(indent: 16, endIndent: 16),
+                            ListTile(
+                              title: const Text('Delivery time'),
+                              subtitle: Text(_time.format(context)),
+                              trailing: const Icon(Icons.schedule_rounded),
+                              onTap: _chooseTime,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _zone,
+                        textCapitalization: TextCapitalization.none,
+                        autocorrect: false,
+                        onChanged: (_) => setState(() {}),
+                        decoration: const InputDecoration(
+                          labelText: 'Time zone',
+                          hintText: 'Europe/Amsterdam',
+                          helperText: 'Use an IANA time zone identifier.',
+                          prefixIcon: Icon(Icons.public_rounded),
+                          fillColor: JarvisColors.surface,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      FilledButton.icon(
+                        onPressed: _saving ? null : _save,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52),
+                        ),
+                        icon: _saving
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.check_rounded),
+                        label: Text(_saving ? 'Saving' : 'Save briefing'),
+                      ),
+                      if (_error != null)
+                        InlineNotice(
+                          message: _error!,
+                          tone: NoticeTone.danger,
+                          margin: const EdgeInsets.only(top: 14),
+                        ),
+                      if (_saved != null)
+                        InlineNotice(
+                          message: _saved!,
+                          tone: NoticeTone.success,
+                          margin: const EdgeInsets.only(top: 14),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: _saving ? null : _save,
-                icon: _saving
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.save_outlined),
-                label: Text(_saving ? 'Saving' : 'Save briefing'),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 14),
-                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
               ],
-              if (_saved != null) ...[
-                const SizedBox(height: 14),
-                Text(_saved!, style: const TextStyle(color: Color(0xff68d6a8))),
-              ],
-            ],
-          ),
-  );
+            ),
+    );
+  }
 }

@@ -1,6 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import 'features/chat/chat_widgets.dart';
+import 'theme.dart';
+import 'ui/jarvis_ui.dart';
+
 class NotificationDetailsScreen extends StatefulWidget {
   const NotificationDetailsScreen({
     required this.http,
@@ -83,15 +87,43 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
       ),
     ),
     body: _loading
-        ? const Center(child: CircularProgressIndicator())
+        ? const LoadingState()
         : _error != null
-        ? Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(_error!, textAlign: TextAlign.center),
-            ),
+        ? EmptyState(
+            icon: Icons.link_off_rounded,
+            title: 'Nothing to show',
+            message: _error,
           )
         : _buildDetails(),
+  );
+
+  IconData get _icon => _isReminder
+      ? Icons.alarm_rounded
+      : _isWatch
+      ? Icons.monitor_heart_outlined
+      : Icons.task_alt_rounded;
+
+  Color get _color => _isReminder
+      ? JarvisColors.rose
+      : _isWatch
+      ? JarvisColors.success
+      : JarvisColors.accent;
+
+  Widget _fact(IconData icon, String text) => Padding(
+    padding: const EdgeInsets.only(top: 12),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: JarvisColors.muted),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(color: JarvisColors.inkSoft, height: 1.4),
+          ),
+        ),
+      ],
+    ),
   );
 
   Widget _buildDetails() {
@@ -111,29 +143,52 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
       _ => '',
     };
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       children: [
-        Text(title, style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Chip(label: Text(status.replaceAll('_', ' '))),
+        ContentWidth(
+          maxWidth: 560,
+          child: SurfaceCard(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IconBadge(icon: _icon, color: _color, size: 52),
+                const SizedBox(height: 18),
+                Text(title, style: Theme.of(context).textTheme.headlineSmall),
+                const SizedBox(height: 12),
+                StatusPill.forStatus(status),
+                if (detail.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  const Divider(),
+                  const SizedBox(height: 18),
+                  _isTask
+                      ? JarvisMarkdown(data: detail)
+                      : Text(
+                          detail,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                ],
+                if (_isWatch && item['lastValue'] != null) ...[
+                  _fact(
+                    Icons.show_chart_rounded,
+                    'Latest value: ${item['lastValue']}',
+                  ),
+                  if ((item['lastCheckedAt'] as String?) != null)
+                    _fact(
+                      Icons.update_rounded,
+                      'Checked ${_date(item['lastCheckedAt'])}',
+                    ),
+                ],
+                if ((_isTask || _isWatch) &&
+                    (item['createdAt'] as String?) != null)
+                  _fact(
+                    Icons.calendar_today_outlined,
+                    'Created ${_date(item['createdAt'])}',
+                  ),
+              ],
+            ),
+          ),
         ),
-        if (detail.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text(detail, style: Theme.of(context).textTheme.bodyLarge),
-        ],
-        if (_isWatch && item['lastValue'] != null) ...[
-          const SizedBox(height: 8),
-          Text('Latest value: ${item['lastValue']}'),
-          if ((item['lastCheckedAt'] as String?) != null)
-            Text('Checked ${_date(item['lastCheckedAt'])}'),
-        ],
-        if ((_isTask || _isWatch) &&
-            (item['createdAt'] as String?) != null) ...[
-          const SizedBox(height: 20),
-          Text('Created ${_date(item['createdAt'])}'),
-        ],
       ],
     );
   }

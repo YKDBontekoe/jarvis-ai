@@ -1,6 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import 'theme.dart';
+import 'ui/jarvis_ui.dart';
+
 typedef ConversationPickerResult = ({
   String? conversationId,
   bool deletedCurrent,
@@ -84,26 +87,17 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   Future<void> _deleteConversation(Map<String, dynamic> conversation) async {
     final id = conversation['id'] as String;
     final title = conversation['title'] as String? ?? 'this conversation';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete conversation?'),
-        content: Text(
+    final confirmed = await showJarvisConfirm(
+      context,
+      title: 'Delete conversation?',
+      message:
           '“$title” and its messages, saved agent state, and memories learned from those messages will be permanently removed.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep conversation'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      cancelLabel: 'Keep conversation',
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: Icons.delete_outline_rounded,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     try {
       await widget.http.delete('/api/v1/conversations/$id');
       if (!mounted) return;
@@ -130,66 +124,108 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         IconButton(
           onPressed: _loading || _creating ? null : _load,
           tooltip: 'Refresh',
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(Icons.refresh_rounded),
         ),
-        IconButton(
-          onPressed: _creating ? null : _createConversation,
-          tooltip: 'New conversation',
-          icon: _creating
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.add_comment_outlined),
-        ),
+        const SizedBox(width: 8),
       ],
     ),
+    floatingActionButton: FloatingActionButton.extended(
+      onPressed: _creating ? null : _createConversation,
+      tooltip: 'New conversation',
+      icon: _creating
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : const Icon(Icons.edit_square, size: 20),
+      label: const Text('New conversation'),
+    ),
     body: _loading
-        ? const Center(child: CircularProgressIndicator())
+        ? const LoadingState()
         : _error != null
-        ? Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_error!),
-                TextButton(onPressed: _load, child: const Text('Retry')),
-              ],
-            ),
-          )
+        ? ErrorState(message: _error!, onRetry: _load)
         : _conversations.isEmpty
-        ? const Center(child: Text('No conversations yet.'))
-        : ListView.separated(
+        ? const EmptyState(
+            icon: Icons.forum_outlined,
+            title: 'No conversations yet.',
+            message: 'Start a new conversation and it will appear here.',
+          )
+        : ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 104),
             itemCount: _conversations.length,
-            separatorBuilder: (context, index) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final conversation = _conversations[index];
               final id = conversation['id'] as String;
-              return ListTile(
-                selected: id == widget.selectedConversationId,
-                leading: const Icon(Icons.forum_outlined),
-                title: Text(
-                  conversation['title'] as String? ?? 'New conversation',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              final selected = id == widget.selectedConversationId;
+              return ContentWidth(
+                child: SurfaceCard(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+                  color: selected
+                      ? JarvisColors.accentSoft
+                      : JarvisColors.surface,
+                  borderColor: selected
+                      ? JarvisColors.accent.withValues(alpha: .3)
+                      : JarvisColors.outline,
+                  onTap: () => Navigator.of(
+                    context,
+                  ).pop((conversationId: id, deletedCurrent: false)),
+                  child: Row(
+                    children: [
+                      IconBadge(
+                        icon: selected
+                            ? Icons.chat_bubble_rounded
+                            : Icons.chat_bubble_outline_rounded,
+                        color: selected
+                            ? JarvisColors.accent
+                            : JarvisColors.inkSoft,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              conversation['title'] as String? ??
+                                  'New conversation',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(
+                                context,
+                              ).textTheme.titleSmall?.copyWith(fontSize: 15),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              _formatDate(conversation['updatedAt']),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (selected)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: Icon(
+                            Icons.check_circle_rounded,
+                            size: 20,
+                            color: JarvisColors.accent,
+                          ),
+                        ),
+                      IconButton(
+                        tooltip: 'Delete conversation',
+                        onPressed: () => _deleteConversation(conversation),
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 20,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                subtitle: Text(_formatDate(conversation['updatedAt'])),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (id == widget.selectedConversationId)
-                      const Icon(Icons.check, size: 19),
-                    IconButton(
-                      tooltip: 'Delete conversation',
-                      onPressed: () => _deleteConversation(conversation),
-                      icon: const Icon(Icons.delete_outline),
-                    ),
-                  ],
-                ),
-                onTap: () => Navigator.of(context).pop((
-                  conversationId: id,
-                  deletedCurrent: false,
-                )),
               );
             },
           ),

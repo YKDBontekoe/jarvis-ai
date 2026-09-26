@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'task_details_screen.dart';
 import 'condition_watches_screen.dart';
 import 'approvals_screen.dart';
+import 'theme.dart';
+import 'ui/jarvis_ui.dart';
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({required this.http, super.key});
@@ -128,24 +130,16 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Future<void> _cancel(Map<String, dynamic> task) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Cancel this task?'),
-        content: Text('“${task['title']}” will stop running.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep task'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Cancel task'),
-          ),
-        ],
-      ),
+    final confirmed = await showJarvisConfirm(
+      context,
+      title: 'Cancel this task?',
+      message: '“${task['title']}” will stop running.',
+      cancelLabel: 'Keep task',
+      confirmLabel: 'Cancel task',
+      destructive: true,
+      icon: Icons.stop_circle_outlined,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     try {
       await widget.http.delete('/api/v1/tasks/${task['id']}');
       await _load();
@@ -187,12 +181,11 @@ class _TasksScreenState extends State<TasksScreen> {
     return MaterialLocalizations.of(context).formatMediumDate(date);
   }
 
-  Color _statusColor(String status) => switch (status) {
-    'running' => const Color(0xff68d6a8),
-    'needs_approval' => const Color(0xffffcb6b),
-    'completed' => const Color(0xff91a9ff),
-    'failed' => const Color(0xffff7185),
-    _ => const Color(0xffa1a2b0),
+  static const _activeStatuses = {
+    'queued',
+    'running',
+    'waiting',
+    'needs_approval',
   };
 
   @override
@@ -203,7 +196,7 @@ class _TasksScreenState extends State<TasksScreen> {
         IconButton(
           tooltip: 'Approvals',
           onPressed: _openApprovals,
-          icon: const Icon(Icons.gpp_maybe_outlined),
+          icon: const Icon(Icons.shield_outlined),
         ),
         IconButton(
           tooltip: 'Condition watches',
@@ -212,13 +205,14 @@ class _TasksScreenState extends State<TasksScreen> {
               builder: (_) => ConditionWatchesScreen(http: widget.http),
             ),
           ),
-          icon: const Icon(Icons.visibility_outlined),
+          icon: const Icon(Icons.monitor_heart_outlined),
         ),
         IconButton(
           tooltip: 'Refresh tasks',
           onPressed: _loading ? null : _load,
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(Icons.refresh_rounded),
         ),
+        const SizedBox(width: 8),
       ],
     ),
     floatingActionButton: FloatingActionButton.extended(
@@ -227,68 +221,173 @@ class _TasksScreenState extends State<TasksScreen> {
           ? const SizedBox(
               width: 18,
               height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
             )
-          : const Icon(Icons.add),
+          : const Icon(Icons.add_rounded),
       label: const Text('New task'),
     ),
     body: _loading && _tasks.isEmpty
-        ? const Center(child: CircularProgressIndicator())
+        ? const LoadingState()
         : _error != null && _tasks.isEmpty
-        ? Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_error!),
-                const SizedBox(height: 12),
-                OutlinedButton(onPressed: _load, child: const Text('Retry')),
-              ],
-            ),
-          )
+        ? ErrorState(message: _error!, onRetry: _load)
         : _tasks.isEmpty
-        ? const Center(
-            child: Text('No tasks yet. Give Jarvis something to work on.'),
+        ? const EmptyState(
+            icon: Icons.task_alt_rounded,
+            title: 'No tasks yet',
+            message: 'No tasks yet. Give Jarvis something to work on.',
           )
         : RefreshIndicator(
             onRefresh: _load,
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
-              itemCount: _tasks.length,
-              itemBuilder: (context, index) {
-                final task = _tasks[index];
-                final status = task['status'] as String? ?? 'queued';
-                final canCancel = [
-                  'queued',
-                  'running',
-                  'needs_approval',
-                ].contains(status);
-                final summary = task['summary'] as String?;
-                return Card(
-                  child: ListTile(
-                    onTap: () => _openTask(task),
-                    isThreeLine: summary?.isNotEmpty == true,
-                    leading: Icon(Icons.task_alt, color: _statusColor(status)),
-                    title: Text(task['title'] as String? ?? 'Task'),
-                    subtitle: Text(
-                      [
-                        status.replaceAll('_', ' '),
-                        _date(task['createdAt']),
-                        if (summary?.isNotEmpty == true) summary!,
-                      ].join(' · '),
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: canCancel
-                        ? IconButton(
-                            tooltip: 'Cancel task',
-                            onPressed: () => _cancel(task),
-                            icon: const Icon(Icons.cancel_outlined),
-                          )
-                        : null,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 104),
+              children: [
+                ContentWidth(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _summary(),
+                      const SizedBox(height: 18),
+                      for (final task in _tasks) _taskCard(task),
+                    ],
                   ),
-                );
-              },
+                ),
+              ],
             ),
           ),
   );
+
+  Widget _summary() {
+    int count(bool Function(String status) test) => _tasks
+        .where((task) => test(task['status'] as String? ?? 'queued'))
+        .length;
+    final stats = [
+      (
+        'Active',
+        count(_activeStatuses.contains),
+        JarvisColors.info,
+        Icons.bolt_rounded,
+      ),
+      (
+        'Needs you',
+        count((status) => status == 'needs_approval'),
+        JarvisColors.warning,
+        Icons.shield_outlined,
+      ),
+      (
+        'Done',
+        count((status) => status == 'completed'),
+        JarvisColors.success,
+        Icons.check_rounded,
+      ),
+    ];
+    return Row(
+      children: [
+        for (final (index, (label, value, color, icon)) in stats.indexed) ...[
+          if (index > 0) const SizedBox(width: 10),
+          Expanded(
+            child: SurfaceCard(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              radius: JarvisRadii.md,
+              child: Row(
+                children: [
+                  IconBadge(icon: icon, color: color, size: 30),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$value',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _taskCard(Map<String, dynamic> task) {
+    final status = task['status'] as String? ?? 'queued';
+    final style = statusStyle(status);
+    final canCancel = ['queued', 'running', 'needs_approval'].contains(status);
+    final summary = task['summary'] as String?;
+    final date = _date(task['createdAt']);
+    return SurfaceCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(16, 14, 6, 14),
+      onTap: () => _openTask(task),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IconBadge(icon: style.icon, color: style.color),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  task['title'] as String? ?? 'Task',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontSize: 15),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    StatusPill(label: style.label, color: style.color),
+                    if (date.isNotEmpty)
+                      Text(date, style: Theme.of(context).textTheme.bodySmall),
+                  ],
+                ),
+                if (summary?.isNotEmpty == true) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    summary!,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: JarvisColors.inkSoft,
+                      fontSize: 13.5,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (canCancel)
+            IconButton(
+              tooltip: 'Cancel task',
+              onPressed: () => _cancel(task),
+              icon: const Icon(Icons.close_rounded, size: 20),
+            )
+          else
+            const Padding(
+              padding: EdgeInsets.all(10),
+              child: Icon(
+                Icons.chevron_right_rounded,
+                color: JarvisColors.muted,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

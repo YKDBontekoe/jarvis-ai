@@ -1,6 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import 'theme.dart';
+import 'ui/jarvis_ui.dart';
+
 class AuditScreen extends StatefulWidget {
   const AuditScreen({required this.http, super.key});
 
@@ -37,7 +40,9 @@ class _AuditScreenState extends State<AuditScreen> {
         );
       }
     } on DioException {
-      if (mounted) setState(() => _error = 'Jarvis could not load the audit log.');
+      if (mounted) {
+        setState(() => _error = 'Jarvis could not load the audit log.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -51,62 +56,195 @@ class _AuditScreenState extends State<AuditScreen> {
         IconButton(
           tooltip: 'Refresh audit log',
           onPressed: _loading ? null : _load,
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(Icons.refresh_rounded),
         ),
+        const SizedBox(width: 8),
       ],
     ),
     body: _loading && _events.isEmpty
-        ? const Center(child: CircularProgressIndicator())
+        ? const LoadingState()
         : _error != null && _events.isEmpty
-        ? Center(child: Text(_error!))
+        ? ErrorState(message: _error!, onRetry: _load)
         : _events.isEmpty
-        ? const Center(child: Text('No audited actions yet.'))
+        ? const EmptyState(
+            icon: Icons.fact_check_outlined,
+            title: 'No audited actions yet.',
+            message:
+                'Approvals, tasks, reminders, files, and memory changes are recorded here.',
+          )
         : RefreshIndicator(
             onRefresh: _load,
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
               itemCount: _events.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final event = _events[index];
-                final success = event['success'] as bool? ?? false;
-                final timestamp = DateTime.tryParse(
-                  event['timestamp'] as String? ?? '',
-                )?.toLocal();
-                final metadata = event['metadataJson'] as String?;
-                return Card(
-                  color: const Color(0xff1a1c25),
-                  child: ListTile(
-                    leading: Icon(
-                      success ? Icons.verified_outlined : Icons.error_outline,
-                      color: success
-                          ? const Color(0xff68d6a8)
-                          : const Color(0xfff08b8b),
-                    ),
-                    title: Text(
-                      (event['action'] as String? ?? 'action').replaceAll('.', ' '),
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 5),
-                      child: Text(
-                        [
-                          event['tool'] as String? ?? 'Jarvis',
-                          event['riskClass'] as String? ?? 'unknown risk',
-                          if (timestamp != null) _formatTime(timestamp),
-                          if (metadata != null && metadata != '{}') metadata,
-                        ].join(' · '),
-                      ),
-                    ),
-                    isThreeLine: metadata != null && metadata != '{}',
-                  ),
-                );
-              },
+              itemBuilder: (context, index) => ContentWidth(
+                child: _AuditRow(
+                  event: _events[index],
+                  first: index == 0,
+                  last: index == _events.length - 1,
+                ),
+              ),
             ),
           ),
   );
+}
 
-  String _formatTime(DateTime value) =>
+class _AuditRow extends StatelessWidget {
+  const _AuditRow({
+    required this.event,
+    required this.first,
+    required this.last,
+  });
+
+  final Map<String, dynamic> event;
+  final bool first;
+  final bool last;
+
+  @override
+  Widget build(BuildContext context) {
+    final success = event['success'] as bool? ?? false;
+    final timestamp = DateTime.tryParse(
+      event['timestamp'] as String? ?? '',
+    )?.toLocal();
+    final metadata = event['metadataJson'] as String?;
+    final risk = event['riskClass'] as String? ?? 'unknown risk';
+    final color = success ? JarvisColors.success : JarvisColors.danger;
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 28,
+            child: Column(
+              children: [
+                Container(
+                  width: 2,
+                  height: 18,
+                  color: first ? Colors.transparent : JarvisColors.outline,
+                ),
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: JarvisColors.surface,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: color, width: 3),
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    color: last ? Colors.transparent : JarvisColors.outline,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SurfaceCard(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              radius: JarvisRadii.md,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        success
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.error_outline_rounded,
+                        size: 17,
+                        color: color,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          (event['action'] as String? ?? 'action').replaceAll(
+                            '.',
+                            ' ',
+                          ),
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                      ),
+                      if (timestamp != null)
+                        Text(
+                          _formatTime(timestamp),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: JarvisColors.muted),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      _Tag(event['tool'] as String? ?? 'Jarvis'),
+                      StatusPill(label: risk, color: _riskColor(risk)),
+                    ],
+                  ),
+                  if (metadata != null && metadata != '{}') ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      metadata,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: JarvisColors.inkSoft,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Color _riskColor(String risk) {
+    final value = risk.toLowerCase();
+    if (value.contains('high') || value.contains('destructive')) {
+      return JarvisColors.danger;
+    }
+    if (value.contains('medium') || value.contains('write')) {
+      return JarvisColors.warning;
+    }
+    if (value.contains('low') || value.contains('read')) {
+      return JarvisColors.success;
+    }
+    return JarvisColors.inkSoft;
+  }
+
+  static String _formatTime(DateTime value) =>
       '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')} '
       '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+}
+
+class _Tag extends StatelessWidget {
+  const _Tag(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: JarvisColors.surfaceMuted,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Text(
+      label,
+      style: const TextStyle(
+        fontFamily: 'monospace',
+        fontSize: 12,
+        color: JarvisColors.inkSoft,
+      ),
+    ),
+  );
 }

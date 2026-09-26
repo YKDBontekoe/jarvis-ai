@@ -4,6 +4,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../theme.dart';
+import '../../ui/jarvis_ui.dart';
 import 'chat_entries.dart';
 import 'tool_catalog.dart';
 
@@ -34,37 +35,31 @@ class _MessageBubbleState extends State<MessageBubble> {
     if (message.isUser) return _userBubble(context, message);
     if (message.pending && message.content.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.only(bottom: 16, left: 2),
+        padding: EdgeInsets.only(bottom: 18),
         child: Align(alignment: Alignment.centerLeft, child: TypingIndicator()),
       );
     }
     return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.only(bottom: 22),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Padding(
-            padding: EdgeInsets.only(top: 2, right: 12),
-            child: JarvisAvatar(size: 26),
+            padding: EdgeInsets.only(top: 1, right: 12),
+            child: JarvisAvatar(size: 28),
           ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                JarvisMarkdown(data: message.content),
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: JarvisMarkdown(data: message.content),
+                ),
                 if (!message.pending)
                   Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: IconButton(
-                      tooltip: _copied ? 'Copied' : 'Copy reply',
-                      visualDensity: VisualDensity.compact,
-                      iconSize: 16,
-                      color: JarvisColors.muted,
-                      onPressed: _copy,
-                      icon: Icon(
-                        _copied ? Icons.check_rounded : Icons.copy_rounded,
-                      ),
-                    ),
+                    padding: const EdgeInsets.only(top: 4),
+                    child: _CopyButton(copied: _copied, onPressed: _copy),
                   ),
               ],
             ),
@@ -77,40 +72,84 @@ class _MessageBubbleState extends State<MessageBubble> {
   Widget _userBubble(BuildContext context, MessageEntry message) => Align(
     alignment: Alignment.centerRight,
     child: Padding(
-      padding: const EdgeInsets.only(bottom: 16, left: 48),
+      padding: const EdgeInsets.only(bottom: 18, left: 56),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             decoration: BoxDecoration(
-              color: JarvisColors.userBubble,
+              gradient: message.failed ? null : JarvisColors.userBubbleGradient,
+              color: message.failed ? JarvisColors.dangerSoft : null,
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
-                bottomLeft: Radius.circular(20),
+                topLeft: Radius.circular(22),
+                topRight: Radius.circular(22),
+                bottomLeft: Radius.circular(22),
                 bottomRight: Radius.circular(6),
               ),
               border: message.failed
-                  ? Border.all(color: JarvisColors.danger.withValues(alpha: .6))
+                  ? Border.all(
+                      color: JarvisColors.danger.withValues(alpha: .35),
+                    )
                   : null,
+              boxShadow: message.failed
+                  ? null
+                  : JarvisShadows.glow(JarvisColors.accent, strength: .22),
             ),
             child: SelectableText(
               message.content,
-              style: const TextStyle(fontSize: 15.5, height: 1.45),
+              style: TextStyle(
+                fontSize: 15.5,
+                height: 1.45,
+                color: message.failed ? JarvisColors.ink : Colors.white,
+              ),
             ),
           ),
           if (message.failed)
-            TextButton.icon(
-              onPressed: widget.onRetry,
-              style: TextButton.styleFrom(
-                foregroundColor: JarvisColors.danger,
-                visualDensity: VisualDensity.compact,
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: TextButton.icon(
+                onPressed: widget.onRetry,
+                style: TextButton.styleFrom(
+                  foregroundColor: JarvisColors.danger,
+                  visualDensity: VisualDensity.compact,
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Not sent — tap to retry'),
               ),
-              icon: const Icon(Icons.refresh_rounded, size: 16),
-              label: const Text('Not sent — tap to retry'),
             ),
         ],
+      ),
+    ),
+  );
+}
+
+class _CopyButton extends StatelessWidget {
+  const _CopyButton({required this.copied, required this.onPressed});
+
+  final bool copied;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: copied ? 'Copied' : 'Copy reply',
+    visualDensity: VisualDensity.compact,
+    iconSize: 16,
+    style: IconButton.styleFrom(
+      foregroundColor: copied ? JarvisColors.success : JarvisColors.muted,
+      minimumSize: const Size(32, 32),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+    ),
+    onPressed: onPressed,
+    icon: AnimatedSwitcher(
+      duration: const Duration(milliseconds: 180),
+      child: Icon(
+        copied ? Icons.check_rounded : Icons.content_copy_rounded,
+        key: ValueKey(copied),
       ),
     ),
   );
@@ -124,54 +163,77 @@ class JarvisMarkdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    const body = TextStyle(fontSize: 15.5, height: 1.55);
+    const body = TextStyle(
+      fontSize: 15.5,
+      height: 1.6,
+      color: JarvisColors.ink,
+      letterSpacing: -.1,
+    );
     final sheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
       p: body,
-      listBullet: body,
+      listBullet: body.copyWith(color: JarvisColors.accent),
       h1: const TextStyle(
         fontSize: 22,
         fontWeight: FontWeight.w700,
         height: 1.3,
+        letterSpacing: -.5,
+        color: JarvisColors.ink,
       ),
       h2: const TextStyle(
         fontSize: 19,
         fontWeight: FontWeight.w700,
         height: 1.3,
+        letterSpacing: -.4,
+        color: JarvisColors.ink,
       ),
       h3: const TextStyle(
         fontSize: 17,
         fontWeight: FontWeight.w600,
         height: 1.3,
+        color: JarvisColors.ink,
       ),
       strong: const TextStyle(fontWeight: FontWeight.w700),
       a: const TextStyle(
         color: JarvisColors.accent,
+        fontWeight: FontWeight.w500,
         decoration: TextDecoration.underline,
-        decorationColor: JarvisColors.accent,
+        decorationColor: Color(0x665b50f0),
       ),
-      code: TextStyle(
+      code: const TextStyle(
         fontFamily: 'monospace',
         fontSize: 13.5,
-        backgroundColor: JarvisColors.surfaceRaised,
-        color: theme.colorScheme.onSurface,
+        backgroundColor: JarvisColors.accentSoft,
+        color: JarvisColors.accentDeep,
       ),
-      codeblockPadding: const EdgeInsets.all(14),
+      codeblockPadding: const EdgeInsets.all(16),
       codeblockDecoration: BoxDecoration(
-        color: const Color(0xff12131b),
-        borderRadius: BorderRadius.circular(12),
+        color: const Color(0xfffafbfd),
+        borderRadius: BorderRadius.circular(JarvisRadii.md),
         border: Border.all(color: JarvisColors.outline),
       ),
-      blockquote: const TextStyle(color: JarvisColors.muted, height: 1.5),
-      blockquotePadding: const EdgeInsets.fromLTRB(14, 6, 10, 6),
-      blockquoteDecoration: const BoxDecoration(
-        border: Border(left: BorderSide(color: JarvisColors.accent, width: 3)),
+      blockquote: const TextStyle(color: JarvisColors.inkSoft, height: 1.55),
+      blockquotePadding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
+      blockquoteDecoration: BoxDecoration(
+        color: JarvisColors.accentSoft.withValues(alpha: .6),
+        borderRadius: BorderRadius.circular(8),
+        border: const Border(
+          left: BorderSide(color: JarvisColors.accent, width: 3),
+        ),
       ),
-      tableHead: const TextStyle(fontWeight: FontWeight.w600),
-      tableBody: const TextStyle(fontSize: 14.5),
-      tableBorder: TableBorder.all(color: JarvisColors.outline),
+      tableHead: const TextStyle(
+        fontWeight: FontWeight.w600,
+        color: JarvisColors.ink,
+      ),
+      tableBody: const TextStyle(fontSize: 14.5, color: JarvisColors.ink),
+      tableHeadAlign: TextAlign.left,
+      tableBorder: TableBorder.all(
+        color: JarvisColors.outline,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      tableCellsDecoration: const BoxDecoration(color: JarvisColors.surface),
       tableCellsPadding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 7,
+        horizontal: 12,
+        vertical: 8,
       ),
       horizontalRuleDecoration: const BoxDecoration(
         border: Border(top: BorderSide(color: JarvisColors.outline)),
@@ -198,10 +260,10 @@ class ToolRunView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(left: 38, bottom: 14),
+    padding: const EdgeInsets.only(left: 40, bottom: 14),
     child: Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 6,
+      runSpacing: 6,
       children: [for (final step in run.steps) _ToolChip(step: step)],
     ),
   );
@@ -222,19 +284,34 @@ class _ToolChip extends StatelessWidget {
     };
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.fromLTRB(8, 5, 10, 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: .08),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: .28)),
+        color: JarvisColors.surface,
+        borderRadius: BorderRadius.circular(40),
+        border: Border.all(color: color.withValues(alpha: .25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(description.icon, size: 15, color: color),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(fontSize: 12.5)),
-          const SizedBox(width: 6),
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: .12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(description.icon, size: 12, color: color),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              color: JarvisColors.inkSoft,
+            ),
+          ),
+          const SizedBox(width: 7),
           switch (step.status) {
             ToolStepStatus.running => SizedBox.square(
               dimension: 11,
@@ -246,7 +323,7 @@ class _ToolChip extends StatelessWidget {
               color: color,
             ),
             ToolStepStatus.failed => Icon(
-              Icons.error_outline_rounded,
+              Icons.close_rounded,
               size: 14,
               color: color,
             ),
@@ -282,139 +359,179 @@ class ApprovalCard extends StatelessWidget {
       ApprovalStatus.failed => JarvisColors.danger,
       _ => JarvisColors.warning,
     };
+    final submitting = approval.status == ApprovalStatus.submitting;
     return Padding(
-      padding: const EdgeInsets.only(left: 38, bottom: 16),
+      padding: const EdgeInsets.only(left: 40, bottom: 18),
       child: Container(
         decoration: BoxDecoration(
           color: JarvisColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: accent.withValues(alpha: .45)),
+          borderRadius: BorderRadius.circular(JarvisRadii.lg),
+          border: Border.all(color: accent.withValues(alpha: .35)),
+          boxShadow: decided ? null : JarvisShadows.soft,
         ),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  decided
-                      ? (approval.status == ApprovalStatus.approved
-                            ? Icons.verified_user_outlined
-                            : Icons.block_rounded)
-                      : Icons.gpp_maybe_outlined,
-                  color: accent,
-                  size: 20,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(switch (approval.status) {
-                    ApprovalStatus.approved => 'Approved',
-                    ApprovalStatus.denied => 'Declined',
-                    _ =>
-                      approval.retry
-                          ? 'Approved, but not finished'
-                          : 'Jarvis needs your approval',
-                  }, style: const TextStyle(fontWeight: FontWeight.w600)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(description.icon, size: 16, color: JarvisColors.muted),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    description.active,
-                    style: const TextStyle(color: JarvisColors.muted),
-                  ),
-                ),
-              ],
-            ),
-            if (arguments.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xff12131b),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final entry in arguments.take(6))
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(
-                                text: '${humanizeToolName(entry.key)}  ',
-                                style: const TextStyle(
-                                  color: JarvisColors.muted,
-                                  fontSize: 12.5,
-                                ),
-                              ),
-                              TextSpan(
-                                text: '${entry.value}',
-                                style: const TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 12.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-            if (approval.error case final error?) ...[
-              const SizedBox(height: 10),
-              Text(error, style: const TextStyle(color: JarvisColors.danger)),
-            ],
-            if (!decided) ...[
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              color: accent.withValues(alpha: .08),
+              child: Row(
                 children: [
-                  if (!approval.retry)
-                    TextButton(
-                      onPressed: approval.status == ApprovalStatus.submitting
-                          ? null
-                          : () => onDecide(false),
-                      child: const Text('Decline'),
-                    ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: approval.status == ApprovalStatus.submitting
-                        ? null
-                        : () => onDecide(approval.decision ?? true),
-                    icon: approval.status == ApprovalStatus.submitting
-                        ? const SizedBox.square(
-                            dimension: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(
-                            approval.retry ||
-                                    approval.status == ApprovalStatus.failed
-                                ? Icons.refresh_rounded
-                                : Icons.check_rounded,
-                            size: 18,
-                          ),
-                    label: Text(
-                      approval.retry || approval.status == ApprovalStatus.failed
-                          ? 'Retry'
-                          : 'Approve',
+                  Icon(
+                    decided
+                        ? (approval.status == ApprovalStatus.approved
+                              ? Icons.verified_user_rounded
+                              : Icons.block_rounded)
+                        : Icons.shield_outlined,
+                    color: accent,
+                    size: 19,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      switch (approval.status) {
+                        ApprovalStatus.approved => 'Approved',
+                        ApprovalStatus.denied => 'Declined',
+                        _ =>
+                          approval.retry
+                              ? 'Approved, but not finished'
+                              : 'Jarvis needs your approval',
+                      },
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14.5,
+                        color: JarvisColors.ink,
+                      ),
                     ),
                   ),
                 ],
               ),
-            ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      IconBadge(
+                        icon: description.icon,
+                        size: 30,
+                        color: JarvisColors.inkSoft,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          description.active,
+                          style: const TextStyle(
+                            color: JarvisColors.ink,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (arguments.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: JarvisColors.canvas,
+                        borderRadius: BorderRadius.circular(JarvisRadii.sm),
+                        border: Border.all(color: JarvisColors.outline),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final entry in arguments.take(6))
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 3),
+                              child: Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: '${humanizeToolName(entry.key)}  ',
+                                      style: const TextStyle(
+                                        color: JarvisColors.muted,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: '${entry.value}',
+                                      style: const TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 12.5,
+                                        color: JarvisColors.ink,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (approval.error case final error?) ...[
+                    const SizedBox(height: 12),
+                    InlineNotice(message: error, tone: NoticeTone.danger),
+                  ],
+                  if (!decided) ...[
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (!approval.retry)
+                          OutlinedButton(
+                            onPressed: submitting
+                                ? null
+                                : () => onDecide(false),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 42),
+                            ),
+                            child: const Text('Decline'),
+                          ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          onPressed: submitting
+                              ? null
+                              : () => onDecide(approval.decision ?? true),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 42),
+                          ),
+                          icon: submitting
+                              ? const SizedBox.square(
+                                  dimension: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Icon(
+                                  approval.retry ||
+                                          approval.status ==
+                                              ApprovalStatus.failed
+                                      ? Icons.refresh_rounded
+                                      : Icons.check_rounded,
+                                  size: 18,
+                                ),
+                          label: Text(
+                            approval.retry ||
+                                    approval.status == ApprovalStatus.failed
+                                ? 'Retry'
+                                : 'Approve',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -448,26 +565,41 @@ class _TypingIndicatorState extends State<TypingIndicator>
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const JarvisAvatar(size: 26),
+        const JarvisAvatar(size: 28),
         const SizedBox(width: 12),
-        AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) => Row(
-            children: [
-              for (var i = 0; i < 3; i++)
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2.5),
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: JarvisColors.accent.withValues(
-                      alpha:
-                          .25 + .75 * _pulse((_controller.value + i * .18) % 1),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: JarvisColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: JarvisColors.outline),
+          ),
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) => Row(
+              children: [
+                for (var i = 0; i < 3; i++)
+                  Transform.translate(
+                    offset: Offset(
+                      0,
+                      -3 * _pulse((_controller.value + i * .18) % 1),
+                    ),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color.lerp(
+                          JarvisColors.outlineStrong,
+                          JarvisColors.accent,
+                          _pulse((_controller.value + i * .18) % 1),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
@@ -483,23 +615,7 @@ class JarvisAvatar extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: size,
-    height: size,
-    decoration: const BoxDecoration(
-      shape: BoxShape.circle,
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xffd6ceff), Color(0xff8f7ff0), Color(0xff5a4fa0)],
-      ),
-    ),
-    child: Icon(
-      Icons.blur_on_rounded,
-      size: size * .66,
-      color: const Color(0xff1b1830),
-    ),
-  );
+  Widget build(BuildContext context) => JarvisOrb(size: size, glow: false);
 }
 
 class ChatComposer extends StatefulWidget {
@@ -510,7 +626,7 @@ class ChatComposer extends StatefulWidget {
     required this.sending,
     required this.voiceActive,
     required this.voiceStarting,
-    this.hint = 'Message Jarvis',
+    this.hint = 'Ask Jarvis anything',
     super.key,
   });
 
@@ -527,7 +643,8 @@ class ChatComposer extends StatefulWidget {
 }
 
 class _ChatComposerState extends State<ChatComposer> {
-  late final FocusNode _focus = FocusNode(onKeyEvent: _onKey);
+  late final FocusNode _focus = FocusNode(onKeyEvent: _onKey)
+    ..addListener(_changed);
 
   @override
   void initState() {
@@ -571,77 +688,105 @@ class _ChatComposerState extends State<ChatComposer> {
   }
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
-    decoration: BoxDecoration(
-      color: JarvisColors.surface,
-      borderRadius: BorderRadius.circular(28),
-      border: Border.all(color: JarvisColors.outline),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: .25),
-          blurRadius: 24,
-          offset: const Offset(0, 8),
+  Widget build(BuildContext context) {
+    final focused = _focus.hasFocus;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: JarvisColors.surface,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: focused
+              ? JarvisColors.accent.withValues(alpha: .45)
+              : JarvisColors.outline,
+          width: focused ? 1.5 : 1,
         ),
-      ],
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Expanded(
-          child: TextField(
-            controller: widget.controller,
-            focusNode: _focus,
-            enabled: _inputEnabled,
-            minLines: 1,
-            maxLines: 6,
-            textInputAction: TextInputAction.newline,
-            keyboardType: TextInputType.multiline,
-            style: const TextStyle(fontSize: 15.5),
-            decoration: InputDecoration(
-              hintText: widget.voiceActive ? 'Listening…' : widget.hint,
-              fillColor: Colors.transparent,
-              contentPadding: const EdgeInsets.fromLTRB(16, 13, 8, 13),
+        boxShadow: JarvisShadows.floating,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: widget.controller,
+              focusNode: _focus,
+              enabled: _inputEnabled,
+              minLines: 1,
+              maxLines: 6,
+              textInputAction: TextInputAction.newline,
+              keyboardType: TextInputType.multiline,
+              style: const TextStyle(fontSize: 15.5, color: JarvisColors.ink),
+              decoration: InputDecoration(
+                hintText: widget.voiceActive ? 'Listening…' : widget.hint,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.fromLTRB(16, 13, 8, 13),
+              ),
             ),
           ),
-        ),
-        IconButton(
-          tooltip: widget.voiceActive ? 'Stop voice' : 'Talk to Jarvis',
-          onPressed: widget.voiceStarting || widget.sending
-              ? null
-              : widget.onVoice,
-          color: widget.voiceActive ? JarvisColors.danger : JarvisColors.muted,
-          icon: widget.voiceStarting
-              ? const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Icon(
-                  widget.voiceActive
-                      ? Icons.stop_rounded
-                      : Icons.mic_none_rounded,
-                ),
-          style: IconButton.styleFrom(minimumSize: const Size(46, 46)),
-        ),
-        const SizedBox(width: 2),
-        AnimatedScale(
-          duration: const Duration(milliseconds: 150),
-          scale: _canSend || widget.sending ? 1 : .92,
-          child: IconButton.filled(
-            tooltip: 'Send',
-            onPressed: _canSend ? widget.onSend : null,
-            icon: widget.sending
+          IconButton(
+            tooltip: widget.voiceActive ? 'Stop voice' : 'Talk to Jarvis',
+            onPressed: widget.voiceStarting || widget.sending
+                ? null
+                : widget.onVoice,
+            icon: widget.voiceStarting
                 ? const SizedBox.square(
-                    dimension: 18,
+                    dimension: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.arrow_upward_rounded),
-            style: IconButton.styleFrom(minimumSize: const Size(46, 46)),
+                : Icon(
+                    widget.voiceActive
+                        ? Icons.stop_rounded
+                        : Icons.mic_none_rounded,
+                  ),
+            style: IconButton.styleFrom(
+              minimumSize: const Size(44, 44),
+              foregroundColor: widget.voiceActive
+                  ? JarvisColors.danger
+                  : JarvisColors.inkSoft,
+              backgroundColor: widget.voiceActive
+                  ? JarvisColors.dangerSoft
+                  : Colors.transparent,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(width: 4),
+          AnimatedScale(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutBack,
+            scale: _canSend || widget.sending ? 1 : .9,
+            child: IconButton.filled(
+              tooltip: 'Send',
+              onPressed: _canSend ? widget.onSend : null,
+              icon: widget.sending
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.arrow_upward_rounded),
+              style: IconButton.styleFrom(
+                minimumSize: const Size(44, 44),
+                backgroundColor: JarvisColors.ink,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: widget.sending
+                    ? JarvisColors.accent
+                    : JarvisColors.surfaceRaised,
+                disabledForegroundColor: widget.sending
+                    ? Colors.white
+                    : JarvisColors.muted,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class SuggestionChips extends StatelessWidget {
@@ -652,25 +797,91 @@ class SuggestionChips extends StatelessWidget {
   static const suggestions = [
     (Icons.alarm_add_rounded, 'Remind me to stretch in 20 minutes'),
     (Icons.psychology_outlined, 'What do you know about me?'),
-    (Icons.alarm_rounded, 'What reminders do I have?'),
+    (Icons.event_note_rounded, 'What reminders do I have?'),
     (
       Icons.travel_explore_rounded,
       'Research the best espresso grinders in the background',
     ),
   ];
 
+  static const _tints = [
+    JarvisColors.accent,
+    JarvisColors.rose,
+    JarvisColors.warning,
+    JarvisColors.sky,
+  ];
+
   @override
-  Widget build(BuildContext context) => Wrap(
-    alignment: WrapAlignment.center,
-    spacing: 8,
-    runSpacing: 8,
-    children: [
-      for (final (icon, text) in suggestions)
-        ActionChip(
-          avatar: Icon(icon, size: 16, color: JarvisColors.accent),
-          label: Text(text),
-          onPressed: onSelected == null ? null : () => onSelected!(text),
-        ),
-    ],
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final columns = constraints.maxWidth >= 440 ? 2 : 1;
+      const gap = 10.0;
+      final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+      return Wrap(
+        spacing: gap,
+        runSpacing: gap,
+        children: [
+          for (final (index, (icon, text)) in suggestions.indexed)
+            SizedBox(
+              width: width,
+              child: _SuggestionCard(
+                icon: icon,
+                text: text,
+                tint: _tints[index % _tints.length],
+                onTap: onSelected == null ? null : () => onSelected!(text),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+}
+
+class _SuggestionCard extends StatelessWidget {
+  const _SuggestionCard({
+    required this.icon,
+    required this.text,
+    required this.tint,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String text;
+  final Color tint;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    enabled: onTap != null,
+    child: SurfaceCard(
+      onTap: onTap,
+      radius: JarvisRadii.md,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      child: Row(
+        children: [
+          IconBadge(icon: icon, color: tint, size: 34),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13.5,
+                height: 1.35,
+                fontWeight: FontWeight.w500,
+                color: JarvisColors.ink,
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.north_east_rounded,
+            size: 16,
+            color: JarvisColors.muted,
+          ),
+        ],
+      ),
+    ),
   );
 }

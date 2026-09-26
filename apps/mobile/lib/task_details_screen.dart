@@ -1,6 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'approvals_screen.dart';
+import 'features/chat/chat_widgets.dart';
+import 'theme.dart';
+import 'ui/jarvis_ui.dart';
 
 class TaskDetailsScreen extends StatefulWidget {
   const TaskDetailsScreen({
@@ -83,82 +86,141 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(_task?['title'] as String? ?? 'Task'),
+      title: Text(
+        _task?['title'] as String? ?? 'Task',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       actions: [
         IconButton(
           tooltip: 'Refresh task',
           onPressed: _loading ? null : _load,
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(Icons.refresh_rounded),
         ),
+        const SizedBox(width: 8),
       ],
     ),
     body: _loading && _task == null
-        ? const Center(child: CircularProgressIndicator())
+        ? const LoadingState()
         : _error != null && _task == null
-        ? Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_error!, textAlign: TextAlign.center),
-                const SizedBox(height: 12),
-                OutlinedButton(onPressed: _load, child: const Text('Retry')),
-              ],
-            ),
-          )
+        ? ErrorState(message: _error!, onRetry: _load)
         : _buildDetails(),
   );
 
   Widget _buildDetails() {
     final task = _task!;
     final status = task['status'] as String? ?? 'unknown';
+    final style = statusStyle(status);
     final conversationId = task['conversationId'] as String?;
     final summary = task['summary'] as String?;
+    final theme = Theme.of(context);
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 32),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
-          Wrap(
-            spacing: 10,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Chip(label: Text(status.replaceAll('_', ' '))),
-              Text(_date(task['createdAt'])),
-            ],
-          ),
-          if (status == 'needs_approval' && conversationId != null) ...[
-            const SizedBox(height: 12),
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.gpp_maybe_outlined),
-                title: const Text('Jarvis needs your approval'),
-                subtitle: const Text(
-                  'Review the actions before this task continues.',
+          ContentWidth(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SurfaceCard(
+                  child: Row(
+                    children: [
+                      IconBadge(icon: style.icon, color: style.color, size: 48),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              task['title'] as String? ?? 'Task',
+                              style: theme.textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                StatusPill(
+                                  label: style.label,
+                                  color: style.color,
+                                ),
+                                Text(
+                                  _date(task['createdAt']),
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _openApprovals(conversationId),
-              ),
+                if (status == 'needs_approval' && conversationId != null)
+                  SurfaceCard(
+                    margin: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+                    color: JarvisColors.warningSoft,
+                    borderColor: JarvisColors.warning.withValues(alpha: .25),
+                    onTap: () => _openApprovals(conversationId),
+                    child: Row(
+                      children: [
+                        const IconBadge(
+                          icon: Icons.shield_outlined,
+                          color: JarvisColors.warning,
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Jarvis needs your approval',
+                                style: theme.textTheme.titleSmall,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Review the actions before this task continues.',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: JarvisColors.inkSoft,
+                        ),
+                      ],
+                    ),
+                  ),
+                if (_error != null)
+                  InlineNotice(
+                    message: _error!,
+                    tone: NoticeTone.danger,
+                    margin: const EdgeInsets.only(top: 12),
+                  ),
+                if (summary?.isNotEmpty == true &&
+                    !_messages.any(
+                      (message) => message['role'] == 'assistant',
+                    )) ...[
+                  const SizedBox(height: 16),
+                  Text(summary!, style: theme.textTheme.bodyLarge),
+                ],
+                if (_messages.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  const SectionHeader('Activity'),
+                ],
+                for (final message in _messages) _TaskMessage(message: message),
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: LoadingState(),
+                  ),
+              ],
             ),
-          ],
-          if (_error != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ],
-          if (summary?.isNotEmpty == true &&
-              !_messages.any((message) => message['role'] == 'assistant')) ...[
-            const SizedBox(height: 12),
-            Text(summary!, style: Theme.of(context).textTheme.bodyLarge),
-          ],
-          const SizedBox(height: 20),
-          for (final message in _messages) _TaskMessage(message: message),
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: Center(child: CircularProgressIndicator()),
-            ),
+          ),
         ],
       ),
     );
@@ -176,22 +238,41 @@ class _TaskMessage extends StatelessWidget {
     final isUser = role == 'user';
     final content = message['content'] as String? ?? '';
     if (content.isEmpty) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+    return SurfaceCard(
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isUser ? const Color(0xff282638) : const Color(0xff1c1e28),
-        borderRadius: BorderRadius.circular(18),
-      ),
+      color: isUser ? JarvisColors.accentSoft : JarvisColors.surface,
+      borderColor: isUser
+          ? JarvisColors.accent.withValues(alpha: .15)
+          : JarvisColors.outline,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            isUser ? 'You' : 'Jarvis',
-            style: Theme.of(context).textTheme.labelLarge,
+          Row(
+            children: [
+              if (isUser)
+                const IconBadge(
+                  icon: Icons.person_outline_rounded,
+                  size: 26,
+                  color: JarvisColors.accent,
+                )
+              else
+                const JarvisAvatar(size: 26),
+              const SizedBox(width: 10),
+              Text(
+                isUser ? 'You' : 'Jarvis',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          SelectableText(content),
+          const SizedBox(height: 10),
+          if (isUser)
+            SelectableText(
+              content,
+              style: const TextStyle(fontSize: 15, height: 1.5),
+            )
+          else
+            JarvisMarkdown(data: content),
         ],
       ),
     );
