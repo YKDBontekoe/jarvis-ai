@@ -1146,6 +1146,10 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  /// Outgoing content fades out before incoming content fades in, so the two
+  /// never overlap mid-transition.
+  static const _fadeThrough = Interval(.5, 1, curve: Curves.easeOutCubic);
+
   static const _destinations = [
     (Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Chat'),
     (Icons.task_alt_outlined, Icons.task_alt_rounded, 'Tasks'),
@@ -1167,9 +1171,9 @@ class _ChatScreenState extends State<ChatScreen> {
           extendBodyBehindAppBar: destination == 2,
           appBar: showIndependentScaffold ? null : _appBar(destination),
           body: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
+            duration: const Duration(milliseconds: 260),
+            switchInCurve: _fadeThrough,
+            switchOutCurve: _fadeThrough,
             child: KeyedSubtree(
               key: ValueKey(destination),
               child: switch (destination) {
@@ -1487,7 +1491,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     const SizedBox(height: 12),
                     AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
+                      duration: const Duration(milliseconds: 240),
+                      switchInCurve: _fadeThrough,
+                      switchOutCurve: _fadeThrough,
                       child: Text(
                         _voiceStarting
                             ? 'Connecting to Jarvis…'
