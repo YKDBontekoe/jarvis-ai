@@ -1,0 +1,8 @@
+{
+    auto_https off
+    admin off
+}
+https://localhost:8443 {
+    tls /certs/localhost.pem /certs/localhost.key
+    reverse_proxy identity:8080
+}

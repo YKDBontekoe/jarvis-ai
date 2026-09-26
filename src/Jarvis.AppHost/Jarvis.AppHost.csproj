@@ -1,0 +1,13 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.5.4">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsAspireHost>true</IsAspireHost>
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <ProjectReference Include="../Jarvis.Api/Jarvis.Api.csproj" />
+    <ProjectReference Include="../../workers/Jarvis.Worker/Jarvis.Worker.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Jarvis.Domain/Jarvis.Domain.csproj" />
+  </ItemGroup>
+</Project>

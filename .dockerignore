@@ -1,0 +1,16 @@
+.git
+.dart_tool
+**/.dart_tool
+.idea
+**/bin
+**/obj
+**/build
+**/.flutter-plugins-dependencies
+**/local.properties
+**/.gradle
+**/.venv
+**/__pycache__
+**/*.pyc
+infra/compose/.env
+artifacts
+**/node_modules

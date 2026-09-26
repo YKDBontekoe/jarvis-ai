@@ -1,0 +1,20 @@
+# .NET
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+
+# Flutter/Dart
+**/.dart_tool/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+apps/mobile/.packages
+
+# Local secrets and state
+.env
+infra/compose/.env
+.aspire/
+artifacts/
+**/node_modules/

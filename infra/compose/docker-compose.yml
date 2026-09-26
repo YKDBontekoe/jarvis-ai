@@ -1,0 +1,217 @@
+name: jarvis
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jarvis
+      POSTGRES_USER: jarvis
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ../postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jarvis -d jarvis"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [data]
+
+  temporal-dev:
+    profiles: [development]
+    image: temporalio/temporal:latest
+    restart: unless-stopped
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--db-filename", "/home/temporal/temporal.db"]
+    ports:
+      - "127.0.0.1:7233:7233"
+      - "127.0.0.1:8233:8233"
+    volumes:
+      - temporal-dev-data:/home/temporal
+    networks: [application]
+
+  livekit:
+    profiles: [development]
+    image: livekit/livekit-server:latest
+    restart: unless-stopped
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-jarvis-local-livekit-development-secret}"
+    command: ["--config", "/etc/livekit.yaml", "--dev", "--bind", "0.0.0.0"]
+    ports:
+      - "${LIVEKIT_BIND_ADDRESS:-127.0.0.1}:7880:7880/tcp"
+      - "${LIVEKIT_BIND_ADDRESS:-127.0.0.1}:7881:7881/tcp"
+      - "${LIVEKIT_BIND_ADDRESS:-127.0.0.1}:50000-50100:50000-50100/udp"
+    volumes:
+      - ../livekit/livekit.yaml:/etc/livekit.yaml:ro
+    networks: [application]
+
+  object-storage:
+    profiles: [development]
+    image: chrislusf/seaweedfs:4.47
+    restart: unless-stopped
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in .env}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in .env}
+      S3_BUCKET: jarvis-files
+    volumes:
+      - object-storage-data:/data
+    networks: [application]
+
+  clamav:
+    profiles: [development]
+    image: clamav/clamav:stable
+    platform: linux/amd64
+    restart: unless-stopped
+    mem_limit: 2g
+    cpus: 2.0
+    volumes:
+      - clamav-signatures:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping=3 >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 5m
+    networks: [application]
+
+  jarvis-api:
+    profiles: [development]
+    build:
+      context: ../..
+      dockerfile: infra/compose/Dockerfile
+      args:
+        PROJECT_PATH: src/Jarvis.Api/Jarvis.Api.csproj
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5082
+      ConnectionStrings__jarvis: Host=postgres;Port=5432;Database=jarvis;Username=jarvis;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      Codex__ExecutablePath: /usr/local/bin/codex
+      Codex__ModelClasses__Fast: ${CODEX_MODEL_FAST:-}
+      Codex__ModelClasses__Standard: ${CODEX_MODEL_STANDARD:-}
+      Codex__ModelClasses__Reasoning: ${CODEX_MODEL_REASONING:-}
+      Codex__ModelClasses__Coding: ${CODEX_MODEL_CODING:-}
+      Codex__ModelClasses__Vision: ${CODEX_MODEL_VISION:-}
+      Codex__ModelClasses__Realtime: ${CODEX_MODEL_REALTIME:-}
+      Jarvis__ModelClass: ${JARVIS_MODEL_CLASS:-}
+      CODEX_HOME: /codex
+      DataProtection__KeysDirectory: /var/lib/jarvis-data-protection-keys
+      Temporal__Address: temporal-dev:7233
+      ObjectStorage__ServiceUrl: http://object-storage:8333
+      ObjectStorage__AccessKey: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in .env}
+      ObjectStorage__SecretKey: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in .env}
+      ObjectStorage__Bucket: jarvis-files
+      ObjectStorage__Region: us-east-1
+      ObjectStorage__MaxUploadBytes: 20971520
+      Antivirus__Host: clamav
+      Antivirus__Port: 3310
+      Antivirus__TimeoutSeconds: 60
+      LiveKit__ApiKey: ${LIVEKIT_API_KEY:-devkey}
+      LiveKit__ApiSecret: ${LIVEKIT_API_SECRET:-jarvis-local-livekit-development-secret}
+      LiveKit__InternalUrl: http://livekit:7880
+      LiveKit__PublicUrl: ${LIVEKIT_PUBLIC_URL:-ws://localhost:7880}
+      Voice__WorkerSecret: ${VOICE_WORKER_SECRET:?Set VOICE_WORKER_SECRET in .env}
+      Push__FirebaseProjectId: ${FIREBASE_PROJECT_ID:-}
+      Push__GoogleServiceAccountFile: /run/secrets/firebase-service-account.json
+    ports:
+      - "${JARVIS_BIND_ADDRESS:-127.0.0.1}:5082:5082"
+    volumes:
+      - ${CODEX_AUTH_FILE}:/codex/auth.json:rw
+      - ${FIREBASE_SERVICE_ACCOUNT_FILE:-/dev/null}:/run/secrets/firebase-service-account.json:ro
+      - data-protection-keys:/var/lib/jarvis-data-protection-keys
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal-dev:
+        condition: service_started
+      object-storage:
+        condition: service_started
+      livekit:
+        condition: service_started
+      clamav:
+        condition: service_healthy
+    networks: [application, data]
+
+  jarvis-voice-worker:
+    profiles: [development]
+    build:
+      context: ../..
+      dockerfile: workers/voice/Dockerfile
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.5
+    pids_limit: 128
+    environment:
+      LIVEKIT_URL: ws://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-jarvis-local-livekit-development-secret}
+      JARVIS_INTERNAL_API_URL: http://jarvis-api:5082
+      VOICE_WORKER_SECRET: ${VOICE_WORKER_SECRET:?Set VOICE_WORKER_SECRET in .env}
+      CODEX_EXECUTABLE_PATH: /usr/local/bin/codex
+      CODEX_MODEL: ${CODEX_MODEL_REALTIME:-}
+      CODEX_HOME: /codex
+      LOG_LEVEL: INFO
+    volumes:
+      - ${CODEX_AUTH_FILE}:/codex/auth.json:rw
+    depends_on:
+      jarvis-api:
+        condition: service_started
+      livekit:
+        condition: service_started
+    networks: [application]
+
+  jarvis-worker:
+    profiles: [development]
+    build:
+      context: ../..
+      dockerfile: infra/compose/Dockerfile
+      args:
+        PROJECT_PATH: workers/Jarvis.Worker/Jarvis.Worker.csproj
+    command: ["Jarvis.Worker.dll"]
+    restart: unless-stopped
+    mem_limit: 2g
+    cpus: 2.0
+    pids_limit: 256
+    environment:
+      DOTNET_ENVIRONMENT: Development
+      DataProtection__KeysDirectory: /var/lib/jarvis-data-protection-keys
+      ConnectionStrings__jarvis: Host=postgres;Port=5432;Database=jarvis;Username=jarvis;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      Temporal__Address: temporal-dev:7233
+      Codex__ExecutablePath: /usr/local/bin/codex
+      Codex__ModelClasses__Fast: ${CODEX_MODEL_FAST:-}
+      Codex__ModelClasses__Standard: ${CODEX_MODEL_STANDARD:-}
+      Codex__ModelClasses__Reasoning: ${CODEX_MODEL_REASONING:-}
+      Codex__ModelClasses__Coding: ${CODEX_MODEL_CODING:-}
+      Codex__ModelClasses__Vision: ${CODEX_MODEL_VISION:-}
+      Codex__ModelClasses__Realtime: ${CODEX_MODEL_REALTIME:-}
+      Jarvis__ModelClass: ${JARVIS_MODEL_CLASS:-}
+      CODEX_HOME: /codex
+      ObjectStorage__ServiceUrl: http://object-storage:8333
+      ObjectStorage__AccessKey: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in .env}
+      ObjectStorage__SecretKey: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in .env}
+      ObjectStorage__Bucket: jarvis-files
+      ObjectStorage__Region: us-east-1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal-dev:
+        condition: service_started
+      object-storage:
+        condition: service_started
+    volumes:
+      - ${CODEX_AUTH_FILE}:/codex/auth.json:rw
+      - data-protection-keys:/var/lib/jarvis-data-protection-keys
+    networks: [application, data]
+
+networks:
+  application:
+    driver: bridge
+  data:
+    internal: true
+
+volumes:
+  postgres-data:
+  temporal-dev-data:
+  object-storage-data:
+  clamav-signatures:
+  data-protection-keys:

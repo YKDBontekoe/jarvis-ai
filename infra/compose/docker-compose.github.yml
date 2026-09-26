@@ -1,0 +1,11 @@
+services:
+  jarvis-api:
+    environment:
+      Mcp__Servers__github__Name: github
+      Mcp__Servers__github__Transport: stdio
+      Mcp__Servers__github__Command: /usr/local/bin/github-mcp-server
+      Mcp__Servers__github__Arguments__0: stdio
+      Mcp__Servers__github__EnvironmentVariables__GITHUB_TOOLSETS: repos,issues,pull_requests
+      Mcp__Servers__github__CredentialProvider: github
+      Mcp__Servers__github__CredentialEnvironmentVariables__GITHUB_PERSONAL_ACCESS_TOKEN: token
+      Mcp__Servers__github__AllowedTools__0: "*"

@@ -1,0 +1,313 @@
+name: jarvis
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jarvis
+      POSTGRES_USER: jarvis
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ../postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jarvis -d jarvis"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [data]
+
+  temporal-postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: temporal
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: ${TEMPORAL_PASSWORD:?Set TEMPORAL_PASSWORD}
+    volumes:
+      - temporal-postgres-data:/var/lib/postgresql
+      - ../temporal/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -d temporal"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [temporal-data]
+
+  temporal:
+    image: temporalio/auto-setup:latest
+    restart: unless-stopped
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${TEMPORAL_PASSWORD:?Set TEMPORAL_PASSWORD}
+      POSTGRES_SEEDS: temporal-postgres
+      DBNAME: temporal
+      VISIBILITY_DBNAME: temporal_visibility
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    networks: [application, temporal-data]
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    restart: unless-stopped
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    depends_on:
+      temporal:
+        condition: service_started
+    networks: [application]
+
+  minio:
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    networks: [data]
+
+  minio-init:
+    image: minio/mc:latest
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        until mc alias set root http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do sleep 2; done
+        mc mb --ignore-existing "root/$${S3_BUCKET}"
+        mc admin policy info root jarvis-file-store >/dev/null 2>&1 || mc admin policy create root jarvis-file-store /policy/jarvis-file-store.json
+        mc admin user remove root "$${S3_ACCESS_KEY}" >/dev/null 2>&1 || true
+        mc admin user add root "$${S3_ACCESS_KEY}" "$${S3_SECRET_KEY}"
+        mc admin policy attach root jarvis-file-store --user "$${S3_ACCESS_KEY}"
+    restart: on-failure
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
+      S3_BUCKET: jarvis-files
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
+    volumes:
+      - ../minio/jarvis-file-store.json:/policy/jarvis-file-store.json:ro
+    depends_on:
+      - minio
+    networks: [data]
+
+  clamav:
+    image: clamav/clamav:stable
+    platform: linux/amd64
+    restart: unless-stopped
+    mem_limit: 2g
+    cpus: 2.0
+    volumes:
+      - clamav-signatures:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping=3 >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 5m
+    networks: [application]
+
+  livekit:
+    image: livekit/livekit-server:latest
+    command: ["--config", "/etc/livekit.yaml", "--bind", "0.0.0.0"]
+    restart: unless-stopped
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET}"
+    volumes:
+      - ../livekit/production.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "${LIVEKIT_BIND_ADDRESS:-0.0.0.0}:7881:7881/tcp"
+      - "${LIVEKIT_BIND_ADDRESS:-0.0.0.0}:50000-50100:50000-50100/udp"
+    networks: [application]
+
+  jarvis-api:
+    build:
+      context: ../..
+      dockerfile: infra/compose/Dockerfile
+      args:
+        PROJECT_PATH: src/Jarvis.Api/Jarvis.Api.csproj
+    user: "${JARVIS_UID:?Set JARVIS_UID}:${JARVIS_GID:?Set JARVIS_GID}"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,size=512m
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:5082
+      HOME: /tmp
+      DataProtection__KeysDirectory: /var/lib/jarvis-data-protection-keys
+      CODEX_HOME: /codex
+      Codex__ExecutablePath: /usr/local/bin/codex
+      Codex__ModelClasses__Fast: ${CODEX_MODEL_FAST:-}
+      Codex__ModelClasses__Standard: ${CODEX_MODEL_STANDARD:-}
+      Codex__ModelClasses__Reasoning: ${CODEX_MODEL_REASONING:-}
+      Codex__ModelClasses__Coding: ${CODEX_MODEL_CODING:-}
+      Codex__ModelClasses__Vision: ${CODEX_MODEL_VISION:-}
+      Codex__ModelClasses__Realtime: ${CODEX_MODEL_REALTIME:-}
+      Jarvis__ModelClass: ${JARVIS_MODEL_CLASS:-}
+      ConnectionStrings__jarvis: Host=postgres;Port=5432;Database=jarvis;Username=jarvis;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      Database__ApplyMigrationsAtStartup: "true"
+      Temporal__Address: temporal:7233
+      ObjectStorage__ServiceUrl: http://minio:9000
+      ObjectStorage__AccessKey: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
+      ObjectStorage__SecretKey: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
+      ObjectStorage__Bucket: jarvis-files
+      ObjectStorage__Region: us-east-1
+      ObjectStorage__MaxUploadBytes: ${MAX_UPLOAD_BYTES:-20971520}
+      Antivirus__Host: clamav
+      Antivirus__Port: 3310
+      Antivirus__TimeoutSeconds: 60
+      Authentication__Authority: ${OIDC_AUTHORITY:?Set OIDC_AUTHORITY}
+      Authentication__Audience: ${OIDC_AUDIENCE:?Set OIDC_AUDIENCE}
+      Cors__AllowedOrigins__0: ${JARVIS_WEB_ORIGIN:?Set JARVIS_WEB_ORIGIN}
+      LiveKit__ApiKey: ${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY}
+      LiveKit__ApiSecret: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET}
+      LiveKit__InternalUrl: http://livekit:7880
+      LiveKit__PublicUrl: wss://${LIVEKIT_DOMAIN:?Set LIVEKIT_DOMAIN}
+      Voice__WorkerSecret: ${VOICE_WORKER_SECRET:?Set VOICE_WORKER_SECRET}
+      Push__FirebaseProjectId: ${FIREBASE_PROJECT_ID:-}
+      Push__GoogleServiceAccountFile: /run/secrets/firebase-service-account.json
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    volumes:
+      - ${CODEX_AUTH_FILE:?Set CODEX_AUTH_FILE}:/codex/auth.json:rw
+      - ${FIREBASE_SERVICE_ACCOUNT_FILE:-/dev/null}:/run/secrets/firebase-service-account.json:ro
+      - ${JARVIS_DATA_PROTECTION_KEYS_DIR:?Set JARVIS_DATA_PROTECTION_KEYS_DIR}:/var/lib/jarvis-data-protection-keys:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
+      clamav:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5082/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+    networks: [application, data]
+
+  jarvis-worker:
+    build:
+      context: ../..
+      dockerfile: infra/compose/Dockerfile
+      args:
+        PROJECT_PATH: workers/Jarvis.Worker/Jarvis.Worker.csproj
+    command: ["Jarvis.Worker.dll"]
+    user: "${JARVIS_UID:?Set JARVIS_UID}:${JARVIS_GID:?Set JARVIS_GID}"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,size=512m
+    restart: unless-stopped
+    mem_limit: 2g
+    cpus: 2.0
+    pids_limit: 256
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      DataProtection__KeysDirectory: /var/lib/jarvis-data-protection-keys
+      HOME: /tmp
+      CODEX_HOME: /codex
+      Codex__ExecutablePath: /usr/local/bin/codex
+      Codex__ModelClasses__Fast: ${CODEX_MODEL_FAST:-}
+      Codex__ModelClasses__Standard: ${CODEX_MODEL_STANDARD:-}
+      Codex__ModelClasses__Reasoning: ${CODEX_MODEL_REASONING:-}
+      Codex__ModelClasses__Coding: ${CODEX_MODEL_CODING:-}
+      Codex__ModelClasses__Vision: ${CODEX_MODEL_VISION:-}
+      Codex__ModelClasses__Realtime: ${CODEX_MODEL_REALTIME:-}
+      Jarvis__ModelClass: ${JARVIS_MODEL_CLASS:-}
+      ConnectionStrings__jarvis: Host=postgres;Port=5432;Database=jarvis;Username=jarvis;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      Temporal__Address: temporal:7233
+      ObjectStorage__ServiceUrl: http://minio:9000
+      ObjectStorage__AccessKey: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
+      ObjectStorage__SecretKey: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
+      ObjectStorage__Bucket: jarvis-files
+      ObjectStorage__Region: us-east-1
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    volumes:
+      - ${CODEX_AUTH_FILE:?Set CODEX_AUTH_FILE}:/codex/auth.json:rw
+      - ${JARVIS_DATA_PROTECTION_KEYS_DIR:?Set JARVIS_DATA_PROTECTION_KEYS_DIR}:/var/lib/jarvis-data-protection-keys:rw
+    depends_on:
+      jarvis-api:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    networks: [application, data]
+
+  jarvis-voice-worker:
+    build:
+      context: ../..
+      dockerfile: workers/voice/Dockerfile
+    user: "${JARVIS_UID:?Set JARVIS_UID}:${JARVIS_GID:?Set JARVIS_GID}"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,size=512m
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.5
+    pids_limit: 128
+    environment:
+      HOME: /tmp
+      CODEX_HOME: /codex
+      LIVEKIT_URL: ws://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET}
+      JARVIS_INTERNAL_API_URL: http://jarvis-api:5082
+      VOICE_WORKER_SECRET: ${VOICE_WORKER_SECRET:?Set VOICE_WORKER_SECRET}
+      CODEX_EXECUTABLE_PATH: /usr/local/bin/codex
+      CODEX_MODEL: ${CODEX_MODEL_REALTIME:-}
+      LOG_LEVEL: INFO
+    volumes:
+      - ${CODEX_AUTH_FILE:?Set CODEX_AUTH_FILE}:/codex/auth.json:rw
+    depends_on:
+      jarvis-api:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+    networks: [application]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      JARVIS_DOMAIN: ${JARVIS_DOMAIN:?Set JARVIS_DOMAIN}
+      LIVEKIT_DOMAIN: ${LIVEKIT_DOMAIN:?Set LIVEKIT_DOMAIN}
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+      - "443:443/udp"
+    volumes:
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      jarvis-api:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+    networks: [edge, application]
+
+networks:
+  edge:
+  application:
+  data:
+    internal: true
+  temporal-data:
+    internal: true
+
+volumes:
+  postgres-data:
+  temporal-postgres-data:
+  minio-data:
+  clamav-signatures:
+  caddy-data:
+  caddy-config:

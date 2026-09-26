@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-Jarvis.Worker-a9e9bb9e-2e4f-47a7-b1de-73d50a889f10</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Jarvis.Agents/Jarvis.Agents.csproj" />
+    <ProjectReference Include="../../src/Jarvis.Infrastructure/Jarvis.Infrastructure.csproj" />
+    <ProjectReference Include="../../src/Jarvis.Mcp/Jarvis.Mcp.csproj" />
+    <ProjectReference Include="../../src/Jarvis.Memory/Jarvis.Memory.csproj" />
+    <ProjectReference Include="../../src/Jarvis.ServiceDefaults/Jarvis.ServiceDefaults.csproj" />
+    <ProjectReference Include="../../src/Jarvis.Workflows/Jarvis.Workflows.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="PdfPig" />
+  </ItemGroup>
+</Project>

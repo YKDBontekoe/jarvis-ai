@@ -1,0 +1,80 @@
+services:
+  jarvis-api:
+    environment:
+      Mcp__Servers__0__Name: playwright
+      Mcp__Servers__0__Transport: streamableHttp
+      Mcp__Servers__0__Endpoint: http://playwright-mcp:8931/mcp
+      Mcp__Servers__0__AllowedTools__0: browser_navigate
+      Mcp__Servers__0__AllowedTools__1: browser_navigate_back
+      Mcp__Servers__0__AllowedTools__2: browser_snapshot
+      Mcp__Servers__0__AllowedTools__3: browser_find
+      Mcp__Servers__0__AllowedTools__4: browser_click
+      Mcp__Servers__0__AllowedTools__5: browser_type
+      Mcp__Servers__0__AllowedTools__6: browser_fill_form
+      Mcp__Servers__0__AllowedTools__7: browser_select_option
+      Mcp__Servers__0__AllowedTools__8: browser_press_key
+      Mcp__Servers__0__AllowedTools__9: browser_wait_for
+      Mcp__Servers__0__AllowedTools__10: browser_take_screenshot
+      Mcp__Servers__0__AllowedTools__11: browser_console_messages
+      Mcp__Servers__0__AutoApprovedTools__0: browser_snapshot
+      Mcp__Servers__0__AutoApprovedTools__1: browser_find
+      Mcp__Servers__0__AutoApprovedTools__2: browser_take_screenshot
+      Mcp__Servers__0__AutoApprovedTools__3: browser_console_messages
+    depends_on:
+      playwright-mcp:
+        condition: service_healthy
+      browser-egress-proxy:
+        condition: service_started
+    networks:
+      - agents
+
+  playwright-mcp:
+    profiles: [browser]
+    image: mcr.microsoft.com/playwright/mcp:latest
+    restart: unless-stopped
+    init: true
+    entrypoint: ["node", "/app/cli.js", "--headless", "--browser", "chromium", "--no-sandbox"]
+    command: ["--port", "8931", "--host", "0.0.0.0", "--allowed-hosts", "playwright-mcp:8931", "--block-service-workers", "--proxy-server", "http://browser-egress-proxy:3128"]
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+      - /home/node:size=512m,mode=1777
+    shm_size: 1gb
+    mem_limit: 2g
+    cpus: 2.0
+    pids_limit: 256
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "const s=require('net').connect(8931,'127.0.0.1');s.on('connect',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+    networks: [agents]
+
+  browser-egress-proxy:
+    profiles: [browser]
+    image: ubuntu/squid:latest
+    restart: unless-stopped
+    read_only: true
+    volumes:
+      - ./browser/squid.conf:/etc/squid/squid.conf:ro
+    tmpfs:
+      - /run/squid:size=16m,mode=0755,uid=13,gid=13
+      - /var/spool/squid:size=64m,mode=0755,uid=13,gid=13
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    command: ["-N", "-f", "/etc/squid/squid.conf"]
+    networks: [agents, browser-egress]
+
+networks:
+  agents:
+    driver: bridge
+    internal: true
+  browser-egress:
+    driver: bridge

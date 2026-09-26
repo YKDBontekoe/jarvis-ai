@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Jarvis.Application/Jarvis.Application.csproj" />
+    <ProjectReference Include="../Jarvis.Mcp/Jarvis.Mcp.csproj" />
+    <ProjectReference Include="../Jarvis.Workflows/Jarvis.Workflows.csproj" />
+    <PackageReference Include="Microsoft.Agents.AI" />
+  </ItemGroup>
+</Project>
