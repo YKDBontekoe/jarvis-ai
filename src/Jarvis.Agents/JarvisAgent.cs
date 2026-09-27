@@ -72,6 +72,7 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcp
         var activeTools = new Dictionary<string, string>(StringComparer.Ordinal);
         await foreach (var update in agent.RunStreamingAsync(input, session, cancellationToken: cancellationToken))
         {
+            var checkpoint = false;
             var approvalRequests = update.Contents.OfType<ToolApprovalRequestContent>().ToArray();
             var approvalCallIds = approvalRequests
                 .Select(request => request.ToolCall)
@@ -96,6 +97,7 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcp
                 if (!activeTools.Remove(result.CallId, out var toolName)) continue;
                 yield return new AgentStreamEvent(ToolProgress: new AgentToolProgress(result.CallId, toolName,
                     result.Exception is null ? "completed" : "failed"));
+                checkpoint = true;
             }
 
             foreach (var request in approvalRequests)
@@ -107,6 +109,13 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcp
                     functionCall.Name,
                     JsonSerializer.Serialize(functionCall.Arguments ?? new Dictionary<string, object?>(),
                         ArgumentsJsonOptions)));
+                checkpoint = true;
+            }
+
+            if (checkpoint)
+            {
+                var checkpointJson = await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken);
+                await conversations.SaveAgentSessionAsync(conversationId, checkpointJson.GetRawText(), cancellationToken);
             }
         }
 

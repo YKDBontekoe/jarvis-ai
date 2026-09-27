@@ -106,8 +106,8 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
 
         await process.StandardInput.WriteAsync(BuildPrompt(repository.Name, task).AsMemory(), timeout.Token);
         process.StandardInput.Close();
-        var stderrTask = process.StandardError.ReadToEndAsync(timeout.Token);
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
         try
         {
             await process.WaitForExitAsync(timeout.Token);
@@ -117,6 +117,9 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
             logger.LogWarning("Codex coding task timed out for repository {RepositoryName}.", repository.Name);
             await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.failed", "high",
                 false, null, metadata, CancellationToken.None);
+            try { await Task.WhenAll(stderrTask, stdoutTask).WaitAsync(TimeSpan.FromSeconds(2)); }
+            catch (TimeoutException) { }
+            catch (OperationCanceledException) { }
             return JsonSerializer.Serialize(new
             {
                 completed = false,
@@ -125,8 +128,11 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
             });
         }
 
-        var standardError = await stderrTask;
-        _ = await stdoutTask;
+        string standardError;
+        try { standardError = await stderrTask.WaitAsync(TimeSpan.FromSeconds(2)); }
+        catch (TimeoutException) { standardError = string.Empty; }
+        try { _ = await stdoutTask.WaitAsync(TimeSpan.FromSeconds(2)); }
+        catch (TimeoutException) { }
         var summary = File.Exists(resultPath)
             ? await File.ReadAllTextAsync(resultPath, cancellationToken)
             : string.Empty;
@@ -227,8 +233,8 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
             catch (InvalidOperationException) { }
             catch (Win32Exception) { }
         });
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
-        var stderrTask = process.StandardError.ReadToEndAsync(timeout.Token);
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
         try
         {
             await process.WaitForExitAsync(timeout.Token);
@@ -238,9 +244,18 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
             try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
             catch (InvalidOperationException) { }
             catch (Win32Exception) { }
+            try { await Task.WhenAll(stdoutTask, stderrTask).WaitAsync(TimeSpan.FromSeconds(2)); }
+            catch (TimeoutException) { }
+            catch (OperationCanceledException) { }
             throw;
         }
-        return new ProcessResult(process.ExitCode, await stdoutTask, await stderrTask);
+        string stdout;
+        string stderr;
+        try { stdout = await stdoutTask.WaitAsync(TimeSpan.FromSeconds(2)); }
+        catch (TimeoutException) { stdout = string.Empty; }
+        try { stderr = await stderrTask.WaitAsync(TimeSpan.FromSeconds(2)); }
+        catch (TimeoutException) { stderr = string.Empty; }
+        return new ProcessResult(process.ExitCode, stdout, stderr);
     }
 
     private static async Task CreateSnapshotRepositoryAsync(string repositoryPath, string worktreePath,

@@ -296,16 +296,36 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
                 decided.DecidedAt is { } decidedAt &&
                 last.CreatedAt >= decidedAt)
             {
+                var session = await conversations.GetAgentSessionAsync(decided.ConversationId, ct);
+                if (session is not null &&
+                    AgentSessionJson.TryGetPendingApprovals(session, out var pendingFromSession, out _))
+                {
+                    foreach (var pendingRequest in pendingFromSession)
+                    {
+                        try
+                        {
+                            await approvals.CreateAsync(ownerId, decided.ConversationId, pendingRequest.RequestId,
+                                pendingRequest.ToolCallId, pendingRequest.ToolName, pendingRequest.ArgumentsJson,
+                                decided.TaskId, ct);
+                        }
+                        catch (InvalidOperationException)
+                        {
+                        }
+                    }
+                }
                 var remaining = (await approvals.ListActionableAsync(ownerId, ct))
                     .Where(x => x.ConversationId == decided.ConversationId && x.Id != approvalId)
                     .ToList();
-                await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
                 if (remaining.Count != 0)
+                {
+                    await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
                     return Results.Accepted("/api/v1/approvals", remaining.Select(ToApprovalDto));
+                }
                 if (decided.Approved == true)
                     await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId, last.Content, runCt);
                 else
                     await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId, last.Content, runCt);
+                await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
                 return Results.Ok(ToDto(last));
             }
         }

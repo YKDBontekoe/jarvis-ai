@@ -24,6 +24,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
   final _zone = TextEditingController(text: 'UTC');
   String? _error;
   String? _saved;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -38,6 +39,8 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    final revision = ++_requestRevision;
     try {
       final response = await widget.http.get<Map<String, dynamic>>(
         '/api/v1/briefings/daily',
@@ -48,7 +51,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
       }
       final map = Map<String, dynamic>.from(data);
       final time = (asJsonString(map['localTime']) ?? '08:00:00').split(':');
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(() {
           _enabled = asJsonBool(map['enabled']);
           _time = TimeOfDay(
@@ -61,7 +64,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
         });
       }
     } on DioException catch (error) {
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(() {
           _error = error.response?.data is Map
               ? asJsonString(
@@ -73,14 +76,16 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
         });
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(() {
           _error = 'Could not load briefing settings.';
           _loaded = false;
         });
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 

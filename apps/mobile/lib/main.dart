@@ -491,73 +491,66 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _openConversation(
+    Future<void> _openConversation(
     String conversationId, {
     bool showHome = false,
   }) async {
     final generation = ++_realtimeGeneration;
+    bool isCurrent() =>
+        mounted &&
+        generation == _realtimeGeneration &&
+        !_signedOut &&
+        !_signingOut;
     await _stopVoice();
+    if (!isCurrent()) return;
     await _hub?.stop();
+    if (!isCurrent()) return;
     _hub = null;
-    if (mounted) {
-      setState(() {
-        _conversationId = conversationId;
-        _connected = false;
-        _sending = false;
-        _selectedDestination = 0;
-        _showHome = showHome;
-        _entries.clear();
-        _error = null;
-      });
-    }
+    setState(() {
+      _conversationId = conversationId;
+      _connected = false;
+      _sending = false;
+      _selectedDestination = 0;
+      _showHome = showHome;
+      _entries.clear();
+      _error = null;
+    });
     final details = await _http.get<Map<String, dynamic>>(
       '/api/v1/conversations/$conversationId',
     );
-    if (!mounted ||
-        _conversationId != conversationId ||
-        _realtimeGeneration != generation) {
-      return;
-    }
+    if (!isCurrent() || _conversationId != conversationId) return;
     final records = jsonMaps(details.data?['messages']);
     final approvals = await _loadConversationApprovals(conversationId);
-    if (mounted &&
-        _conversationId == conversationId &&
-        _realtimeGeneration == generation) {
-      setState(() {
-        _entries.addAll(
-          records
-              .where(
-                (message) =>
-                    message['role'] is String && message['content'] is String,
-              )
-              .map(
-                (message) => MessageEntry(
-                  role: message['role'] as String,
-                  content: message['content'] as String,
-                ),
+    if (!isCurrent() || _conversationId != conversationId) return;
+    setState(() {
+      _entries.addAll(
+        records
+            .where(
+              (message) =>
+                  message['role'] is String && message['content'] is String,
+            )
+            .map(
+              (message) => MessageEntry(
+                role: message['role'] as String,
+                content: message['content'] as String,
               ),
-        );
-        _entries.addAll(approvals);
-      });
-      _scrollToBottom(jump: true);
-    }
+            ),
+      );
+      _entries.addAll(approvals);
+    });
+    _scrollToBottom(jump: true);
     unawaited(_loadRecent());
-    if (_conversationId == conversationId &&
-        _realtimeGeneration == generation) {
-      try {
-        await _connectRealtime(generation);
-      } catch (error) {
-        if (mounted &&
-            _conversationId == conversationId &&
-            _realtimeGeneration == generation) {
-          setState(() {
-            _connected = false;
-            _error = error is DioException
-                ? _describeError(error)
-                : 'Could not connect realtime updates.';
-          });
-        }
-      }
+    if (!isCurrent() || _conversationId != conversationId) return;
+    try {
+      await _connectRealtime(generation);
+    } catch (error) {
+      if (!isCurrent() || _conversationId != conversationId) return;
+      setState(() {
+        _connected = false;
+        _error = error is DioException
+            ? _describeError(error)
+            : 'Could not connect realtime updates.';
+      });
     }
   }
 
@@ -1020,7 +1013,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _connected = true;
           _homeRevision++;
         });
-        await _reloadConversationEntries(conversationId);
+        await _reloadConversationEntries(conversationId, generation);
       }
     } catch (_) {
       if (mounted &&
@@ -1035,7 +1028,11 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _reloadConversationEntries(String conversationId) async {
+  Future<void> _reloadConversationEntries(
+    String conversationId, [
+    int? generation,
+  ]) async {
+    final expectedGeneration = generation ?? _realtimeGeneration;
     try {
       final details = await _http.get<Map<String, dynamic>>(
         '/api/v1/conversations/$conversationId',
@@ -1043,6 +1040,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final approvals = await _loadConversationApprovals(conversationId);
       if (!mounted ||
           _conversationId != conversationId ||
+          _realtimeGeneration != expectedGeneration ||
           _signedOut ||
           _signingOut) {
         return;
