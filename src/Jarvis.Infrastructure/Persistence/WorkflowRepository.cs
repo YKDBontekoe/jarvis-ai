@@ -164,7 +164,7 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         if (task is null || task.Status is "completed" or "failed" or "cancelled") return;
         task.Complete(summary);
         AddAuditEvent(task.OwnerId, "temporal", "task.completed", "low", true, task.Id);
-        await CancelPendingApprovalsAsync(task.Id, task.OwnerId, cancellationToken);
+        await CancelIncompleteApprovalsAsync(task.Id, task.OwnerId, cancellationToken);
         if (!await db.Notifications.AnyAsync(x => x.Id == task.Id, cancellationToken))
         {
             var notification = new Notification(task.Id, task.OwnerId, "task.completed",
@@ -183,7 +183,7 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         if (task is null || task.Status is "completed" or "failed" or "cancelled") return;
         task.Fail(summary);
         AddAuditEvent(task.OwnerId, "temporal", "task.failed", "high", false, task.Id);
-        await CancelPendingApprovalsAsync(task.Id, task.OwnerId, cancellationToken);
+        await CancelIncompleteApprovalsAsync(task.Id, task.OwnerId, cancellationToken);
         if (!await db.Notifications.AnyAsync(x => x.Id == task.Id, cancellationToken))
         {
             var notification = new Notification(task.Id, task.OwnerId, "task.failed",
@@ -203,19 +203,25 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
             return false;
         task.Cancel();
         AddAuditEvent(ownerId, "tasks", "task.cancelled", "moderate", true, task.Id);
-        await CancelPendingApprovalsAsync(task.Id, ownerId, cancellationToken);
+        await CancelIncompleteApprovalsAsync(task.Id, ownerId, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return true;
     }
 
-    private async Task CancelPendingApprovalsAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken)
+    private async Task CancelIncompleteApprovalsAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken)
     {
         var approvals = await db.ToolApprovals.Where(x =>
-                x.TaskId == taskId && x.OwnerId == ownerId && x.Status == "pending")
+                x.TaskId == taskId && x.OwnerId == ownerId &&
+                (x.Status == "pending" ||
+                 ((x.Status == "approved" || x.Status == "rejected") &&
+                  x.ResumeStatus != "completed" && x.ResumeStatus != "cancelled")))
             .ToListAsync(cancellationToken);
         foreach (var approval in approvals)
+        {
             approval.Cancel();
+            approval.AbortResume();
+        }
         await ApprovalInboxCleanup.RemoveAsync(db, approvals.Select(x => x.Id).ToArray(), cancellationToken);
     }
 

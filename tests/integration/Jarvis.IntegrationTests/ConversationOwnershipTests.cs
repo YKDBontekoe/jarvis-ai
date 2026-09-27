@@ -189,6 +189,36 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
             (await database.ToolApprovals.SingleAsync(x => x.Id == created.Approval.Id)).Status);
     }
 
+    [Fact]
+    public async Task Cancelling_a_task_clears_decided_incomplete_approval_inbox()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var conversations = new ConversationStore(database);
+        var tasks = new WorkflowRepository(database);
+        var approvals = new ToolApprovalStore(database);
+        var conversation = await conversations.CreateAsync(owner, "Task chat", CancellationToken.None);
+        var task = await tasks.CreateAsync(owner, "Research", "Look this up", conversation.Id, CancellationToken.None);
+        database.PushDevices.Add(new PushDevice(owner, "fcm-token", "android"));
+        await database.SaveChangesAsync();
+
+        var created = await approvals.CreateAsync(owner, conversation.Id, "req-2", "call-2",
+            "ForgetMemory", "{}", task.Id, CancellationToken.None);
+        Assert.True(created.Created);
+        Assert.NotNull(created.NotificationId);
+        Assert.NotNull(await approvals.DecideAsync(created.Approval.Id, owner, true, CancellationToken.None));
+
+        Assert.True(await tasks.CancelTaskAsync(task.Id, owner, CancellationToken.None));
+        database.ChangeTracker.Clear();
+
+        Assert.Empty(await database.Notifications.Where(x => x.Id == created.NotificationId).ToListAsync());
+        Assert.Empty(await database.PushDeliveries.Where(x => x.NotificationId == created.NotificationId)
+            .ToListAsync());
+        var stored = await database.ToolApprovals.SingleAsync(x => x.Id == created.Approval.Id);
+        Assert.Equal("approved", stored.Status);
+        Assert.Equal("cancelled", stored.ResumeStatus);
+    }
+
     private JarvisDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<JarvisDbContext>()
