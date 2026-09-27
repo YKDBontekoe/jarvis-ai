@@ -1,3 +1,4 @@
+using Jarvis.Application.Learning;
 using Jarvis.Application.Memory;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -5,7 +6,8 @@ using Microsoft.Extensions.AI;
 namespace Jarvis.Agents;
 
 internal sealed class PersonalMemoryContextProvider(
-    IMemoryService memories, MemoryReranker reranker, Guid ownerId) : MessageAIContextProvider
+    IMemoryService memories, MemoryReranker reranker, Guid ownerId,
+    IMemoryRecallTracker? recalls = null) : MessageAIContextProvider
 {
     private const int MaxContextCharacters = 8_000;
 
@@ -34,6 +36,7 @@ internal sealed class PersonalMemoryContextProvider(
         foreach (var hit in hits)
         {
             if (!includedIds.Add(hit.Memory.Id)) continue;
+            recalls?.Record(ownerId, hit.Memory.Id, query);
             if (!AppendMemory(content, hit.Memory.Kind, hit.Memory.Content)) break;
         }
 

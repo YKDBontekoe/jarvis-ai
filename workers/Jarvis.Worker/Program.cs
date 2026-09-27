@@ -35,6 +35,7 @@ builder.Services.AddSingleton<IFileProcessingScheduler>(services => services.Get
 builder.Services.AddSingleton<IConditionWatchScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
 builder.Services.AddSingleton<IDailyBriefingScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
 builder.Services.AddSingleton<Jarvis.Application.Learning.IHeartbeatScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
+builder.Services.AddSingleton<Jarvis.Application.Learning.IDreamingScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
 builder.Services.AddHostedService<TemporalWorkflowReconciler>();
 builder.Services.AddHostedService<MemoryIndexingWorker>();
 builder.Services.AddScoped<IReminderService, ReminderService>();
@@ -57,6 +58,7 @@ var conditionWatchActivities = new ConditionWatchActivities(
     host.Services.GetRequiredService<PublicJsonMetricReader>());
 var briefingActivities = new DailyBriefingActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
 var heartbeatActivities = new AssistantHeartbeatActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
+var dreamingActivities = new AssistantDreamingActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
 using var worker = new TemporalWorker(client, new TemporalWorkerOptions(TemporalReminderScheduler.TaskQueue)
     .AddWorkflow<ReminderWorkflow>()
     .AddWorkflow<FileProcessingWorkflow>()
@@ -64,6 +66,7 @@ using var worker = new TemporalWorker(client, new TemporalWorkerOptions(Temporal
     .AddWorkflow<ConditionWatchWorkflow>()
     .AddWorkflow<DailyBriefingWorkflow>()
     .AddWorkflow<AssistantHeartbeatWorkflow>()
+    .AddWorkflow<AssistantDreamingWorkflow>()
     .AddActivity(activities.DeliverReminderAsync)
     .AddActivity(activities.FailReminderAsync)
     .AddActivity(fileActivities.ProcessStoredFileAsync)
@@ -75,7 +78,8 @@ using var worker = new TemporalWorker(client, new TemporalWorkerOptions(Temporal
     .AddActivity(conditionWatchActivities.FailAsync)
     .AddActivity(briefingActivities.ResolveScheduleAsync)
     .AddActivity(briefingActivities.DeliverAsync)
-    .AddActivity(heartbeatActivities.RunAsync));
+    .AddActivity(heartbeatActivities.RunAsync)
+    .AddActivity(dreamingActivities.RunAsync));
 
 await host.StartAsync();
 try
@@ -192,6 +196,33 @@ internal sealed class AssistantHeartbeatActivities(IServiceScopeFactory scopeFac
         await services.GetRequiredService<Jarvis.Agents.Learning.HeartbeatService>()
             .RunAsync(input.OwnerId, cancellationToken);
         return new Jarvis.Application.Learning.HeartbeatRunResult(true, settings.HeartbeatMinutes);
+    }
+}
+
+internal sealed class AssistantDreamingActivities(IServiceScopeFactory scopeFactory) : AssistantDreamingActivityContract
+{
+    [Temporalio.Activities.Activity("RunAssistantDreaming")]
+    public override async Task<Jarvis.Application.Learning.DreamingRunResult> RunAsync(
+        Jarvis.Application.Learning.DreamingWorkflowInput input)
+    {
+        var cancellationToken = ActivityExecutionContext.Current.CancellationToken;
+        using var trace = JarvisWorkerTelemetry.Source.StartActivity("dreaming.run");
+        using var heartbeat = new ActivityHeartbeat(input.OwnerId);
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var services = scope.ServiceProvider;
+        var settings = await services.GetRequiredService<Jarvis.Application.Settings.IOwnerSettingsStore>()
+            .GetAsync<Jarvis.Application.Settings.LearningSettings>(input.OwnerId,
+                Jarvis.Application.Settings.SettingsSections.Learning, cancellationToken);
+        if (settings is not { DreamingEnabled: true })
+            return new Jarvis.Application.Learning.DreamingRunResult(false, 0);
+        services.GetRequiredService<WorkerCurrentUser>().SetOwner(input.OwnerId);
+        await services.GetRequiredService<Jarvis.Agents.Learning.DreamingService>()
+            .SweepAsync(input.OwnerId, force: false, cancellationToken);
+        var briefing = await services.GetRequiredService<IDailyBriefingRepository>()
+            .GetAsync(input.OwnerId, cancellationToken);
+        var minutes = Jarvis.Application.Learning.DreamingClock.MinutesUntilNext(DateTimeOffset.UtcNow,
+            settings.DreamingHour, briefing?.TimeZoneId);
+        return new Jarvis.Application.Learning.DreamingRunResult(true, minutes);
     }
 }
 

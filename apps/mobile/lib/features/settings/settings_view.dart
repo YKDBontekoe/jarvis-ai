@@ -24,7 +24,7 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
       ),
       (
         title: 'Learning & heartbeat',
-        subtitle: 'Continuous learning and proactive check-ins',
+        subtitle: 'Continuous learning, dreaming, and check-ins',
         icon: PhosphorIconsRegular.pulse,
         destination: 'learning',
       ),

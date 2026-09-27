@@ -2,6 +2,7 @@ using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
 using Jarvis.Application.Integrations;
+using Jarvis.Application.Learning;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Workflows;
 using Jarvis.Mcp;
@@ -24,6 +25,7 @@ internal sealed class CoreAgentTools(
     McpToolHost mcpToolHost,
     IAuditEventStore auditEvents,
     ICurrentUser currentUser,
+    IMemoryRecallTracker recalls,
     CodexProcessLimiter codexProcessLimiter,
     IConfiguration configuration,
     ILoggerFactory loggerFactory,
@@ -34,7 +36,7 @@ internal sealed class CoreAgentTools(
     {
         var taskTools = new TaskAgentTools(taskService, currentUser);
         var memoryTools = new MemoryAgentTools(memoryService, reranker, auditEvents, currentUser,
-            loggerFactory.CreateLogger<MemoryAgentTools>());
+            loggerFactory.CreateLogger<MemoryAgentTools>(), recalls);
         var watchTools = new ConditionWatchAgentTools(watchService, currentUser);
         var reminderTools = new ReminderAgentTools(reminderService, currentUser);
         var fileTools = new FileAgentTools(fileSearch, fileRepository, currentUser);
@@ -80,6 +82,7 @@ internal sealed class CoreAgentContext(
     MemoryReranker reranker,
     IJarvisTaskRepository tasks,
     IConditionWatchRepository watches,
+    IMemoryRecallTracker recalls,
     TimeProvider? timeProvider = null) : IAgentContextContributor
 {
     public int Order => 0;
@@ -87,7 +90,7 @@ internal sealed class CoreAgentContext(
     public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
     [
         new ClockContextProvider(briefings, context.OwnerId, timeProvider ?? TimeProvider.System),
-        new PersonalMemoryContextProvider(memories, reranker, context.OwnerId),
+        new PersonalMemoryContextProvider(memories, reranker, context.OwnerId, recalls),
         new ActiveTasksContextProvider(tasks, context.OwnerId, context.ExecutingTaskId),
         new ActiveConditionWatchesContextProvider(watches, context.OwnerId)
     ];

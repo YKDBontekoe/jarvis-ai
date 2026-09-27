@@ -91,6 +91,7 @@ internal static class ApiServiceRegistration
         services.AddSingleton<IConditionWatchScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<IDailyBriefingScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<Jarvis.Application.Learning.IHeartbeatScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
+        services.AddSingleton<Jarvis.Application.Learning.IDreamingScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddScoped<IReminderService, ReminderService>();
         services.AddScoped<IConditionWatchService, ConditionWatchService>();
         services.AddScoped<IDailyBriefingService, DailyBriefingService>();
