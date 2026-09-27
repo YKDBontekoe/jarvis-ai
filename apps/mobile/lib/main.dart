@@ -448,6 +448,10 @@ class _ChatScreenState extends State<ChatScreen> {
             final request = error.requestOptions;
             request.headers['Authorization'] = 'Bearer $token';
             request.extra['jarvisRetriedAuth'] = true;
+            final data = request.data;
+            if (data is FormData) {
+              request.data = data.clone();
+            }
             handler.resolve(await _http.fetch(request));
           } on DioException catch (retryError) {
             handler.next(retryError);
@@ -1017,7 +1021,6 @@ class _ChatScreenState extends State<ChatScreen> {
             asJsonString(event?['message']) ??
             'Jarvis could not complete this response.';
       });
-      if (_voiceActive || _voiceStarting) unawaited(_stopVoice());
     });
     hub.on('voice.transcript', (arguments) {
       final transcript = asJsonString(_payload(arguments)?['text']) ?? '';
@@ -1555,11 +1558,11 @@ class _ChatScreenState extends State<ChatScreen> {
           replace(
             (current) => current.copyWith(
               status: ApprovalStatus.pending,
-              clearDecision: true,
               clearError: true,
             ),
           );
         });
+        await _syncConversationApprovals();
         return;
       }
       final status = error.response?.statusCode;
