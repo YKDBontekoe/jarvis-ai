@@ -390,10 +390,14 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
                         elif event.get("type") == "done":
                             final_text = event.get("responseText")
 
-                if isinstance(final_text, str) and not streamed_text:
-                    speech_buffer = final_text
-                elif isinstance(final_text, str) and final_text.startswith(streamed_text):
-                    speech_buffer += final_text[len(streamed_text):]
+                if isinstance(final_text, str) and final_text.strip():
+                    if not streamed_text or final_text.startswith(streamed_text):
+                        if not streamed_text:
+                            speech_buffer = final_text
+                        else:
+                            speech_buffer += final_text[len(streamed_text):]
+                    else:
+                        speech_buffer = final_text
                 if speech_buffer.strip():
                     await codex.speak(speech_buffer)
                 elif not streamed_text.strip():
