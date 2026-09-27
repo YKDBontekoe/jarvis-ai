@@ -15,6 +15,8 @@ void main() {
     expect(statusStyle('needs_approval').color, JarvisColors.warning);
     expect(statusStyle('running').label, 'In progress');
     expect(statusStyle('completed').color, JarvisColors.success);
+    expect(statusStyle('ready').label, 'Ready');
+    expect(statusStyle('ready').color, JarvisColors.success);
     expect(statusStyle('failed').color, JarvisColors.danger);
     expect(statusStyle('some_new_state').label, 'Some new state');
     expect(statusStyle('').label, 'Unknown');

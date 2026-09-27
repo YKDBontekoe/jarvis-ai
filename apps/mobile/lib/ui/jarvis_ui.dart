@@ -313,8 +313,8 @@ StatusStyle statusStyle(String status) => switch (status) {
     color: JarvisColors.warning,
     icon: PhosphorIconsRegular.shieldWarning,
   ),
-  'completed' || 'delivered' || 'indexed' || 'triggered' || 'sent' => (
-    label: _titleCase(status),
+  'completed' || 'delivered' || 'indexed' || 'triggered' || 'sent' || 'ready' => (
+    label: status == 'ready' ? 'Ready' : _titleCase(status),
     color: JarvisColors.success,
     icon: PhosphorIconsRegular.checkCircle,
   ),

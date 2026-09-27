@@ -170,6 +170,11 @@ class _RemindersScreenState extends State<RemindersScreen>
       selectedTime.hour,
       selectedTime.minute,
     );
+    if (!localDueAt.isAfter(DateTime.now())) {
+      titleController.dispose();
+      if (mounted) _showError('Choose a time in the future.');
+      return;
+    }
     try {
       await widget.http.post(
         '/api/v1/reminders',
@@ -183,7 +188,8 @@ class _RemindersScreenState extends State<RemindersScreen>
       if (mounted) {
         final message = error.response?.statusCode == 503
             ? 'The reminder service is unavailable. Try again shortly.'
-            : 'Jarvis could not create that reminder.';
+            : firstProblemMessage(error.response?.data) ??
+                  'Jarvis could not create that reminder.';
         _showError(message);
       }
     } finally {
