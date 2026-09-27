@@ -123,6 +123,8 @@ public interface IJarvisTaskRepository
     Task<JarvisTaskRecord?> GetTaskByIdAsync(Guid id, CancellationToken cancellationToken);
     Task<JarvisTaskRecord?> GetTaskByConversationIdAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<JarvisTaskRecord>> ListQueuedForSchedulingAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<JarvisTaskRecord>> ListRecentlyTerminalAsync(DateTimeOffset completedAfter,
+        CancellationToken cancellationToken);
     Task MarkTaskScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<JarvisTaskRecord>> ListActiveAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<JarvisTaskRecord>> ListAsync(Guid ownerId, CancellationToken cancellationToken);

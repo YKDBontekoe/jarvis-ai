@@ -63,6 +63,7 @@ using var worker = new TemporalWorker(client, new TemporalWorkerOptions(Temporal
     .AddActivity(taskActivities.RunTaskAsync)
     .AddActivity(taskActivities.CompleteApprovedTaskAsync)
     .AddActivity(taskActivities.FailTaskAsync)
+    .AddActivity(taskActivities.GetTaskStatusAsync)
     .AddActivity(conditionWatchActivities.CheckAsync)
     .AddActivity(conditionWatchActivities.FailAsync)
     .AddActivity(briefingActivities.ResolveScheduleAsync)
@@ -318,6 +319,16 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
         await using var scope = scopeFactory.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<IJarvisTaskRepository>()
             .FailAsync(input.TaskId, "Jarvis could not complete this task.", activity.CancellationToken);
+    }
+
+    [Temporalio.Activities.Activity("GetJarvisTaskStatus")]
+    public override async Task<string?> GetTaskStatusAsync(JarvisTaskWorkflowInput input)
+    {
+        var activity = ActivityExecutionContext.Current;
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var task = await scope.ServiceProvider.GetRequiredService<IJarvisTaskRepository>()
+            .GetTaskByIdAsync(input.TaskId, activity.CancellationToken);
+        return task?.Status;
     }
 }
 

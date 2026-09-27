@@ -82,6 +82,27 @@ internal sealed class TemporalWorkflowReconciler(
                             .MarkTaskScheduleDispatchedAsync(task.Id, cancellationToken);
                     }, cancellationToken);
 
+            var terminalTasks = await services.GetRequiredService<IJarvisTaskRepository>()
+                .ListRecentlyTerminalAsync(DateTimeOffset.UtcNow.AddHours(-24), cancellationToken);
+            foreach (var task in terminalTasks)
+                await TryScheduleAsync("task cancel", task.Id,
+                    async () =>
+                    {
+                        try
+                        {
+                            await scheduler.CancelTaskAsync(task.WorkflowId, cancellationToken);
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        catch (Exception exception)
+                        {
+                            logger.LogDebug(exception, "Terminal task workflow {WorkflowId} was already stopped.",
+                                task.WorkflowId);
+                        }
+                    }, cancellationToken);
+
             var watches = await services.GetRequiredService<IConditionWatchRepository>()
                 .ListPendingForSchedulingAsync(cancellationToken);
             foreach (var watch in watches)

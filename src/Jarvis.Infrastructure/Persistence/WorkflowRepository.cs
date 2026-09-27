@@ -101,6 +101,14 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
             .OrderBy(x => x.CreatedAt).Take(200).ToListAsync(cancellationToken))
             .Select(x => x.ToRecord()).ToList();
 
+    public async Task<IReadOnlyList<JarvisTaskRecord>> ListRecentlyTerminalAsync(DateTimeOffset completedAfter,
+        CancellationToken cancellationToken) =>
+        (await db.Tasks.AsNoTracking().Where(x =>
+                (x.Status == "cancelled" || x.Status == "failed" || x.Status == "completed") &&
+                x.CompletedAt != null && x.CompletedAt >= completedAfter)
+            .OrderByDescending(x => x.CompletedAt).Take(100).ToListAsync(cancellationToken))
+            .Select(x => x.ToRecord()).ToList();
+
     public async Task MarkTaskScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken)
     {
         var task = await db.Tasks.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
