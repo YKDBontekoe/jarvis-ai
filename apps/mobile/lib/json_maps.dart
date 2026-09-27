@@ -27,3 +27,20 @@ int asJsonInt(dynamic value, [int fallback = 0]) => switch (value) {
 
 bool asJsonBool(dynamic value, [bool fallback = false]) =>
     value is bool flag ? flag : fallback;
+
+String? firstProblemMessage(dynamic data) {
+  if (data is! Map) return null;
+  final map = Map<String, dynamic>.from(data);
+  final detail = asJsonString(map['detail']);
+  if (detail != null && detail.isNotEmpty) return detail;
+  final errors = map['errors'];
+  if (errors is Map) {
+    for (final value in errors.values) {
+      if (value is List && value.isNotEmpty && value.first is String) {
+        final message = value.first as String;
+        if (message.isNotEmpty) return message;
+      }
+    }
+  }
+  return asJsonString(map['title']);
+}

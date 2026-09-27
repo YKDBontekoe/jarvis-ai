@@ -58,14 +58,16 @@ Future<Map<String, dynamic>?> completeAuthorizationCode(
   session.removeItem(_verifierKey);
   web.window.history.replaceState(null, web.document.title, redirectUri);
 
-  if (error != null) throw StateError('The identity provider denied sign in.');
+  if (error != null) {
+    if (expectedState == null || verifier == null || returnedState != expectedState)
+      return null;
+    throw StateError('The identity provider denied sign in.');
+  }
   if (code == null ||
       expectedState == null ||
       verifier == null ||
       returnedState != expectedState) {
-    throw StateError(
-      'The identity provider returned an invalid sign-in response.',
-    );
+    return null;
   }
 
   final metadata = await _loadMetadata(issuer);

@@ -32,6 +32,25 @@ void main() {
     expect(jsonString({'name': 'x'}, 'id'), isNull);
   });
 
+  test('firstProblemMessage reads ASP.NET detail and error lists', () {
+    expect(
+      firstProblemMessage({
+        'detail': 'Title must contain 1 to 200 characters.',
+      }),
+      'Title must contain 1 to 200 characters.',
+    );
+    expect(
+      firstProblemMessage({
+        'errors': {
+          'timeZoneId': ['Unknown time zone.'],
+        },
+      }),
+      'Unknown time zone.',
+    );
+    expect(firstProblemMessage('nope'), isNull);
+    expect(firstProblemMessage(null), isNull);
+  });
+
   test('asJsonString, asJsonInt, and asJsonBool ignore the wrong JSON types', () {
     expect(asJsonString('ok'), 'ok');
     expect(asJsonString(''), '');

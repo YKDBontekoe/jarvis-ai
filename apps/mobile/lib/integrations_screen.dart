@@ -179,10 +179,9 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                           Navigator.pop(dialogContext, true);
                         }
                       } on DioException catch (error) {
-                        final data = error.response?.data;
-                        final message = data is Map<String, dynamic>
-                            ? _problemMessage(data)
-                            : 'Could not save credential.';
+                        final message =
+                            firstProblemMessage(error.response?.data) ??
+                            'Could not save credential.';
                         if (dialogContext.mounted) {
                           setDialogState(() {
                             dialogError = message;
@@ -205,18 +204,6 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     nameController.dispose();
     valueController.dispose();
     if (saved == true && mounted) await _load();
-  }
-
-  String _problemMessage(Map<String, dynamic> data) {
-    final detail = asJsonString(data['detail']);
-    if (detail != null) return detail;
-    final errors = data['errors'];
-    if (errors is Map<String, dynamic>) {
-      for (final value in errors.values) {
-        if (value is List && value.isNotEmpty) return value.first.toString();
-      }
-    }
-    return 'Could not save credential.';
   }
 
   Future<void> _deleteSecret(String provider, String secretName) async {

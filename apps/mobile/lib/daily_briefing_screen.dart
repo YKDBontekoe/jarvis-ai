@@ -118,18 +118,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
       if (mounted) setState(() => _saved = 'Briefing settings saved.');
     } on DioException catch (error) {
       if (mounted) {
-        final body = error.response?.data;
-        final detail = body is Map
-            ? asJsonString(
-                    Map<String, dynamic>.from(body)['detail'],
-                  ) ??
-                  (body['errors'] is Map
-                      ? (Map<String, dynamic>.from(body['errors'] as Map)
-                            .values
-                            .firstOrNull
-                            ?.toString())
-                      : null)
-            : null;
+        final detail = firstProblemMessage(error.response?.data);
         setState(() => _error = detail ?? 'Could not save briefing settings.');
       }
     } finally {

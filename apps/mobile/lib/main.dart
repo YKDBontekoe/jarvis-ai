@@ -369,6 +369,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _showHome = true;
   int _realtimeGeneration = 0;
   int _openGeneration = 0;
+  int _recentRevision = 0;
   int _initGeneration = 0;
   EventsListener<RoomEvent>? _voiceEvents;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -1892,9 +1893,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _loadRecent() async {
     if (_signedOut || _signingOut) return;
+    final revision = ++_recentRevision;
     try {
       final response = await _http.get<List<dynamic>>('/api/v1/conversations');
-      if (!mounted || _signedOut || _signingOut) return;
+      if (!mounted ||
+          _signedOut ||
+          _signingOut ||
+          revision != _recentRevision) {
+        return;
+      }
       setState(
         () => _recent = jsonMaps(response.data)
             .where((item) => item['id'] is String)
