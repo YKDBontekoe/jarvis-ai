@@ -10,10 +10,10 @@ using System.Net.Sockets;
 
 namespace Jarvis.Mcp;
 
-public sealed class McpToolHost(IConfiguration configuration, ILogger<McpToolHost> logger,
+public sealed partial class McpToolHost(IConfiguration configuration, ILogger<McpToolHost> logger,
     ILoggerFactory loggerFactory,
     ICurrentUser currentUser, IIntegrationCredentialStore credentialStore,
-    IUserMcpServerRegistry userMcpServers) : IAsyncDisposable
+    IUserMcpServerRegistry userMcpServers, IOwnerMcpPolicyStore ownerPolicy) : IAsyncDisposable
 {
     private readonly List<IAsyncDisposable> _clients = [];
     private IReadOnlyList<AITool> _tools = [];
@@ -45,35 +45,24 @@ public sealed class McpToolHost(IConfiguration configuration, ILogger<McpToolHos
     {
         if (_initialized) return;
 
-        var configuredServers = configuration.GetSection("Mcp:Servers").GetChildren()
-            .Select(section => section.Get<McpServerOptions>())
-            .Where(server => server is not null)
-            .Cast<McpServerOptions>()
-            .ToList();
-        foreach (var userServer in await userMcpServers.ListAsync(currentUser.OwnerId, cancellationToken))
-        {
-            var secrets = await credentialStore.GetSecretsAsync(currentUser.OwnerId, userServer.Id, cancellationToken);
-            var server = new McpServerOptions
-            {
-                Name = userServer.Name,
-                Transport = "streamableHttp",
-                Endpoint = userServer.Endpoint,
-                AllowedTools = userServer.AllowedTools.ToArray(),
-                CredentialProvider = userServer.Id,
-                ConnectionTimeoutSeconds = 30
-            };
-            if (secrets?.TryGetValue("token", out _) == true)
-            {
-                server.CredentialHeaders["Authorization"] = "token";
-                server.CredentialHeaderPrefixes["Authorization"] = "Bearer";
-            }
-            configuredServers.Add(server);
-        }
-        var servers = configuredServers.ToArray();
+        var policy = await ownerPolicy.GetAsync(currentUser.OwnerId, cancellationToken);
+        var configuredServers = McpServerConfiguration.Read(configuration).ToList();
         var tools = new List<AITool>();
         var toolNames = new HashSet<string>(StringComparer.Ordinal);
         var statuses = new List<McpServerConnectionStatus>();
-        foreach (var server in servers)
+        foreach (var userServer in await userMcpServers.ListAsync(currentUser.OwnerId, cancellationToken))
+        {
+            if (!userServer.Enabled)
+            {
+                statuses.Add(new McpServerConnectionStatus(userServer.Name, "paused", 0, "paused_by_owner",
+                    userServer.Id, false, userServer.AllowedTools));
+                continue;
+            }
+            configuredServers.Add(await CreateUserServerOptionsAsync(userServer, cancellationToken));
+        }
+
+        var servers = new List<McpServerOptions>();
+        foreach (var server in configuredServers)
         {
             if (string.IsNullOrWhiteSpace(server.Name))
             {
@@ -81,55 +70,95 @@ public sealed class McpToolHost(IConfiguration configuration, ILogger<McpToolHos
                 statuses.Add(new McpServerConnectionStatus("(unnamed)", "unavailable", 0, "invalid_configuration"));
                 continue;
             }
+            if (!IntegrationCredentialProviders.IsUserMcpServerId(server.CredentialProvider) &&
+                policy.TryGetValue(server.Name, out var hostPolicy))
+            {
+                if (!hostPolicy.Enabled)
+                {
+                    statuses.Add(new McpServerConnectionStatus(server.Name, "paused", 0, "paused_by_owner",
+                        null, false, null));
+                    continue;
+                }
+                if (hostPolicy.AllowedTools is { Count: > 0 })
+                {
+                    server.AllowedTools = McpToolSelection.Restrict(server.AllowedTools, hostPolicy.AllowedTools);
+                    server.OwnerNarrowed = true;
+                }
+            }
             if (server.AllowedTools.Length == 0)
             {
                 logger.LogWarning("Skipping MCP server {ServerName}: no tools are explicitly allowlisted.", server.Name);
-                statuses.Add(new McpServerConnectionStatus(server.Name, "disabled", 0, "no_tools_allowlisted"));
+                statuses.Add(new McpServerConnectionStatus(server.Name, "disabled", 0,
+                    server.OwnerNarrowed ? "no_matching_tools" : "no_tools_allowlisted", UserServerId(server), true, []));
                 continue;
             }
+            servers.Add(server);
+        }
 
+        foreach (var server in servers)
+        {
             IAsyncDisposable? client = null;
             try
             {
                 var credentialResolution = await ResolveCredentialsAsync(server, cancellationToken);
                 if (!credentialResolution.Ready)
                 {
-                    statuses.Add(new McpServerConnectionStatus(server.Name, "needs_credentials", 0, "credentials_required"));
+                    statuses.Add(new McpServerConnectionStatus(server.Name, "needs_credentials", 0, "credentials_required",
+                        UserServerId(server), true, null));
                     continue;
                 }
                 var serverSecrets = credentialResolution.Secrets;
-                if (server.CredentialProvider?.StartsWith("jarvis-mcp-", StringComparison.Ordinal) == true)
+                if (IntegrationCredentialProviders.IsUserMcpServerId(server.CredentialProvider))
                     await McpServerEndpointValidator.ValidateAsync(server.Endpoint, cancellationToken);
 
                 var connectedClient = await McpClient.CreateAsync(CreateTransport(server, loggerFactory), cancellationToken: cancellationToken);
                 client = connectedClient;
                 var availableTools = await connectedClient.ListToolsAsync(cancellationToken: cancellationToken);
-                var allowAllTools = server.AllowedTools.Contains("*", StringComparer.Ordinal);
+                var allowAllTools = McpToolSelection.AllowsAll(server.AllowedTools);
                 var availableNames = availableTools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
+                if (allowAllTools && availableNames.Count > McpToolSelection.MaxTools)
+                {
+                    await CloseQuietlyAsync(connectedClient);
+                    client = null;
+                    statuses.Add(new McpServerConnectionStatus(server.Name, "unavailable", 0, "too_many_tools",
+                        UserServerId(server), true, null));
+                    logger.LogWarning("Skipping MCP server {ServerName}: it exposes {ToolCount} tools, above the {MaxTools} tool limit.",
+                        server.Name, availableNames.Count, McpToolSelection.MaxTools);
+                    continue;
+                }
                 var allowed = allowAllTools
                     ? availableNames
                     : server.AllowedTools.ToHashSet(StringComparer.Ordinal);
+                if (server.OwnerNarrowed)
+                {
+                    allowed.IntersectWith(availableNames);
+                    if (allowed.Count == 0)
+                    {
+                        await CloseQuietlyAsync(connectedClient);
+                        client = null;
+                        statuses.Add(new McpServerConnectionStatus(server.Name, "disabled", 0, "no_matching_tools",
+                            UserServerId(server), true, []));
+                        continue;
+                    }
+                }
                 var autoApproved = server.AutoApprovedTools.ToHashSet(StringComparer.Ordinal);
+                if (server.OwnerNarrowed) autoApproved.IntersectWith(allowed);
                 ValidateApprovalPolicy(allowed, autoApproved, server.Name);
-                var transportSecrets = server.Headers.Values
-                    .Concat(server.EnvironmentVariables.Values)
-                    .Concat(serverSecrets?.Values ?? [])
-                    .Where(value => !string.IsNullOrEmpty(value))
-                    .Select(value => value!)
-                    .Distinct(StringComparer.Ordinal)
-                    .ToArray();
+                var transportSecrets = SecretValues(serverSecrets, server);
+                var serverKey = UserServerId(server) ?? server.Name;
                 var selected = availableTools.Where(tool => allowed.Contains(tool.Name)).Select(tool =>
                 {
                     if (tool is not AIFunction function)
                         throw new InvalidOperationException($"MCP tool '{tool.Name}' cannot be wrapped in an approval requirement.");
-                    var protectedFunction = transportSecrets.Length == 0
+                    AIFunction protectedFunction = transportSecrets.Length == 0
                         ? function
                         : new SecretRedactingAIFunction(function, transportSecrets);
+                    protectedFunction = new GuardedMcpTool(protectedFunction, this, serverKey, tool.Name);
                     return autoApproved.Contains(tool.Name)
                         ? (AITool)protectedFunction
                         : new ApprovalRequiredAIFunction(protectedFunction);
                 }).ToArray();
-                var missing = allowAllTools
+                var missing = allowAllTools || server.OwnerNarrowed
                     ? []
                     : allowed.Except(availableNames, StringComparer.Ordinal).ToArray();
                 if (missing.Length != 0)
@@ -142,8 +171,10 @@ public sealed class McpToolHost(IConfiguration configuration, ILogger<McpToolHos
                 tools.AddRange(selected);
                 foreach (var tool in selected) toolNames.Add(tool.Name);
                 _clients.Add(connectedClient);
+                Remember(server, new LiveSession(connectedClient, transportSecrets));
                 client = null;
-                statuses.Add(new McpServerConnectionStatus(server.Name, "connected", selected.Length, null));
+                statuses.Add(new McpServerConnectionStatus(server.Name, "connected", selected.Length, null,
+                    UserServerId(server), true, selected.Select(tool => tool.Name).ToArray()));
                 logger.LogInformation("Connected MCP server {ServerName}; enabled {ToolCount} allowlisted tools.", server.Name, selected.Length);
             }
             catch (Exception exception) when (CancellationExceptions.Unwrap(exception) is { } canceled)
@@ -153,15 +184,11 @@ public sealed class McpToolHost(IConfiguration configuration, ILogger<McpToolHos
             }
             catch (Exception exception)
             {
-                if (client is not null)
-                {
-                    try { await client.DisposeAsync(); }
-                    catch { /* Keep the owning agent run available when an optional server fails. */ }
-                }
+                if (client is not null) await CloseQuietlyAsync(client);
                 var issue = exception is ArgumentException or InvalidOperationException
                     ? "invalid_configuration"
                     : "server_unavailable";
-                statuses.Add(new McpServerConnectionStatus(server.Name, "unavailable", 0, issue));
+                statuses.Add(new McpServerConnectionStatus(server.Name, "unavailable", 0, issue, UserServerId(server)));
                 logger.LogWarning("Skipping MCP server {ServerName} after initialization failure ({FailureType}).",
                     server.Name, exception.GetType().Name);
             }
@@ -170,6 +197,40 @@ public sealed class McpToolHost(IConfiguration configuration, ILogger<McpToolHos
         _tools = tools;
         _statuses = statuses;
         _initialized = true;
+    }
+
+    private async Task<McpServerOptions> CreateUserServerOptionsAsync(UserMcpServer userServer,
+        CancellationToken cancellationToken)
+    {
+        var secrets = await credentialStore.GetSecretsAsync(currentUser.OwnerId, userServer.Id, cancellationToken);
+        var server = new McpServerOptions
+        {
+            Name = userServer.Name,
+            Transport = "streamableHttp",
+            Endpoint = userServer.Endpoint,
+            AllowedTools = userServer.AllowedTools.ToArray(),
+            CredentialProvider = userServer.Id,
+            ConnectionTimeoutSeconds = 30
+        };
+        if (secrets?.ContainsKey("token") == true)
+        {
+            server.CredentialHeaders["Authorization"] = "token";
+            server.CredentialHeaderPrefixes["Authorization"] = "Bearer";
+        }
+        return server;
+    }
+
+    private static string? UserServerId(McpServerOptions server) =>
+        IntegrationCredentialProviders.IsUserMcpServerId(server.CredentialProvider) ? server.CredentialProvider : null;
+
+    private static string[] SecretValues(IReadOnlyDictionary<string, string>? secrets, McpServerOptions server) =>
+        server.Headers.Values.Concat(server.EnvironmentVariables.Values).Concat(secrets?.Values ?? [])
+            .Where(value => !string.IsNullOrEmpty(value)).Select(value => value!).Distinct(StringComparer.Ordinal).ToArray();
+
+    private static async Task CloseQuietlyAsync(IAsyncDisposable client)
+    {
+        try { await client.DisposeAsync(); }
+        catch { /* Keep the owning agent run available when an optional server fails. */ }
     }
 
     private async Task<(bool Ready, IReadOnlyDictionary<string, string>? Secrets)> ResolveCredentialsAsync(
@@ -327,7 +388,22 @@ public sealed class McpToolHost(IConfiguration configuration, ILogger<McpToolHos
     }
 }
 
-public sealed record McpServerConnectionStatus(string Name, string State, int ToolCount, string? Issue);
+public sealed record McpServerConnectionStatus(string Name, string State, int ToolCount, string? Issue,
+    string? Id = null, bool Enabled = true, IReadOnlyList<string>? Tools = null);
+
+public static class McpServerConfiguration
+{
+    public static McpServerOptions[] Read(IConfiguration configuration) =>
+        configuration.GetSection("Mcp:Servers").GetChildren()
+            .Select(section => section.Get<McpServerOptions>())
+            .Where(server => server is not null)
+            .Cast<McpServerOptions>()
+            .ToArray();
+
+    public static McpServerOptions? Find(IConfiguration configuration, string name) =>
+        Read(configuration).FirstOrDefault(server =>
+            server.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+}
 
 public sealed class McpServerOptions
 {
@@ -344,6 +420,7 @@ public sealed class McpServerOptions
     public Dictionary<string, string> CredentialHeaderPrefixes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public string[] AllowedTools { get; set; } = [];
     public string[] AutoApprovedTools { get; set; } = [];
+    public bool OwnerNarrowed { get; set; }
     public string? WorkingDirectory { get; set; }
     public int ConnectionTimeoutSeconds { get; set; } = 30;
 }
