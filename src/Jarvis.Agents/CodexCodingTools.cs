@@ -341,9 +341,18 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
             return true;
 
         return name.Equals("id_rsa", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("id_dsa", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("id_ecdsa", StringComparison.OrdinalIgnoreCase) ||
                name.Equals("id_ed25519", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("id_rsa_sk", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("id_dsa_sk", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("id_ecdsa_sk", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("id_ed25519_sk", StringComparison.OrdinalIgnoreCase) ||
                name.Equals("auth.json", StringComparison.OrdinalIgnoreCase) ||
                name.Equals("credentials.json", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("credentials", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("application_default_credentials.json", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".envrc", StringComparison.OrdinalIgnoreCase) ||
                name.Equals(".npmrc", StringComparison.OrdinalIgnoreCase) ||
                name.Equals(".yarnrc", StringComparison.OrdinalIgnoreCase) ||
                name.Equals(".yarnrc.yml", StringComparison.OrdinalIgnoreCase) ||

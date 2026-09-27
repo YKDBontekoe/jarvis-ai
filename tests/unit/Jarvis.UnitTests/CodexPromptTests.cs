@@ -34,6 +34,15 @@ public sealed class CodexPromptTests
     [InlineData(".kube/config")]
     [InlineData(".docker/config.json")]
     [InlineData(".pgpass")]
+    [InlineData("id_ecdsa")]
+    [InlineData("deploy/id_dsa")]
+    [InlineData("id_ed25519_sk")]
+    [InlineData("keys/id_ecdsa_sk")]
+    [InlineData(".envrc")]
+    [InlineData("backend/.envrc")]
+    [InlineData("credentials")]
+    [InlineData("ops/credentials")]
+    [InlineData("application_default_credentials.json")]
     public void Credential_filenames_are_sensitive_coding_paths(string path) =>
         Assert.True(CodexCodingTools.IsSensitivePath(path));
 
