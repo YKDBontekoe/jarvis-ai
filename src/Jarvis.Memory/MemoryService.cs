@@ -5,9 +5,10 @@ using Jarvis.Domain.Memory;
 
 namespace Jarvis.Memory;
 
-public sealed class MemoryService(IMemoryRepository repository) : IMemoryService
+public sealed class MemoryService(IMemoryRepository repository, IMemoryIndexRepository? index = null,
+    IMemoryEmbedder? embedder = null) : IMemoryService
 {
-    private static readonly HashSet<string> Kinds = ["preference", "fact", "decision", "project", "event", "relationship", "technical", "routine", "other"];
+    internal const double MinimumSemanticSimilarity = 0.3;
 
     public async Task<MemoryRecord> CreateAsync(Guid ownerId, string kind, string content, float importance,
         float confidence, DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken,
@@ -36,7 +37,7 @@ public sealed class MemoryService(IMemoryRepository repository) : IMemoryService
 
     public Task<IReadOnlyList<MemoryRecord>> ListAsync(Guid ownerId, string? kind, CancellationToken cancellationToken)
     {
-        if (kind is not null && !Kinds.Contains(kind)) throw new ArgumentException("Unknown memory kind.", nameof(kind));
+        if (!MemoryKinds.IsValidFilter(kind)) throw new ArgumentException("Unknown memory kind.", nameof(kind));
         return repository.ListAsync(ownerId, kind, cancellationToken);
     }
 
@@ -64,17 +65,21 @@ public sealed class MemoryService(IMemoryRepository repository) : IMemoryService
         try
         {
             if (string.IsNullOrWhiteSpace(query)) return hits;
-            if (kind is not null && !Kinds.Contains(kind))
+            if (!MemoryKinds.IsValidFilter(kind))
                 throw new ArgumentException("Unknown memory kind.", nameof(kind));
             if (!await repository.HasActiveMemoriesAsync(ownerId, cancellationToken)) return hits;
 
             var textResults = await repository.SearchTextAsync(ownerId, query, kind, cancellationToken);
             var trigramResults = await repository.SearchTrigramAsync(ownerId, query, kind, cancellationToken);
+            var semanticResults = await SearchSemanticAsync(ownerId, query, kind, cancellationToken);
+            activity?.SetTag("jarvis.memory.semantic_hits", semanticResults.Count);
             var scores = new Dictionary<Guid, double>();
             AddRanks(textResults, scores);
             AddRanks(trigramResults, scores);
+            AddRanks(semanticResults, scores);
 
-            var all = textResults.Concat(trigramResults).DistinctBy(x => x.Id).ToDictionary(x => x.Id);
+            var all = textResults.Concat(trigramResults).Concat(semanticResults).DistinctBy(x => x.Id)
+                .ToDictionary(x => x.Id);
             hits = scores.Select(pair => new MemorySearchHit(all[pair.Key], pair.Value + RecencyBoost(all[pair.Key])))
                 .OrderByDescending(x => x.Score).Take(8).ToList();
             activity?.SetTag("jarvis.memory.hit_count", hits.Count);
@@ -99,6 +104,27 @@ public sealed class MemoryService(IMemoryRepository repository) : IMemoryService
         }
     }
 
+    private async Task<IReadOnlyList<MemoryRecord>> SearchSemanticAsync(Guid ownerId, string query, string? kind,
+        CancellationToken cancellationToken)
+    {
+        if (index is null || embedder is null) return [];
+        try
+        {
+            var embeddings = await embedder.EmbedAsync(ownerId, [query], cancellationToken);
+            return embeddings is [var embedding]
+                ? await index.SearchSemanticAsync(ownerId, embedding, kind, MinimumSemanticSimilarity, 20,
+                    cancellationToken)
+                : [];
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException ||
+                                          !cancellationToken.IsCancellationRequested)
+        {
+            // Keyword search still answers when the embedding provider is unavailable.
+            Activity.Current?.AddEvent(new ActivityEvent("jarvis.memory.semantic_unavailable"));
+            return [];
+        }
+    }
+
     private static void AddRanks(IReadOnlyList<MemoryRecord> memories, Dictionary<Guid, double> scores)
     {
         for (var index = 0; index < memories.Count; index++)
@@ -116,7 +142,7 @@ public sealed class MemoryService(IMemoryRepository repository) : IMemoryService
 
     private static void Validate(string kind, string content, float importance, float confidence)
     {
-        if (!Kinds.Contains(kind)) throw new ArgumentException("Unknown memory kind.", nameof(kind));
+        if (!MemoryKinds.IsValid(kind)) throw new ArgumentException("Unknown memory kind.", nameof(kind));
         if (string.IsNullOrWhiteSpace(content) || content.Length > 8_000) throw new ArgumentException("Memory content must contain 1 to 8,000 characters.", nameof(content));
         if (importance is < 0 or > 1 || confidence is < 0 or > 1) throw new ArgumentOutOfRangeException(nameof(importance), "Importance and confidence must be between zero and one.");
     }

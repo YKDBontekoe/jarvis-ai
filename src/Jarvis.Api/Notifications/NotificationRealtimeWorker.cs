@@ -52,7 +52,9 @@ public sealed class NotificationRealtimeWorker(
                 _watermark = latest;
                 _cursorId = await db.Notifications.AsNoTracking()
                     .Where(x => x.CreatedAt == latest)
-                    .MaxAsync(x => x.Id, cancellationToken);
+                    .OrderByDescending(x => x.Id)
+                    .Select(x => x.Id)
+                    .FirstAsync(cancellationToken);
             }
             _seeded = true;
             return;

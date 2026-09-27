@@ -18,7 +18,7 @@ public sealed class MemoryRepository(JarvisDbContext db) : IMemoryRepository
         var memory = new MemoryEntity
         {
             Id = Guid.CreateVersion7(), OwnerId = ownerId, Kind = kind, Content = content,
-            Importance = importance, Confidence = confidence, Embedding = null,
+            Importance = importance, Confidence = confidence, Embedding = null, EmbeddingModel = null, GraphIndexedAt = null,
             SourceType = sourceType, SourceId = sourceId, CreatedAt = now, UpdatedAt = now,
             ValidUntil = validUntil, IsPinned = isPinned
         };
@@ -41,12 +41,15 @@ public sealed class MemoryRepository(JarvisDbContext db) : IMemoryRepository
         var replacement = new MemoryEntity
         {
             Id = Guid.CreateVersion7(), OwnerId = ownerId, Kind = kind, Content = content,
-            Importance = importance, Confidence = confidence, Embedding = null,
+            Importance = importance, Confidence = confidence, Embedding = null, EmbeddingModel = null, GraphIndexedAt = null,
             SourceType = sourceType, SourceId = sourceId, CreatedAt = now, UpdatedAt = now,
             ValidUntil = null, IsPinned = false
         };
         db.Memories.Add(replacement);
         await db.SaveChangesAsync(cancellationToken);
+        await db.GraphRelations
+            .Where(x => x.OwnerId == ownerId && x.SourceMemoryId == existing.Id && x.ValidTo == null)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.ValidTo, now), cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return replacement.ToRecord();
     }
@@ -75,6 +78,8 @@ public sealed class MemoryRepository(JarvisDbContext db) : IMemoryRepository
         memory.Importance = importance;
         memory.Confidence = confidence;
         memory.Embedding = null;
+        memory.EmbeddingModel = null;
+        memory.GraphIndexedAt = null;
         memory.ValidUntil = validUntil;
         memory.IsPinned = isPinned;
         memory.UpdatedAt = DateTimeOffset.UtcNow;

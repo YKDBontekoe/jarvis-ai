@@ -3,18 +3,17 @@ using Jarvis.Application.Conversations;
 
 namespace Jarvis.Api.Security;
 
-public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor, IConfiguration configuration, IWebHostEnvironment environment) : ICurrentUser
+public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor, OwnerExecutionContext ownerContext,
+    IConfiguration configuration, IWebHostEnvironment environment) : ICurrentUser
 {
     public Guid OwnerId
     {
         get
         {
-            var context = httpContextAccessor.HttpContext;
-            if (context?.Items.TryGetValue("Jarvis.InternalVoiceOwnerId", out var trustedOwnerId) == true &&
-                trustedOwnerId is Guid ownerId)
-                return ownerId;
+            if (ownerContext.OwnerId is { } trustedOwnerId)
+                return trustedOwnerId;
 
-            var principal = context?.User;
+            var principal = httpContextAccessor.HttpContext?.User;
             var subject = principal?.FindFirstValue("sub") ?? principal?.FindFirstValue(ClaimTypes.NameIdentifier);
             if (Guid.TryParse(subject, out var userId))
                 return userId;

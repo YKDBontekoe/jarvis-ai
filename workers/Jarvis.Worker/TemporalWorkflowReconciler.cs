@@ -16,6 +16,8 @@ internal sealed class TemporalWorkflowReconciler(
     ILogger<TemporalWorkflowReconciler> logger) : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromMinutes(10);
+    private DateTimeOffset _nextHeartbeatReconcile = DateTimeOffset.MinValue;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -152,6 +154,23 @@ internal sealed class TemporalWorkflowReconciler(
                         await briefingRepository.MarkScheduleDispatchedAsync(briefing.OwnerId,
                             briefing.WorkflowId, cancellationToken);
                     }, cancellationToken);
+
+            if (DateTimeOffset.UtcNow >= _nextHeartbeatReconcile)
+            {
+                _nextHeartbeatReconcile = DateTimeOffset.UtcNow + HeartbeatInterval;
+                var settingsStore = services.GetRequiredService<Jarvis.Application.Settings.IOwnerSettingsStore>();
+                var heartbeatScheduler = services.GetRequiredService<Jarvis.Application.Learning.IHeartbeatScheduler>();
+                foreach (var ownerId in await settingsStore.ListOwnersAsync(
+                             Jarvis.Application.Settings.SettingsSections.Learning, cancellationToken))
+                {
+                    var learning = await settingsStore.GetAsync<Jarvis.Application.Settings.LearningSettings>(ownerId,
+                        Jarvis.Application.Settings.SettingsSections.Learning, cancellationToken);
+                    if (learning is { HeartbeatEnabled: true })
+                        await TryScheduleAsync("heartbeat", ownerId,
+                            () => heartbeatScheduler.ScheduleHeartbeatAsync(ownerId, cancellationToken),
+                            cancellationToken);
+                }
+            }
 
             await fileRepository.RequeueStaleQueuedAsync(
                 DateTimeOffset.UtcNow.AddMinutes(-FileIndexing.QueuedDispatchStaleMinutes), cancellationToken);

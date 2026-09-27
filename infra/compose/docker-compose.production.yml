@@ -159,6 +159,9 @@ services:
       LiveKit__InternalUrl: http://livekit:7880
       LiveKit__PublicUrl: wss://${LIVEKIT_DOMAIN:?Set LIVEKIT_DOMAIN}
       Voice__WorkerSecret: ${VOICE_WORKER_SECRET:?Set VOICE_WORKER_SECRET}
+      Jarvis__PublicBaseUrl: ${JARVIS_WEB_ORIGIN:?Set JARVIS_WEB_ORIGIN}
+      Channels__PublicBaseUrl: ${JARVIS_WEB_ORIGIN:?Set JARVIS_WEB_ORIGIN}
+      Channels__Signal__BaseUrl: ${SIGNAL_CLI_REST_URL:-}
       Push__FirebaseProjectId: ${FIREBASE_PROJECT_ID:-}
       Push__GoogleServiceAccountFile: /run/secrets/firebase-service-account.json
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}

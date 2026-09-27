@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Jarvis.Agents.ModelProviders;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Memory;
 using Jarvis.Domain.Memory;
@@ -8,13 +9,11 @@ using Microsoft.Extensions.Logging;
 namespace Jarvis.Agents;
 
 internal sealed class ConversationMemoryExtractor(
-    IChatClient chatClient,
+    IChatClientResolver chatClients,
     IMemoryService memories,
     IAuditEventStore auditEvents,
     ILogger<ConversationMemoryExtractor> logger) : IConversationMemoryExtractor
 {
-    private static readonly HashSet<string> SupportedKinds =
-        ["preference", "fact", "decision", "project", "event", "relationship", "technical", "routine", "other"];
 
     public async Task ExtractAndStoreAsync(Guid ownerId, Guid sourceMessageId, string userMessage, CancellationToken cancellationToken)
     {
@@ -30,6 +29,7 @@ internal sealed class ConversationMemoryExtractor(
                 .Where(memory => memory.ValidUntil is null || memory.ValidUntil > DateTimeOffset.UtcNow)
                 .ToArray();
 
+        var chatClient = await chatClients.GetChatClientAsync(ownerId, ModelPurpose.Background, cancellationToken);
         var response = await chatClient.GetResponseAsync(
             [
                 new ChatMessage(ChatRole.System, """
@@ -74,7 +74,7 @@ internal sealed class ConversationMemoryExtractor(
         {
             var kind = candidate.Kind?.Trim().ToLowerInvariant();
             var content = candidate.Content?.Trim();
-            if (kind is null || !SupportedKinds.Contains(kind) || string.IsNullOrWhiteSpace(content) ||
+            if (!MemoryKinds.IsValid(kind) || string.IsNullOrWhiteSpace(content) ||
                 content.Length > 500 || candidate.Confidence is < 0.82f or > 1f || candidate.Importance is < 0f or > 1f ||
                 MemoryAgentTools.LooksLikeSecret(content))
                 continue;

@@ -41,6 +41,17 @@ public interface IConversationMemoryExtractor
     Task ExtractAndStoreAsync(Guid ownerId, Guid sourceMessageId, string userMessage, CancellationToken cancellationToken);
 }
 
+public static class MemoryKinds
+{
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
+        { "preference", "fact", "decision", "project", "event", "relationship", "technical", "routine", "other" };
+
+    public static bool IsValid([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] string? kind) =>
+        kind is not null && All.Contains(kind);
+
+    public static bool IsValidFilter(string? kind) => kind is null || All.Contains(kind);
+}
+
 public static class MemoryValidity
 {
     public static DateTimeOffset? ForUpdate(DateTimeOffset? validUntil) =>

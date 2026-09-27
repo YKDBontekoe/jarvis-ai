@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Memory;
+using Jarvis.Agents.ModelProviders;
 
 namespace Jarvis.Agents;
 
@@ -31,8 +32,33 @@ public static class DependencyInjection
                 sourceName: "Jarvis.CodexChatClient",
                 configure: telemetry => telemetry.EnableSensitiveData = false)
             .Build());
+        services.AddSingleton<OpenAiCompatibleClientFactory>();
+        services.AddScoped<IChatClientResolver, ChatClientResolver>();
         services.AddScoped<IConversationMemoryExtractor, ConversationMemoryExtractor>();
         services.AddScoped<MemoryReranker>();
+        services.AddScoped<IAgentToolContributor, CoreAgentTools>();
+        services.AddScoped<IAgentContextContributor, CoreAgentContext>();
+        services.AddScoped<IAgentToolContributor, Skills.SkillToolContributor>();
+        services.AddScoped<IAgentContextContributor, Skills.SkillContextContributor>();
+        services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();
+        services.AddScoped<IAgentContextContributor, Persona.PersonaContextContributor>();
+        services.AddScoped<IMemoryEmbedder, Memory.ResolverMemoryEmbedder>();
+        services.AddScoped<Memory.KnowledgeGraphExtractor>();
+        services.AddScoped<Memory.MemoryIndexer>();
+        services.AddScoped<IAgentToolContributor, Memory.KnowledgeGraphToolContributor>();
+        services.AddScoped<IAgentContextContributor, Memory.KnowledgeGraphContextContributor>();
+        services.AddSingleton<Jarvis.Application.Realtime.IRealtimePublisher, Jarvis.Application.Realtime.NoOpRealtimePublisher>();
+        services.AddSingleton<Jarvis.Application.Devices.IDeviceInvoker, Jarvis.Application.Devices.NoOpDeviceInvoker>();
+        services.AddScoped<IAgentToolContributor, Surfaces.SurfaceToolContributor>();
+        services.AddScoped<IAgentContextContributor, Surfaces.SurfaceContextContributor>();
+        services.AddScoped<IAgentToolContributor, Networking.RemoteAgentToolContributor>();
+        services.AddScoped<IAgentContextContributor, Networking.RemoteAgentContextContributor>();
+        services.AddScoped<IAgentToolContributor, Devices.DeviceToolContributor>();
+        services.AddScoped<IAgentContextContributor, Devices.DeviceContextContributor>();
+        services.AddScoped<IAgentToolContributor, Browser.BrowserToolContributor>();
+        services.AddScoped<IAgentContextContributor, Browser.BrowserContextContributor>();
+        services.AddScoped<Learning.ReflectionService>();
+        services.AddScoped<Learning.HeartbeatService>();
         services.AddScoped<JarvisAgentFactory>();
         services.AddScoped<IJarvisAgent, JarvisAgent>();
         return services;

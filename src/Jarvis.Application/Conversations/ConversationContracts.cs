@@ -15,6 +15,13 @@ public interface IConversationStore
     Task SaveAgentSessionAsync(Guid conversationId, string state, CancellationToken cancellationToken);
 }
 
+/// <summary>Owner-wide, read-only history used by background learning.</summary>
+public interface IConversationHistory
+{
+    Task<IReadOnlyList<Message>> ListRecentMessagesAsync(Guid ownerId, DateTimeOffset since, int limit,
+        CancellationToken cancellationToken);
+}
+
 public enum ConversationDeleteResult
 {
     Deleted,

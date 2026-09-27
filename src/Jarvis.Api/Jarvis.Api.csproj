@@ -12,4 +12,7 @@
     <PackageReference Include="Microsoft.OpenApi" />
     <PackageReference Include="Google.Apis.Auth" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jarvis.UnitTests" />
+  </ItemGroup>
 </Project>

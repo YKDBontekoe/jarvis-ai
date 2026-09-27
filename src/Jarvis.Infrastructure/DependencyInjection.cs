@@ -33,11 +33,20 @@ public static class DependencyInjection
         }
 
         services.AddDbContext<JarvisDbContext>(options => options.UseNpgsql(connectionString, npgsql => npgsql.UseVector()));
-        services.AddScoped<IConversationStore, ConversationStore>();
+        services.AddScoped<ConversationStore>();
+        services.AddScoped<IConversationStore>(provider => provider.GetRequiredService<ConversationStore>());
+        services.AddScoped<IConversationHistory>(provider => provider.GetRequiredService<ConversationStore>());
         services.AddScoped<IConversationRunLock>(serviceProvider => new PostgresConversationRunLock(
             connectionString,
             serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PostgresConversationRunLock>>()));
         services.AddScoped<IMemoryRepository, MemoryRepository>();
+        services.AddScoped<IMemoryIndexRepository, MemoryIndexRepository>();
+        services.AddScoped<IKnowledgeGraphRepository, KnowledgeGraphRepository>();
+        services.AddScoped<Jarvis.Application.Channels.IChannelRepository, ChannelRepository>();
+        services.AddScoped<Jarvis.Application.Surfaces.IUiSurfaceRepository, UiSurfaceRepository>();
+        services.AddScoped<Jarvis.Application.Agents.IRemoteAgentRepository, RemoteAgentRepository>();
+        services.AddScoped<Jarvis.Application.Agents.IA2ATokenRepository, A2ATokenRepository>();
+        services.AddScoped<Jarvis.Application.Browser.IBrowserSessionStore, BrowserSessionRepository>();
         services.AddScoped<IToolApprovalStore, ToolApprovalStore>();
         services.AddScoped<IAuditEventStore, AuditEventStore>();
         services.AddScoped<IReminderRepository, WorkflowRepository>();
@@ -49,6 +58,10 @@ public static class DependencyInjection
         services.AddScoped<IIntegrationCredentialStore, IntegrationCredentialStore>();
         services.AddScoped<IUserMcpServerRegistry, UserMcpServerRegistry>();
         services.AddScoped<IDailyBriefingRepository, DailyBriefingRepository>();
+        services.AddScoped<Jarvis.Application.Settings.IOwnerSettingsStore, OwnerSettingsStore>();
+        services.AddScoped<Jarvis.Application.Skills.ISkillRepository, SkillRepository>();
+        services.AddScoped<Jarvis.Application.Persona.IMessageFeedbackRepository, MessageFeedbackRepository>();
+        services.AddScoped<Jarvis.Application.Persona.PersonaService>();
         services.AddScoped<IFileService, FileService>();
         services.AddScoped<IFileMalwareScanner, ClamAvVirusScanner>();
         services.AddScoped<IFileSearchService, FileSearchService>();

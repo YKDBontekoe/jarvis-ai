@@ -1,0 +1,110 @@
+using System.Text.Json;
+using Jarvis.Agents.ModelProviders;
+using Jarvis.Application.Audit;
+using Jarvis.Application.Conversations;
+using Jarvis.Application.Integrations;
+using Jarvis.Application.Settings;
+
+namespace Jarvis.Api.Endpoints;
+
+public sealed record ModelSettingsDto(string Provider, string? ChatModel, string? FastModel, string? EmbeddingModel,
+    bool OpenRouterKeyConfigured, IReadOnlyList<string> Providers);
+public sealed record SaveModelSettingsRequest(string? Provider, string? ChatModel, string? FastModel,
+    string? EmbeddingModel);
+
+internal static class ModelSettingsEndpoints
+{
+    public static RouteGroupBuilder MapModelSettingsEndpoints(this RouteGroupBuilder api, ILogger logger)
+    {
+        var models = api.MapGroup("/settings/models");
+
+        models.MapGet("", async (IOwnerSettingsStore settings, IIntegrationCredentialStore credentials,
+                ICurrentUser currentUser, CancellationToken ct) =>
+            Results.Ok(await ToDtoAsync(currentUser.OwnerId, settings, credentials, ct)))
+            .WithName("GetModelSettings");
+
+        models.MapPut("", async (SaveModelSettingsRequest request, IOwnerSettingsStore settings,
+            IIntegrationCredentialStore credentials, IAuditEventStore audit, ICurrentUser currentUser,
+            CancellationToken ct) =>
+        {
+            ModelSettings normalized;
+            try
+            {
+                normalized = new ModelSettings(request.Provider ?? ModelSettings.Codex, request.ChatModel,
+                    request.FastModel, request.EmbeddingModel).Normalize();
+            }
+            catch (ArgumentException exception)
+            {
+                return EndpointHelpers.Invalid("provider", exception.Message);
+            }
+            if (normalized.UsesOpenRouter && !await HasOpenRouterKeyAsync(currentUser.OwnerId, credentials, ct))
+                return EndpointHelpers.Invalid("provider", "Save an OpenRouter API key before selecting OpenRouter.");
+            await settings.SaveAsync(currentUser.OwnerId, SettingsSections.Models, normalized, ct);
+            await EndpointHelpers.TryAppendAuditAsync(audit, logger, currentUser.OwnerId, "settings",
+                "models.updated", "moderate", true, null,
+                JsonSerializer.Serialize(new { provider = normalized.Provider, chatModel = normalized.ChatModel }), ct);
+            return Results.Ok(await ToDtoAsync(currentUser.OwnerId, settings, credentials, ct));
+        }).WithName("SaveModelSettings");
+
+        models.MapPut("/openrouter-key", async (SaveIntegrationSecretRequest request,
+            IIntegrationCredentialStore credentials, IOwnerSettingsStore settings, ICurrentUser currentUser,
+            CancellationToken ct) =>
+        {
+            var value = request.Value?.Trim();
+            if (string.IsNullOrEmpty(value) || value.Length > 400 || value.Any(char.IsWhiteSpace))
+                return EndpointHelpers.Invalid("value", "Paste the OpenRouter API key without spaces.");
+            await credentials.SaveSecretAsync(currentUser.OwnerId, IntegrationCredentialProviders.OpenRouter,
+                ModelSettings.OpenRouterKeySecret, value, ct);
+            return Results.Ok(await ToDtoAsync(currentUser.OwnerId, settings, credentials, ct));
+        }).WithName("SaveOpenRouterKey");
+
+        models.MapDelete("/openrouter-key", async (IIntegrationCredentialStore credentials,
+            IOwnerSettingsStore settings, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            await credentials.DeleteAsync(currentUser.OwnerId, IntegrationCredentialProviders.OpenRouter, ct);
+            var current = await settings.GetAsync<ModelSettings>(currentUser.OwnerId, SettingsSections.Models, ct);
+            if (current?.UsesOpenRouter == true)
+                await settings.SaveAsync(currentUser.OwnerId, SettingsSections.Models,
+                    current with { Provider = ModelSettings.Codex }, ct);
+            return Results.Ok(await ToDtoAsync(currentUser.OwnerId, settings, credentials, ct));
+        }).WithName("DeleteOpenRouterKey");
+
+        models.MapGet("/openrouter/catalog", async (string? search, OpenRouterCatalog catalog, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await catalog.ListAsync(search, ct));
+            }
+            catch (HttpRequestException exception)
+            {
+                logger.LogWarning(exception, "Could not load the OpenRouter model catalog.");
+                return Results.Problem("OpenRouter's model list is temporarily unavailable.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
+        }).WithName("ListOpenRouterModels");
+
+        models.MapPost("/test", async (IChatClientResolver resolver, IOwnerSettingsStore settings,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var current = await settings.GetAsync<ModelSettings>(currentUser.OwnerId, SettingsSections.Models, ct)
+                          ?? ModelSettings.Default;
+            var client = await resolver.GetChatClientAsync(currentUser.OwnerId, ModelPurpose.Chat, ct);
+            return Results.Ok(await OpenRouterCatalog.TestAsync(client, current.Provider, current.ChatModel, ct));
+        }).WithName("TestModelSettings");
+
+        return api;
+    }
+
+    private static async Task<ModelSettingsDto> ToDtoAsync(Guid ownerId, IOwnerSettingsStore settings,
+        IIntegrationCredentialStore credentials, CancellationToken ct)
+    {
+        var current = await settings.GetAsync<ModelSettings>(ownerId, SettingsSections.Models, ct) ?? ModelSettings.Default;
+        return new ModelSettingsDto(current.Provider, current.ChatModel, current.FastModel, current.EmbeddingModel,
+            await HasOpenRouterKeyAsync(ownerId, credentials, ct), ModelSettings.Providers);
+    }
+
+    private static async Task<bool> HasOpenRouterKeyAsync(Guid ownerId, IIntegrationCredentialStore credentials,
+        CancellationToken ct) =>
+        (await credentials.GetStatusAsync(ownerId, IntegrationCredentialProviders.OpenRouter, ct))
+        ?.SecretNames.Contains(ModelSettings.OpenRouterKeySecret) == true;
+}

@@ -10,6 +10,8 @@ public sealed class MemoryEntity
     public string Kind { get; set; } = "fact";
     public string Content { get; set; } = string.Empty;
     public Vector? Embedding { get; set; }
+    public string? EmbeddingModel { get; set; }
+    public DateTimeOffset? GraphIndexedAt { get; set; }
     public float Importance { get; set; }
     public float Confidence { get; set; }
     public string? SourceType { get; set; }

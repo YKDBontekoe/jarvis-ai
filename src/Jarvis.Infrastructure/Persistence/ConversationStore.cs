@@ -6,8 +6,20 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Jarvis.Infrastructure.Persistence;
 
-public sealed class ConversationStore(JarvisDbContext db) : IConversationStore
+public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, IConversationHistory
 {
+    public async Task<IReadOnlyList<Message>> ListRecentMessagesAsync(Guid ownerId, DateTimeOffset since, int limit,
+        CancellationToken cancellationToken) =>
+        (await db.Messages.AsNoTracking()
+            .Where(message => message.CreatedAt > since &&
+                              db.Conversations.Any(conversation => conversation.Id == message.ConversationId &&
+                                                                   conversation.OwnerId == ownerId))
+            .OrderByDescending(message => message.CreatedAt)
+            .Take(limit)
+            .ToListAsync(cancellationToken))
+        .OrderBy(message => message.CreatedAt)
+        .ToArray();
+
     public async Task<Conversation> CreateAsync(Guid ownerId, string title, CancellationToken cancellationToken)
     {
         var conversation = new Conversation(ownerId, title);

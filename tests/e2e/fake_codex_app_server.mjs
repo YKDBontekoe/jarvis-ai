@@ -4,6 +4,7 @@
 // same JSON-RPC subset as CodexCliChatClient, streams structured output in small deltas, and
 // plans multi-step Jarvis tool calls from the prompt text. It never contacts a network service.
 import readline from 'node:readline';
+import { extractGraph, reflect } from './fake_reflection.mjs';
 
 const MODEL = 'jarvis-fixture';
 const STREAM_DELAY_MS = Number(process.env.FAKE_CODEX_DELAY_MS ?? 18);
@@ -13,6 +14,13 @@ const CONTEXT_PREFIXES = [
   'Active durable tasks',
   'Active condition watches',
   'An unrelated task',
+  'Available skills',
+  'Learned persona',
+  'Knowledge graph',
+  'Connected devices',
+  'Remote agents',
+  'Generative UI',
+  'Browser agent',
 ];
 
 const send = message => process.stdout.write(JSON.stringify(message) + '\n');
@@ -68,6 +76,11 @@ const call = (name, args) => ({ type: 'tool_call', text: '', name, argumentsJson
 function plan(prompt) {
   if (prompt.includes('Extract at most three useful long-term memories')) return text('[]');
   if (prompt.includes('Reorder saved-memory candidates')) return text('[]');
+
+  if (prompt.includes('You maintain a temporal knowledge graph'))
+    return text(JSON.stringify(extractGraph(parseConversation(prompt).request)));
+  if (prompt.includes('You are Jarvis reflecting on recent work with your user'))
+    return text(JSON.stringify(reflect(parseConversation(prompt).request)));
 
   const conversation = parseConversation(prompt);
   const tools = new Set([...prompt.matchAll(/^- ([A-Za-z_]+): /gm)].map(match => match[1]));
@@ -136,6 +149,40 @@ function plan(prompt) {
       : "I don't have anything saved about you yet. Tell me what you'd like me to remember!");
   }
 
+  if (/\b(save|keep) (this|that|it) as a skill\b|\bhere is how i like\b/.test(lower) && has('SaveSkill')) {
+    if (results.length === 0) {
+      const topic = request.match(/how i like (?:my )?(.+?)(?::|$)/i)?.[1] ?? 'weekly review';
+      const name = keywords(topic).split(' ').slice(0, 3).join('-');
+      const steps = request.split(/:\s*/).slice(1).join(': ') || 'Follow the steps the user described.';
+      return call('SaveSkill', {
+        name,
+        description: `Use when the user asks for their ${topic.replace(/[.!]$/, '')}.`,
+        instructions: steps.split(/,\s*|;\s*|\.\s+/).filter(Boolean)
+          .map((step, index) => `${index + 1}. ${step.trim().replace(/\.$/, '')}.`).join('\n'),
+        reason: 'The user described their preferred workflow.',
+      });
+    }
+    return text(/saved and active|proposed/.test(last)
+      ? `Got it — I saved that as a skill so I'll do it your way next time. ${last}`
+      : last);
+  }
+
+  if (/^from now on\b|\balways (answer|reply)\b/.test(lower) && has('LearnPreference')) {
+    if (results.length === 0) {
+      const statement = request.replace(/^from now on,?\s*/i, '').replace(/^\w/, c => c.toUpperCase());
+      const category = /dutch|english|language/i.test(request) ? 'language'
+        : /short|brief|bullet|table|format/i.test(request) ? 'format' : 'workstyle';
+      return call('LearnPreference', { category, statement, confidence: 0.95 });
+    }
+    return text(`Understood — I'll remember that. ${last}`);
+  }
+
+  if (/\buse (my|the) ([a-z-]+) skill\b/.test(lower) && has('LoadSkill')) {
+    const name = lower.match(/\buse (?:my|the) ([a-z-]+) skill\b/)[1];
+    if (results.length === 0) return call('LoadSkill', { name });
+    return text(`Following your **${name}** skill:\n\n${last.split('\n\n').slice(1).join('\n\n') || last}`);
+  }
+
   if (/\btime\b.*\bin\b/.test(lower) && has('GetCurrentTime')) {
     if (results.length === 0) return call('GetCurrentTime', { timeZoneId: guessZone(lower) });
     return text(`It's currently **${last.match(/: (\w+ \d{4}-\d{2}-\d{2} \d{2}:\d{2})/)?.[1] ?? 'unknown'}** in ${guessZone(lower)}.`);
@@ -145,6 +192,39 @@ function plan(prompt) {
     if (results.length === 0)
       return call('CreateTask', { title: request.slice(0, 60), instructions: request });
     return text("I've started that as a background task. I'll notify you when the results are ready — you can follow along in **Tasks**.");
+  }
+
+  if (/\b(show|render|pick|choose)\b.*\b(card|form|options|plan)\b/.test(lower) && has('RenderUi')) {
+    if (results.length === 0) {
+      return call('RenderUi', {
+        kind: 'choice',
+        title: 'Pick a plan',
+        body: 'Choose how you would like Jarvis to proceed.',
+        itemsJson: JSON.stringify([
+          { id: 'a', title: 'Option A', subtitle: 'Fastest' },
+          { id: 'b', title: 'Option B', subtitle: 'Most thorough' },
+        ]),
+        actionsJson: JSON.stringify([
+          { id: 'a', label: 'Option A', style: 'primary' },
+          { id: 'b', label: 'Option B', style: 'secondary' },
+        ]),
+      });
+    }
+    return text('I put the choices on a card in the app. Tap one there.');
+  }
+
+  if (/\b(browse|look up on the web|open the page)\b/.test(lower) && has('BrowseTheWeb')) {
+    if (results.length === 0)
+      return call('BrowseTheWeb', { goal: request, startUrl: request.match(/https?:\/\/\S+/)?.[0] ?? null });
+    return text(`I'll use the isolated browser for that. ${last}`);
+  }
+
+  if (/\b(ask|delegate to) (the )?(travel|other|remote) agent\b/.test(lower) && has('DelegateToAgent')) {
+    if (results.length === 0) return call('ListRemoteAgents', {});
+    const id = last.match(/id ([0-9a-f-]{36})/i)?.[1];
+    if (results.length === 1) return id ? call('DelegateToAgent', { agent: id, message: request }) :
+      text('No remote agent is connected yet. Add one under Settings → Agents.');
+    return text(`I asked the other agent:\n\n${last}`);
   }
 
   if (conversation.executingTask)
@@ -214,3 +294,4 @@ function guessZone(lower) {
   if (lower.includes('amsterdam')) return 'Europe/Amsterdam';
   return 'UTC';
 }
+

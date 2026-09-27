@@ -33,6 +33,20 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<FileContentChunkEntity> FileContentChunks => Set<FileContentChunkEntity>();
     public DbSet<IntegrationCredential> IntegrationCredentials => Set<IntegrationCredential>();
     public DbSet<DailyBriefingPreference> DailyBriefings => Set<DailyBriefingPreference>();
+    public DbSet<OwnerSettingEntity> OwnerSettings => Set<OwnerSettingEntity>();
+    public DbSet<SkillEntity> Skills => Set<SkillEntity>();
+    public DbSet<SkillRevisionEntity> SkillRevisions => Set<SkillRevisionEntity>();
+    public DbSet<MessageFeedbackEntity> MessageFeedback => Set<MessageFeedbackEntity>();
+    public DbSet<GraphEntityEntity> GraphEntities => Set<GraphEntityEntity>();
+    public DbSet<GraphRelationEntity> GraphRelations => Set<GraphRelationEntity>();
+    public DbSet<ChannelConnectionEntity> ChannelConnections => Set<ChannelConnectionEntity>();
+    public DbSet<ChannelMessageEntity> ChannelMessages => Set<ChannelMessageEntity>();
+    public DbSet<ChannelThreadEntity> ChannelThreads => Set<ChannelThreadEntity>();
+    public DbSet<UiSurfaceEntity> UiSurfaces => Set<UiSurfaceEntity>();
+    public DbSet<RemoteAgentEntity> RemoteAgents => Set<RemoteAgentEntity>();
+    public DbSet<A2ATokenEntity> A2ATokens => Set<A2ATokenEntity>();
+    public DbSet<BrowserSessionEntity> BrowserSessions => Set<BrowserSessionEntity>();
+    public DbSet<BrowserStepEntity> BrowserSteps => Set<BrowserStepEntity>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -103,6 +117,8 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.Property(x => x.Kind).HasColumnName("kind").HasMaxLength(40).IsRequired();
             entity.Property(x => x.Content).HasColumnName("content").IsRequired();
             entity.Property(x => x.Embedding).HasColumnName("embedding").HasColumnType("vector(1536)");
+            entity.Property(x => x.EmbeddingModel).HasColumnName("embedding_model").HasMaxLength(200);
+            entity.Property(x => x.GraphIndexedAt).HasColumnName("graph_indexed_at");
             entity.Property(x => x.Importance).HasColumnName("importance");
             entity.Property(x => x.Confidence).HasColumnName("confidence");
             entity.Property(x => x.SourceType).HasColumnName("source_type").HasMaxLength(60);
@@ -336,6 +352,253 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             entity.HasIndex(x => x.WorkflowId).IsUnique();
             entity.HasIndex(x => new { x.Enabled, x.ScheduleDispatchedAt });
+        });
+
+        modelBuilder.Entity<OwnerSettingEntity>(entity =>
+        {
+            entity.ToTable("owner_settings");
+            entity.HasKey(x => new { x.OwnerId, x.Section });
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Section).HasColumnName("section").HasMaxLength(60);
+            entity.Property(x => x.ValueJson).HasColumnName("value").HasColumnType("jsonb").IsRequired();
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => x.Section);
+        });
+
+        modelBuilder.Entity<SkillEntity>(entity =>
+        {
+            entity.ToTable("skills");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Name).HasColumnName("name").HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Description).HasColumnName("description").HasMaxLength(1_024).IsRequired();
+            entity.Property(x => x.Instructions).HasColumnName("instructions").IsRequired();
+            entity.Property(x => x.Source).HasColumnName("source").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.IsLocked).HasColumnName("is_locked");
+            entity.Property(x => x.Version).HasColumnName("version");
+            entity.Property(x => x.UseCount).HasColumnName("use_count");
+            entity.Property(x => x.LastUsedAt).HasColumnName("last_used_at");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => new { x.OwnerId, x.Name }).IsUnique();
+            entity.HasIndex(x => new { x.OwnerId, x.Status });
+        });
+
+        modelBuilder.Entity<SkillRevisionEntity>(entity =>
+        {
+            entity.ToTable("skill_revisions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.SkillId).HasColumnName("skill_id");
+            entity.Property(x => x.Version).HasColumnName("version");
+            entity.Property(x => x.Description).HasColumnName("description").HasMaxLength(1_024).IsRequired();
+            entity.Property(x => x.Instructions).HasColumnName("instructions").IsRequired();
+            entity.Property(x => x.Source).HasColumnName("source").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.ChangeNote).HasColumnName("change_note").HasMaxLength(500);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasOne<SkillEntity>().WithMany().HasForeignKey(x => x.SkillId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.SkillId, x.Version }).IsUnique();
+        });
+
+        modelBuilder.Entity<MessageFeedbackEntity>(entity =>
+        {
+            entity.ToTable("message_feedback");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.ConversationId).HasColumnName("conversation_id");
+            entity.Property(x => x.MessageId).HasColumnName("message_id");
+            entity.Property(x => x.Rating).HasColumnName("rating").HasMaxLength(10).IsRequired();
+            entity.Property(x => x.Note).HasColumnName("note").HasMaxLength(1_000);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.ProcessedAt).HasColumnName("processed_at");
+            entity.HasOne<Message>().WithMany().HasForeignKey(x => x.MessageId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.OwnerId, x.MessageId }).IsUnique();
+            entity.HasIndex(x => new { x.OwnerId, x.ProcessedAt });
+        });
+
+        modelBuilder.Entity<GraphEntityEntity>(entity =>
+        {
+            entity.ToTable("graph_entities");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Name).HasColumnName("name").HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Key).HasColumnName("key").HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Type).HasColumnName("type").HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Summary).HasColumnName("summary").HasMaxLength(500);
+            entity.Property(x => x.AliasesJson).HasColumnName("aliases").HasMaxLength(2_000).IsRequired();
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => new { x.OwnerId, x.Key }).IsUnique();
+            entity.HasIndex(x => new { x.OwnerId, x.UpdatedAt });
+        });
+
+        modelBuilder.Entity<GraphRelationEntity>(entity =>
+        {
+            entity.ToTable("graph_relations");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.SubjectId).HasColumnName("subject_id");
+            entity.Property(x => x.Predicate).HasColumnName("predicate").HasMaxLength(60).IsRequired();
+            entity.Property(x => x.ObjectId).HasColumnName("object_id");
+            entity.Property(x => x.ObjectValue).HasColumnName("object_value").HasMaxLength(300);
+            entity.Property(x => x.ValidFrom).HasColumnName("valid_from");
+            entity.Property(x => x.ValidTo).HasColumnName("valid_to");
+            entity.Property(x => x.Confidence).HasColumnName("confidence");
+            entity.Property(x => x.SourceMemoryId).HasColumnName("source_memory_id");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasOne<GraphEntityEntity>().WithMany().HasForeignKey(x => x.SubjectId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<GraphEntityEntity>().WithMany().HasForeignKey(x => x.ObjectId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<MemoryEntity>().WithMany().HasForeignKey(x => x.SourceMemoryId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.OwnerId, x.SubjectId, x.Predicate, x.ValidTo });
+            entity.HasIndex(x => new { x.OwnerId, x.ObjectId });
+        });
+
+        modelBuilder.Entity<ChannelConnectionEntity>(entity =>
+        {
+            entity.ToTable("channel_connections");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Kind).HasColumnName("kind").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Account).HasColumnName("account").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Enabled).HasColumnName("enabled");
+            entity.Property(x => x.AllowedSendersJson).HasColumnName("allowed_senders").HasColumnType("jsonb").IsRequired();
+            entity.Property(x => x.ForwardNotifications).HasColumnName("forward_notifications");
+            entity.Property(x => x.NotifyRecipient).HasColumnName("notify_recipient").HasMaxLength(40);
+            entity.Property(x => x.WebhookKey).HasColumnName("webhook_key").HasMaxLength(64).IsRequired();
+            entity.Property(x => x.LastInboundAt).HasColumnName("last_inbound_at");
+            entity.Property(x => x.LastOutboundAt).HasColumnName("last_outbound_at");
+            entity.Property(x => x.LastError).HasColumnName("last_error").HasMaxLength(500);
+            entity.Property(x => x.NotificationsForwardedUntil).HasColumnName("notifications_forwarded_until");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => x.WebhookKey).IsUnique();
+            entity.HasIndex(x => new { x.Kind, x.Account }).IsUnique();
+            entity.HasIndex(x => x.OwnerId);
+        });
+
+        modelBuilder.Entity<ChannelMessageEntity>(entity =>
+        {
+            entity.ToTable("channel_messages");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.ConnectionId).HasColumnName("connection_id");
+            entity.Property(x => x.Direction).HasColumnName("direction").HasMaxLength(4).IsRequired();
+            entity.Property(x => x.Peer).HasColumnName("peer").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Text).HasColumnName("text").IsRequired();
+            entity.Property(x => x.ExternalId).HasColumnName("external_id").HasMaxLength(200);
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Error).HasColumnName("error").HasMaxLength(500);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.ProcessedAt).HasColumnName("processed_at");
+            entity.Property(x => x.LeaseUntil).HasColumnName("lease_until");
+            entity.HasOne<ChannelConnectionEntity>().WithMany().HasForeignKey(x => x.ConnectionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.ConnectionId, x.ExternalId }).IsUnique().HasFilter("external_id IS NOT NULL");
+            entity.HasIndex(x => new { x.Direction, x.Status, x.CreatedAt });
+            entity.HasIndex(x => new { x.ConnectionId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<ChannelThreadEntity>(entity =>
+        {
+            entity.ToTable("channel_threads");
+            entity.HasKey(x => new { x.ConnectionId, x.Peer });
+            entity.Property(x => x.ConnectionId).HasColumnName("connection_id");
+            entity.Property(x => x.Peer).HasColumnName("peer").HasMaxLength(80);
+            entity.Property(x => x.ConversationId).HasColumnName("conversation_id");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasOne<ChannelConnectionEntity>().WithMany().HasForeignKey(x => x.ConnectionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Conversation>().WithMany().HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UiSurfaceEntity>(entity =>
+        {
+            entity.ToTable("ui_surfaces");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.ConversationId).HasColumnName("conversation_id");
+            entity.Property(x => x.Kind).HasColumnName("kind").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Title).HasColumnName("title").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.SchemaJson).HasColumnName("schema").HasColumnType("jsonb").IsRequired();
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.CompletedAction).HasColumnName("completed_action").HasMaxLength(40);
+            entity.Property(x => x.ValuesJson).HasColumnName("values").HasColumnType("jsonb");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasOne<Conversation>().WithMany().HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.OwnerId, x.ConversationId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<RemoteAgentEntity>(entity =>
+        {
+            entity.ToTable("remote_agents");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Name).HasColumnName("name").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Url).HasColumnName("url").HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Enabled).HasColumnName("enabled");
+            entity.Property(x => x.LastUsedAt).HasColumnName("last_used_at");
+            entity.Property(x => x.LastError).HasColumnName("last_error").HasMaxLength(500);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => new { x.OwnerId, x.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<A2ATokenEntity>(entity =>
+        {
+            entity.ToTable("a2a_tokens");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Name).HasColumnName("name").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.TokenHash).HasColumnName("token_hash").HasMaxLength(128).IsRequired();
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.LastUsedAt).HasColumnName("last_used_at");
+            entity.HasIndex(x => x.TokenHash).IsUnique();
+            entity.HasIndex(x => x.OwnerId);
+        });
+
+        modelBuilder.Entity<BrowserSessionEntity>(entity =>
+        {
+            entity.ToTable("browser_sessions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.ConversationId).HasColumnName("conversation_id");
+            entity.Property(x => x.Goal).HasColumnName("goal").HasMaxLength(1_000).IsRequired();
+            entity.Property(x => x.StartUrl).HasColumnName("start_url").HasMaxLength(500);
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasOne<Conversation>().WithMany().HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(x => x.Steps).WithOne().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.OwnerId, x.ConversationId, x.Status });
+        });
+
+        modelBuilder.Entity<BrowserStepEntity>(entity =>
+        {
+            entity.ToTable("browser_steps");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.SessionId).HasColumnName("session_id");
+            entity.Property(x => x.Ordinal).HasColumnName("ordinal");
+            entity.Property(x => x.Tool).HasColumnName("tool").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Summary).HasColumnName("summary").HasMaxLength(1_000).IsRequired();
+            entity.Property(x => x.Success).HasColumnName("success");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => new { x.SessionId, x.Ordinal }).IsUnique();
         });
 
         modelBuilder.Entity<Message>(entity =>

@@ -19,7 +19,7 @@ internal sealed class PersonalMemoryContextProvider(
         if (string.IsNullOrWhiteSpace(query)) return [];
 
         var hits = await memories.SearchAsync(ownerId, query, cancellationToken);
-        hits = await reranker.RerankAsync(query, hits, cancellationToken);
+        hits = await reranker.RerankAsync(ownerId, query, hits, cancellationToken);
         var pinned = await memories.ListPinnedAsync(ownerId, cancellationToken);
         if (hits.Count == 0 && pinned.Count == 0) return [];
 

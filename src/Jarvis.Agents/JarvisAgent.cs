@@ -3,13 +3,14 @@ using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Conversations;
+using Jarvis.Agents.ModelProviders;
 using Jarvis.Mcp;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
 namespace Jarvis.Agents;
 
-public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcpToolHost,
+public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientResolver chatClients, McpToolHost mcpToolHost,
     IConversationStore conversations, IJarvisTaskRepository tasks, ICurrentUser currentUser) : IJarvisAgent
 {
     private static readonly JsonSerializerOptions ArgumentsJsonOptions = new(JsonSerializerDefaults.Web);
@@ -67,8 +68,11 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcp
     {
         if (_agent is not null) return _agent;
         await mcpToolHost.InitializeAsync(cancellationToken);
-        var task = await tasks.GetTaskByConversationIdAsync(conversationId, currentUser.OwnerId, cancellationToken);
-        return _agent = agentFactory.Create(mcpToolHost.Tools, task?.Id);
+        var ownerId = currentUser.OwnerId;
+        var task = await tasks.GetTaskByConversationIdAsync(conversationId, ownerId, cancellationToken);
+        var chatClient = await chatClients.GetChatClientAsync(ownerId, ModelPurpose.Chat, cancellationToken);
+        return _agent = agentFactory.Create(chatClient, mcpToolHost.Tools,
+            new AgentBuildContext(ownerId, task?.Id, conversationId));
     }
 
     private async Task<AgentSession> LoadSessionAsync(AIAgent agent, Guid conversationId,

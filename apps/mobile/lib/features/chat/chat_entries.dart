@@ -11,24 +11,39 @@ class MessageEntry extends ChatEntry {
     required this.content,
     this.pending = false,
     this.failed = false,
+    this.id,
+    this.rating,
   });
 
   final String role;
   final String content;
   final bool pending;
 
+  /// Server message id, known once the reply is stored; needed for feedback.
+  final String? id;
+
+  /// The owner's feedback on an assistant reply: `up`, `down`, or null.
+  final String? rating;
+
   /// A user message whose request did not complete and can be retried.
   final bool failed;
 
   bool get isUser => role == 'user';
 
-  MessageEntry copyWith({String? content, bool? pending, bool? failed}) =>
-      MessageEntry(
-        role: role,
-        content: content ?? this.content,
-        pending: pending ?? this.pending,
-        failed: failed ?? this.failed,
-      );
+  MessageEntry copyWith({
+    String? content,
+    bool? pending,
+    bool? failed,
+    String? id,
+    String? rating,
+  }) => MessageEntry(
+    role: role,
+    content: content ?? this.content,
+    pending: pending ?? this.pending,
+    failed: failed ?? this.failed,
+    id: id ?? this.id,
+    rating: rating ?? this.rating,
+  );
 }
 
 /// Continues the in-flight assistant reply even when approval cards sit after it.
@@ -38,7 +53,9 @@ void appendAssistantDelta(List<ChatEntry> entries, String delta) {
   );
   if (pendingIndex >= 0) {
     final pending = entries[pendingIndex] as MessageEntry;
-    entries[pendingIndex] = pending.copyWith(content: '${pending.content}$delta');
+    entries[pendingIndex] = pending.copyWith(
+      content: '${pending.content}$delta',
+    );
     return;
   }
   final lastAssistant = entries.lastIndexWhere(
@@ -157,5 +174,73 @@ class ApprovalEntry extends ChatEntry {
     decision: clearDecision ? null : decision ?? this.decision,
     error: clearError ? null : error ?? this.error,
     retry: retry,
+  );
+}
+
+/// A native card Jarvis rendered with RenderUi.
+class UiSurfaceEntry extends ChatEntry {
+  const UiSurfaceEntry({
+    required this.id,
+    required this.title,
+    required this.status,
+    required this.schema,
+  });
+
+  final String id;
+  final String title;
+  final String status;
+  final Map<String, dynamic> schema;
+
+  static UiSurfaceEntry? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final id = value['id']?.toString();
+    if (id == null || id.isEmpty) return null;
+    final schema = value['schema'];
+    return UiSurfaceEntry(
+      id: id,
+      title: value['title'] is String ? value['title'] as String : '',
+      status: value['status'] is String ? value['status'] as String : 'open',
+      schema: schema is Map
+          ? Map<String, dynamic>.from(schema)
+          : const <String, dynamic>{},
+    );
+  }
+
+  UiSurfaceEntry copyWith({String? status}) => UiSurfaceEntry(
+    id: id,
+    title: title,
+    status: status ?? this.status,
+    schema: schema,
+  );
+}
+
+class BrowserStepItem {
+  const BrowserStepItem({
+    required this.tool,
+    required this.summary,
+    required this.success,
+  });
+
+  final String tool;
+  final String summary;
+  final bool success;
+}
+
+/// Isolated browser/computer-use timeline for one goal.
+class BrowserSessionEntry extends ChatEntry {
+  const BrowserSessionEntry({
+    required this.id,
+    required this.goal,
+    required this.steps,
+  });
+
+  final String id;
+  final String goal;
+  final List<BrowserStepItem> steps;
+
+  BrowserSessionEntry withStep(BrowserStepItem step) => BrowserSessionEntry(
+    id: id,
+    goal: goal,
+    steps: [...steps, step],
   );
 }
