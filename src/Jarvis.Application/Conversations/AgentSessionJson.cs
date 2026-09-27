@@ -219,7 +219,8 @@ public static class AgentSessionJson
                 foreach (var content in contents.EnumerateArray())
                 {
                     var type = content.TryGetProperty("$type", out var typeElement) ? typeElement.GetString() : null;
-                    if (type is "toolApproval" or "functionApproval")
+                    if (type is "toolApproval" or "functionApproval"
+                        or "toolApprovalResponse" or "functionApprovalResponse")
                     {
                         var id = ReadString(content, "id") ?? ReadString(content, "requestId");
                         if (string.Equals(id, requestId, StringComparison.Ordinal))
@@ -382,7 +383,7 @@ public static class AgentSessionJson
         {
             var type = content.TryGetProperty("$type", out var typeElement) ? typeElement.GetString() : null;
             if (type is "functionCall" or "functionResult" or "functionApprovalRequest" or "toolApprovalRequest"
-                or "toolApproval")
+                or "toolApproval" or "functionApproval" or "toolApprovalResponse" or "functionApprovalResponse")
                 return false;
             if (content.TryGetProperty("text", out var textElement) &&
                 (type is null or "text") &&
@@ -406,7 +407,7 @@ public static class AgentSessionJson
         {
             var type = content.TryGetProperty("$type", out var typeElement) ? typeElement.GetString() : null;
             if (type is "functionCall" or "functionResult" or "functionApprovalRequest" or "toolApprovalRequest"
-                or "toolApproval")
+                or "toolApproval" or "functionApproval" or "toolApprovalResponse" or "functionApprovalResponse")
                 return true;
         }
         return false;

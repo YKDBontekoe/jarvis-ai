@@ -185,5 +185,17 @@ public sealed class AgentSessionJsonTests
             """;
         Assert.True(AgentSessionJson.HasAnsweredApproval(answered, "req-1", "c1"));
         Assert.False(AgentSessionJson.HasAnsweredApproval(answered, "req-2", "c2"));
+
+        const string liveAnswered = """
+            {"stateBag":{"messages":[
+              {"role":"user","contents":[{"text":"Remind me","$type":"text"}]},
+              {"role":"assistant","contents":[
+                {"id":"req-1","$type":"functionApprovalRequest","functionCall":{"callId":"c1","name":"CreateReminder"}}
+              ]},
+              {"role":"user","contents":[{"id":"req-1","$type":"toolApprovalResponse"}]}
+            ]}}
+            """;
+        Assert.True(AgentSessionJson.HasAnsweredApproval(liveAnswered, "req-1", "c1"));
+        Assert.False(AgentSessionJson.HasAnsweredApproval(liveAnswered, "req-2", "c2"));
     }
 }
