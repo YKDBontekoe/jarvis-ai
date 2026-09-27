@@ -38,7 +38,8 @@ public sealed class JarvisTaskWorkflow
                 (JarvisTaskActivityContract activities) => activities.RunTaskAsync(input),
                 new ActivityOptions
                 {
-                    StartToCloseTimeout = TimeSpan.FromMinutes(15),
+                    StartToCloseTimeout = TimeSpan.FromMinutes(75),
+                    HeartbeatTimeout = TimeSpan.FromMinutes(1),
                     RetryPolicy = new Temporalio.Common.RetryPolicy
                     {
                         InitialInterval = TimeSpan.FromSeconds(2),

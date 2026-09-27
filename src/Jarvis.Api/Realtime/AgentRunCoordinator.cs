@@ -180,6 +180,19 @@ public sealed class AgentRunCoordinator(
 
         if (approvalRequests.Count != 0)
         {
+            Message? preface = null;
+            if (answer.Length > 0)
+            {
+                preface = new Message(conversationId, "assistant", answer.ToString(), messageId);
+                await conversations.AddMessageAsync(preface, cancellationToken);
+                await clients.SendAsync("message.completed", new
+                {
+                    id = preface.Id,
+                    role = preface.Role,
+                    content = preface.Content,
+                    createdAt = preface.CreatedAt
+                }, cancellationToken);
+            }
             foreach (var request in approvalRequests)
             {
                 var created = await approvals.CreateAsync(ownerId, conversationId, request.RequestId,
@@ -202,7 +215,7 @@ public sealed class AgentRunCoordinator(
             if (memorySourceId is { } approvedFlowSourceId && !string.IsNullOrWhiteSpace(memorySource))
                 await ExtractMemorySafelyAsync(ownerId, conversationId, approvedFlowSourceId, memorySource,
                     cancellationToken);
-            return new AgentRunOutcome(null, pending);
+            return new AgentRunOutcome(preface, pending);
         }
 
         var assistantMessage = new Message(conversationId, "assistant", answer.ToString(), messageId);

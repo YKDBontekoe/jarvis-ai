@@ -196,7 +196,8 @@ api.MapPost("/conversations/{conversationId:guid}/messages", async (
         : new Message(conversationId, "user", content);
     if (!ReferenceEquals(userMessage, lastMessage))
         await store.AddMessageAsync(userMessage, ct);
-    if (await coordinator.TryRecoverCompletedAssistantAsync(conversationId, content, ct) is { } recovered)
+    if (ReferenceEquals(userMessage, lastMessage) &&
+        await coordinator.TryRecoverCompletedAssistantAsync(conversationId, content, ct) is { } recovered)
     {
         await coordinator.PublishRecoveredAssistantAsync(conversationId, recovered, ct);
         return Results.Ok(ToDto(recovered));

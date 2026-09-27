@@ -325,32 +325,12 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await TryRequeueAfterCancelAsync(files, input, CancellationToken.None);
             throw;
         }
         catch
         {
             await files.SetProcessingStatusAsync(input.FileId, input.OwnerId, "failed", CancellationToken.None);
             throw;
-        }
-    }
-
-    private static async Task TryRequeueAfterCancelAsync(IFileRepository files, FileProcessingInput input,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var current = await files.GetAsync(input.FileId, input.OwnerId, cancellationToken);
-            if (current is null || current.ProcessingStatus == "deleting") return;
-            await files.RequeueForProcessingAsync(input.FileId, input.OwnerId, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch
-        {
-            // Temporal still observes the cancellation; reconciliation will reclaim leftover processing rows.
         }
     }
 
@@ -427,7 +407,7 @@ internal sealed class ActivityHeartbeat : IDisposable
         activity.Heartbeat(resourceId);
         _timer = new Timer(_ =>
         {
-            try { ActivityExecutionContext.Current.Heartbeat(resourceId); }
+            try { activity.Heartbeat(resourceId); }
             catch (InvalidOperationException) { }
         }, null, TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(20));
     }

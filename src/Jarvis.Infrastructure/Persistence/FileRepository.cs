@@ -82,10 +82,17 @@ public sealed class FileRepository(JarvisDbContext db) : IFileRepository
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public async Task<bool> SetProcessingStatusAsync(Guid id, Guid ownerId, string status, CancellationToken cancellationToken) =>
-        await db.Files.Where(x => x.Id == id && x.OwnerId == ownerId &&
-                (x.ProcessingStatus != "deleting" || status == "deleting"))
-            .ExecuteUpdateAsync(update => update.SetProperty(x => x.ProcessingStatus, status), cancellationToken) != 0;
+    public async Task<bool> SetProcessingStatusAsync(Guid id, Guid ownerId, string status, CancellationToken cancellationToken)
+    {
+        var query = db.Files.Where(x => x.Id == id && x.OwnerId == ownerId);
+        if (status == "processing")
+            query = query.Where(x => x.ProcessingStatus == "queued" || x.ProcessingStatus == "processing"
+                || x.ProcessingStatus == "failed");
+        else
+            query = query.Where(x => x.ProcessingStatus != "deleting" || status == "deleting");
+        return await query.ExecuteUpdateAsync(update => update.SetProperty(x => x.ProcessingStatus, status),
+            cancellationToken) != 0;
+    }
 }
 
 public sealed class FileContentRepository(JarvisDbContext db) : IFileContentRepository

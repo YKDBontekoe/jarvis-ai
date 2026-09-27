@@ -19,6 +19,7 @@ public sealed class FileProcessingWorkflow
         new ActivityOptions
         {
             StartToCloseTimeout = TimeSpan.FromMinutes(10),
+            HeartbeatTimeout = TimeSpan.FromMinutes(1),
             RetryPolicy = new Temporalio.Common.RetryPolicy
             {
                 InitialInterval = TimeSpan.FromSeconds(3),

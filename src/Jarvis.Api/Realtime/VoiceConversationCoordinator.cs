@@ -51,7 +51,8 @@ public sealed class VoiceConversationCoordinator(
                     await conversations.AddMessageAsync(userMessage, cancellationToken);
 
                 var coordinator = services.GetRequiredService<AgentRunCoordinator>();
-                if (await coordinator.TryRecoverCompletedAssistantAsync(conversationId, transcript,
+                if (ReferenceEquals(userMessage, lastMessage) &&
+                    await coordinator.TryRecoverCompletedAssistantAsync(conversationId, transcript,
                         cancellationToken) is { } recovered)
                 {
                     await coordinator.PublishRecoveredAssistantAsync(conversationId, recovered, cancellationToken);
