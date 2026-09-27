@@ -218,6 +218,9 @@ public sealed class AgentRunCoordinator(
             return new AgentRunOutcome(preface, pending);
         }
 
+        if (answer.Length == 0)
+            throw new InvalidOperationException("The agent completed without an assistant response.");
+
         var assistantMessage = new Message(conversationId, "assistant", answer.ToString(), messageId);
         await conversations.AddMessageAsync(assistantMessage, cancellationToken);
         if (memorySourceId is { } sourceMessageId && !string.IsNullOrWhiteSpace(memorySource))

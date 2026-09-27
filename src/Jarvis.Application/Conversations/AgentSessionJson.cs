@@ -77,6 +77,49 @@ public static class AgentSessionJson
         }
     }
 
+    public static bool HasInFlightProgressAfterUser(string sessionJson, string userContent)
+    {
+        if (string.IsNullOrEmpty(userContent)) return false;
+        try
+        {
+            using var document = JsonDocument.Parse(sessionJson);
+            if (!TryFindMessages(document.RootElement, out var messages) || messages.GetArrayLength() == 0)
+                return false;
+
+            var lastUserIndex = -1;
+            for (var index = 0; index < messages.GetArrayLength(); index++)
+            {
+                var message = messages[index];
+                if (IsRole(message, "assistant")) continue;
+                if (!TryGetPlainText(message, out var text) ||
+                    !string.Equals(text, userContent, StringComparison.Ordinal))
+                    continue;
+                lastUserIndex = index;
+            }
+
+            if (lastUserIndex < 0) return false;
+            for (var index = lastUserIndex + 1; index < messages.GetArrayLength(); index++)
+            {
+                if (!IsRole(messages[index], "assistant") && TryGetPlainText(messages[index], out _))
+                    return false;
+            }
+
+            if (lastUserIndex == messages.GetArrayLength() - 1)
+                return true;
+
+            for (var index = lastUserIndex + 1; index < messages.GetArrayLength(); index++)
+            {
+                if (HasToolContents(messages[index])) return true;
+            }
+
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
     public static bool TryGetPendingApprovals(string sessionJson,
         out IReadOnlyList<AgentToolApprovalRequest> approvals, out string preface)
     {
@@ -184,6 +227,20 @@ public static class AgentSessionJson
 
         text = output.ToString();
         return text.Length > 0;
+    }
+
+    private static bool HasToolContents(JsonElement message)
+    {
+        if (!message.TryGetProperty("contents", out var contents) || contents.ValueKind != JsonValueKind.Array)
+            return false;
+        foreach (var content in contents.EnumerateArray())
+        {
+            var type = content.TryGetProperty("$type", out var typeElement) ? typeElement.GetString() : null;
+            if (type is "functionCall" or "functionResult" or "functionApprovalRequest" or "toolApprovalRequest"
+                or "toolApproval")
+                return true;
+        }
+        return false;
     }
 
     private static int MetadataSortKey(string name) => name switch

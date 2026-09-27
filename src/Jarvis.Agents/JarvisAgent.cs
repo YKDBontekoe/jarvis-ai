@@ -22,8 +22,12 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcp
     {
         var agent = await GetAgentAsync(conversationId, cancellationToken);
         var session = await LoadSessionAsync(agent, conversationId, cancellationToken);
-        await foreach (var update in RunAndSaveAsync(agent, conversationId,
-            [new ChatMessage(ChatRole.User, currentUserMessage.Content)], session, cancellationToken))
+        var sessionJson = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
+        ChatMessage[] input = [new ChatMessage(ChatRole.User, currentUserMessage.Content)];
+        if (sessionJson is not null &&
+            AgentSessionJson.HasInFlightProgressAfterUser(sessionJson, currentUserMessage.Content))
+            input = [];
+        await foreach (var update in RunAndSaveAsync(agent, conversationId, input, session, cancellationToken))
             yield return update;
     }
 

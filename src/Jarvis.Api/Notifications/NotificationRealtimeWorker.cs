@@ -13,7 +13,7 @@ public sealed class NotificationRealtimeWorker(
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
     private DateTimeOffset _watermark = DateTimeOffset.MinValue;
-    private readonly HashSet<Guid> _publishedAtWatermark = [];
+    private Guid _cursorId = Guid.Empty;
     private bool _seeded;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -50,20 +50,18 @@ public sealed class NotificationRealtimeWorker(
             if (latest != default)
             {
                 _watermark = latest;
-                var ids = await db.Notifications.AsNoTracking()
+                _cursorId = await db.Notifications.AsNoTracking()
                     .Where(x => x.CreatedAt == latest)
-                    .Select(x => x.Id)
-                    .ToListAsync(cancellationToken);
-                foreach (var id in ids)
-                    _publishedAtWatermark.Add(id);
+                    .MaxAsync(x => x.Id, cancellationToken);
             }
             _seeded = true;
             return;
         }
 
         var watermark = _watermark;
+        var cursorId = _cursorId;
         var rows = await db.Notifications.AsNoTracking()
-            .Where(x => x.CreatedAt >= watermark)
+            .Where(x => x.CreatedAt > watermark || (x.CreatedAt == watermark && x.Id.CompareTo(cursorId) > 0))
             .OrderBy(x => x.CreatedAt)
             .ThenBy(x => x.Id)
             .Take(200)
@@ -71,9 +69,6 @@ public sealed class NotificationRealtimeWorker(
 
         foreach (var notification in rows)
         {
-            if (notification.CreatedAt == _watermark && _publishedAtWatermark.Contains(notification.Id))
-                continue;
-
             await hub.Clients.Group(JarvisEventsHub.OwnerGroupName(notification.OwnerId))
                 .SendAsync("notification.created", new
                 {
@@ -94,13 +89,8 @@ public sealed class NotificationRealtimeWorker(
                         .SendAsync("tool.approval_required", ToApprovalEvent(approval), cancellationToken);
             }
 
-            if (notification.CreatedAt > _watermark)
-            {
-                _watermark = notification.CreatedAt;
-                _publishedAtWatermark.Clear();
-            }
-
-            _publishedAtWatermark.Add(notification.Id);
+            _watermark = notification.CreatedAt;
+            _cursorId = notification.Id;
         }
     }
 

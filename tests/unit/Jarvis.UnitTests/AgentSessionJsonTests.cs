@@ -85,4 +85,26 @@ public sealed class AgentSessionJsonTests
             """{"stateBag":{"messages":[{"role":"user","contents":[{"text":"Hello","$type":"text"}]}]}}""",
             out _, out _));
     }
+
+    [Fact]
+    public void DetectsInFlightToolProgressWithoutRequiringAFinalAssistantTurn()
+    {
+        const string inFlight = """
+            {"stateBag":{"messages":[
+              {"role":"user","contents":[{"text":"Remind me","$type":"text"}]},
+              {"role":"assistant","contents":[
+                {"callId":"c1","$type":"functionCall","name":"CreateReminder","arguments":{"title":"Dentist"}},
+                {"callId":"c1","$type":"functionResult","text":"created"}
+              ]}
+            ]}}
+            """;
+        Assert.True(AgentSessionJson.HasInFlightProgressAfterUser(inFlight, "Remind me"));
+        Assert.False(AgentSessionJson.HasInFlightProgressAfterUser(inFlight, "Something else"));
+        Assert.False(AgentSessionJson.HasInFlightProgressAfterUser(
+            """{"stateBag":{"messages":[{"contents":[{"text":"Hello","$type":"text"}]},{"contents":[{"text":"Done.","$type":"text"}]}]}}""",
+            "Hello"));
+        Assert.True(AgentSessionJson.HasInFlightProgressAfterUser(
+            """{"stateBag":{"messages":[{"role":"user","contents":[{"text":"Remind me","$type":"text"}]}]}}""",
+            "Remind me"));
+    }
 }

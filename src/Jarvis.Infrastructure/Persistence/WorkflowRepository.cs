@@ -113,7 +113,8 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var task = await GetLockedTaskAsync(id, cancellationToken);
-        if (task is null || task.Status is "running" or "completed" or "failed" or "cancelled") return;
+        if (task is null || task.Status is "running" or "completed" or "failed" or "cancelled" or "needs_approval")
+            return;
         task.MarkRunning();
         AddAuditEvent(task.OwnerId, "temporal", "task.started", "low", true, task.Id);
         await db.SaveChangesAsync(cancellationToken);
