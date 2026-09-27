@@ -104,6 +104,7 @@ jobs:
           GHCR_USER: ${{ github.actor }}
           GIT_SHA: ${{ github.sha }}
           GIT_REF: ${{ github.ref }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           JARVIS_API_IMAGE: ${{ needs.prepare.outputs.prefix }}/api:${{ github.sha }}
           JARVIS_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/worker:${{ github.sha }}
           JARVIS_VOICE_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/voice-worker:${{ github.sha }}
@@ -115,16 +116,18 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT || 22 }}
           command_timeout: 30m
           script_stop: true
-          envs: GHCR_TOKEN,GHCR_USER,GIT_SHA,GIT_REF,JARVIS_API_IMAGE,JARVIS_WORKER_IMAGE,JARVIS_VOICE_WORKER_IMAGE,DEPLOY_COMPOSE_FILES
+          envs: GHCR_TOKEN,GHCR_USER,GIT_SHA,GIT_REF,GITHUB_REPOSITORY,JARVIS_API_IMAGE,JARVIS_WORKER_IMAGE,JARVIS_VOICE_WORKER_IMAGE,DEPLOY_COMPOSE_FILES
           script: |
             set -euo pipefail
             cd '${{ secrets.DEPLOY_PATH }}'
             if [[ ! -d .git ]]; then
-              echo "DEPLOY_PATH is not a git checkout." >&2
-              exit 1
+              git init
+              git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
             fi
-            git fetch --prune origin
-            git fetch --force origin "${GIT_SHA}" || git fetch --force origin "${GIT_REF}"
+            git_auth="$(printf 'x-access-token:%s' "${GHCR_TOKEN}" | base64 -w0)"
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${git_auth}" fetch --prune origin
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${git_auth}" fetch --force origin "${GIT_SHA}" || \
+              git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${git_auth}" fetch --force origin "${GIT_REF}"
             git checkout --detach "${GIT_SHA}"
             echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
             chmod +x scripts/deploy/remote-up.sh
