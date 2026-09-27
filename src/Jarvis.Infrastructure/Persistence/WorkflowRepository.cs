@@ -206,16 +206,10 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
     private async Task CancelPendingApprovalsAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken)
     {
         var approvals = await db.ToolApprovals.Where(x =>
-                x.TaskId == taskId && x.OwnerId == ownerId &&
-                (x.Status == "pending" ||
-                 ((x.Status == "approved" || x.Status == "rejected") &&
-                  x.ResumeStatus != "completed" && x.ResumeStatus != "cancelled")))
+                x.TaskId == taskId && x.OwnerId == ownerId && x.Status == "pending")
             .ToListAsync(cancellationToken);
         foreach (var approval in approvals)
-        {
             approval.Cancel();
-            approval.AbortResume();
-        }
     }
 
     public async Task<ReminderRecord> CreateAsync(Guid ownerId, string title, DateTimeOffset dueAt, CancellationToken cancellationToken)
@@ -262,11 +256,20 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
 
     public async Task MarkScheduleFailedAsync(Guid id, CancellationToken cancellationToken)
     {
-        var reminder = await db.Reminders.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var reminder = await GetLockedReminderAsync(id, cancellationToken);
         if (reminder is null || reminder.Status != "pending") return;
         reminder.FailScheduling();
         AddAuditEvent(reminder.OwnerId, "temporal", "reminder.schedule_failed", "high", false, reminder.Id);
+        if (!await db.Notifications.AnyAsync(x => x.Id == reminder.Id, cancellationToken))
+        {
+            var notification = new Notification(reminder.Id, reminder.OwnerId, "reminder.failed",
+                "Reminder could not be delivered", reminder.Title, reminder.Id);
+            db.Notifications.Add(notification);
+            await PushDeliveryQueue.QueueAsync(db, notification, cancellationToken);
+        }
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task CompleteAndNotifyAsync(ReminderWorkflowInput input, CancellationToken cancellationToken)

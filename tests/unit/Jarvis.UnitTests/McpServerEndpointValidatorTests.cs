@@ -26,6 +26,8 @@ public sealed class McpServerEndpointValidatorTests
     [InlineData("192.31.196.1", true)]
     [InlineData("192.175.48.1", true)]
     [InlineData("224.0.0.1", false)]
+    [InlineData("240.0.0.1", false)]
+    [InlineData("255.255.255.255", false)]
     [InlineData("2606:4700:4700::1111", true)]
     [InlineData("::1", false)]
     [InlineData("fc00::1", false)]

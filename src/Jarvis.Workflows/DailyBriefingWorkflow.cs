@@ -34,30 +34,42 @@ public sealed class DailyBriefingWorkflow
         while (true)
         {
             DailyBriefingActivityInput delivery;
-            if (Workflow.Patched("daily-briefing-schedule-activity"))
+            try
             {
-                var schedule = await Workflow.ExecuteActivityAsync(
-                    (DailyBriefingActivityContract activities) => activities.ResolveScheduleAsync(input), options);
-                var now = new DateTimeOffset(DateTime.SpecifyKind(Workflow.UtcNow, DateTimeKind.Utc));
-                var delay = schedule.FireAt - now;
-                if (delay < TimeSpan.Zero) delay = TimeSpan.Zero;
-                await Workflow.DelayAsync(delay);
-                delivery = new DailyBriefingActivityInput(input.OwnerId, input.WorkflowId, schedule.LocalDate,
-                    input.TimeZoneId, schedule.LocalDayStart, schedule.NextLocalDayStart);
-            }
-            else
-            {
-                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(input.TimeZoneId);
-                var now = new DateTimeOffset(DateTime.SpecifyKind(Workflow.UtcNow, DateTimeKind.Utc));
-                var fireAt = GetNextOccurrence(now, input.LocalTime, timeZone);
-                await Workflow.DelayAsync(fireAt - now);
+                if (Workflow.Patched("daily-briefing-schedule-activity"))
+                {
+                    var schedule = await Workflow.ExecuteActivityAsync(
+                        (DailyBriefingActivityContract activities) => activities.ResolveScheduleAsync(input), options);
+                    var now = new DateTimeOffset(DateTime.SpecifyKind(Workflow.UtcNow, DateTimeKind.Utc));
+                    var delay = schedule.FireAt - now;
+                    if (delay < TimeSpan.Zero) delay = TimeSpan.Zero;
+                    await Workflow.DelayAsync(delay);
+                    delivery = new DailyBriefingActivityInput(input.OwnerId, input.WorkflowId, schedule.LocalDate,
+                        input.TimeZoneId, schedule.LocalDayStart, schedule.NextLocalDayStart);
+                }
+                else
+                {
+                    var timeZone = TimeZoneInfo.FindSystemTimeZoneById(input.TimeZoneId);
+                    var now = new DateTimeOffset(DateTime.SpecifyKind(Workflow.UtcNow, DateTimeKind.Utc));
+                    var fireAt = GetNextOccurrence(now, input.LocalTime, timeZone);
+                    await Workflow.DelayAsync(fireAt - now);
 
-                var deliveredAt = DateTime.SpecifyKind(Workflow.UtcNow, DateTimeKind.Utc);
-                var localDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(deliveredAt, timeZone).Date);
-                var dayStart = ResolveLocalTime(localDate.ToDateTime(TimeOnly.MinValue), timeZone);
-                var nextDayStart = ResolveLocalTime(localDate.AddDays(1).ToDateTime(TimeOnly.MinValue), timeZone);
-                delivery = new DailyBriefingActivityInput(input.OwnerId, input.WorkflowId, localDate,
-                    input.TimeZoneId, dayStart, nextDayStart);
+                    var deliveredAt = DateTime.SpecifyKind(Workflow.UtcNow, DateTimeKind.Utc);
+                    var localDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(deliveredAt, timeZone).Date);
+                    var dayStart = ResolveLocalTime(localDate.ToDateTime(TimeOnly.MinValue), timeZone);
+                    var nextDayStart = ResolveLocalTime(localDate.AddDays(1).ToDateTime(TimeOnly.MinValue), timeZone);
+                    delivery = new DailyBriefingActivityInput(input.OwnerId, input.WorkflowId, localDate,
+                        input.TimeZoneId, dayStart, nextDayStart);
+                }
+            }
+            catch (ActivityFailureException)
+            {
+                if (!Workflow.Patched("daily-briefing-retry-resolve")) throw;
+                await Workflow.DelayAsync(TimeSpan.FromMinutes(5));
+                if (Workflow.ContinueAsNewSuggested)
+                    throw Workflow.CreateContinueAsNewException(
+                        (DailyBriefingWorkflow workflow) => workflow.RunAsync(input));
+                continue;
             }
 
             var sameDayAttempts = 0;

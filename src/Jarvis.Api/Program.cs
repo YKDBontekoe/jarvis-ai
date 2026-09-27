@@ -335,11 +335,11 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
                     await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
                     return Results.Accepted("/api/v1/approvals", remaining.Select(ToApprovalDto));
                 }
-                await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
                 if (decided.Approved == true)
                     await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId, last.Content, runCt);
                 else
                     await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId, last.Content, runCt);
+                await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
                 return Results.Ok(ToDto(last));
             }
         }
@@ -351,7 +351,6 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
             await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
             return Results.Accepted("/api/v1/approvals", outcome.PendingApprovals.Select(ToApprovalDto));
         }
-        await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
         if (decided.Approved == true)
         {
             await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId,
@@ -362,6 +361,7 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
             await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId,
                 outcome.AssistantMessage?.Content ?? "The tool call was declined.", runCt);
         }
+        await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
         return Results.Ok(ToDto(outcome.AssistantMessage!));
     }
     catch (OperationCanceledException)
@@ -870,6 +870,8 @@ api.MapGet("/memory", async (IMemoryService memory, ICurrentUser currentUser, st
 api.MapGet("/memory/search", async (IMemoryService memory, ICurrentUser currentUser, string query,
     string? kind, CancellationToken ct) =>
 {
+    if (string.IsNullOrWhiteSpace(query) || query.Length > 2_000)
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["query"] = ["Query must contain 1 to 2,000 characters."] });
     if (!IsMemoryKindValid(kind)) return Results.ValidationProblem(new Dictionary<string, string[]>
         { ["kind"] = ["Choose a supported memory category."] });
     return Results.Ok((await memory.SearchAsync(currentUser.OwnerId, query, ct, kind))

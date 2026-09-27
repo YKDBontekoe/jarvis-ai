@@ -59,7 +59,7 @@ public sealed class ConditionWatchWorkflow
                 new ActivityOptions
                 {
                     StartToCloseTimeout = TimeSpan.FromMinutes(1),
-                    RetryPolicy = new Temporalio.Common.RetryPolicy { MaximumAttempts = 3 }
+                    RetryPolicy = new Temporalio.Common.RetryPolicy { MaximumAttempts = 8 }
                 });
             throw;
         }

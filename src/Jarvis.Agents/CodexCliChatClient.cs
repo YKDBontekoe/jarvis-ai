@@ -652,7 +652,15 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
             var line = await reader.ReadLineAsync(cancellationToken);
             if (line is null)
             {
-                var stderr = await stderrTask;
+                string stderr;
+                try
+                {
+                    stderr = await stderrTask.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
+                }
+                catch (TimeoutException)
+                {
+                    stderr = "";
+                }
                 throw new InvalidOperationException("Codex CLI app-server exited unexpectedly: " + Limit(stderr.Trim(), 2_000));
             }
             return JsonDocument.Parse(line);

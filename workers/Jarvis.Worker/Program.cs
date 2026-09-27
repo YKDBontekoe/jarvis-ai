@@ -59,6 +59,7 @@ using var worker = new TemporalWorker(client, new TemporalWorkerOptions(Temporal
     .AddWorkflow<ConditionWatchWorkflow>()
     .AddWorkflow<DailyBriefingWorkflow>()
     .AddActivity(activities.DeliverReminderAsync)
+    .AddActivity(activities.FailReminderAsync)
     .AddActivity(fileActivities.ProcessStoredFileAsync)
     .AddActivity(taskActivities.RunTaskAsync)
     .AddActivity(taskActivities.CompleteApprovedTaskAsync)
@@ -91,6 +92,17 @@ internal sealed class ReminderActivities(IServiceScopeFactory scopeFactory) : Re
         await using var scope = scopeFactory.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IReminderRepository>();
         await repository.CompleteAndNotifyAsync(reminder, activity.CancellationToken);
+    }
+
+    [Temporalio.Activities.Activity("FailReminder")]
+    public override async Task FailReminderAsync(ReminderWorkflowInput reminder)
+    {
+        var activity = ActivityExecutionContext.Current;
+        using var trace = JarvisWorkerTelemetry.Source.StartActivity("reminder.fail");
+        trace?.SetTag("jarvis.reminder.id", reminder.ReminderId);
+        await using var scope = scopeFactory.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<IReminderRepository>()
+            .MarkScheduleFailedAsync(reminder.ReminderId, activity.CancellationToken);
     }
 }
 

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
+using Jarvis.Application.Integrations;
 
 namespace Jarvis.Workflows;
 
@@ -8,23 +9,6 @@ namespace Jarvis.Workflows;
 public sealed class PublicJsonMetricReader
 {
     private const int MaxResponseBytes = 1_048_576;
-    private static readonly (IPAddress Network, int PrefixLength)[] NonPublicIpv4Networks =
-    [
-        (IPAddress.Parse("0.0.0.0"), 8),
-        (IPAddress.Parse("10.0.0.0"), 8),
-        (IPAddress.Parse("100.64.0.0"), 10),
-        (IPAddress.Parse("127.0.0.0"), 8),
-        (IPAddress.Parse("169.254.0.0"), 16),
-        (IPAddress.Parse("172.16.0.0"), 12),
-        (IPAddress.Parse("192.0.0.0"), 24),
-        (IPAddress.Parse("192.0.2.0"), 24),
-        (IPAddress.Parse("192.88.99.0"), 24),
-        (IPAddress.Parse("192.168.0.0"), 16),
-        (IPAddress.Parse("198.18.0.0"), 15),
-        (IPAddress.Parse("198.51.100.0"), 24),
-        (IPAddress.Parse("203.0.113.0"), 24),
-        (IPAddress.Parse("224.0.0.0"), 4)
-    ];
 
     public async Task<double> ReadAsync(string url, string jsonPath, CancellationToken cancellationToken)
     {
@@ -90,7 +74,7 @@ public sealed class PublicJsonMetricReader
         IPAddress[] addresses = IPAddress.TryParse(host, out var literal)
             ? [literal]
             : await Dns.GetHostAddressesAsync(host, cancellationToken);
-        var publicAddresses = addresses.Where(IsPublicAddress).ToArray();
+        var publicAddresses = addresses.Where(McpServerEndpointValidator.IsPublic).ToArray();
         if (publicAddresses.Length == 0)
             throw new SocketException((int)SocketError.AccessDenied);
 
@@ -111,39 +95,6 @@ public sealed class PublicJsonMetricReader
             }
         }
         throw new HttpRequestException("Could not connect to the public condition watch host.", lastError);
-    }
-
-    private static bool IsPublicAddress(IPAddress address)
-    {
-        if (address.IsIPv4MappedToIPv6) return IsPublicAddress(address.MapToIPv4());
-        if (address.AddressFamily == AddressFamily.InterNetwork)
-            return !NonPublicIpv4Networks.Any(network => IsInNetwork(address, network.Network, network.PrefixLength));
-        if (address.AddressFamily != AddressFamily.InterNetworkV6 || IPAddress.IsLoopback(address) ||
-            address.IsIPv6LinkLocal || address.IsIPv6Multicast)
-            return false;
-
-        var bytes = address.GetAddressBytes();
-        // Global unicast space only. Exclude documentation, protocol assignment, Teredo, and 6to4 ranges.
-        if (bytes[0] is < 0x20 or > 0x3f ||
-            bytes[0] == 0x20 && bytes[1] == 0x01 &&
-                (bytes[2] == 0x0d && bytes[3] == 0xb8 ||
-                 bytes[2] == 0x00 && (bytes[3] == 0x00 || bytes[3] == 0x02 || bytes[3] == 0x10)) ||
-            bytes[0] == 0x20 && bytes[1] == 0x02)
-            return false;
-        return true;
-    }
-
-    private static bool IsInNetwork(IPAddress address, IPAddress network, int prefixLength)
-    {
-        var candidate = address.GetAddressBytes();
-        var prefix = network.GetAddressBytes();
-        var wholeBytes = prefixLength / 8;
-        var remainingBits = prefixLength % 8;
-        for (var index = 0; index < wholeBytes; index++)
-            if (candidate[index] != prefix[index]) return false;
-        if (remainingBits == 0) return true;
-        var mask = (byte)(0xff << (8 - remainingBits));
-        return (candidate[wholeBytes] & mask) == (prefix[wholeBytes] & mask);
     }
 
     private static bool IsLocalName(string host)
