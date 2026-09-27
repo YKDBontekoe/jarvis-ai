@@ -48,7 +48,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           '/api/v1/tasks/${widget.taskId}',
         );
         final data = taskResponse.data;
-        task = data is Map ? Map<String, dynamic>.from(data) : null;
+        task = data == null ? null : Map<String, dynamic>.from(data);
       } on DioException catch (error) {
         if (!mounted || revision != _requestRevision) return;
         setState(() {
