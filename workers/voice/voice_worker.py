@@ -228,6 +228,7 @@ class CodexRealtimeSession:
 
     async def _read_loop(self) -> None:
         assert self.process.stdout is not None
+        crashed = False
         try:
             while line := await self.process.stdout.readline():
                 try:
@@ -245,10 +246,23 @@ class CodexRealtimeSession:
             raise
         except Exception:
             logger.exception("Codex app-server reader failed.")
+            crashed = True
+        else:
+            crashed = True
         finally:
             for future in self.pending.values():
                 if not future.done():
                     future.set_exception(RuntimeError("Codex app-server closed its output."))
+            if crashed and self.thread_id is not None:
+                await self.notifications.put(
+                    {
+                        "method": "thread/realtime/error",
+                        "params": {
+                            "threadId": self.thread_id,
+                            "message": "Codex app-server closed its output.",
+                        },
+                    }
+                )
 
     async def _handle_notifications(self, handler: Callable[[dict[str, Any]], Awaitable[None]]) -> None:
         while True:
@@ -501,6 +515,10 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
         if disconnected.identity == participant.identity:
             participant_left.set()
 
+    @ctx.room.on("disconnected")
+    def on_room_disconnected(*_args: object) -> None:
+        participant_left.set()
+
     for publication in participant.track_publications.values():
         track = publication.track
         if isinstance(track, rtc.RemoteAudioTrack):
@@ -508,8 +526,19 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
             audio_tasks.add(task)
             task.add_done_callback(audio_tasks.discard)
 
+    process_exited = asyncio.create_task(codex.process.wait())
+    left = asyncio.create_task(participant_left.wait())
     try:
-        await participant_left.wait()
+        done, pending = await asyncio.wait(
+            {process_exited, left}, return_when=asyncio.FIRST_COMPLETED
+        )
+        if process_exited in done:
+            logger.error("Codex app-server exited while the voice session was still live.")
+            await ctx.room.local_participant.set_attributes({"jarvis.voice.status": "unavailable"})
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
     finally:
         duck_output()
         for task in turn_tasks:
