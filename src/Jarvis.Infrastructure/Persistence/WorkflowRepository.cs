@@ -327,6 +327,18 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         return true;
     }
 
+    public async Task<NotificationRecord> CreateAsync(Guid ownerId, string type, string title, string body,
+        Guid? sourceId, CancellationToken cancellationToken)
+    {
+        var notification = new Notification(Guid.CreateVersion7(), ownerId, type,
+            title.Length <= 300 ? title : title[..300], body.Length <= 2_000 ? body : body[..2_000], sourceId);
+        db.Notifications.Add(notification);
+        await PushDeliveryQueue.QueueAsync(db, notification, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return new NotificationRecord(notification.Id, notification.Type, notification.Title, notification.Body,
+            notification.SourceId, notification.CreatedAt, notification.ReadAt);
+    }
+
     private Task<JarvisTask?> GetLockedTaskAsync(Guid id, CancellationToken cancellationToken) =>
         db.Tasks.FromSqlInterpolated($"SELECT * FROM tasks WHERE \"Id\" = {id} FOR UPDATE")
             .SingleOrDefaultAsync(cancellationToken);

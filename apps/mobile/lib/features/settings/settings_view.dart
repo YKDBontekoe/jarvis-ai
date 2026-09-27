@@ -23,6 +23,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         destination: 'models',
       ),
       (
+        title: 'Skills',
+        subtitle: 'Procedures Jarvis learned or you taught it',
+        icon: PhosphorIconsRegular.magicWand,
+        destination: 'skills',
+      ),
+      (
         title: 'Integrations',
         subtitle: 'Manage MCP servers and credentials',
         icon: PhosphorIconsRegular.plugsConnected,

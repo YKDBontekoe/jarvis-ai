@@ -31,6 +31,7 @@ import 'features/home/home_overview.dart';
 import 'features/settings/model_settings_screen.dart';
 import 'features/settings/settings_view.dart';
 import 'features/shell/sidebar.dart';
+import 'features/skills/skills_screen.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
 
@@ -665,6 +666,7 @@ class _ChatScreenState extends State<ChatScreen> {
       'briefing' => DailyBriefingScreen(http: _http),
       'integrations' => IntegrationsScreen(http: _http),
       'models' => ModelSettingsScreen(http: _http),
+      'skills' => SkillsScreen(http: _http),
       _ => null,
     };
     if (destination == 'sign_out') {

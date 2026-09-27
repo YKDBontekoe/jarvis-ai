@@ -13,6 +13,10 @@ const CONTEXT_PREFIXES = [
   'Active durable tasks',
   'Active condition watches',
   'An unrelated task',
+  'Available skills',
+  'Learned persona',
+  'Knowledge graph',
+  'Connected devices',
 ];
 
 const send = message => process.stdout.write(JSON.stringify(message) + '\n');
@@ -134,6 +138,30 @@ function plan(prompt) {
     const items = [...last.matchAll(/\] (.+?)(?:\n|$)/g)].map(match => match[1]);
     return text(items.length ? "Here's what I have saved about you:\n\n" + items.map(item => `- ${item}`).join('\n')
       : "I don't have anything saved about you yet. Tell me what you'd like me to remember!");
+  }
+
+  if (/\b(save|keep) (this|that|it) as a skill\b|\bhere is how i like\b/.test(lower) && has('SaveSkill')) {
+    if (results.length === 0) {
+      const topic = request.match(/how i like (?:my )?(.+?)(?::|$)/i)?.[1] ?? 'weekly review';
+      const name = keywords(topic).split(' ').slice(0, 3).join('-');
+      const steps = request.split(/:\s*/).slice(1).join(': ') || 'Follow the steps the user described.';
+      return call('SaveSkill', {
+        name,
+        description: `Use when the user asks for their ${topic.replace(/[.!]$/, '')}.`,
+        instructions: steps.split(/,\s*|;\s*|\.\s+/).filter(Boolean)
+          .map((step, index) => `${index + 1}. ${step.trim().replace(/\.$/, '')}.`).join('\n'),
+        reason: 'The user described their preferred workflow.',
+      });
+    }
+    return text(/saved and active|proposed/.test(last)
+      ? `Got it — I saved that as a skill so I'll do it your way next time. ${last}`
+      : last);
+  }
+
+  if (/\buse (my|the) ([a-z-]+) skill\b/.test(lower) && has('LoadSkill')) {
+    const name = lower.match(/\buse (?:my|the) ([a-z-]+) skill\b/)[1];
+    if (results.length === 0) return call('LoadSkill', { name });
+    return text(`Following your **${name}** skill:\n\n${last.split('\n\n').slice(1).join('\n\n') || last}`);
   }
 
   if (/\btime\b.*\bin\b/.test(lower) && has('GetCurrentTime')) {

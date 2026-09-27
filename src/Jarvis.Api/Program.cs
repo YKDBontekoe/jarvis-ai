@@ -44,5 +44,6 @@ api.MapVoiceEndpoints(app.Logger);
 api.MapFileEndpoints(app.Logger);
 api.MapMemoryEndpoints(app.Logger);
 api.MapModelSettingsEndpoints(app.Logger);
+api.MapSkillEndpoints(app.Logger);
 
 app.Run();

@@ -34,6 +34,8 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<IntegrationCredential> IntegrationCredentials => Set<IntegrationCredential>();
     public DbSet<DailyBriefingPreference> DailyBriefings => Set<DailyBriefingPreference>();
     public DbSet<OwnerSettingEntity> OwnerSettings => Set<OwnerSettingEntity>();
+    public DbSet<SkillEntity> Skills => Set<SkillEntity>();
+    public DbSet<SkillRevisionEntity> SkillRevisions => Set<SkillRevisionEntity>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -348,6 +350,43 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.Property(x => x.ValueJson).HasColumnName("value").HasColumnType("jsonb").IsRequired();
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             entity.HasIndex(x => x.Section);
+        });
+
+        modelBuilder.Entity<SkillEntity>(entity =>
+        {
+            entity.ToTable("skills");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Name).HasColumnName("name").HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Description).HasColumnName("description").HasMaxLength(1_024).IsRequired();
+            entity.Property(x => x.Instructions).HasColumnName("instructions").IsRequired();
+            entity.Property(x => x.Source).HasColumnName("source").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.IsLocked).HasColumnName("is_locked");
+            entity.Property(x => x.Version).HasColumnName("version");
+            entity.Property(x => x.UseCount).HasColumnName("use_count");
+            entity.Property(x => x.LastUsedAt).HasColumnName("last_used_at");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => new { x.OwnerId, x.Name }).IsUnique();
+            entity.HasIndex(x => new { x.OwnerId, x.Status });
+        });
+
+        modelBuilder.Entity<SkillRevisionEntity>(entity =>
+        {
+            entity.ToTable("skill_revisions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.SkillId).HasColumnName("skill_id");
+            entity.Property(x => x.Version).HasColumnName("version");
+            entity.Property(x => x.Description).HasColumnName("description").HasMaxLength(1_024).IsRequired();
+            entity.Property(x => x.Instructions).HasColumnName("instructions").IsRequired();
+            entity.Property(x => x.Source).HasColumnName("source").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.ChangeNote).HasColumnName("change_note").HasMaxLength(500);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasOne<SkillEntity>().WithMany().HasForeignKey(x => x.SkillId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.SkillId, x.Version }).IsUnique();
         });
 
         modelBuilder.Entity<Message>(entity =>

@@ -38,6 +38,8 @@ public static class DependencyInjection
         services.AddScoped<MemoryReranker>();
         services.AddScoped<IAgentToolContributor, CoreAgentTools>();
         services.AddScoped<IAgentContextContributor, CoreAgentContext>();
+        services.AddScoped<IAgentToolContributor, Skills.SkillToolContributor>();
+        services.AddScoped<IAgentContextContributor, Skills.SkillContextContributor>();
         services.AddScoped<JarvisAgentFactory>();
         services.AddScoped<IJarvisAgent, JarvisAgent>();
         return services;
