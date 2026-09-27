@@ -96,10 +96,22 @@ public sealed class KnowledgeGraphRepository(JarvisDbContext db) : IKnowledgeGra
         var ids = degrees.Select(x => x.Id).ToHashSet();
         var entities = await db.GraphEntities.AsNoTracking().Where(x => x.OwnerId == ownerId && ids.Contains(x.Id))
             .ToListAsync(cancellationToken);
-        var edges = await current.Where(x => x.ObjectId != null && ids.Contains(x.SubjectId) && ids.Contains(x.ObjectId!.Value))
-            .Select(x => new GraphEdge(x.SubjectId, x.ObjectId!.Value, x.Predicate)).Take(400)
-            .ToListAsync(cancellationToken);
-        return new GraphOverview(await ToRecordsAsync(ownerId, entities, cancellationToken), edges);
+        var edgeRows = await current
+            .Where(x => x.ObjectId != null && ids.Contains(x.SubjectId) && ids.Contains(x.ObjectId!.Value))
+            .OrderByDescending(x => x.Confidence)
+            .Select(x => new { x.SubjectId, ObjectId = x.ObjectId!.Value, x.Predicate, x.Confidence, x.ValidFrom })
+            .Take(400).ToListAsync(cancellationToken);
+        var literalRows = await current
+            .Where(x => x.ObjectId == null && !string.IsNullOrEmpty(x.ObjectValue) && ids.Contains(x.SubjectId))
+            .OrderByDescending(x => x.Confidence)
+            .Select(x => new { x.SubjectId, x.Predicate, x.ObjectValue, x.Confidence, x.ValidFrom })
+            .Take(400).ToListAsync(cancellationToken);
+        var edges = edgeRows.Select(x => new GraphEdge(x.SubjectId, x.ObjectId, x.Predicate, x.Confidence, x.ValidFrom))
+            .ToArray();
+        var literals = literalRows
+            .Select(x => new GraphLiteral(x.SubjectId, x.Predicate, x.ObjectValue!, x.Confidence, x.ValidFrom))
+            .ToArray();
+        return new GraphOverview(await ToRecordsAsync(ownerId, entities, cancellationToken), edges, literals);
     }
 
     public async Task<int> MergeAsync(Guid ownerId, IReadOnlyList<GraphFact> facts, Guid? sourceMemoryId,

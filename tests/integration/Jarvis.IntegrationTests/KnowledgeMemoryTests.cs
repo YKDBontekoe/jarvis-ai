@@ -67,13 +67,16 @@ public sealed class KnowledgeMemoryTests : IAsyncLifetime
         [
             new GraphFact("user", "person", "has_sister", "Anna", "person", true, false, DateTimeOffset.UtcNow, 0.9f),
             new GraphFact("Anna", "person", "works_at", "Philips", "organization", true, true, DateTimeOffset.UtcNow, 0.9f),
+            new GraphFact("Anna", "person", "role", "engineer", null, false, true, DateTimeOffset.UtcNow, 0.8f),
             new GraphFact("Annie", "person", "nickname_of", "Anna", "person", true, false, DateTimeOffset.UtcNow, 0.5f)
         ], memory.Id, CancellationToken.None);
 
         var mentioned = await graph.FindMentionedAsync(owner, "What does anna do at philips?", 5, CancellationToken.None);
         Assert.Equal(["Anna", "Philips"], mentioned.Select(entity => entity.Name).Order());
         var overview = await graph.GetOverviewAsync(owner, 10, CancellationToken.None);
-        Assert.Contains(overview.Edges, edge => edge.Predicate == "works_at");
+        var worksAt = Assert.Single(overview.Edges, edge => edge.Predicate == "works_at");
+        Assert.True(worksAt.Confidence >= 0.9f);
+        Assert.Contains(overview.Literals, literal => literal.Predicate == "role" && literal.Value == "engineer");
 
         await memories.ReplaceAsync(memory.Id, owner, "relationship", "My sister Anna now works at ASML.", 0.7f, 0.9f,
             "user", null, CancellationToken.None);
