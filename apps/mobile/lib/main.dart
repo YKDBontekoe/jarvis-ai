@@ -649,13 +649,21 @@ class _ChatScreenState extends State<ChatScreen> {
     await Navigator.of(
       context,
     ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
-    if (destination == 'approvals' && mounted && !_signedOut && !_signingOut) {
+    if (!mounted || _signedOut || _signingOut) return;
+    if (destination == 'approvals') {
       await _syncConversationApprovals();
+    }
+    if (destination == 'tasks' ||
+        destination == 'approvals' ||
+        destination == 'watches' ||
+        destination == 'reminders') {
+      setState(() => _homeRevision++);
     }
   }
 
   void _selectDestination(int index) {
     if (index == 2) {
+      if (_busy || _hasPendingApproval || _signedOut || _signingOut) return;
       setState(() => _selectedDestination = 2);
       unawaited(_toggleVoice());
       return;
@@ -1193,6 +1201,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final platform = defaultTargetPlatform == TargetPlatform.iOS
         ? 'ios'
         : 'android';
+    final previous = _pushToken;
     await _http.put<void>(
       '/api/v1/push-devices',
       data: {'token': token, 'platform': platform},
@@ -1207,6 +1216,16 @@ class _ChatScreenState extends State<ChatScreen> {
         // Sign-out already dropped local state; stale server rows expire at Firebase.
       }
       return;
+    }
+    if (previous != null && previous != token) {
+      try {
+        await _http.delete<void>(
+          '/api/v1/push-devices',
+          data: {'token': previous},
+        );
+      } on DioException {
+        // The new token is registered; Firebase expires the previous one.
+      }
     }
     _pushToken = token;
   }
@@ -1249,14 +1268,9 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
     if (opensTaskDetails(type) && sourceId != null) {
-      unawaited(
-        Navigator.of(context).push<void>(
-          MaterialPageRoute<void>(
-            builder: (_) =>
-                TaskDetailsScreen(http: _http, taskId: sourceId),
-          ),
-        ),
-      );
+      unawaited(_openPushedDetail(
+        TaskDetailsScreen(http: _http, taskId: sourceId),
+      ));
       return;
     }
     if (sourceId == null || !opensNotificationDetails(type)) {
@@ -1264,16 +1278,23 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
     unawaited(
-      Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(
-          builder: (_) => NotificationDetailsScreen(
-            http: _http,
-            notificationType: type!,
-            sourceId: sourceId,
-          ),
+      _openPushedDetail(
+        NotificationDetailsScreen(
+          http: _http,
+          notificationType: type!,
+          sourceId: sourceId,
         ),
       ),
     );
+  }
+
+  Future<void> _openPushedDetail(Widget page) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => page),
+    );
+    if (mounted && !_signedOut && !_signingOut) {
+      setState(() => _homeRevision++);
+    }
   }
 
   Future<bool> _send([String? text]) async {
@@ -1375,7 +1396,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _decide(ApprovalEntry approval, bool approved) async {
     final conversationId = _conversationId;
-    if (conversationId == null || _busy || _signedOut || _signingOut) return;
+    if (conversationId == null ||
+        _busy ||
+        _voiceActive ||
+        _voiceStarting ||
+        _signedOut ||
+        _signingOut) {
+      return;
+    }
     final generation = _realtimeGeneration;
     void replace(ApprovalEntry Function(ApprovalEntry current) update) {
       final index = _entries.indexWhere(
@@ -1491,7 +1519,9 @@ class _ChatScreenState extends State<ChatScreen> {
       await _stopVoice();
       return;
     }
-    if (_sending || _hasPendingApproval || _signedOut || _signingOut) return;
+    if (_sending || _busy || _hasPendingApproval || _signedOut || _signingOut) {
+      return;
+    }
     final conversationId = _conversationId;
     if (conversationId == null || !_connected) {
       setState(() => _error = 'Connect to Jarvis before starting voice.');
@@ -2079,7 +2109,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 controller: _input,
                 onSend: () => unawaited(_send()),
                 onCancel: _busy ? () => _runCancel?.cancel() : null,
-                onVoice: _conversationId == null
+                onVoice: _conversationId == null ||
+                        (_busy && !_voiceActive && !_voiceStarting)
                     ? null
                     : () => _selectDestination(2),
                 onAttach: _showQuickActions,
@@ -2164,7 +2195,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     const SizedBox(height: 32),
                     FilledButton.icon(
-                      onPressed: _sending ? null : _toggleVoice,
+                      onPressed: _voiceActive || _voiceStarting
+                          ? _toggleVoice
+                          : (_busy || _hasPendingApproval ? null : _toggleVoice),
                       style: FilledButton.styleFrom(
                         backgroundColor: _voiceActive || _voiceStarting
                             ? JarvisColors.danger
@@ -2377,7 +2410,7 @@ class _ChatScreenState extends State<ChatScreen> {
     ready: _conversationId != null,
     voiceStarting: _voiceStarting,
     onTalk: _conversationId == null ||
-            _sending ||
+            _busy ||
             _hasPendingApproval ||
             !_connected
         ? null
