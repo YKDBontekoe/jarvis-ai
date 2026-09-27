@@ -45,7 +45,11 @@ public sealed class VoiceConversationCoordinator(
                 var pendingApprovals = await approvals.ListActionableForConversationAsync(ownerId, conversationId,
                     cancellationToken);
                 if (pendingApprovals.Count > 0)
-                    return "I need your approval before I can continue. Check the Jarvis app.";
+                {
+                    return pendingApprovals.Any(x => x.Status == "pending")
+                        ? "I need your approval before I can continue. Check the Jarvis app."
+                        : "I'm still finishing the last tool decision. Check the Jarvis app if it needs a retry.";
+                }
 
                 await clients.SendAsync("voice.transcript", new { conversationId, text = transcript },
                     cancellationToken);

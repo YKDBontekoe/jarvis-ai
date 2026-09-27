@@ -16,7 +16,8 @@ namespace Jarvis.Agents;
 /// under Agent Framework's normal execution and approval pipeline.
 /// </summary>
 public sealed class CodexCliChatClient(string executablePath, string? model = null, string? visionModel = null,
-    IReadOnlyDictionary<string, string>? modelClasses = null, bool enableWebSearch = true) : IChatClient
+    IReadOnlyDictionary<string, string>? modelClasses = null, bool enableWebSearch = true,
+    int turnTimeoutSeconds = 300) : IChatClient
 {
     private static readonly ActivitySource ActivitySource = new("Jarvis.CodexChatClient");
     private static readonly Meter Meter = new("Jarvis.CodexChatClient");
@@ -53,6 +54,7 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
         .Where(item => !string.IsNullOrWhiteSpace(item.Key) && !string.IsNullOrWhiteSpace(item.Value))
         .ToDictionary(item => item.Key.Trim(), item => item.Value.Trim(), StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _processSlots = new(2, 2);
+    private readonly TimeSpan _turnTimeout = TimeSpan.FromSeconds(turnTimeoutSeconds);
     private readonly SemaphoreSlim _modelCatalogLock = new(1, 1);
     private readonly object _modelCatalogSync = new();
     private AvailableModel[]? _modelCatalog;
@@ -136,7 +138,10 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
             using var process = new Process { StartInfo = CreateAppServerStart(executablePath, scratch, enableWebSearch) };
             if (!process.Start()) throw new InvalidOperationException("Could not start the Codex CLI app-server.");
 
-            using var killOnCancellation = cancellationToken.Register(() =>
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(_turnTimeout);
+            var runToken = timeout.Token;
+            using var killOnCancellation = runToken.Register(() =>
             {
                 try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
                 catch (InvalidOperationException) { }
@@ -148,16 +153,16 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
             try
             {
                 var rpc = new AppServerConnection(writer, reader, stderrTask);
-                await rpc.InitializeAsync(cancellationToken);
+                await rpc.InitializeAsync(runToken);
                 var modality = prompt.Images.Count > 0 ? "image" : "text";
                 var hasVisionClass = _modelClasses.ContainsKey("vision");
                 var selectedModel = prompt.Images.Count > 0
                     ? visionModel ?? (hasVisionClass ? "vision" : requestedModel)
                     : requestedModel;
-                var modelCatalog = await GetModelCatalogAsync(rpc, cancellationToken);
+                var modelCatalog = await GetModelCatalogAsync(rpc, runToken);
                 var resolvedModel = ResolveModel(modelCatalog, ResolveModelSelector(selectedModel), modality,
                     allowCompatibleFallback: prompt.Images.Count > 0 && visionModel is null && !hasVisionClass);
-                var threadId = await rpc.StartThreadAsync(scratch, resolvedModel, cancellationToken);
+                var threadId = await rpc.StartThreadAsync(scratch, resolvedModel, runToken);
                 var rawResponse = new StringBuilder();
                 var textDecoder = new StructuredTextStreamDecoder();
 
@@ -184,13 +189,19 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
                                 ModelId = resolvedModel
                             });
                         }
-                    }, cancellationToken);
+                    }, runToken);
                     modelOutcome = "completed";
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
                     modelOutcome = "cancelled";
                     throw;
+                }
+                catch (OperationCanceledException)
+                {
+                    modelOutcome = "timeout";
+                    throw new TimeoutException(
+                        $"Codex CLI model turn exceeded {_turnTimeout.TotalSeconds:0} seconds.");
                 }
                 finally
                 {

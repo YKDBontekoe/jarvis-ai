@@ -202,6 +202,46 @@ public static class AgentSessionJson
         }
     }
 
+    public static bool HasAnsweredApproval(string sessionJson, string requestId, string toolCallId)
+    {
+        if (string.IsNullOrEmpty(requestId) && string.IsNullOrEmpty(toolCallId)) return false;
+        try
+        {
+            using var document = JsonDocument.Parse(sessionJson);
+            if (!TryFindMessages(document.RootElement, out var messages))
+                return false;
+
+            for (var index = 0; index < messages.GetArrayLength(); index++)
+            {
+                var message = messages[index];
+                if (!message.TryGetProperty("contents", out var contents) || contents.ValueKind != JsonValueKind.Array)
+                    continue;
+                foreach (var content in contents.EnumerateArray())
+                {
+                    var type = content.TryGetProperty("$type", out var typeElement) ? typeElement.GetString() : null;
+                    if (type is "toolApproval" or "functionApproval")
+                    {
+                        var id = ReadString(content, "id") ?? ReadString(content, "requestId");
+                        if (string.Equals(id, requestId, StringComparison.Ordinal))
+                            return true;
+                    }
+                    else if (type is "functionCall" or "functionResult")
+                    {
+                        var callId = ReadString(content, "callId");
+                        if (string.Equals(callId, toolCallId, StringComparison.Ordinal))
+                            return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
     private static bool TryGetLastUserText(string sessionJson, out string text)
     {
         text = string.Empty;

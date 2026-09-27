@@ -41,14 +41,25 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcp
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var agent = await GetAgentAsync(conversationId, cancellationToken);
+        var sessionJson = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
+        ChatMessage[] input;
+        if (sessionJson is not null &&
+            AgentSessionJson.HasAnsweredApproval(sessionJson, approval.RequestId, approval.ToolCallId))
+        {
+            input = [];
+        }
+        else
+        {
+            var arguments = ToolCallArguments.Parse(approval.ArgumentsJson);
+            var functionCall = new FunctionCallContent(approval.ToolCallId, approval.ToolName, arguments);
+            var approvalRequest = new ToolApprovalRequestContent(approval.RequestId, functionCall);
+            var response = approvalRequest.CreateResponse(approval.Approved,
+                approval.Approved ? null : "The user rejected this tool call.");
+            input = [new ChatMessage(ChatRole.User, [response])];
+        }
+
         var session = await LoadSessionAsync(agent, conversationId, cancellationToken);
-        var arguments = ToolCallArguments.Parse(approval.ArgumentsJson);
-        var functionCall = new FunctionCallContent(approval.ToolCallId, approval.ToolName, arguments);
-        var approvalRequest = new ToolApprovalRequestContent(approval.RequestId, functionCall);
-        var response = approvalRequest.CreateResponse(approval.Approved,
-            approval.Approved ? null : "The user rejected this tool call.");
-        await foreach (var update in RunAndSaveAsync(agent, conversationId,
-            [new ChatMessage(ChatRole.User, [response])], session, cancellationToken))
+        await foreach (var update in RunAndSaveAsync(agent, conversationId, input, session, cancellationToken))
             yield return update;
     }
 

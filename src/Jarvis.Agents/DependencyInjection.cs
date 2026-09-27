@@ -18,8 +18,11 @@ public static class DependencyInjection
         if (string.IsNullOrWhiteSpace(model)) model = null;
         if (string.IsNullOrWhiteSpace(visionModel)) visionModel = null;
         var modelClasses = configuration.GetSection("Codex:ModelClasses").Get<Dictionary<string, string>>() ?? [];
+        var turnTimeoutSeconds = configuration.GetValue("Codex:TurnTimeoutSeconds", 300);
+        if (turnTimeoutSeconds is < 30 or > 1_800)
+            throw new InvalidOperationException("Codex:TurnTimeoutSeconds must be between 30 and 1800.");
         services.AddSingleton<IChatClient>(serviceProvider => new CodexCliChatClient(executablePath, model, visionModel,
-                modelClasses, enableWebSearch)
+                modelClasses, enableWebSearch, turnTimeoutSeconds)
             .AsBuilder()
             .UseOpenTelemetry(
                 serviceProvider.GetRequiredService<ILoggerFactory>(),

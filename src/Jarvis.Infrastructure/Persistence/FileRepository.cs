@@ -86,10 +86,17 @@ public sealed class FileRepository(JarvisDbContext db) : IFileRepository
     {
         var query = db.Files.Where(x => x.Id == id && x.OwnerId == ownerId);
         if (status == "processing")
+        {
             query = query.Where(x => x.ProcessingStatus == "queued" || x.ProcessingStatus == "processing"
                 || x.ProcessingStatus == "failed");
-        else
-            query = query.Where(x => x.ProcessingStatus != "deleting" || status == "deleting");
+            var startedAt = DateTimeOffset.UtcNow;
+            return await query.ExecuteUpdateAsync(update => update
+                    .SetProperty(x => x.ProcessingStatus, status)
+                    .SetProperty(x => x.ScheduleDispatchedAt, startedAt),
+                cancellationToken) != 0;
+        }
+
+        query = query.Where(x => x.ProcessingStatus != "deleting" || status == "deleting");
         return await query.ExecuteUpdateAsync(update => update.SetProperty(x => x.ProcessingStatus, status),
             cancellationToken) != 0;
     }

@@ -156,4 +156,34 @@ public sealed class AgentSessionJsonTests
             """{"stateBag":{"messages":[{"contents":[{"text":"Hello","$type":"text"}]},{"contents":[{"text":"Done.","$type":"text"}]}]}}""",
             "Something else", out _));
     }
+
+    [Fact]
+    public void DetectsWhenAnApprovalHasAlreadyBeenAnswered()
+    {
+        const string unanswered = """
+            {"stateBag":{"messages":[
+              {"role":"user","contents":[{"text":"Remind me","$type":"text"}]},
+              {"role":"assistant","contents":[
+                {"id":"req-1","$type":"functionApprovalRequest","functionCall":{"callId":"c1","name":"CreateReminder"}}
+              ]}
+            ]}}
+            """;
+        Assert.False(AgentSessionJson.HasAnsweredApproval(unanswered, "req-1", "c1"));
+
+        const string answered = """
+            {"stateBag":{"messages":[
+              {"role":"user","contents":[{"text":"Remind me","$type":"text"}]},
+              {"role":"assistant","contents":[
+                {"id":"req-1","$type":"functionApprovalRequest","functionCall":{"callId":"c1","name":"CreateReminder"}}
+              ]},
+              {"role":"user","contents":[{"id":"req-1","$type":"toolApproval"}]},
+              {"role":"assistant","contents":[
+                {"callId":"c1","$type":"functionCall","name":"CreateReminder"},
+                {"callId":"c1","$type":"functionResult","text":"created"}
+              ]}
+            ]}}
+            """;
+        Assert.True(AgentSessionJson.HasAnsweredApproval(answered, "req-1", "c1"));
+        Assert.False(AgentSessionJson.HasAnsweredApproval(answered, "req-2", "c2"));
+    }
 }

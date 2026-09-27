@@ -261,7 +261,7 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
         IToolApprovalStore approvals, IJarvisTaskRepository tasks, JarvisTaskRecord task,
         IReadOnlyList<AgentToolApprovalRequest> requests, string preface, CancellationToken cancellationToken)
     {
-        if (!string.IsNullOrEmpty(preface))
+        if (!string.IsNullOrWhiteSpace(preface))
         {
             var existing = await conversations.GetMessagesAsync(task.ConversationId, cancellationToken);
             var last = existing.Count > 0 ? existing[^1] : null;
