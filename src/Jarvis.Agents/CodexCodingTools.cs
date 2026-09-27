@@ -104,10 +104,10 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
             catch (System.ComponentModel.Win32Exception) { }
         });
 
-        await process.StandardInput.WriteAsync(BuildPrompt(repository.Name, task).AsMemory(), timeout.Token);
-        process.StandardInput.Close();
         var stderrTask = process.StandardError.ReadToEndAsync();
         var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        await process.StandardInput.WriteAsync(BuildPrompt(repository.Name, task).AsMemory(), timeout.Token);
+        process.StandardInput.Close();
         try
         {
             await process.WaitForExitAsync(timeout.Token);
