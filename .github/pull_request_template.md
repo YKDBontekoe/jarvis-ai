@@ -13,11 +13,15 @@ Jarvis uses [Semantic Versioning 2.0.0](https://semver.org/) for **release tags*
 | **Patch** | Backward-compatible fixes, docs, CI, or dependency updates with no new capability | `v1.2.4` |
 | **None** | No user-facing release (refactor, tests, internal tooling only) | — |
 
-- [ ] **SemVer bump:** `major` / `minor` / `patch` / `none`
-- [ ] If releasing: I will tag `vX.Y.Z` on the merge commit (or document the intended tag below).
+- [ ] **SemVer bump: major**
+- [ ] **SemVer bump: minor**
+- [ ] **SemVer bump: patch**
+- [ ] **SemVer bump: none** (merge without creating a release tag)
 - [ ] If mobile changes ship: `apps/mobile/pubspec.yaml` `version:` matches the intended **marketing** SemVer (`X.Y.Z+N`).
 
-**Intended release tag (if any):** `v` _e.g. 1.2.0_
+Merging to `main` runs [`.github/workflows/create-release-tag.yml`](.github/workflows/create-release-tag.yml), which reads the checked **SemVer bump** above and pushes `vX.Y.Z`. That tag triggers the iOS IPA and backend deploy workflows. Use **none** for refactors and other changes that should not release.
+
+**Intended release tag (optional):** `v1.2.0` — use when the computed bump would not land on the version you need.
 
 ## Type of change
 

@@ -129,6 +129,121 @@ def bump_semver(version: str, bump: str) -> str:
     raise SemVerError(f"Unknown bump '{bump}' (expected major, minor, or patch).")
 
 
+def _semver_sort_key(version: str) -> tuple[int, int, int]:
+    return parse_semver(version)
+
+
+def latest_release_version(tag_names: list[str]) -> str | None:
+    """Return the highest MAJOR.MINOR.PATCH among v* release tags."""
+    versions: list[str] = []
+    for name in tag_names:
+        name = name.strip()
+        if not name:
+            continue
+        try:
+            versions.append(parse_semver_tag(name))
+        except SemVerError:
+            continue
+    if not versions:
+        return None
+    return max(versions, key=_semver_sort_key)
+
+
+def parse_intended_release_tag(body: str) -> str | None:
+    """Parse an explicit vX.Y.Z from the pull request SemVer section."""
+    match = re.search(
+        r"\*\*Intended release tag[^*]*\*\*:\s*`?(v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))`?",
+        body,
+        flags=re.IGNORECASE,
+    )
+    if match is None:
+        return None
+    tag_name = match.group(1)
+    parse_semver_tag(tag_name)
+    return tag_name
+
+
+def parse_pr_semver_bump(body: str) -> str | None:
+    """
+    Read the checked SemVer bump from a pull request body.
+
+    Returns major, minor, patch, none, or None when no bump is selected.
+    """
+    for kind in ("major", "minor", "patch", "none"):
+        if re.search(
+            rf"^\s*-\s*\[[xX]\]\s*\*\*SemVer bump:\s*{kind}\*\*",
+            body,
+            flags=re.IGNORECASE | re.MULTILINE,
+        ):
+            return kind
+
+    if re.search(r"^\s*-\s*\[[xX]\]\s*\*\*SemVer bump:\*\*", body, re.I | re.MULTILINE):
+        if parse_intended_release_tag(body):
+            return "explicit"
+        if re.search(r"^\s*-\s*\[[xX]\]\s*Breaking change \(major\)", body, re.I | re.MULTILINE):
+            return "major"
+        if re.search(r"^\s*-\s*\[[xX]\]\s*Feature \(minor\)", body, re.I | re.MULTILINE):
+            return "minor"
+        if re.search(r"^\s*-\s*\[[xX]\]\s*Bug fix \(patch\)", body, re.I | re.MULTILINE):
+            return "patch"
+        if re.search(
+            r"^\s*-\s*\[[xX]\]\s*Refactor \(no SemVer release\)",
+            body,
+            re.I | re.MULTILINE,
+        ):
+            return "none"
+
+    if re.search(r"^\s*-\s*\[[xX]\]\s*Breaking change \(major\)", body, re.I | re.MULTILINE):
+        return "major"
+    if re.search(r"^\s*-\s*\[[xX]\]\s*Feature \(minor\)", body, re.I | re.MULTILINE):
+        return "minor"
+    if re.search(r"^\s*-\s*\[[xX]\]\s*Bug fix \(patch\)", body, re.I | re.MULTILINE):
+        return "patch"
+    if re.search(r"^\s*-\s*\[[xX]\]\s*Refactor \(no SemVer release\)", body, re.I | re.MULTILINE):
+        return "none"
+
+    return None
+
+
+def plan_next_release_tag(
+    *,
+    bump: str,
+    tag_names: list[str],
+    pubspec_path: Path,
+    intended_tag: str | None = None,
+) -> str | None:
+    """
+    Compute the next v* tag to create, or None when no release should be made.
+    """
+    if bump == "none":
+        return None
+    if bump == "explicit":
+        if not intended_tag:
+            raise SemVerError(
+                "SemVer bump is set but no intended release tag was found in the PR body."
+            )
+        parse_semver_tag(intended_tag)
+        return intended_tag
+
+    latest = latest_release_version(tag_names)
+    if intended_tag:
+        parse_semver_tag(intended_tag)
+        return intended_tag
+
+    base = latest
+    if base is None:
+        pubspec_version, _ = parse_pubspec_version(pubspec_path)
+        base = pubspec_version if is_valid_semver(pubspec_version) else "0.1.0"
+
+    next_version = bump_semver(base, bump)
+    tag_name = f"v{next_version}"
+    if tag_name in {name.strip() for name in tag_names if name.strip()}:
+        raise SemVerError(
+            f"Release tag '{tag_name}' already exists; choose a higher intended tag."
+        )
+    return tag_name
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ref-type", default="")
@@ -152,6 +267,21 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Append version, tag, and build lines to GITHUB_OUTPUT",
     )
+    parser.add_argument(
+        "--pr-body-file",
+        type=Path,
+        help="Pull request body used to plan the next release tag",
+    )
+    parser.add_argument(
+        "--tag-names-file",
+        type=Path,
+        help="Newline-separated git tag names (for example output of git tag -l 'v*')",
+    )
+    parser.add_argument(
+        "--plan-release",
+        action="store_true",
+        help="Plan the next v* tag from PR body and existing tags; writes skip=true when no release",
+    )
     return parser
 
 
@@ -174,6 +304,49 @@ def main(argv: list[str] | None = None) -> int:
             if not args.version or not args.build:
                 parser.error("--write-pubspec requires --version and --build")
             write_pubspec_version(args.pubspec, args.version, args.build)
+            return 0
+
+        if args.plan_release:
+            if args.pr_body_file is None or args.tag_names_file is None:
+                parser.error("--plan-release requires --pr-body-file and --tag-names-file")
+            pr_body = args.pr_body_file.read_text(encoding="utf-8")
+            tag_names = [
+                line.strip()
+                for line in args.tag_names_file.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            bump = parse_pr_semver_bump(pr_body)
+            lines: list[str]
+            if bump is None:
+                lines = ["skip=true\n", "reason=no_semver_bump_selected\n"]
+            else:
+                intended = parse_intended_release_tag(pr_body)
+                tag_name = plan_next_release_tag(
+                    bump=bump,
+                    tag_names=tag_names,
+                    pubspec_path=args.pubspec,
+                    intended_tag=intended,
+                )
+                if tag_name is None:
+                    lines = ["skip=true\n", "reason=semver_bump_none\n"]
+                else:
+                    version = parse_semver_tag(tag_name)
+                    lines = [
+                        "skip=false\n",
+                        f"bump={bump}\n",
+                        f"version={version}\n",
+                        f"tag={tag_name}\n",
+                    ]
+            if args.github_output:
+                output_path = os.environ.get("GITHUB_OUTPUT")
+                if not output_path:
+                    print("GITHUB_OUTPUT is not set.", file=sys.stderr)
+                    return 1
+                with open(output_path, "a", encoding="utf-8") as handle:
+                    handle.writelines(lines)
+            else:
+                for line in lines:
+                    print(line, end="")
             return 0
 
         version, tag_name, build = resolve_release(
