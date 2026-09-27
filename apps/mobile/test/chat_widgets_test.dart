@@ -184,6 +184,67 @@ void main() {
     expect(decisions, [true, false]);
   });
 
+  test('copyWith can clear a leftover decision after a cancelled decline', () {
+    const approval = ApprovalEntry(
+      id: 'a1',
+      toolName: 'ForgetMemory',
+      argumentsJson: '{}',
+      status: ApprovalStatus.submitting,
+      decision: false,
+    );
+    final reset = approval.copyWith(
+      status: ApprovalStatus.pending,
+      clearDecision: true,
+    );
+    expect(reset.decision, isNull);
+    expect(reset.status, ApprovalStatus.pending);
+  });
+
+  testWidgets('pending Approve ignores a leftover decline decision', (
+    tester,
+  ) async {
+    final decisions = <bool>[];
+    await tester.pumpWidget(
+      _host(
+        ApprovalCard(
+          approval: const ApprovalEntry(
+            id: 'a1',
+            toolName: 'ForgetMemory',
+            argumentsJson: '{}',
+            decision: false,
+          ),
+          onDecide: decisions.add,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Approve'));
+    expect(decisions, [true]);
+  });
+
+  testWidgets('declined retry still resubmits the previous decline', (
+    tester,
+  ) async {
+    final decisions = <bool>[];
+    await tester.pumpWidget(
+      _host(
+        ApprovalCard(
+          approval: const ApprovalEntry(
+            id: 'a3',
+            toolName: 'ForgetMemory',
+            argumentsJson: '{}',
+            retry: true,
+            decision: false,
+          ),
+          onDecide: decisions.add,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Retry'));
+    expect(decisions, [false]);
+  });
+
   testWidgets('decided and retryable approval cards change their actions', (
     tester,
   ) async {

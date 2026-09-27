@@ -1555,6 +1555,7 @@ class _ChatScreenState extends State<ChatScreen> {
           replace(
             (current) => current.copyWith(
               status: ApprovalStatus.pending,
+              clearDecision: true,
               clearError: true,
             ),
           );
@@ -1574,6 +1575,7 @@ class _ChatScreenState extends State<ChatScreen> {
               : status == 409
               ? current.copyWith(
                   status: ApprovalStatus.pending,
+                  clearDecision: true,
                   error:
                       'Decide the earlier pending tool call first, or this one was already handled.',
                 )

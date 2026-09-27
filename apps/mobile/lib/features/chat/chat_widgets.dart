@@ -493,7 +493,13 @@ class ApprovalCard extends StatelessWidget {
                         FilledButton.icon(
                           onPressed: submitting
                               ? null
-                              : () => onDecide(approval.decision ?? true),
+                              : () => onDecide(
+                                  approval.retry ||
+                                          approval.status ==
+                                              ApprovalStatus.failed
+                                      ? (approval.decision ?? true)
+                                      : true,
+                                ),
                           style: FilledButton.styleFrom(
                             minimumSize: const Size(0, 42),
                           ),

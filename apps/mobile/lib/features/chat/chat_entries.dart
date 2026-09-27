@@ -128,12 +128,13 @@ class ApprovalEntry extends ChatEntry {
     bool? decision,
     String? error,
     bool clearError = false,
+    bool clearDecision = false,
   }) => ApprovalEntry(
     id: id,
     toolName: toolName,
     argumentsJson: argumentsJson,
     status: status ?? this.status,
-    decision: decision ?? this.decision,
+    decision: clearDecision ? null : decision ?? this.decision,
     error: clearError ? null : error ?? this.error,
     retry: retry,
   );
