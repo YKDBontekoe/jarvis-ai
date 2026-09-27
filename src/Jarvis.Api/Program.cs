@@ -830,8 +830,8 @@ api.MapPost("/files", async (IFormFile? file, IFileService files, IAuditEventSto
     {
         var stored = await files.UploadAsync(currentUser.OwnerId, file.FileName, file.ContentType,
             file.Length, content, ct);
-        await audit.AppendAsync(currentUser.OwnerId, "files", "file.uploaded", "moderate", true, null,
-            JsonSerializer.Serialize(new { resourceId = stored.Id }), ct);
+        await TryAppendAuditAsync(audit, app.Logger, currentUser.OwnerId, "files", "file.uploaded",
+            "moderate", true, null, JsonSerializer.Serialize(new { resourceId = stored.Id }), ct);
         return Results.Created($"/api/v1/files/{stored.Id}", ToFileDto(stored));
     }
     catch (ArgumentException exception)
@@ -840,8 +840,8 @@ api.MapPost("/files", async (IFormFile? file, IFileService files, IAuditEventSto
     }
     catch (MalwareDetectedException)
     {
-        await audit.AppendAsync(currentUser.OwnerId, "files", "file.malware_rejected", "high", false,
-            null, null, ct);
+        await TryAppendAuditAsync(audit, app.Logger, currentUser.OwnerId, "files", "file.malware_rejected",
+            "high", false, null, null, ct);
         return Results.UnprocessableEntity(new { message = "The uploaded file was rejected by malware scanning." });
     }
     catch (Exception exception) when (exception is not OperationCanceledException)
@@ -898,8 +898,8 @@ api.MapPost("/memory", async (IMemoryService memory, IAuditEventStore audit,
     if (!ValidateMemoryRequest(request, out var errors)) return Results.ValidationProblem(errors);
     var record = await memory.CreateAsync(currentUser.OwnerId, request.Kind!, request.Content!, request.Importance,
         request.Confidence, request.ValidUntil, request.IsPinned, ct);
-    await audit.AppendAsync(currentUser.OwnerId, "memory", "memory.created", "moderate", true, null,
-        JsonSerializer.Serialize(new { resourceId = record.Id, kind = record.Kind }), ct);
+    await TryAppendAuditAsync(audit, app.Logger, currentUser.OwnerId, "memory", "memory.created", "moderate",
+        true, null, JsonSerializer.Serialize(new { resourceId = record.Id, kind = record.Kind }), ct);
     return Results.Created($"/api/v1/memory/{record.Id}", ToMemoryDto(record));
 }).WithName("CreateMemory");
 
@@ -917,8 +917,8 @@ api.MapPut("/memory/{id:guid}", async (Guid id, IMemoryService memory, IAuditEve
     var record = await memory.UpdateAsync(id, currentUser.OwnerId, request.Kind!, request.Content!, request.Importance,
         request.Confidence, request.ValidUntil, request.IsPinned, ct);
     if (record is null) return Results.NotFound();
-    await audit.AppendAsync(currentUser.OwnerId, "memory", "memory.updated", "moderate", true, null,
-        JsonSerializer.Serialize(new { resourceId = id, kind = record.Kind }), ct);
+    await TryAppendAuditAsync(audit, app.Logger, currentUser.OwnerId, "memory", "memory.updated", "moderate",
+        true, null, JsonSerializer.Serialize(new { resourceId = id, kind = record.Kind }), ct);
     return Results.Ok(ToMemoryDto(record));
 }).WithName("UpdateMemory");
 
@@ -927,8 +927,8 @@ api.MapDelete("/memory/{id:guid}", async (Guid id, IMemoryService memory, IAudit
 {
     if (await memory.GetAsync(id, currentUser.OwnerId, ct) is null) return Results.NotFound();
     await memory.DeleteAsync(id, currentUser.OwnerId, ct);
-    await audit.AppendAsync(currentUser.OwnerId, "memory", "memory.deleted", "high", true, null,
-        JsonSerializer.Serialize(new { resourceId = id }), ct);
+    await TryAppendAuditAsync(audit, app.Logger, currentUser.OwnerId, "memory", "memory.deleted", "high",
+        true, null, JsonSerializer.Serialize(new { resourceId = id }), ct);
     return Results.NoContent();
 }).WithName("DeleteMemory");
 
@@ -1075,6 +1075,21 @@ static async Task WriteVoiceStreamEventAsync(Stream stream, object value, Cancel
     await stream.WriteAsync(data, cancellationToken);
     await stream.WriteAsync(new byte[] { (byte)'\n' }, cancellationToken);
     await stream.FlushAsync(cancellationToken);
+}
+
+static async Task TryAppendAuditAsync(IAuditEventStore audit, ILogger logger, Guid ownerId, string tool,
+    string action, string riskClass, bool success, Guid? approvalId, string? metadataJson,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        await audit.AppendAsync(ownerId, tool, action, riskClass, success, approvalId, metadataJson,
+            cancellationToken);
+    }
+    catch (Exception exception) when (exception is not OperationCanceledException)
+    {
+        logger.LogWarning(exception, "Could not append audit event {Action}.", action);
+    }
 }
 static ToolApprovalDto ToApprovalDto(ToolApprovalRecord approval) => new(approval.Id, approval.ConversationId,
     approval.ToolName, approval.ArgumentsJson, approval.Status, approval.Approved, approval.ResumeStatus,

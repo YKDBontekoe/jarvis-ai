@@ -110,6 +110,18 @@ public sealed class AgentToolTests
     }
 
     [Fact]
+    public async Task Remember_still_succeeds_when_audit_append_fails()
+    {
+        var memories = new FakeMemoryService();
+        var tools = CreateMemoryTools(memories, new ThrowingAuditStore());
+
+        var result = await tools.RememberAsync("The user prefers oat milk.", "preference");
+
+        Assert.StartsWith("Saved", result);
+        Assert.Single(memories.Items);
+    }
+
+    [Fact]
     public async Task Remember_refuses_secrets_and_normalizes_unknown_kinds()
     {
         var memories = new FakeMemoryService();
@@ -208,8 +220,9 @@ public sealed class AgentToolTests
         Assert.Equal(["ListReminders", "CancelReminder"], client.ToolNamesCalled);
     }
 
-    private static MemoryAgentTools CreateMemoryTools(FakeMemoryService memories, FakeAuditStore audit) =>
-        new(memories, new MemoryReranker(new EchoContextClient(), NullLogger<MemoryReranker>.Instance), audit, new FixedUser());
+    private static MemoryAgentTools CreateMemoryTools(FakeMemoryService memories, IAuditEventStore audit) =>
+        new(memories, new MemoryReranker(new EchoContextClient(), NullLogger<MemoryReranker>.Instance), audit,
+            new FixedUser(), NullLogger<MemoryAgentTools>.Instance);
 
     private sealed class FixedUser : ICurrentUser
     {
@@ -303,6 +316,16 @@ public sealed class AgentToolTests
             return Task.FromResult(new AuditEventRecord(Guid.NewGuid(), agentRunId, tool, action, riskClass, approvalId,
                 DateTimeOffset.UtcNow, success, metadataJson));
         }
+
+        public Task<IReadOnlyList<AuditEventRecord>> ListAsync(Guid ownerId, int limit, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class ThrowingAuditStore : IAuditEventStore
+    {
+        public Task<AuditEventRecord> AppendAsync(Guid ownerId, string tool, string action, string riskClass, bool success,
+            Guid? approvalId, string? metadataJson, CancellationToken cancellationToken, Guid? agentRunId = null) =>
+            throw new InvalidOperationException("Audit store is unavailable.");
 
         public Task<IReadOnlyList<AuditEventRecord>> ListAsync(Guid ownerId, int limit, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
