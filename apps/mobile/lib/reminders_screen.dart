@@ -234,35 +234,33 @@ class _RemindersScreenState extends State<RemindersScreen>
           builder: (_) => ApprovalsScreen(http: widget.http),
         ),
       );
-      return;
-    }
-    if (opensDailyBriefing(type)) {
+    } else if (opensDailyBriefing(type)) {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) => DailyBriefingScreen(http: widget.http),
         ),
       );
-      return;
-    }
-    if (opensTaskDetails(type) && sourceId != null) {
+    } else if (opensTaskDetails(type) && sourceId != null) {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) =>
               TaskDetailsScreen(http: widget.http, taskId: sourceId),
         ),
       );
+    } else if (sourceId != null && opensNotificationDetails(type)) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => NotificationDetailsScreen(
+            http: widget.http,
+            notificationType: type!,
+            sourceId: sourceId,
+          ),
+        ),
+      );
+    } else {
       return;
     }
-    if (sourceId == null || !opensNotificationDetails(type)) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => NotificationDetailsScreen(
-          http: widget.http,
-          notificationType: type!,
-          sourceId: sourceId,
-        ),
-      ),
-    );
+    if (mounted) await _load();
   }
 
   void _showError(String message) {

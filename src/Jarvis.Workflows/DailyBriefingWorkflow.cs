@@ -60,15 +60,21 @@ public sealed class DailyBriefingWorkflow
                     input.TimeZoneId, dayStart, nextDayStart);
             }
 
-            try
+            while (true)
             {
-                var shouldContinue = await Workflow.ExecuteActivityAsync(
-                    (DailyBriefingActivityContract activities) => activities.DeliverAsync(delivery), options);
-                if (!shouldContinue) return;
-            }
-            catch (ActivityFailureException)
-            {
-                // Keep the daily schedule alive if data access or push delivery is temporarily unavailable.
+                try
+                {
+                    var shouldContinue = await Workflow.ExecuteActivityAsync(
+                        (DailyBriefingActivityContract activities) => activities.DeliverAsync(delivery), options);
+                    if (!shouldContinue) return;
+                    break;
+                }
+                catch (ActivityFailureException)
+                {
+                    // Keep the daily schedule alive if data access or push delivery is temporarily unavailable.
+                    if (!Workflow.Patched("daily-briefing-retry-same-day")) break;
+                    await Workflow.DelayAsync(TimeSpan.FromMinutes(5));
+                }
             }
 
             if (Workflow.ContinueAsNewSuggested)

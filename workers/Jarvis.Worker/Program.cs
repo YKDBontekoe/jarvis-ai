@@ -126,10 +126,17 @@ internal sealed class ConditionWatchActivities(IServiceScopeFactory scopeFactory
 internal sealed class DailyBriefingActivities(IServiceScopeFactory scopeFactory) : DailyBriefingActivityContract
 {
     [Temporalio.Activities.Activity("ResolveDailyBriefingSchedule")]
-    public override Task<DailyBriefingSchedule> ResolveScheduleAsync(DailyBriefingWorkflowInput input)
+    public override async Task<DailyBriefingSchedule> ResolveScheduleAsync(DailyBriefingWorkflowInput input)
     {
-        var schedule = DailyBriefingClock.ResolveNext(DateTimeOffset.UtcNow, input.LocalTime, input.TimeZoneId);
-        return Task.FromResult(schedule);
+        var activity = ActivityExecutionContext.Current;
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var preference = await scope.ServiceProvider.GetRequiredService<IDailyBriefingRepository>()
+            .GetAsync(input.OwnerId, activity.CancellationToken);
+        var lastDelivered = preference is not null && preference.WorkflowId == input.WorkflowId
+            ? preference.LastDeliveredDate
+            : null;
+        return DailyBriefingClock.ResolveNext(DateTimeOffset.UtcNow, input.LocalTime, input.TimeZoneId,
+            lastDelivered);
     }
 
     [Temporalio.Activities.Activity("DeliverDailyBriefing")]
