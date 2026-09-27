@@ -23,14 +23,13 @@ required_images=(
   "${JARVIS_API_IMAGE:?Set JARVIS_API_IMAGE to the GHCR api image}"
   "${JARVIS_WORKER_IMAGE:?Set JARVIS_WORKER_IMAGE to the GHCR worker image}"
   "${JARVIS_VOICE_WORKER_IMAGE:?Set JARVIS_VOICE_WORKER_IMAGE to the GHCR voice-worker image}"
-  "${JARVIS_STORAGE_IMAGE:?Set JARVIS_STORAGE_IMAGE to the GHCR storage-tools image}"
 )
 
 echo "Pulling Jarvis images:"
 printf '  %s\n' "${required_images[@]}"
 
 docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" pull \
-  jarvis-api jarvis-worker jarvis-voice-worker minio minio-init
+  jarvis-api jarvis-worker jarvis-voice-worker garage
 
 docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" up \
   -d --no-build --remove-orphans

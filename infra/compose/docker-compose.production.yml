@@ -61,40 +61,25 @@ services:
         condition: service_started
     networks: [application]
 
-  minio:
-    image: ${JARVIS_STORAGE_IMAGE:?Set JARVIS_STORAGE_IMAGE}
-    command: ["server", "/data", "--console-address", ":9001"]
+  garage:
+    image: dxflrs/garage:v2.4.1
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
     restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
+      GARAGE_CONFIG_FILE: /etc/garage.toml
+      GARAGE_DEFAULT_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
+      GARAGE_DEFAULT_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
+      GARAGE_DEFAULT_BUCKET: jarvis-files
     volumes:
-      - minio-data:/data
-    networks: [data]
-
-  minio-init:
-    image: ${JARVIS_STORAGE_IMAGE:?Set JARVIS_STORAGE_IMAGE}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        set -eu
-        until mc alias set root http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do sleep 2; done
-        mc mb --ignore-existing "root/$${S3_BUCKET}"
-        mc admin policy info root jarvis-file-store >/dev/null 2>&1 || mc admin policy create root jarvis-file-store /policy/jarvis-file-store.json
-        mc admin user remove root "$${S3_ACCESS_KEY}" >/dev/null 2>&1 || true
-        mc admin user add root "$${S3_ACCESS_KEY}" "$${S3_SECRET_KEY}"
-        mc admin policy attach root jarvis-file-store --user "$${S3_ACCESS_KEY}"
-    restart: on-failure
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}
-      S3_BUCKET: jarvis-files
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
-    volumes:
-      - ../minio/jarvis-file-store.json:/policy/jarvis-file-store.json:ro
-    depends_on:
-      - minio
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
+      - ${GARAGE_CONFIG_FILE:?Set GARAGE_CONFIG_FILE}:/etc/garage.toml:ro
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
     networks: [data]
 
   clamav:
@@ -155,7 +140,7 @@ services:
       ConnectionStrings__jarvis: Host=postgres;Port=5432;Database=jarvis;Username=jarvis;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       Database__ApplyMigrationsAtStartup: "true"
       Temporal__Address: temporal:7233
-      ObjectStorage__ServiceUrl: http://minio:9000
+      ObjectStorage__ServiceUrl: http://garage:3900
       ObjectStorage__AccessKey: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
       ObjectStorage__SecretKey: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
       ObjectStorage__Bucket: jarvis-files
@@ -184,8 +169,8 @@ services:
         condition: service_healthy
       temporal:
         condition: service_started
-      minio-init:
-        condition: service_completed_successfully
+      garage:
+        condition: service_healthy
       clamav:
         condition: service_healthy
       livekit:
@@ -229,7 +214,7 @@ services:
       Jarvis__ModelClass: ${JARVIS_MODEL_CLASS:-}
       ConnectionStrings__jarvis: Host=postgres;Port=5432;Database=jarvis;Username=jarvis;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       Temporal__Address: temporal:7233
-      ObjectStorage__ServiceUrl: http://minio:9000
+      ObjectStorage__ServiceUrl: http://garage:3900
       ObjectStorage__AccessKey: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
       ObjectStorage__SecretKey: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
       ObjectStorage__Bucket: jarvis-files
@@ -240,6 +225,8 @@ services:
       - ${JARVIS_DATA_PROTECTION_KEYS_DIR:?Set JARVIS_DATA_PROTECTION_KEYS_DIR}:/var/lib/jarvis-data-protection-keys:rw
     depends_on:
       jarvis-api:
+        condition: service_healthy
+      garage:
         condition: service_healthy
       temporal:
         condition: service_started
@@ -310,7 +297,8 @@ networks:
 volumes:
   postgres-data:
   temporal-postgres-data:
-  minio-data:
+  garage-meta:
+  garage-data:
   clamav-signatures:
   caddy-data:
   caddy-config:

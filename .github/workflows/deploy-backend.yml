@@ -51,9 +51,6 @@ jobs:
           - name: voice-worker
             dockerfile: workers/voice/Dockerfile
             build-args: ""
-          - name: storage-tools
-            dockerfile: infra/compose/minio/Dockerfile
-            build-args: ""
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -110,7 +107,6 @@ jobs:
           JARVIS_API_IMAGE: ${{ needs.prepare.outputs.prefix }}/api:${{ github.sha }}
           JARVIS_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/worker:${{ github.sha }}
           JARVIS_VOICE_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/voice-worker:${{ github.sha }}
-          JARVIS_STORAGE_IMAGE: ${{ needs.prepare.outputs.prefix }}/storage-tools:${{ github.sha }}
           DEPLOY_COMPOSE_FILES: ${{ vars.DEPLOY_COMPOSE_FILES }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
@@ -126,6 +122,5 @@ jobs:
             git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${git_auth}" fetch --force origin "${GIT_REF}"
           git checkout --detach "${GIT_SHA}"
           echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
-          export JARVIS_STORAGE_IMAGE
           chmod +x scripts/deploy/remote-up.sh
           scripts/deploy/remote-up.sh

@@ -21,10 +21,9 @@ IMAGE_DEFAULTS = {
 REQUIRED_ENV = {
     "POSTGRES_PASSWORD": "postgres-test-secret",
     "TEMPORAL_PASSWORD": "temporal-test-secret",
-    "MINIO_ROOT_USER": "jarvis_minio_admin",
-    "MINIO_ROOT_PASSWORD": "minio-test-secret",
     "S3_ACCESS_KEY": "jarvis_object_store",
     "S3_SECRET_KEY": "s3-test-secret",
+    "GARAGE_CONFIG_FILE": "/tmp/garage.toml",
     "JARVIS_UID": "1000",
     "JARVIS_GID": "1000",
     "CODEX_AUTH_FILE": "/tmp/codex-auth.json",
