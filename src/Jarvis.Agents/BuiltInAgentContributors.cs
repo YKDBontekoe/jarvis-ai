@@ -27,6 +27,7 @@ internal sealed class CoreAgentTools(
     CodexProcessLimiter codexProcessLimiter,
     IConfiguration configuration,
     ILoggerFactory loggerFactory,
+    CodexExecutable codexExecutable,
     TimeProvider? timeProvider = null) : IAgentToolContributor
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context)
@@ -65,7 +66,7 @@ internal sealed class CoreAgentTools(
         if ((configuration.GetSection("Coding:Repositories").Get<CodingRepositoryOption[]>() ?? []).Length > 0)
         {
             var codingTools = new CodexCodingTools(configuration, loggerFactory.CreateLogger<CodexCodingTools>(),
-                auditEvents, currentUser, codexProcessLimiter);
+                auditEvents, currentUser, codexProcessLimiter, codexExecutable);
             yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(codingTools.RunCodingTaskAsync));
         }
     }

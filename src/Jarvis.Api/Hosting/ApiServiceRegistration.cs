@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using Jarvis.Agents;
 using Jarvis.Api.Conversations;
 using Jarvis.Api.Notifications;
@@ -107,6 +108,12 @@ internal static class ApiServiceRegistration
         services.AddSingleton<VoiceConversationCoordinator>();
         services.AddHttpClient<LiveKitAgentDispatchClient>();
         services.AddHttpClient<Jarvis.Agents.ModelProviders.OpenRouterCatalog>(client => client.Timeout = TimeSpan.FromSeconds(20));
+        services.AddHttpClient("npm-registry", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(20);
+            client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("jarvis", "1.0"));
+        });
+        services.AddSingleton<CodexInstallation>();
         services.AddHttpClient("firebase-messaging", client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddHostedService<NotificationPushWorker>();
         services.AddHostedService<NotificationRealtimeWorker>();

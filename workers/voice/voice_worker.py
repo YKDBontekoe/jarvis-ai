@@ -16,6 +16,7 @@ from aiortc import MediaStreamTrack, RTCConfiguration, RTCPeerConnection, RTCSes
 from av import AudioFrame, AudioResampler
 from livekit import agents, rtc
 
+from codex_executable import resolve_codex_executable
 from playback_gate import VoicePlaybackGate
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
@@ -109,8 +110,7 @@ class CodexRealtimeSession:
     @classmethod
     async def start(cls) -> CodexRealtimeSession:
         scratch = tempfile.mkdtemp(prefix="jarvis-codex-voice-")
-        codex = os.getenv("CODEX_EXECUTABLE_PATH", "codex")
-        codex_path = shutil.which(codex) or codex
+        codex_path = resolve_codex_executable()
         home = os.getenv("HOME", str(Path.home()))
         env = {
             "PATH": os.getenv("PATH", "/usr/local/bin:/usr/bin:/bin"),

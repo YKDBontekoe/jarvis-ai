@@ -52,7 +52,7 @@ internal sealed class ChatClientResolver(
             logger.LogWarning("Owner {OwnerId} selected OpenRouter without an API key; using Codex.", ownerId);
         }
         else if (ResolveCodexModelOverride(settings, purpose) is { } codexModel)
-            client = new ModelSelectingChatClient(codexClient, codexModel);
+            client = new SelectedModelChatClient(codexClient, codexModel);
         _chatClients[(ownerId, purpose)] = client;
         return client;
     }
@@ -91,6 +91,30 @@ internal sealed class ChatClientResolver(
                !string.IsNullOrWhiteSpace(key)
             ? key
             : null;
+    }
+
+    /// <summary>Applies an owner-selected Codex model id without disposing the shared Codex client.</summary>
+    private sealed class SelectedModelChatClient(IChatClient inner, string modelId) : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            inner.GetResponseAsync(messages, WithModel(options), cancellationToken);
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+            inner.GetStreamingResponseAsync(messages, WithModel(options), cancellationToken);
+
+        public object? GetService(Type serviceType, object? serviceKey = null) =>
+            serviceType.IsInstanceOfType(this) ? this : inner.GetService(serviceType, serviceKey);
+
+        public void Dispose() { }
+
+        private ChatOptions WithModel(ChatOptions? options)
+        {
+            options ??= new ChatOptions();
+            options.ModelId = modelId;
+            return options;
+        }
     }
 }
 

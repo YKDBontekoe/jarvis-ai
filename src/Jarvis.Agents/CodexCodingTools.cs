@@ -11,7 +11,8 @@ namespace Jarvis.Agents;
 
 /// <summary>Runs a coding task in an isolated snapshot using the Codex CLI harness.</summary>
 public sealed class CodexCodingTools(IConfiguration configuration, ILogger<CodexCodingTools> logger,
-    IAuditEventStore audit, ICurrentUser currentUser, CodexProcessLimiter processLimiter)
+    IAuditEventStore audit, ICurrentUser currentUser, CodexProcessLimiter processLimiter,
+    CodexExecutable codexExecutable)
 {
     private const int MaxTaskLength = 16_000;
     private const int MaxResultLength = 24_000;
@@ -64,7 +65,7 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
         await CreateSnapshotRepositoryAsync(repositoryPath, worktreePath, files.StandardOutput, cancellationToken);
 
         var resultPath = Path.Combine(repositoryWorktreeRoot, $"{taskId}.result.txt");
-        var executable = configuration["Codex:ExecutablePath"] ?? "codex";
+        var executable = codexExecutable.Resolve();
         var codingModel = configuration["Codex:ModelClasses:Coding"];
         if (string.IsNullOrWhiteSpace(codingModel)) codingModel = configuration["Codex:Model"];
 
