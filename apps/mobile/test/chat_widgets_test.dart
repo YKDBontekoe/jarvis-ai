@@ -210,13 +210,24 @@ void main() {
               ),
               onDecide: (_) {},
             ),
+            ApprovalCard(
+              approval: const ApprovalEntry(
+                id: 'a3',
+                toolName: 'ForgetMemory',
+                argumentsJson: '{}',
+                retry: true,
+                decision: false,
+              ),
+              onDecide: (_) {},
+            ),
           ],
         ),
       ),
     );
     expect(find.text('Approved'), findsOneWidget);
     expect(find.text('Approved, but not finished'), findsOneWidget);
-    expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('Declined, but not finished'), findsOneWidget);
+    expect(find.text('Retry'), findsNWidgets(2));
     expect(find.text('Decline'), findsNothing);
   });
 

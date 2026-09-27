@@ -390,7 +390,9 @@ class ApprovalCard extends StatelessWidget {
                         ApprovalStatus.denied => 'Declined',
                         _ =>
                           approval.retry
-                              ? 'Approved, but not finished'
+                              ? (approval.decision == false
+                                  ? 'Declined, but not finished'
+                                  : 'Approved, but not finished')
                               : 'Jarvis needs your approval',
                       },
                       style: const TextStyle(
