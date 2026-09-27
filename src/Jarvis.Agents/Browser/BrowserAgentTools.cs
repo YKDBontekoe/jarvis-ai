@@ -10,7 +10,7 @@ namespace Jarvis.Agents.Browser;
 
 internal sealed class BrowserAgentTools(
     IBrowserSessionStore sessions,
-    AgentTurnContext turn,
+    Guid? conversationId,
     IRealtimePublisher realtime,
     McpToolHost mcp,
     ICurrentUser currentUser)
@@ -21,7 +21,7 @@ internal sealed class BrowserAgentTools(
         [Description("Optional https URL to start from.")] string? startUrl = null,
         CancellationToken cancellationToken = default)
     {
-        if (turn.ConversationId is not { } conversationId)
+        if (conversationId is not { } id)
             return "BrowseTheWeb is only available during an interactive conversation.";
         var trimmedGoal = goal?.Trim() ?? string.Empty;
         if (trimmedGoal.Length is 0 or > 1_000)
@@ -36,12 +36,12 @@ internal sealed class BrowserAgentTools(
         if (browserTools.Length == 0)
             return "The isolated Playwright browser is not connected. Enable the browser Compose profile, then try again.";
 
-        var session = await sessions.StartAsync(currentUser.OwnerId, conversationId, trimmedGoal, url,
+        var session = await sessions.StartAsync(currentUser.OwnerId, id, trimmedGoal, url,
             cancellationToken);
         await sessions.RecordStepAsync(session.Id, "BrowseTheWeb",
             url is null ? $"Started: {trimmedGoal}" : $"Started: {trimmedGoal} at {url}", true, cancellationToken);
-        await realtime.PublishToConversationAsync(conversationId, "browser.session",
-            new { id = session.Id, conversationId, goal = trimmedGoal, startUrl = url, status = session.Status },
+        await realtime.PublishToConversationAsync(id, "browser.session",
+            new { id = session.Id, conversationId = id, goal = trimmedGoal, startUrl = url, status = session.Status },
             cancellationToken);
         var hint = url is null
             ? "Use the connected browser_* tools to complete the goal. Keep going until you can answer, then stop."
@@ -52,14 +52,13 @@ internal sealed class BrowserAgentTools(
 
 internal sealed class BrowserToolContributor(
     IBrowserSessionStore sessions,
-    AgentTurnContext turn,
     IRealtimePublisher realtime,
     McpToolHost mcp,
     ICurrentUser currentUser) : IAgentToolContributor
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context) =>
         [new ApprovalRequiredAIFunction(AIFunctionFactory.Create(
-            new BrowserAgentTools(sessions, turn, realtime, mcp, currentUser).BrowseTheWebAsync))];
+            new BrowserAgentTools(sessions, context.ConversationId, realtime, mcp, currentUser).BrowseTheWebAsync))];
 }
 
 internal sealed class BrowserContextContributor : IAgentContextContributor
@@ -87,15 +86,15 @@ internal sealed class BrowserContextProvider : MessageAIContextProvider
 internal sealed class BrowserStepRecordingFunction : DelegatingAIFunction
 {
     private readonly IBrowserSessionStore _sessions;
-    private readonly AgentTurnContext _turn;
+    private readonly Guid? _conversationId;
     private readonly IRealtimePublisher _realtime;
     private readonly ICurrentUser _currentUser;
 
-    public BrowserStepRecordingFunction(AIFunction inner, IBrowserSessionStore sessions, AgentTurnContext turn,
+    public BrowserStepRecordingFunction(AIFunction inner, IBrowserSessionStore sessions, Guid? conversationId,
         IRealtimePublisher realtime, ICurrentUser currentUser) : base(inner)
     {
         _sessions = sessions;
-        _turn = turn;
+        _conversationId = conversationId;
         _realtime = realtime;
         _currentUser = currentUser;
     }
@@ -116,7 +115,7 @@ internal sealed class BrowserStepRecordingFunction : DelegatingAIFunction
         }
         finally
         {
-            if (_turn.ConversationId is { } conversationId)
+            if (_conversationId is { } conversationId)
             {
                 var session = await _sessions.GetActiveForConversationAsync(_currentUser.OwnerId, conversationId,
                     cancellationToken);
@@ -136,13 +135,13 @@ internal sealed class BrowserStepRecordingFunction : DelegatingAIFunction
 internal static class BrowserToolWrapping
 {
     public static IEnumerable<AITool> Wrap(IEnumerable<AITool> tools, IBrowserSessionStore sessions,
-        AgentTurnContext turn, IRealtimePublisher realtime, ICurrentUser currentUser)
+        Guid? conversationId, IRealtimePublisher realtime, ICurrentUser currentUser)
     {
         foreach (var tool in tools)
         {
             if (tool is AIFunction function &&
                 function.Name.StartsWith("browser_", StringComparison.OrdinalIgnoreCase))
-                yield return new BrowserStepRecordingFunction(function, sessions, turn, realtime, currentUser);
+                yield return new BrowserStepRecordingFunction(function, sessions, conversationId, realtime, currentUser);
             else
                 yield return tool;
         }

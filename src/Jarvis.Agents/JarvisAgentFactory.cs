@@ -35,8 +35,9 @@ public sealed class JarvisAgentFactory(
     {
         var modelClass = configuration["Jarvis:ModelClass"];
         if (string.IsNullOrWhiteSpace(modelClass)) modelClass = null;
-        var tools = Browser.BrowserToolWrapping.Wrap(mcpTools, services.GetRequiredService<Jarvis.Application.Browser.IBrowserSessionStore>(),
-            services.GetRequiredService<AgentTurnContext>(),
+        var tools = Browser.BrowserToolWrapping.Wrap(mcpTools,
+            services.GetRequiredService<Jarvis.Application.Browser.IBrowserSessionStore>(),
+            context.ConversationId,
             services.GetRequiredService<Jarvis.Application.Realtime.IRealtimePublisher>(),
             services.GetRequiredService<ICurrentUser>()).ToList();
         var toolNames = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);

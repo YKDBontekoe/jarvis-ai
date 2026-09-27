@@ -10,7 +10,7 @@ namespace Jarvis.Agents.Surfaces;
 
 internal sealed class SurfaceAgentTools(
     IUiSurfaceRepository surfaces,
-    AgentTurnContext turn,
+    Guid? conversationId,
     IRealtimePublisher realtime,
     ICurrentUser currentUser)
 {
@@ -24,18 +24,18 @@ internal sealed class SurfaceAgentTools(
         [Description("Buttons as JSON: [{id,label,style}]. style is primary, secondary, or danger.")] string? actionsJson = null,
         CancellationToken cancellationToken = default)
     {
-        if (turn.ConversationId is not { } conversationId)
+        if (conversationId is not { } id)
             return "RenderUi is only available during an interactive conversation.";
         try
         {
             var schema = UiSurfaceSchema.Normalize(kind, title, body, Parse(itemsJson), Parse(fieldsJson),
                 Parse(actionsJson));
-            var surface = await surfaces.CreateAsync(currentUser.OwnerId, conversationId,
+            var surface = await surfaces.CreateAsync(currentUser.OwnerId, id,
                 (kind ?? UiSurfaceKinds.Card).Trim().ToLowerInvariant(), title.Trim(), schema, cancellationToken);
-            await realtime.PublishToConversationAsync(conversationId, "ui.surface", new
+            await realtime.PublishToConversationAsync(id, "ui.surface", new
             {
                 id = surface.Id,
-                conversationId,
+                conversationId = id,
                 kind = surface.Kind,
                 title = surface.Title,
                 status = surface.Status,
@@ -59,12 +59,12 @@ internal sealed class SurfaceAgentTools(
 
 internal sealed class SurfaceToolContributor(
     IUiSurfaceRepository surfaces,
-    AgentTurnContext turn,
     IRealtimePublisher realtime,
     ICurrentUser currentUser) : IAgentToolContributor
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context) =>
-        [AIFunctionFactory.Create(new SurfaceAgentTools(surfaces, turn, realtime, currentUser).RenderUiAsync)];
+        [AIFunctionFactory.Create(new SurfaceAgentTools(surfaces, context.ConversationId, realtime, currentUser)
+            .RenderUiAsync)];
 }
 
 internal sealed class SurfaceContextContributor : IAgentContextContributor

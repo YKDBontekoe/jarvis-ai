@@ -11,8 +11,7 @@ using Microsoft.Extensions.AI;
 namespace Jarvis.Agents;
 
 public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientResolver chatClients, McpToolHost mcpToolHost,
-    IConversationStore conversations, IJarvisTaskRepository tasks, ICurrentUser currentUser,
-    AgentTurnContext turnContext) : IJarvisAgent
+    IConversationStore conversations, IJarvisTaskRepository tasks, ICurrentUser currentUser) : IJarvisAgent
 {
     private static readonly JsonSerializerOptions ArgumentsJsonOptions = new(JsonSerializerDefaults.Web);
     private AIAgent? _agent;
@@ -22,7 +21,6 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
         Message currentUserMessage,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using var _ = turnContext.Begin(conversationId);
         var agent = await GetAgentAsync(conversationId, cancellationToken);
         var sessionJson = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
         ChatMessage[] input = [new ChatMessage(ChatRole.User, currentUserMessage.Content)];
@@ -43,7 +41,6 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
         ToolApprovalReply approval,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using var _ = turnContext.Begin(conversationId);
         var agent = await GetAgentAsync(conversationId, cancellationToken);
         var sessionJson = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
         ChatMessage[] input;
@@ -74,7 +71,8 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
         var ownerId = currentUser.OwnerId;
         var task = await tasks.GetTaskByConversationIdAsync(conversationId, ownerId, cancellationToken);
         var chatClient = await chatClients.GetChatClientAsync(ownerId, ModelPurpose.Chat, cancellationToken);
-        return _agent = agentFactory.Create(chatClient, mcpToolHost.Tools, new AgentBuildContext(ownerId, task?.Id));
+        return _agent = agentFactory.Create(chatClient, mcpToolHost.Tools,
+            new AgentBuildContext(ownerId, task?.Id, conversationId));
     }
 
     private async Task<AgentSession> LoadSessionAsync(AIAgent agent, Guid conversationId,
