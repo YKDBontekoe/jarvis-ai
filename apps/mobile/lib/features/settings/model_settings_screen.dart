@@ -122,10 +122,13 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
   }
 
   Future<void> _removeKey() async {
+    final embeddingOnly = _provider == 'codex';
     final confirmed = await showJarvisConfirm(
       context,
       title: 'Remove OpenRouter key?',
-      message: 'Jarvis switches back to ChatGPT (Codex) for every request.',
+      message: embeddingOnly
+          ? 'Semantic memory search stops until you add a key and embedding model again.'
+          : 'Jarvis switches back to ChatGPT (Codex) for chat and clears any OpenRouter embedding model.',
       confirmLabel: 'Remove',
       destructive: true,
       icon: PhosphorIconsRegular.key,
@@ -201,10 +204,8 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _providerCard(),
-                      if (_provider == 'openrouter') ...[
-                        const SizedBox(height: 16),
-                        _keyCard(),
-                      ],
+                      const SizedBox(height: 16),
+                      _keyCard(embeddingOnly: _provider == 'codex'),
                       const SizedBox(height: 16),
                       _modelsCard(),
                       if (_error != null)
@@ -274,7 +275,8 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
         Text('Provider', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 6),
         const Text(
-          'ChatGPT uses the server’s signed-in Codex session. OpenRouter uses your own key and any of its hundreds of models.',
+          'ChatGPT uses the server’s signed-in Codex session for conversations. '
+          'OpenRouter uses your own key for chat—or only for the optional embedding model while chat stays on Codex.',
           style: TextStyle(color: JarvisColors.inkSoft, height: 1.4),
         ),
         const SizedBox(height: 14),
@@ -299,7 +301,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     ),
   );
 
-  Widget _keyCard() => SurfaceCard(
+  Widget _keyCard({required bool embeddingOnly}) => SurfaceCard(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -309,7 +311,9 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'OpenRouter API key',
+                embeddingOnly
+                    ? 'OpenRouter API key (embeddings)'
+                    : 'OpenRouter API key',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
@@ -319,6 +323,13 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
             ),
           ],
         ),
+        if (embeddingOnly) ...[
+          const SizedBox(height: 6),
+          const Text(
+            'Required only when you pick an embedding model below. Chat stays on Codex.',
+            style: TextStyle(color: JarvisColors.inkSoft, height: 1.4),
+          ),
+        ],
         const SizedBox(height: 12),
         TextField(
           key: const Key('openrouter-key'),

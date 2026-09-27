@@ -51,6 +51,8 @@ internal sealed class ChatClientResolver(
         {
             logger.LogWarning("Owner {OwnerId} selected OpenRouter without an API key; using Codex.", ownerId);
         }
+        else if (ResolveCodexModelOverride(settings, purpose) is { } codexModel)
+            client = new ModelSelectingChatClient(codexClient, codexModel);
         _chatClients[(ownerId, purpose)] = client;
         return client;
     }
@@ -73,6 +75,14 @@ internal sealed class ChatClientResolver(
         await settingsStore.GetAsync<ModelSettings>(ownerId, SettingsSections.Models, cancellationToken)
         ?? ModelSettings.Default;
 
+    private static string? ResolveCodexModelOverride(ModelSettings settings, ModelPurpose purpose) =>
+        purpose switch
+        {
+            ModelPurpose.Chat => settings.ChatModel,
+            ModelPurpose.Background => settings.FastModel ?? settings.ChatModel,
+            _ => null
+        };
+
     private async Task<string?> GetOpenRouterKeyAsync(Guid ownerId, CancellationToken cancellationToken)
     {
         var secrets = await credentials.GetSecretsAsync(ownerId, IntegrationCredentialProviders.OpenRouter,
@@ -81,5 +91,29 @@ internal sealed class ChatClientResolver(
                !string.IsNullOrWhiteSpace(key)
             ? key
             : null;
+    }
+}
+
+/// <summary>Applies an owner-selected Codex model id to each chat request.</summary>
+internal sealed class ModelSelectingChatClient(IChatClient inner, string modelId) : IChatClient
+{
+    public void Dispose() => inner.Dispose();
+
+    public object? GetService(Type serviceType, object? serviceKey = null) =>
+        inner.GetService(serviceType, serviceKey);
+
+    public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+        CancellationToken cancellationToken = default) =>
+        inner.GetResponseAsync(messages, WithModel(options), cancellationToken);
+
+    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+        inner.GetStreamingResponseAsync(messages, WithModel(options), cancellationToken);
+
+    private ChatOptions WithModel(ChatOptions? options)
+    {
+        if (options is null) return new ChatOptions { ModelId = modelId };
+        options.ModelId = modelId;
+        return options;
     }
 }

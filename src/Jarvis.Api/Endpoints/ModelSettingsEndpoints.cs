@@ -39,6 +39,9 @@ internal static class ModelSettingsEndpoints
             }
             if (normalized.UsesOpenRouter && !await HasOpenRouterKeyAsync(currentUser.OwnerId, credentials, ct))
                 return EndpointHelpers.Invalid("provider", "Save an OpenRouter API key before selecting OpenRouter.");
+            if (normalized.UsesOpenRouterEmbeddings && !await HasOpenRouterKeyAsync(currentUser.OwnerId, credentials, ct))
+                return EndpointHelpers.Invalid("embeddingModel",
+                    "Save an OpenRouter API key before choosing an embedding model.");
             await settings.SaveAsync(currentUser.OwnerId, SettingsSections.Models, normalized, ct);
             await EndpointHelpers.TryAppendAuditAsync(audit, logger, currentUser.OwnerId, "settings",
                 "models.updated", "moderate", true, null,
@@ -63,9 +66,21 @@ internal static class ModelSettingsEndpoints
         {
             await credentials.DeleteAsync(currentUser.OwnerId, IntegrationCredentialProviders.OpenRouter, ct);
             var current = await settings.GetAsync<ModelSettings>(currentUser.OwnerId, SettingsSections.Models, ct);
-            if (current?.UsesOpenRouter == true)
-                await settings.SaveAsync(currentUser.OwnerId, SettingsSections.Models,
-                    current with { Provider = ModelSettings.Codex }, ct);
+            if (current is not null)
+            {
+                var updated = current.UsesOpenRouter
+                    ? current with
+                    {
+                        Provider = ModelSettings.Codex,
+                        ChatModel = null,
+                        FastModel = null
+                    }
+                    : current;
+                if (updated.UsesOpenRouterEmbeddings)
+                    updated = updated with { EmbeddingModel = null };
+                if (updated != current)
+                    await settings.SaveAsync(currentUser.OwnerId, SettingsSections.Models, updated, ct);
+            }
             return Results.Ok(await ToDtoAsync(currentUser.OwnerId, settings, credentials, ct));
         }).WithName("DeleteOpenRouterKey");
 

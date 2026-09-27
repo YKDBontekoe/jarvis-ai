@@ -66,6 +66,23 @@ public sealed class ModelProviderTests
     }
 
     [Fact]
+    public async Task Resolver_applies_owner_codex_chat_model_without_openrouter()
+    {
+        var codex = new NamedClient("codex");
+        var settings = new InMemorySettingsStore();
+        await settings.SaveAsync(Owner, SettingsSections.Models,
+            new ModelSettings(ModelSettings.Codex, ChatModel: "gpt-5.2"), CancellationToken.None);
+
+        var capturing = new CapturingClient(codex);
+        var client = await CreateResolver(capturing, settings, new InMemoryCredentialStore())
+            .GetChatClientAsync(Owner, ModelPurpose.Chat, CancellationToken.None);
+
+        Assert.NotSame(codex, client);
+        _ = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "hi")]);
+        Assert.Equal("gpt-5.2", capturing.LastModelId);
+    }
+
+    [Fact]
     public async Task Resolver_prefixes_embedding_model_names_by_source()
     {
         var settings = new InMemorySettingsStore();
@@ -132,5 +149,23 @@ public sealed class ModelProviderTests
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
             ChatOptions? options = null, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class CapturingClient(IChatClient inner) : IChatClient
+    {
+        public string? LastModelId { get; private set; }
+
+        public void Dispose() => inner.Dispose();
+        public object? GetService(Type serviceType, object? serviceKey = null) =>
+            inner.GetService(serviceType, serviceKey);
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            LastModelId = options?.ModelId;
+            return inner.GetResponseAsync(messages, options, cancellationToken);
+        }
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+            inner.GetStreamingResponseAsync(messages, options, cancellationToken);
     }
 }

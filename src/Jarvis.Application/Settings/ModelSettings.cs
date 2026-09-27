@@ -22,6 +22,9 @@ public sealed partial record ModelSettings(
 
     public bool UsesOpenRouter => Provider == OpenRouter;
 
+    /// <summary>OpenRouter is used for semantic memory when an embedding model is configured.</summary>
+    public bool UsesOpenRouterEmbeddings => !string.IsNullOrEmpty(EmbeddingModel);
+
     /// <summary>Returns a normalized copy or throws <see cref="ArgumentException"/> for invalid input.</summary>
     public ModelSettings Normalize()
     {

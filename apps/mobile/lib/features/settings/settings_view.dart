@@ -18,7 +18,7 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
     [
       (
         title: 'Models',
-        subtitle: 'ChatGPT or your own OpenRouter models',
+        subtitle: 'Codex chat, OpenRouter, or OpenRouter embeddings only',
         icon: PhosphorIconsRegular.cpu,
         destination: 'models',
       ),
