@@ -100,6 +100,16 @@ public sealed class NotificationPushWorker(
                 continue;
             }
 
+            if (notification.Type == "approval.required" && notification.SourceId is { } approvalId &&
+                !await db.ToolApprovals.AsNoTracking().AnyAsync(
+                    x => x.Id == approvalId && x.Status == "pending", cancellationToken))
+            {
+                await db.PushDeliveries.Where(x => x.NotificationId == candidate.NotificationId &&
+                                                   x.DeviceId == candidate.DeviceId)
+                    .ExecuteDeleteAsync(cancellationToken);
+                continue;
+            }
+
             try
             {
                 var accessToken = await credential.UnderlyingCredential

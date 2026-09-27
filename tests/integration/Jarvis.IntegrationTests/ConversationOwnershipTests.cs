@@ -1,6 +1,7 @@
 using Jarvis.Infrastructure.Persistence;
 using Jarvis.Application.Files;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Approvals;
 using Jarvis.Domain.Approvals;
 using Jarvis.Domain.Files;
 using Jarvis.Domain.Workflows;
@@ -156,6 +157,36 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
         Assert.True(await files.SetProcessingStatusAsync(id, owner, "processing", CancellationToken.None));
         Assert.True(await files.SetProcessingStatusAsync(id, owner, "ready", CancellationToken.None));
         Assert.Equal("ready", (await files.GetAsync(id, owner, CancellationToken.None))!.ProcessingStatus);
+    }
+
+    [Fact]
+    public async Task Cancelling_incomplete_task_approvals_removes_their_inbox_and_push()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var conversations = new ConversationStore(database);
+        var tasks = new WorkflowRepository(database);
+        var approvals = new ToolApprovalStore(database);
+        var conversation = await conversations.CreateAsync(owner, "Task chat", CancellationToken.None);
+        var task = await tasks.CreateAsync(owner, "Research", "Look this up", conversation.Id, CancellationToken.None);
+        database.PushDevices.Add(new PushDevice(owner, "fcm-token", "android"));
+        await database.SaveChangesAsync();
+
+        var created = await approvals.CreateAsync(owner, conversation.Id, "req-1", "call-1",
+            "ForgetMemory", "{}", task.Id, CancellationToken.None);
+        Assert.True(created.Created);
+        Assert.NotNull(created.NotificationId);
+        Assert.NotEmpty(await database.PushDeliveries.Where(x => x.NotificationId == created.NotificationId)
+            .ToListAsync());
+
+        await approvals.CancelIncompleteForTaskAsync(task.Id, owner, CancellationToken.None);
+        database.ChangeTracker.Clear();
+
+        Assert.Empty(await database.Notifications.Where(x => x.Id == created.NotificationId).ToListAsync());
+        Assert.Empty(await database.PushDeliveries.Where(x => x.NotificationId == created.NotificationId)
+            .ToListAsync());
+        Assert.Equal("cancelled",
+            (await database.ToolApprovals.SingleAsync(x => x.Id == created.Approval.Id)).Status);
     }
 
     private JarvisDbContext CreateDbContext()

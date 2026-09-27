@@ -216,6 +216,7 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
             .ToListAsync(cancellationToken);
         foreach (var approval in approvals)
             approval.Cancel();
+        await ApprovalInboxCleanup.RemoveAsync(db, approvals.Select(x => x.Id).ToArray(), cancellationToken);
     }
 
     public async Task<ReminderRecord> CreateAsync(Guid ownerId, string title, DateTimeOffset dueAt, CancellationToken cancellationToken)

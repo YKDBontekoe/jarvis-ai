@@ -168,11 +168,13 @@ public sealed class ToolApprovalStore(JarvisDbContext db) : IToolApprovalStore
                   x.ResumeStatus != "completed" && x.ResumeStatus != "cancelled")))
             .ToListAsync(cancellationToken);
         if (approvals.Count == 0) return;
+        var approvalIds = approvals.Select(x => x.Id).ToArray();
         foreach (var approval in approvals)
         {
             approval.Cancel();
             approval.AbortResume();
         }
+        await ApprovalInboxCleanup.RemoveAsync(db, approvalIds, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
     }
 
