@@ -50,7 +50,7 @@ const _oidcRedirectUri = String.fromEnvironment(
 const _webOidcRedirectUri = String.fromEnvironment(
   'JARVIS_WEB_OIDC_REDIRECT_URI',
 );
-const _oidcScopes = ['openid', 'profile', 'offline_access', 'jarvis-api'];
+const _oidcScopes = ['openid', 'profile', 'offline_access'];
 const _firebaseApiKey = String.fromEnvironment('JARVIS_FIREBASE_API_KEY');
 const _firebaseProjectId = String.fromEnvironment('JARVIS_FIREBASE_PROJECT_ID');
 const _firebaseSenderId = String.fromEnvironment('JARVIS_FIREBASE_SENDER_ID');

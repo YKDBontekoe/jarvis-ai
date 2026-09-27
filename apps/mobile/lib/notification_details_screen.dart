@@ -61,7 +61,7 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
       final response = await widget.http.get<Map<String, dynamic>>(path);
       final data = response.data;
       if (!mounted) return;
-      if (data is! Map) {
+      if (data == null) {
         setState(() => _error = 'Jarvis returned an invalid item.');
         return;
       }

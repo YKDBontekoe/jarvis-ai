@@ -159,7 +159,7 @@ The bundled Temporal server uses its development mode and SQLite persistence. A 
 
 ## Production Compose
 
-`infra/compose/docker-compose.production.yml` is a separate production topology. It runs Jarvis behind Caddy with persistent PostgreSQL, a PostgreSQL-backed Temporal server, private MinIO storage with a bucket-scoped application policy, ClamAV, LiveKit, and the Jarvis API/workers. Only Caddy's HTTP/HTTPS ports and LiveKit's required media ports are published; Postgres, Temporal, MinIO, and ClamAV remain on private Docker networks.
+`infra/compose/docker-compose.production.yml` is a separate production topology. It runs Jarvis behind Caddy with persistent PostgreSQL, a PostgreSQL-backed Temporal server, private Garage S3-compatible storage, ClamAV, LiveKit, and the Jarvis API/workers. Only Caddy's HTTP/HTTPS ports and LiveKit's required media ports are published; Postgres, Temporal, Garage, and ClamAV remain on private Docker networks.
 
 Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, set its mode to `0600`, and replace every placeholder. Set `JARVIS_UID`/`JARVIS_GID` to the account that owns the mounted Codex `auth.json`, configure your OIDC issuer/audience and DNS names, and sign the Codex CLI in with ChatGPT OAuth on the host. Point `CODEX_AUTH_FILE` at that OAuth file. The API and both workers run as that unprivileged numeric user so the mounted OAuth file stays readable without running those containers as root.
 
@@ -183,7 +183,7 @@ Add `-f infra/compose/docker-compose.home-assistant.yml` to that command and set
 
 Add `-f infra/compose/docker-compose.github.yml` to enable GitHub. Host builds still need `--build` so the API image includes the pinned MCP server; GHCR images already include it.
 
-Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit media, plus outbound HTTPS for Codex OAuth/model access, Firebase FCM/OAuth, user-configured public condition-watch endpoints, Caddy certificate issuance, ClamAV signature updates, and GHCR pulls. The API applies EF migrations at startup after Postgres is healthy. Temporal owns a separate persistent Postgres database. MinIO creates a private bucket and a least-privilege user before the API starts. Keep the Compose environment file and Codex OAuth file private, and pin every third-party container image to an audited release or digest before deploying. This production topology has been configuration-validated; live service startup still requires pulling its container images and setting real OIDC, DNS, Firebase, APNs, and OAuth credentials.
+Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit media, plus outbound HTTPS for Codex OAuth/model access, Firebase FCM/OAuth, user-configured public condition-watch endpoints, Caddy certificate issuance, ClamAV signature updates, and GHCR pulls. The API applies EF migrations at startup after Postgres is healthy. Temporal owns a separate persistent Postgres database. Garage creates the private `jarvis-files` bucket and its application access key before the API starts. Keep the Compose environment file, Garage config, and Codex OAuth file private, and pin every third-party container image to an audited release or digest before deploying. This production topology has been configuration-validated; live service startup still requires pulling its container images and setting real OIDC, DNS, Firebase, APNs, and OAuth credentials.
 
 ## GitHub Actions pipelines
 
@@ -209,22 +209,25 @@ Local packaging uses the same layout as CI: `flutter build ios --release --no-co
 
 Push notifications and some entitlements may be limited without a normal signed distribution profile; in-app chat, OIDC, and SignalR still depend on your configured `JARVIS_API_URL` and identity provider.
 
-Optional: [`scripts/altstore/generate_source.py`](scripts/altstore/generate_source.py) can still build AltStore-style `source.json` if you later ship a **signed** IPA to a public URL. The release workflow no longer publishes `source.json` or GitHub Pages, because unsigned builds are not suitable for AltStore/SideStore install.
+The iOS release workflow publishes both the IPA and generated `source.json` to the Jarvis server. It updates automatically for `v*` releases; a manual workflow run also publishes the selected version without creating a GitHub Release. Add `https://jarvis.ykdbonte.dev/altstore/source.json` to AltStore. Each run keeps earlier IPA versions available for existing source entries. The feed and download are public; keep private data out of the IPA and source metadata.
 
-### Backend GHCR images and SSH deploy
+The self-hosted runner serves `/home/ykdbonte/.jarvis/altstore` through the host Caddy route at `/altstore/*`. The public endpoint is independent of GitHub repository visibility, and the workflow updates the source only after the IPA artifact is ready.
 
-[`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) builds `api`, `worker`, and `voice-worker` from the production Dockerfiles, pushes them to `ghcr.io/<owner>/jarvis-ai/<name>:<git-sha>` (plus the version tag and `latest` on `v*` tags), then SSHs to your server to pull those images and restart Compose. It runs when a `v*` release tag is created (automatically after merge to `main`, or manually), not on every commit to `main`.
+### Backend GHCR images and deployment
+
+[`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) builds `api`, `worker`, and `voice-worker`, pushes them to `ghcr.io/<owner>/jarvis-ai/<name>:<git-sha>` (plus the version tag and `latest` on `v*` tags), then deploys through a self-hosted runner on your server. Garage uses its pinned upstream image. The workflow runs when a `v*` release tag is created (automatically after merge to `main`, or manually), not on every commit to `main`.
 
 Server bootstrap:
 
 1. Clone this repository to a persistent path such as `/opt/jarvis`.
-2. Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, mode `0600`, and fill in real secrets. Set `JARVIS_API_IMAGE`, `JARVIS_WORKER_IMAGE`, and `JARVIS_VOICE_WORKER_IMAGE` to the GHCR names for this repo (the deploy job overrides the tag with the git SHA).
-3. Install Docker with the Compose plugin. The checkout must be able to `git fetch` this repository (SSH deploy key or HTTPS credentials).
-4. Add repository secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`, and optional `DEPLOY_PORT` (default `22`).
-5. Optional repository variable `DEPLOY_COMPOSE_FILES` lists extra Compose overlays relative to the repo root, for example `infra/compose/docker-compose.github.yml infra/compose/docker-compose.home-assistant.yml`.
-6. In GitHub → Packages, link the three container packages to this repository so `GITHUB_TOKEN` can push and the deploy job can pull. Keep packages private if the repo is private; the job logs into GHCR on the server with a short-lived token. For later manual pulls, `docker login ghcr.io` on the host with a PAT that has `read:packages`.
+2. Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, mode `0600`, and fill in real secrets. Set `GARAGE_CONFIG_FILE` to the private Garage config file path. The deploy job supplies the API and worker image names and commit tag.
+3. Install Docker with the Compose plugin. The checkout must be able to `git fetch` this repository; the workflow uses its short-lived `GITHUB_TOKEN` for the fetch and GHCR pull.
+4. Add repository secret `DEPLOY_PATH` for the production checkout path on the server.
+5. Register a persistent Linux x64 self-hosted runner on the production server with the `jarvis-deploy` label. Run it as the account that owns the checkout and production env file, with Docker and Compose access. The build jobs stay on GitHub-hosted runners; only the deploy job runs on the server.
+6. Set repository variable `DEPLOY_COMPOSE_FILES` to `infra/compose/docker-compose.production.tunnel.yml` when using a host-level reverse proxy or Cloudflare Tunnel instead of the bundled public Caddy edge. Optional overlays can be space-separated after it, for example `infra/compose/docker-compose.github.yml infra/compose/docker-compose.home-assistant.yml`.
+7. In GitHub → Packages, link the three application container packages to this repository so `GITHUB_TOKEN` can push and the deploy job can pull. Keep packages private if the repo is private; the runner logs into GHCR with a short-lived token. For later manual pulls, `docker login ghcr.io` on the host with a PAT that has `read:packages`.
 
-`workflow_dispatch` accepts `skip_deploy` to build/push images without SSHing, and an optional extra `image_tag`. Production secrets stay in `.env.production` on the server and are never passed through GitHub Actions. `python3 -m unittest tests/unit/compose/test_production_images.py` checks that Compose interpolates the GHCR image variables.
+`workflow_dispatch` accepts `skip_deploy` to build/push images without deploying, and an optional extra `image_tag`. Production secrets stay in `.env.production` on the server and are never passed through GitHub Actions. `python3 -m unittest tests/unit/compose/test_production_images.py` checks that Compose interpolates the GHCR image variables.
 
 MCP tools are disabled unless configured. Set `Mcp__Servers__0__Name`, `Mcp__Servers__0__Transport`, and `Mcp__Servers__0__AllowedTools__0`; stdio servers also need `Mcp__Servers__0__Command` and optional arguments/environment, while Streamable HTTP servers need `Mcp__Servers__0__Endpoint` and optional headers. Tools are approval-required by default; add an exact tool name to `Mcp__Servers__0__AutoApprovedTools__0` only when unattended execution is intended. Stdio children receive a minimal environment by default. To inject an owner's encrypted integration credentials into a stdio child, set `Mcp__Servers__0__CredentialProvider`, map a child variable to a stored secret name under `CredentialEnvironmentVariables`, and store those values under the same provider slug. For Streamable HTTP, map headers with `CredentialHeaders`; sending mapped credentials requires HTTPS. Store the complete header value (including a `Bearer` scheme when required) in the encrypted credential record. The API opens a scoped MCP connection for each agent run and disposes it when the run finishes. Stored or configured transport values are scrubbed from MCP tool results and errors before those values can reach the model context.
 

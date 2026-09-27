@@ -26,7 +26,7 @@ int asJsonInt(dynamic value, [int fallback = 0]) => switch (value) {
 };
 
 bool asJsonBool(dynamic value, [bool fallback = false]) =>
-    value is bool flag ? flag : fallback;
+    value is bool ? value : fallback;
 
 /// Keeps a future TTL on pin/edit; expired or missing validity is sent as null.
 String? activeValidUntil(Map<String, dynamic> memory, [DateTime? now]) {

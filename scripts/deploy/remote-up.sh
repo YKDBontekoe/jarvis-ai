@@ -29,7 +29,7 @@ echo "Pulling Jarvis images:"
 printf '  %s\n' "${required_images[@]}"
 
 docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" pull \
-  jarvis-api jarvis-worker jarvis-voice-worker
+  jarvis-api jarvis-worker jarvis-voice-worker garage
 
 docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" up \
   -d --no-build --remove-orphans

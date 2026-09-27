@@ -26,7 +26,10 @@ DEFAULT_DESCRIPTION = (
     "voice, and owner-scoped integrations."
 )
 APP_PERMISSIONS: dict[str, Any] = {
-    "entitlements": ["aps-environment"],
+    # The published IPA is built with --no-codesign. AltStore validates this
+    # list against the downloaded IPA before it signs it, so profile-provided
+    # entitlements such as aps-environment must not be declared here.
+    "entitlements": [],
     "privacy": {
         "NSMicrophoneUsageDescription": (
             "Jarvis uses your microphone for voice conversations."

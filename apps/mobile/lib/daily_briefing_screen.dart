@@ -46,7 +46,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
         '/api/v1/briefings/daily',
       );
       final data = response.data;
-      if (data is! Map) {
+      if (data == null) {
         throw const FormatException('Missing briefing settings.');
       }
       final map = Map<String, dynamic>.from(data);

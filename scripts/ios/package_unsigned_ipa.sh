@@ -5,6 +5,7 @@ set -euo pipefail
 
 APP_PATH="${1:?Usage: package_unsigned_ipa.sh path/to/Runner.app [output.ipa]}"
 OUTPUT="${2:-Jarvis.ipa}"
+OUTPUT_NAME="$(basename "${OUTPUT}")"
 
 if [[ ! -d "${APP_PATH}" ]]; then
   echo "App bundle not found: ${APP_PATH}" >&2
@@ -19,8 +20,9 @@ cp -R "${APP_PATH}" "${STAGE}/Payload/"
 
 (
   cd "${STAGE}"
-  zip -qr "${OUTPUT}" Payload
+  zip -qr "${OUTPUT_NAME}" Payload
 )
 
-mv "${STAGE}/${OUTPUT}" "${OUTPUT}"
+mkdir -p "$(dirname "${OUTPUT}")"
+mv "${STAGE}/${OUTPUT_NAME}" "${OUTPUT}"
 echo "Wrote unsigned IPA: ${OUTPUT}"
