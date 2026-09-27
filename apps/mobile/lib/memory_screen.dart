@@ -176,6 +176,10 @@ class _MemoryScreenState extends State<MemoryScreen> {
       content.dispose();
       return;
     }
+    if (!mounted) {
+      content.dispose();
+      return;
+    }
     try {
       await widget.http.post(
         '/api/v1/memory',
@@ -288,6 +292,10 @@ class _MemoryScreenState extends State<MemoryScreen> {
       ),
     );
     if (saved != true) {
+      content.dispose();
+      return;
+    }
+    if (!mounted) {
       content.dispose();
       return;
     }

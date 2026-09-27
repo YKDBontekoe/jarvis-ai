@@ -142,6 +142,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(message)));
+        await _load();
       }
     } finally {
       if (mounted) setState(() => _processingId = null);

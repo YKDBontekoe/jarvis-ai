@@ -118,8 +118,8 @@ public sealed class NotificationPushWorker(
                 }
 
                 var body = await response.Content.ReadAsStringAsync(cancellationToken);
-                var invalidToken = response.StatusCode == System.Net.HttpStatusCode.NotFound &&
-                                   body.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase);
+                var invalidToken = body.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase) ||
+                                   body.Contains("SENDER_ID_MISMATCH", StringComparison.OrdinalIgnoreCase);
                 if (invalidToken)
                 {
                     await db.PushDeliveries.Where(x => x.DeviceId == device.Id)
