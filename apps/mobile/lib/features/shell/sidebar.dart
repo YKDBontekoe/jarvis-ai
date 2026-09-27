@@ -42,10 +42,18 @@ class JarvisSidebar extends StatefulWidget {
 
 class _JarvisSidebarState extends State<JarvisSidebar> {
   final _search = TextEditingController();
+  final _searchFocus = FocusNode();
+
+  void _leaveSearch(VoidCallback action) {
+    _searchFocus.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+    action();
+  }
 
   @override
   void dispose() {
     _search.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -98,6 +106,7 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                       height: 42,
                       child: TextField(
                         controller: _search,
+                        focusNode: _searchFocus,
                         onChanged: (_) => setState(() {}),
                         textInputAction: TextInputAction.search,
                         style: const TextStyle(fontSize: 14.5),
@@ -126,7 +135,7 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     icon: PhosphorIconsRegular.notePencil,
                     tooltip: 'New chat',
                     size: 42,
-                    onPressed: widget.onNewChat,
+                    onPressed: () => _leaveSearch(widget.onNewChat),
                   ),
                 ],
               ),
@@ -139,32 +148,33 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     leading: const JarvisOrb(size: 22, glow: false),
                     label: 'Jarvis',
                     selected: widget.homeSelected,
-                    onTap: widget.onHome,
+                    onTap: () => _leaveSearch(widget.onHome),
                   ),
                   _NavRow(
                     icon: PhosphorIconsRegular.waveform,
                     label: 'Voice',
-                    onTap: widget.onVoice,
+                    onTap: () => _leaveSearch(widget.onVoice),
                   ),
                   _NavRow(
                     icon: PhosphorIconsRegular.listChecks,
                     label: 'Tasks',
-                    onTap: () => widget.onUtility('tasks'),
+                    onTap: () => _leaveSearch(() => widget.onUtility('tasks')),
                   ),
                   _NavRow(
                     icon: PhosphorIconsRegular.notebook,
                     label: 'Memory',
-                    onTap: () => widget.onUtility('memory'),
+                    onTap: () => _leaveSearch(() => widget.onUtility('memory')),
                   ),
                   _NavRow(
                     icon: PhosphorIconsRegular.bell,
                     label: 'Reminders',
-                    onTap: () => widget.onUtility('reminders'),
+                    onTap: () =>
+                        _leaveSearch(() => widget.onUtility('reminders')),
                   ),
                   _NavRow(
                     icon: PhosphorIconsRegular.folderSimple,
                     label: 'Files',
-                    onTap: () => widget.onUtility('files'),
+                    onTap: () => _leaveSearch(() => widget.onUtility('files')),
                   ),
                   const SizedBox(height: 18),
                   Padding(
@@ -182,7 +192,7 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                           ),
                         ),
                         TextButton(
-                          onPressed: widget.onSeeAll,
+                          onPressed: () => _leaveSearch(widget.onSeeAll),
                           style: TextButton.styleFrom(
                             foregroundColor: JarvisColors.muted,
                             visualDensity: VisualDensity.compact,
@@ -227,7 +237,9 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                             conversation['id'] == widget.selectedConversationId,
                         onTap: () {
                           final id = jsonString(conversation, 'id');
-                          if (id != null) widget.onConversation(id);
+                          if (id != null) {
+                            _leaveSearch(() => widget.onConversation(id));
+                          }
                         },
                       ),
                   ],
@@ -235,7 +247,10 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
               ),
             ),
             const Divider(),
-            _SettingsRow(connected: widget.connected, onTap: widget.onSettings),
+            _SettingsRow(
+              connected: widget.connected,
+              onTap: () => _leaveSearch(widget.onSettings),
+            ),
           ],
         ),
       ),
