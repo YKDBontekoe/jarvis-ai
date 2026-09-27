@@ -163,7 +163,7 @@ services:
       Push__GoogleServiceAccountFile: /run/secrets/firebase-service-account.json
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     volumes:
-      - ${CODEX_AUTH_FILE:?Set CODEX_AUTH_FILE}:/codex/auth.json:rw
+      - ${CODEX_HOME_DIR:?Set CODEX_HOME_DIR}:/codex:rw
       - ${FIREBASE_SERVICE_ACCOUNT_FILE:-/dev/null}:/run/secrets/firebase-service-account.json:ro
       - ${JARVIS_DATA_PROTECTION_KEYS_DIR:?Set JARVIS_DATA_PROTECTION_KEYS_DIR}:/var/lib/jarvis-data-protection-keys:rw
     depends_on:
@@ -223,7 +223,7 @@ services:
       ObjectStorage__Region: us-east-1
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     volumes:
-      - ${CODEX_AUTH_FILE:?Set CODEX_AUTH_FILE}:/codex/auth.json:rw
+      - ${CODEX_HOME_DIR:?Set CODEX_HOME_DIR}:/codex:rw
       - ${JARVIS_DATA_PROTECTION_KEYS_DIR:?Set JARVIS_DATA_PROTECTION_KEYS_DIR}:/var/lib/jarvis-data-protection-keys:rw
     depends_on:
       jarvis-api:
@@ -259,7 +259,7 @@ services:
       CODEX_MODEL: ${CODEX_MODEL_REALTIME:-}
       LOG_LEVEL: INFO
     volumes:
-      - ${CODEX_AUTH_FILE:?Set CODEX_AUTH_FILE}:/codex/auth.json:rw
+      - ${CODEX_HOME_DIR:?Set CODEX_HOME_DIR}:/codex:rw
     depends_on:
       jarvis-api:
         condition: service_healthy
