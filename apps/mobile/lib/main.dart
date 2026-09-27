@@ -604,6 +604,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _chooseConversation() async {
+    _dismissKeyboard();
     final selection = await Navigator.of(context)
         .push<ConversationPickerResult>(
           MaterialPageRoute<ConversationPickerResult>(
@@ -675,6 +676,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _openUtility(String destination) {
     if (_signedOut || _signingOut) return;
+    _dismissKeyboard();
     final page = switch (destination) {
       'tasks' => TasksScreen(http: _http),
       'memory' => MemoryScreen(http: _http),
@@ -733,9 +735,11 @@ class _ChatScreenState extends State<ChatScreen> {
         }
         return;
       }
+      _dismissKeyboard();
       unawaited(_toggleVoice());
       return;
     }
+    _dismissKeyboard();
     if (_voiceActive || _voiceStarting) unawaited(_stopVoice());
     setState(() => _selectedDestination = index);
   }
@@ -2323,7 +2327,10 @@ class _ChatScreenState extends State<ChatScreen> {
     onSettings: () => _fromSidebar(_openSettings),
   );
 
+  void _dismissKeyboard() => FocusManager.instance.primaryFocus?.unfocus();
+
   void _fromSidebar(VoidCallback action) {
+    _dismissKeyboard();
     final scaffold = _scaffoldKey.currentState;
     if (scaffold?.isDrawerOpen ?? false) scaffold!.closeDrawer();
     action();
@@ -2414,6 +2421,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _startNewChat() {
+    _dismissKeyboard();
     if (_selectedDestination != 0) setState(() => _selectedDestination = 0);
     if (!_hasMessages && _conversationId != null) {
       setState(() => _showHome = true);
@@ -2442,7 +2450,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: CircleIconButton(
                   icon: PhosphorIconsRegular.list,
                   tooltip: 'Menu',
-                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                  onPressed: () {
+                    _dismissKeyboard();
+                    _scaffoldKey.currentState?.openDrawer();
+                  },
                 ),
               ),
         centerTitle: true,
