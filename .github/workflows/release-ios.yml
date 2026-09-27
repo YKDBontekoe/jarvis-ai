@@ -123,8 +123,8 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Jarvis ${{ steps.version.outputs.version }}
           body: |
-            Unsigned `Jarvis.ipa` for [LiveContainer](https://github.com/LiveContainer/LiveContainer) (or similar loaders).
-            Download the IPA from this release and import it in LiveContainer on your device.
+            Unsigned `Jarvis.ipa` for [AltStore Classic](https://altstore.io/) (signed by AltServer during installation) or [LiveContainer](https://github.com/LiveContainer/LiveContainer).
+            Add the Jarvis source to AltStore Classic, or download the IPA from this release and import it in LiveContainer.
           generate_release_notes: true
           files: dist/Jarvis.ipa
 

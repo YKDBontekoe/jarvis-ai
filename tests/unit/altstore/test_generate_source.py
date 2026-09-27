@@ -56,7 +56,7 @@ class GenerateSourceTests(unittest.TestCase):
             self.assertEqual(source["identifier"], "com.example.jarvis_mobile.source")
             app = source["apps"][0]
             self.assertEqual(app["bundleIdentifier"], "com.example.jarvis_mobile")
-            self.assertEqual(app["appPermissions"]["entitlements"], ["aps-environment"])
+            self.assertEqual(app["appPermissions"]["entitlements"], [])
             self.assertIn("NSMicrophoneUsageDescription", app["appPermissions"]["privacy"])
             version = app["versions"][0]
             self.assertEqual(version["version"], "1.0.0")
