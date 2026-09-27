@@ -3,7 +3,7 @@ using System.Net;
 namespace Jarvis.Application.Integrations;
 
 public sealed record UserMcpServer(string Id, string Name, string Endpoint,
-    IReadOnlyList<string> AllowedTools, DateTimeOffset UpdatedAt);
+    IReadOnlyList<string> AllowedTools, DateTimeOffset UpdatedAt, bool HasToken);
 
 public sealed record AddUserMcpServerRequest(string Name, string Endpoint, IReadOnlyList<string> AllowedTools);
 

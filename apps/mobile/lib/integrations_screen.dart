@@ -70,12 +70,16 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   Future<void> _editSecret({String? provider, String? secretName}) async {
     final replacing =
         secretName != null &&
-        _providers.any(
-          (item) =>
-              item['provider'] == provider &&
-              jsonStrings(item['secretNames'])
-                  .contains(secretName),
-        );
+        (_providers.any(
+              (item) =>
+                  item['provider'] == provider &&
+                  jsonStrings(item['secretNames']).contains(secretName),
+            ) ||
+            (secretName == 'token' &&
+                _managedServers.any(
+                  (server) =>
+                      server['id'] == provider && server['hasToken'] == true,
+                )));
     final providerController = TextEditingController(text: provider ?? '');
     final nameController = TextEditingController(text: secretName ?? '');
     final valueController = TextEditingController();
@@ -396,12 +400,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     final endpoint = asJsonString(server['endpoint']) ?? '';
     final tools =
         jsonStrings(server['allowedTools']);
-    final hasToken = _providers.any(
-      (provider) =>
-          provider['provider'] == id &&
-          jsonStrings(provider['secretNames'])
-              .contains('token'),
-    );
+    final hasToken = server['hasToken'] == true;
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),

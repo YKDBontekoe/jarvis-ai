@@ -17,4 +17,15 @@ public sealed class IntegrationCredentialProviderTests
     {
         Assert.Equal(expected, IntegrationCredentialProviders.IsUserMcpManaged(provider));
     }
+
+    [Theory]
+    [InlineData("token", true)]
+    [InlineData("server_config", false)]
+    [InlineData("TOKEN", false)]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    public void IsUserMcpTokenSecret_only_matches_token(string? secretName, bool expected)
+    {
+        Assert.Equal(expected, IntegrationCredentialProviders.IsUserMcpTokenSecret(secretName));
+    }
 }
