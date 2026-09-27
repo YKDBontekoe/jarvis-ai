@@ -62,7 +62,7 @@ services:
     networks: [application]
 
   minio:
-    image: minio/minio:latest
+    image: ${JARVIS_STORAGE_IMAGE:?Set JARVIS_STORAGE_IMAGE}
     command: ["server", "/data", "--console-address", ":9001"]
     restart: unless-stopped
     environment:
@@ -73,7 +73,7 @@ services:
     networks: [data]
 
   minio-init:
-    image: minio/mc:latest
+    image: ${JARVIS_STORAGE_IMAGE:?Set JARVIS_STORAGE_IMAGE}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
