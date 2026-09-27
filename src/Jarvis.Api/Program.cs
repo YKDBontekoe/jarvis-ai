@@ -266,8 +266,8 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     if (await conversations.GetAsync(pending.ConversationId, ownerId, ct) is null) return Results.NotFound();
     if (pending.Status == "pending")
     {
-        var earlier = (await approvals.ListActionableAsync(ownerId, ct))
-            .FirstOrDefault(x => x.ConversationId == pending.ConversationId && x.Status == "pending");
+        var earlier = (await approvals.ListActionableForConversationAsync(ownerId, pending.ConversationId, ct))
+            .FirstOrDefault(x => x.Status == "pending");
         if (earlier is not null && earlier.Id != pending.Id)
             return Results.Conflict(new { message = "Decide the earlier pending tool call for this conversation first." });
     }
@@ -324,8 +324,8 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
                         }
                     }
                 }
-                var remaining = (await approvals.ListActionableAsync(ownerId, ct))
-                    .Where(x => x.ConversationId == decided.ConversationId && x.Id != approvalId)
+                var remaining = (await approvals.ListActionableForConversationAsync(ownerId, decided.ConversationId, ct))
+                    .Where(x => x.Id != approvalId)
                     .ToList();
                 if (remaining.Count != 0)
                 {

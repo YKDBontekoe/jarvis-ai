@@ -357,6 +357,8 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
                     await files.SetProcessingStatusAsync(input.FileId, input.OwnerId, "failed", cancellationToken);
                     return;
                 }
+
+                extracted = $"Image {file.FileName} contained no legible text.";
             }
 
             extracted = extracted.Length > MaxExtractedCharacters ? extracted[..MaxExtractedCharacters] : extracted;
