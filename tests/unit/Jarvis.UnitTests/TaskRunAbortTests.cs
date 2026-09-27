@@ -30,4 +30,22 @@ public sealed class TaskRunAbortTests
 
         Assert.False(abort.IsCancellationRequested);
     }
+
+    [Fact]
+    public void Register_cancels_the_previous_run_for_the_same_task()
+    {
+        var registry = new TaskRunAbort();
+        using var first = new CancellationTokenSource();
+        using var second = new CancellationTokenSource();
+        var taskId = Guid.CreateVersion7();
+        using var firstLease = registry.Register(taskId, first);
+        using var secondLease = registry.Register(taskId, second);
+
+        Assert.True(first.IsCancellationRequested);
+        Assert.False(second.IsCancellationRequested);
+
+        registry.Abort(taskId);
+
+        Assert.True(second.IsCancellationRequested);
+    }
 }

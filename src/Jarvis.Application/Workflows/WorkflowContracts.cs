@@ -33,6 +33,8 @@ public sealed record SaveDailyBriefingRequest(bool Enabled, TimeOnly LocalTime, 
 public sealed record DailyBriefingWorkflowInput(Guid OwnerId, string WorkflowId, TimeOnly LocalTime, string TimeZoneId);
 public sealed record DailyBriefingActivityInput(Guid OwnerId, string WorkflowId, DateOnly LocalDate,
     string TimeZoneId, DateTimeOffset LocalDayStart, DateTimeOffset NextLocalDayStart);
+public sealed record DailyBriefingSchedule(DateTimeOffset FireAt, DateOnly LocalDate,
+    DateTimeOffset LocalDayStart, DateTimeOffset NextLocalDayStart);
 
 public interface IDailyBriefingRepository
 {

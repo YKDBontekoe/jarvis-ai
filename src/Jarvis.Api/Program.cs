@@ -25,6 +25,7 @@ using Jarvis.Workflows;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -242,6 +243,7 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     IJarvisTaskService tasks,
     IJarvisTaskRepository taskRepository,
     ITaskRunAbort taskRunAbort,
+    IServiceScopeFactory scopes,
     CancellationToken ct) =>
 {
     var ownerId = currentUser.OwnerId;
@@ -280,6 +282,9 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
         ? taskRunAbort.Register(resumeTaskId, abort)
         : null;
     var runCt = abort.Token;
+    using var watchCts = CancellationTokenSource.CreateLinkedTokenSource(runCt);
+    if (decided.TaskId is { } watchTaskId)
+        _ = WatchTaskCancellationAsync(scopes, logger, watchTaskId, ownerId, abort, watchCts.Token);
 
     try
     {
@@ -287,13 +292,20 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
         {
             var messages = await conversations.GetMessagesAsync(decided.ConversationId, runCt);
             var last = messages.Count > 0 ? messages[^1] : null;
-            if (last is { Role: "assistant" })
+            if (last is { Role: "assistant" } &&
+                decided.DecidedAt is { } decidedAt &&
+                last.CreatedAt >= decidedAt)
             {
+                var remaining = (await approvals.ListActionableAsync(ownerId, ct))
+                    .Where(x => x.ConversationId == decided.ConversationId && x.Id != approvalId)
+                    .ToList();
+                await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
+                if (remaining.Count != 0)
+                    return Results.Accepted("/api/v1/approvals", remaining.Select(ToApprovalDto));
                 if (decided.Approved == true)
                     await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId, last.Content, runCt);
                 else
                     await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId, last.Content, runCt);
-                await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
                 return Results.Ok(ToDto(last));
             }
         }
@@ -330,6 +342,11 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
         logger.LogError(exception, "Tool approval {ApprovalId} was decided but its agent resume failed.", approvalId);
         return Results.Problem("Jarvis could not resume this decided tool call. It can be retried from Tool approvals.",
             statusCode: StatusCodes.Status502BadGateway);
+    }
+    finally
+    {
+        try { watchCts.Cancel(); }
+        catch (ObjectDisposedException) { }
     }
 }).WithName("DecideToolApproval");
 
@@ -848,6 +865,39 @@ api.MapDelete("/memory/{id:guid}", async (Guid id, IMemoryService memory, IAudit
 }).WithName("DeleteMemory");
 
 app.Run();
+
+static async Task WatchTaskCancellationAsync(IServiceScopeFactory scopes, ILogger logger, Guid taskId, Guid ownerId,
+    CancellationTokenSource abort, CancellationToken cancellationToken)
+{
+    try
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(400));
+        while (await timer.WaitForNextTickAsync(cancellationToken))
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            var tasks = scope.ServiceProvider.GetRequiredService<IJarvisTaskRepository>();
+            var task = await tasks.GetTaskAsync(taskId, ownerId, cancellationToken);
+            if (task is null || task.Status == "cancelled")
+            {
+                try { abort.Cancel(); }
+                catch (ObjectDisposedException) { }
+                return;
+            }
+            if (task.Status is "completed" or "failed")
+                return;
+        }
+    }
+    catch (OperationCanceledException)
+    {
+    }
+    catch (ObjectDisposedException)
+    {
+    }
+    catch (Exception exception)
+    {
+        logger.LogWarning(exception, "Task cancellation watch failed for {TaskId}.", taskId);
+    }
+}
 
 static MessageDto ToDto(Message message) => new(message.Id, message.Role, message.Content, message.CreatedAt);
 static async Task WriteVoiceStreamEventAsync(Stream stream, object value, CancellationToken cancellationToken)

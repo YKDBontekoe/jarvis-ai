@@ -61,4 +61,28 @@ public sealed class AgentSessionJsonTests
         Assert.Equal("Done.", text);
         Assert.False(AgentSessionJson.TryGetCompletedAssistantTextAfterUser(session, "Something else", out _));
     }
+
+    [Fact]
+    public void RecoversPendingApprovalsAndPrefaceFromTheLastAssistantTurn()
+    {
+        const string session = """
+            {"stateBag":{"messages":[
+              {"role":"user","contents":[{"text":"Remind me","$type":"text"}]},
+              {"role":"assistant","contents":[
+                {"text":"I can create that reminder.","$type":"text"},
+                {"id":"req-1","$type":"functionApprovalRequest","functionCall":{"callId":"c1","name":"CreateReminder","arguments":{"title":"Dentist"}}}
+              ]}
+            ]}}
+            """;
+        Assert.True(AgentSessionJson.TryGetPendingApprovals(session, out var approvals, out var preface));
+        Assert.Equal("I can create that reminder.", preface);
+        var approval = Assert.Single(approvals);
+        Assert.Equal("req-1", approval.RequestId);
+        Assert.Equal("c1", approval.ToolCallId);
+        Assert.Equal("CreateReminder", approval.ToolName);
+        Assert.Contains("Dentist", approval.ArgumentsJson);
+        Assert.False(AgentSessionJson.TryGetPendingApprovals(
+            """{"stateBag":{"messages":[{"role":"user","contents":[{"text":"Hello","$type":"text"}]}]}}""",
+            out _, out _));
+    }
 }

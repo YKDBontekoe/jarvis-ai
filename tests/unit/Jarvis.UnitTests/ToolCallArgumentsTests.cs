@@ -38,4 +38,24 @@ public sealed class ToolCallArgumentsTests
         Assert.ThrowsAny<JsonException>(() => ToolCallArguments.Parse("\"x\""));
         Assert.ThrowsAny<JsonException>(() => ToolCallArguments.Parse("{"));
     }
+
+    [Fact]
+    public void Web_serialized_dictionaries_round_trip_through_parse()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var json = JsonSerializer.Serialize(
+            new Dictionary<string, object?>
+            {
+                ["title"] = "Buy milk",
+                ["count"] = 2,
+                ["nested"] = new Dictionary<string, object?> { ["id"] = "m1" }
+            },
+            options);
+
+        var arguments = ToolCallArguments.Parse(json);
+        Assert.Equal("Buy milk", arguments["title"]);
+        Assert.Equal(2L, arguments["count"]);
+        var nested = Assert.IsType<Dictionary<string, object?>>(arguments["nested"]);
+        Assert.Equal("m1", nested["id"]);
+    }
 }

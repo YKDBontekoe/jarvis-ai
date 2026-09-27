@@ -12,6 +12,7 @@ namespace Jarvis.Agents;
 public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcpToolHost,
     IConversationStore conversations, IJarvisTaskRepository tasks, ICurrentUser currentUser) : IJarvisAgent
 {
+    private static readonly JsonSerializerOptions ArgumentsJsonOptions = new(JsonSerializerDefaults.Web);
     private AIAgent? _agent;
 
     public async IAsyncEnumerable<AgentStreamEvent> StreamReplyAsync(
@@ -104,7 +105,8 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcp
                     request.RequestId,
                     functionCall.CallId,
                     functionCall.Name,
-                    JsonSerializer.Serialize(functionCall.Arguments)));
+                    JsonSerializer.Serialize(functionCall.Arguments ?? new Dictionary<string, object?>(),
+                        ArgumentsJsonOptions)));
             }
         }
 

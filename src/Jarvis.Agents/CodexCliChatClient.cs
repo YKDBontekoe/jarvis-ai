@@ -142,7 +142,7 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
                 catch (InvalidOperationException) { }
                 catch (System.ComponentModel.Win32Exception) { }
             });
-            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            var stderrTask = process.StandardError.ReadToEndAsync();
             using var writer = process.StandardInput;
             using var reader = process.StandardOutput;
             try
@@ -251,6 +251,9 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
                 try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
                 catch (InvalidOperationException) { }
                 catch (System.ComponentModel.Win32Exception) { }
+                try { await stderrTask.WaitAsync(TimeSpan.FromSeconds(2)); }
+                catch (TimeoutException) { }
+                catch (OperationCanceledException) { }
             }
         }
         finally

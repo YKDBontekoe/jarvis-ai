@@ -7,6 +7,9 @@ namespace Jarvis.Workflows;
 
 public abstract class DailyBriefingActivityContract
 {
+    [Activity("ResolveDailyBriefingSchedule")]
+    public abstract Task<DailyBriefingSchedule> ResolveScheduleAsync(DailyBriefingWorkflowInput input);
+
     [Activity("DeliverDailyBriefing")]
     public abstract Task<bool> DeliverAsync(DailyBriefingActivityInput input);
 }
@@ -17,7 +20,6 @@ public sealed class DailyBriefingWorkflow
     [WorkflowRun]
     public async Task RunAsync(DailyBriefingWorkflowInput input)
     {
-        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(input.TimeZoneId);
         var options = new ActivityOptions
         {
             StartToCloseTimeout = TimeSpan.FromMinutes(1),
@@ -31,21 +33,37 @@ public sealed class DailyBriefingWorkflow
 
         while (true)
         {
-            var utcNow = DateTime.SpecifyKind(Workflow.UtcNow, DateTimeKind.Utc);
-            var now = new DateTimeOffset(utcNow);
-            var fireAt = GetNextOccurrence(now, input.LocalTime, timeZone);
-            await Workflow.DelayAsync(fireAt - now);
+            DailyBriefingActivityInput delivery;
+            if (Workflow.Patched("daily-briefing-schedule-activity"))
+            {
+                var schedule = await Workflow.ExecuteActivityAsync(
+                    (DailyBriefingActivityContract activities) => activities.ResolveScheduleAsync(input), options);
+                var now = new DateTimeOffset(DateTime.SpecifyKind(Workflow.UtcNow, DateTimeKind.Utc));
+                var delay = schedule.FireAt - now;
+                if (delay < TimeSpan.Zero) delay = TimeSpan.Zero;
+                await Workflow.DelayAsync(delay);
+                delivery = new DailyBriefingActivityInput(input.OwnerId, input.WorkflowId, schedule.LocalDate,
+                    input.TimeZoneId, schedule.LocalDayStart, schedule.NextLocalDayStart);
+            }
+            else
+            {
+                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(input.TimeZoneId);
+                var now = new DateTimeOffset(DateTime.SpecifyKind(Workflow.UtcNow, DateTimeKind.Utc));
+                var fireAt = GetNextOccurrence(now, input.LocalTime, timeZone);
+                await Workflow.DelayAsync(fireAt - now);
 
-            var deliveredAt = DateTime.SpecifyKind(Workflow.UtcNow, DateTimeKind.Utc);
-            var localDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(deliveredAt, timeZone).Date);
-            var dayStart = ResolveLocalTime(localDate.ToDateTime(TimeOnly.MinValue), timeZone);
-            var nextDayStart = ResolveLocalTime(localDate.AddDays(1).ToDateTime(TimeOnly.MinValue), timeZone);
+                var deliveredAt = DateTime.SpecifyKind(Workflow.UtcNow, DateTimeKind.Utc);
+                var localDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(deliveredAt, timeZone).Date);
+                var dayStart = ResolveLocalTime(localDate.ToDateTime(TimeOnly.MinValue), timeZone);
+                var nextDayStart = ResolveLocalTime(localDate.AddDays(1).ToDateTime(TimeOnly.MinValue), timeZone);
+                delivery = new DailyBriefingActivityInput(input.OwnerId, input.WorkflowId, localDate,
+                    input.TimeZoneId, dayStart, nextDayStart);
+            }
+
             try
             {
                 var shouldContinue = await Workflow.ExecuteActivityAsync(
-                    (DailyBriefingActivityContract activities) => activities.DeliverAsync(
-                        new DailyBriefingActivityInput(input.OwnerId, input.WorkflowId, localDate,
-                            input.TimeZoneId, dayStart, nextDayStart)), options);
+                    (DailyBriefingActivityContract activities) => activities.DeliverAsync(delivery), options);
                 if (!shouldContinue) return;
             }
             catch (ActivityFailureException)

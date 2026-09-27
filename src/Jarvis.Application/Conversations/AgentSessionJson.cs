@@ -77,6 +77,83 @@ public static class AgentSessionJson
         }
     }
 
+    public static bool TryGetPendingApprovals(string sessionJson,
+        out IReadOnlyList<AgentToolApprovalRequest> approvals, out string preface)
+    {
+        approvals = [];
+        preface = string.Empty;
+        try
+        {
+            using var document = JsonDocument.Parse(sessionJson);
+            if (!TryFindMessages(document.RootElement, out var messages) || messages.GetArrayLength() == 0)
+                return false;
+
+            var last = messages[messages.GetArrayLength() - 1];
+            if (IsRole(last, "user") ||
+                !last.TryGetProperty("contents", out var contents) ||
+                contents.ValueKind != JsonValueKind.Array)
+                return false;
+
+            var found = new List<AgentToolApprovalRequest>();
+            var text = new StringBuilder();
+            foreach (var content in contents.EnumerateArray())
+            {
+                var type = content.TryGetProperty("$type", out var typeElement) ? typeElement.GetString() : null;
+                if (type is "text")
+                {
+                    if (content.TryGetProperty("text", out var textElement) &&
+                        textElement.ValueKind == JsonValueKind.String)
+                        text.Append(textElement.GetString());
+                    continue;
+                }
+
+                if (type is not ("functionApprovalRequest" or "toolApprovalRequest")) continue;
+                if (TryReadApproval(content, out var request))
+                    found.Add(request);
+            }
+
+            if (found.Count == 0) return false;
+            approvals = found;
+            preface = text.ToString();
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryReadApproval(JsonElement content, out AgentToolApprovalRequest request)
+    {
+        request = null!;
+        var requestId = ReadString(content, "id") ?? ReadString(content, "requestId");
+        if (string.IsNullOrEmpty(requestId) ||
+            !(content.TryGetProperty("functionCall", out var call) || content.TryGetProperty("toolCall", out call)) ||
+            call.ValueKind != JsonValueKind.Object)
+            return false;
+
+        var callId = ReadString(call, "callId");
+        var name = ReadString(call, "name");
+        if (string.IsNullOrEmpty(callId) || string.IsNullOrEmpty(name))
+            return false;
+
+        var argumentsJson = "{}";
+        if (call.TryGetProperty("arguments", out var args))
+        {
+            argumentsJson = args.ValueKind == JsonValueKind.String
+                ? args.GetString() ?? "{}"
+                : args.GetRawText();
+        }
+
+        request = new AgentToolApprovalRequest(requestId, callId, name, argumentsJson);
+        return true;
+    }
+
+    private static string? ReadString(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
     private static bool IsRole(JsonElement message, string role) =>
         message.TryGetProperty("role", out var value) &&
         value.ValueKind == JsonValueKind.String &&

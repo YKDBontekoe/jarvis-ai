@@ -14,7 +14,15 @@ public sealed class TaskRunAbort : ITaskRunAbort
 
     public IDisposable Register(Guid taskId, CancellationTokenSource abort)
     {
-        _runs[taskId] = abort;
+        _runs.AddOrUpdate(taskId, abort, (_, previous) =>
+        {
+            if (!ReferenceEquals(previous, abort))
+            {
+                try { previous.Cancel(); }
+                catch (ObjectDisposedException) { }
+            }
+            return abort;
+        });
         return new Lease(_runs, taskId, abort);
     }
 
