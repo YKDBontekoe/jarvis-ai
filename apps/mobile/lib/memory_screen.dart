@@ -307,7 +307,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
           'content': content.text.trim(),
           'importance': memory['importance'] ?? 0.5,
           'confidence': memory['confidence'] ?? 0.8,
-          'validUntil': memory['validUntil'],
+          'validUntil': null,
           'isPinned': pinned,
         },
       );
@@ -324,7 +324,14 @@ class _MemoryScreenState extends State<MemoryScreen> {
     try {
       await widget.http.put(
         '/api/v1/memory/${memory['id']}',
-        data: {...memory, 'isPinned': pinned},
+        data: {
+          'kind': memory['kind'],
+          'content': memory['content'],
+          'importance': memory['importance'] ?? 0.5,
+          'confidence': memory['confidence'] ?? 0.8,
+          'validUntil': null,
+          'isPinned': pinned,
+        },
       );
       if (mounted) await _load(query: _searching ? _query.text.trim() : null);
     } on DioException {

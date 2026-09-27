@@ -830,6 +830,11 @@ class _ChatScreenState extends State<ChatScreen> {
       if (existing >= 0) {
         final current = _entries[existing] as ApprovalEntry;
         if (current.status == ApprovalStatus.submitting) continue;
+        if (current.status != ApprovalStatus.pending &&
+            approval.status == ApprovalStatus.pending &&
+            !approval.retry) {
+          continue;
+        }
         _entries[existing] = approval;
       } else {
         _entries.add(approval);
