@@ -3,6 +3,15 @@ namespace Jarvis.Application.Integrations;
 public sealed record IntegrationCredentialStatus(string Provider, IReadOnlyList<string> SecretNames,
     DateTimeOffset UpdatedAt);
 
+public static class IntegrationCredentialProviders
+{
+    public const string UserMcpPrefix = "jarvis-mcp-";
+
+    public static bool IsUserMcpManaged(string? provider) =>
+        !string.IsNullOrEmpty(provider) &&
+        provider.StartsWith(UserMcpPrefix, StringComparison.Ordinal);
+}
+
 public interface IIntegrationCredentialStore
 {
     Task<IReadOnlyList<IntegrationCredentialStatus>> ListAsync(Guid ownerId, CancellationToken cancellationToken);

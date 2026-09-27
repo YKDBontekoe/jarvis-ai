@@ -509,7 +509,8 @@ api.MapDelete("/mcp-servers/{id}", async (string id, IUserMcpServerRegistry serv
 
 api.MapGet("/integrations/credentials", async (IIntegrationCredentialStore credentials,
     ICurrentUser currentUser, CancellationToken ct) =>
-    Results.Ok(await credentials.ListAsync(currentUser.OwnerId, ct)))
+    Results.Ok((await credentials.ListAsync(currentUser.OwnerId, ct))
+        .Where(status => !IntegrationCredentialProviders.IsUserMcpManaged(status.Provider))))
     .WithName("ListIntegrationCredentialStatuses");
 
 api.MapGet("/integrations/connections", async (McpToolHost mcpToolHost, CancellationToken ct) =>
@@ -521,6 +522,7 @@ api.MapGet("/integrations/connections", async (McpToolHost mcpToolHost, Cancella
 api.MapGet("/integrations/{provider}/credentials", async (string provider,
     IIntegrationCredentialStore credentials, ICurrentUser currentUser, CancellationToken ct) =>
 {
+    if (IntegrationCredentialProviders.IsUserMcpManaged(provider)) return Results.NotFound();
     var status = await credentials.GetStatusAsync(currentUser.OwnerId, provider, ct);
     return status is null ? Results.NotFound() : Results.Ok(status);
 }).WithName("GetIntegrationCredentialStatus");
@@ -529,6 +531,7 @@ api.MapPut("/integrations/{provider}/credentials", async (string provider,
     SaveIntegrationCredentialsRequest request, IIntegrationCredentialStore credentials,
     ICurrentUser currentUser, CancellationToken ct) =>
 {
+    if (RejectUserMcpCredentialRoute(provider) is { } rejected) return rejected;
     try
     {
         await credentials.SaveAsync(currentUser.OwnerId, provider, request.Secrets, ct);
@@ -544,6 +547,7 @@ api.MapPut("/integrations/{provider}/credentials/{secretName}", async (string pr
     SaveIntegrationSecretRequest request, IIntegrationCredentialStore credentials,
     ICurrentUser currentUser, CancellationToken ct) =>
 {
+    if (RejectUserMcpCredentialRoute(provider) is { } rejected) return rejected;
     try
     {
         await credentials.SaveSecretAsync(currentUser.OwnerId, provider, secretName, request.Value, ct);
@@ -558,6 +562,7 @@ api.MapPut("/integrations/{provider}/credentials/{secretName}", async (string pr
 api.MapDelete("/integrations/{provider}/credentials/{secretName}", async (string provider, string secretName,
     IIntegrationCredentialStore credentials, ICurrentUser currentUser, CancellationToken ct) =>
 {
+    if (RejectUserMcpCredentialRoute(provider) is { } rejected) return rejected;
     try
     {
         return await credentials.DeleteSecretAsync(currentUser.OwnerId, provider, secretName, ct)
@@ -571,8 +576,10 @@ api.MapDelete("/integrations/{provider}/credentials/{secretName}", async (string
 
 api.MapDelete("/integrations/{provider}/credentials", async (string provider,
     IIntegrationCredentialStore credentials, ICurrentUser currentUser, CancellationToken ct) =>
-    await credentials.DeleteAsync(currentUser.OwnerId, provider, ct) ? Results.NoContent() : Results.NotFound())
-    .WithName("DeleteIntegrationCredentials");
+{
+    if (RejectUserMcpCredentialRoute(provider) is { } rejected) return rejected;
+    return await credentials.DeleteAsync(currentUser.OwnerId, provider, ct) ? Results.NoContent() : Results.NotFound();
+}).WithName("DeleteIntegrationCredentials");
 
 api.MapGet("/briefings/daily", async (IDailyBriefingService briefings, ICurrentUser currentUser,
     CancellationToken ct) =>
@@ -920,6 +927,15 @@ api.MapDelete("/memory/{id:guid}", async (Guid id, IMemoryService memory, IAudit
 }).WithName("DeleteMemory");
 
 app.Run();
+
+static IResult? RejectUserMcpCredentialRoute(string provider)
+{
+    if (!IntegrationCredentialProviders.IsUserMcpManaged(provider)) return null;
+    return Results.ValidationProblem(new Dictionary<string, string[]>
+    {
+        ["provider"] = ["MCP servers are managed from /api/v1/mcp-servers, not integration credentials."]
+    });
+}
 
 static async Task HeartbeatApprovalResumeAsync(IServiceScopeFactory scopes, ILogger logger, Guid approvalId,
     Guid ownerId, CancellationToken cancellationToken)

@@ -185,13 +185,13 @@ public sealed class AgentRunCoordinator(
             {
                 preface = new Message(conversationId, "assistant", answer.ToString(), messageId);
                 await conversations.AddMessageAsync(preface, cancellationToken);
-                await clients.SendAsync("message.completed", new
+                await PublishSafelyAsync(clients, "message.completed", new
                 {
                     id = preface.Id,
                     role = preface.Role,
                     content = preface.Content,
                     createdAt = preface.CreatedAt
-                }, cancellationToken);
+                }, conversationId, cancellationToken);
             }
             foreach (var request in approvalRequests)
             {
@@ -199,19 +199,22 @@ public sealed class AgentRunCoordinator(
                     request.ToolCallId, request.ToolName, request.ArgumentsJson, taskId, cancellationToken);
                 var approval = created.Approval;
                 pending.Add(approval);
-                await clients.SendAsync("tool.approval_required", ToApprovalEvent(approval), cancellationToken);
+                await PublishSafelyAsync(clients, "tool.approval_required", ToApprovalEvent(approval),
+                    conversationId, cancellationToken);
                 if (created.Created)
-                    await hub.Clients.Group(JarvisEventsHub.OwnerGroupName(ownerId)).SendAsync("notification.created",
+                    await PublishSafelyAsync(hub.Clients.Group(JarvisEventsHub.OwnerGroupName(ownerId)),
+                        "notification.created",
                         new
                         {
-                        type = "approval.required",
-                        notificationId = created.NotificationId,
-                        title = "Approval needed",
+                            type = "approval.required",
+                            notificationId = created.NotificationId,
+                            title = "Approval needed",
                             body = $"Jarvis is waiting for approval to run {approval.ToolName}.",
                             sourceId = approval.Id
-                        }, cancellationToken);
+                        }, conversationId, cancellationToken);
             }
-            await clients.SendAsync("agent.waiting_for_approval", new { conversationId }, cancellationToken);
+            await PublishSafelyAsync(clients, "agent.waiting_for_approval", new { conversationId },
+                conversationId, cancellationToken);
             if (memorySourceId is { } approvedFlowSourceId && !string.IsNullOrWhiteSpace(memorySource))
                 await ExtractMemorySafelyAsync(ownerId, conversationId, approvedFlowSourceId, memorySource,
                     cancellationToken);
@@ -226,15 +229,34 @@ public sealed class AgentRunCoordinator(
         if (memorySourceId is { } sourceMessageId && !string.IsNullOrWhiteSpace(memorySource))
             await ExtractMemorySafelyAsync(ownerId, conversationId, sourceMessageId, memorySource, cancellationToken);
 
-        await clients.SendAsync("message.completed", new
+        await PublishSafelyAsync(clients, "message.completed", new
         {
             id = assistantMessage.Id,
             role = assistantMessage.Role,
             content = assistantMessage.Content,
             createdAt = assistantMessage.CreatedAt
-        }, cancellationToken);
-        await clients.SendAsync("agent.completed", new { conversationId }, cancellationToken);
+        }, conversationId, cancellationToken);
+        await PublishSafelyAsync(clients, "agent.completed", new { conversationId }, conversationId,
+            cancellationToken);
         return new AgentRunOutcome(assistantMessage, []);
+    }
+
+    private async Task PublishSafelyAsync(IClientProxy clients, string eventName, object payload,
+        Guid conversationId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await clients.SendAsync(eventName, payload, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "Could not publish {EventName} for conversation {ConversationId}.", eventName, conversationId);
+        }
     }
 
     private async Task ExtractMemorySafelyAsync(Guid ownerId, Guid conversationId, Guid sourceMessageId,

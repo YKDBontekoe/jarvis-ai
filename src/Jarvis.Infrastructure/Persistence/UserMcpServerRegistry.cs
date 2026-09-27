@@ -6,7 +6,7 @@ namespace Jarvis.Infrastructure.Persistence;
 
 public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore credentials) : IUserMcpServerRegistry
 {
-    private const string ProviderPrefix = "jarvis-mcp-";
+    private const string ProviderPrefix = IntegrationCredentialProviders.UserMcpPrefix;
     private const string ConfigSecret = "server_config";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
