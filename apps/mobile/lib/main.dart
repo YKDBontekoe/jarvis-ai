@@ -548,6 +548,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final records = jsonMaps(details.data?['messages']);
     final approvals = await _loadConversationApprovals(conversationId);
     if (!isLatestOpen()) return;
+    final knownApprovals = approvals ?? const <ApprovalEntry>[];
 
     _runCancel?.cancel();
     final generation = ++_realtimeGeneration;
@@ -568,7 +569,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _sending = false;
       _selectedDestination = 0;
       _showHome = showHome &&
-          !approvals.any(
+          !knownApprovals.any(
             (entry) =>
                 entry.status == ApprovalStatus.pending ||
                 entry.status == ApprovalStatus.failed,
@@ -588,7 +589,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
         )
-        ..addAll(approvals);
+        ..addAll(knownApprovals);
       _error = null;
     });
     _scrollToBottom(jump: true);
@@ -598,6 +599,12 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     try {
       await _connectRealtime(generation);
+      if (approvals == null &&
+          isCurrent() &&
+          isLatestOpen() &&
+          _conversationId == conversationId) {
+        unawaited(_syncConversationApprovals());
+      }
     } catch (error) {
       if (!isCurrent() || !isLatestOpen() || _conversationId != conversationId) {
         return;
@@ -611,7 +618,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<List<ApprovalEntry>> _loadConversationApprovals(
+  Future<List<ApprovalEntry>?> _loadConversationApprovals(
     String conversationId,
   ) async {
     try {
@@ -622,7 +629,7 @@ class _ChatScreenState extends State<ChatScreen> {
           .whereType<ApprovalEntry>()
           .toList();
     } on DioException {
-      return const [];
+      return null;
     }
   }
 
@@ -801,10 +808,22 @@ class _ChatScreenState extends State<ChatScreen> {
     final index = _entries.lastIndexWhere(
       (entry) => entry is MessageEntry && !entry.isUser && entry.pending,
     );
+    if (content.trim().isEmpty) {
+      if (index >= 0) {
+        final pending = _entries[index] as MessageEntry;
+        if (pending.content.isEmpty) {
+          _entries.removeAt(index);
+        } else {
+          _entries[index] = pending.copyWith(pending: false);
+        }
+      }
+      _settleToolRuns();
+      return;
+    }
     final message = MessageEntry(role: 'assistant', content: content);
     if (index >= 0) {
       _entries[index] = message;
-    } else if (content.isNotEmpty) {
+    } else {
       final last = _entries.isEmpty ? null : _entries.last;
       if (last is MessageEntry && !last.isUser && last.content == content) {
         _settleToolRuns();
@@ -876,7 +895,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final conversationId = _conversationId;
     if (conversationId == null) return;
     final approvals = await _loadConversationApprovals(conversationId);
-    if (!mounted ||
+    if (approvals == null ||
+        !mounted ||
         _signedOut ||
         _signingOut ||
         _conversationId != conversationId) {
@@ -1140,7 +1160,8 @@ class _ChatScreenState extends State<ChatScreen> {
         '/api/v1/conversations/$conversationId',
       );
       final approvals = await _loadConversationApprovals(conversationId);
-      if (!mounted ||
+      if (approvals == null ||
+          !mounted ||
           _conversationId != conversationId ||
           _realtimeGeneration != expectedGeneration ||
           _signedOut ||
