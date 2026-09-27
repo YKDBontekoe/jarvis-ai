@@ -125,6 +125,18 @@ public sealed class UiSurfaceRepository(JarvisDbContext db) : IUiSurfaceReposito
         await db.SaveChangesAsync(cancellationToken);
         return entity.ToRecord();
     }
+
+    public async Task ReopenAsync(Guid ownerId, Guid id, CancellationToken cancellationToken)
+    {
+        var entity = await db.UiSurfaces.SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId,
+            cancellationToken);
+        if (entity is null || entity.Status != "completed") return;
+        entity.Status = "open";
+        entity.CompletedAction = null;
+        entity.ValuesJson = null;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }
 
 public sealed class RemoteAgentRepository(JarvisDbContext db) : IRemoteAgentRepository

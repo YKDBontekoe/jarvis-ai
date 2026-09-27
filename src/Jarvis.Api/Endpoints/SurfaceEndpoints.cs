@@ -44,7 +44,10 @@ internal static class SurfaceEndpoints
             var content = values.Count == 0
                 ? $"I chose '{actionId}' on the {surface.Title} card."
                 : $"I chose '{actionId}' on the {surface.Title} card: {string.Join(", ", values.Select(pair => $"{pair.Key}={pair.Value}"))}.";
-            return (await turns.SendAsync(currentUser.OwnerId, surface.ConversationId, content, ct)).ToHttpResult();
+            var result = await turns.SendAsync(currentUser.OwnerId, surface.ConversationId, content, ct);
+            if (result is ConversationTurnResult.Failed)
+                await surfaces.ReopenAsync(currentUser.OwnerId, id, CancellationToken.None);
+            return result.ToHttpResult();
         }).WithName("SubmitUiSurfaceAction");
 
         return api;

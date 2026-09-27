@@ -35,6 +35,7 @@ public interface IUiSurfaceRepository
         CancellationToken cancellationToken);
     Task<UiSurfaceRecord?> CompleteAsync(Guid ownerId, Guid id, string actionId, string valuesJson,
         CancellationToken cancellationToken);
+    Task ReopenAsync(Guid ownerId, Guid id, CancellationToken cancellationToken);
 }
 
 /// <summary>A2UI-inspired generative UI: a small native widget tree Jarvis can render in the app.</summary>
