@@ -8,17 +8,29 @@ const base = 'http://localhost:5082/api/v1';
 const reportPath = 'artifacts/verification/extended-flow.json';
 const selected = process.env.JARVIS_EXTENDED_CASES?.split(',');
 const checks = selected && existsSync(reportPath) ? JSON.parse(readFileSync(reportPath)).checks : [];
-let access, expiresAt = 0;
+const sessions = new Map();
+function accountEmail(username = fixture.username) {
+  if (username.includes('@')) return username;
+  return username === fixture.username ? fixture.email : `${username}@example.invalid`;
+}
 async function token(username = fixture.username) {
-  if (username === fixture.username && expiresAt > Date.now() + 30000) return access;
-  const response = await fetch(fixture.issuer + '/protocol/openid-connect/token', {
-    method: 'POST', body: new URLSearchParams({ grant_type: 'password', client_id: fixture.clientId,
-      username, password: fixture.password, scope: 'openid profile' }),
+  const email = accountEmail(username);
+  const cached = sessions.get(email);
+  if (cached && cached.expiresAt > Date.now() + 30000) return cached.accessToken;
+  let response = await fetch(base + '/auth/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: fixture.password }),
   });
+  if (response.status === 401) {
+    response = await fetch(base + '/auth/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: fixture.password }),
+    });
+  }
   assert.equal(response.status, 200);
   const result = await response.json();
-  if (username === fixture.username) { access = result.access_token; expiresAt = Date.now() + result.expires_in * 1000; }
-  return result.access_token;
+  sessions.set(email, { accessToken: result.accessToken, expiresAt: Date.parse(result.expiresAt) });
+  return result.accessToken;
 }
 async function request(method, path, data, statuses = [200]) {
   const response = await fetch(base + path, { method, headers: { Authorization: 'Bearer ' + await token(),
