@@ -213,7 +213,7 @@ Optional: [`scripts/altstore/generate_source.py`](scripts/altstore/generate_sour
 
 ### Backend GHCR images and SSH deploy
 
-[`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) builds `api`, `worker`, and `voice-worker` from the production Dockerfiles, pushes them to `ghcr.io/<owner>/jarvis-ai/<name>:<git-sha>` (plus the version tag and `latest` on `v*` tags), then SSHs to your server to pull those images and restart Compose. It does **not** run on every push to `main`.
+[`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) builds `api`, `worker`, and `voice-worker` from the production Dockerfiles, pushes them to `ghcr.io/<owner>/jarvis-ai/<name>:<git-sha>` (plus the version tag and `latest` on `v*` tags), then SSHs to your server to pull those images and restart Compose. It runs when a `v*` release tag is created (automatically after merge to `main`, or manually), not on every commit to `main`.
 
 Server bootstrap:
 
