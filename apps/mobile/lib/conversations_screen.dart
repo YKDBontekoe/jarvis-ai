@@ -107,6 +107,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       icon: PhosphorIconsRegular.trash,
     );
     if (!confirmed) return;
+    if (!mounted) return;
     try {
       await widget.http.delete('/api/v1/conversations/$id');
       if (!mounted) return;

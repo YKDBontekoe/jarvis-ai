@@ -496,11 +496,12 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       icon: PhosphorIconsRegular.plugsConnected,
     );
     if (!confirmed) return;
+    if (!mounted) return;
     try {
       await widget.http.delete<void>(
         '/api/v1/mcp-servers/${Uri.encodeComponent(id)}',
       );
-      await _load();
+      if (mounted) await _load();
     } on DioException {
       if (mounted) setState(() => _error = 'Could not remove MCP server.');
     }
