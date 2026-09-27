@@ -26,6 +26,8 @@ class _RemindersScreenState extends State<RemindersScreen>
   List<Map<String, dynamic>> _reminders = [];
   List<Map<String, dynamic>> _notifications = [];
   bool _loading = true;
+  bool _remindersFailed = false;
+  bool _notificationsFailed = false;
   String? _error;
   int _requestRevision = 0;
 
@@ -41,16 +43,19 @@ class _RemindersScreenState extends State<RemindersScreen>
     setState(() {
       _loading = true;
       _error = null;
+      _remindersFailed = false;
+      _notificationsFailed = false;
     });
     try {
-      String? error;
+      var remindersFailed = false;
+      var notificationsFailed = false;
       try {
         final reminders = await widget.http.get<List<dynamic>>('/api/v1/reminders');
         if (mounted && revision == _requestRevision) {
           setState(() => _reminders = jsonMaps(reminders.data));
         }
       } on DioException {
-        error = 'Jarvis could not load reminders.';
+        remindersFailed = true;
       }
       try {
         final notifications = await widget.http.get<List<dynamic>>(
@@ -60,10 +65,18 @@ class _RemindersScreenState extends State<RemindersScreen>
           setState(() => _notifications = jsonMaps(notifications.data));
         }
       } on DioException {
-        error ??= 'Jarvis could not load notifications.';
+        notificationsFailed = true;
       }
       if (mounted && revision == _requestRevision) {
-        setState(() => _error = error);
+        setState(() {
+          _remindersFailed = remindersFailed;
+          _notificationsFailed = notificationsFailed;
+          _error = remindersFailed
+              ? 'Jarvis could not load reminders.'
+              : notificationsFailed
+              ? 'Jarvis could not load notifications.'
+              : null;
+        });
       }
     } finally {
       if (mounted && revision == _requestRevision) {
@@ -384,7 +397,12 @@ class _RemindersScreenState extends State<RemindersScreen>
   int get _unreadCount =>
       _notifications.where((item) => item['readAt'] == null).length;
 
-  Widget _buildReminders() => _reminders.isEmpty
+  Widget _buildReminders() => _remindersFailed && _reminders.isEmpty
+      ? ErrorState(
+          message: 'Jarvis could not load reminders.',
+          onRetry: _load,
+        )
+      : _reminders.isEmpty
       ? const EmptyState(
           icon: PhosphorIconsRegular.alarm,
           title: 'No reminders yet.',
@@ -461,7 +479,12 @@ class _RemindersScreenState extends State<RemindersScreen>
     _ => PhosphorIconsRegular.bell,
   };
 
-  Widget _buildNotifications() => _notifications.isEmpty
+  Widget _buildNotifications() => _notificationsFailed && _notifications.isEmpty
+      ? ErrorState(
+          message: 'Jarvis could not load notifications.',
+          onRetry: _load,
+        )
+      : _notifications.isEmpty
       ? const EmptyState(
           icon: PhosphorIconsRegular.bell,
           title: 'No notifications yet.',

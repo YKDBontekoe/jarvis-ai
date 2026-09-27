@@ -650,8 +650,11 @@ class _ChatScreenState extends State<ChatScreen> {
       await _clearCurrentConversation();
       if (!mounted || _signedOut || _signingOut) return;
       await _createAndOpenConversation();
-    } else if (selection?.conversationId != null &&
-        selection!.conversationId != _conversationId) {
+    } else if (selection?.conversationId != null) {
+      if (selection!.conversationId == _conversationId) {
+        setState(() => _showHome = false);
+        return;
+      }
       if (!mounted || _signedOut || _signingOut) return;
       try {
         await _openConversation(selection.conversationId!);

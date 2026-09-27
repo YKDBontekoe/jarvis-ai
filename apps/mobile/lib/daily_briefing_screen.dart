@@ -91,7 +91,14 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
 
   Future<void> _chooseTime() async {
     final selected = await showTimePicker(context: context, initialTime: _time);
-    if (selected != null && mounted) setState(() => _time = selected);
+    if (selected != null && mounted) _discardSavedNotice(() => _time = selected);
+  }
+
+  void _discardSavedNotice([VoidCallback? apply]) {
+    setState(() {
+      apply?.call();
+      _saved = null;
+    });
   }
 
   Future<void> _save() async {
@@ -197,7 +204,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
                               title: const Text('Send a daily briefing'),
                               value: _enabled,
                               onChanged: (value) =>
-                                  setState(() => _enabled = value),
+                                  _discardSavedNotice(() => _enabled = value),
                             ),
                             const Divider(indent: 16, endIndent: 16),
                             ListTile(
@@ -214,7 +221,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
                         controller: _zone,
                         textCapitalization: TextCapitalization.none,
                         autocorrect: false,
-                        onChanged: (_) => setState(() {}),
+                        onChanged: (_) => _discardSavedNotice(),
                         decoration: const InputDecoration(
                           labelText: 'Time zone',
                           hintText: 'Europe/Amsterdam',
