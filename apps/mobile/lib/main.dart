@@ -789,20 +789,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _appendDelta(String delta) {
-    final last = _entries.isEmpty ? null : _entries.last;
-    if (last is MessageEntry && !last.isUser && last.pending) {
-      _entries[_entries.length - 1] = last.copyWith(
-        content: '${last.content}$delta',
-      );
-    } else if (last is MessageEntry && !last.isUser && !last.pending) {
-      return;
-    } else {
-      _entries.add(
-        MessageEntry(role: 'assistant', content: delta, pending: true),
-      );
-    }
-  }
+  void _appendDelta(String delta) => appendAssistantDelta(_entries, delta);
 
   void _completeAssistant(String content) {
     final index = _entries.lastIndexWhere(
@@ -1160,14 +1147,14 @@ class _ChatScreenState extends State<ChatScreen> {
         '/api/v1/conversations/$conversationId',
       );
       final approvals = await _loadConversationApprovals(conversationId);
-      if (approvals == null ||
-          !mounted ||
+      if (!mounted ||
           _conversationId != conversationId ||
           _realtimeGeneration != expectedGeneration ||
           _signedOut ||
           _signingOut) {
         return;
       }
+      final knownApprovals = approvals ?? _entries.whereType<ApprovalEntry>().toList();
       setState(() {
         _entries
           ..clear()
@@ -1184,8 +1171,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
           );
-        _addApprovals(approvals);
+        _addApprovals(knownApprovals);
       });
+      if (approvals == null) {
+        unawaited(_syncConversationApprovals());
+      }
     } on DioException {
       // Keep the current transcript if history cannot be refreshed.
     }

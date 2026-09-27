@@ -33,6 +33,52 @@ void main() {
     });
   });
 
+  group('appendAssistantDelta', () {
+    test('keeps writing the preface when an approval card is last', () {
+      final entries = <ChatEntry>[
+        const MessageEntry(role: 'user', content: 'Remind me'),
+        const MessageEntry(
+          role: 'assistant',
+          content: 'I can schedule that.',
+          pending: true,
+        ),
+        const ApprovalEntry(
+          id: 'a1',
+          toolName: 'CreateReminder',
+          argumentsJson: '{}',
+        ),
+      ];
+      appendAssistantDelta(entries, ' Checking the calendar.');
+      expect(entries, hasLength(3));
+      final pending = entries[1] as MessageEntry;
+      expect(pending.content, 'I can schedule that. Checking the calendar.');
+      expect(pending.pending, isTrue);
+    });
+
+    test('ignores stale deltas after the assistant turn completed', () {
+      final entries = <ChatEntry>[
+        const MessageEntry(role: 'user', content: 'Hi'),
+        const MessageEntry(role: 'assistant', content: 'Hello.'),
+      ];
+      appendAssistantDelta(entries, ' extra');
+      expect(entries, hasLength(2));
+      expect((entries[1] as MessageEntry).content, 'Hello.');
+    });
+
+    test('starts a pending bubble after the latest user message', () {
+      final entries = <ChatEntry>[
+        const MessageEntry(role: 'user', content: 'Hi'),
+        const MessageEntry(role: 'assistant', content: 'Hello.'),
+        const MessageEntry(role: 'user', content: 'And then?'),
+      ];
+      appendAssistantDelta(entries, 'Next.');
+      expect(entries, hasLength(4));
+      final pending = entries.last as MessageEntry;
+      expect(pending.content, 'Next.');
+      expect(pending.pending, isTrue);
+    });
+  });
+
   group('ApprovalEntry.fromJson', () {
     test('reads API approvals and marks resumed decisions for retry', () {
       final approval = ApprovalEntry.fromJson({

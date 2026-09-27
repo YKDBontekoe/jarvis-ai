@@ -31,6 +31,26 @@ class MessageEntry extends ChatEntry {
       );
 }
 
+/// Continues the in-flight assistant reply even when approval cards sit after it.
+void appendAssistantDelta(List<ChatEntry> entries, String delta) {
+  final pendingIndex = entries.lastIndexWhere(
+    (entry) => entry is MessageEntry && !entry.isUser && entry.pending,
+  );
+  if (pendingIndex >= 0) {
+    final pending = entries[pendingIndex] as MessageEntry;
+    entries[pendingIndex] = pending.copyWith(content: '${pending.content}$delta');
+    return;
+  }
+  final lastAssistant = entries.lastIndexWhere(
+    (entry) => entry is MessageEntry && !entry.isUser,
+  );
+  final lastUser = entries.lastIndexWhere(
+    (entry) => entry is MessageEntry && entry.isUser,
+  );
+  if (lastAssistant > lastUser) return;
+  entries.add(MessageEntry(role: 'assistant', content: delta, pending: true));
+}
+
 enum ToolStepStatus { running, completed, failed }
 
 class ToolStep {
