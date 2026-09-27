@@ -5,7 +5,7 @@ Jarvis is a self-hosted personal assistant built as a modular .NET monolith with
 ## Current implementation
 
 - Flutter chat shell with Markdown replies (tables, code blocks, links) and copy, a typing indicator, live tool-activity chips per reply, inline approve/decline cards for approval-gated tool calls, retry for messages that failed to send, a new-chat action, suggested prompts, Enter-to-send, and a navigation rail on wide screens
-- Native generative UI cards (`RenderUi`) for choices, forms, status, and lists, rendered in the Flutter chat transcript instead of long Markdown; tapping an action continues the conversation
+- Native generative UI cards (`RenderUi`) for choices, forms, status, and lists. Only the latest card stays interactive and sits above the composer; earlier cards collapse to a one-line receipt. Tapping an action continues the conversation
 - Isolated Playwright browser/computer-use sessions (`BrowseTheWeb`) with an in-chat step timeline; navigation stays approval-gated and private/local hosts are blocked
 - Agent2Agent: a public agent card at `/.well-known/agent-card.json`, JSON-RPC `POST /a2a` with hashed inbound bearer tokens, and a Settings → Agents registry that can delegate (after approval) to HTTPS peers
 - Connected device nodes over SignalR: the signed-in app can honor location, battery, clipboard, open-URL, and local notification requests, with per-capability toggles under Settings → This device

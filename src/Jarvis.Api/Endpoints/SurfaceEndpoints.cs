@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Jarvis.Api.Conversations;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Realtime;
 using Jarvis.Application.Surfaces;
 
 namespace Jarvis.Api.Endpoints;
@@ -25,7 +26,7 @@ internal static class SurfaceEndpoints
 
         api.MapPost("/ui-surfaces/{id:guid}/actions", async (Guid id, UiSurfaceActionRequest request,
             IUiSurfaceRepository surfaces, ConversationTurnService turns, ICurrentUser currentUser,
-            CancellationToken ct) =>
+            IRealtimePublisher realtime, CancellationToken ct) =>
         {
             var surface = await surfaces.GetAsync(currentUser.OwnerId, id, ct);
             if (surface is null) return Results.NotFound();
@@ -41,12 +42,14 @@ internal static class SurfaceEndpoints
                 return EndpointHelpers.Invalid("values", "Field values must be short.");
             var valuesJson = JsonSerializer.Serialize(values);
             await surfaces.CompleteAsync(currentUser.OwnerId, id, actionId, valuesJson, ct);
-            var content = values.Count == 0
-                ? $"I chose '{actionId}' on the {surface.Title} card."
-                : $"I chose '{actionId}' on the {surface.Title} card: {string.Join(", ", values.Select(pair => $"{pair.Key}={pair.Value}"))}.";
+            var content = DescribeAnswer(surface, actionId, values);
             var result = await turns.SendAsync(currentUser.OwnerId, surface.ConversationId, content, ct);
             if (result is ConversationTurnResult.Failed)
-                await surfaces.ReopenAsync(currentUser.OwnerId, id, CancellationToken.None);
+            {
+                foreach (var changed in await surfaces.ReopenAsync(currentUser.OwnerId, id, CancellationToken.None))
+                    await realtime.PublishToConversationAsync(changed.ConversationId, "ui.surface", Payload(changed),
+                        CancellationToken.None);
+            }
             return result.ToHttpResult();
         }).WithName("SubmitUiSurfaceAction");
 
@@ -59,4 +62,28 @@ internal static class SurfaceEndpoints
         return new UiSurfaceDto(surface.Id, surface.ConversationId, surface.Kind, surface.Title, surface.Status,
             document.RootElement.Clone(), surface.CreatedAt);
     }
+
+    internal static string DescribeAnswer(UiSurfaceRecord surface, string actionId,
+        IReadOnlyDictionary<string, string> values)
+    {
+        if (values.TryGetValue("label", out var label) && !string.IsNullOrWhiteSpace(label))
+            return $"I picked \"{label.Trim()}\".";
+        var answers = values
+            .Where(pair => pair.Key is not "choice" and not "label" && !string.IsNullOrWhiteSpace(pair.Value))
+            .Select(pair => $"{pair.Key}: {pair.Value.Trim()}")
+            .ToArray();
+        if (answers.Length > 0)
+            return $"My answers for \"{surface.Title}\": {string.Join("; ", answers)}.";
+        return $"I chose '{actionId}' on the {surface.Title} card.";
+    }
+
+    private static object Payload(UiSurfaceRecord surface) => new
+    {
+        id = surface.Id,
+        conversationId = surface.ConversationId,
+        kind = surface.Kind,
+        title = surface.Title,
+        status = surface.Status,
+        schema = JsonSerializer.Deserialize<JsonElement>(surface.SchemaJson)
+    };
 }

@@ -66,6 +66,168 @@ void main() {
     expect(submitted, isTrue);
   });
 
+  test('only the latest open card stays live', () {
+    final entries = [
+      const UiSurfaceEntry(
+        id: 'old',
+        title: 'Old',
+        status: 'open',
+        schema: {'kind': 'form', 'fields': [], 'actions': []},
+      ),
+      const UiSurfaceEntry(
+        id: 'new',
+        title: 'New',
+        status: 'open',
+        schema: {
+          'kind': 'choice',
+          'items': [
+            {'id': 'a', 'title': 'A'},
+          ],
+        },
+      ),
+      const UiSurfaceEntry(
+        id: 'done',
+        title: 'Done',
+        status: 'completed',
+        schema: {},
+      ),
+    ];
+    expect(liveSurface(entries)?.id, 'new');
+    expect(surfaceAwaitsReply(entries[1]), isTrue);
+    expect(surfaceAwaitsReply(entries[2]), isFalse);
+  });
+
+  testWidgets('a choice card requires a pick before sharing', (tester) async {
+    String? action;
+    Map<String, String>? values;
+    await show(
+      tester,
+      Scaffold(
+        body: UiSurfaceCard(
+          surface: const UiSurfaceEntry(
+            id: 'surf-2',
+            title: 'What should I learn?',
+            status: 'open',
+            schema: {
+              'kind': 'choice',
+              'title': 'What should I learn?',
+              'body': 'Pick something fun to share.',
+              'items': [
+                {'id': 'day', 'title': 'A normal day'},
+                {'id': 'hobby', 'title': 'Free time'},
+              ],
+              'actions': [
+                {'id': 'share', 'label': 'Share', 'style': 'secondary'},
+              ],
+            },
+          ),
+          onAction: (id, submitted) async {
+            action = id;
+            values = submitted;
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Share'));
+    await tester.pump();
+    expect(action, isNull);
+    expect(find.text('Pick one option first.'), findsOneWidget);
+
+    await tester.tap(find.text('Free time'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Share'));
+    await tester.pump();
+    expect(action, 'share');
+    expect(values?['choice'], 'hobby');
+    expect(values?['label'], 'Free time');
+  });
+
+  testWidgets('form answers stay put and empty shares do nothing', (
+    tester,
+  ) async {
+    Map<String, String>? values;
+    var submitted = false;
+    Widget card() => UiSurfaceCard(
+      key: const ValueKey('day-form'),
+      surface: const UiSurfaceEntry(
+        id: 'surf-3',
+        title: 'About you',
+        status: 'open',
+        schema: {
+          'kind': 'form',
+          'title': 'About you',
+          'fields': [
+            {
+              'id': 'day',
+              'label': 'What does a normal day look like?',
+              'type': 'text',
+              'placeholder': 'Morning, work, evening…',
+            },
+          ],
+          'actions': [
+            {'id': 'share', 'label': 'Share', 'style': 'secondary'},
+          ],
+        },
+      ),
+      onAction: (_, submittedValues) async {
+        submitted = true;
+        values = submittedValues;
+      },
+    );
+
+    Future<void> pump(String marker) => tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: Column(children: [Text(marker), card()])),
+      ),
+    );
+
+    await pump('first');
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Share'));
+    await tester.pump();
+    expect(submitted, isFalse);
+    expect(find.text('Add an answer first.'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'I walk the dog');
+    await pump('second');
+    expect(find.text('I walk the dog'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Share'));
+    await tester.pump();
+    expect(submitted, isTrue);
+    expect(values?['day'], 'I walk the dog');
+  });
+
+  testWidgets('a used card collapses to one answered line', (tester) async {
+    await show(
+      tester,
+      Scaffold(
+        body: const UiSurfaceCard(
+          surface: UiSurfaceEntry(
+            id: 'surf-4',
+            title: 'About you',
+            status: 'completed',
+            schema: {
+              'kind': 'form',
+              'title': 'About you',
+              'fields': [
+                {'id': 'day', 'label': 'What does a normal day look like?'},
+              ],
+              'actions': [
+                {'id': 'share', 'label': 'Share', 'style': 'primary'},
+              ],
+            },
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Answered'), findsOneWidget);
+    expect(find.text('Submitted'), findsNothing);
+    expect(find.byType(FilledButton), findsNothing);
+    expect(find.byType(TextField), findsNothing);
+  });
+
   testWidgets('device settings save location and clipboard toggles', (
     tester,
   ) async {
