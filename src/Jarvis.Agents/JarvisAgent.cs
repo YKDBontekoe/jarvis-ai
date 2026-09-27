@@ -89,8 +89,10 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcp
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var activeTools = new Dictionary<string, string>(StringComparer.Ordinal);
-        await foreach (var update in agent.RunStreamingAsync(input, session, cancellationToken: cancellationToken))
+        try
         {
+            await foreach (var update in agent.RunStreamingAsync(input, session, cancellationToken: cancellationToken))
+            {
             var checkpoint = false;
             var approvalRequests = update.Contents.OfType<ToolApprovalRequestContent>().ToArray();
             var approvalCallIds = approvalRequests
@@ -133,11 +135,25 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcp
 
             if (checkpoint)
             {
-                var checkpointJson = await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken);
-                await conversations.SaveAgentSessionAsync(conversationId, checkpointJson.GetRawText(), cancellationToken);
+                await SaveSessionAsync(agent, conversationId, session, cancellationToken);
             }
         }
+        }
+        finally
+        {
+            try
+            {
+                await SaveSessionAsync(agent, conversationId, session, CancellationToken.None);
+            }
+            catch (Exception)
+            {
+            }
+        }
+    }
 
+    private async Task SaveSessionAsync(AIAgent agent, Guid conversationId, AgentSession session,
+        CancellationToken cancellationToken)
+    {
         var serialized = await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken);
         await conversations.SaveAgentSessionAsync(conversationId, serialized.GetRawText(), cancellationToken);
     }

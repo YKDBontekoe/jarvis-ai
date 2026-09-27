@@ -52,6 +52,71 @@ public sealed class AgentRunCoordinator(
             cancellationToken);
     }
 
+    public async Task<AgentRunOutcome?> TryRecoverPendingApprovalsAsync(Guid ownerId, Guid conversationId,
+        Guid? taskId, CancellationToken cancellationToken)
+    {
+        var session = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
+        if (session is null ||
+            !AgentSessionJson.TryGetPendingApprovals(session, out var requests, out var preface))
+            return null;
+
+        var clients = hub.Clients.Group(JarvisEventsHub.GroupName(conversationId));
+        Message? prefaceMessage = null;
+        if (!string.IsNullOrWhiteSpace(preface))
+        {
+            var messages = await conversations.GetMessagesAsync(conversationId, cancellationToken);
+            var last = messages.Count > 0 ? messages[^1] : null;
+            if (last is { Role: "assistant" } && last.Content == preface)
+            {
+                prefaceMessage = last;
+            }
+            else
+            {
+                prefaceMessage = new Message(conversationId, "assistant", preface);
+                await conversations.AddMessageAsync(prefaceMessage, cancellationToken);
+                await PublishSafelyAsync(clients, "message.completed", new
+                {
+                    id = prefaceMessage.Id,
+                    role = prefaceMessage.Role,
+                    content = prefaceMessage.Content,
+                    createdAt = prefaceMessage.CreatedAt
+                }, conversationId, cancellationToken);
+            }
+        }
+
+        var pending = new List<ToolApprovalRecord>();
+        foreach (var request in requests)
+        {
+            try
+            {
+                var created = await approvals.CreateAsync(ownerId, conversationId, request.RequestId,
+                    request.ToolCallId, request.ToolName, request.ArgumentsJson, taskId, cancellationToken);
+                pending.Add(created.Approval);
+                await PublishSafelyAsync(clients, "tool.approval_required", ToApprovalEvent(created.Approval),
+                    conversationId, cancellationToken);
+                if (created.Created)
+                    await PublishSafelyAsync(hub.Clients.Group(JarvisEventsHub.OwnerGroupName(ownerId)),
+                        "notification.created",
+                        new
+                        {
+                            type = "approval.required",
+                            notificationId = created.NotificationId,
+                            title = "Approval needed",
+                            body = $"Jarvis is waiting for approval to run {created.Approval.ToolName}.",
+                            sourceId = created.Approval.Id
+                        }, conversationId, cancellationToken);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        if (pending.Count == 0) return null;
+        await PublishSafelyAsync(clients, "agent.waiting_for_approval", new { conversationId },
+            conversationId, cancellationToken);
+        return new AgentRunOutcome(prefaceMessage, pending);
+    }
+
     public async Task<AgentRunOutcome> RunAsync(Guid ownerId, Guid conversationId,
         IAsyncEnumerable<AgentStreamEvent> events, string? memorySource, CancellationToken cancellationToken,
         Guid? taskId = null, Guid? memorySourceId = null,

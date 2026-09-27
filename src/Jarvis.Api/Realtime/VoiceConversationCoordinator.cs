@@ -70,6 +70,11 @@ public sealed class VoiceConversationCoordinator(
                     return recovered.Content;
                 }
 
+                if (ReferenceEquals(userMessage, lastMessage) &&
+                    await coordinator.TryRecoverPendingApprovalsAsync(ownerId, conversationId, null,
+                        cancellationToken) is { PendingApprovals.Count: > 0 })
+                    return "I need your approval before I can continue. Check the Jarvis app.";
+
                 try
                 {
                     var agent = services.GetRequiredService<IJarvisAgent>();

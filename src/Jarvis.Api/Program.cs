@@ -212,6 +212,10 @@ api.MapPost("/conversations/{conversationId:guid}/messages", async (
         await coordinator.PublishRecoveredAssistantAsync(conversationId, recovered, ct);
         return Results.Ok(ToDto(recovered));
     }
+    if (ReferenceEquals(userMessage, lastMessage) &&
+        await coordinator.TryRecoverPendingApprovalsAsync(currentUser.OwnerId, conversationId, null, ct)
+            is { PendingApprovals.Count: > 0 } recoveredApprovals)
+        return Results.Accepted("/api/v1/approvals", recoveredApprovals.PendingApprovals.Select(ToApprovalDto));
     try
     {
         var outcome = await coordinator.RunAsync(currentUser.OwnerId, conversationId,
