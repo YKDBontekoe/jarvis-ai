@@ -127,4 +127,27 @@ public sealed class AgentSessionJsonTests
             """{"stateBag":{"messages":[{"role":"user","contents":[{"text":"Remind me","$type":"text"}]}]}}""",
             "Remind me"));
     }
+
+    [Fact]
+    public void AbandonsIncompleteTurnsOnlyForADifferentUser()
+    {
+        const string inFlight = """
+            {"stateBag":{"messages":[
+              {"role":"user","contents":[{"text":"Hello","$type":"text"}]},
+              {"role":"assistant","contents":[{"text":"Hi.","$type":"text"}]},
+              {"role":"user","contents":[{"text":"Remind me","$type":"text"}]},
+              {"role":"assistant","contents":[
+                {"callId":"c1","$type":"functionCall","name":"CreateReminder","arguments":{"title":"Dentist"}}
+              ]}
+            ]}}
+            """;
+        Assert.False(AgentSessionJson.TryAbandonIncompleteTurn(inFlight, "Remind me", out _));
+        Assert.True(AgentSessionJson.TryAbandonIncompleteTurn(inFlight, "Never mind", out var truncated));
+        Assert.True(AgentSessionJson.TryGetCompletedAssistantTextAfterUser(truncated, "Hello", out var text));
+        Assert.Equal("Hi.", text);
+        Assert.False(AgentSessionJson.HasInFlightProgressAfterUser(truncated, "Remind me"));
+        Assert.False(AgentSessionJson.TryAbandonIncompleteTurn(
+            """{"stateBag":{"messages":[{"contents":[{"text":"Hello","$type":"text"}]},{"contents":[{"text":"Done.","$type":"text"}]}]}}""",
+            "Something else", out _));
+    }
 }

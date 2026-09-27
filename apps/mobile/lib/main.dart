@@ -380,7 +380,10 @@ class _ChatScreenState extends State<ChatScreen> {
   bool get _hasMessages => _entries.any((entry) => entry is MessageEntry);
 
   bool get _hasPendingApproval => _entries.any(
-    (entry) => entry is ApprovalEntry && entry.status == ApprovalStatus.pending,
+    (entry) =>
+        entry is ApprovalEntry &&
+        (entry.status == ApprovalStatus.pending ||
+            entry.status == ApprovalStatus.failed),
   );
 
   bool get _busy =>

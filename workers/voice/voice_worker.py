@@ -403,6 +403,10 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
                 return
             if current_turn is not None and not current_turn.done():
                 current_turn.cancel()
+                try:
+                    await current_turn
+                except asyncio.CancelledError:
+                    pass
             current_turn = asyncio.create_task(process_transcript(transcript))
             turn_tasks.add(current_turn)
             current_turn.add_done_callback(finish_turn)

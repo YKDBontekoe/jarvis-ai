@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Jarvis.Application.Conversations;
 
@@ -142,6 +143,17 @@ public static class AgentSessionJson
         }
     }
 
+    public static bool TryAbandonIncompleteTurn(string sessionJson, string incomingUserContent, out string truncated)
+    {
+        truncated = sessionJson;
+        if (string.IsNullOrEmpty(incomingUserContent) ||
+            !TryGetLastUserText(sessionJson, out var lastUser) ||
+            string.Equals(lastUser, incomingUserContent, StringComparison.Ordinal) ||
+            !HasInFlightProgressAfterUser(sessionJson, lastUser))
+            return false;
+        return TryDropIncompleteTurn(sessionJson, out truncated);
+    }
+
     public static bool TryGetPendingApprovals(string sessionJson,
         out IReadOnlyList<AgentToolApprovalRequest> approvals, out string preface)
     {
@@ -186,6 +198,99 @@ public static class AgentSessionJson
         {
             return false;
         }
+    }
+
+    private static bool TryGetLastUserText(string sessionJson, out string text)
+    {
+        text = string.Empty;
+        try
+        {
+            using var document = JsonDocument.Parse(sessionJson);
+            if (!TryFindMessages(document.RootElement, out var messages) || messages.GetArrayLength() == 0)
+                return false;
+
+            var found = false;
+            for (var index = 0; index < messages.GetArrayLength(); index++)
+            {
+                var message = messages[index];
+                if (IsRole(message, "assistant")) continue;
+                if (!TryGetPlainText(message, out var userText)) continue;
+                text = userText;
+                found = true;
+            }
+
+            return found;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryDropIncompleteTurn(string sessionJson, out string truncated)
+    {
+        truncated = sessionJson;
+        try
+        {
+            var node = JsonNode.Parse(sessionJson);
+            if (node is null || !TryFindMessagesNode(node, out var messages) || messages.Count == 0)
+                return false;
+
+            var removed = false;
+            while (messages.Count > 0 && !IsCompletedAssistantNode(messages[^1]))
+            {
+                messages.RemoveAt(messages.Count - 1);
+                removed = true;
+            }
+
+            if (!removed) return false;
+            truncated = PrepareForRead(node.ToJsonString());
+            return true;
+        }
+        catch (JsonException)
+        {
+            truncated = sessionJson;
+            return false;
+        }
+    }
+
+    private static bool TryFindMessagesNode(JsonNode node, out JsonArray messages)
+    {
+        messages = null!;
+        if (node is JsonObject obj)
+        {
+            if (obj.TryGetPropertyValue("stateBag", out var stateBag) && stateBag is not null &&
+                TryFindMessagesNode(stateBag, out messages))
+                return true;
+            if (obj.TryGetPropertyValue("messages", out var value) && value is JsonArray array)
+            {
+                messages = array;
+                return true;
+            }
+
+            foreach (var property in obj)
+            {
+                if (property.Key is "stateBag" or "messages" || property.Value is null) continue;
+                if (TryFindMessagesNode(property.Value, out messages)) return true;
+            }
+        }
+        else if (node is JsonArray items)
+        {
+            foreach (var item in items)
+            {
+                if (item is not null && TryFindMessagesNode(item, out messages)) return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsCompletedAssistantNode(JsonNode? node)
+    {
+        if (node is null) return false;
+        using var document = JsonDocument.Parse(node.ToJsonString());
+        var message = document.RootElement;
+        return !IsRole(message, "user") && TryGetPlainText(message, out _) && !HasToolContents(message);
     }
 
     private static bool TryReadApproval(JsonElement content, out AgentToolApprovalRequest request)
