@@ -25,7 +25,9 @@ public sealed class FileProcessingWorkflow
                 InitialInterval = TimeSpan.FromSeconds(3),
                 MaximumInterval = TimeSpan.FromMinutes(1),
                 BackoffCoefficient = 2,
-                MaximumAttempts = 5
+                MaximumAttempts = MaximumProcessingAttempts
             }
         });
+
+    public const int MaximumProcessingAttempts = 5;
 }

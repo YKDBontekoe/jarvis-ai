@@ -412,7 +412,8 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
         }
         catch
         {
-            await files.SetProcessingStatusAsync(input.FileId, input.OwnerId, "failed", CancellationToken.None);
+            if (ActivityExecutionContext.Current.Info.Attempt >= FileProcessingWorkflow.MaximumProcessingAttempts)
+                await files.SetProcessingStatusAsync(input.FileId, input.OwnerId, "failed", CancellationToken.None);
             throw;
         }
     }
