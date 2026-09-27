@@ -28,6 +28,14 @@ int asJsonInt(dynamic value, [int fallback = 0]) => switch (value) {
 bool asJsonBool(dynamic value, [bool fallback = false]) =>
     value is bool flag ? flag : fallback;
 
+/// Keeps a future TTL on pin/edit; expired or missing validity is sent as null.
+String? activeValidUntil(Map<String, dynamic> memory, [DateTime? now]) {
+  final raw = asJsonString(memory['validUntil']);
+  final parsed = DateTime.tryParse(raw ?? '');
+  if (parsed == null || !parsed.isAfter(now ?? DateTime.now())) return null;
+  return raw;
+}
+
 String? firstProblemMessage(dynamic data) {
   if (data is! Map) return null;
   final map = Map<String, dynamic>.from(data);

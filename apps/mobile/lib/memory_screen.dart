@@ -307,7 +307,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
           'content': content.text.trim(),
           'importance': memory['importance'] ?? 0.5,
           'confidence': memory['confidence'] ?? 0.8,
-          'validUntil': null,
+          'validUntil': activeValidUntil(memory),
           'isPinned': pinned,
         },
       );
@@ -329,7 +329,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
           'content': memory['content'],
           'importance': memory['importance'] ?? 0.5,
           'confidence': memory['confidence'] ?? 0.8,
-          'validUntil': null,
+          'validUntil': activeValidUntil(memory),
           'isPinned': pinned,
         },
       );

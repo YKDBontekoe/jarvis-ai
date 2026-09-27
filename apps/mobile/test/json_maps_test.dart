@@ -81,6 +81,8 @@ void main() {
       isTrue,
     );
   });
+
+  test('normalizeOidcIssuer trims trailing slashes and compares issuers', () {
     expect(normalizeOidcIssuer('https://idp.example.com/'), 'https://idp.example.com');
     expect(
       normalizeOidcIssuer('https://idp.example.com/realms/foo/'),
@@ -97,5 +99,19 @@ void main() {
       ),
       isFalse,
     );
+  });
+
+  test('activeValidUntil keeps a future TTL and clears expired ones', () {
+    final now = DateTime.utc(2026, 9, 27, 12);
+    expect(
+      activeValidUntil({'validUntil': '2026-12-01T00:00:00.000Z'}, now),
+      '2026-12-01T00:00:00.000Z',
+    );
+    expect(
+      activeValidUntil({'validUntil': '2026-01-01T00:00:00.000Z'}, now),
+      isNull,
+    );
+    expect(activeValidUntil({'validUntil': null}, now), isNull);
+    expect(activeValidUntil({}, now), isNull);
   });
 }
