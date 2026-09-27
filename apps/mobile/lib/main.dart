@@ -850,7 +850,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _addApprovals(Iterable<ApprovalEntry> approvals) {
-    _removePlaceholder();
+    final placeholder = _placeholderIndex;
+    if (placeholder >= 0) _entries.removeAt(placeholder);
     _settleToolRuns();
     for (final approval in approvals) {
       final existing = _entries.indexWhere(
