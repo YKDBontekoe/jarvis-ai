@@ -69,8 +69,8 @@ public sealed class NotificationRealtimeWorker(
 
         foreach (var notification in rows)
         {
-            await hub.Clients.Group(JarvisEventsHub.OwnerGroupName(notification.OwnerId))
-                .SendAsync("notification.created", new
+            await PublishSafelyAsync(hub.Clients.Group(JarvisEventsHub.OwnerGroupName(notification.OwnerId)),
+                "notification.created", new
                 {
                     type = notification.Type,
                     notificationId = notification.Id,
@@ -84,13 +84,30 @@ public sealed class NotificationRealtimeWorker(
                 var approval = await db.ToolApprovals.AsNoTracking()
                     .SingleOrDefaultAsync(x => x.Id == approvalId && x.OwnerId == notification.OwnerId,
                         cancellationToken);
-                if (approval is not null)
-                    await hub.Clients.Group(JarvisEventsHub.GroupName(approval.ConversationId))
-                        .SendAsync("tool.approval_required", ToApprovalEvent(approval), cancellationToken);
+                if (approval is { Status: "pending" })
+                    await PublishSafelyAsync(hub.Clients.Group(JarvisEventsHub.GroupName(approval.ConversationId)),
+                        "tool.approval_required", ToApprovalEvent(approval), cancellationToken);
             }
 
             _watermark = notification.CreatedAt;
             _cursorId = notification.Id;
+        }
+    }
+
+    private async Task PublishSafelyAsync(IClientProxy clients, string eventName, object payload,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await clients.SendAsync(eventName, payload, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Could not publish {EventName} for a notification fan-out.", eventName);
         }
     }
 

@@ -52,7 +52,30 @@ public sealed class JarvisTaskWorkflow
                 });
 
             if (!waitingForApproval) return;
-            if (Workflow.Patched("task-approval-poll-terminal"))
+            if (Workflow.Patched("task-approval-ignore-poll-errors"))
+            {
+                while (_approvalSummary is null)
+                {
+                    var signaled = await Workflow.WaitConditionAsync(
+                        () => _approvalSummary is not null, TimeSpan.FromMinutes(2));
+                    if (signaled) break;
+                    try
+                    {
+                        var status = await Workflow.ExecuteActivityAsync(
+                            (JarvisTaskActivityContract activities) => activities.GetTaskStatusAsync(input),
+                            new ActivityOptions
+                            {
+                                StartToCloseTimeout = TimeSpan.FromSeconds(20),
+                                RetryPolicy = new Temporalio.Common.RetryPolicy { MaximumAttempts = 3 }
+                            });
+                        if (status is null or "cancelled" or "failed" or "completed") return;
+                    }
+                    catch (Exception) when (!Workflow.CancellationToken.IsCancellationRequested)
+                    {
+                    }
+                }
+            }
+            else if (Workflow.Patched("task-approval-poll-terminal"))
             {
                 while (_approvalSummary is null)
                 {

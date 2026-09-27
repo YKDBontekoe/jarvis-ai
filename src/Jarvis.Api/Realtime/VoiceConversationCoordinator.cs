@@ -88,11 +88,19 @@ public sealed class VoiceConversationCoordinator(
                 catch (Exception exception)
                 {
                     logger.LogError(exception, "Voice agent run failed for conversation {ConversationId}.", conversationId);
-                    await clients.SendAsync("agent.failed", new
+                    try
                     {
-                        conversationId,
-                        message = "Jarvis could not complete this response."
-                    }, CancellationToken.None);
+                        await clients.SendAsync("agent.failed", new
+                        {
+                            conversationId,
+                            message = "Jarvis could not complete this response."
+                        }, CancellationToken.None);
+                    }
+                    catch (Exception publishException)
+                    {
+                        logger.LogWarning(publishException,
+                            "Could not publish agent.failed for conversation {ConversationId}.", conversationId);
+                    }
                     spokenResponse = "I could not complete that. Check the Jarvis app.";
                 }
             }

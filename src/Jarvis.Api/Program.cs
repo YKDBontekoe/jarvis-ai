@@ -230,8 +230,8 @@ api.MapPost("/conversations/{conversationId:guid}/messages", async (
     catch (Exception exception)
     {
         app.Logger.LogError(exception, "Agent run failed for conversation {ConversationId}", conversationId);
-        await hub.Clients.Group(JarvisEventsHub.GroupName(conversationId))
-            .SendAsync("agent.failed", new { conversationId, message = "Jarvis could not complete this response." }, CancellationToken.None);
+        await PublishAgentFailedAsync(hub, app.Logger, conversationId,
+            "Jarvis could not complete this response.");
         return Results.Problem("Jarvis could not complete this response.", statusCode: StatusCodes.Status502BadGateway);
     }
 
@@ -367,12 +367,7 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     catch (OperationCanceledException)
     {
         await approvals.MarkResumeFailedAsync(approvalId, ownerId, CancellationToken.None);
-        await hub.Clients.Group(JarvisEventsHub.GroupName(decided.ConversationId))
-            .SendAsync("agent.failed", new
-            {
-                conversationId = decided.ConversationId,
-                message = "This task was cancelled."
-            }, CancellationToken.None);
+        await PublishAgentFailedAsync(hub, logger, decided.ConversationId, "This task was cancelled.");
         if (ct.IsCancellationRequested) throw;
         return Results.Conflict(new { message = "This task was cancelled." });
     }
@@ -380,12 +375,8 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     {
         await approvals.MarkResumeFailedAsync(approvalId, ownerId, CancellationToken.None);
         logger.LogError(exception, "Tool approval {ApprovalId} was decided but its agent resume failed.", approvalId);
-        await hub.Clients.Group(JarvisEventsHub.GroupName(decided.ConversationId))
-            .SendAsync("agent.failed", new
-            {
-                conversationId = decided.ConversationId,
-                message = "Jarvis could not complete this response."
-            }, CancellationToken.None);
+        await PublishAgentFailedAsync(hub, logger, decided.ConversationId,
+            "Jarvis could not complete this response.");
         return Results.Problem("Jarvis could not resume this decided tool call. It can be retried from Tool approvals.",
             statusCode: StatusCodes.Status502BadGateway);
     }
@@ -962,6 +953,21 @@ static IntegrationCredentialStatus PublicCredentialStatus(IntegrationCredentialS
                 .ToArray()
         }
         : status;
+
+static async Task PublishAgentFailedAsync(IHubContext<JarvisEventsHub> hub, ILogger logger, Guid conversationId,
+    string message)
+{
+    try
+    {
+        await hub.Clients.Group(JarvisEventsHub.GroupName(conversationId))
+            .SendAsync("agent.failed", new { conversationId, message }, CancellationToken.None);
+    }
+    catch (Exception exception)
+    {
+        logger.LogWarning(exception, "Could not publish agent.failed for conversation {ConversationId}.",
+            conversationId);
+    }
+}
 
 static async Task HeartbeatApprovalResumeAsync(IServiceScopeFactory scopes, ILogger logger, Guid approvalId,
     Guid ownerId, CancellationToken cancellationToken)
