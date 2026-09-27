@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
+import 'features/memory/knowledge_graph_screen.dart';
 import 'json_maps.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -356,6 +357,15 @@ class _MemoryScreenState extends State<MemoryScreen> {
     appBar: AppBar(
       title: const Text('Memory'),
       actions: [
+        IconButton(
+          tooltip: 'Knowledge graph',
+          onPressed: () => Navigator.of(context).push<void>(
+            MaterialPageRoute(
+              builder: (_) => KnowledgeGraphScreen(http: widget.http),
+            ),
+          ),
+          icon: const Icon(PhosphorIconsRegular.graph),
+        ),
         HeaderAction(
           label: 'Add',
           icon: PhosphorIconsRegular.plus,

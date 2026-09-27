@@ -5,8 +5,11 @@ using Jarvis.Domain.Memory;
 
 namespace Jarvis.Memory;
 
-public sealed class MemoryService(IMemoryRepository repository) : IMemoryService
+public sealed class MemoryService(IMemoryRepository repository, IMemoryIndexRepository? index = null,
+    IMemoryEmbedder? embedder = null) : IMemoryService
 {
+    internal const double MinimumSemanticSimilarity = 0.3;
+
     public async Task<MemoryRecord> CreateAsync(Guid ownerId, string kind, string content, float importance,
         float confidence, DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken,
         string sourceType = "user", Guid? sourceId = null)
@@ -68,11 +71,15 @@ public sealed class MemoryService(IMemoryRepository repository) : IMemoryService
 
             var textResults = await repository.SearchTextAsync(ownerId, query, kind, cancellationToken);
             var trigramResults = await repository.SearchTrigramAsync(ownerId, query, kind, cancellationToken);
+            var semanticResults = await SearchSemanticAsync(ownerId, query, kind, cancellationToken);
+            activity?.SetTag("jarvis.memory.semantic_hits", semanticResults.Count);
             var scores = new Dictionary<Guid, double>();
             AddRanks(textResults, scores);
             AddRanks(trigramResults, scores);
+            AddRanks(semanticResults, scores);
 
-            var all = textResults.Concat(trigramResults).DistinctBy(x => x.Id).ToDictionary(x => x.Id);
+            var all = textResults.Concat(trigramResults).Concat(semanticResults).DistinctBy(x => x.Id)
+                .ToDictionary(x => x.Id);
             hits = scores.Select(pair => new MemorySearchHit(all[pair.Key], pair.Value + RecencyBoost(all[pair.Key])))
                 .OrderByDescending(x => x.Score).Take(8).ToList();
             activity?.SetTag("jarvis.memory.hit_count", hits.Count);
@@ -94,6 +101,27 @@ public sealed class MemoryService(IMemoryRepository repository) : IMemoryService
             var tags = new TagList { { "search.outcome", outcome } };
             MemoryDiagnostics.SearchDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, tags);
             MemoryDiagnostics.SearchResults.Add(hits.Count, tags);
+        }
+    }
+
+    private async Task<IReadOnlyList<MemoryRecord>> SearchSemanticAsync(Guid ownerId, string query, string? kind,
+        CancellationToken cancellationToken)
+    {
+        if (index is null || embedder is null) return [];
+        try
+        {
+            var embeddings = await embedder.EmbedAsync(ownerId, [query], cancellationToken);
+            return embeddings is [var embedding]
+                ? await index.SearchSemanticAsync(ownerId, embedding, kind, MinimumSemanticSimilarity, 20,
+                    cancellationToken)
+                : [];
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException ||
+                                          !cancellationToken.IsCancellationRequested)
+        {
+            // Keyword search still answers when the embedding provider is unavailable.
+            Activity.Current?.AddEvent(new ActivityEvent("jarvis.memory.semantic_unavailable"));
+            return [];
         }
     }
 

@@ -81,6 +81,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
     'Data',
     [
       (
+        title: 'Knowledge graph',
+        subtitle: 'People, places, and projects Jarvis connects over time',
+        icon: PhosphorIconsRegular.graph,
+        destination: 'graph',
+      ),
+      (
         title: 'Files',
         subtitle: 'Browse uploaded documents',
         icon: PhosphorIconsRegular.folderOpen,

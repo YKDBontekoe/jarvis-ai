@@ -37,6 +37,8 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<SkillEntity> Skills => Set<SkillEntity>();
     public DbSet<SkillRevisionEntity> SkillRevisions => Set<SkillRevisionEntity>();
     public DbSet<MessageFeedbackEntity> MessageFeedback => Set<MessageFeedbackEntity>();
+    public DbSet<GraphEntityEntity> GraphEntities => Set<GraphEntityEntity>();
+    public DbSet<GraphRelationEntity> GraphRelations => Set<GraphRelationEntity>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -107,6 +109,8 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.Property(x => x.Kind).HasColumnName("kind").HasMaxLength(40).IsRequired();
             entity.Property(x => x.Content).HasColumnName("content").IsRequired();
             entity.Property(x => x.Embedding).HasColumnName("embedding").HasColumnType("vector(1536)");
+            entity.Property(x => x.EmbeddingModel).HasColumnName("embedding_model").HasMaxLength(200);
+            entity.Property(x => x.GraphIndexedAt).HasColumnName("graph_indexed_at");
             entity.Property(x => x.Importance).HasColumnName("importance");
             entity.Property(x => x.Confidence).HasColumnName("confidence");
             entity.Property(x => x.SourceType).HasColumnName("source_type").HasMaxLength(60);
@@ -405,6 +409,45 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.HasOne<Message>().WithMany().HasForeignKey(x => x.MessageId).OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(x => new { x.OwnerId, x.MessageId }).IsUnique();
             entity.HasIndex(x => new { x.OwnerId, x.ProcessedAt });
+        });
+
+        modelBuilder.Entity<GraphEntityEntity>(entity =>
+        {
+            entity.ToTable("graph_entities");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Name).HasColumnName("name").HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Key).HasColumnName("key").HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Type).HasColumnName("type").HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Summary).HasColumnName("summary").HasMaxLength(500);
+            entity.Property(x => x.AliasesJson).HasColumnName("aliases").HasMaxLength(2_000).IsRequired();
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => new { x.OwnerId, x.Key }).IsUnique();
+            entity.HasIndex(x => new { x.OwnerId, x.UpdatedAt });
+        });
+
+        modelBuilder.Entity<GraphRelationEntity>(entity =>
+        {
+            entity.ToTable("graph_relations");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.SubjectId).HasColumnName("subject_id");
+            entity.Property(x => x.Predicate).HasColumnName("predicate").HasMaxLength(60).IsRequired();
+            entity.Property(x => x.ObjectId).HasColumnName("object_id");
+            entity.Property(x => x.ObjectValue).HasColumnName("object_value").HasMaxLength(300);
+            entity.Property(x => x.ValidFrom).HasColumnName("valid_from");
+            entity.Property(x => x.ValidTo).HasColumnName("valid_to");
+            entity.Property(x => x.Confidence).HasColumnName("confidence");
+            entity.Property(x => x.SourceMemoryId).HasColumnName("source_memory_id");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasOne<GraphEntityEntity>().WithMany().HasForeignKey(x => x.SubjectId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<GraphEntityEntity>().WithMany().HasForeignKey(x => x.ObjectId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<MemoryEntity>().WithMany().HasForeignKey(x => x.SourceMemoryId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.OwnerId, x.SubjectId, x.Predicate, x.ValidTo });
+            entity.HasIndex(x => new { x.OwnerId, x.ObjectId });
         });
 
         modelBuilder.Entity<Message>(entity =>

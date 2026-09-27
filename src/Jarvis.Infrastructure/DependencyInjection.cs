@@ -40,6 +40,8 @@ public static class DependencyInjection
             connectionString,
             serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PostgresConversationRunLock>>()));
         services.AddScoped<IMemoryRepository, MemoryRepository>();
+        services.AddScoped<IMemoryIndexRepository, MemoryIndexRepository>();
+        services.AddScoped<IKnowledgeGraphRepository, KnowledgeGraphRepository>();
         services.AddScoped<IToolApprovalStore, ToolApprovalStore>();
         services.AddScoped<IAuditEventStore, AuditEventStore>();
         services.AddScoped<IReminderRepository, WorkflowRepository>();

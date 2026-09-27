@@ -6,6 +6,7 @@
   <ItemGroup>
     <ProjectReference Include="../../../src/Jarvis.Application/Jarvis.Application.csproj" />
     <ProjectReference Include="../../../src/Jarvis.Agents/Jarvis.Agents.csproj" />
+    <ProjectReference Include="../../../src/Jarvis.Memory/Jarvis.Memory.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

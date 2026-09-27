@@ -29,6 +29,7 @@ import 'features/chat/chat_entries.dart';
 import 'features/chat/chat_widgets.dart';
 import 'features/home/home_overview.dart';
 import 'features/learning/learning_screen.dart';
+import 'features/memory/knowledge_graph_screen.dart';
 import 'features/persona/persona_screen.dart';
 import 'features/settings/model_settings_screen.dart';
 import 'features/settings/settings_view.dart';
@@ -672,6 +673,7 @@ class _ChatScreenState extends State<ChatScreen> {
       'skills' => SkillsScreen(http: _http),
       'persona' => PersonaScreen(http: _http),
       'learning' => LearningScreen(http: _http),
+      'graph' => KnowledgeGraphScreen(http: _http),
       _ => null,
     };
     if (destination == 'sign_out') {

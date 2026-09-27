@@ -4,7 +4,7 @@
 // same JSON-RPC subset as CodexCliChatClient, streams structured output in small deltas, and
 // plans multi-step Jarvis tool calls from the prompt text. It never contacts a network service.
 import readline from 'node:readline';
-import { reflect } from './fake_reflection.mjs';
+import { extractGraph, reflect } from './fake_reflection.mjs';
 
 const MODEL = 'jarvis-fixture';
 const STREAM_DELAY_MS = Number(process.env.FAKE_CODEX_DELAY_MS ?? 18);
@@ -74,6 +74,8 @@ function plan(prompt) {
   if (prompt.includes('Extract at most three useful long-term memories')) return text('[]');
   if (prompt.includes('Reorder saved-memory candidates')) return text('[]');
 
+  if (prompt.includes('You maintain a temporal knowledge graph'))
+    return text(JSON.stringify(extractGraph(parseConversation(prompt).request)));
   if (prompt.includes('You are Jarvis reflecting on recent work with your user'))
     return text(JSON.stringify(reflect(parseConversation(prompt).request)));
 

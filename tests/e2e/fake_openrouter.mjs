@@ -4,7 +4,7 @@
 // non-streaming /chat/completions with native tool calls, and hashed bag-of-words /embeddings.
 import http from 'node:http';
 import crypto from 'node:crypto';
-import { reflect } from './fake_reflection.mjs';
+import { extractGraph, reflect } from './fake_reflection.mjs';
 
 const PORT = Number(process.env.FAKE_OPENROUTER_PORT ?? 5199);
 const DIMENSIONS = 256;
@@ -44,8 +44,12 @@ function embeddings(response, body) {
   const inputs = Array.isArray(body.input) ? body.input : [body.input];
   json(response, 200, {
     object: 'list', model: body.model,
-    data: inputs.map((text, index) => ({ object: 'embedding', index, embedding: embed(String(text)) })),
-    usage: { prompt_tokens: inputs.join(' ').length / 4, total_tokens: inputs.join(' ').length / 4 },
+    data: inputs.map((text, index) => {
+      const vector = embed(String(text));
+      return { object: 'embedding', index, embedding: body.encoding_format === 'base64'
+        ? Buffer.from(new Float32Array(vector).buffer).toString('base64') : vector };
+    }),
+    usage: { prompt_tokens: Math.ceil(inputs.join(' ').length / 4), total_tokens: Math.ceil(inputs.join(' ').length / 4) },
   });
 }
 
@@ -113,6 +117,7 @@ function plan(body) {
   if (/Reply with the single word OK/.test(request)) return { text: 'OK' };
   if (/Extract at most three useful long-term memories/.test(system + all)) return { text: '[]' };
   if (/Reorder saved-memory candidates/.test(system + all)) return { text: '[]' };
+  if (/You maintain a temporal knowledge graph/.test(system)) return { text: JSON.stringify(extractGraph(request)) };
   if (/You are Jarvis reflecting on recent work with your user/.test(system))
     return { text: JSON.stringify(reflect(request)) };
 

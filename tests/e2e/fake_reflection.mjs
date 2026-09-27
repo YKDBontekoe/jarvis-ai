@@ -25,3 +25,30 @@ export function reflect(requestJson) {
   if (city) memories.push({ kind: 'fact', content: `The user lives in ${city}.`, importance: 0.7, confidence: 0.9 });
   return { persona, skills, memories, insights: [] };
 }
+
+// Heuristic stand-in for knowledge-graph extraction over stored memories.
+export function extractGraph(requestJson) {
+  let input;
+  try { input = JSON.parse(requestJson); } catch { return { facts: [] }; }
+  const facts = [];
+  for (const memory of input.memories ?? []) {
+    const content = String(memory.content ?? '');
+    const add = (subject, subjectType, predicate, object, objectType, objectIsEntity, exclusive) =>
+      facts.push({ memory: memory.index, subject, subjectType, predicate, object, objectType, objectIsEntity, exclusive,
+        validFrom: null });
+    let match;
+    if ((match = content.match(/\b(?:lives|live|moved) (?:in|to) ([A-Z][\w-]+)/)))
+      add('user', 'person', 'lives_in', match[1], 'place', true, true);
+    if ((match = content.match(/\bname is ([A-Z][a-z]+)/)))
+      add('user', 'person', 'name', match[1], null, false, true);
+    if ((match = content.match(/\bworks? (?:at|for) ([A-Z][\w&-]+(?: [A-Z][\w&-]+)?)/)))
+      add('user', 'person', 'works_at', match[1], 'organization', true, true);
+    if ((match = content.match(/\b(sister|brother|partner|wife|husband|friend|daughter|son)(?: is| named|,)? ([A-Z][a-z]+)/i)))
+      add('user', 'person', `has_${match[1].toLowerCase()}`, match[2], 'person', true, false);
+    if ((match = content.match(/\b([A-Z][a-z]+)'s birthday is ([^.]+)/)))
+      add(match[1], 'person', 'birthday', match[2].trim(), null, false, true);
+    if ((match = content.match(/\b(?:likes?|loves?|enjoys?) ([a-z][\w -]{2,40}?)(?:\.|,|$)/i)))
+      add('user', 'person', 'likes', match[1].trim(), 'topic', true, false);
+  }
+  return { facts };
+}

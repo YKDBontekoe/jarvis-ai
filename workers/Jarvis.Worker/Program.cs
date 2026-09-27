@@ -36,6 +36,7 @@ builder.Services.AddSingleton<IConditionWatchScheduler>(services => services.Get
 builder.Services.AddSingleton<IDailyBriefingScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
 builder.Services.AddSingleton<Jarvis.Application.Learning.IHeartbeatScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
 builder.Services.AddHostedService<TemporalWorkflowReconciler>();
+builder.Services.AddHostedService<MemoryIndexingWorker>();
 builder.Services.AddScoped<IReminderService, ReminderService>();
 builder.Services.AddScoped<IConditionWatchService, ConditionWatchService>();
 builder.Services.AddSingleton<PublicJsonMetricReader>();
