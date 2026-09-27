@@ -538,7 +538,12 @@ class _ChatScreenState extends State<ChatScreen> {
       _connected = false;
       _sending = false;
       _selectedDestination = 0;
-      _showHome = showHome;
+      _showHome = showHome &&
+          !approvals.any(
+            (entry) =>
+                entry.status == ApprovalStatus.pending ||
+                entry.status == ApprovalStatus.failed,
+          );
       _entries
         ..clear()
         ..addAll(
@@ -602,6 +607,8 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         );
+    if (!mounted || _signedOut || _signingOut) return;
+    unawaited(_loadRecent());
     if (selection?.deletedCurrent == true) {
       if (!mounted || _signedOut || _signingOut) return;
       await _clearCurrentConversation();
@@ -1863,6 +1870,11 @@ class _ChatScreenState extends State<ChatScreen> {
     homeSelected: _showHome && _selectedDestination == 0,
     connected: _connected,
     onHome: () => _fromSidebar(() {
+      if (_hasPendingApproval) {
+        if (_selectedDestination != 0) _selectDestination(0);
+        setState(() => _showHome = false);
+        return;
+      }
       if (_selectedDestination != 0) _selectDestination(0);
       setState(() => _showHome = true);
     }),
@@ -2163,7 +2175,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         Expanded(
-          child: _showHome || _entries.isEmpty
+          child: (_showHome && !_hasPendingApproval) || _entries.isEmpty
               ? _welcome()
               : ListView.builder(
                   controller: _scroll,
@@ -2195,7 +2207,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     ? null
                     : () => _selectDestination(2),
                 onAttach: _showQuickActions,
-                sending: _busy || _hasPendingApproval,
+                sending: _busy,
+                awaitingApproval: _hasPendingApproval,
                 voiceActive: _voiceActive,
                 voiceStarting: _voiceStarting,
               ),

@@ -619,6 +619,7 @@ class ChatComposer extends StatefulWidget {
     required this.voiceStarting,
     this.onCancel,
     this.onAttach,
+    this.awaitingApproval = false,
     this.hint = 'Ask Jarvis anything',
     super.key,
   });
@@ -628,6 +629,7 @@ class ChatComposer extends StatefulWidget {
   final VoidCallback? onCancel;
   final VoidCallback? onVoice;
   final bool sending;
+  final bool awaitingApproval;
   final bool voiceActive;
   final bool voiceStarting;
 
@@ -675,6 +677,7 @@ class _ChatComposerState extends State<ChatComposer> {
   bool get _canSend =>
       _inputEnabled &&
       !widget.sending &&
+      !widget.awaitingApproval &&
       widget.controller.text.trim().isNotEmpty;
 
   @override
@@ -692,6 +695,7 @@ class _ChatComposerState extends State<ChatComposer> {
         widget.onVoice != null &&
         !hasText &&
         !widget.sending &&
+        !widget.awaitingApproval &&
         !widget.voiceActive;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),

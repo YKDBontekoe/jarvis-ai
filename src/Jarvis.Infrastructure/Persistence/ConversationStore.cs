@@ -37,6 +37,9 @@ public sealed class ConversationStore(JarvisDbContext db) : IConversationStore
         await db.Memories.Where(x => x.SourceType == "conversation" && x.SourceId != null &&
                 messageIds.Contains(x.SourceId.Value))
             .ExecuteDeleteAsync(cancellationToken);
+        var approvalIds = db.ToolApprovals.Where(x => x.ConversationId == conversationId).Select(x => x.Id);
+        await db.Notifications.Where(x => x.SourceId != null && approvalIds.Contains(x.SourceId.Value))
+            .ExecuteDeleteAsync(cancellationToken);
         db.Conversations.Remove(conversation);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

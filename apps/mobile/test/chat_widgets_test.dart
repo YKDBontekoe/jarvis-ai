@@ -284,6 +284,27 @@ void main() {
     expect(cancelled, 1);
   });
 
+  testWidgets('composer awaiting approval disables send without a spinner', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        ChatComposer(
+          controller: TextEditingController(text: 'Approve first'),
+          onSend: () {},
+          onVoice: null,
+          sending: false,
+          awaitingApproval: true,
+          voiceActive: false,
+          voiceStarting: false,
+        ),
+      ),
+    );
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(tester.widget<IconButton>(find.byTooltip('Send')).onPressed, isNull);
+  });
+
   testWidgets('suggestion chips send their prompt', (tester) async {
     String? selected;
     await tester.pumpWidget(

@@ -1,6 +1,9 @@
 using Jarvis.Infrastructure.Persistence;
 using Jarvis.Application.Files;
+using Jarvis.Application.Conversations;
+using Jarvis.Domain.Approvals;
 using Jarvis.Domain.Files;
+using Jarvis.Domain.Workflows;
 using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
@@ -105,6 +108,32 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
         var hit = Assert.Single(hits);
         Assert.Equal(expectedId, hit.FileId);
         Assert.Equal("invoice.txt", hit.FileName);
+    }
+
+    [Fact]
+    public async Task Deleting_a_conversation_removes_its_approval_notifications()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var store = new ConversationStore(database);
+        var conversation = await store.CreateAsync(owner, "Needs approval", CancellationToken.None);
+        var approval = new ToolApproval(owner, conversation.Id, "req-1", "call-1", "ForgetMemory", "{}");
+        var approvalNotification = new Notification(Guid.CreateVersion7(), owner, "approval.required",
+            "Approval needed", "ForgetMemory", approval.Id);
+        var reminderNotification = new Notification(Guid.CreateVersion7(), owner, "reminder.fired",
+            "Reminder", "Standup", Guid.CreateVersion7());
+        database.ToolApprovals.Add(approval);
+        database.Notifications.Add(approvalNotification);
+        database.Notifications.Add(reminderNotification);
+        await database.SaveChangesAsync();
+
+        Assert.Equal(ConversationDeleteResult.Deleted,
+            await store.DeleteAsync(conversation.Id, owner, CancellationToken.None));
+        database.ChangeTracker.Clear();
+
+        Assert.Empty(await database.Notifications.Where(x => x.Id == approvalNotification.Id).ToListAsync());
+        Assert.Single(await database.Notifications.Where(x => x.Id == reminderNotification.Id).ToListAsync());
+        Assert.Empty(await database.ToolApprovals.Where(x => x.Id == approval.Id).ToListAsync());
     }
 
     private JarvisDbContext CreateDbContext()
