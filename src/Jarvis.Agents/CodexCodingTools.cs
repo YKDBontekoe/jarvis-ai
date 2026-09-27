@@ -324,13 +324,15 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
             throw new InvalidOperationException($"Could not establish the isolated coding baseline: {Limit(committed.StandardError, 1_500)}");
     }
 
-    private static bool IsSensitivePath(string relativePath)
+    internal static bool IsSensitivePath(string relativePath)
     {
         var normalized = relativePath.Replace('\\', '/');
         var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (segments.Any(segment => segment.Equals(".ssh", StringComparison.OrdinalIgnoreCase) ||
                                     segment.Equals(".aws", StringComparison.OrdinalIgnoreCase) ||
                                     segment.Equals(".azure", StringComparison.OrdinalIgnoreCase) ||
+                                    segment.Equals(".kube", StringComparison.OrdinalIgnoreCase) ||
+                                    segment.Equals(".docker", StringComparison.OrdinalIgnoreCase) ||
                                     segment.Equals(".codex", StringComparison.OrdinalIgnoreCase) ||
                                     segment.Equals("secrets", StringComparison.OrdinalIgnoreCase)))
             return true;
@@ -355,7 +357,15 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
         return name.Equals("id_rsa", StringComparison.OrdinalIgnoreCase) ||
                name.Equals("id_ed25519", StringComparison.OrdinalIgnoreCase) ||
                name.Equals("auth.json", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("credentials.json", StringComparison.OrdinalIgnoreCase);
+               name.Equals("credentials.json", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".npmrc", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".yarnrc", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".yarnrc.yml", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".pypirc", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".netrc", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("_netrc", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".git-credentials", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".pgpass", StringComparison.OrdinalIgnoreCase);
     }
 
     private static StringComparison PathComparison => OperatingSystem.IsWindows()

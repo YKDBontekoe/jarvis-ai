@@ -75,7 +75,8 @@ internal sealed class ConversationMemoryExtractor(
             var kind = candidate.Kind?.Trim().ToLowerInvariant();
             var content = candidate.Content?.Trim();
             if (kind is null || !SupportedKinds.Contains(kind) || string.IsNullOrWhiteSpace(content) ||
-                content.Length > 500 || candidate.Confidence is < 0.82f or > 1f || candidate.Importance is < 0f or > 1f)
+                content.Length > 500 || candidate.Confidence is < 0.82f or > 1f || candidate.Importance is < 0f or > 1f ||
+                MemoryAgentTools.LooksLikeSecret(content))
                 continue;
 
             var normalized = Normalize(kind, content);
