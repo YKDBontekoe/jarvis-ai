@@ -97,6 +97,9 @@ internal static class ApiServiceRegistration
         services.AddScoped<IJarvisTaskService, JarvisTaskService>();
         services.AddSingleton<ITaskRunAbort, TaskRunAbort>();
         services.AddJarvisAgent(configuration);
+        services.AddSingleton<Jarvis.Application.Realtime.IRealtimePublisher, Devices.SignalRRealtimePublisher>();
+        services.AddSingleton<Jarvis.Application.Devices.IDeviceInvoker, Devices.SignalRDeviceInvoker>();
+        services.AddHttpClient("a2a", client => client.Timeout = TimeSpan.FromSeconds(30));
         services.AddScoped<McpToolHost>();
         services.AddScoped<AgentRunCoordinator>();
         services.AddScoped<ConversationTurnService>();

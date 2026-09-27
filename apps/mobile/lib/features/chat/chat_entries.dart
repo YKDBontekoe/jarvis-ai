@@ -176,3 +176,71 @@ class ApprovalEntry extends ChatEntry {
     retry: retry,
   );
 }
+
+/// A native card Jarvis rendered with RenderUi.
+class UiSurfaceEntry extends ChatEntry {
+  const UiSurfaceEntry({
+    required this.id,
+    required this.title,
+    required this.status,
+    required this.schema,
+  });
+
+  final String id;
+  final String title;
+  final String status;
+  final Map<String, dynamic> schema;
+
+  static UiSurfaceEntry? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final id = value['id']?.toString();
+    if (id == null || id.isEmpty) return null;
+    final schema = value['schema'];
+    return UiSurfaceEntry(
+      id: id,
+      title: value['title'] is String ? value['title'] as String : '',
+      status: value['status'] is String ? value['status'] as String : 'open',
+      schema: schema is Map
+          ? Map<String, dynamic>.from(schema)
+          : const <String, dynamic>{},
+    );
+  }
+
+  UiSurfaceEntry copyWith({String? status}) => UiSurfaceEntry(
+    id: id,
+    title: title,
+    status: status ?? this.status,
+    schema: schema,
+  );
+}
+
+class BrowserStepItem {
+  const BrowserStepItem({
+    required this.tool,
+    required this.summary,
+    required this.success,
+  });
+
+  final String tool;
+  final String summary;
+  final bool success;
+}
+
+/// Isolated browser/computer-use timeline for one goal.
+class BrowserSessionEntry extends ChatEntry {
+  const BrowserSessionEntry({
+    required this.id,
+    required this.goal,
+    required this.steps,
+  });
+
+  final String id;
+  final String goal;
+  final List<BrowserStepItem> steps;
+
+  BrowserSessionEntry withStep(BrowserStepItem step) => BrowserSessionEntry(
+    id: id,
+    goal: goal,
+    steps: [...steps, step],
+  );
+}

@@ -49,5 +49,11 @@ api.MapPersonaEndpoints();
 api.MapLearningEndpoints(app.Logger);
 api.MapKnowledgeGraphEndpoints();
 api.MapChannelEndpoints(app.Logger);
+api.MapSurfaceEndpoints();
+api.MapA2AManagementEndpoints();
+api.MapDeviceEndpoints();
+api.MapBrowserEndpoints();
+
+app.MapA2AProtocol();
 
 app.Run();

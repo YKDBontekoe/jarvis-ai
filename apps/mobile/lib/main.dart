@@ -10,6 +10,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'memory_screen.dart';
 import 'approvals_screen.dart';
@@ -27,6 +28,7 @@ import 'daily_briefing_screen.dart';
 import 'integrations_screen.dart';
 import 'features/chat/chat_entries.dart';
 import 'features/chat/chat_widgets.dart';
+import 'features/chat/generative_ui.dart';
 import 'features/home/home_overview.dart';
 import 'features/learning/learning_screen.dart';
 import 'features/memory/knowledge_graph_screen.dart';
@@ -34,7 +36,10 @@ import 'features/persona/persona_screen.dart';
 import 'features/settings/model_settings_screen.dart';
 import 'features/settings/settings_view.dart';
 import 'features/shell/sidebar.dart';
+import 'features/agents/agents_screen.dart';
 import 'features/channels/channels_screen.dart';
+import 'features/devices/devices_screen.dart';
+import 'features/settings/voice_settings_screen.dart';
 import 'features/skills/skills_screen.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -304,6 +309,10 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _obscurePassword = true;
   bool _voiceActive = false;
   bool _voiceStarting = false;
+  bool _voiceHandsFree = true;
+  bool _voiceCaptions = true;
+  String? _voiceCaption;
+  String? _voiceCaptionRole;
   int _voiceGeneration = 0;
   CancelToken? _runCancel;
   int _selectedDestination = 0;
@@ -554,6 +563,11 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     try {
       await _connectRealtime(generation);
+      if (isCurrent() &&
+          isLatestOpen() &&
+          _conversationId == conversationId) {
+        unawaited(_loadConversationSurfaces(conversationId));
+      }
       if (approvals == null &&
           isCurrent() &&
           isLatestOpen() &&
@@ -676,6 +690,9 @@ class _ChatScreenState extends State<ChatScreen> {
       'learning' => LearningScreen(http: _http),
       'graph' => KnowledgeGraphScreen(http: _http),
       'channels' => ChannelsScreen(http: _http),
+      'agents' => AgentsScreen(http: _http),
+      'devices' => DevicesScreen(http: _http),
+      'voice-settings' => VoiceSettingsScreen(http: _http),
       _ => null,
     };
     if (destination == 'sign_out') {
@@ -1025,6 +1042,82 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       unawaited(_stopVoice());
     });
+    hub.on('ui.surface', (arguments) {
+      final surface = UiSurfaceEntry.fromJson(_payload(arguments));
+      if (surface == null ||
+          !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        return;
+      }
+      setState(() {
+        _showHome = false;
+        _upsertSurface(surface);
+      });
+      _scrollToBottom();
+    });
+    hub.on('browser.session', (arguments) {
+      final event = _payload(arguments);
+      final id = asJsonString(event?['id']);
+      final goal = asJsonString(event?['goal']);
+      if (id == null ||
+          goal == null ||
+          !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        return;
+      }
+      setState(() {
+        _showHome = false;
+        _upsertBrowserSession(
+          BrowserSessionEntry(id: id, goal: goal, steps: const []),
+        );
+      });
+      _scrollToBottom();
+    });
+    hub.on('browser.step', (arguments) {
+      final event = _payload(arguments);
+      final sessionId = asJsonString(event?['sessionId']);
+      final summary = asJsonString(event?['summary']);
+      if (sessionId == null ||
+          summary == null ||
+          !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        return;
+      }
+      setState(() {
+        _appendBrowserStep(
+          sessionId,
+          BrowserStepItem(
+            tool: asJsonString(event?['tool']) ?? 'browser',
+            summary: summary,
+            success: event?['success'] != false,
+          ),
+        );
+      });
+      _scrollToBottom();
+    });
+    hub.on('device.invoke', (arguments) {
+      final event = _payload(arguments);
+      final invokeId = asJsonString(event?['invokeId']);
+      final capability = asJsonString(event?['capability']);
+      if (invokeId == null ||
+          capability == null ||
+          !mounted ||
+          _signedOut ||
+          !identical(_hub, hub)) {
+        return;
+      }
+      unawaited(_handleDeviceInvoke(invokeId, capability, event));
+    });
+    hub.on('voice.caption', (arguments) {
+      final event = _payload(arguments);
+      final text = asJsonString(event?['text']) ?? '';
+      if (!_voiceCaptions ||
+          text.isEmpty ||
+          !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        return;
+      }
+      setState(() {
+        _voiceCaption = text;
+        _voiceCaptionRole = asJsonString(event?['role']) ?? 'user';
+      });
+    });
     hub.onreconnecting(({error}) {
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
       unawaited(_stopVoice());
@@ -1067,6 +1160,14 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
       await hub.invoke('JoinConversation', args: [conversationId]);
+      try {
+        await hub.invoke(
+          'RegisterDevice',
+          args: ['Jarvis app', ['battery', 'open_url', 'notify', 'clipboard', 'location']],
+        );
+      } catch (_) {
+        // Older servers without device nodes still stream chat.
+      }
       if (_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         setState(() => _connected = true);
       }
@@ -1084,6 +1185,17 @@ class _ChatScreenState extends State<ChatScreen> {
     final generation = _realtimeGeneration;
     try {
       await hub.invoke('JoinConversation', args: [conversationId]);
+      try {
+        await hub.invoke(
+          'RegisterDevice',
+          args: [
+            'Jarvis app',
+            ['battery', 'open_url', 'notify', 'clipboard', 'location'],
+          ],
+        );
+      } catch (_) {
+        // Older servers without device nodes still stream chat.
+      }
       if (mounted &&
           _hub == hub &&
           _conversationId == conversationId &&
@@ -1147,6 +1259,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (approvals == null) {
         unawaited(_syncConversationApprovals());
       }
+      unawaited(_loadConversationSurfaces(conversationId));
     } on DioException {
       // Keep the current transcript if history cannot be refreshed.
     }
@@ -1522,6 +1635,175 @@ class _ChatScreenState extends State<ChatScreen> {
     _completeAssistant(content, id: data is Map ? asJsonString(data['id']) : null);
   }
 
+  void _upsertSurface(UiSurfaceEntry surface) {
+    final existing = _entries.indexWhere(
+      (entry) => entry is UiSurfaceEntry && entry.id == surface.id,
+    );
+    if (existing >= 0) {
+      _entries[existing] = surface;
+    } else {
+      _entries.add(surface);
+    }
+  }
+
+  void _upsertBrowserSession(BrowserSessionEntry session) {
+    final existing = _entries.indexWhere(
+      (entry) => entry is BrowserSessionEntry && entry.id == session.id,
+    );
+    if (existing >= 0) {
+      final current = _entries[existing] as BrowserSessionEntry;
+      _entries[existing] = BrowserSessionEntry(
+        id: session.id,
+        goal: session.goal,
+        steps: current.steps,
+      );
+    } else {
+      _entries.add(session);
+    }
+  }
+
+  void _appendBrowserStep(String sessionId, BrowserStepItem step) {
+    final existing = _entries.indexWhere(
+      (entry) => entry is BrowserSessionEntry && entry.id == sessionId,
+    );
+    if (existing >= 0) {
+      _entries[existing] = (_entries[existing] as BrowserSessionEntry).withStep(
+        step,
+      );
+    } else {
+      _entries.add(
+        BrowserSessionEntry(id: sessionId, goal: 'Browser task', steps: [step]),
+      );
+    }
+  }
+
+  Future<void> _submitSurface(
+    UiSurfaceEntry surface,
+    String action,
+    Map<String, String> values,
+  ) async {
+    try {
+      final response = await _http.post<dynamic>(
+        '/api/v1/ui-surfaces/${surface.id}/actions',
+        data: {'actionId': action, 'values': values},
+      );
+      if (!mounted) return;
+      setState(() {
+        _upsertSurface(surface.copyWith(status: 'completed'));
+        _applyRunResult(response);
+      });
+      _scrollToBottom();
+    } on DioException catch (error) {
+      if (mounted) setState(() => _error = _describeError(error));
+    }
+  }
+
+  Future<void> _handleDeviceInvoke(
+    String invokeId,
+    String capability,
+    Map<Object?, Object?>? event,
+  ) async {
+    String? result;
+    String? error;
+    try {
+      switch (capability) {
+        case 'clipboard':
+          final data = await Clipboard.getData('text/plain');
+          result = (data?.text ?? '').trim().isEmpty
+              ? 'The clipboard is empty.'
+              : data!.text!.trim();
+        case 'open_url':
+          final args = event?['arguments'];
+          final url = args is Map ? asJsonString(args['url']) : null;
+          if (url == null) {
+            error = 'No URL was provided.';
+          } else {
+            final parsed = Uri.tryParse(url);
+            if (parsed == null ||
+                !(parsed.isScheme('http') || parsed.isScheme('https'))) {
+              error = 'That URL cannot be opened.';
+            } else {
+              await launchUrl(parsed, mode: LaunchMode.externalApplication);
+              result = 'Opened $url';
+            }
+          }
+        case 'notify':
+          final args = event?['arguments'];
+          final title = args is Map
+              ? asJsonString(args['title']) ?? 'Jarvis'
+              : 'Jarvis';
+          final body = args is Map ? asJsonString(args['body']) ?? '' : '';
+          if (mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('$title\n$body')));
+          }
+          result = 'Shown on this device.';
+        case 'battery':
+          result = 'Battery level is not available in this client yet.';
+        case 'location':
+          result =
+              'Location is turned off or not available on this device build.';
+        default:
+          error = 'This device does not handle $capability.';
+      }
+    } catch (caught) {
+      error = 'The device could not complete $capability.';
+    }
+    try {
+      await _http.post<void>(
+        '/api/v1/devices/invoke/$invokeId/result',
+        data: {'result': result, 'error': error},
+      );
+    } on DioException {
+      try {
+        await _hub?.invoke(
+          'CompleteDeviceInvoke',
+          args: [invokeId, result, error],
+        );
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _loadConversationSurfaces(String conversationId) async {
+    try {
+      final response = await _http.get<List<dynamic>>(
+        '/api/v1/conversations/$conversationId/surfaces',
+      );
+      final sessions = await _http.get<List<dynamic>>(
+        '/api/v1/conversations/$conversationId/browser-sessions',
+      );
+      if (!mounted || _conversationId != conversationId) return;
+      setState(() {
+        for (final surface in jsonMaps(response.data)) {
+          final entry = UiSurfaceEntry.fromJson(surface);
+          if (entry != null) _upsertSurface(entry);
+        }
+        for (final session in jsonMaps(sessions.data)) {
+          final id = asJsonString(session['id']);
+          final goal = asJsonString(session['goal']);
+          if (id == null || goal == null) continue;
+          _upsertBrowserSession(
+            BrowserSessionEntry(
+              id: id,
+              goal: goal,
+              steps: [
+                for (final step in jsonMaps(session['steps']))
+                  BrowserStepItem(
+                    tool: asJsonString(step['tool']) ?? 'browser',
+                    summary: asJsonString(step['summary']) ?? '',
+                    success: step['success'] != false,
+                  ),
+              ],
+            ),
+          );
+        }
+      });
+    } on DioException {
+      // Chat still works if surfaces cannot be refreshed.
+    }
+  }
+
   Future<void> _rate(MessageEntry message, String rating) async {
     final conversationId = _conversationId;
     final messageId = message.id;
@@ -1745,6 +2027,12 @@ class _ChatScreenState extends State<ChatScreen> {
       final token = asJsonString(session['token']);
       if (serverUrl == null || token == null) {
         throw StateError('Jarvis returned incomplete LiveKit credentials.');
+      }
+      _voiceHandsFree = session['handsFree'] != false;
+      _voiceCaptions = session['captions'] != false;
+      if (!_voiceCaptions) {
+        _voiceCaption = null;
+        _voiceCaptionRole = null;
       }
 
       await AudioManager.instance.setSpeakerOutputPreferred(true);
@@ -2437,6 +2725,13 @@ class _ChatScreenState extends State<ChatScreen> {
       approval: entry,
       onDecide: (approved) => unawaited(_decide(entry, approved)),
     ),
+    UiSurfaceEntry() => UiSurfaceCard(
+      surface: entry,
+      onAction: entry.status == 'open'
+          ? (action, values) => unawaited(_submitSurface(entry, action, values))
+          : null,
+    ),
+    BrowserSessionEntry() => BrowserTimelineView(session: entry),
   };
 
   Widget _voiceBody() {
@@ -2481,13 +2776,29 @@ class _ChatScreenState extends State<ChatScreen> {
                     const SizedBox(height: 10),
                     Text(
                       _voiceActive
-                          ? 'Speak naturally. You can interrupt at any time.'
+                          ? (_voiceHandsFree
+                              ? 'Speak naturally. Stay on this screen and interrupt at any time.'
+                              : 'Speak naturally. You can interrupt at any time.')
                           : 'Voice continues this conversation and its memory.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyLarge?.copyWith(
                         color: JarvisColors.inkSoft,
                       ),
                     ),
+                    if (_voiceCaptions && _voiceCaption != null) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        _voiceCaptionRole == 'assistant' ? 'Jarvis' : 'You',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: JarvisColors.muted,
+                        ),
+                      ),
+                      Text(
+                        _voiceCaption!,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                    ],
                     if (_error != null)
                       InlineNotice(
                         message: _error!,
@@ -2533,6 +2844,10 @@ class _ChatScreenState extends State<ChatScreen> {
                         _VoiceHint(
                           icon: PhosphorIconsRegular.waveform,
                           label: 'Interrupt anytime',
+                        ),
+                        _VoiceHint(
+                          icon: PhosphorIconsRegular.ear,
+                          label: 'Hands-free',
                         ),
                         _VoiceHint(
                           icon: PhosphorIconsRegular.brain,

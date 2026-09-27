@@ -43,6 +43,7 @@ builder.Services.AddSingleton<PublicJsonMetricReader>();
 builder.Services.AddJarvisMemory();
 builder.Services.AddScoped<McpToolHost>();
 builder.Services.AddJarvisAgent(builder.Configuration);
+builder.Services.AddHttpClient("a2a", client => client.Timeout = TimeSpan.FromSeconds(30));
 var host = builder.Build();
 
 var temporalAddress = builder.Configuration["Temporal:Address"] ?? "localhost:7233";

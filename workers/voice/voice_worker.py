@@ -373,6 +373,18 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
         for task in list(playback_tasks):
             task.cancel()
 
+    async def publish_caption(role: str, text: str, final: bool) -> None:
+        if not text.strip():
+            return
+        try:
+            await http.post(
+                f"{api_url}/api/v1/voice/internal/{conversation_id}/caption",
+                headers={"X-Jarvis-Voice-Secret": worker_secret},
+                json={"ownerId": owner_id, "role": role, "text": text.strip()[:2000], "final": final},
+            )
+        except Exception:
+            logger.debug("Could not publish a voice caption.", exc_info=True)
+
     async def speak_text(text: str) -> None:
         if not text.strip() or not playback.try_start_speak():
             return
@@ -426,6 +438,7 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
                                 continue
                             streamed_text += delta
                             speech_buffer += delta
+                            await publish_caption("assistant", streamed_text, False)
                             if len(speech_buffer) >= 160 or (
                                 len(speech_buffer) >= 48 and speech_buffer.rstrip().endswith((".", "!", "?", "\n"))
                             ):
@@ -464,10 +477,14 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
         params = message.get("params", {})
         if method == "thread/realtime/transcript/delta" and params.get("role") == "user":
             duck_output(suppress_inflight=True)
+            partial = params.get("text", "").strip()
+            if partial:
+                await publish_caption("user", partial, False)
         elif method == "thread/realtime/transcript/done" and params.get("role") == "user":
             transcript = params.get("text", "").strip()
             if not transcript:
                 return
+            await publish_caption("user", transcript, True)
             duck_output(suppress_inflight=True)
             if current_turn is not None and not current_turn.done():
                 current_turn.cancel()

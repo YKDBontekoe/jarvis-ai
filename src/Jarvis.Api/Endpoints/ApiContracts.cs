@@ -5,8 +5,9 @@ namespace Jarvis.Api.Endpoints;
 public sealed record CreateConversationRequest(string? Title);
 public sealed record VoiceSessionRequest(Guid ConversationId);
 public sealed record VoiceSessionDto(string ServerUrl, string Room, string Identity, string Token,
-    DateTimeOffset ExpiresAt);
+    DateTimeOffset ExpiresAt, bool HandsFree, bool Captions);
 public sealed record VoiceWorkerTranscriptRequest(Guid OwnerId, string? Transcript);
+public sealed record VoiceCaptionRequest(Guid OwnerId, string? Role, string? Text, bool Final);
 public sealed record SendMessageRequest([Required, StringLength(32_000, MinimumLength = 1)] string? Content);
 public sealed record ConversationDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 public sealed record ConversationDetailsDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,

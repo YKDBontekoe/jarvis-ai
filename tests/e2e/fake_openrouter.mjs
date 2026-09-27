@@ -10,7 +10,8 @@ const PORT = Number(process.env.FAKE_OPENROUTER_PORT ?? 5199);
 const DIMENSIONS = 256;
 const CONTEXT_PREFIXES = [
   'Current time reference:', 'Stored personal memory references', 'Active durable tasks',
-  'Active condition watches', 'An unrelated task', 'Learned persona', 'Available skills', 'Knowledge graph',
+  'Connected devices', 'An unrelated task', 'Learned persona', 'Available skills', 'Knowledge graph',
+  'Remote agents', 'Generative UI', 'Browser agent',
 ];
 const MODELS = [
   { id: 'anthropic/claude-sonnet-4.5', name: 'Anthropic: Claude Sonnet 4.5', context_length: 200000,

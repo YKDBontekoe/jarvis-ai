@@ -47,6 +47,17 @@ public static class DependencyInjection
         services.AddScoped<Memory.MemoryIndexer>();
         services.AddScoped<IAgentToolContributor, Memory.KnowledgeGraphToolContributor>();
         services.AddScoped<IAgentContextContributor, Memory.KnowledgeGraphContextContributor>();
+        services.AddSingleton<AgentTurnContext>();
+        services.AddSingleton<Jarvis.Application.Realtime.IRealtimePublisher, Jarvis.Application.Realtime.NoOpRealtimePublisher>();
+        services.AddSingleton<Jarvis.Application.Devices.IDeviceInvoker, Jarvis.Application.Devices.NoOpDeviceInvoker>();
+        services.AddScoped<IAgentToolContributor, Surfaces.SurfaceToolContributor>();
+        services.AddScoped<IAgentContextContributor, Surfaces.SurfaceContextContributor>();
+        services.AddScoped<IAgentToolContributor, Networking.RemoteAgentToolContributor>();
+        services.AddScoped<IAgentContextContributor, Networking.RemoteAgentContextContributor>();
+        services.AddScoped<IAgentToolContributor, Devices.DeviceToolContributor>();
+        services.AddScoped<IAgentContextContributor, Devices.DeviceContextContributor>();
+        services.AddScoped<IAgentToolContributor, Browser.BrowserToolContributor>();
+        services.AddScoped<IAgentContextContributor, Browser.BrowserContextContributor>();
         services.AddScoped<Learning.ReflectionService>();
         services.AddScoped<Learning.HeartbeatService>();
         services.AddScoped<JarvisAgentFactory>();

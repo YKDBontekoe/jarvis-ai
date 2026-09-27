@@ -11,7 +11,8 @@ using Microsoft.Extensions.AI;
 namespace Jarvis.Agents;
 
 public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientResolver chatClients, McpToolHost mcpToolHost,
-    IConversationStore conversations, IJarvisTaskRepository tasks, ICurrentUser currentUser) : IJarvisAgent
+    IConversationStore conversations, IJarvisTaskRepository tasks, ICurrentUser currentUser,
+    AgentTurnContext turnContext) : IJarvisAgent
 {
     private static readonly JsonSerializerOptions ArgumentsJsonOptions = new(JsonSerializerDefaults.Web);
     private AIAgent? _agent;
@@ -21,6 +22,7 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
         Message currentUserMessage,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        using var _ = turnContext.Begin(conversationId);
         var agent = await GetAgentAsync(conversationId, cancellationToken);
         var sessionJson = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
         ChatMessage[] input = [new ChatMessage(ChatRole.User, currentUserMessage.Content)];
@@ -41,6 +43,7 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
         ToolApprovalReply approval,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        using var _ = turnContext.Begin(conversationId);
         var agent = await GetAgentAsync(conversationId, cancellationToken);
         var sessionJson = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
         ChatMessage[] input;

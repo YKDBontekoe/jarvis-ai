@@ -18,6 +18,9 @@ const CONTEXT_PREFIXES = [
   'Learned persona',
   'Knowledge graph',
   'Connected devices',
+  'Remote agents',
+  'Generative UI',
+  'Browser agent',
 ];
 
 const send = message => process.stdout.write(JSON.stringify(message) + '\n');
@@ -189,6 +192,39 @@ function plan(prompt) {
     if (results.length === 0)
       return call('CreateTask', { title: request.slice(0, 60), instructions: request });
     return text("I've started that as a background task. I'll notify you when the results are ready — you can follow along in **Tasks**.");
+  }
+
+  if (/\b(show|render|pick|choose)\b.*\b(card|form|options|plan)\b/.test(lower) && has('RenderUi')) {
+    if (results.length === 0) {
+      return call('RenderUi', {
+        kind: 'choice',
+        title: 'Pick a plan',
+        body: 'Choose how you would like Jarvis to proceed.',
+        itemsJson: JSON.stringify([
+          { id: 'a', title: 'Option A', subtitle: 'Fastest' },
+          { id: 'b', title: 'Option B', subtitle: 'Most thorough' },
+        ]),
+        actionsJson: JSON.stringify([
+          { id: 'a', label: 'Option A', style: 'primary' },
+          { id: 'b', label: 'Option B', style: 'secondary' },
+        ]),
+      });
+    }
+    return text('I put the choices on a card in the app. Tap one there.');
+  }
+
+  if (/\b(browse|look up on the web|open the page)\b/.test(lower) && has('BrowseTheWeb')) {
+    if (results.length === 0)
+      return call('BrowseTheWeb', { goal: request, startUrl: request.match(/https?:\/\/\S+/)?.[0] ?? null });
+    return text(`I'll use the isolated browser for that. ${last}`);
+  }
+
+  if (/\b(ask|delegate to) (the )?(travel|other|remote) agent\b/.test(lower) && has('DelegateToAgent')) {
+    if (results.length === 0) return call('ListRemoteAgents', {});
+    const id = last.match(/id ([0-9a-f-]{36})/i)?.[1];
+    if (results.length === 1) return id ? call('DelegateToAgent', { agent: id, message: request }) :
+      text('No remote agent is connected yet. Add one under Settings → Agents.');
+    return text(`I asked the other agent:\n\n${last}`);
   }
 
   if (conversation.executingTask)

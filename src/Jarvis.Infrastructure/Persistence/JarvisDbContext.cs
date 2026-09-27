@@ -42,6 +42,11 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<ChannelConnectionEntity> ChannelConnections => Set<ChannelConnectionEntity>();
     public DbSet<ChannelMessageEntity> ChannelMessages => Set<ChannelMessageEntity>();
     public DbSet<ChannelThreadEntity> ChannelThreads => Set<ChannelThreadEntity>();
+    public DbSet<UiSurfaceEntity> UiSurfaces => Set<UiSurfaceEntity>();
+    public DbSet<RemoteAgentEntity> RemoteAgents => Set<RemoteAgentEntity>();
+    public DbSet<A2ATokenEntity> A2ATokens => Set<A2ATokenEntity>();
+    public DbSet<BrowserSessionEntity> BrowserSessions => Set<BrowserSessionEntity>();
+    public DbSet<BrowserStepEntity> BrowserSteps => Set<BrowserStepEntity>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -512,6 +517,88 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<Conversation>().WithMany().HasForeignKey(x => x.ConversationId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UiSurfaceEntity>(entity =>
+        {
+            entity.ToTable("ui_surfaces");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.ConversationId).HasColumnName("conversation_id");
+            entity.Property(x => x.Kind).HasColumnName("kind").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Title).HasColumnName("title").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.SchemaJson).HasColumnName("schema").HasColumnType("jsonb").IsRequired();
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.CompletedAction).HasColumnName("completed_action").HasMaxLength(40);
+            entity.Property(x => x.ValuesJson).HasColumnName("values").HasColumnType("jsonb");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasOne<Conversation>().WithMany().HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.OwnerId, x.ConversationId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<RemoteAgentEntity>(entity =>
+        {
+            entity.ToTable("remote_agents");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Name).HasColumnName("name").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Url).HasColumnName("url").HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Enabled).HasColumnName("enabled");
+            entity.Property(x => x.LastUsedAt).HasColumnName("last_used_at");
+            entity.Property(x => x.LastError).HasColumnName("last_error").HasMaxLength(500);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => new { x.OwnerId, x.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<A2ATokenEntity>(entity =>
+        {
+            entity.ToTable("a2a_tokens");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Name).HasColumnName("name").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.TokenHash).HasColumnName("token_hash").HasMaxLength(128).IsRequired();
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.LastUsedAt).HasColumnName("last_used_at");
+            entity.HasIndex(x => x.TokenHash).IsUnique();
+            entity.HasIndex(x => x.OwnerId);
+        });
+
+        modelBuilder.Entity<BrowserSessionEntity>(entity =>
+        {
+            entity.ToTable("browser_sessions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.ConversationId).HasColumnName("conversation_id");
+            entity.Property(x => x.Goal).HasColumnName("goal").HasMaxLength(1_000).IsRequired();
+            entity.Property(x => x.StartUrl).HasColumnName("start_url").HasMaxLength(500);
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasOne<Conversation>().WithMany().HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(x => x.Steps).WithOne().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.OwnerId, x.ConversationId, x.Status });
+        });
+
+        modelBuilder.Entity<BrowserStepEntity>(entity =>
+        {
+            entity.ToTable("browser_steps");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.SessionId).HasColumnName("session_id");
+            entity.Property(x => x.Ordinal).HasColumnName("ordinal");
+            entity.Property(x => x.Tool).HasColumnName("tool").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Summary).HasColumnName("summary").HasMaxLength(1_000).IsRequired();
+            entity.Property(x => x.Success).HasColumnName("success");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => new { x.SessionId, x.Ordinal }).IsUnique();
         });
 
         modelBuilder.Entity<Message>(entity =>

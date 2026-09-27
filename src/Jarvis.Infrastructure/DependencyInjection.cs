@@ -43,6 +43,10 @@ public static class DependencyInjection
         services.AddScoped<IMemoryIndexRepository, MemoryIndexRepository>();
         services.AddScoped<IKnowledgeGraphRepository, KnowledgeGraphRepository>();
         services.AddScoped<Jarvis.Application.Channels.IChannelRepository, ChannelRepository>();
+        services.AddScoped<Jarvis.Application.Surfaces.IUiSurfaceRepository, UiSurfaceRepository>();
+        services.AddScoped<Jarvis.Application.Agents.IRemoteAgentRepository, RemoteAgentRepository>();
+        services.AddScoped<Jarvis.Application.Agents.IA2ATokenRepository, A2ATokenRepository>();
+        services.AddScoped<Jarvis.Application.Browser.IBrowserSessionStore, BrowserSessionRepository>();
         services.AddScoped<IToolApprovalStore, ToolApprovalStore>();
         services.AddScoped<IAuditEventStore, AuditEventStore>();
         services.AddScoped<IReminderRepository, WorkflowRepository>();

@@ -14,4 +14,5 @@ public static class SettingsSections
     public const string Learning = "learning";
     public const string Persona = "persona";
     public const string Devices = "devices";
+    public const string Voice = "voice";
 }

@@ -119,6 +119,81 @@ const _catalog = <String, ToolDescription>{
     'Ran a coding task',
     PhosphorIconsRegular.code,
   ),
+  'LoadSkill': ToolDescription(
+    'Loading a skill',
+    'Loaded a skill',
+    PhosphorIconsRegular.magicWand,
+  ),
+  'ListSkills': ToolDescription(
+    'Checking skills',
+    'Checked skills',
+    PhosphorIconsRegular.magicWand,
+  ),
+  'SaveSkill': ToolDescription(
+    'Saving a skill',
+    'Saved a skill',
+    PhosphorIconsRegular.magicWand,
+  ),
+  'LearnPreference': ToolDescription(
+    'Learning a preference',
+    'Learned a preference',
+    PhosphorIconsRegular.userCircle,
+  ),
+  'QueryKnowledgeGraph': ToolDescription(
+    'Checking the knowledge graph',
+    'Checked the knowledge graph',
+    PhosphorIconsRegular.graph,
+  ),
+  'RenderUi': ToolDescription(
+    'Building a card for you',
+    'Built a card for you',
+    PhosphorIconsRegular.appWindow,
+  ),
+  'ListRemoteAgents': ToolDescription(
+    'Checking connected agents',
+    'Checked connected agents',
+    PhosphorIconsRegular.robot,
+  ),
+  'DelegateToAgent': ToolDescription(
+    'Asking another agent',
+    'Asked another agent',
+    PhosphorIconsRegular.shareNetwork,
+  ),
+  'ListDevices': ToolDescription(
+    'Checking your devices',
+    'Checked your devices',
+    PhosphorIconsRegular.deviceMobile,
+  ),
+  'GetDeviceLocation': ToolDescription(
+    'Reading your location',
+    'Read your location',
+    PhosphorIconsRegular.mapPin,
+  ),
+  'ReadDeviceClipboard': ToolDescription(
+    'Reading the clipboard',
+    'Read the clipboard',
+    PhosphorIconsRegular.clipboardText,
+  ),
+  'OpenUrlOnDevice': ToolDescription(
+    'Opening a link on your device',
+    'Opened a link on your device',
+    PhosphorIconsRegular.globe,
+  ),
+  'NotifyDevice': ToolDescription(
+    'Sending a device notification',
+    'Sent a device notification',
+    PhosphorIconsRegular.bell,
+  ),
+  'GetDeviceBattery': ToolDescription(
+    'Checking battery',
+    'Checked battery',
+    PhosphorIconsRegular.batteryFull,
+  ),
+  'BrowseTheWeb': ToolDescription(
+    'Using the isolated browser',
+    'Used the isolated browser',
+    PhosphorIconsRegular.browser,
+  ),
 };
 
 String humanizeToolName(String tool) {

@@ -6,7 +6,9 @@ using System.Threading.Channels;
 using Jarvis.Api.Realtime;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Security;
+using Jarvis.Application.Settings;
 using Jarvis.Application.Workflows;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Jarvis.Api.Endpoints;
@@ -17,7 +19,7 @@ internal static class VoiceEndpoints
     {
         api.MapPost("/voice/session", async (VoiceSessionRequest request, IConversationStore conversations,
             IJarvisTaskRepository tasks, ICurrentUser currentUser, IConfiguration configuration,
-            LiveKitAgentDispatchClient dispatchClient, CancellationToken ct) =>
+            IOwnerSettingsStore settings, LiveKitAgentDispatchClient dispatchClient, CancellationToken ct) =>
         {
             if (await conversations.GetAsync(request.ConversationId, currentUser.OwnerId, ct) is null)
                 return Results.NotFound();
@@ -50,8 +52,40 @@ internal static class VoiceEndpoints
             var identity = Guid.CreateVersion7().ToString("N");
             var expiresAt = DateTimeOffset.UtcNow.AddMinutes(10);
             var token = CreateRoomToken(apiKey, apiSecret, room, identity, expiresAt);
-            return Results.Ok(new VoiceSessionDto(serverUrl!, room, identity, token, expiresAt));
+            var voice = await settings.GetAsync<VoiceSettings>(currentUser.OwnerId, SettingsSections.Voice, ct)
+                        ?? VoiceSettings.Default;
+            return Results.Ok(new VoiceSessionDto(serverUrl!, room, identity, token, expiresAt, voice.HandsFree,
+                voice.Captions));
         }).WithName("CreateVoiceSession");
+
+        api.MapGet("/settings/voice", async (IOwnerSettingsStore settings, ICurrentUser currentUser,
+                CancellationToken ct) =>
+                Results.Ok(await settings.GetAsync<VoiceSettings>(currentUser.OwnerId, SettingsSections.Voice, ct)
+                           ?? VoiceSettings.Default))
+            .WithName("GetVoiceSettings");
+
+        api.MapPut("/settings/voice", async (VoiceSettings request, IOwnerSettingsStore settings,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            await settings.SaveAsync(currentUser.OwnerId, SettingsSections.Voice, request, ct);
+            return Results.Ok(request);
+        }).WithName("SaveVoiceSettings");
+
+        api.MapPost("/voice/internal/{conversationId:guid}/caption", async (Guid conversationId,
+            VoiceCaptionRequest request, HttpRequest httpRequest, IConfiguration configuration,
+            IHubContext<JarvisEventsHub> hub, CancellationToken ct) =>
+        {
+            var expectedSecret = configuration["Voice:WorkerSecret"];
+            var suppliedSecret = httpRequest.Headers["X-Jarvis-Voice-Secret"].ToString();
+            if (!SecretComparer.FixedTimeEquals(expectedSecret, suppliedSecret))
+                return Results.Unauthorized();
+            var text = request.Text?.Trim() ?? string.Empty;
+            if (text.Length > 2_000) text = text[..2_000];
+            var role = request.Role is "assistant" ? "assistant" : "user";
+            await hub.Clients.Group(JarvisEventsHub.GroupName(conversationId))
+                .SendAsync("voice.caption", new { conversationId, role, text, final = request.Final }, ct);
+            return Results.NoContent();
+        }).WithName("PublishVoiceCaption").AllowAnonymous();
 
         api.MapPost("/voice/internal/{conversationId:guid}/transcript", async (Guid conversationId,
             VoiceWorkerTranscriptRequest request, HttpRequest httpRequest, IConfiguration configuration,

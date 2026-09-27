@@ -13,10 +13,15 @@ public sealed class ChannelOptions
 
     public static ChannelOptions From(IConfiguration configuration) => new()
     {
-        WhatsAppGraphBaseUrl = configuration["Channels:WhatsApp:GraphBaseUrl"] ?? "https://graph.facebook.com/v21.0",
-        SignalBaseUrl = configuration["Channels:Signal:BaseUrl"],
-        PublicBaseUrl = configuration["Channels:PublicBaseUrl"]
+        WhatsAppGraphBaseUrl = EmptyToNull(configuration["Channels:WhatsApp:GraphBaseUrl"])
+                               ?? "https://graph.facebook.com/v21.0",
+        SignalBaseUrl = EmptyToNull(configuration["Channels:Signal:BaseUrl"]),
+        PublicBaseUrl = EmptyToNull(configuration["Channels:PublicBaseUrl"])
+                        ?? EmptyToNull(configuration["Jarvis:PublicBaseUrl"])
     };
+
+    private static string? EmptyToNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
 /// <summary>Sends text to one recipient on a messaging platform.</summary>

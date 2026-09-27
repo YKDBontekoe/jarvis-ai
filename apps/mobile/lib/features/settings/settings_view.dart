@@ -47,6 +47,24 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         destination: 'channels',
       ),
       (
+        title: 'Agents',
+        subtitle: 'Agent2Agent peers and inbound tokens',
+        icon: PhosphorIconsRegular.robot,
+        destination: 'agents',
+      ),
+      (
+        title: 'This device',
+        subtitle: 'Location, clipboard, links, and notifications',
+        icon: PhosphorIconsRegular.deviceMobile,
+        destination: 'devices',
+      ),
+      (
+        title: 'Voice',
+        subtitle: 'Hands-free listening and live captions',
+        icon: PhosphorIconsRegular.microphone,
+        destination: 'voice-settings',
+      ),
+      (
         title: 'Integrations',
         subtitle: 'Manage MCP servers and credentials',
         icon: PhosphorIconsRegular.plugsConnected,

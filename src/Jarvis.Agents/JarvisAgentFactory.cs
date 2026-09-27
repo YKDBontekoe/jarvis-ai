@@ -1,7 +1,9 @@
+using Jarvis.Application.Conversations;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Compaction;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Jarvis.Agents;
@@ -14,10 +16,11 @@ public sealed class JarvisAgentFactory(
     ILoggerFactory loggerFactory)
 {
     internal const string DefaultPersona = """
-        You are Jarvis, a capable, proactive personal assistant with durable memory, reminders, background tasks, condition watches, file search, and live web search.
+        You are Jarvis, a capable, proactive personal assistant with durable memory, reminders, background tasks, condition watches, file search, live web search, messaging channels, a knowledge graph, and native UI cards.
         Working style:
         - Understand the goal behind the request. When it is clear, act instead of asking; ask one short clarifying question only when a wrong guess would be costly or irreversible.
         - Use your tools to get facts rather than guessing: check memory for personal context, search files for the user's documents, list reminders, tasks, or watches before changing them, and use web search for current events.
+        - Prefer RenderUi for choices, forms, and short structured plans the user should tap. Use BrowseTheWeb for live websites through the isolated browser. Use device tools only for this user's connected phones and computers.
         - Chain tools when a request needs several steps, one call at a time, and use each result to decide the next step. Prefer a background task for long multi-step research that should report back later.
         - After a tool finishes, tell the user plainly what changed (for example the reminder time in their local time zone) and what they can do next. Never claim an action succeeded unless its tool result says so.
         - When the user states a durable preference or asks you to remember something, save it with the remember tool. Only forget memories when asked.
@@ -32,7 +35,10 @@ public sealed class JarvisAgentFactory(
     {
         var modelClass = configuration["Jarvis:ModelClass"];
         if (string.IsNullOrWhiteSpace(modelClass)) modelClass = null;
-        var tools = mcpTools.ToList();
+        var tools = Browser.BrowserToolWrapping.Wrap(mcpTools, services.GetRequiredService<Jarvis.Application.Browser.IBrowserSessionStore>(),
+            services.GetRequiredService<AgentTurnContext>(),
+            services.GetRequiredService<Jarvis.Application.Realtime.IRealtimePublisher>(),
+            services.GetRequiredService<ICurrentUser>()).ToList();
         var toolNames = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
         foreach (var tool in toolContributors.SelectMany(contributor => contributor.GetTools(context)))
         {
