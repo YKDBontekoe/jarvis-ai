@@ -206,6 +206,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
       icon: PhosphorIconsRegular.trash,
     );
     if (!delete) return;
+    if (!mounted) return;
     try {
       await widget.http.delete('/api/v1/memory/${memory['id']}');
       if (mounted) await _load(query: _searching ? _query.text.trim() : null);

@@ -1582,16 +1582,27 @@ class _ChatScreenState extends State<ChatScreen> {
     if (conversationId != null) {
       try {
         await _openConversation(conversationId, showHome: _showHome);
-        if (mounted) setState(() => _error = null);
+        if (mounted &&
+            !_signedOut &&
+            !_signingOut &&
+            _conversationId == conversationId) {
+          setState(() => _error = null);
+        }
       } on DioException catch (error) {
-        if (mounted) {
+        if (mounted &&
+            !_signedOut &&
+            !_signingOut &&
+            _conversationId == conversationId) {
           setState(() {
             _error = _describeError(error);
             if (_isAuthExpired(error)) _signedOut = true;
           });
         }
       } catch (error) {
-        if (mounted) {
+        if (mounted &&
+            !_signedOut &&
+            !_signingOut &&
+            _conversationId == conversationId) {
           setState(() => _error = 'Could not connect to Jarvis: $error');
         }
       }
