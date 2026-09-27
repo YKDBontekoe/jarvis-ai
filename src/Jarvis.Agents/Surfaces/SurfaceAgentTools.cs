@@ -14,7 +14,7 @@ internal sealed class SurfaceAgentTools(
     IRealtimePublisher realtime,
     ICurrentUser currentUser)
 {
-    [Description("Render an interactive native card, form, choice list, status, or list in the Jarvis app. Use this when the user should pick an option, fill a short form, confirm a plan, or review structured items instead of reading a long Markdown reply. Keep copy short. Actions come back as the user's next message.")]
+    [Description("Show one interactive card in the Jarvis app when a tap or a short typed answer is easier than Markdown. Only one card stays open: rendering another closes the previous one. Do not call this twice in one turn. choice: tappable options in items, each with its own action. form: one question per field (label is the question, placeholder is an example) and one primary action. Keep the written reply to a single short sentence.")]
     public async Task<string> RenderUiAsync(
         [Description("card, form, choice, status, or list.")] string kind,
         [Description("Short title shown at the top of the card.")] string title,
@@ -30,24 +30,32 @@ internal sealed class SurfaceAgentTools(
         {
             var schema = UiSurfaceSchema.Normalize(kind, title, body, Parse(itemsJson), Parse(fieldsJson),
                 Parse(actionsJson));
-            var surface = await surfaces.CreateAsync(currentUser.OwnerId, id,
+            var created = await surfaces.CreateAsync(currentUser.OwnerId, id,
                 (kind ?? UiSurfaceKinds.Card).Trim().ToLowerInvariant(), title.Trim(), schema, cancellationToken);
-            await realtime.PublishToConversationAsync(id, "ui.surface", new
-            {
-                id = surface.Id,
-                conversationId = id,
-                kind = surface.Kind,
-                title = surface.Title,
-                status = surface.Status,
-                schema = JsonSerializer.Deserialize<JsonElement>(surface.SchemaJson)
-            }, cancellationToken);
-            return $"Rendered a {surface.Kind} titled '{surface.Title}' in the app (surface {surface.Id:N}). Keep your spoken or written reply short; the card is the main answer.";
+            foreach (var previous in created.Replaced)
+                await PublishAsync(id, previous, cancellationToken);
+            await PublishAsync(id, created.Surface, cancellationToken);
+            var closed = created.Replaced.Count == 0
+                ? ""
+                : $" Closed {created.Replaced.Count} older card{(created.Replaced.Count == 1 ? "" : "s")} so only this one is active.";
+            return $"Rendered a {created.Surface.Kind} titled '{created.Surface.Title}' in the app (surface {created.Surface.Id:N}).{closed} Keep your reply to one short sentence; the card asks the question.";
         }
         catch (ArgumentException exception)
         {
             return "The UI was not shown: " + exception.Message;
         }
     }
+
+    private Task PublishAsync(Guid conversationId, UiSurfaceRecord surface, CancellationToken cancellationToken) =>
+        realtime.PublishToConversationAsync(conversationId, "ui.surface", new
+        {
+            id = surface.Id,
+            conversationId,
+            kind = surface.Kind,
+            title = surface.Title,
+            status = surface.Status,
+            schema = JsonSerializer.Deserialize<JsonElement>(surface.SchemaJson)
+        }, cancellationToken);
 
     private static JsonElement? Parse(string? json)
     {
@@ -83,7 +91,9 @@ internal sealed class SurfaceContextProvider : MessageAIContextProvider
         CancellationToken cancellationToken = default)
     {
         const string text = Prefix +
-            ": when a choice, form, plan, or short list would be easier in the app than as Markdown, call RenderUi. Keep the text reply brief. Do not invent extra chrome.";
+            ": call RenderUi at most once per turn, and only when a tap or a short typed answer beats Markdown. If a card is already open, wait for it. " +
+            "Choices go in items with one action each. Typed answers go in form fields whose label is the question and whose placeholder is an example. " +
+            "The written reply is one short sentence; do not repeat the card.";
         return new ValueTask<IEnumerable<ChatMessage>>([new ChatMessage(ChatRole.User, text)]);
     }
 }

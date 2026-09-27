@@ -26,16 +26,21 @@ public sealed record UiSurfaceRecord(
 
 public sealed record UiSurfaceAction(string ActionId, IReadOnlyDictionary<string, string> Values);
 
+/// <summary>A newly rendered card, plus any older open cards in that conversation that were closed.</summary>
+public sealed record UiSurfaceCreateResult(UiSurfaceRecord Surface, IReadOnlyList<UiSurfaceRecord> Replaced);
+
 public interface IUiSurfaceRepository
 {
-    Task<UiSurfaceRecord> CreateAsync(Guid ownerId, Guid conversationId, string kind, string title, string schemaJson,
-        CancellationToken cancellationToken);
+    Task<UiSurfaceCreateResult> CreateAsync(Guid ownerId, Guid conversationId, string kind, string title,
+        string schemaJson, CancellationToken cancellationToken);
     Task<UiSurfaceRecord?> GetAsync(Guid ownerId, Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<UiSurfaceRecord>> ListForConversationAsync(Guid ownerId, Guid conversationId,
         CancellationToken cancellationToken);
     Task<UiSurfaceRecord?> CompleteAsync(Guid ownerId, Guid id, string actionId, string valuesJson,
         CancellationToken cancellationToken);
-    Task ReopenAsync(Guid ownerId, Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Reopens a completed card and closes any other open card in the same conversation.</summary>
+    Task<IReadOnlyList<UiSurfaceRecord>> ReopenAsync(Guid ownerId, Guid id, CancellationToken cancellationToken);
 }
 
 /// <summary>A2UI-inspired generative UI: a small native widget tree Jarvis can render in the app.</summary>

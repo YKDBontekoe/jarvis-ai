@@ -300,6 +300,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Room? _voiceRoom;
   String? _conversationId;
   String? _error;
+  String? _surfaceError;
+  String? _surfaceErrorFor;
   bool _connected = false;
   bool _sending = false;
   bool _signedOut = false;
@@ -333,6 +335,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final Set<String> _shownPushNotifications = {};
 
   bool get _hasMessages => _entries.any((entry) => entry is MessageEntry);
+
+  UiSurfaceEntry? get _liveSurface => liveSurface(_entries);
 
   bool get _hasPendingApproval => _entries.any(
     (entry) =>
@@ -1641,6 +1645,20 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _upsertSurface(UiSurfaceEntry surface) {
+    if (surface.status == 'open') {
+      for (var index = 0; index < _entries.length; index++) {
+        final entry = _entries[index];
+        if (entry is UiSurfaceEntry &&
+            entry.id != surface.id &&
+            entry.status == 'open') {
+          _entries[index] = entry.copyWith(status: 'replaced');
+        }
+      }
+      if (_surfaceErrorFor != null && _surfaceErrorFor != surface.id) {
+        _surfaceError = null;
+        _surfaceErrorFor = null;
+      }
+    }
     final existing = _entries.indexWhere(
       (entry) => entry is UiSurfaceEntry && entry.id == surface.id,
     );
@@ -1648,6 +1666,20 @@ class _ChatScreenState extends State<ChatScreen> {
       _entries[existing] = surface;
     } else {
       _entries.add(surface);
+    }
+    _collapseStaleSurfaces();
+  }
+
+  void _collapseStaleSurfaces() {
+    final liveId = _liveSurface?.id;
+    if (liveId == null) return;
+    for (var index = 0; index < _entries.length; index++) {
+      final entry = _entries[index];
+      if (entry is UiSurfaceEntry &&
+          entry.status == 'open' &&
+          entry.id != liveId) {
+        _entries[index] = entry.copyWith(status: 'replaced');
+      }
     }
   }
 
@@ -1687,6 +1719,12 @@ class _ChatScreenState extends State<ChatScreen> {
     String action,
     Map<String, String> values,
   ) async {
+    if (mounted && _surfaceErrorFor == surface.id) {
+      setState(() {
+        _surfaceError = null;
+        _surfaceErrorFor = null;
+      });
+    }
     try {
       final response = await _http.post<dynamic>(
         '/api/v1/ui-surfaces/${surface.id}/actions',
@@ -1695,11 +1733,23 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       setState(() {
         _upsertSurface(surface.copyWith(status: 'completed'));
+        _surfaceError = null;
+        _surfaceErrorFor = null;
         _applyRunResult(response);
       });
       _scrollToBottom();
     } on DioException catch (error) {
-      if (mounted) setState(() => _error = _describeError(error));
+      if (!mounted) return;
+      final used = error.response?.statusCode == 409;
+      final message = used
+          ? 'This card was already used.'
+          : _describeError(error);
+      setState(() {
+        if (used) _upsertSurface(surface.copyWith(status: 'completed'));
+        _surfaceError = message;
+        _surfaceErrorFor = surface.id;
+        if (used) _error = message;
+      });
     }
   }
 
@@ -2697,6 +2747,36 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
         ),
+        if (_liveSurface case final live? when surfaceAwaitsReply(live))
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final height = constraints.maxHeight.isFinite
+                  ? constraints.maxHeight
+                  : 640.0;
+              return ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 788,
+                  maxHeight: math.min(360, height * 0.42),
+                ),
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
+                  children: [
+                    UiSurfaceCard(
+                      key: ValueKey('live-${live.id}'),
+                      surface: live,
+                      pinned: true,
+                      errorText: _surfaceErrorFor == live.id
+                          ? _surfaceError
+                          : null,
+                      onAction: (action, values) =>
+                          _submitSurface(live, action, values),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 788),
@@ -2737,14 +2817,25 @@ class _ChatScreenState extends State<ChatScreen> {
       approval: entry,
       onDecide: (approved) => unawaited(_decide(entry, approved)),
     ),
-    UiSurfaceEntry() => UiSurfaceCard(
-      surface: entry,
-      onAction: entry.status == 'open'
-          ? (action, values) => _submitSurface(entry, action, values)
-          : null,
-    ),
+    UiSurfaceEntry() => _surfaceView(entry),
     BrowserSessionEntry() => BrowserTimelineView(session: entry),
   };
+
+  Widget _surfaceView(UiSurfaceEntry entry) {
+    final live = _liveSurface;
+    if (live != null && entry.id == live.id && surfaceAwaitsReply(live)) {
+      return const SizedBox.shrink();
+    }
+    final current =
+        live != null && entry.id == live.id && entry.status == 'open';
+    return UiSurfaceCard(
+      key: ValueKey(entry.id),
+      surface: entry,
+      onAction: current
+          ? (action, values) => _submitSurface(entry, action, values)
+          : null,
+    );
+  }
 
   Widget _voiceBody() {
     final theme = Theme.of(context);

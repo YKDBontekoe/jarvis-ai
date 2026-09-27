@@ -81,10 +81,19 @@ public sealed class BrowserStepEntity
 
 public sealed class UiSurfaceRepository(JarvisDbContext db) : IUiSurfaceRepository
 {
-    public async Task<UiSurfaceRecord> CreateAsync(Guid ownerId, Guid conversationId, string kind, string title,
+    public async Task<UiSurfaceCreateResult> CreateAsync(Guid ownerId, Guid conversationId, string kind, string title,
         string schemaJson, CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
+        var open = await db.UiSurfaces
+            .Where(x => x.OwnerId == ownerId && x.ConversationId == conversationId && x.Status == "open")
+            .ToListAsync(cancellationToken);
+        foreach (var previous in open)
+        {
+            previous.Status = "replaced";
+            previous.UpdatedAt = now;
+        }
+
         var entity = new UiSurfaceEntity
         {
             Id = Guid.CreateVersion7(),
@@ -99,7 +108,7 @@ public sealed class UiSurfaceRepository(JarvisDbContext db) : IUiSurfaceReposito
         };
         db.UiSurfaces.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
-        return entity.ToRecord();
+        return new UiSurfaceCreateResult(entity.ToRecord(), open.Select(x => x.ToRecord()).ToArray());
     }
 
     public async Task<UiSurfaceRecord?> GetAsync(Guid ownerId, Guid id, CancellationToken cancellationToken) =>
@@ -126,16 +135,29 @@ public sealed class UiSurfaceRepository(JarvisDbContext db) : IUiSurfaceReposito
         return entity.ToRecord();
     }
 
-    public async Task ReopenAsync(Guid ownerId, Guid id, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<UiSurfaceRecord>> ReopenAsync(Guid ownerId, Guid id,
+        CancellationToken cancellationToken)
     {
         var entity = await db.UiSurfaces.SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId,
             cancellationToken);
-        if (entity is null || entity.Status != "completed") return;
+        if (entity is null || entity.Status != "completed") return [];
+        var now = DateTimeOffset.UtcNow;
+        var others = await db.UiSurfaces
+            .Where(x => x.OwnerId == ownerId && x.ConversationId == entity.ConversationId && x.Status == "open" &&
+                        x.Id != id)
+            .ToListAsync(cancellationToken);
+        foreach (var other in others)
+        {
+            other.Status = "replaced";
+            other.UpdatedAt = now;
+        }
+
         entity.Status = "open";
         entity.CompletedAction = null;
         entity.ValuesJson = null;
-        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        entity.UpdatedAt = now;
         await db.SaveChangesAsync(cancellationToken);
+        return [entity.ToRecord(), .. others.Select(other => other.ToRecord())];
     }
 }
 
