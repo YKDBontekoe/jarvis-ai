@@ -20,9 +20,14 @@ public sealed record GraphRelationRecord(Guid Id, Guid SubjectId, string Subject
     Guid? ObjectId, string? ObjectName, string? ObjectValue, DateTimeOffset ValidFrom, DateTimeOffset? ValidTo,
     float Confidence, Guid? SourceMemoryId);
 
-public sealed record GraphEdge(Guid From, Guid To, string Predicate);
+public sealed record GraphEdge(Guid From, Guid To, string Predicate, float Confidence, DateTimeOffset ValidFrom);
 
-public sealed record GraphOverview(IReadOnlyList<GraphEntityRecord> Entities, IReadOnlyList<GraphEdge> Edges);
+/// <summary>A current fact whose object is a literal (a date, title, or short description) rather than another entity.</summary>
+public sealed record GraphLiteral(Guid EntityId, string Predicate, string Value, float Confidence,
+    DateTimeOffset ValidFrom);
+
+public sealed record GraphOverview(IReadOnlyList<GraphEntityRecord> Entities, IReadOnlyList<GraphEdge> Edges,
+    IReadOnlyList<GraphLiteral> Literals);
 
 public sealed record GraphEntityDetails(GraphEntityRecord Entity, IReadOnlyList<GraphRelationRecord> Current,
     IReadOnlyList<GraphRelationRecord> History);
