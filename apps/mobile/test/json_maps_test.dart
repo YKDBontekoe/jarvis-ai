@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/json_maps.dart';
-import 'package:jarvis_mobile/oidc_issuer.dart';
 
 void main() {
   test('jsonMaps keeps object rows and skips invalid entries', () {
@@ -47,6 +46,10 @@ void main() {
       }),
       'Unknown time zone.',
     );
+    expect(
+      firstProblemMessage({'message': 'Invalid email or password.'}),
+      'Invalid email or password.',
+    );
     expect(firstProblemMessage('nope'), isNull);
     expect(firstProblemMessage(null), isNull);
   });
@@ -60,45 +63,6 @@ void main() {
     expect(asJsonInt('3'), 0);
     expect(asJsonBool(true), isTrue);
     expect(asJsonBool('true'), isFalse);
-  });
-
-  test('oidcRedirectOrigin drops query, fragment, and credentials', () {
-    expect(
-      oidcRedirectOrigin(
-        Uri.parse('https://app.example.com/chat/?code=abc&state=xyz#frag'),
-      ).toString(),
-      'https://app.example.com/chat/',
-    );
-    expect(
-      oidcRedirectOrigin(Uri.parse('http://localhost:5082/?error=access_denied'))
-          .toString(),
-      'http://localhost:5082/',
-    );
-    expect(
-      Uri.parse('https://app.example.com/?code=abc')
-          .replace(query: null, fragment: null)
-          .hasQuery,
-      isTrue,
-    );
-  });
-
-  test('normalizeOidcIssuer trims trailing slashes and compares issuers', () {
-    expect(normalizeOidcIssuer('https://idp.example.com/'), 'https://idp.example.com');
-    expect(
-      normalizeOidcIssuer('https://idp.example.com/realms/foo/'),
-      'https://idp.example.com/realms/foo',
-    );
-    expect(
-      oidcIssuersMatch('https://idp.example.com', 'https://idp.example.com/'),
-      isTrue,
-    );
-    expect(
-      oidcIssuersMatch(
-        'https://idp.example.com/realms/foo',
-        'https://idp.example.com/realms/bar',
-      ),
-      isFalse,
-    );
   });
 
   test('activeValidUntil keeps a future TTL and clears expired ones', () {

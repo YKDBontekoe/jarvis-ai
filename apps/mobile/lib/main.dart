@@ -1,16 +1,11 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
-import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'oidc_web_stub.dart'
-    if (dart.library.js_interop) 'oidc_web.dart'
-    as web_oidc;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:signalr_netcore/signalr_client.dart';
@@ -41,16 +36,6 @@ const _apiBaseUrl = String.fromEnvironment(
   'JARVIS_API_URL',
   defaultValue: 'http://localhost:5082',
 );
-const _oidcIssuer = String.fromEnvironment('JARVIS_OIDC_ISSUER');
-const _oidcClientId = String.fromEnvironment('JARVIS_OIDC_CLIENT_ID');
-const _oidcRedirectUri = String.fromEnvironment(
-  'JARVIS_OIDC_REDIRECT_URI',
-  defaultValue: 'com.example.jarvis_mobile:/oauth2redirect',
-);
-const _webOidcRedirectUri = String.fromEnvironment(
-  'JARVIS_WEB_OIDC_REDIRECT_URI',
-);
-const _oidcScopes = ['openid', 'profile', 'offline_access'];
 const _firebaseApiKey = String.fromEnvironment('JARVIS_FIREBASE_API_KEY');
 const _firebaseProjectId = String.fromEnvironment('JARVIS_FIREBASE_PROJECT_ID');
 const _firebaseSenderId = String.fromEnvironment('JARVIS_FIREBASE_SENDER_ID');
@@ -101,15 +86,17 @@ Future<void> _initializeFirebase() async {
 }
 
 class _AuthSession {
-  _AuthSession()
-    : enabled =
-          _oidcIssuer.isNotEmpty ||
-          _oidcClientId.isNotEmpty ||
-          (kIsWeb && kReleaseMode);
+  _AuthSession({this.enabled = true});
 
   final bool enabled;
-  final _appAuth = const FlutterAppAuth();
   final _storage = const FlutterSecureStorage();
+  final _authHttp = Dio(
+    BaseOptions(
+      baseUrl: _apiBaseUrl,
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 20),
+    ),
+  );
   Future<String?>? _accessTokenInFlight;
   var _generation = 0;
   Future<void> _sessionLock = Future.value();
@@ -122,18 +109,6 @@ class _AuthSession {
         .catchError((_) {})
         .then((_) => action())
         .whenComplete(released.complete);
-  }
-
-  String get _redirectUri => kIsWeb
-      ? web_oidc.currentRedirectUri(_webOidcRedirectUri)
-      : _oidcRedirectUri;
-
-  void _ensureConfigured() {
-    if (_oidcIssuer.isEmpty || _oidcClientId.isEmpty) {
-      throw StateError(
-        'Set both JARVIS_OIDC_ISSUER and JARVIS_OIDC_CLIENT_ID.',
-      );
-    }
   }
 
   Future<String?> accessToken({bool forceRefresh = false}) {
@@ -152,19 +127,8 @@ class _AuthSession {
   }
 
   Future<String?> _readOrRefreshAccessToken({bool forceRefresh = false}) async {
-    final generation = _generation;
     if (!enabled) return null;
-    _ensureConfigured();
-    if (kIsWeb) {
-      final response = await web_oidc.completeAuthorizationCode(
-        _oidcIssuer,
-        _oidcClientId,
-        _redirectUri,
-        _oidcScopes,
-      );
-      if (response != null) await _saveWebResponse(response, null);
-      if (generation != _generation) return null;
-    }
+    final generation = _generation;
     final expiration = int.tryParse(
       await _storage.read(key: 'token_expiration') ?? '',
     );
@@ -180,36 +144,17 @@ class _AuthSession {
     final refreshToken = await _storage.read(key: 'refresh_token');
     if (refreshToken == null) return null;
     try {
-      if (kIsWeb) {
-        final response = await web_oidc.refreshAuthorizationTokens(
-          _oidcIssuer,
-          _oidcClientId,
-          refreshToken,
-        );
-        if (generation != _generation) return null;
-        await _saveWebResponse(response, refreshToken);
-        if (generation != _generation) return null;
-        return response['access_token'] as String;
-      }
-      final response = await _appAuth.token(
-        TokenRequest(
-          _oidcClientId,
-          _redirectUri,
-          issuer: _oidcIssuer,
-          refreshToken: refreshToken,
-          scopes: _oidcScopes,
-        ),
+      final response = await _authHttp.post<Object?>(
+        '/api/v1/auth/refresh',
+        data: {'refreshToken': refreshToken},
       );
       if (generation != _generation) return null;
-      await _save(
-        response.accessToken,
-        response.refreshToken ?? refreshToken,
-        response.accessTokenExpirationDateTime,
-      );
+      final session = _sessionFrom(response.data);
+      await _save(session.accessToken, session.refreshToken, session.expiresAt);
       if (generation != _generation) return null;
-      return response.accessToken;
-    } catch (error) {
-      if (_isInvalidGrantError(error)) {
+      return session.accessToken;
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 401) {
         _generation++;
         _accessTokenInFlight = null;
         await _storage.deleteAll();
@@ -219,51 +164,22 @@ class _AuthSession {
     }
   }
 
-  static bool _isInvalidGrantError(Object error) {
-    if (error is PlatformException) {
-      return _isInvalidGrant(error.code) || _isInvalidGrant(error.message);
-    }
-    if (error is DioException) {
-      final data = error.response?.data;
-      if (data is Map && _isInvalidGrant(data['error']?.toString())) {
-        return true;
-      }
-      return _isInvalidGrant(error.message);
-    }
-    return _isInvalidGrant(error.toString());
-  }
+  Future<void> signIn(String email, String password) =>
+      _exchange('/api/v1/auth/login', email, password);
 
-  static bool _isInvalidGrant(String? value) =>
-      value != null && value.toLowerCase().contains('invalid_grant');
+  Future<void> register(String email, String password) =>
+      _exchange('/api/v1/auth/register', email, password);
 
-  Future<void> signIn() async {
+  Future<void> _exchange(String path, String email, String password) async {
     await _serialized(() async {
-      if (kIsWeb) {
-        _ensureConfigured();
-        await web_oidc.beginAuthorizationCode(
-          _oidcIssuer,
-          _oidcClientId,
-          _redirectUri,
-          _oidcScopes,
-        );
-        return;
-      }
-      _ensureConfigured();
-      final response = await _appAuth.authorizeAndExchangeCode(
-        AuthorizationTokenRequest(
-          _oidcClientId,
-          _redirectUri,
-          issuer: _oidcIssuer,
-          scopes: _oidcScopes,
-        ),
+      final response = await _authHttp.post<Object?>(
+        path,
+        data: {'email': email, 'password': password},
       );
       _generation++;
       _accessTokenInFlight = null;
-      await _save(
-        response.accessToken,
-        response.refreshToken,
-        response.accessTokenExpirationDateTime,
-      );
+      final session = _sessionFrom(response.data);
+      await _save(session.accessToken, session.refreshToken, session.expiresAt);
     });
   }
 
@@ -271,47 +187,53 @@ class _AuthSession {
     await _serialized(() async {
       _generation++;
       _accessTokenInFlight = null;
+      final refreshToken = await _storage.read(key: 'refresh_token');
+      if (refreshToken != null) {
+        try {
+          await _authHttp.post<void>(
+            '/api/v1/auth/logout',
+            data: {'refreshToken': refreshToken},
+          );
+        } on DioException {
+          // Local sign-out still clears the session when the API is unreachable.
+        }
+      }
       await _storage.deleteAll();
     });
   }
 
-  Future<void> _saveWebResponse(
-    Map<String, dynamic> response,
-    String? previousRefreshToken,
-  ) async {
-    final expiresIn = response['expires_in'];
-    if (expiresIn is! num || expiresIn <= 0) {
-      throw StateError(
-        'The identity provider returned an invalid token lifetime.',
-      );
+  ({String accessToken, String refreshToken, DateTime expiresAt}) _sessionFrom(
+    Object? data,
+  ) {
+    final body = data is Map ? Map<String, dynamic>.from(data) : null;
+    final accessToken = asJsonString(body?['accessToken']);
+    final refreshToken = asJsonString(body?['refreshToken']);
+    final expiresAt = DateTime.tryParse(asJsonString(body?['expiresAt']) ?? '');
+    if (accessToken == null ||
+        accessToken.isEmpty ||
+        refreshToken == null ||
+        refreshToken.isEmpty ||
+        expiresAt == null) {
+      throw StateError('Jarvis returned an incomplete sign-in response.');
     }
-    final refreshToken =
-        asJsonString(response['refresh_token']) ?? previousRefreshToken;
-    await _save(
-      asJsonString(response['access_token']),
-      refreshToken,
-      DateTime.now().add(Duration(seconds: expiresIn.toInt())),
+    return (
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      expiresAt: expiresAt,
     );
   }
 
   Future<void> _save(
-    String? accessToken,
-    String? refreshToken,
-    DateTime? expiresAt,
+    String accessToken,
+    String refreshToken,
+    DateTime expiresAt,
   ) async {
-    if (accessToken == null || expiresAt == null) {
-      throw StateError(
-        'The identity provider returned an incomplete token response.',
-      );
-    }
     await _storage.write(key: 'access_token', value: accessToken);
+    await _storage.write(key: 'refresh_token', value: refreshToken);
     await _storage.write(
       key: 'token_expiration',
       value: expiresAt.millisecondsSinceEpoch.toString(),
     );
-    if (refreshToken != null) {
-      await _storage.write(key: 'refresh_token', value: refreshToken);
-    }
   }
 }
 
@@ -322,19 +244,24 @@ Future<void> main() async {
 }
 
 class JarvisApp extends StatelessWidget {
-  const JarvisApp({super.key});
+  const JarvisApp({this.skipAuthentication = false, super.key});
+
+  /// Widget tests render the assistant shell without an account session.
+  final bool skipAuthentication;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Jarvis',
     debugShowCheckedModeBanner: false,
     theme: buildJarvisTheme(),
-    home: const ChatScreen(),
+    home: ChatScreen(skipAuthentication: skipAuthentication),
   );
 }
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  const ChatScreen({this.skipAuthentication = false, super.key});
+
+  final bool skipAuthentication;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -343,7 +270,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   static const _wideLayoutWidth = 840.0;
 
-  final _auth = _AuthSession();
+  late final _auth = _AuthSession(enabled: !widget.skipAuthentication);
   final _http = Dio(
     BaseOptions(
       baseUrl: _apiBaseUrl,
@@ -352,6 +279,8 @@ class _ChatScreenState extends State<ChatScreen> {
     ),
   );
   final _input = TextEditingController();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
   final _scroll = ScrollController();
   final _entries = <ChatEntry>[];
   HubConnection? _hub;
@@ -361,8 +290,11 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _connected = false;
   bool _sending = false;
   bool _signedOut = false;
+  bool _restoringSession = true;
   bool _signingOut = false;
   bool _authBusy = false;
+  bool _creatingAccount = false;
+  bool _obscurePassword = true;
   bool _voiceActive = false;
   bool _voiceStarting = false;
   int _voiceGeneration = 0;
@@ -402,6 +334,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.skipAuthentication) _restoringSession = false;
     _attachPushListeners();
     _http.interceptors.add(
       InterceptorsWrapper(
@@ -475,7 +408,10 @@ class _ChatScreenState extends State<ChatScreen> {
       if (stale()) return;
       if (_auth.enabled && await _auth.accessToken() == null) {
         if (mounted && generation == _initGeneration) {
-          setState(() => _signedOut = true);
+          setState(() {
+            _signedOut = true;
+            _restoringSession = false;
+          });
         }
         return;
       }
@@ -509,23 +445,34 @@ class _ChatScreenState extends State<ChatScreen> {
           _handlePushPayload(initialPush.data);
         }
       }
-      if (mounted && generation == _initGeneration) setState(() => _error = null);
+      if (mounted && generation == _initGeneration) {
+        setState(() {
+          _error = null;
+          _signedOut = false;
+          _restoringSession = false;
+        });
+      }
     } on DioException catch (error) {
       if (mounted && generation == _initGeneration) {
         setState(() {
           _error = _describeError(error);
+          _restoringSession = false;
           if (_isAuthExpired(error)) _signedOut = true;
         });
       }
     } on FormatException {
       if (mounted && generation == _initGeneration) {
-        setState(() => _error = 'Jarvis returned an invalid conversation.');
+        setState(() {
+          _error = 'Jarvis returned an invalid conversation.';
+          _restoringSession = false;
+        });
       }
     } catch (error) {
       if (mounted && generation == _initGeneration) {
         setState(() {
           _error = 'Could not connect to Jarvis: $error';
-          if (_auth.enabled) _signedOut = true;
+          _signedOut = true;
+          _restoringSession = false;
         });
       }
     }
@@ -1186,17 +1133,81 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _signIn() async {
     if (_signingOut) return;
-    setState(() => _authBusy = true);
+    final email = _email.text.trim();
+    final password = _password.text;
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      setState(() => _error = 'Enter a valid email address.');
+      return;
+    }
+    if (password.isEmpty || password.length > 128) {
+      setState(() => _error = 'Enter your password.');
+      return;
+    }
+    if (_creatingAccount && !_passwordMeetsPolicy(password)) {
+      setState(
+        () => _error =
+            'Use 8 to 128 characters with an uppercase letter, a lowercase letter, and a number.',
+      );
+      return;
+    }
+    setState(() {
+      _authBusy = true;
+      _error = null;
+    });
     try {
-      await _auth.signIn();
-      if (kIsWeb) return;
-      if (mounted) setState(() => _signedOut = false);
+      if (_creatingAccount) {
+        await _auth.register(email, password);
+      } else {
+        await _auth.signIn(email, password);
+      }
+      _password.clear();
+      if (mounted) {
+        setState(() {
+          _signedOut = false;
+          _restoringSession = true;
+        });
+      }
       await _initialize();
+    } on DioException catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = _accountError(error);
+          _signedOut = true;
+          _restoringSession = false;
+        });
+      }
     } catch (error) {
-      if (mounted) setState(() => _error = 'Sign in failed: $error');
+      if (mounted) {
+        setState(() {
+          _error = 'Sign in failed: $error';
+          _signedOut = true;
+          _restoringSession = false;
+        });
+      }
     } finally {
       if (mounted) setState(() => _authBusy = false);
     }
+  }
+
+  bool _passwordMeetsPolicy(String password) =>
+      password.length >= 8 &&
+      password.length <= 128 &&
+      password.contains(RegExp(r'[A-Z]')) &&
+      password.contains(RegExp(r'[a-z]')) &&
+      password.contains(RegExp(r'[0-9]'));
+
+  String _accountError(DioException error) {
+    final data = error.response?.data;
+    if (data is Map) {
+      final message = asJsonString(Map<String, dynamic>.from(data)['message']);
+      if (message != null && message.isNotEmpty) return message;
+      final problem = firstProblemMessage(data);
+      if (problem != null) return problem;
+    }
+    if (error.response?.statusCode == 401) {
+      return 'Invalid email or password.';
+    }
+    return _describeError(error);
   }
 
   Future<void> _signOut() async {
@@ -1211,12 +1222,14 @@ class _ChatScreenState extends State<ChatScreen> {
       Navigator.of(context).popUntil((route) => route.isFirst);
       setState(() {
         _signedOut = true;
+        _restoringSession = false;
         _connected = false;
         _sending = false;
         _conversationId = null;
         _error = null;
         _entries.clear();
         _recent = [];
+        _password.clear();
       });
     }
     try {
@@ -1853,6 +1866,8 @@ class _ChatScreenState extends State<ChatScreen> {
     unawaited(_pushOpenedSubscription?.cancel());
     unawaited(_pushForegroundSubscription?.cancel());
     _input.dispose();
+    _email.dispose();
+    _password.dispose();
     _scroll.dispose();
     _http.close();
     super.dispose();
@@ -1864,6 +1879,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_restoringSession) {
+      return const Scaffold(
+        body: Stack(
+          children: [
+            Positioned.fill(child: _AmbientBackdrop()),
+            Center(child: JarvisOrb(size: 96, semanticLabel: 'Jarvis')),
+          ],
+        ),
+      );
+    }
     if (_signedOut) return _signInScreen();
 
     return LayoutBuilder(
@@ -2098,94 +2123,161 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       );
 
-  Widget _signInScreen() => Scaffold(
-    body: Stack(
-      children: [
-        const Positioned.fill(child: _AmbientBackdrop()),
-        SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(28),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const JarvisOrb(size: 96, semanticLabel: 'Jarvis'),
-                    const SizedBox(height: 32),
-                    Text(
-                      'Sign in to Jarvis',
-                      textAlign: TextAlign.center,
-                      style: JarvisType.serif.copyWith(fontSize: 42),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Your private assistant for conversations, tasks, memory, and voice.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: JarvisColors.inkSoft,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _authBusy || _signingOut ? null : _signIn,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: JarvisColors.ink,
-                          minimumSize: const Size.fromHeight(54),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(40),
+  Widget _signInScreen() {
+    final busy = _authBusy || _signingOut;
+    return Scaffold(
+      body: Stack(
+        children: [
+          const Positioned.fill(child: _AmbientBackdrop()),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(28),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  child: AutofillGroup(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const JarvisOrb(size: 96, semanticLabel: 'Jarvis'),
+                        const SizedBox(height: 32),
+                        Text(
+                          _creatingAccount
+                              ? 'Create your account'
+                              : 'Sign in to Jarvis',
+                          textAlign: TextAlign.center,
+                          style: JarvisType.serif.copyWith(fontSize: 42),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Your private assistant for conversations, tasks, memory, and voice.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(color: JarvisColors.inkSoft),
+                        ),
+                        const SizedBox(height: 32),
+                        TextField(
+                          controller: _email,
+                          enabled: !busy,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.email],
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          decoration: const InputDecoration(
+                            labelText: 'Email',
                           ),
                         ),
-                        icon: _authBusy
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(PhosphorIconsRegular.signIn),
-                        label: const Text(
-                          'Continue with your identity provider',
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _password,
+                          enabled: !busy,
+                          obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: [
+                            _creatingAccount
+                                ? AutofillHints.newPassword
+                                : AutofillHints.password,
+                          ],
+                          onSubmitted: busy ? null : (_) => unawaited(_signIn()),
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            suffixIcon: IconButton(
+                              tooltip: _obscurePassword
+                                  ? 'Show password'
+                                  : 'Hide password',
+                              onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              ),
+                              icon: Icon(
+                                _obscurePassword
+                                    ? PhosphorIconsRegular.eye
+                                    : PhosphorIconsRegular.eyeSlash,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          PhosphorIconsRegular.lockSimple,
-                          size: 14,
-                          color: JarvisColors.muted,
+                        const SizedBox(height: 8),
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Use 8 or more characters with upper and lower case letters and a number.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: JarvisColors.muted,
+                            ),
+                          ),
                         ),
-                        SizedBox(width: 6),
-                        Text(
-                          'Secured with OpenID Connect + PKCE',
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: busy ? null : () => unawaited(_signIn()),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: JarvisColors.ink,
+                              minimumSize: const Size.fromHeight(54),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(40),
+                              ),
+                            ),
+                            icon: _authBusy
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Icon(
+                                    _creatingAccount
+                                        ? PhosphorIconsRegular.user
+                                        : PhosphorIconsRegular.signIn,
+                                  ),
+                            label: Text(
+                              _creatingAccount ? 'Create account' : 'Sign in',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: busy
+                              ? null
+                              : () => setState(() {
+                                  _creatingAccount = !_creatingAccount;
+                                  _error = null;
+                                }),
+                          child: Text(
+                            _creatingAccount
+                                ? 'Already have an account? Sign in'
+                                : 'Need an account? Create one',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Your password is checked by Jarvis.',
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 12.5,
                             color: JarvisColors.muted,
                           ),
                         ),
+                        if (_error != null)
+                          InlineNotice(
+                            message: _error!,
+                            tone: NoticeTone.danger,
+                            margin: const EdgeInsets.only(top: 24),
+                          ),
                       ],
                     ),
-                    if (_error != null)
-                      InlineNotice(
-                        message: _error!,
-                        tone: NoticeTone.danger,
-                        margin: const EdgeInsets.only(top: 24),
-                      ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 
   Widget _chatBody() => SafeArea(
     child: Column(

@@ -1,11 +1,10 @@
-# Adds production authentication to the disposable local stack.
+# Adds production account authentication to the disposable local stack.
 services:
   jarvis-api:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Database__ApplyMigrationsAtStartup: "true"
-      Authentication__Authority: https://localhost:8443/realms/jarvis-verification
+      Authentication__Issuer: https://jarvis.local
       Authentication__Audience: jarvis-api
-    volumes:
-      - ../../artifacts/verification/certs/localhost.pem:/usr/local/share/ca-certificates/jarvis-verification.crt:ro
-    entrypoint: ["/bin/sh", "-c", "update-ca-certificates >/dev/null && exec dotnet Jarvis.Api.dll"]
+      Authentication__SigningKey: verification-signing-key-at-least-32b
+      Authentication__AllowRegistration: "true"

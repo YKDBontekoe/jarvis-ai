@@ -3,14 +3,20 @@ using Jarvis.Domain.Approvals;
 using Jarvis.Domain.Audit;
 using Jarvis.Domain.Workflows;
 using Jarvis.Domain.Integrations;
+using Jarvis.Infrastructure.Identity;
 using Jarvis.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
 
 namespace Jarvis.Infrastructure.Persistence;
 
-public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options) : DbContext(options)
+public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
+    : IdentityDbContext<JarvisUser, IdentityRole<Guid>, Guid>(options)
 {
+    public DbSet<AuthRefreshToken> AuthRefreshTokens => Set<AuthRefreshToken>();
+
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<AgentSessionState> AgentSessions => Set<AgentSessionState>();
@@ -50,6 +56,31 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options) :
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<JarvisUser>(entity =>
+        {
+            entity.ToTable("users");
+            entity.Property(user => user.Id).ValueGeneratedNever();
+        });
+        modelBuilder.Entity<IdentityRole<Guid>>().ToTable("roles");
+        modelBuilder.Entity<IdentityUserRole<Guid>>().ToTable("user_roles");
+        modelBuilder.Entity<IdentityUserClaim<Guid>>().ToTable("user_claims");
+        modelBuilder.Entity<IdentityUserLogin<Guid>>().ToTable("user_logins");
+        modelBuilder.Entity<IdentityRoleClaim<Guid>>().ToTable("role_claims");
+        modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("user_tokens");
+        modelBuilder.Entity<AuthRefreshToken>(entity =>
+        {
+            entity.ToTable("auth_refresh_tokens");
+            entity.HasKey(token => token.Id);
+            entity.Property(token => token.Id).ValueGeneratedNever();
+            entity.Property(token => token.TokenHash).HasMaxLength(128).IsRequired();
+            entity.Property(token => token.ReplacedByHash).HasMaxLength(128);
+            entity.HasIndex(token => token.TokenHash).IsUnique();
+            entity.HasIndex(token => new { token.UserId, token.ExpiresAt });
+            entity.HasOne<JarvisUser>().WithMany().HasForeignKey(token => token.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<Conversation>(entity =>
         {
             entity.ToTable("conversations");

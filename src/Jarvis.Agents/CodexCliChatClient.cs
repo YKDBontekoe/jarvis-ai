@@ -290,7 +290,7 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
             CreateNoWindow = true
         };
         // The model process only needs Codex OAuth and the runtime path. Do not pass database,
-        // object-storage, OIDC, or application secrets to the child process.
+        // object-storage, account tokens, or application secrets to the child process.
         var inheritedPath = Environment.GetEnvironmentVariable("PATH");
         var home = Environment.GetEnvironmentVariable("HOME");
         var codexHome = Environment.GetEnvironmentVariable("CODEX_HOME");

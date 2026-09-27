@@ -70,8 +70,6 @@ jobs:
         working-directory: apps/mobile
         env:
           JARVIS_API_URL: ${{ secrets.JARVIS_API_URL }}
-          JARVIS_OIDC_ISSUER: ${{ secrets.JARVIS_OIDC_ISSUER }}
-          JARVIS_OIDC_CLIENT_ID: ${{ secrets.JARVIS_OIDC_CLIENT_ID }}
           JARVIS_FIREBASE_API_KEY: ${{ secrets.JARVIS_FIREBASE_API_KEY }}
           JARVIS_FIREBASE_PROJECT_ID: ${{ secrets.JARVIS_FIREBASE_PROJECT_ID }}
           JARVIS_FIREBASE_SENDER_ID: ${{ secrets.JARVIS_FIREBASE_SENDER_ID }}
@@ -91,8 +89,6 @@ jobs:
             fi
           }
           add_define JARVIS_API_URL "${JARVIS_API_URL}"
-          add_define JARVIS_OIDC_ISSUER "${JARVIS_OIDC_ISSUER}"
-          add_define JARVIS_OIDC_CLIENT_ID "${JARVIS_OIDC_CLIENT_ID}"
           add_define JARVIS_FIREBASE_API_KEY "${JARVIS_FIREBASE_API_KEY}"
           add_define JARVIS_FIREBASE_PROJECT_ID "${JARVIS_FIREBASE_PROJECT_ID}"
           add_define JARVIS_FIREBASE_SENDER_ID "${JARVIS_FIREBASE_SENDER_ID}"

@@ -4,6 +4,9 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../../../src/Jarvis.Application/Jarvis.Application.csproj" />
     <ProjectReference Include="../../../src/Jarvis.Infrastructure/Jarvis.Infrastructure.csproj" />
   </ItemGroup>

@@ -16,8 +16,8 @@ Jarvis is a self-hosted personal assistant built as a modular .NET monolith with
 - Owner-scoped memory and document search using PostgreSQL full-text and trigram search merged with reciprocal rank fusion; pinned, unexpired memories are included in bounded agent context, and up to eight memory candidates are reranked through the same Codex CLI + ChatGPT OAuth path, with an eight-second fallback to PostgreSQL order
 - Optional MCP stdio tools, constrained to an explicit tool allowlist
 - Per-run MCP connections that inject each owner's encrypted integration credentials only into the configured transport headers or child-process environment, then redact those values from tool results and errors before returning them to the agent; an unavailable optional server is isolated and skipped so it does not interrupt chat
-- OIDC bearer authentication and per-user ownership outside Development
-- Flutter native and web OIDC sign-in with authorization code + PKCE; mobile tokens use OS secure storage and browser tokens use WebCrypto-backed `flutter_secure_storage`
+- ASP.NET Core Identity accounts stored with Entity Framework, with bearer authentication and per-user ownership outside Development
+- Flutter email and password sign-in and registration; access and refresh tokens use OS secure storage on mobile and WebCrypto-backed `flutter_secure_storage` on the web
 - User-managed memory with category filters, search, edit, pin, delete, and visible superseded history; Codex-based extraction deduplicates repeats and transactionally supersedes only explicit corrections to unpinned memories
 - Agent Framework truncation compaction trims old conversation groups above 80,000 tokens to below 64,000 while preserving the four newest groups and keeping tool-call groups intact; full history remains in the session store
 - Agent Framework provides owner-scoped queued, running, and approval-waiting task context to interactive conversations, with task content labeled as untrusted reference data
@@ -46,7 +46,7 @@ Jarvis is a self-hosted personal assistant built as a modular .NET monolith with
 - LiveKit development server plus Flutter `livekit_client` room publishing and a LiveKit Agents voice worker bridged to Codex realtime through the app-server WebSocket transport
 - OpenTelemetry traces and metrics via OTLP, including correlated agent/tool/model spans, agent duration, time-to-first-token, model and tool latency/outcomes, Codex-reported input/output/cached/reasoning token counts, native Codex web-search action counts, memory-search latency/hit counts, and Temporal worker operation spans; telemetry excludes prompts, memory queries, search queries, tool arguments, and results
 
-Development uses a fixed local owner ID and permits unauthenticated access. Outside Development, the API requires OIDC bearer authentication and maps the validated issuer + subject to a stable per-user owner ID. Production startup requires both `Authentication:Authority` and `Authentication:Audience`. Configure your provider and origins before exposing the API. Jarvis sends model prompts and relevant conversation context to the Codex CLI app-server, which must be signed in with ChatGPT OAuth on the host or container. The adapter opens an ephemeral thread in an empty temporary directory with a read-only sandbox, disables Codex shell, browser, computer, app, plugin, skill, image-generation, and multi-agent tools plus MCP servers, and enables only Codex's native standalone web search when configured. The child process receives only OAuth/runtime environment variables; shell network access stays disabled. Codex app-server message-delta events stream chat, while structured Jarvis tool requests are executed separately by Agent Framework through Jarvis's permission and approval path. The app-server and native standalone web-search feature are experimental and should be versioned alongside the Codex CLI installation.
+Development uses a fixed local owner ID when a request has no access token, so local scripts can run without signing in. A signed-in request uses that account's Identity user ID in every environment. Outside Development, the API requires a Jarvis-issued bearer token. Production startup requires `Authentication:Issuer`, `Authentication:Audience`, and `Authentication:SigningKey`. Configure those values and your web origins before exposing the API. Jarvis sends model prompts and relevant conversation context to the Codex CLI app-server, which must be signed in with ChatGPT OAuth on the host or container. The adapter opens an ephemeral thread in an empty temporary directory with a read-only sandbox, disables Codex shell, browser, computer, app, plugin, skill, image-generation, and multi-agent tools plus MCP servers, and enables only Codex's native standalone web search when configured. The child process receives only OAuth/runtime environment variables; shell network access stays disabled. Codex app-server message-delta events stream chat, while structured Jarvis tool requests are executed separately by Agent Framework through Jarvis's permission and approval path. The app-server and native standalone web-search feature are experimental and should be versioned alongside the Codex CLI installation.
 
 ## Run locally
 
@@ -97,7 +97,7 @@ dotnet run --project workers/Jarvis.Worker --no-launch-profile &
 (cd tests/e2e && npm ci && node local_fixture_flow.mjs)
 ```
 
-`local_fixture_flow.mjs` checks streaming, tool events, approvals (approve and decline), memory, reminders, and a Temporal background task through the public HTTP and SignalR API. For the web app, run `flutter build web --profile` and serve `build/web` on `http://localhost:5137`, which is an allowed development CORS origin; release web builds require OIDC.
+`local_fixture_flow.mjs` checks streaming, tool events, approvals (approve and decline), memory, reminders, and a Temporal background task through the public HTTP and SignalR API. For the web app, run `flutter build web --profile` and serve `build/web` on `http://localhost:5137`, which is an allowed development CORS origin. The app signs in against the API; a Development API still accepts unauthenticated script calls.
 
 PostgreSQL integration tests use Testcontainers and the same pgvector PostgreSQL image as the app. Run them on a machine with Docker available:
 
@@ -161,7 +161,7 @@ The bundled Temporal server uses its development mode and SQLite persistence. A 
 
 `infra/compose/docker-compose.production.yml` is a separate production topology. It runs Jarvis behind Caddy with persistent PostgreSQL, a PostgreSQL-backed Temporal server, private Garage S3-compatible storage, ClamAV, LiveKit, and the Jarvis API/workers. Only Caddy's HTTP/HTTPS ports and LiveKit's required media ports are published; Postgres, Temporal, Garage, and ClamAV remain on private Docker networks.
 
-Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, set its mode to `0600`, and replace every placeholder. Set `JARVIS_UID`/`JARVIS_GID` to the account that owns the mounted Codex `auth.json`, configure your OIDC issuer/audience and DNS names, and sign the Codex CLI in with ChatGPT OAuth on the host. Point `CODEX_AUTH_FILE` at that OAuth file. The API and both workers run as that unprivileged numeric user so the mounted OAuth file stays readable without running those containers as root.
+Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, set its mode to `0600`, and replace every placeholder. Set `JARVIS_UID`/`JARVIS_GID` to the account that owns the mounted Codex `auth.json`, configure the account issuer, audience, signing key, and DNS names, and sign the Codex CLI in with ChatGPT OAuth on the host. Point `CODEX_AUTH_FILE` at that OAuth file. The API and both workers run as that unprivileged numeric user so the mounted OAuth file stays readable without running those containers as root.
 
 With DNS for `JARVIS_DOMAIN` and `LIVEKIT_DOMAIN` pointing at the host, start the stack with:
 
@@ -183,7 +183,7 @@ Add `-f infra/compose/docker-compose.home-assistant.yml` to that command and set
 
 Add `-f infra/compose/docker-compose.github.yml` to enable GitHub. Host builds still need `--build` so the API image includes the pinned MCP server; GHCR images already include it.
 
-Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit media, plus outbound HTTPS for Codex OAuth/model access, Firebase FCM/OAuth, user-configured public condition-watch endpoints, Caddy certificate issuance, ClamAV signature updates, and GHCR pulls. The API applies EF migrations at startup after Postgres is healthy. Temporal owns a separate persistent Postgres database. Garage creates the private `jarvis-files` bucket and its application access key before the API starts. Keep the Compose environment file, Garage config, and Codex OAuth file private, and pin every third-party container image to an audited release or digest before deploying. This production topology has been configuration-validated; live service startup still requires pulling its container images and setting real OIDC, DNS, Firebase, APNs, and OAuth credentials.
+Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit media, plus outbound HTTPS for Codex OAuth/model access, Firebase FCM/OAuth, user-configured public condition-watch endpoints, Caddy certificate issuance, ClamAV signature updates, and GHCR pulls. The API applies EF migrations at startup after Postgres is healthy. Temporal owns a separate persistent Postgres database. Garage creates the private `jarvis-files` bucket and its application access key before the API starts. Keep the Compose environment file, Garage config, and Codex OAuth file private, and pin every third-party container image to an audited release or digest before deploying. This production topology has been configuration-validated; live service startup still requires pulling its container images and setting real account signing keys, DNS, Firebase, APNs, and Codex OAuth credentials.
 
 ## GitHub Actions pipelines
 
@@ -201,13 +201,13 @@ Before tagging, align `apps/mobile/pubspec.yaml` with the marketing version (`ve
 
 [`.github/workflows/release-ios.yml`](.github/workflows/release-ios.yml) builds an **unsigned** release IPA on `macos-latest` and attaches `Jarvis.ipa` to the GitHub Release for the SemVer tag. No Apple signing certificates or provisioning profiles are required.
 
-1. Add production Flutter `--dart-define` repository secrets when you need a non-local API and auth at build time: `JARVIS_API_URL`, `JARVIS_OIDC_ISSUER`, `JARVIS_OIDC_CLIENT_ID`, and optional Firebase iOS keys (`JARVIS_FIREBASE_*`).
+1. Add production Flutter `--dart-define` repository secrets when you need a non-local API at build time: `JARVIS_API_URL` and optional Firebase iOS keys (`JARVIS_FIREBASE_*`).
 2. Tag `vX.Y.Z` or run the workflow manually. Download `Jarvis.ipa` from the release.
 3. Import the IPA in [LiveContainer](https://github.com/LiveContainer/LiveContainer) on your device (or copy the file via AirDrop, Files, or another transfer you already use with LiveContainer).
 
 Local packaging uses the same layout as CI: `flutter build ios --release --no-codesign` then [`scripts/ios/package_unsigned_ipa.sh`](scripts/ios/package_unsigned_ipa.sh).
 
-Push notifications and some entitlements may be limited without a normal signed distribution profile; in-app chat, OIDC, and SignalR still depend on your configured `JARVIS_API_URL` and identity provider.
+Push notifications and some entitlements may be limited without a normal signed distribution profile; in-app chat, account sign-in, and SignalR still depend on your configured `JARVIS_API_URL`.
 
 The iOS release workflow publishes both the IPA and generated `source.json` to the Jarvis server. It updates automatically for `v*` releases; a manual workflow run also publishes the selected version without creating a GitHub Release. Add `https://jarvis.ykdbonte.dev/altstore/source.json` to AltStore. Each run keeps earlier IPA versions available for existing source entries. The feed and download are public; keep private data out of the IPA and source metadata.
 
@@ -241,7 +241,7 @@ The Flutter default API URL is `http://localhost:5082`. On Android emulators use
 
 Mobile push uses Firebase Cloud Messaging for both Android and iOS; configure an APNs authentication key for the iOS app in the Firebase project. Pass `JARVIS_FIREBASE_API_KEY`, `JARVIS_FIREBASE_PROJECT_ID`, `JARVIS_FIREBASE_SENDER_ID`, and the platform's `JARVIS_FIREBASE_ANDROID_APP_ID` or `JARVIS_FIREBASE_IOS_APP_ID` as Flutter `--dart-define` values. Set `JARVIS_FIREBASE_IOS_BUNDLE_ID` if the iOS bundle ID differs from `com.example.jarvis_mobile`. The iOS target declares Push Notifications and Background Modes/Remote notifications; use a real signing profile with APNs enabled. The app requests notification permission after sign-in, registers token refreshes with Jarvis, and removes the device registration on sign-out. In production, set `FIREBASE_PROJECT_ID` and `FIREBASE_SERVICE_ACCOUNT_FILE` in the protected Compose environment file; the service-account file is mounted read-only into the API and must be readable by `JARVIS_UID`. Leave the project ID empty to disable server push delivery. SignalR and the in-app notification list continue to work without Firebase configuration.
 
-For OIDC sign-in, register a public authorization-code + PKCE client with redirect URI `com.example.jarvis_mobile:/oauth2redirect` for native apps and the web app origin (or the exact `JARVIS_WEB_OIDC_REDIRECT_URI`) for Flutter web. Run with `--dart-define=JARVIS_OIDC_ISSUER=https://id.example.com/application/o/jarvis/ --dart-define=JARVIS_OIDC_CLIENT_ID=jarvis-mobile`; web builds may also set `--dart-define=JARVIS_WEB_OIDC_REDIRECT_URI=https://jarvis.example.com/`. The browser flow uses state validation and S256 PKCE, exchanges codes without a client secret, refreshes tokens, and stores tokens through `flutter_secure_storage`'s WebCrypto-backed browser implementation. Serve the web app over HTTPS (or localhost), allow the app origin at the identity provider for discovery/token CORS, and configure the same origin in `Cors:AllowedOrigins`. Production Flutter web builds fail closed and require both OIDC defines; an unconfigured Development web build can still use the Development identity bypass.
+Sign in from the Flutter app with email and password. The API stores accounts with ASP.NET Core Identity and Entity Framework, returns a short-lived JWT plus a rotating refresh token, and uses the account ID as the owner ID. Tokens stay in `flutter_secure_storage` (OS secure storage on mobile, WebCrypto in the browser). Serve the web app over HTTPS (or localhost) and configure that origin in `Cors:AllowedOrigins`. Set `Authentication__AllowRegistration=false` after the accounts you need have been created.
 
 ## Configuration
 
@@ -257,8 +257,11 @@ Important settings are in `src/Jarvis.Api/appsettings.json` and may be overridde
 - `Coding__Repositories__0__Name` and `Coding__Repositories__0__Path`: explicit repository allowlist that enables the approval-gated coding tool. Aspire sets this to the current Git checkout.
 - `Coding__WorktreeRoot`: optional parent directory for isolated coding workspaces. Defaults to `.jarvis-worktrees` beside the configured repository.
 - `Coding__TimeoutSeconds`: coding-task time limit from 60 to 3,600 seconds (default 900).
-- `Authentication__Authority`: required outside Development; use your Authentik/Keycloak OIDC issuer.
-- `Authentication__Audience`: required outside Development; the API audience configured in your identity provider.
+- `Authentication__Issuer`: required outside Development; a stable token issuer such as `https://jarvis.example.com`.
+- `Authentication__Audience`: required outside Development; the API audience, usually `jarvis-api`.
+- `Authentication__SigningKey`: required outside Development; at least 32 random bytes. Do not reuse the Development key.
+- `Authentication__AllowRegistration`: allow `POST /api/v1/auth/register` (default `true`). Set `false` after the owner account exists.
+- `Authentication__AccessTokenMinutes` and `Authentication__RefreshTokenDays`: token lifetimes (defaults 15 minutes and 30 days).
 - `OTEL_EXPORTER_OTLP_ENDPOINT`: OpenTelemetry collector or Aspire Dashboard endpoint.
 - `Mcp__Servers__0__Name`, `Mcp__Servers__0__Transport`, `Mcp__Servers__0__Command`, `Mcp__Servers__0__Endpoint`, `Mcp__Servers__0__AllowedTools__0`, and `Mcp__Servers__0__AutoApprovedTools__0`: optional MCP server settings. Supported transports are `stdio` and `streamableHttp`. Only explicitly allowlisted tools reach the agent; tools require approval unless named in `AutoApprovedTools`.
 - `Mcp__Servers__0__CredentialProvider`, `Mcp__Servers__0__CredentialEnvironmentVariables__TOKEN`, and `Mcp__Servers__0__CredentialHeaders__Authorization`: map encrypted owner-scoped integration secrets to an MCP server's process environment or HTTPS headers. Credential map values name secret fields in `PUT /api/v1/integrations/{provider}/credentials`.

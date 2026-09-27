@@ -123,7 +123,7 @@ void main() {
   testWidgets('menu opens the sidebar with destinations and recents', (
     tester,
   ) async {
-    await tester.pumpWidget(const JarvisApp());
+    await tester.pumpWidget(const JarvisApp(skipAuthentication: true));
     await tester.pumpAndSettle();
     expect(find.text('Recents'), findsNothing);
     await tester.tap(find.byTooltip('Menu'));
@@ -134,7 +134,7 @@ void main() {
   });
 
   testWidgets('settings opens from the sidebar', (tester) async {
-    await tester.pumpWidget(const JarvisApp());
+    await tester.pumpWidget(const JarvisApp(skipAuthentication: true));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Menu'));
     await tester.pumpAndSettle();

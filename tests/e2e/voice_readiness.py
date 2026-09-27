@@ -1,19 +1,23 @@
 """Verify unavailable Codex audio does not produce a falsely usable voice session."""
 import json
-import ssl
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 from pathlib import Path
 
 fixture = json.loads(Path('artifacts/verification/identity-fixture.json').read_text())
-context = ssl.create_default_context(cafile='artifacts/verification/certs/localhost.pem')
-grant = urllib.parse.urlencode(dict(grant_type='password', client_id=fixture['clientId'],
-    username=fixture['username'], password=fixture['password'], scope='openid profile')).encode()
-with urllib.request.urlopen(urllib.request.Request(fixture['issuer'] + '/protocol/openid-connect/token',
-    data=grant), context=context) as response:
-    access = json.load(response)['access_token']
+login = json.dumps({'email': fixture['email'], 'password': fixture['password']}).encode()
+login_request = urllib.request.Request('http://localhost:5082/api/v1/auth/login', data=login,
+    headers={'Content-Type': 'application/json'})
+try:
+    with urllib.request.urlopen(login_request) as response:
+        access = json.load(response)['accessToken']
+except urllib.error.HTTPError as error:
+    assert error.code == 401, error.code
+    register = urllib.request.Request('http://localhost:5082/api/v1/auth/register', data=login,
+        headers={'Content-Type': 'application/json'})
+    with urllib.request.urlopen(register) as response:
+        access = json.load(response)['accessToken']
 
 def request(method, path, data=None):
     headers = {'Authorization': 'Bearer ' + access, 'Content-Type': 'application/json'}

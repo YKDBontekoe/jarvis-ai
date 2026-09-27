@@ -50,5 +50,7 @@ String? firstProblemMessage(dynamic data) {
       }
     }
   }
+  final message = asJsonString(map['message']);
+  if (message != null && message.isNotEmpty) return message;
   return asJsonString(map['title']);
 }

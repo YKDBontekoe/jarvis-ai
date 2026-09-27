@@ -447,7 +447,17 @@ void main() {
     );
 
     expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(tester.widget<IconButton>(find.byTooltip('Send')).onPressed, isNull);
+    expect(
+      tester
+          .widget<IconButton>(
+            find.ancestor(
+              of: find.byTooltip('Send'),
+              matching: find.byType(IconButton),
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
   });
 
   testWidgets('suggestion chips send their prompt', (tester) async {

@@ -48,7 +48,7 @@ Merging to `main` runs [`.github/workflows/create-release-tag.yml`](.github/work
 
 - [ ] Not applicable
 - [ ] UI / UX
-- [ ] OIDC, push, or LiveKit
+- [ ] Sign-in, push, or LiveKit
 - [ ] iOS build / unsigned IPA / LiveContainer
 
 ## Related issues
