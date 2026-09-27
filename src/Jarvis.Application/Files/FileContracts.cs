@@ -11,6 +11,7 @@ public interface IFileRepository
     Task<IReadOnlyList<StoredFile>> ListDeletingAsync(CancellationToken cancellationToken);
     Task MarkProcessingScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken);
     Task<bool> RequeueForProcessingAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+    Task<int> RequeueStaleQueuedAsync(DateTimeOffset olderThan, CancellationToken cancellationToken);
     Task<int> RequeueStaleProcessingAsync(DateTimeOffset olderThan, CancellationToken cancellationToken);
     Task<bool> MarkDeletingAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);

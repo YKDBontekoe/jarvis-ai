@@ -59,6 +59,12 @@ public sealed class FileRepository(JarvisDbContext db) : IFileRepository
                 .SetProperty(x => x.ProcessingStatus, "queued")
                 .SetProperty(x => x.ScheduleDispatchedAt, (DateTimeOffset?)null), cancellationToken) != 0;
 
+    public async Task<int> RequeueStaleQueuedAsync(DateTimeOffset olderThan, CancellationToken cancellationToken) =>
+        await db.Files.Where(x => x.ProcessingStatus == "queued" &&
+                x.ScheduleDispatchedAt != null && x.ScheduleDispatchedAt < olderThan)
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(x => x.ScheduleDispatchedAt, (DateTimeOffset?)null), cancellationToken);
+
     public async Task<int> RequeueStaleProcessingAsync(DateTimeOffset olderThan, CancellationToken cancellationToken) =>
         await db.Files.Where(x => x.ProcessingStatus == "processing" &&
                 x.ScheduleDispatchedAt != null && x.ScheduleDispatchedAt < olderThan)

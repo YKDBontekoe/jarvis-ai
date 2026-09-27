@@ -153,6 +153,8 @@ internal sealed class TemporalWorkflowReconciler(
                             briefing.WorkflowId, cancellationToken);
                     }, cancellationToken);
 
+            await fileRepository.RequeueStaleQueuedAsync(
+                DateTimeOffset.UtcNow.AddMinutes(-FileIndexing.QueuedDispatchStaleMinutes), cancellationToken);
             await fileRepository.RequeueStaleProcessingAsync(DateTimeOffset.UtcNow.AddMinutes(-60),
                 cancellationToken);
             var files = await fileRepository.ListQueuedForProcessingAsync(cancellationToken);

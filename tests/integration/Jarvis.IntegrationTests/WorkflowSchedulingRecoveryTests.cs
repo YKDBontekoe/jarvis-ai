@@ -1,6 +1,8 @@
 using Jarvis.Infrastructure.Persistence;
+using Jarvis.Application.Files;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Conversations;
+using Jarvis.Domain.Files;
 using Jarvis.Domain.Workflows;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
@@ -81,6 +83,37 @@ public sealed class WorkflowSchedulingRecoveryTests : IAsyncLifetime
         Assert.Equal(2, pending.Count);
         Assert.Contains(pending, item => item.Id == stale.Id);
         Assert.Contains(pending, item => item.Id == fresh.Id);
+    }
+
+    [Fact]
+    public async Task Stale_queued_files_are_requeued_for_temporal_restart()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var files = new FileRepository(database);
+        var staleId = Guid.CreateVersion7();
+        var freshId = Guid.CreateVersion7();
+        var recentId = Guid.CreateVersion7();
+        await files.CreateAsync(new StoredFile(staleId, owner, staleId.ToString(), "stale.txt", "text/plain",
+            32, new string('0', 64), DateTimeOffset.UtcNow, "queued"), CancellationToken.None);
+        await files.CreateAsync(new StoredFile(freshId, owner, freshId.ToString(), "fresh.txt", "text/plain",
+            32, new string('0', 64), DateTimeOffset.UtcNow, "queued"), CancellationToken.None);
+        await files.CreateAsync(new StoredFile(recentId, owner, recentId.ToString(), "recent.txt", "text/plain",
+            32, new string('0', 64), DateTimeOffset.UtcNow, "queued"), CancellationToken.None);
+        await files.MarkProcessingScheduleDispatchedAsync(staleId, CancellationToken.None);
+        await files.MarkProcessingScheduleDispatchedAsync(recentId, CancellationToken.None);
+        await database.Files.Where(x => x.Id == staleId)
+            .ExecuteUpdateAsync(update => update.SetProperty(x => x.ScheduleDispatchedAt,
+                DateTimeOffset.UtcNow.AddMinutes(-(FileIndexing.QueuedDispatchStaleMinutes + 1))));
+        database.ChangeTracker.Clear();
+
+        Assert.Equal(1, await files.RequeueStaleQueuedAsync(
+            DateTimeOffset.UtcNow.AddMinutes(-FileIndexing.QueuedDispatchStaleMinutes), CancellationToken.None));
+        var pending = await files.ListQueuedForProcessingAsync(CancellationToken.None);
+        Assert.Equal(2, pending.Count);
+        Assert.Contains(pending, item => item.Id == staleId);
+        Assert.Contains(pending, item => item.Id == freshId);
+        Assert.DoesNotContain(pending, item => item.Id == recentId);
     }
 
     [Fact]
