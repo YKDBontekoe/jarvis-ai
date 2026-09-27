@@ -161,7 +161,7 @@ The bundled Temporal server uses its development mode and SQLite persistence. A 
 
 `infra/compose/docker-compose.production.yml` is a separate production topology. It runs Jarvis behind Caddy with persistent PostgreSQL, a PostgreSQL-backed Temporal server, private Garage S3-compatible storage, ClamAV, LiveKit, and the Jarvis API/workers. Only Caddy's HTTP/HTTPS ports and LiveKit's required media ports are published; Postgres, Temporal, Garage, and ClamAV remain on private Docker networks.
 
-Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, set its mode to `0600`, and replace every placeholder. Set `JARVIS_UID`/`JARVIS_GID` to the account that owns the mounted Codex `auth.json`, configure the account issuer, audience, signing key, and DNS names, and sign the Codex CLI in with ChatGPT OAuth on the host. Point `CODEX_AUTH_FILE` at that OAuth file. The API and both workers run as that unprivileged numeric user so the mounted OAuth file stays readable without running those containers as root.
+Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, set its mode to `0600`, and replace every placeholder. Set `JARVIS_UID`/`JARVIS_GID` to the account that owns `CODEX_HOME_DIR`, configure the account issuer, audience, signing key, and DNS names, and sign the Codex CLI in with ChatGPT OAuth using `CODEX_HOME="$CODEX_HOME_DIR" codex login`. Use a dedicated persistent directory for `CODEX_HOME_DIR`, owned by that numeric account with mode `0700`; it stores `auth.json` and writable Codex app-server state. The API and both workers mount this directory and run as that unprivileged user.
 
 With DNS for `JARVIS_DOMAIN` and `LIVEKIT_DOMAIN` pointing at the host, start the stack with:
 
