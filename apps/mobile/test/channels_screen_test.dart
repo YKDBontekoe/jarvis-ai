@@ -96,8 +96,14 @@ void main() {
       find.byKey(const Key('channel-access-token')),
       'EAAB',
     );
-    await tester.enterText(find.text('App secret'), 'app-secret');
-    await tester.enterText(find.text('Webhook verify token'), 'verify-me');
+    await tester.enterText(
+      find.byKey(const Key('channel-app-secret')),
+      'app-secret',
+    );
+    await tester.enterText(
+      find.byKey(const Key('channel-verify-token')),
+      'verify-me',
+    );
     await tester.tap(find.byKey(const Key('channel-save')));
     await tester.pumpAndSettle();
 

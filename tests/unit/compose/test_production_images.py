@@ -27,6 +27,7 @@ REQUIRED_ENV = {
     "JARVIS_UID": "1000",
     "JARVIS_GID": "1000",
     "CODEX_AUTH_FILE": "/tmp/codex-auth.json",
+    "CODEX_HOME_DIR": "/tmp/codex-home",
     "JARVIS_DATA_PROTECTION_KEYS_DIR": "/tmp/jarvis-data-protection-keys",
     "AUTH_ISSUER": "https://jarvis.example.com",
     "AUTH_AUDIENCE": "jarvis-api",

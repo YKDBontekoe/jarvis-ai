@@ -652,12 +652,14 @@ class _ChannelEditorSheetState extends State<ChannelEditorSheet> {
               ),
               const SizedBox(height: 10),
               TextField(
+                key: const Key('channel-app-secret'),
                 controller: _appSecret,
                 obscureText: true,
                 decoration: const InputDecoration(labelText: 'App secret'),
               ),
               const SizedBox(height: 10),
               TextField(
+                key: const Key('channel-verify-token'),
                 controller: _verifyToken,
                 decoration: const InputDecoration(
                   labelText: 'Webhook verify token',

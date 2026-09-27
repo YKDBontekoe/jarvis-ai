@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'ui/phosphor_icons.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -1759,7 +1760,7 @@ class _ChatScreenState extends State<ChatScreen> {
       try {
         await _hub?.invoke(
           'CompleteDeviceInvoke',
-          args: [invokeId, result, error],
+          args: [invokeId, result ?? '', error ?? ''],
         );
       } catch (_) {}
     }
@@ -2728,7 +2729,7 @@ class _ChatScreenState extends State<ChatScreen> {
     UiSurfaceEntry() => UiSurfaceCard(
       surface: entry,
       onAction: entry.status == 'open'
-          ? (action, values) => unawaited(_submitSurface(entry, action, values))
+          ? (action, values) => _submitSurface(entry, action, values)
           : null,
     ),
     BrowserSessionEntry() => BrowserTimelineView(session: entry),
