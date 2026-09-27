@@ -786,6 +786,11 @@ api.MapGet("/files/search", async (string? query, IFileSearchService files, ICur
     return Results.Ok(hits.Select(hit => new FileSearchHitDto(hit.FileId, hit.FileName, hit.ChunkIndex, hit.Content, hit.Score)));
 }).WithName("SearchFiles");
 
+api.MapPost("/files/{id:guid}/reprocess", async (Guid id, IFileService files, ICurrentUser currentUser,
+    CancellationToken ct) =>
+    await files.RetryIndexingAsync(id, currentUser.OwnerId, ct) ? Results.NoContent() : Results.NotFound())
+    .WithName("RetryFileIndexing");
+
 api.MapPost("/files", async (IFormFile? file, IFileService files, IAuditEventStore audit,
     ICurrentUser currentUser, CancellationToken ct) =>
 {

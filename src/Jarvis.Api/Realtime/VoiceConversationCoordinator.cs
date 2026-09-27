@@ -93,6 +93,7 @@ public sealed class VoiceConversationCoordinator(
                         conversationId,
                         message = "Jarvis could not complete this response."
                     }, CancellationToken.None);
+                    spokenResponse = "I could not complete that. Check the Jarvis app.";
                 }
             }
             finally { accessor.HttpContext = priorContext; }

@@ -8,6 +8,9 @@ public sealed class McpServerEndpointValidatorTests
 {
     [Theory]
     [InlineData("8.8.8.8", true)]
+    [InlineData("::ffff:8.8.8.8", true)]
+    [InlineData("::ffff:10.0.0.1", false)]
+    [InlineData("::ffff:169.254.169.254", false)]
     [InlineData("1.1.1.1", true)]
     [InlineData("10.0.0.1", false)]
     [InlineData("100.64.0.1", false)]

@@ -107,6 +107,28 @@ public sealed class FileService(
         return content is null ? null : (file, content);
     }
 
+    public async Task<bool> RetryIndexingAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+    {
+        var file = await repository.GetAsync(id, ownerId, cancellationToken);
+        if (file is null || file.ProcessingStatus == "deleting" || !FileIndexing.IsIndexable(file.ContentType))
+            return false;
+        if (!await repository.RequeueForProcessingAsync(id, ownerId, cancellationToken)) return false;
+        try
+        {
+            await scheduler.ScheduleAsync(id, ownerId, cancellationToken);
+            await repository.MarkProcessingScheduleDispatchedAsync(id, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "File {FileId} remains queued for Temporal indexing recovery.", id);
+        }
+        return true;
+    }
+
     public async Task<bool> DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
     {
         var file = await repository.GetAsync(id, ownerId, cancellationToken);

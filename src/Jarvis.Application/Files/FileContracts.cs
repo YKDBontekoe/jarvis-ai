@@ -60,5 +60,6 @@ public interface IFileService
         Stream content, CancellationToken cancellationToken);
     Task<IReadOnlyList<StoredFile>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<(StoredFile File, Stream Content)?> OpenReadAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+    Task<bool> RetryIndexingAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<bool> DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
 }

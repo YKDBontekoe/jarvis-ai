@@ -125,6 +125,20 @@ class _FilesScreenState extends State<FilesScreen> {
     }
   }
 
+  Future<void> _retryIndexing(Map<String, dynamic> file) async {
+    final id = jsonString(file, 'id');
+    if (id == null) return;
+    setState(() => _busy = true);
+    try {
+      await widget.http.post('/api/v1/files/$id/reprocess');
+      await _load();
+    } on DioException {
+      if (mounted) _showError('Jarvis could not retry indexing this file.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _delete(Map<String, dynamic> file) async {
     final id = jsonString(file, 'id');
     if (id == null) return;
@@ -240,10 +254,17 @@ class _FilesScreenState extends State<FilesScreen> {
                       PopupMenuButton<String>(
                         enabled: !_busy,
                         icon: const Icon(PhosphorIconsRegular.dotsThree),
-                        onSelected: (action) =>
-                            action == 'open' ? _download(file) : _delete(file),
-                        itemBuilder: (context) => const [
-                          PopupMenuItem(
+                        onSelected: (action) {
+                          if (action == 'open') {
+                            _download(file);
+                          } else if (action == 'retry') {
+                            _retryIndexing(file);
+                          } else if (action == 'delete') {
+                            _delete(file);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
                             value: 'open',
                             child: ListTile(
                               leading: Icon(
@@ -253,7 +274,18 @@ class _FilesScreenState extends State<FilesScreen> {
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
-                          PopupMenuItem(
+                          if (status == 'failed')
+                            const PopupMenuItem(
+                              value: 'retry',
+                              child: ListTile(
+                                leading: Icon(
+                                  PhosphorIconsRegular.arrowsClockwise,
+                                ),
+                                title: Text('Retry indexing'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          const PopupMenuItem(
                             value: 'delete',
                             child: ListTile(
                               leading: Icon(

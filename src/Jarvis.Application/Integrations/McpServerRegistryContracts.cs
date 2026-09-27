@@ -50,7 +50,8 @@ public static class McpServerEndpointValidator
 
     public static bool IsPublic(IPAddress address)
     {
-        if (IPAddress.IsLoopback(address) || address.IsIPv4MappedToIPv6) return false;
+        if (address.IsIPv4MappedToIPv6) return IsPublic(address.MapToIPv4());
+        if (IPAddress.IsLoopback(address)) return false;
         if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
         {
             var bytes = address.GetAddressBytes();
