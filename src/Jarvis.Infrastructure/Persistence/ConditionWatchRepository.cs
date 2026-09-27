@@ -39,17 +39,11 @@ public sealed class ConditionWatchRepository(JarvisDbContext db) : IConditionWat
 
     public async Task<int> RequeueStaleActiveAsync(DateTimeOffset utcNow, CancellationToken cancellationToken)
     {
-        var candidates = await db.ConditionWatches.AsNoTracking()
-            .Where(x => x.Status == "active" && x.ScheduleDispatchedAt != null)
-            .Select(x => new { x.Id, x.IntervalMinutes, Heartbeat = x.LastCheckedAt ?? x.ScheduleDispatchedAt })
-            .Take(200).ToListAsync(cancellationToken);
-        var staleIds = candidates
-            .Where(x => x.Heartbeat is not null &&
-                        x.Heartbeat.Value.AddMinutes(x.IntervalMinutes + ConditionWatch.ScheduleStaleGraceMinutes) < utcNow)
-            .Select(x => x.Id)
-            .ToList();
-        if (staleIds.Count == 0) return 0;
-        return await db.ConditionWatches.Where(x => staleIds.Contains(x.Id) && x.Status == "active")
+        var grace = ConditionWatch.ScheduleStaleGraceMinutes;
+        return await db.ConditionWatches.Where(x => x.Status == "active" &&
+                x.ScheduleDispatchedAt != null &&
+                (x.LastCheckedAt ?? x.ScheduleDispatchedAt)!.Value
+                    .AddMinutes(x.IntervalMinutes + grace) < utcNow)
             .ExecuteUpdateAsync(update => update.SetProperty(x => x.ScheduleDispatchedAt, (DateTimeOffset?)null),
                 cancellationToken);
     }

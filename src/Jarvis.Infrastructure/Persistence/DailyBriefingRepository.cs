@@ -43,7 +43,7 @@ public sealed class DailyBriefingRepository(JarvisDbContext db) : IDailyBriefing
     {
         var dispatched = await db.DailyBriefings.AsNoTracking()
             .Where(x => x.Enabled && x.ScheduleDispatchedAt != null)
-            .Take(200).ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
         var staleIds = dispatched
             .Where(x => DailyBriefingClock.IsDispatchStale(x.Enabled, x.ScheduleDispatchedAt, x.LocalTime,
                 x.TimeZoneId, x.LastDeliveredDate, utcNow))
