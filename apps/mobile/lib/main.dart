@@ -136,11 +136,13 @@ class _AuthSession {
     }
   }
 
-  Future<String?> accessToken() {
+  Future<String?> accessToken({bool forceRefresh = false}) {
     final existing = _accessTokenInFlight;
-    if (existing != null) return existing;
+    if (existing != null && !forceRefresh) return existing;
     late final Future<String?> pending;
-    pending = _serialized(_readOrRefreshAccessToken).whenComplete(() {
+    pending = _serialized(
+      () => _readOrRefreshAccessToken(forceRefresh: forceRefresh),
+    ).whenComplete(() {
       if (identical(_accessTokenInFlight, pending)) {
         _accessTokenInFlight = null;
       }
@@ -149,7 +151,7 @@ class _AuthSession {
     return pending;
   }
 
-  Future<String?> _readOrRefreshAccessToken() async {
+  Future<String?> _readOrRefreshAccessToken({bool forceRefresh = false}) async {
     final generation = _generation;
     if (!enabled) return null;
     _ensureConfigured();
@@ -168,7 +170,8 @@ class _AuthSession {
     );
     final accessToken = await _storage.read(key: 'access_token');
     if (generation != _generation) return null;
-    if (accessToken != null &&
+    if (!forceRefresh &&
+        accessToken != null &&
         expiration != null &&
         expiration > DateTime.now().millisecondsSinceEpoch + 30000) {
       return accessToken;
@@ -424,11 +427,33 @@ class _ChatScreenState extends State<ChatScreen> {
             handler.reject(DioException(requestOptions: options, error: error));
           }
         },
-        onError: (error, handler) {
-          if (!_signedOut && !_signingOut && _isAuthExpired(error)) {
-            unawaited(_signOut());
+        onError: (error, handler) async {
+          if (_signedOut ||
+              _signingOut ||
+              !_isAuthExpired(error) ||
+              error.requestOptions.extra['jarvisRetriedAuth'] == true) {
+            if (!_signedOut && !_signingOut && _isAuthExpired(error)) {
+              unawaited(_signOut());
+            }
+            handler.next(error);
+            return;
           }
-          handler.next(error);
+          try {
+            final token = await _auth.accessToken(forceRefresh: true);
+            if (token == null || token.isEmpty) {
+              if (!_signedOut && !_signingOut) unawaited(_signOut());
+              handler.next(error);
+              return;
+            }
+            final request = error.requestOptions;
+            request.headers['Authorization'] = 'Bearer $token';
+            request.extra['jarvisRetriedAuth'] = true;
+            handler.resolve(await _http.fetch(request));
+          } on DioException catch (retryError) {
+            handler.next(retryError);
+          } catch (_) {
+            handler.next(error);
+          }
         },
       ),
     );

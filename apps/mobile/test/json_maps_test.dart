@@ -62,7 +62,25 @@ void main() {
     expect(asJsonBool('true'), isFalse);
   });
 
-  test('normalizeOidcIssuer ignores a trailing slash', () {
+  test('oidcRedirectOrigin drops query, fragment, and credentials', () {
+    expect(
+      oidcRedirectOrigin(
+        Uri.parse('https://app.example.com/chat/?code=abc&state=xyz#frag'),
+      ).toString(),
+      'https://app.example.com/chat/',
+    );
+    expect(
+      oidcRedirectOrigin(Uri.parse('http://localhost:5082/?error=access_denied'))
+          .toString(),
+      'http://localhost:5082/',
+    );
+    expect(
+      Uri.parse('https://app.example.com/?code=abc')
+          .replace(query: null, fragment: null)
+          .hasQuery,
+      isTrue,
+    );
+  });
     expect(normalizeOidcIssuer('https://idp.example.com/'), 'https://idp.example.com');
     expect(
       normalizeOidcIssuer('https://idp.example.com/realms/foo/'),

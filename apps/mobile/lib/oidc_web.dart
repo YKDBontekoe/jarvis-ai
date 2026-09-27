@@ -20,7 +20,7 @@ final _http = Dio(
 String currentRedirectUri(String configuredRedirectUri) {
   final redirectUri = configuredRedirectUri.isNotEmpty
       ? Uri.parse(configuredRedirectUri)
-      : Uri.base.replace(query: null, fragment: null);
+      : oidcRedirectOrigin(Uri.base);
   final localDevelopmentHost =
       redirectUri.host == 'localhost' ||
       redirectUri.host == '127.0.0.1' ||
