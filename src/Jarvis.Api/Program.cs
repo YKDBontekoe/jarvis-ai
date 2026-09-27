@@ -18,6 +18,7 @@ using Jarvis.Application.Integrations;
 using Jarvis.Application.Security;
 using Jarvis.Domain.Conversations;
 using Jarvis.Infrastructure;
+using Jarvis.Infrastructure.Identity;
 using Jarvis.Infrastructure.Persistence;
 using Jarvis.Memory;
 using Jarvis.Mcp;
@@ -30,10 +31,7 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-if (!builder.Environment.IsDevelopment() &&
-    (string.IsNullOrWhiteSpace(builder.Configuration["Authentication:Authority"]) ||
-     string.IsNullOrWhiteSpace(builder.Configuration["Authentication:Audience"])))
-    throw new InvalidOperationException("Configure OIDC Authentication:Authority and Authentication:Audience before running Jarvis outside Development.");
+var accountTokens = AccountTokenOptions.From(builder.Configuration, builder.Environment.IsDevelopment());
 
 if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(builder.Configuration["Antivirus:Host"]))
     throw new InvalidOperationException("Configure Antivirus:Host with a private ClamAV daemon before running Jarvis outside Development.");
@@ -47,20 +45,18 @@ if (!builder.Environment.IsDevelopment() &&
         .Any(key => string.IsNullOrWhiteSpace(builder.Configuration[key])))
     throw new InvalidOperationException("Configure LiveKit and Voice:WorkerSecret before running Jarvis outside Development.");
 
-if (!builder.Environment.IsDevelopment())
-{
-    builder.Services.AddAuthentication("Bearer").AddJwtBearer("Bearer", options =>
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
-        options.Authority = builder.Configuration["Authentication:Authority"];
-        options.Audience = builder.Configuration["Authentication:Audience"];
-        options.RequireHttpsMetadata = true;
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
         options.MapInboundClaims = false;
+        options.TokenValidationParameters = accountTokens.ValidationParameters();
         options.Events = new JwtBearerEvents
         {
             OnTokenValidated = context =>
             {
-                if (string.IsNullOrWhiteSpace(context.Principal?.FindFirst("sub")?.Value))
-                    context.Fail("The access token must identify an OIDC subject.");
+                if (!Guid.TryParse(context.Principal?.FindFirst("sub")?.Value, out _))
+                    context.Fail("The access token must identify an account.");
                 return Task.CompletedTask;
             },
             OnMessageReceived = context =>
@@ -72,13 +68,13 @@ if (!builder.Environment.IsDevelopment())
             }
         };
     });
-    builder.Services.AddAuthorization();
-}
+builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 
 builder.AddServiceDefaults();
 builder.Services.AddJarvisInfrastructure(builder.Configuration);
+builder.Services.AddJarvisIdentity(accountTokens);
 builder.Services.AddJarvisMemory();
 builder.Services.AddSingleton<TemporalReminderScheduler>();
 builder.Services.AddSingleton<IFileProcessingScheduler>(serviceProvider => serviceProvider.GetRequiredService<TemporalReminderScheduler>());
@@ -119,17 +115,15 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
 app.UseCors();
-if (!app.Environment.IsDevelopment())
-{
-    app.UseAuthentication();
-    app.UseAuthorization();
-}
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapDefaultEndpoints();
 var hub = app.MapHub<JarvisEventsHub>("/hubs/events");
 if (!app.Environment.IsDevelopment()) hub.RequireAuthorization();
 
 var api = app.MapGroup("/api/v1");
 if (!app.Environment.IsDevelopment()) api.RequireAuthorization();
+api.MapAccountAuth();
 api.MapPost("/conversations", async (IConversationStore store, ICurrentUser currentUser, CreateConversationRequest request, CancellationToken ct) =>
 {
     var title = string.IsNullOrWhiteSpace(request.Title) ? "New conversation" : request.Title.Trim();
