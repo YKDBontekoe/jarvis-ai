@@ -43,19 +43,27 @@ class _RemindersScreenState extends State<RemindersScreen>
       _error = null;
     });
     try {
-      final responses = await Future.wait([
-        widget.http.get<List<dynamic>>('/api/v1/reminders'),
-        widget.http.get<List<dynamic>>('/api/v1/notifications'),
-      ]);
-      if (mounted && revision == _requestRevision) {
-        setState(() {
-          _reminders = jsonMaps(responses[0].data);
-          _notifications = jsonMaps(responses[1].data);
-        });
+      String? error;
+      try {
+        final reminders = await widget.http.get<List<dynamic>>('/api/v1/reminders');
+        if (mounted && revision == _requestRevision) {
+          setState(() => _reminders = jsonMaps(reminders.data));
+        }
+      } on DioException {
+        error = 'Jarvis could not load reminders.';
       }
-    } on DioException {
+      try {
+        final notifications = await widget.http.get<List<dynamic>>(
+          '/api/v1/notifications',
+        );
+        if (mounted && revision == _requestRevision) {
+          setState(() => _notifications = jsonMaps(notifications.data));
+        }
+      } on DioException {
+        error ??= 'Jarvis could not load notifications.';
+      }
       if (mounted && revision == _requestRevision) {
-        setState(() => _error = 'Jarvis could not load reminders.');
+        setState(() => _error = error);
       }
     } finally {
       if (mounted && revision == _requestRevision) {

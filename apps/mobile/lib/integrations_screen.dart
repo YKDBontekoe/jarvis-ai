@@ -33,35 +33,44 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     if (!mounted) return;
     final revision = ++_requestRevision;
     try {
-      final response = await widget.http.get<List<dynamic>>(
-        '/api/v1/integrations/credentials',
-      );
-      final connectionResponse = await widget.http.get<List<dynamic>>(
-        '/api/v1/integrations/connections',
-      );
-      final serversResponse = await widget.http.get<List<dynamic>>(
-        '/api/v1/mcp-servers',
-      );
+      String? error;
+      try {
+        final response = await widget.http.get<List<dynamic>>(
+          '/api/v1/integrations/credentials',
+        );
+        if (!mounted || revision != _requestRevision) return;
+        setState(() => _providers = jsonMaps(response.data));
+      } on DioException {
+        error = 'Could not load integration credentials.';
+      }
+      try {
+        final connectionResponse = await widget.http.get<List<dynamic>>(
+          '/api/v1/integrations/connections',
+        );
+        if (!mounted || revision != _requestRevision) return;
+        setState(() => _connections = jsonMaps(connectionResponse.data));
+      } on DioException {
+        error ??= 'Could not load integration connections.';
+      }
+      try {
+        final serversResponse = await widget.http.get<List<dynamic>>(
+          '/api/v1/mcp-servers',
+        );
+        if (!mounted || revision != _requestRevision) return;
+        setState(() => _managedServers = jsonMaps(serversResponse.data));
+      } on DioException {
+        error ??= 'Could not load MCP servers.';
+      }
       if (!mounted || revision != _requestRevision) return;
       setState(() {
-        _providers = jsonMaps(response.data);
-        _connections = jsonMaps(connectionResponse.data);
-        _managedServers = jsonMaps(serversResponse.data);
         _loading = false;
-        _error = null;
+        _error = error;
       });
-    } on DioException {
-      if (mounted && revision == _requestRevision) {
-        setState(() {
-          _loading = false;
-          _error = 'Could not load integration credentials.';
-        });
-      }
     } catch (_) {
       if (mounted && revision == _requestRevision) {
         setState(() {
           _loading = false;
-          _error = 'Could not load integration credentials.';
+          _error ??= 'Could not load integration credentials.';
         });
       }
     }

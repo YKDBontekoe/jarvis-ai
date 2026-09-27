@@ -42,28 +42,40 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       _error = null;
     });
     try {
-      final responses = await Future.wait<Response<dynamic>>([
-        widget.http.get<Map<String, dynamic>>('/api/v1/tasks/${widget.taskId}'),
-        widget.http.get<List<dynamic>>(
-          '/api/v1/tasks/${widget.taskId}/messages',
-        ),
-      ]);
+      Map<String, dynamic>? task;
+      try {
+        final taskResponse = await widget.http.get<Map<String, dynamic>>(
+          '/api/v1/tasks/${widget.taskId}',
+        );
+        final data = taskResponse.data;
+        task = data is Map ? Map<String, dynamic>.from(data) : null;
+      } on DioException catch (error) {
+        if (!mounted || revision != _requestRevision) return;
+        setState(() {
+          _error = error.response?.statusCode == 404
+              ? 'This task is no longer available.'
+              : 'Jarvis could not load the task details.';
+        });
+        return;
+      }
       if (!mounted || revision != _requestRevision) return;
       setState(() {
-        final task = responses[0].data;
-        _task = task is Map ? Map<String, dynamic>.from(task) : null;
-        _messages = jsonMaps(responses[1].data);
+        _task = task;
         if (_task == null) {
           _error = 'Jarvis returned an invalid task.';
         }
       });
-    } on DioException catch (error) {
-      if (!mounted || revision != _requestRevision) return;
-      setState(() {
-        _error = error.response?.statusCode == 404
-            ? 'This task is no longer available.'
-            : 'Jarvis could not load the task details.';
-      });
+      if (task == null) return;
+      try {
+        final messagesResponse = await widget.http.get<List<dynamic>>(
+          '/api/v1/tasks/${widget.taskId}/messages',
+        );
+        if (!mounted || revision != _requestRevision) return;
+        setState(() => _messages = jsonMaps(messagesResponse.data));
+      } on DioException {
+        if (!mounted || revision != _requestRevision) return;
+        setState(() => _error = 'Jarvis could not load the task activity.');
+      }
     } catch (_) {
       if (!mounted || revision != _requestRevision) return;
       setState(() => _error = 'Jarvis could not load the task details.');

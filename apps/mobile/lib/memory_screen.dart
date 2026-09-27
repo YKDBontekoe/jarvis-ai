@@ -424,7 +424,11 @@ class _MemoryScreenState extends State<MemoryScreen> {
               tone: NoticeTone.danger,
               margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               actions: [
-                TextButton(onPressed: _load, child: const Text('Retry')),
+                TextButton(
+                  onPressed: () =>
+                      _load(query: _searching ? _query.text.trim() : null),
+                  child: const Text('Retry'),
+                ),
               ],
             ),
           ),
@@ -432,7 +436,11 @@ class _MemoryScreenState extends State<MemoryScreen> {
           child: _loading
               ? const LoadingState()
               : _error != null && _memories.isEmpty
-              ? ErrorState(message: _error!, onRetry: _load)
+              ? ErrorState(
+                  message: _error!,
+                  onRetry: () =>
+                      _load(query: _searching ? _query.text.trim() : null),
+                )
               : _memories.isEmpty
               ? EmptyState(
                   icon: _searching
