@@ -83,6 +83,28 @@ public sealed class WorkflowSchedulingRecoveryTests : IAsyncLifetime
         Assert.Contains(pending, item => item.Id == fresh.Id);
     }
 
+    [Fact]
+    public async Task Stale_enabled_briefings_are_requeued_for_temporal_restart()
+    {
+        await using var database = CreateDbContext();
+        var now = DateTimeOffset.UtcNow;
+        var stale = new DailyBriefingPreference(Guid.CreateVersion7(), true, new TimeOnly(8, 0), "UTC");
+        stale.MarkScheduleDispatched();
+        stale.MarkDelivered(DateOnly.FromDateTime(now.UtcDateTime.AddDays(-2)));
+        var fresh = new DailyBriefingPreference(Guid.CreateVersion7(), true, new TimeOnly(8, 0), "UTC");
+        fresh.MarkScheduleDispatched();
+        fresh.MarkDelivered(DateOnly.FromDateTime(now.UtcDateTime));
+        database.DailyBriefings.AddRange(stale, fresh);
+        await database.SaveChangesAsync();
+        await database.DailyBriefings.Where(x => x.OwnerId == stale.OwnerId)
+            .ExecuteUpdateAsync(update => update.SetProperty(x => x.ScheduleDispatchedAt, now.AddDays(-2)));
+
+        var briefings = new DailyBriefingRepository(database);
+        Assert.Equal(1, await briefings.RequeueStaleEnabledAsync(now, CancellationToken.None));
+        var pending = await briefings.ListPendingForSchedulingAsync(CancellationToken.None);
+        Assert.Equal(stale.OwnerId, Assert.Single(pending).OwnerId);
+    }
+
     private JarvisDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<JarvisDbContext>()

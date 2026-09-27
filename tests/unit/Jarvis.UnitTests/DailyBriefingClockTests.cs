@@ -70,4 +70,20 @@ public sealed class DailyBriefingClockTests
         Assert.Equal(new DateTimeOffset(2026, 3, 11, 8, 0, 0, TimeSpan.Zero), schedule.FireAt);
         Assert.Equal(new DateOnly(2026, 3, 11), schedule.LocalDate);
     }
+
+    [Fact]
+    public void Dispatch_is_stale_when_a_missed_day_should_catch_up()
+    {
+        var now = new DateTimeOffset(2026, 3, 10, 9, 0, 0, TimeSpan.Zero);
+        Assert.True(DailyBriefingClock.IsDispatchStale(true, now.AddDays(-2), new TimeOnly(8, 0), "UTC",
+            new DateOnly(2026, 3, 9), now));
+        Assert.False(DailyBriefingClock.IsDispatchStale(true, now, new TimeOnly(8, 0), "UTC",
+            new DateOnly(2026, 3, 9), now));
+        Assert.False(DailyBriefingClock.IsDispatchStale(true, now.AddHours(-1), new TimeOnly(8, 0), "UTC",
+            new DateOnly(2026, 3, 10), now));
+        Assert.False(DailyBriefingClock.IsDispatchStale(false, now.AddDays(-2), new TimeOnly(8, 0), "UTC",
+            new DateOnly(2026, 3, 9), now));
+        Assert.False(DailyBriefingClock.IsDispatchStale(true, null, new TimeOnly(8, 0), "UTC",
+            new DateOnly(2026, 3, 9), now));
+    }
 }

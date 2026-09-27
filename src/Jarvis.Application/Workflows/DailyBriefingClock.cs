@@ -23,6 +23,29 @@ public static class DailyBriefingClock
         return new DailyBriefingSchedule(fireAt, localDate, dayStart, nextDayStart);
     }
 
+    public static bool IsDispatchStale(bool enabled, DateTimeOffset? scheduleDispatchedAt, TimeOnly localTime,
+        string timeZoneId, DateOnly? lastDeliveredDate, DateTimeOffset utcNow)
+    {
+        if (!enabled || scheduleDispatchedAt is null) return false;
+        if (scheduleDispatchedAt > utcNow.AddMinutes(-30)) return false;
+        try
+        {
+            return ResolveNext(utcNow, localTime, timeZoneId, lastDeliveredDate).FireAt <= utcNow;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return false;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
     private static DateTimeOffset GetNextOccurrence(DateTimeOffset now, TimeOnly localTime, TimeZoneInfo timeZone,
         DateOnly? lastDeliveredDate, bool catchUpMissedDay)
     {

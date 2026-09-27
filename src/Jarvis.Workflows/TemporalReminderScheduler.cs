@@ -98,7 +98,7 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
             new WorkflowOptions(id: briefing.WorkflowId, taskQueue: TaskQueue)
             {
                 IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
-                IdReusePolicy = WorkflowIdReusePolicy.RejectDuplicate
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
             });
     }
 

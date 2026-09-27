@@ -125,6 +125,7 @@ internal sealed class TemporalWorkflowReconciler(
                     }, cancellationToken);
 
             var briefingRepository = services.GetRequiredService<IDailyBriefingRepository>();
+            await briefingRepository.RequeueStaleEnabledAsync(DateTimeOffset.UtcNow, cancellationToken);
             var briefings = await briefingRepository.ListPendingForSchedulingAsync(cancellationToken);
             foreach (var briefing in briefings)
                 await TryScheduleAsync("daily briefing", briefing.OwnerId,

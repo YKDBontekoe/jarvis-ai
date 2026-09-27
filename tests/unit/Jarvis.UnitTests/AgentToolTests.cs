@@ -316,6 +316,8 @@ public sealed class AgentToolTests
             SaveDailyBriefingRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<DailyBriefingPreferenceRecord>> ListPendingForSchedulingAsync(
             CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<int> RequeueStaleEnabledAsync(DateTimeOffset utcNow, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
         public Task MarkScheduleDispatchedAsync(Guid ownerId, string workflowId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
         public Task<bool> DeliverAsync(DailyBriefingActivityInput input, CancellationToken cancellationToken) =>

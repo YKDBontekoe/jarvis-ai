@@ -39,6 +39,22 @@ public sealed class DailyBriefingRepository(JarvisDbContext db) : IDailyBriefing
             .OrderBy(x => x.UpdatedAt).Take(200).ToListAsync(cancellationToken))
         .Select(x => x.ToRecord()).ToArray();
 
+    public async Task<int> RequeueStaleEnabledAsync(DateTimeOffset utcNow, CancellationToken cancellationToken)
+    {
+        var dispatched = await db.DailyBriefings.AsNoTracking()
+            .Where(x => x.Enabled && x.ScheduleDispatchedAt != null)
+            .Take(200).ToListAsync(cancellationToken);
+        var staleIds = dispatched
+            .Where(x => DailyBriefingClock.IsDispatchStale(x.Enabled, x.ScheduleDispatchedAt, x.LocalTime,
+                x.TimeZoneId, x.LastDeliveredDate, utcNow))
+            .Select(x => x.OwnerId)
+            .ToList();
+        if (staleIds.Count == 0) return 0;
+        return await db.DailyBriefings.Where(x => staleIds.Contains(x.OwnerId) && x.Enabled)
+            .ExecuteUpdateAsync(update => update.SetProperty(x => x.ScheduleDispatchedAt, (DateTimeOffset?)null),
+                cancellationToken);
+    }
+
     public async Task MarkScheduleDispatchedAsync(Guid ownerId, string workflowId,
         CancellationToken cancellationToken)
     {

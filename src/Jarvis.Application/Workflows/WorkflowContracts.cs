@@ -42,6 +42,7 @@ public interface IDailyBriefingRepository
     Task<(DailyBriefingPreferenceRecord Preference, string PreviousWorkflowId)> SaveAsync(Guid ownerId,
         SaveDailyBriefingRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<DailyBriefingPreferenceRecord>> ListPendingForSchedulingAsync(CancellationToken cancellationToken);
+    Task<int> RequeueStaleEnabledAsync(DateTimeOffset utcNow, CancellationToken cancellationToken);
     Task MarkScheduleDispatchedAsync(Guid ownerId, string workflowId, CancellationToken cancellationToken);
     Task<bool> DeliverAsync(DailyBriefingActivityInput input, CancellationToken cancellationToken);
 }
