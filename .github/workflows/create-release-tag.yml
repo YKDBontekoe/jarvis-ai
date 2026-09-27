@@ -82,3 +82,4 @@ jobs:
           git tag -a "${TAG}" -m "Release ${TAG}"
           git push origin "${TAG}"
           gh workflow run release-ios.yml --ref "${TAG}"
+          gh workflow run deploy-backend.yml --ref "${TAG}"
