@@ -59,20 +59,40 @@ public static class AgentSessionJson
     public static bool TryGetCompletedAssistantTextAfterUser(string sessionJson, string userContent, out string text)
     {
         text = string.Empty;
-        if (string.IsNullOrEmpty(userContent) || !TryGetCompletedAssistantText(sessionJson, out text))
-            return false;
+        if (string.IsNullOrEmpty(userContent)) return false;
         try
         {
             using var document = JsonDocument.Parse(sessionJson);
-            if (!TryFindMessages(document.RootElement, out var messages))
+            if (!TryFindMessages(document.RootElement, out var messages) || messages.GetArrayLength() < 2)
                 return false;
-            var previous = messages[messages.GetArrayLength() - 2];
-            if (IsRole(previous, "assistant") || !TryGetPlainText(previous, out var previousText))
+
+            var lastIndex = messages.GetArrayLength() - 1;
+            var last = messages[lastIndex];
+            if (IsRole(last, "user") || !TryGetPlainText(last, out text))
                 return false;
-            return string.Equals(previousText, userContent, StringComparison.Ordinal);
+
+            for (var index = lastIndex - 1; index >= 0; index--)
+            {
+                var message = messages[index];
+                if (IsRole(message, "assistant") || HasToolContents(message))
+                    continue;
+                if (!TryGetPlainText(message, out var previousText))
+                {
+                    text = string.Empty;
+                    return false;
+                }
+                if (string.Equals(previousText, userContent, StringComparison.Ordinal))
+                    return true;
+                text = string.Empty;
+                return false;
+            }
+
+            text = string.Empty;
+            return false;
         }
         catch (JsonException)
         {
+            text = string.Empty;
             return false;
         }
     }
@@ -80,6 +100,8 @@ public static class AgentSessionJson
     public static bool HasInFlightProgressAfterUser(string sessionJson, string userContent)
     {
         if (string.IsNullOrEmpty(userContent)) return false;
+        if (TryGetCompletedAssistantTextAfterUser(sessionJson, userContent, out _))
+            return false;
         try
         {
             using var document = JsonDocument.Parse(sessionJson);

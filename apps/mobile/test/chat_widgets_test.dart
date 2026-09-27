@@ -245,6 +245,25 @@ void main() {
     expect(sent, 1);
   });
 
+  testWidgets('composer stop stays enabled while voice is starting', (tester) async {
+    var stopped = 0;
+    await tester.pumpWidget(
+      _host(
+        ChatComposer(
+          controller: TextEditingController(),
+          onSend: () {},
+          onVoice: () => stopped++,
+          sending: false,
+          voiceActive: false,
+          voiceStarting: true,
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Stop voice'));
+    expect(stopped, 1);
+  });
+
   testWidgets('suggestion chips send their prompt', (tester) async {
     String? selected;
     await tester.pumpWidget(

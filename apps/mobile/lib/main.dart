@@ -379,6 +379,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   bool get _hasMessages => _entries.any((entry) => entry is MessageEntry);
 
+  bool get _hasPendingApproval => _entries.any(
+    (entry) => entry is ApprovalEntry && entry.status == ApprovalStatus.pending,
+  );
+
   bool get _busy =>
       _sending ||
       _entries.any(
@@ -504,9 +508,10 @@ class _ChatScreenState extends State<ChatScreen> {
         !_signingOut;
     await _stopVoice();
     if (!isCurrent()) return;
-    await _hub?.stop();
-    if (!isCurrent()) return;
+    final previous = _hub;
     _hub = null;
+    await previous?.stop();
+    if (!isCurrent()) return;
     setState(() {
       _conversationId = conversationId;
       _connected = false;
@@ -983,8 +988,8 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       await hub.start();
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) {
-        await hub.stop();
         if (identical(_hub, hub)) _hub = null;
+        await hub.stop();
         return;
       }
       await hub.invoke('JoinConversation', args: [conversationId]);
@@ -992,8 +997,8 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() => _connected = true);
       }
     } catch (_) {
-      await hub.stop();
       if (identical(_hub, hub)) _hub = null;
+      await hub.stop();
       rethrow;
     }
   }
@@ -1096,6 +1101,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _connected = false;
         _sending = false;
         _conversationId = null;
+        _error = null;
         _entries.clear();
         _recent = [];
       });
@@ -1271,6 +1277,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (content.isEmpty ||
         conversationId == null ||
         _busy ||
+        _hasPendingApproval ||
         _voiceActive ||
         _voiceStarting ||
         _signedOut ||
@@ -1339,7 +1346,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _retry(MessageEntry message) async {
-    if (_busy || _voiceActive || _voiceStarting || _signedOut || _signingOut) {
+    if (_busy ||
+        _hasPendingApproval ||
+        _voiceActive ||
+        _voiceStarting ||
+        _signedOut ||
+        _signingOut) {
       return;
     }
     setState(() => _entries.remove(message));
@@ -1445,7 +1457,7 @@ class _ChatScreenState extends State<ChatScreen> {
       await _stopVoice();
       return;
     }
-    if (_sending || _signedOut || _signingOut) return;
+    if (_sending || _hasPendingApproval || _signedOut || _signingOut) return;
     final conversationId = _conversationId;
     if (conversationId == null || !_connected) {
       setState(() => _error = 'Connect to Jarvis before starting voice.');
@@ -2036,7 +2048,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ? null
                     : () => _selectDestination(2),
                 onAttach: _showQuickActions,
-                sending: _busy,
+                sending: _busy || _hasPendingApproval,
                 voiceActive: _voiceActive,
                 voiceStarting: _voiceStarting,
               ),
@@ -2331,6 +2343,7 @@ class _ChatScreenState extends State<ChatScreen> {
     voiceStarting: _voiceStarting,
     onTalk: _conversationId == null ||
             _sending ||
+            _hasPendingApproval ||
             !_connected
         ? null
         : () => _selectDestination(2),
@@ -2339,7 +2352,7 @@ class _ChatScreenState extends State<ChatScreen> {
     onContinueConversation: _hasMessages
         ? () => setState(() => _showHome = false)
         : null,
-    onSuggestion: _conversationId == null || _busy
+    onSuggestion: _conversationId == null || _busy || _hasPendingApproval
         ? null
         : (text) => unawaited(_send(text)),
   );

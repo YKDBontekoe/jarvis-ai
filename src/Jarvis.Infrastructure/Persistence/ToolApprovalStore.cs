@@ -84,18 +84,34 @@ public sealed class ToolApprovalStore(JarvisDbContext db) : IToolApprovalStore
             cancellationToken))?.ToRecord();
     }
 
-    public async Task<IReadOnlyList<ToolApprovalRecord>> ListActionableAsync(Guid ownerId, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<ToolApprovalRecord>> ListActionableAsync(Guid ownerId,
+        CancellationToken cancellationToken) =>
+        MaterializeActionableAsync(
+            OrderedActionable(ActionableQuery(ownerId)).Take(100), cancellationToken);
+
+    public Task<IReadOnlyList<ToolApprovalRecord>> ListActionableForConversationAsync(Guid ownerId,
+        Guid conversationId, CancellationToken cancellationToken) =>
+        MaterializeActionableAsync(
+            OrderedActionable(ActionableQuery(ownerId).Where(x => x.ConversationId == conversationId)),
+            cancellationToken);
+
+    private IQueryable<ToolApproval> ActionableQuery(Guid ownerId)
     {
         var staleBefore = DateTimeOffset.UtcNow - ResumeRecoveryAge;
-        return (await db.ToolApprovals.AsNoTracking().Where(x => x.OwnerId == ownerId &&
+        return db.ToolApprovals.AsNoTracking().Where(x => x.OwnerId == ownerId &&
             (x.Status == "pending" ||
              ((x.Status == "approved" || x.Status == "rejected") &&
               (x.ResumeStatus == "pending" || x.ResumeStatus == "failed" ||
                (x.ResumeStatus == "running" && x.ResumeStartedAt < staleBefore)))) &&
-            (x.TaskId == null || db.Tasks.Any(task => task.Id == x.TaskId && task.Status == "needs_approval")))
-            .OrderBy(x => x.Status == "pending" ? 0 : 1).ThenBy(x => x.CreatedAt).Take(100)
-            .ToListAsync(cancellationToken)).Select(x => x.ToRecord()).ToList();
+            (x.TaskId == null || db.Tasks.Any(task => task.Id == x.TaskId && task.Status == "needs_approval")));
     }
+
+    private static IQueryable<ToolApproval> OrderedActionable(IQueryable<ToolApproval> query) =>
+        query.OrderBy(x => x.Status == "pending" ? 0 : 1).ThenBy(x => x.CreatedAt);
+
+    private static async Task<IReadOnlyList<ToolApprovalRecord>> MaterializeActionableAsync(
+        IQueryable<ToolApproval> query, CancellationToken cancellationToken) =>
+        (await query.ToListAsync(cancellationToken)).Select(x => x.ToRecord()).ToList();
 
     public Task<bool> HasPendingForTaskAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken) =>
         db.ToolApprovals.AsNoTracking().AnyAsync(x => x.TaskId == taskId && x.OwnerId == ownerId &&

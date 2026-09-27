@@ -122,6 +122,8 @@ public sealed class NotificationPushWorker(
                                    body.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase);
                 if (invalidToken)
                 {
+                    await db.PushDeliveries.Where(x => x.DeviceId == device.Id)
+                        .ExecuteDeleteAsync(cancellationToken);
                     await db.PushDevices.Where(x => x.Id == device.Id)
                         .ExecuteDeleteAsync(cancellationToken);
                     logger.LogInformation("Removed an expired push token for owner {OwnerId}.", device.OwnerId);

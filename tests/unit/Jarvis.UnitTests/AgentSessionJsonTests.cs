@@ -63,6 +63,25 @@ public sealed class AgentSessionJsonTests
     }
 
     [Fact]
+    public void RecoversAssistantTextAfterToolTurnsForTheMatchingUser()
+    {
+        const string session = """
+            {"stateBag":{"messages":[
+              {"role":"user","contents":[{"text":"Remind me","$type":"text"}]},
+              {"role":"assistant","contents":[
+                {"callId":"c1","$type":"functionCall","name":"CreateReminder","arguments":{"title":"Dentist"}},
+                {"callId":"c1","$type":"functionResult","text":"created"}
+              ]},
+              {"role":"assistant","contents":[{"text":"Reminder set.","$type":"text"}]}
+            ]}}
+            """;
+        Assert.True(AgentSessionJson.TryGetCompletedAssistantTextAfterUser(session, "Remind me", out var text));
+        Assert.Equal("Reminder set.", text);
+        Assert.False(AgentSessionJson.TryGetCompletedAssistantTextAfterUser(session, "Something else", out _));
+        Assert.False(AgentSessionJson.HasInFlightProgressAfterUser(session, "Remind me"));
+    }
+
+    [Fact]
     public void RecoversPendingApprovalsAndPrefaceFromTheLastAssistantTurn()
     {
         const string session = """
@@ -84,6 +103,7 @@ public sealed class AgentSessionJsonTests
         Assert.False(AgentSessionJson.TryGetPendingApprovals(
             """{"stateBag":{"messages":[{"role":"user","contents":[{"text":"Hello","$type":"text"}]}]}}""",
             out _, out _));
+        Assert.True(AgentSessionJson.HasInFlightProgressAfterUser(session, "Remind me"));
     }
 
     [Fact]

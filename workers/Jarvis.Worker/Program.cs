@@ -236,6 +236,8 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
         if (task is null || task.Status is "completed" or "failed" or "cancelled") return false;
 
         var result = answer.ToString();
+        if (string.IsNullOrWhiteSpace(result))
+            throw new InvalidOperationException("The agent completed without an assistant response.");
         assistantMessage = new Message(task.ConversationId, "assistant", result, task.ResultMessageId);
         await conversations.AddMessageAsync(assistantMessage, cancellationToken);
         try

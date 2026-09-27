@@ -742,7 +742,7 @@ class _ChatComposerState extends State<ChatComposer> {
                   icon: PhosphorIconsRegular.stop,
                   tooltip: 'Stop voice',
                   danger: true,
-                  onPressed: widget.voiceStarting ? null : widget.onVoice,
+                  onPressed: widget.onVoice,
                 )
               else
                 AnimatedSwitcher(

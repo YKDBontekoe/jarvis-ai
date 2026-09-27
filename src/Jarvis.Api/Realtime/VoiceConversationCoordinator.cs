@@ -20,7 +20,6 @@ public sealed class VoiceConversationCoordinator(
         if (transcript.Length > 32_000) transcript = transcript[..32_000];
 
         var clients = hub.Clients.Group(JarvisEventsHub.GroupName(conversationId));
-        await clients.SendAsync("voice.transcript", new { conversationId, text = transcript }, cancellationToken);
         string? spokenResponse = null;
 
         var accessorScope = scopeFactory.CreateAsyncScope();
@@ -36,12 +35,20 @@ public sealed class VoiceConversationCoordinator(
                 var services = accessorScope.ServiceProvider;
                 var conversations = services.GetRequiredService<IConversationStore>();
                 var tasks = services.GetRequiredService<IJarvisTaskRepository>();
+                var approvals = services.GetRequiredService<IToolApprovalStore>();
                 if (await conversations.GetAsync(conversationId, ownerId, cancellationToken) is null ||
                     await tasks.GetTaskByConversationIdAsync(conversationId, ownerId, cancellationToken) is not null)
                     return null;
 
                 var runLock = services.GetRequiredService<IConversationRunLock>();
                 await using var lease = await runLock.AcquireAsync(conversationId, cancellationToken);
+                var pendingApprovals = await approvals.ListActionableForConversationAsync(ownerId, conversationId,
+                    cancellationToken);
+                if (pendingApprovals.Count > 0)
+                    return "I need your approval before I can continue. Check the Jarvis app.";
+
+                await clients.SendAsync("voice.transcript", new { conversationId, text = transcript },
+                    cancellationToken);
                 var existingMessages = await conversations.GetMessagesAsync(conversationId, cancellationToken);
                 var lastMessage = existingMessages.Count > 0 ? existingMessages[^1] : null;
                 var userMessage = lastMessage is { Role: "user" } && lastMessage.Content == transcript

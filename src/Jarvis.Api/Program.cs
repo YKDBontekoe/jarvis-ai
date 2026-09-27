@@ -174,6 +174,7 @@ api.MapPost("/conversations/{conversationId:guid}/messages", async (
     IConversationStore store,
     IConversationRunLock runLock,
     IJarvisTaskRepository tasks,
+    IToolApprovalStore approvals,
     ICurrentUser currentUser,
     IJarvisAgent agent,
     AgentRunCoordinator coordinator,
@@ -192,10 +193,20 @@ api.MapPost("/conversations/{conversationId:guid}/messages", async (
     await using var runLease = await runLock.AcquireAsync(conversationId, ct);
     var existingMessages = await store.GetMessagesAsync(conversationId, ct);
     var lastMessage = existingMessages.Count > 0 ? existingMessages[^1] : null;
-    var userMessage = lastMessage is { Role: "user" } && lastMessage.Content == content
-        ? lastMessage
-        : new Message(conversationId, "user", content);
-    if (!ReferenceEquals(userMessage, lastMessage))
+    var isSameUserTurn = lastMessage is { Role: "user" } && lastMessage.Content == content;
+    var pendingApprovals = await approvals.ListActionableForConversationAsync(currentUser.OwnerId, conversationId, ct);
+    if (pendingApprovals.Count > 0)
+    {
+        if (!isSameUserTurn)
+            return Results.Conflict(new { message = "Decide the pending tool call for this conversation first." });
+        var stillPending = pendingApprovals.Where(x => x.Status == "pending").ToList();
+        if (stillPending.Count > 0)
+            return Results.Accepted("/api/v1/approvals", stillPending.Select(ToApprovalDto));
+        return Results.Conflict(new { message = "A previous tool decision is still finishing for this conversation." });
+    }
+
+    var userMessage = isSameUserTurn ? lastMessage! : new Message(conversationId, "user", content);
+    if (!isSameUserTurn)
         await store.AddMessageAsync(userMessage, ct);
     if (ReferenceEquals(userMessage, lastMessage) &&
         await coordinator.TryRecoverCompletedAssistantAsync(conversationId, content, ct) is { } recovered)
