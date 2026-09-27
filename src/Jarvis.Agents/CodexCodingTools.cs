@@ -9,14 +9,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Jarvis.Agents;
 
-/// <summary>Runs a coding task in a fresh detached worktree using the Codex CLI harness.</summary>
+/// <summary>Runs a coding task in an isolated snapshot using the Codex CLI harness.</summary>
 public sealed class CodexCodingTools(IConfiguration configuration, ILogger<CodexCodingTools> logger,
     IAuditEventStore audit, ICurrentUser currentUser, CodexProcessLimiter processLimiter)
 {
     private const int MaxTaskLength = 16_000;
     private const int MaxResultLength = 24_000;
 
-    [Description("Implement or investigate a coding task in an allowlisted repository. Jarvis creates a fresh detached Git worktree; changes remain there for review and are never merged into the main checkout automatically. This action always requires user approval.")]
+    [Description("Implement or investigate a coding task in an allowlisted repository. Jarvis copies the current tree into an isolated Git snapshot without history, so deleted credentials in the object store are unreachable. Changes remain there for review and are never merged into the main checkout automatically. This action always requires user approval.")]
     public async Task<string> RunCodingTaskAsync(
         [Description("Repository name from the configured Jarvis coding repository allowlist.")] string repositoryName,
         [Description("The coding task to perform. Include the intended outcome and relevant constraints.")] string task,
@@ -55,27 +55,13 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
         var worktreePath = Path.Combine(repositoryWorktreeRoot, taskId);
         Directory.CreateDirectory(repositoryWorktreeRoot);
 
-        var head = await RunProcessAsync("git", repositoryPath,
-            ["rev-parse", "--verify", "HEAD"], cancellationToken);
         var files = await RunProcessAsync("git", repositoryPath,
             ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], cancellationToken);
         if (files.ExitCode != 0)
             throw new InvalidOperationException($"Could not list source files for the coding task: {Limit(files.StandardError, 1_500)}");
-        var hasSensitiveTrackedFiles = files.StandardOutput.Split('\0', StringSplitOptions.RemoveEmptyEntries)
-            .Any(IsSensitivePath);
-        var useGitWorktree = head.ExitCode == 0 && !hasSensitiveTrackedFiles;
-        var sourceMode = useGitWorktree ? "git-worktree" : "filtered-file-snapshot";
-        if (useGitWorktree)
-        {
-            var add = await RunProcessAsync("git", repositoryPath,
-                ["worktree", "add", "--detach", worktreePath, "HEAD"], cancellationToken);
-            if (add.ExitCode != 0)
-                throw new InvalidOperationException($"Could not create a coding worktree: {Limit(add.StandardError, 1_500)}");
-        }
-        else
-        {
-            await CreateSnapshotRepositoryAsync(repositoryPath, worktreePath, files.StandardOutput, cancellationToken);
-        }
+        // Never share the source repo object database: detached worktrees expose deleted blobs via git log/show.
+        const string sourceMode = "filtered-file-snapshot";
+        await CreateSnapshotRepositoryAsync(repositoryPath, worktreePath, files.StandardOutput, cancellationToken);
 
         var resultPath = Path.Combine(repositoryWorktreeRoot, $"{taskId}.result.txt");
         var executable = configuration["Codex:ExecutablePath"] ?? "codex";
