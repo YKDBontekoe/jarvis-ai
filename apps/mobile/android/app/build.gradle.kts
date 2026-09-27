@@ -23,7 +23,6 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        manifestPlaceholders += mapOf("appAuthRedirectScheme" to "com.example.jarvis_mobile")
     }
 
     buildTypes {
