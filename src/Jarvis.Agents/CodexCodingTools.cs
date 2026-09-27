@@ -11,7 +11,7 @@ namespace Jarvis.Agents;
 
 /// <summary>Runs a coding task in a fresh detached worktree using the Codex CLI harness.</summary>
 public sealed class CodexCodingTools(IConfiguration configuration, ILogger<CodexCodingTools> logger,
-    IAuditEventStore audit, ICurrentUser currentUser)
+    IAuditEventStore audit, ICurrentUser currentUser, CodexProcessLimiter processLimiter)
 {
     private const int MaxTaskLength = 16_000;
     private const int MaxResultLength = 24_000;
@@ -85,76 +85,88 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
         var start = CreateMinimalProcessStart(executable, worktreePath);
         AddCodexCodingArguments(start, worktreePath, resultPath, codingModel);
         var metadata = JsonSerializer.Serialize(new { repository = repository.Name, sourceMode });
-        await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.started", "high",
-            true, null, metadata, cancellationToken);
-        using var process = new Process { StartInfo = start };
-        if (!process.Start())
-        {
-            await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.failed", "high",
-                false, null, metadata, CancellationToken.None);
-            throw new InvalidOperationException("Could not start the Codex CLI coding process.");
-        }
 
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
-        using var killOnCancellation = timeout.Token.Register(() =>
-        {
-            try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
-            catch (InvalidOperationException) { }
-            catch (System.ComponentModel.Win32Exception) { }
-        });
-
-        var stderrTask = process.StandardError.ReadToEndAsync();
-        var stdoutTask = process.StandardOutput.ReadToEndAsync();
-        await process.StandardInput.WriteAsync(BuildPrompt(repository.Name, task).AsMemory(), timeout.Token);
-        process.StandardInput.Close();
+        await processLimiter.WaitAsync(cancellationToken);
+        var exitCode = -1;
+        var standardError = string.Empty;
         try
         {
-            await process.WaitForExitAsync(timeout.Token);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            logger.LogWarning("Codex coding task timed out for repository {RepositoryName}.", repository.Name);
-            await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.failed", "high",
-                false, null, metadata, CancellationToken.None);
-            try { await Task.WhenAll(stderrTask, stdoutTask).WaitAsync(TimeSpan.FromSeconds(2)); }
-            catch (TimeoutException) { }
-            catch (OperationCanceledException) { }
-            return JsonSerializer.Serialize(new
+            await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.started", "high",
+                true, null, metadata, cancellationToken);
+            using var process = new Process { StartInfo = start };
+            if (!process.Start())
             {
-                completed = false,
-                reason = "Codex reached the coding-task time limit.",
-                worktreePath
+                await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.failed", "high",
+                    false, null, metadata, CancellationToken.None);
+                throw new InvalidOperationException("Could not start the Codex CLI coding process.");
+            }
+
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+            using var killOnCancellation = timeout.Token.Register(() =>
+            {
+                try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+                catch (InvalidOperationException) { }
+                catch (System.ComponentModel.Win32Exception) { }
             });
+
+            var stderrTask = process.StandardError.ReadToEndAsync();
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            await process.StandardInput.WriteAsync(BuildPrompt(repository.Name, task).AsMemory(), timeout.Token);
+            process.StandardInput.Close();
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                logger.LogWarning("Codex coding task timed out for repository {RepositoryName}.", repository.Name);
+                await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.failed", "high",
+                    false, null, metadata, CancellationToken.None);
+                try { await Task.WhenAll(stderrTask, stdoutTask).WaitAsync(TimeSpan.FromSeconds(2)); }
+                catch (TimeoutException) { }
+                catch (OperationCanceledException) { }
+                return JsonSerializer.Serialize(new
+                {
+                    completed = false,
+                    reason = "Codex reached the coding-task time limit.",
+                    worktreePath
+                });
+            }
+
+            try { standardError = await stderrTask.WaitAsync(TimeSpan.FromSeconds(2)); }
+            catch (TimeoutException) { standardError = string.Empty; }
+            try { _ = await stdoutTask.WaitAsync(TimeSpan.FromSeconds(2)); }
+            catch (TimeoutException) { }
+            exitCode = process.ExitCode;
+        }
+        finally
+        {
+            processLimiter.Release();
         }
 
-        string standardError;
-        try { standardError = await stderrTask.WaitAsync(TimeSpan.FromSeconds(2)); }
-        catch (TimeoutException) { standardError = string.Empty; }
-        try { _ = await stdoutTask.WaitAsync(TimeSpan.FromSeconds(2)); }
-        catch (TimeoutException) { }
         var summary = File.Exists(resultPath)
             ? await File.ReadAllTextAsync(resultPath, cancellationToken)
             : string.Empty;
         var status = await RunProcessAsync("git", worktreePath, ["status", "--short"], cancellationToken);
         var diff = await RunProcessAsync("git", worktreePath, ["diff", "--stat", "HEAD"], cancellationToken);
         await audit.AppendAsync(currentUser.OwnerId, "codex",
-            process.ExitCode == 0 ? "coding_task.completed" : "coding_task.failed",
-            "high", process.ExitCode == 0, null, metadata, cancellationToken);
+            exitCode == 0 ? "coding_task.completed" : "coding_task.failed",
+            "high", exitCode == 0, null, metadata, cancellationToken);
         logger.LogInformation("Codex coding task finished for repository {RepositoryName} with exit code {ExitCode}.",
-            repository.Name, process.ExitCode);
+            repository.Name, exitCode);
 
         return JsonSerializer.Serialize(new
         {
-            completed = process.ExitCode == 0,
-            exitCode = process.ExitCode,
+            completed = exitCode == 0,
+            exitCode,
             repository = repository.Name,
             sourceMode,
             worktreePath,
             changedFiles = Limit(status.StandardOutput.Trim(), 4_000),
             diffSummary = Limit(diff.StandardOutput.Trim(), 4_000),
             summary = Limit(summary.Trim(), MaxResultLength),
-            error = process.ExitCode == 0 ? null : Limit(standardError.Trim(), 2_000)
+            error = exitCode == 0 ? null : Limit(standardError.Trim(), 2_000)
         });
     }
 

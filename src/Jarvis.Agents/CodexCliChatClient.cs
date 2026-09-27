@@ -17,7 +17,7 @@ namespace Jarvis.Agents;
 /// </summary>
 public sealed class CodexCliChatClient(string executablePath, string? model = null, string? visionModel = null,
     IReadOnlyDictionary<string, string>? modelClasses = null, bool enableWebSearch = true,
-    int turnTimeoutSeconds = 300) : IChatClient
+    int turnTimeoutSeconds = 300, CodexProcessLimiter? processLimiter = null) : IChatClient
 {
     private static readonly ActivitySource ActivitySource = new("Jarvis.CodexChatClient");
     private static readonly Meter Meter = new("Jarvis.CodexChatClient");
@@ -53,7 +53,7 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
     private readonly Dictionary<string, string> _modelClasses = (modelClasses ?? new Dictionary<string, string>())
         .Where(item => !string.IsNullOrWhiteSpace(item.Key) && !string.IsNullOrWhiteSpace(item.Value))
         .ToDictionary(item => item.Key.Trim(), item => item.Value.Trim(), StringComparer.OrdinalIgnoreCase);
-    private readonly SemaphoreSlim _processSlots = new(2, 2);
+    private readonly CodexProcessLimiter _processSlots = processLimiter ?? new CodexProcessLimiter();
     private readonly TimeSpan _turnTimeout = TimeSpan.FromSeconds(turnTimeoutSeconds);
     private readonly SemaphoreSlim _modelCatalogLock = new(1, 1);
     private readonly object _modelCatalogSync = new();
@@ -113,7 +113,7 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
 
     public void Dispose()
     {
-        _processSlots.Dispose();
+        if (processLimiter is null) _processSlots.Dispose();
         _modelCatalogLock.Dispose();
     }
 

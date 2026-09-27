@@ -79,7 +79,8 @@ public sealed class JarvisAgentFactory(IServiceProvider services, IConfiguration
         {
             var codingTool = AIFunctionFactory.Create(new CodexCodingTools(configuration,
                 services.GetRequiredService<ILogger<CodexCodingTools>>(),
-                auditEvents, currentUser).RunCodingTaskAsync);
+                auditEvents, currentUser,
+                services.GetRequiredService<CodexProcessLimiter>()).RunCodingTaskAsync);
             tools.Add(new ApprovalRequiredAIFunction(codingTool));
         }
 
