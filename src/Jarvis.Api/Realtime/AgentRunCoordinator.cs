@@ -41,14 +41,15 @@ public sealed class AgentRunCoordinator(
         CancellationToken cancellationToken)
     {
         var clients = hub.Clients.Group(JarvisEventsHub.GroupName(conversationId));
-        await clients.SendAsync("message.completed", new
+        await PublishSafelyAsync(clients, "message.completed", new
         {
             id = assistant.Id,
             role = assistant.Role,
             content = assistant.Content,
             createdAt = assistant.CreatedAt
-        }, cancellationToken);
-        await clients.SendAsync("agent.completed", new { conversationId }, cancellationToken);
+        }, conversationId, cancellationToken);
+        await PublishSafelyAsync(clients, "agent.completed", new { conversationId }, conversationId,
+            cancellationToken);
     }
 
     public async Task<AgentRunOutcome> RunAsync(Guid ownerId, Guid conversationId,
@@ -103,7 +104,8 @@ public sealed class AgentRunCoordinator(
         var activeToolSpans = new Dictionary<string, (Activity? Span, long StartedAt)>(StringComparer.Ordinal);
         var firstTextTokenSeen = false;
         var clients = hub.Clients.Group(JarvisEventsHub.GroupName(conversationId));
-        await clients.SendAsync("agent.started", new { conversationId }, cancellationToken);
+        await PublishSafelyAsync(clients, "agent.started", new { conversationId }, conversationId,
+            cancellationToken);
 
         try
         {
@@ -119,7 +121,8 @@ public sealed class AgentRunCoordinator(
                         _ => null
                     };
                     if (eventName is not null)
-                        await clients.SendAsync(eventName, new { conversationId, tool = toolProgress.ToolName }, cancellationToken);
+                        await PublishSafelyAsync(clients, eventName,
+                            new { conversationId, tool = toolProgress.ToolName }, conversationId, cancellationToken);
 
                     if (toolProgress.Phase == "started")
                     {
@@ -157,7 +160,9 @@ public sealed class AgentRunCoordinator(
                         activity?.SetTag("jarvis.time_to_first_token_ms", elapsed);
                     }
                     answer.Append(update.TextDelta);
-                    await clients.SendAsync("message.delta", new { conversationId, messageId, delta = update.TextDelta }, cancellationToken);
+                    await PublishSafelyAsync(clients, "message.delta",
+                        new { conversationId, messageId, delta = update.TextDelta }, conversationId,
+                        cancellationToken);
                     if (onTextDelta is not null)
                         await onTextDelta(update.TextDelta, cancellationToken);
                 }
