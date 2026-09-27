@@ -155,7 +155,7 @@ api.MapGet("/conversations/{conversationId:guid}", async (Guid conversationId, I
 }).WithName("GetConversation");
 
 api.MapDelete("/conversations/{conversationId:guid}", async (Guid conversationId,
-    IConversationStore store, IConversationRunLock runLock, IAuditEventStore audit,
+    IConversationStore store, IConversationRunLock runLock,
     ICurrentUser currentUser, CancellationToken ct) =>
 {
     await using var lease = await runLock.AcquireAsync(conversationId, ct);
@@ -163,8 +163,6 @@ api.MapDelete("/conversations/{conversationId:guid}", async (Guid conversationId
     if (result == ConversationDeleteResult.NotFound) return Results.NotFound();
     if (result == ConversationDeleteResult.TaskBacked)
         return Results.Conflict(new { message = "Task conversations are managed from the Tasks section." });
-    await audit.AppendAsync(currentUser.OwnerId, "conversations", "conversation.deleted", "moderate", true,
-        null, JsonSerializer.Serialize(new { resourceId = conversationId }), ct);
     return Results.NoContent();
 }).WithName("DeleteConversation");
 

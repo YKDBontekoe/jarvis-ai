@@ -96,7 +96,10 @@ public sealed class FileRepository(JarvisDbContext db) : IFileRepository
                 cancellationToken) != 0;
         }
 
-        query = query.Where(x => x.ProcessingStatus != "deleting" || status == "deleting");
+        if (status is "ready" or "failed")
+            query = query.Where(x => x.ProcessingStatus == "processing");
+        else
+            query = query.Where(x => x.ProcessingStatus != "deleting" || status == "deleting");
         return await query.ExecuteUpdateAsync(update => update.SetProperty(x => x.ProcessingStatus, status),
             cancellationToken) != 0;
     }

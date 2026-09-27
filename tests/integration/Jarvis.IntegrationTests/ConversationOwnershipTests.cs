@@ -134,6 +134,28 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
         Assert.Empty(await database.Notifications.Where(x => x.Id == approvalNotification.Id).ToListAsync());
         Assert.Single(await database.Notifications.Where(x => x.Id == reminderNotification.Id).ToListAsync());
         Assert.Empty(await database.ToolApprovals.Where(x => x.Id == approval.Id).ToListAsync());
+        Assert.Single(await database.AuditEvents.Where(x =>
+            x.OwnerId == owner && x.Action == "conversation.deleted").ToListAsync());
+    }
+
+    [Fact]
+    public async Task Terminal_file_status_does_not_overwrite_a_requeued_file()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var files = new FileRepository(database);
+        var id = Guid.CreateVersion7();
+        await files.CreateAsync(new StoredFile(id, owner, id.ToString(), "notes.txt", "text/plain",
+            32, new string('0', 64), DateTimeOffset.UtcNow, "queued"), CancellationToken.None);
+
+        Assert.True(await files.SetProcessingStatusAsync(id, owner, "processing", CancellationToken.None));
+        Assert.True(await files.RequeueForProcessingAsync(id, owner, CancellationToken.None));
+        Assert.False(await files.SetProcessingStatusAsync(id, owner, "failed", CancellationToken.None));
+        Assert.Equal("queued", (await files.GetAsync(id, owner, CancellationToken.None))!.ProcessingStatus);
+
+        Assert.True(await files.SetProcessingStatusAsync(id, owner, "processing", CancellationToken.None));
+        Assert.True(await files.SetProcessingStatusAsync(id, owner, "ready", CancellationToken.None));
+        Assert.Equal("ready", (await files.GetAsync(id, owner, CancellationToken.None))!.ProcessingStatus);
     }
 
     private JarvisDbContext CreateDbContext()

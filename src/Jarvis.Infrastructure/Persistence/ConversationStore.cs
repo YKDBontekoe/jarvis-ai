@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Jarvis.Application.Conversations;
+using Jarvis.Domain.Audit;
 using Jarvis.Domain.Conversations;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,6 +43,8 @@ public sealed class ConversationStore(JarvisDbContext db) : IConversationStore
         await db.Notifications.Where(x => x.SourceId != null && approvalIds.Contains(x.SourceId.Value))
             .ExecuteDeleteAsync(cancellationToken);
         db.Conversations.Remove(conversation);
+        db.AuditEvents.Add(new AuditEvent(ownerId, "conversations", "conversation.deleted", "moderate", true,
+            metadataJson: JsonSerializer.Serialize(new { resourceId = conversationId })));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return ConversationDeleteResult.Deleted;
