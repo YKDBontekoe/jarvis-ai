@@ -219,6 +219,7 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
             .ToListAsync(cancellationToken);
         foreach (var approval in approvals)
         {
+            await db.Entry(approval).ReloadAsync(cancellationToken);
             approval.Cancel();
             approval.AbortResume();
         }

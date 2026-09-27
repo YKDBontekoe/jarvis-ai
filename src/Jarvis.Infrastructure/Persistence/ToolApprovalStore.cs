@@ -171,6 +171,7 @@ public sealed class ToolApprovalStore(JarvisDbContext db) : IToolApprovalStore
         var approvalIds = approvals.Select(x => x.Id).ToArray();
         foreach (var approval in approvals)
         {
+            await db.Entry(approval).ReloadAsync(cancellationToken);
             approval.Cancel();
             approval.AbortResume();
         }
