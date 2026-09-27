@@ -154,7 +154,7 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
             : 'Task');
     final status = asJsonString(item['status']) ?? '';
     final detail = switch (widget.notificationType) {
-      'reminder.due' => _date(item['dueAt']),
+      'reminder.due' || 'reminder.failed' => _date(item['dueAt']),
       'task.completed' || 'task.failed' => asJsonString(item['summary']) ?? '',
       'watch.triggered' || 'watch.failed' => _watchCondition(item),
       _ => '',

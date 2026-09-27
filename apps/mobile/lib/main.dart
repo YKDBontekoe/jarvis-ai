@@ -1137,6 +1137,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _signIn() async {
+    if (_signingOut) return;
     setState(() => _authBusy = true);
     try {
       await _auth.signIn();
@@ -1203,6 +1204,7 @@ class _ChatScreenState extends State<ChatScreen> {
     await hub?.stop();
     } finally {
       _signingOut = false;
+      if (mounted) setState(() {});
     }
   }
 
@@ -2078,7 +2080,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed: _authBusy ? null : _signIn,
+                        onPressed: _authBusy || _signingOut ? null : _signIn,
                         style: FilledButton.styleFrom(
                           backgroundColor: JarvisColors.ink,
                           minimumSize: const Size.fromHeight(54),
