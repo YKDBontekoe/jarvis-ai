@@ -7,6 +7,7 @@ bool opensTaskDetails(String? type) =>
 
 bool opensNotificationDetails(String? type) =>
     type == 'reminder.due' ||
+    type == 'reminder.failed' ||
     type == 'task.completed' ||
     type == 'task.failed' ||
     type == 'watch.triggered' ||

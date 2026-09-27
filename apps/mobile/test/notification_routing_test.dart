@@ -6,6 +6,7 @@ void main() {
     expect(opensNotificationDetails('watch.triggered'), isTrue);
     expect(opensNotificationDetails('watch.failed'), isTrue);
     expect(opensNotificationDetails('reminder.due'), isTrue);
+    expect(opensNotificationDetails('reminder.failed'), isTrue);
     expect(opensNotificationDetails('briefing.ready'), isFalse);
   });
 

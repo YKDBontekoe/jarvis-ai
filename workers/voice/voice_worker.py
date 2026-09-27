@@ -349,42 +349,54 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
     turn_lock = asyncio.Lock()
     current_turn: asyncio.Task[None] | None = None
 
-    async def process_transcript(transcript: str) -> None:
-        async with turn_lock:
-            streamed_text = ""
-            speech_buffer = ""
-            final_text: str | None = None
-            async with http.stream(
-                "POST",
-                f"{api_url}/api/v1/voice/internal/{conversation_id}/transcript",
-                headers={"X-Jarvis-Voice-Secret": worker_secret},
-                json={"ownerId": owner_id, "transcript": transcript},
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line:
-                        continue
-                    event = json.loads(line)
-                    if event.get("type") == "delta":
-                        delta = event.get("text", "")
-                        if not isinstance(delta, str) or not delta:
-                            continue
-                        streamed_text += delta
-                        speech_buffer += delta
-                        if len(speech_buffer) >= 160 or (
-                            len(speech_buffer) >= 48 and speech_buffer.rstrip().endswith((".", "!", "?", "\n"))
-                        ):
-                            await codex.speak(speech_buffer)
-                            speech_buffer = ""
-                    elif event.get("type") == "done":
-                        final_text = event.get("responseText")
+    async def speak_failure() -> None:
+        try:
+            await codex.speak("I could not complete that. Check the Jarvis app.")
+        except Exception:
+            logger.exception("Could not speak the voice error.")
 
-            if isinstance(final_text, str) and not streamed_text:
-                speech_buffer = final_text
-            elif isinstance(final_text, str) and final_text.startswith(streamed_text):
-                speech_buffer += final_text[len(streamed_text):]
-            if speech_buffer.strip():
-                await codex.speak(speech_buffer)
+    async def process_transcript(transcript: str) -> None:
+        try:
+            async with turn_lock:
+                streamed_text = ""
+                speech_buffer = ""
+                final_text: str | None = None
+                async with http.stream(
+                    "POST",
+                    f"{api_url}/api/v1/voice/internal/{conversation_id}/transcript",
+                    headers={"X-Jarvis-Voice-Secret": worker_secret},
+                    json={"ownerId": owner_id, "transcript": transcript},
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        event = json.loads(line)
+                        if event.get("type") == "delta":
+                            delta = event.get("text", "")
+                            if not isinstance(delta, str) or not delta:
+                                continue
+                            streamed_text += delta
+                            speech_buffer += delta
+                            if len(speech_buffer) >= 160 or (
+                                len(speech_buffer) >= 48 and speech_buffer.rstrip().endswith((".", "!", "?", "\n"))
+                            ):
+                                await codex.speak(speech_buffer)
+                                speech_buffer = ""
+                        elif event.get("type") == "done":
+                            final_text = event.get("responseText")
+
+                if isinstance(final_text, str) and not streamed_text:
+                    speech_buffer = final_text
+                elif isinstance(final_text, str) and final_text.startswith(streamed_text):
+                    speech_buffer += final_text[len(streamed_text):]
+                if speech_buffer.strip():
+                    await codex.speak(speech_buffer)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Voice response failed")
+            await speak_failure()
 
     def finish_turn(task: asyncio.Task[None]) -> None:
         turn_tasks.discard(task)
@@ -426,6 +438,7 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
                 logger.exception("Codex voice returned an invalid audio chunk.")
         elif method == "thread/realtime/error":
             logger.error("Codex realtime error: %s", params.get("message", "unknown error"))
+            asyncio.create_task(speak_failure())
 
     codex.start_notifications(on_codex_notification)
 

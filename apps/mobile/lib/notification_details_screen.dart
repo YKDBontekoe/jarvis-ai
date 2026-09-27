@@ -29,7 +29,9 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
   bool _loading = true;
   String? _error;
 
-  bool get _isReminder => widget.notificationType == 'reminder.due';
+  bool get _isReminder =>
+      widget.notificationType == 'reminder.due' ||
+      widget.notificationType == 'reminder.failed';
   bool get _isWatch => widget.notificationType.startsWith('watch.');
   bool get _isTask =>
       widget.notificationType == 'task.completed' ||
@@ -44,7 +46,8 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
   Future<void> _load() async {
     try {
       final path = switch (widget.notificationType) {
-        'reminder.due' => '/api/v1/reminders/${widget.sourceId}',
+        'reminder.due' ||
+        'reminder.failed' => '/api/v1/reminders/${widget.sourceId}',
         'task.completed' ||
         'task.failed' => '/api/v1/tasks/${widget.sourceId}',
         'watch.triggered' ||

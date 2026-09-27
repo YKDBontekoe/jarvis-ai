@@ -368,6 +368,7 @@ class _ChatScreenState extends State<ChatScreen> {
   int _homeRevision = 0;
   bool _showHome = true;
   int _realtimeGeneration = 0;
+  int _openGeneration = 0;
   int _initGeneration = 0;
   EventsListener<RoomEvent>? _voiceEvents;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -504,15 +505,21 @@ class _ChatScreenState extends State<ChatScreen> {
     String conversationId, {
     bool showHome = false,
   }) async {
-    _runCancel?.cancel();
+    final openGeneration = ++_openGeneration;
+    bool isLatestOpen() =>
+        mounted &&
+        openGeneration == _openGeneration &&
+        !_signedOut &&
+        !_signingOut;
     final details = await _http.get<Map<String, dynamic>>(
       '/api/v1/conversations/$conversationId',
     );
-    if (!mounted || _signedOut || _signingOut) return;
+    if (!isLatestOpen()) return;
     final records = jsonMaps(details.data?['messages']);
     final approvals = await _loadConversationApprovals(conversationId);
-    if (!mounted || _signedOut || _signingOut) return;
+    if (!isLatestOpen()) return;
 
+    _runCancel?.cancel();
     final generation = ++_realtimeGeneration;
     bool isCurrent() =>
         mounted &&
@@ -520,11 +527,11 @@ class _ChatScreenState extends State<ChatScreen> {
         !_signedOut &&
         !_signingOut;
     await _stopVoice();
-    if (!isCurrent()) return;
+    if (!isCurrent() || !isLatestOpen()) return;
     final previous = _hub;
     _hub = null;
     await previous?.stop();
-    if (!isCurrent()) return;
+    if (!isCurrent() || !isLatestOpen()) return;
     setState(() {
       _conversationId = conversationId;
       _connected = false;
@@ -551,11 +558,15 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _scrollToBottom(jump: true);
     unawaited(_loadRecent());
-    if (!isCurrent() || _conversationId != conversationId) return;
+    if (!isCurrent() || !isLatestOpen() || _conversationId != conversationId) {
+      return;
+    }
     try {
       await _connectRealtime(generation);
     } catch (error) {
-      if (!isCurrent() || _conversationId != conversationId) return;
+      if (!isCurrent() || !isLatestOpen() || _conversationId != conversationId) {
+        return;
+      }
       setState(() {
         _connected = false;
         _error = error is DioException
@@ -608,6 +619,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _clearCurrentConversation() async {
     _runCancel?.cancel();
+    _openGeneration++;
     _realtimeGeneration++;
     await _stopVoice();
     if (!mounted || _signedOut || _signingOut) return;
@@ -673,6 +685,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (destination == 'approvals') {
       await _syncConversationApprovals();
     }
+    if (!mounted || _signedOut || _signingOut) return;
     if (destination == 'tasks' ||
         destination == 'approvals' ||
         destination == 'watches' ||
@@ -1266,7 +1279,7 @@ class _ChatScreenState extends State<ChatScreen> {
         message.data['type'] == 'approval.required') {
       setState(() => _homeRevision++);
     }
-    final notificationId = message.data['notificationId'];
+    final notificationId = asJsonString(message.data['notificationId']);
     if (notificationId != null &&
         !_shownPushNotifications.add(notificationId)) {
       return;
