@@ -68,18 +68,18 @@ class _AuditScreenState extends State<AuditScreen> {
         const SizedBox(width: 8),
       ],
     ),
-    body: _loading && _events.isEmpty
-        ? const LoadingState()
-        : _error != null && _events.isEmpty
-        ? ErrorState(message: _error!, onRetry: _load)
-        : _events.isEmpty
-        ? const EmptyState(
-            icon: PhosphorIconsRegular.listChecks,
-            title: 'No audited actions yet.',
-            message:
-                'Approvals, tasks, reminders, files, and memory changes are recorded here.',
-          )
-        : RefreshIndicator(
+    body: ListScreenBody(
+      loading: _loading,
+      error: _error,
+      isEmpty: _events.isEmpty,
+      onRetry: _load,
+      empty: const EmptyState(
+        icon: PhosphorIconsRegular.listChecks,
+        title: 'No audited actions yet.',
+        message:
+            'Approvals, tasks, reminders, files, and memory changes are recorded here.',
+      ),
+      child: RefreshIndicator(
             onRefresh: _load,
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
@@ -93,6 +93,7 @@ class _AuditScreenState extends State<AuditScreen> {
               ),
             ),
           ),
+    ),
   );
 }
 

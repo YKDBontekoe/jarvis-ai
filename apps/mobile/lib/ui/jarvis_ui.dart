@@ -460,6 +460,51 @@ class ErrorState extends StatelessWidget {
   );
 }
 
+/// Loading, empty, full-page error, or a list that keeps rows visible when a refresh fails.
+class ListScreenBody extends StatelessWidget {
+  const ListScreenBody({
+    required this.loading,
+    required this.error,
+    required this.isEmpty,
+    required this.empty,
+    required this.child,
+    required this.onRetry,
+    super.key,
+  });
+
+  final bool loading;
+  final String? error;
+  final bool isEmpty;
+  final Widget empty;
+  final Widget child;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading && isEmpty) return const LoadingState();
+    if (error != null && isEmpty) {
+      return ErrorState(message: error!, onRetry: onRetry);
+    }
+    if (isEmpty) return empty;
+    return Column(
+      children: [
+        if (error != null)
+          ContentWidth(
+            child: InlineNotice(
+              message: error!,
+              tone: NoticeTone.danger,
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              actions: [
+                TextButton(onPressed: onRetry, child: const Text('Retry')),
+              ],
+            ),
+          ),
+        Expanded(child: child),
+      ],
+    );
+  }
+}
+
 class LoadingState extends StatelessWidget {
   const LoadingState({super.key});
 

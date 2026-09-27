@@ -234,17 +234,17 @@ class _TasksScreenState extends State<TasksScreen> {
         ),
       ],
     ),
-    body: _loading && _tasks.isEmpty
-        ? const LoadingState()
-        : _error != null && _tasks.isEmpty
-        ? ErrorState(message: _error!, onRetry: _load)
-        : _tasks.isEmpty
-        ? const EmptyState(
-            icon: PhosphorIconsRegular.checkCircle,
-            title: 'No tasks yet',
-            message: 'No tasks yet. Give Jarvis something to work on.',
-          )
-        : RefreshIndicator(
+    body: ListScreenBody(
+      loading: _loading,
+      error: _error,
+      isEmpty: _tasks.isEmpty,
+      onRetry: _load,
+      empty: const EmptyState(
+        icon: PhosphorIconsRegular.checkCircle,
+        title: 'No tasks yet',
+        message: 'No tasks yet. Give Jarvis something to work on.',
+      ),
+      child: RefreshIndicator(
             onRefresh: _load,
             child: ListView(
               padding: EdgeInsets.fromLTRB(
@@ -267,6 +267,7 @@ class _TasksScreenState extends State<TasksScreen> {
               ],
             ),
           ),
+    ),
   );
 
   Widget _summary() {

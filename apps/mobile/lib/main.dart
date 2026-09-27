@@ -500,10 +500,19 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-    Future<void> _openConversation(
+  Future<void> _openConversation(
     String conversationId, {
     bool showHome = false,
   }) async {
+    _runCancel?.cancel();
+    final details = await _http.get<Map<String, dynamic>>(
+      '/api/v1/conversations/$conversationId',
+    );
+    if (!mounted || _signedOut || _signingOut) return;
+    final records = jsonMaps(details.data?['messages']);
+    final approvals = await _loadConversationApprovals(conversationId);
+    if (!mounted || _signedOut || _signingOut) return;
+
     final generation = ++_realtimeGeneration;
     bool isCurrent() =>
         mounted &&
@@ -512,7 +521,6 @@ class _ChatScreenState extends State<ChatScreen> {
         !_signingOut;
     await _stopVoice();
     if (!isCurrent()) return;
-    _runCancel?.cancel();
     final previous = _hub;
     _hub = null;
     await previous?.stop();
@@ -523,31 +531,23 @@ class _ChatScreenState extends State<ChatScreen> {
       _sending = false;
       _selectedDestination = 0;
       _showHome = showHome;
-      _entries.clear();
-      _error = null;
-    });
-    final details = await _http.get<Map<String, dynamic>>(
-      '/api/v1/conversations/$conversationId',
-    );
-    if (!isCurrent() || _conversationId != conversationId) return;
-    final records = jsonMaps(details.data?['messages']);
-    final approvals = await _loadConversationApprovals(conversationId);
-    if (!isCurrent() || _conversationId != conversationId) return;
-    setState(() {
-      _entries.addAll(
-        records
-            .where(
-              (message) =>
-                  message['role'] is String && message['content'] is String,
-            )
-            .map(
-              (message) => MessageEntry(
-                role: message['role'] as String,
-                content: message['content'] as String,
+      _entries
+        ..clear()
+        ..addAll(
+          records
+              .where(
+                (message) =>
+                    message['role'] is String && message['content'] is String,
+              )
+              .map(
+                (message) => MessageEntry(
+                  role: message['role'] as String,
+                  content: message['content'] as String,
+                ),
               ),
-            ),
-      );
-      _entries.addAll(approvals);
+        )
+        ..addAll(approvals);
+      _error = null;
     });
     _scrollToBottom(jump: true);
     unawaited(_loadRecent());
@@ -592,6 +592,8 @@ class _ChatScreenState extends State<ChatScreen> {
         );
     if (selection?.deletedCurrent == true) {
       if (!mounted || _signedOut || _signingOut) return;
+      await _clearCurrentConversation();
+      if (!mounted || _signedOut || _signingOut) return;
       await _createAndOpenConversation();
     } else if (selection?.conversationId != null &&
         selection!.conversationId != _conversationId) {
@@ -602,6 +604,24 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) setState(() => _error = _describeError(error));
       }
     }
+  }
+
+  Future<void> _clearCurrentConversation() async {
+    _runCancel?.cancel();
+    _realtimeGeneration++;
+    await _stopVoice();
+    if (!mounted || _signedOut || _signingOut) return;
+    final previous = _hub;
+    _hub = null;
+    await previous?.stop();
+    if (!mounted || _signedOut || _signingOut) return;
+    setState(() {
+      _conversationId = null;
+      _connected = false;
+      _sending = false;
+      _entries.clear();
+      _error = null;
+    });
   }
 
   Future<void> _createAndOpenConversation() async {
@@ -663,8 +683,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _selectDestination(int index) {
     if (index == 2) {
-      if (_busy || _hasPendingApproval || _signedOut || _signingOut) return;
-      setState(() => _selectedDestination = 2);
+      if (_busy ||
+          _hasPendingApproval ||
+          _signedOut ||
+          _signingOut ||
+          !_connected ||
+          _conversationId == null) {
+        if (!_connected || _conversationId == null) {
+          setState(() => _error = 'Connect to Jarvis before starting voice.');
+        }
+        return;
+      }
       unawaited(_toggleVoice());
       return;
     }
@@ -1257,6 +1286,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _handlePushPayload(Map<String, dynamic> data) {
     if (!mounted || _signedOut) return;
+    unawaited(_markPushNotificationRead(asJsonString(data['notificationId'])));
     final type = asJsonString(data['type']);
     final sourceId = asJsonString(data['sourceId']);
     if (opensApprovalScreen(type)) {
@@ -1286,6 +1316,15 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _markPushNotificationRead(String? notificationId) async {
+    if (notificationId == null || notificationId.isEmpty) return;
+    try {
+      await _http.post('/api/v1/notifications/$notificationId/read');
+    } on DioException {
+      // The unread badge refreshes the next time Reminders is opened.
+    }
   }
 
   Future<void> _openPushedDetail(Widget page) async {
@@ -1524,13 +1563,17 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     final conversationId = _conversationId;
     if (conversationId == null || !_connected) {
-      setState(() => _error = 'Connect to Jarvis before starting voice.');
+      setState(() {
+        _error = 'Connect to Jarvis before starting voice.';
+        if (_selectedDestination == 2) _selectedDestination = 0;
+      });
       return;
     }
 
     final voiceGeneration = ++_voiceGeneration;
     setState(() {
       _voiceStarting = true;
+      _selectedDestination = 2;
       _error = null;
     });
     Room? room;
@@ -1585,20 +1628,33 @@ class _ChatScreenState extends State<ChatScreen> {
       if (isCurrent()) setState(() => _error = 'Could not start voice: $error');
     } finally {
       if (mounted && voiceGeneration == _voiceGeneration) {
-        setState(() => _voiceStarting = false);
+        setState(() {
+          _voiceStarting = false;
+          if (!_voiceActive && _selectedDestination == 2) {
+            _selectedDestination = 0;
+          }
+        });
       }
     }
   }
 
   Future<void> _abandonVoiceRoom(Room? room) async {
-    if (identical(_voiceRoom, room)) {
+    if (room == null) return;
+    final owned = identical(_voiceRoom, room);
+    if (owned) {
       _voiceEvents?.dispose();
       _voiceEvents = null;
       _voiceRoom = null;
+    } else {
+      return;
     }
-    await room?.disconnect();
-    await room?.dispose();
-    await AudioManager.instance.setSpeakerOutputPreferred(false);
+    try {
+      await room.disconnect();
+      await room.dispose();
+    } catch (_) {}
+    try {
+      await AudioManager.instance.setSpeakerOutputPreferred(false);
+    } catch (_) {}
   }
 
   void _listenToVoiceRoom(Room room) {
@@ -1623,14 +1679,19 @@ class _ChatScreenState extends State<ChatScreen> {
     _voiceEvents = null;
     final room = _voiceRoom;
     _voiceRoom = null;
-    await room?.localParticipant?.setMicrophoneEnabled(false);
-    await room?.disconnect();
-    await room?.dispose();
-    await AudioManager.instance.setSpeakerOutputPreferred(false);
-    if (mounted && (_voiceActive || _voiceStarting)) {
+    try {
+      await room?.localParticipant?.setMicrophoneEnabled(false);
+      await room?.disconnect();
+      await room?.dispose();
+    } catch (_) {}
+    try {
+      await AudioManager.instance.setSpeakerOutputPreferred(false);
+    } catch (_) {}
+    if (mounted && (_voiceActive || _voiceStarting || _selectedDestination == 2)) {
       setState(() {
         _voiceActive = false;
         _voiceStarting = false;
+        if (_selectedDestination == 2) _selectedDestination = 0;
       });
     }
   }

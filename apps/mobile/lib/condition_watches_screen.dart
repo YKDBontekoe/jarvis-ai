@@ -267,18 +267,18 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
         ),
       ],
     ),
-    body: _loading && _watches.isEmpty
-        ? const LoadingState()
-        : _error != null && _watches.isEmpty
-        ? ErrorState(message: _error!, onRetry: _load)
-        : _watches.isEmpty
-        ? const EmptyState(
-            icon: PhosphorIconsRegular.pulse,
-            title: 'No watches yet',
-            message:
-                'No watches yet. Set a threshold and Jarvis will keep an eye on it.',
-          )
-        : RefreshIndicator(
+    body: ListScreenBody(
+      loading: _loading,
+      error: _error,
+      isEmpty: _watches.isEmpty,
+      onRetry: _load,
+      empty: const EmptyState(
+        icon: PhosphorIconsRegular.pulse,
+        title: 'No watches yet',
+        message:
+            'No watches yet. Set a threshold and Jarvis will keep an eye on it.',
+      ),
+      child: RefreshIndicator(
             onRefresh: _load,
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
@@ -287,6 +287,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
                   ContentWidth(child: _watchCard(_watches[index])),
             ),
           ),
+    ),
   );
 
   Widget _watchCard(Map<String, dynamic> watch) {

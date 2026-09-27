@@ -144,17 +144,17 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         ),
       ],
     ),
-    body: _loading && _conversations.isEmpty
-        ? const LoadingState()
-        : _error != null && _conversations.isEmpty
-        ? ErrorState(message: _error!, onRetry: _load)
-        : _conversations.isEmpty
-        ? const EmptyState(
-            icon: PhosphorIconsRegular.chatsCircle,
-            title: 'No conversations yet.',
-            message: 'Start a new conversation and it will appear here.',
-          )
-        : ListView.builder(
+    body: ListScreenBody(
+      loading: _loading,
+      error: _error,
+      isEmpty: _conversations.isEmpty,
+      onRetry: _load,
+      empty: const EmptyState(
+        icon: PhosphorIconsRegular.chatsCircle,
+        title: 'No conversations yet.',
+        message: 'Start a new conversation and it will appear here.',
+      ),
+      child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             itemCount: _conversations.length,
             itemBuilder: (context, index) {
@@ -221,6 +221,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
               );
             },
           ),
+    ),
   );
 
   String _formatDate(Object? value) {

@@ -195,18 +195,18 @@ class _FilesScreenState extends State<FilesScreen> {
         ),
       ],
     ),
-    body: _loading && _files.isEmpty
-        ? const LoadingState()
-        : _error != null && _files.isEmpty
-        ? ErrorState(message: _error!, onRetry: _load)
-        : _files.isEmpty
-        ? const EmptyState(
-            icon: PhosphorIconsRegular.folderOpen,
-            title: 'No files yet',
-            message:
-                'Your files will be stored privately with Jarvis. PDFs and text are indexed so Jarvis can search them.',
-          )
-        : ListView.builder(
+    body: ListScreenBody(
+      loading: _loading,
+      error: _error,
+      isEmpty: _files.isEmpty,
+      onRetry: _load,
+      empty: const EmptyState(
+        icon: PhosphorIconsRegular.folderOpen,
+        title: 'No files yet',
+        message:
+            'Your files will be stored privately with Jarvis. PDFs and text are indexed so Jarvis can search them.',
+      ),
+      child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             itemCount: _files.length,
             itemBuilder: (context, index) {
@@ -307,6 +307,7 @@ class _FilesScreenState extends State<FilesScreen> {
               );
             },
           ),
+    ),
   );
 
   IconData _fileIcon(String name) =>

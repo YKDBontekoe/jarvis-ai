@@ -173,22 +173,23 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         const SizedBox(width: 8),
       ],
     ),
-    body: _loading && _approvals.isEmpty
-        ? const LoadingState()
-        : _error != null && _approvals.isEmpty
-        ? ErrorState(message: _error!, onRetry: _load)
-        : _approvals.isEmpty
-        ? const EmptyState(
-            icon: PhosphorIconsRegular.shieldCheck,
-            title: 'All clear',
-            message: 'No tool calls are waiting for approval.',
-          )
-        : ListView.builder(
+    body: ListScreenBody(
+      loading: _loading,
+      error: _error,
+      isEmpty: _approvals.isEmpty,
+      onRetry: _load,
+      empty: const EmptyState(
+        icon: PhosphorIconsRegular.shieldCheck,
+        title: 'All clear',
+        message: 'No tool calls are waiting for approval.',
+      ),
+      child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             itemCount: _approvals.length,
             itemBuilder: (context, index) =>
                 ContentWidth(child: _approvalCard(_approvals[index])),
           ),
+    ),
   );
 
   Widget _approvalCard(Map<String, dynamic> approval) {

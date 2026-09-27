@@ -351,14 +351,20 @@ class _RemindersScreenState extends State<RemindersScreen>
         ),
       ),
     ),
-    body: _loading && _reminders.isEmpty && _notifications.isEmpty
-        ? const LoadingState()
-        : _error != null && _reminders.isEmpty && _notifications.isEmpty
-        ? ErrorState(message: _error!, onRetry: _load)
-        : TabBarView(
-            controller: _tabs,
-            children: [_buildReminders(), _buildNotifications()],
-          ),
+    body: ListScreenBody(
+      loading: _loading,
+      error: _error,
+      isEmpty: _reminders.isEmpty && _notifications.isEmpty,
+      onRetry: _load,
+      empty: TabBarView(
+        controller: _tabs,
+        children: [_buildReminders(), _buildNotifications()],
+      ),
+      child: TabBarView(
+        controller: _tabs,
+        children: [_buildReminders(), _buildNotifications()],
+      ),
+    ),
   );
 
   int get _unreadCount =>

@@ -410,7 +410,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
             ),
           ),
         ),
-        if (_error != null)
+        if (_error != null && _memories.isNotEmpty)
           ContentWidth(
             child: InlineNotice(
               message: _error!,
@@ -424,6 +424,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
         Expanded(
           child: _loading
               ? const LoadingState()
+              : _error != null && _memories.isEmpty
+              ? ErrorState(message: _error!, onRetry: _load)
               : _memories.isEmpty
               ? EmptyState(
                   icon: _searching

@@ -99,7 +99,16 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
     ),
     body: _loading
         ? const LoadingState()
-        : _error != null || _item == null
+        : _error != null && _item == null
+        ? (_error == 'This item is no longer available.' ||
+                  _error == 'This notification has no linked item.'
+              ? EmptyState(
+                  icon: PhosphorIconsRegular.linkBreak,
+                  title: 'Nothing to show',
+                  message: _error!,
+                )
+              : ErrorState(message: _error!, onRetry: _load))
+        : _item == null
         ? EmptyState(
             icon: PhosphorIconsRegular.linkBreak,
             title: 'Nothing to show',
