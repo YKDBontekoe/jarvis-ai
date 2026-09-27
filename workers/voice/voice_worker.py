@@ -402,7 +402,7 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
             raise
         except Exception:
             logger.exception("Voice response failed")
-            await speak_failure()
+            await speak_error_turn()
 
     def finish_turn(task: asyncio.Task[None]) -> None:
         turn_tasks.discard(task)
