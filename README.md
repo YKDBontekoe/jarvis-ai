@@ -209,7 +209,9 @@ Local packaging uses the same layout as CI: `flutter build ios --release --no-co
 
 Push notifications and some entitlements may be limited without a normal signed distribution profile; in-app chat, OIDC, and SignalR still depend on your configured `JARVIS_API_URL` and identity provider.
 
-Optional: [`scripts/altstore/generate_source.py`](scripts/altstore/generate_source.py) can still build AltStore-style `source.json` if you later ship a **signed** IPA to a public URL. The release workflow no longer publishes `source.json` or GitHub Pages, because unsigned builds are not suitable for AltStore/SideStore install.
+The **Publish AltStore source** workflow builds the current iOS app and publishes both the IPA and generated `source.json` to the Jarvis server. Add `https://jarvis.ykdbonte.dev/altstore/source.json` to AltStore. Each workflow run uses a unique IPA build number and keeps earlier IPA versions available for existing source entries. The feed and download are public; keep private data out of the IPA and source metadata.
+
+The self-hosted runner serves `/home/ykdbonte/.jarvis/altstore` through the host Caddy route at `/altstore/*`. The public endpoint is independent of GitHub repository visibility, and the workflow updates the source only after the IPA artifact is ready.
 
 ### Backend GHCR images and deployment
 
