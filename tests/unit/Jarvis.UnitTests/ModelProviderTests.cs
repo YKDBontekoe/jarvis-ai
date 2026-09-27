@@ -99,6 +99,26 @@ public sealed class ModelProviderTests
     }
 
     [Fact]
+    public async Task Resolver_uses_the_owner_codex_chat_model_for_conversations()
+    {
+        var codex = new NamedClient("codex");
+        var settings = new InMemorySettingsStore();
+        await settings.SaveAsync(Owner, SettingsSections.Models,
+            new ModelSettings(ModelSettings.Codex, "gpt-5.4"), CancellationToken.None);
+
+        var resolver = CreateResolver(codex, settings, new InMemoryCredentialStore());
+        var chat = await resolver.GetChatClientAsync(Owner, ModelPurpose.Chat, CancellationToken.None);
+        await foreach (var _ in chat.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "hi")])) { }
+
+        Assert.Equal("gpt-5.4", codex.LastOptions?.ModelId);
+
+        var background = await resolver.GetChatClientAsync(Owner, ModelPurpose.Background, CancellationToken.None);
+        Assert.NotSame(codex, background);
+        _ = await background.GetResponseAsync([new ChatMessage(ChatRole.User, "bg")]);
+        Assert.Equal("gpt-5.4", codex.LastOptions?.ModelId);
+    }
+
+    [Fact]
     public void Resize_pads_short_vectors_and_renormalizes_truncated_vectors()
     {
         var padded = FixedDimensionEmbeddingGenerator.Resize([1f, 2f], 4);
@@ -141,14 +161,25 @@ public sealed class ModelProviderTests
     private sealed class NamedClient(string name) : IChatClient
     {
         public string Name => name;
+        public ChatOptions? LastOptions { get; private set; }
         public void Dispose() { }
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, name)));
+            CancellationToken cancellationToken = default)
+        {
+            LastOptions = options;
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, name)));
+        }
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
-            ChatOptions? options = null, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            LastOptions = options;
+            return Empty();
+            static async IAsyncEnumerable<ChatResponseUpdate> Empty()
+            {
+                yield break;
+            }
+        }
     }
 
     private sealed class CapturingClient(IChatClient inner) : IChatClient

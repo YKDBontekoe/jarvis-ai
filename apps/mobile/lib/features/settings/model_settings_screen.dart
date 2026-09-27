@@ -28,6 +28,15 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
   bool _loading = true;
   bool _saving = false;
   bool _testing = false;
+  bool _codexLoading = true;
+  bool _updating = false;
+  bool _updateAvailable = false;
+  bool _canUpdate = false;
+  String? _installedVersion;
+  String? _latestVersion;
+  String? _updateBlocked;
+  String? _codexError;
+  List<Map<String, dynamic>> _codexModels = const [];
   String? _error;
   String? _notice;
   Map<String, dynamic>? _test;
@@ -67,15 +76,100 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
         _loading = false;
         _error = null;
       });
+      await _loadCodex();
     } on DioException catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
+        _codexLoading = false;
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not load model settings.';
       });
     }
+  }
+
+  void _applyCodex(Map<String, dynamic> data) {
+    _installedVersion = asJsonString(data['installedVersion']);
+    _latestVersion = asJsonString(data['latestVersion']);
+    _updateAvailable = asJsonBool(data['updateAvailable']);
+    _canUpdate = asJsonBool(data['canUpdate']);
+    _updateBlocked = asJsonString(data['updateBlockedReason']);
+    _codexError = asJsonString(data['error']);
+    _codexModels = jsonMaps(data['models']);
+  }
+
+  Future<void> _loadCodex() async {
+    try {
+      final response = await widget.http.get<Map<String, dynamic>>(
+        '/api/v1/settings/models/codex',
+      );
+      if (!mounted) return;
+      setState(() {
+        _applyCodex(response.data ?? const {});
+        _codexLoading = false;
+      });
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _codexLoading = false;
+        _codexError =
+            firstProblemMessage(error.response?.data) ??
+            'Could not load the models supported by the installed Codex CLI.';
+      });
+    }
+  }
+
+  Future<void> _updateCodex() async {
+    setState(() {
+      _updating = true;
+      _error = null;
+      _notice = null;
+    });
+    try {
+      final response = await widget.http.post<Map<String, dynamic>>(
+        '/api/v1/settings/models/codex/update',
+      );
+      if (!mounted) return;
+      final data = response.data ?? const {};
+      setState(() {
+        _applyCodex(data);
+        _notice =
+            'Codex ${asJsonString(data['installedVersion']) ?? 'CLI'} is installed. New replies use it right away.';
+      });
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
+            'Jarvis could not update Codex.',
+      );
+    } finally {
+      if (mounted) setState(() => _updating = false);
+    }
+  }
+
+  List<Map<String, dynamic>> get _visibleCodexModels {
+    final selected = _chat.text.trim();
+    return [
+      for (final model in _codexModels)
+        if (!asJsonBool(model['hidden']) ||
+            (asJsonString(model['model']) ?? asJsonString(model['id'])) ==
+                selected)
+          model,
+    ];
+  }
+
+  Future<void> _pickCodex() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => CodexModelPicker(
+        models: _visibleCodexModels,
+        selected: _chat.text.trim(),
+      ),
+    );
+    if (picked != null && mounted) setState(() => _chat.text = picked);
   }
 
   Future<void> _run(
@@ -205,6 +299,8 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
                     children: [
                       _providerCard(),
                       const SizedBox(height: 16),
+                      _codexCard(),
+                      const SizedBox(height: 16),
                       _keyCard(embeddingOnly: _provider == 'codex'),
                       const SizedBox(height: 16),
                       _modelsCard(),
@@ -301,6 +397,95 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     ),
   );
 
+  Widget _codexCard() {
+    final installed = _installedVersion ?? 'unknown';
+    final latest = _latestVersion;
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const IconBadge(icon: PhosphorIconsRegular.cpu, size: 34),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Codex CLI',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              if (!_codexLoading)
+                StatusPill(
+                  label: _updateAvailable
+                      ? 'Update available'
+                      : _canUpdate && latest != null
+                      ? 'Up to date'
+                      : 'Installed',
+                  color: _updateAvailable
+                      ? JarvisColors.warning
+                      : _canUpdate && latest != null
+                      ? JarvisColors.success
+                      : JarvisColors.muted,
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            latest == null
+                ? 'Installed $installed.'
+                : 'Installed $installed. Latest release is $latest.',
+            style: const TextStyle(color: JarvisColors.inkSoft, height: 1.4),
+          ),
+          if (_codexLoading)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: LinearProgressIndicator(),
+            ),
+          if (_updateAvailable)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.tonalIcon(
+                  key: const Key('update-codex'),
+                  onPressed: _updating || _saving
+                      ? null
+                      : () => unawaited(_updateCodex()),
+                  icon: _updating
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(
+                          PhosphorIconsRegular.arrowsClockwise,
+                          size: 18,
+                        ),
+                  label: Text('Update to $latest'),
+                ),
+              ),
+            ),
+          if (_updateBlocked != null && !_canUpdate)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _updateBlocked!,
+                style: const TextStyle(
+                  color: JarvisColors.inkSoft,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          if (_codexError != null)
+            InlineNotice(
+              message: _codexError!,
+              tone: NoticeTone.danger,
+              margin: const EdgeInsets.only(top: 12),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _keyCard({required bool embeddingOnly}) => SurfaceCard(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -367,22 +552,35 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
 
   Widget _modelsCard() {
     final openRouter = _provider == 'openrouter';
+    final codexPicker = !openRouter && _visibleCodexModels.isNotEmpty;
     Widget field(
       TextEditingController controller,
       String label,
       String helper, {
       Key? key,
+      bool codexModels = false,
     }) => Padding(
       padding: const EdgeInsets.only(top: 12),
       child: TextField(
         key: key,
         controller: controller,
+        readOnly: codexModels,
         autocorrect: false,
         decoration: InputDecoration(
           labelText: label,
+          hintText: codexModels && controller.text.trim().isEmpty
+              ? 'Account default'
+              : null,
           helperText: helper,
-          helperMaxLines: 2,
-          suffixIcon: openRouter || controller == _embedding
+          helperMaxLines: 3,
+          suffixIcon: codexModels
+              ? IconButton(
+                  key: const Key('browse-codex-models'),
+                  tooltip: 'Browse Codex models',
+                  icon: const Icon(PhosphorIconsRegular.magnifyingGlass),
+                  onPressed: () => unawaited(_pickCodex()),
+                )
+              : openRouter || controller == _embedding
               ? IconButton(
                   tooltip: 'Browse OpenRouter models',
                   icon: const Icon(PhosphorIconsRegular.magnifyingGlass),
@@ -392,6 +590,17 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
         ),
       ),
     );
+    final selected = _chat.text.trim();
+    final known = _codexModels.any(
+      (model) =>
+          (asJsonString(model['model']) ?? asJsonString(model['id'])) ==
+          selected,
+    );
+    final codexHelper = _codexModels.isEmpty
+        ? 'Leave empty to use the ChatGPT account default.'
+        : 'Models supported by Codex ${_installedVersion ?? 'the installed CLI'}. '
+              'Leave empty for the account default.'
+              '${selected.isNotEmpty && !known ? ' This model is not in the installed catalog.' : ''}';
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -402,8 +611,9 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
             'Chat model',
             openRouter
                 ? 'Used for conversations and background tasks. Pick one that supports tools.'
-                : 'Leave empty to use the ChatGPT account default.',
+                : codexHelper,
             key: const Key('chat-model'),
+            codexModels: codexPicker,
           ),
           if (openRouter)
             field(
@@ -587,4 +797,129 @@ class _OpenRouterModelPickerState extends State<OpenRouterModelPicker> {
       ),
     ),
   );
+}
+
+/// Models reported by the installed Codex CLI, including the account default.
+class CodexModelPicker extends StatefulWidget {
+  const CodexModelPicker({
+    required this.models,
+    required this.selected,
+    super.key,
+  });
+
+  final List<Map<String, dynamic>> models;
+  final String selected;
+
+  @override
+  State<CodexModelPicker> createState() => _CodexModelPickerState();
+}
+
+class _CodexModelPickerState extends State<CodexModelPicker> {
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _search.text.trim().toLowerCase();
+    final models = widget.models.where((model) {
+      if (query.isEmpty) return true;
+      final id =
+          (asJsonString(model['model']) ?? asJsonString(model['id']) ?? '')
+              .toLowerCase();
+      final name = (asJsonString(model['displayName']) ?? '').toLowerCase();
+      return id.contains(query) || name.contains(query);
+    }).toList();
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * .8,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Codex models',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(PhosphorIconsRegular.x),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: TextField(
+                controller: _search,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass),
+                  hintText: 'Search installed Codex models',
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView.separated(
+                itemCount: models.length + (query.isEmpty ? 1 : 0),
+                separatorBuilder: (_, _) => const Divider(indent: 20),
+                itemBuilder: (context, index) {
+                  if (query.isEmpty && index == 0) {
+                    return ListTile(
+                      title: const Text('Account default'),
+                      subtitle: const Text(
+                        'Use the default model from the signed-in ChatGPT account.',
+                      ),
+                      trailing: widget.selected.isEmpty
+                          ? const Icon(
+                              PhosphorIconsRegular.check,
+                              size: 18,
+                              color: JarvisColors.success,
+                            )
+                          : null,
+                      onTap: () => Navigator.pop(context, ''),
+                    );
+                  }
+                  final model = models[query.isEmpty ? index - 1 : index];
+                  final id =
+                      asJsonString(model['model']) ??
+                      asJsonString(model['id']) ??
+                      '';
+                  final description = asJsonString(model['description']);
+                  return ListTile(
+                    title: Text(asJsonString(model['displayName']) ?? id),
+                    subtitle: Text(
+                      description == null ? id : '$id · $description',
+                    ),
+                    trailing: asJsonBool(model['supportsImages'])
+                        ? const Tooltip(
+                            message: 'Accepts images',
+                            child: Icon(
+                              PhosphorIconsRegular.image,
+                              size: 18,
+                              color: JarvisColors.inkSoft,
+                            ),
+                          )
+                        : null,
+                    onTap: () => Navigator.pop(context, id),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -15,7 +15,7 @@ namespace Jarvis.Agents;
 /// and MCP servers are disabled; Jarvis functions are returned as structured calls and remain
 /// under Agent Framework's normal execution and approval pipeline.
 /// </summary>
-public sealed class CodexCliChatClient(string executablePath, string? model = null, string? visionModel = null,
+public sealed class CodexCliChatClient(CodexExecutable executable, string? model = null, string? visionModel = null,
     IReadOnlyDictionary<string, string>? modelClasses = null, bool enableWebSearch = true,
     int turnTimeoutSeconds = 300, CodexProcessLimiter? processLimiter = null) : IChatClient
 {
@@ -58,6 +58,7 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
     private readonly SemaphoreSlim _modelCatalogLock = new(1, 1);
     private readonly object _modelCatalogSync = new();
     private AvailableModel[]? _modelCatalog;
+    private string? _modelCatalogExecutable;
     private DateTimeOffset _modelCatalogExpiresAt;
     private static readonly JsonObject OutputSchema = JsonNode.Parse("""
         {
@@ -135,6 +136,7 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
         try
         {
             Directory.CreateDirectory(scratch);
+            var executablePath = executable.Resolve();
             using var process = new Process { StartInfo = CreateAppServerStart(executablePath, scratch, enableWebSearch) };
             if (!process.Start()) throw new InvalidOperationException("Could not start the Codex CLI app-server.");
 
@@ -159,7 +161,7 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
                 var selectedModel = prompt.Images.Count > 0
                     ? visionModel ?? (hasVisionClass ? "vision" : requestedModel)
                     : requestedModel;
-                var modelCatalog = await GetModelCatalogAsync(rpc, runToken);
+                var modelCatalog = await GetModelCatalogAsync(rpc, executablePath, runToken);
                 var resolvedModel = ResolveModel(modelCatalog, ResolveModelSelector(selectedModel), modality,
                     allowCompatibleFallback: prompt.Images.Count > 0 && visionModel is null && !hasVisionClass);
                 var threadId = await rpc.StartThreadAsync(scratch, resolvedModel, runToken);
@@ -482,12 +484,13 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
 
     internal sealed record PromptPayload(string Text, IReadOnlyList<string> Images);
 
-    private async Task<AvailableModel[]> GetModelCatalogAsync(AppServerConnection rpc,
+    private async Task<AvailableModel[]> GetModelCatalogAsync(AppServerConnection rpc, string executablePath,
         CancellationToken cancellationToken)
     {
         lock (_modelCatalogSync)
         {
-            if (_modelCatalog is not null && _modelCatalogExpiresAt > DateTimeOffset.UtcNow)
+            if (_modelCatalog is not null && _modelCatalogExecutable == executablePath &&
+                _modelCatalogExpiresAt > DateTimeOffset.UtcNow)
                 return _modelCatalog;
         }
 
@@ -496,7 +499,8 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
         {
             lock (_modelCatalogSync)
             {
-                if (_modelCatalog is not null && _modelCatalogExpiresAt > DateTimeOffset.UtcNow)
+                if (_modelCatalog is not null && _modelCatalogExecutable == executablePath &&
+                    _modelCatalogExpiresAt > DateTimeOffset.UtcNow)
                     return _modelCatalog;
             }
 
@@ -504,6 +508,7 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
             lock (_modelCatalogSync)
             {
                 _modelCatalog = catalog;
+                _modelCatalogExecutable = executablePath;
                 _modelCatalogExpiresAt = DateTimeOffset.UtcNow + ModelCatalogLifetime;
                 return _modelCatalog;
             }

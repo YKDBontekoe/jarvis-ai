@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Jarvis.Agents;
 using Jarvis.Agents.ModelProviders;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
@@ -11,6 +12,11 @@ public sealed record ModelSettingsDto(string Provider, string? ChatModel, string
     bool OpenRouterKeyConfigured, IReadOnlyList<string> Providers);
 public sealed record SaveModelSettingsRequest(string? Provider, string? ChatModel, string? FastModel,
     string? EmbeddingModel);
+public sealed record CodexModelDto(string Id, string Model, string DisplayName, string? Description, bool IsDefault,
+    bool Hidden, bool SupportsImages, IReadOnlyList<string> InputModalities);
+public sealed record CodexInstallationDto(string? InstalledVersion, string? LatestVersion, bool UpdateAvailable,
+    bool CanUpdate, bool UsingManagedInstall, string? UpdateBlockedReason, string? Error,
+    IReadOnlyList<CodexModelDto> Models);
 
 internal static class ModelSettingsEndpoints
 {
@@ -25,7 +31,7 @@ internal static class ModelSettingsEndpoints
 
         models.MapPut("", async (SaveModelSettingsRequest request, IOwnerSettingsStore settings,
             IIntegrationCredentialStore credentials, IAuditEventStore audit, ICurrentUser currentUser,
-            CancellationToken ct) =>
+            CodexInstallation codex, CancellationToken ct) =>
         {
             ModelSettings normalized;
             try
@@ -36,6 +42,13 @@ internal static class ModelSettingsEndpoints
             catch (ArgumentException exception)
             {
                 return EndpointHelpers.Invalid("provider", exception.Message);
+            }
+            if (normalized.Provider == ModelSettings.Codex && normalized.ChatModel is not null)
+            {
+                var catalog = await codex.GetStatusAsync(ct);
+                if (catalog.Error is null && !catalog.SupportsModel(normalized.ChatModel))
+                    return EndpointHelpers.Invalid("chatModel",
+                        $"The installed Codex CLI does not support '{normalized.ChatModel}'. Choose a listed model or update Codex.");
             }
             if (normalized.UsesOpenRouter && !await HasOpenRouterKeyAsync(currentUser.OwnerId, credentials, ct))
                 return EndpointHelpers.Invalid("provider", "Save an OpenRouter API key before selecting OpenRouter.");
@@ -84,6 +97,27 @@ internal static class ModelSettingsEndpoints
             return Results.Ok(await ToDtoAsync(currentUser.OwnerId, settings, credentials, ct));
         }).WithName("DeleteOpenRouterKey");
 
+        models.MapGet("/codex", async (CodexInstallation codex, CancellationToken ct) =>
+            Results.Ok(ToCodexDto(await codex.GetStatusAsync(ct))))
+            .WithName("GetCodexInstallation");
+
+        models.MapPost("/codex/update", async (CodexInstallation codex, IAuditEventStore audit, ICurrentUser currentUser,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                var status = await codex.UpdateAsync(ct);
+                await EndpointHelpers.TryAppendAuditAsync(audit, logger, currentUser.OwnerId, "settings",
+                    "codex.updated", "moderate", true, null,
+                    JsonSerializer.Serialize(new { version = status.InstalledVersion }), ct);
+                return Results.Ok(ToCodexDto(status));
+            }
+            catch (InvalidOperationException exception)
+            {
+                return EndpointHelpers.Invalid("codex", exception.Message);
+            }
+        }).WithName("UpdateCodex");
+
         models.MapGet("/openrouter/catalog", async (string? search, OpenRouterCatalog catalog, CancellationToken ct) =>
         {
             try
@@ -117,6 +151,12 @@ internal static class ModelSettingsEndpoints
         return new ModelSettingsDto(current.Provider, current.ChatModel, current.FastModel, current.EmbeddingModel,
             await HasOpenRouterKeyAsync(ownerId, credentials, ct), ModelSettings.Providers);
     }
+
+    private static CodexInstallationDto ToCodexDto(CodexInstallationStatus status) =>
+        new(status.InstalledVersion, status.LatestVersion, status.UpdateAvailable, status.CanUpdate,
+            status.UsingManagedInstall, status.UpdateBlockedReason, status.Error,
+            status.Models.Select(model => new CodexModelDto(model.Id, model.Model, model.DisplayName, model.Description,
+                model.IsDefault, model.Hidden, model.SupportsImages, model.InputModalities)).ToArray());
 
     private static async Task<bool> HasOpenRouterKeyAsync(Guid ownerId, IIntegrationCredentialStore credentials,
         CancellationToken ct) =>

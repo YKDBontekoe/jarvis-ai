@@ -12,7 +12,6 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddJarvisAgent(this IServiceCollection services, IConfiguration configuration)
     {
-        var executablePath = configuration["Codex:ExecutablePath"] ?? "codex";
         var model = configuration["Codex:Model"];
         var visionModel = configuration["Codex:VisionModel"];
         var enableWebSearch = configuration.GetValue("Codex:EnableWebSearch", true);
@@ -22,8 +21,10 @@ public static class DependencyInjection
         var turnTimeoutSeconds = configuration.GetValue("Codex:TurnTimeoutSeconds", 300);
         if (turnTimeoutSeconds is < 30 or > 1_800)
             throw new InvalidOperationException("Codex:TurnTimeoutSeconds must be between 30 and 1800.");
+        services.AddSingleton(CodexExecutable.From(configuration));
         services.AddSingleton<CodexProcessLimiter>();
-        services.AddSingleton<IChatClient>(serviceProvider => new CodexCliChatClient(executablePath, model, visionModel,
+        services.AddSingleton<IChatClient>(serviceProvider => new CodexCliChatClient(
+                serviceProvider.GetRequiredService<CodexExecutable>(), model, visionModel,
                 modelClasses, enableWebSearch, turnTimeoutSeconds,
                 serviceProvider.GetRequiredService<CodexProcessLimiter>())
             .AsBuilder()
