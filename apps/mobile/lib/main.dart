@@ -586,9 +586,11 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         );
     if (selection?.deletedCurrent == true) {
+      if (!mounted || _signedOut || _signingOut) return;
       await _createAndOpenConversation();
     } else if (selection?.conversationId != null &&
         selection!.conversationId != _conversationId) {
+      if (!mounted || _signedOut || _signingOut) return;
       try {
         await _openConversation(selection.conversationId!);
       } on DioException catch (error) {
@@ -603,8 +605,10 @@ class _ChatScreenState extends State<ChatScreen> {
         '/api/v1/conversations',
         data: const {'title': 'New conversation'},
       );
-      final id = response.data?['id'] as String?;
-      if (id == null) throw const FormatException('Missing conversation ID.');
+      final id = response.data?['id'];
+      if (id is! String || id.isEmpty) {
+        throw const FormatException('Missing conversation ID.');
+      }
       await _openConversation(id);
     } on DioException catch (error) {
       if (mounted) setState(() => _error = _describeError(error));
@@ -616,6 +620,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _openUtility(String destination) {
+    if (_signedOut || _signingOut) return;
     final page = switch (destination) {
       'tasks' => TasksScreen(http: _http),
       'memory' => MemoryScreen(http: _http),
@@ -639,7 +644,7 @@ class _ChatScreenState extends State<ChatScreen> {
     await Navigator.of(
       context,
     ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
-    if (destination == 'approvals' && mounted) {
+    if (destination == 'approvals' && mounted && !_signedOut && !_signingOut) {
       await _syncConversationApprovals();
     }
   }
@@ -816,7 +821,7 @@ class _ChatScreenState extends State<ChatScreen> {
         .build();
     hub.on('message.delta', (arguments) {
       final event = _payload(arguments);
-      final delta = event?['delta'] as String? ?? '';
+      final delta = asJsonString(event?['delta']) ?? '';
       if (delta.isEmpty || !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
@@ -828,12 +833,12 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     hub.on('message.completed', (arguments) {
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
-      final content = _payload(arguments)?['content'] as String? ?? '';
+      final content = asJsonString(_payload(arguments)?['content']) ?? '';
       setState(() => _completeAssistant(content));
       _scrollToBottom();
     });
     hub.on('tool.started', (arguments) {
-      final tool = _payload(arguments)?['tool'] as String?;
+      final tool = asJsonString(_payload(arguments)?['tool']);
       if (tool == null || !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
@@ -841,14 +846,14 @@ class _ChatScreenState extends State<ChatScreen> {
       _scrollToBottom();
     });
     hub.on('tool.completed', (arguments) {
-      final tool = _payload(arguments)?['tool'] as String?;
+      final tool = asJsonString(_payload(arguments)?['tool']);
       if (tool == null || !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
       setState(() => _toolEvent(tool, success: true));
     });
     hub.on('tool.failed', (arguments) {
-      final tool = _payload(arguments)?['tool'] as String?;
+      final tool = asJsonString(_payload(arguments)?['tool']);
       if (tool == null || !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
@@ -878,8 +883,8 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() => _homeRevision++);
       }
       if (event['type'] != 'approval.required') return;
-      final notificationId = event['notificationId'] as String?;
-      final approvalId = event['sourceId'] as String?;
+      final notificationId = asJsonString(event['notificationId']);
+      final approvalId = asJsonString(event['sourceId']);
       final inline = _entries.any(
         (entry) => entry is ApprovalEntry && entry.id == approvalId,
       );
@@ -891,7 +896,7 @@ class _ChatScreenState extends State<ChatScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            event['body'] as String? ?? 'Jarvis needs your approval.',
+            asJsonString(event['body']) ?? 'Jarvis needs your approval.',
           ),
           action: SnackBarAction(
             label: 'Review',
@@ -912,13 +917,13 @@ class _ChatScreenState extends State<ChatScreen> {
         _removePlaceholder();
         _settleToolRuns();
         _error =
-            event?['message'] as String? ??
+            asJsonString(event?['message']) ??
             'Jarvis could not complete this response.';
       });
       if (_voiceActive || _voiceStarting) unawaited(_stopVoice());
     });
     hub.on('voice.transcript', (arguments) {
-      final transcript = _payload(arguments)?['text'] as String? ?? '';
+      final transcript = asJsonString(_payload(arguments)?['text']) ?? '';
       if (transcript.isEmpty ||
           !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
@@ -938,14 +943,19 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
       final event = _payload(arguments);
       setState(
-        () => _error = event?['message'] as String? ?? 'Voice session failed.',
+        () => _error = asJsonString(event?['message']) ?? 'Voice session failed.',
       );
       unawaited(_stopVoice());
     });
     hub.onreconnecting(({error}) {
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
       unawaited(_stopVoice());
-      setState(() => _connected = false);
+      setState(() {
+        _connected = false;
+        _selectedDestination = _selectedDestination == 2 ? 0 : _selectedDestination;
+        _removePlaceholder();
+        _settleToolRuns();
+      });
     });
     hub.onreconnected(({connectionId}) {
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
@@ -957,6 +967,8 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         setState(() {
           _connected = false;
+          _selectedDestination = _selectedDestination == 2 ? 0 : _selectedDestination;
+          _removePlaceholder();
           _settleToolRuns();
           _error ??= 'Realtime updates disconnected. Retry the connection.';
         });
@@ -1092,6 +1104,8 @@ class _ChatScreenState extends State<ChatScreen> {
     await _auth.signOut();
     await hub?.stop();
     if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      Navigator.of(context).popUntil((route) => route.isFirst);
       setState(() {
         _signedOut = true;
         _connected = false;
@@ -1125,12 +1139,15 @@ class _ChatScreenState extends State<ChatScreen> {
         sound: true,
       );
       if (settings.authorizationStatus == AuthorizationStatus.denied) return;
+      if (_signedOut || _signingOut) return;
       _attachPushListeners();
       _pushTokenSubscription ??= messaging.onTokenRefresh.listen((token) {
         unawaited(_registerPushToken(token).catchError((_) {}));
       });
       final token = await messaging.getToken();
-      if (token != null) await _registerPushToken(token);
+      if (token != null && !_signedOut && !_signingOut) {
+        await _registerPushToken(token);
+      }
     } on FirebaseException catch (error) {
       if (mounted) {
         setState(
@@ -1192,8 +1209,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _handlePushPayload(Map<String, dynamic> data) {
     if (!mounted || _signedOut) return;
-    final type = data['type'] as String?;
-    final sourceId = data['sourceId'] as String?;
+    final type = asJsonString(data['type']);
+    final sourceId = asJsonString(data['sourceId']);
     if (opensApprovalScreen(type)) {
       _openUtility('approvals');
       return;
@@ -1289,7 +1306,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       return;
     }
-    final content = data is Map ? data['content'] as String? ?? '' : '';
+    final content = data is Map ? asJsonString(data['content']) ?? '' : '';
     _completeAssistant(content);
   }
 
@@ -1363,6 +1380,18 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
         );
       });
+    } catch (_) {
+      if (!mounted || _conversationId != conversationId) return;
+      setState(() {
+        _removePlaceholder();
+        _settleToolRuns();
+        replace(
+          (current) => current.copyWith(
+            status: ApprovalStatus.failed,
+            error: 'Jarvis could not finish this step. You can retry.',
+          ),
+        );
+      });
     } finally {
       _scrollToBottom();
     }
@@ -1395,8 +1424,8 @@ class _ChatScreenState extends State<ChatScreen> {
       if (session == null) {
         throw StateError('Jarvis returned no voice session.');
       }
-      final serverUrl = session['serverUrl'] as String?;
-      final token = session['token'] as String?;
+      final serverUrl = asJsonString(session['serverUrl']);
+      final token = asJsonString(session['token']);
       if (serverUrl == null || token == null) {
         throw StateError('Jarvis returned incomplete LiveKit credentials.');
       }
@@ -1495,7 +1524,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     if (status == 409) {
       final data = error.response?.data;
-      final message = data is Map ? data['message'] as String? : null;
+      final message = data is Map ? asJsonString(data['message']) : null;
       return message ?? 'Jarvis is busy with this conversation.';
     }
     if (status != null) return 'Jarvis returned HTTP $status.';
@@ -1530,7 +1559,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _scrollToBottom({bool jump = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) return;
+      if (!mounted || !_scroll.hasClients) return;
       final target = _scroll.position.maxScrollExtent;
       if (jump) {
         _scroll.jumpTo(target);

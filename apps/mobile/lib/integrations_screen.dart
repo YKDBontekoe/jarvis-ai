@@ -63,7 +63,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         _providers.any(
           (item) =>
               item['provider'] == provider &&
-              (item['secretNames'] as List<dynamic>? ?? const <dynamic>[])
+              jsonStrings(item['secretNames'])
                   .contains(secretName),
         );
     final providerController = TextEditingController(text: provider ?? '');
@@ -346,7 +346,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     final configured = _providers.any(
       (item) =>
           item['provider'] == provider &&
-          (item['secretNames'] as List<dynamic>? ?? const <dynamic>[]).contains(
+          jsonStrings(item['secretNames']).contains(
             'token',
           ),
     );
@@ -396,13 +396,11 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     final name = server['name'] as String? ?? 'MCP server';
     final endpoint = server['endpoint'] as String? ?? '';
     final tools =
-        (server['allowedTools'] as List<dynamic>? ?? const <dynamic>[])
-            .whereType<String>()
-            .toList();
+        jsonStrings(server['allowedTools']);
     final hasToken = _providers.any(
       (provider) =>
           provider['provider'] == id &&
-          (provider['secretNames'] as List<dynamic>? ?? const <dynamic>[])
+          jsonStrings(provider['secretNames'])
               .contains('token'),
     );
     return SurfaceCard(
@@ -506,9 +504,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   Widget _providerCard(Map<String, dynamic> provider) {
     final slug = provider['provider'] as String? ?? '';
     final names =
-        (provider['secretNames'] as List<dynamic>? ?? const <dynamic>[])
-            .whereType<String>()
-            .toList();
+        jsonStrings(provider['secretNames']);
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
@@ -570,8 +566,8 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   Widget _connectionCard(Map<String, dynamic> connection) {
     final name = connection['name'] as String? ?? 'MCP server';
     final state = connection['state'] as String? ?? 'unavailable';
-    final toolCount = connection['toolCount'] as int? ?? 0;
-    final issue = connection['issue'] as String?;
+    final toolCount = asJsonInt(connection['toolCount']);
+    final issue = asJsonString(connection['issue']);
     final (icon, detail, label, color) = switch (state) {
       'connected' => (
         PhosphorIconsRegular.checkCircle,

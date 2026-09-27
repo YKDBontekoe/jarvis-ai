@@ -67,8 +67,10 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         '/api/v1/conversations',
         data: const {'title': 'New conversation'},
       );
-      final id = response.data?['id'] as String?;
-      if (id == null) throw const FormatException('Missing conversation ID.');
+      final id = response.data?['id'];
+      if (id is! String || id.isEmpty) {
+        throw const FormatException('Missing conversation ID.');
+      }
       if (mounted) {
         Navigator.of(context).pop((conversationId: id, deletedCurrent: false));
       }

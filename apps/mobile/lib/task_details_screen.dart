@@ -48,8 +48,12 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       ]);
       if (!mounted) return;
       setState(() {
-        _task = responses[0].data as Map<String, dynamic>?;
+        final task = responses[0].data;
+        _task = task is Map ? Map<String, dynamic>.from(task) : null;
         _messages = jsonMaps(responses[1].data);
+        if (_task == null) {
+          _error = 'Jarvis returned an invalid task.';
+        }
       });
     } on DioException catch (error) {
       if (!mounted) return;
@@ -58,6 +62,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
             ? 'This task is no longer available.'
             : 'Jarvis could not load the task details.';
       });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Jarvis could not load the task details.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -103,8 +110,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     ),
     body: _loading && _task == null
         ? const LoadingState()
-        : _error != null && _task == null
-        ? ErrorState(message: _error!, onRetry: _load)
+        : _task == null
+        ? ErrorState(
+            message: _error ?? 'Jarvis could not load the task details.',
+            onRetry: _load,
+          )
         : _buildDetails(),
   );
 

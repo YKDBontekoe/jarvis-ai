@@ -16,3 +16,11 @@ String? jsonString(Map<dynamic, dynamic> map, String key) {
   final value = map[key];
   return value is String && value.isNotEmpty ? value : null;
 }
+
+String? asJsonString(dynamic value) => value is String ? value : null;
+
+int asJsonInt(dynamic value, [int fallback = 0]) => switch (value) {
+  int number => number,
+  num number => number.toInt(),
+  _ => fallback,
+};

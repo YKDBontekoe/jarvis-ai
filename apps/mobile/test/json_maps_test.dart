@@ -30,4 +30,13 @@ void main() {
     expect(jsonString({'id': 1}, 'id'), isNull);
     expect(jsonString({'name': 'x'}, 'id'), isNull);
   });
+
+  test('asJsonString and asJsonInt ignore the wrong JSON types', () {
+    expect(asJsonString('ok'), 'ok');
+    expect(asJsonString(''), '');
+    expect(asJsonString(1), isNull);
+    expect(asJsonInt(3), 3);
+    expect(asJsonInt(3.2), 3);
+    expect(asJsonInt('3'), 0);
+  });
 }

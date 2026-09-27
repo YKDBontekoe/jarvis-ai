@@ -260,7 +260,7 @@ class _RemindersScreenState extends State<RemindersScreen>
   }
 
   String _formatDate(dynamic raw) {
-    final date = DateTime.tryParse(raw as String? ?? '')?.toLocal();
+    final date = DateTime.tryParse(asJsonString(raw) ?? '')?.toLocal();
     if (date == null) return '';
     final dateLabel = MaterialLocalizations.of(context).formatMediumDate(date);
     final timeLabel = MaterialLocalizations.of(
