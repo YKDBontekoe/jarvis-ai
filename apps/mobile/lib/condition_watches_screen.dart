@@ -230,6 +230,18 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
   }
 
   Future<void> _cancel(Map<String, dynamic> watch) async {
+    final title = asJsonString(watch['title']) ?? 'Condition watch';
+    final confirmed = await showJarvisConfirm(
+      context,
+      title: 'Stop watching?',
+      message: '“$title” will no longer be checked.',
+      cancelLabel: 'Keep watch',
+      confirmLabel: 'Stop watching',
+      destructive: true,
+      icon: PhosphorIconsRegular.stopCircle,
+    );
+    if (!confirmed) return;
+    if (!mounted) return;
     try {
       await widget.http.delete<void>('/api/v1/watches/${watch['id']}');
       if (mounted) await _load();
