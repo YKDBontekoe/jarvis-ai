@@ -16,6 +16,8 @@ from aiortc import MediaStreamTrack, RTCConfiguration, RTCPeerConnection, RTCSes
 from av import AudioFrame, AudioResampler
 from livekit import agents, rtc
 
+from playback_gate import VoicePlaybackGate
+
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger("jarvis.voice")
 
@@ -361,19 +363,26 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
     audio_tasks: set[asyncio.Task[None]] = set()
     turn_tasks: set[asyncio.Task[None]] = set()
     playback_tasks: set[asyncio.Task[None]] = set()
-    playback_generation = 0
+    playback = VoicePlaybackGate()
     turn_lock = asyncio.Lock()
     current_turn: asyncio.Task[None] | None = None
 
-    def duck_output() -> None:
-        nonlocal playback_generation
-        playback_generation += 1
+    def duck_output(*, suppress_inflight: bool = False) -> None:
+        playback.duck(suppress_inflight=suppress_inflight)
         output_source.clear_queue()
         for task in list(playback_tasks):
             task.cancel()
 
+    async def speak_text(text: str) -> None:
+        if not text.strip() or not playback.try_start_speak():
+            return
+        try:
+            await codex.speak(text)
+        finally:
+            playback.finish_speak()
+
     async def play_output_frame(frame: rtc.AudioFrame, generation: int) -> None:
-        if generation != playback_generation:
+        if generation != playback.generation:
             return
         try:
             await output_source.capture_frame(frame)
@@ -384,17 +393,19 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
 
     async def speak_failure() -> None:
         try:
-            await codex.speak("I could not complete that. Check the Jarvis app.")
+            await speak_text("I could not complete that. Check the Jarvis app.")
         except Exception:
             logger.exception("Could not speak the voice error.")
 
     async def speak_error_turn() -> None:
         async with turn_lock:
+            playback.begin_turn()
             await speak_failure()
 
     async def process_transcript(transcript: str) -> None:
         try:
             async with turn_lock:
+                playback.begin_turn()
                 streamed_text = ""
                 speech_buffer = ""
                 final_text: str | None = None
@@ -418,7 +429,7 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
                             if len(speech_buffer) >= 160 or (
                                 len(speech_buffer) >= 48 and speech_buffer.rstrip().endswith((".", "!", "?", "\n"))
                             ):
-                                await codex.speak(speech_buffer)
+                                await speak_text(speech_buffer)
                                 speech_buffer = ""
                         elif event.get("type") == "done":
                             final_text = event.get("responseText")
@@ -433,7 +444,7 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
                         duck_output()
                         speech_buffer = final_text
                 if speech_buffer.strip():
-                    await codex.speak(speech_buffer)
+                    await speak_text(speech_buffer)
                 elif not streamed_text.strip():
                     await speak_failure()
         except asyncio.CancelledError:
@@ -452,18 +463,21 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
         method = message.get("method")
         params = message.get("params", {})
         if method == "thread/realtime/transcript/delta" and params.get("role") == "user":
-            duck_output()
+            duck_output(suppress_inflight=True)
         elif method == "thread/realtime/transcript/done" and params.get("role") == "user":
             transcript = params.get("text", "").strip()
             if not transcript:
                 return
-            duck_output()
+            duck_output(suppress_inflight=True)
             if current_turn is not None and not current_turn.done():
                 current_turn.cancel()
             current_turn = asyncio.create_task(process_transcript(transcript))
             turn_tasks.add(current_turn)
             current_turn.add_done_callback(finish_turn)
         elif method == "thread/realtime/outputAudio/delta":
+            generation = playback.accept_frame()
+            if generation is None:
+                return
             audio = params.get("audio", {})
             try:
                 sample_rate = int(audio.get("sampleRate", 24000))
@@ -474,7 +488,6 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
                 if sample_rate != 24000 or channels != 1:
                     logger.warning("Codex voice audio format differs from the LiveKit output track.")
                     return
-                generation = playback_generation
                 task = asyncio.create_task(play_output_frame(frame, generation))
                 playback_tasks.add(task)
                 task.add_done_callback(playback_tasks.discard)
@@ -482,7 +495,7 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
                 logger.exception("Codex voice returned an invalid audio chunk.")
         elif method == "thread/realtime/error":
             logger.error("Codex realtime error: %s", params.get("message", "unknown error"))
-            duck_output()
+            duck_output(suppress_inflight=True)
             if current_turn is not None and not current_turn.done():
                 current_turn.cancel()
             current_turn = asyncio.create_task(speak_error_turn())
