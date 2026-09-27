@@ -362,6 +362,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _authBusy = false;
   bool _voiceActive = false;
   bool _voiceStarting = false;
+  int _voiceGeneration = 0;
   int _selectedDestination = 0;
   int _homeRevision = 0;
   bool _showHome = true;
@@ -644,7 +645,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _selectDestination(int index) {
-    if (_voiceStarting && index == 2) return;
     if (index == 2) {
       setState(() => _selectedDestination = 2);
       unawaited(_toggleVoice());
@@ -1441,28 +1441,37 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _toggleVoice() async {
-    if (_voiceActive) {
+    if (_voiceActive || _voiceStarting) {
       await _stopVoice();
       return;
     }
-    if (_voiceStarting || _sending || _signedOut || _signingOut) return;
+    if (_sending || _signedOut || _signingOut) return;
     final conversationId = _conversationId;
     if (conversationId == null || !_connected) {
       setState(() => _error = 'Connect to Jarvis before starting voice.');
       return;
     }
 
+    final voiceGeneration = ++_voiceGeneration;
     setState(() {
       _voiceStarting = true;
       _error = null;
     });
     Room? room;
     final generation = _realtimeGeneration;
+    bool isCurrent() =>
+        mounted &&
+        voiceGeneration == _voiceGeneration &&
+        !_signedOut &&
+        !_signingOut &&
+        _conversationId == conversationId &&
+        _realtimeGeneration == generation;
     try {
       final sessionResponse = await _http.post<Map<String, dynamic>>(
         '/api/v1/voice/session',
         data: {'conversationId': conversationId},
       );
+      if (!isCurrent()) return;
       final session = sessionResponse.data;
       if (session == null) {
         throw StateError('Jarvis returned no voice session.');
@@ -1474,39 +1483,34 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       await AudioManager.instance.setSpeakerOutputPreferred(true);
+      if (!isCurrent()) return;
       room = Room();
       _voiceRoom = room;
       _listenToVoiceRoom(room);
       await room.connect(serverUrl, token).timeout(const Duration(seconds: 20));
-      if (_voiceRoom != room ||
-          !mounted ||
-          _conversationId != conversationId ||
-          _realtimeGeneration != generation) {
+      if (!isCurrent() || _voiceRoom != room) {
         await _abandonVoiceRoom(room);
         return;
       }
       await room.localParticipant?.setMicrophoneEnabled(true);
-      if (_voiceRoom != room ||
-          !mounted ||
-          _conversationId != conversationId ||
-          _realtimeGeneration != generation) {
+      if (!isCurrent() || _voiceRoom != room) {
         await _abandonVoiceRoom(room);
         return;
       }
-      if (mounted) {
-        setState(() {
-          _voiceActive = true;
-          _selectedDestination = 2;
-        });
-      }
+      setState(() {
+        _voiceActive = true;
+        _selectedDestination = 2;
+      });
     } on DioException catch (error) {
-      if (mounted) setState(() => _error = _describeError(error));
+      if (isCurrent()) setState(() => _error = _describeError(error));
       await _abandonVoiceRoom(room);
     } catch (error) {
       await _abandonVoiceRoom(room);
-      if (mounted) setState(() => _error = 'Could not start voice: $error');
+      if (isCurrent()) setState(() => _error = 'Could not start voice: $error');
     } finally {
-      if (mounted) setState(() => _voiceStarting = false);
+      if (mounted && voiceGeneration == _voiceGeneration) {
+        setState(() => _voiceStarting = false);
+      }
     }
   }
 
@@ -1538,6 +1542,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _stopVoice() async {
+    _voiceGeneration++;
     _voiceEvents?.dispose();
     _voiceEvents = null;
     final room = _voiceRoom;
@@ -2112,11 +2117,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     const SizedBox(height: 32),
                     FilledButton.icon(
-                      onPressed: _voiceStarting || _sending
-                          ? null
-                          : _toggleVoice,
+                      onPressed: _sending ? null : _toggleVoice,
                       style: FilledButton.styleFrom(
-                        backgroundColor: _voiceActive
+                        backgroundColor: _voiceActive || _voiceStarting
                             ? JarvisColors.danger
                             : JarvisColors.ink,
                         minimumSize: const Size(220, 56),
@@ -2135,7 +2138,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                   : PhosphorIconsRegular.microphone,
                             ),
                       label: Text(
-                        _voiceActive ? 'End voice chat' : 'Start voice chat',
+                        _voiceActive || _voiceStarting
+                            ? 'End voice chat'
+                            : 'Start voice chat',
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -2325,11 +2330,10 @@ class _ChatScreenState extends State<ChatScreen> {
     ready: _conversationId != null,
     voiceStarting: _voiceStarting,
     onTalk: _conversationId == null ||
-            _voiceStarting ||
             _sending ||
             !_connected
         ? null
-        : () => unawaited(_toggleVoice()),
+        : () => _selectDestination(2),
     onOpenTasks: () => _openUtility('tasks'),
     refreshRevision: _homeRevision,
     onContinueConversation: _hasMessages
