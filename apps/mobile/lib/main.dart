@@ -1484,6 +1484,9 @@ class _ChatScreenState extends State<ChatScreen> {
       if (identical(_runCancel, run)) _runCancel = null;
       _scrollToBottom();
     }
+  }
+
+  Future<void> _toggleVoice() async {
     if (_voiceActive || _voiceStarting) {
       await _stopVoice();
       return;
