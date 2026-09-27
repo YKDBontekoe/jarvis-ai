@@ -164,7 +164,7 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
                     allowCompatibleFallback: prompt.Images.Count > 0 && visionModel is null && !hasVisionClass);
                 var threadId = await rpc.StartThreadAsync(scratch, resolvedModel, runToken);
                 var rawResponse = new StringBuilder();
-                var textDecoder = new StructuredTextStreamDecoder();
+                StructuredTextStreamDecoder textDecoder = new();
 
                 using var modelActivity = ActivitySource.StartActivity("jarvis.model.completion");
                 modelActivity?.SetTag("gen_ai.request.model", resolvedModel);
@@ -229,7 +229,65 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
                     throw new InvalidOperationException("Codex CLI completed without an assistant response.");
 
                 using var document = JsonDocument.Parse(rawResponse.ToString());
-                var assistant = ParseAssistantMessage(document.RootElement, toolNames);
+                ChatMessage assistant;
+                try
+                {
+                    assistant = ParseAssistantMessage(document.RootElement, toolNames);
+                }
+                catch (InvalidOperationException exception) when (exception.InnerException is JsonException)
+                {
+                    // The structured response schema stores function arguments as JSON text so it can
+                    // represent each tool's own schema. If the model returns malformed JSON in that
+                    // string, ask once for a complete replacement instead of failing the whole turn.
+                    rawResponse.Clear();
+                    textDecoder = new StructuredTextStreamDecoder();
+                    var retryPrompt = prompt with
+                    {
+                        Text = prompt.Text + "\n\nYour previous tool call had invalid JSON in argumentsJson. " +
+                            "Retry the same intended tool call with argumentsJson containing one complete, valid JSON object. " +
+                            "Do not execute an incomplete call. If you cannot repair it, return a concise text response."
+                    };
+                    var retryStarted = Stopwatch.GetTimestamp();
+                    var retryOutcome = "failed";
+                    try
+                    {
+                        usage = await rpc.RunTurnAsync(threadId, retryPrompt, resolvedModel, delta =>
+                        {
+                            if (rawResponse.Length + delta.Length > MaxOutputLength)
+                                throw new InvalidOperationException("Codex CLI response exceeded the output size limit.");
+                            rawResponse.Append(delta);
+                            var textDelta = textDecoder.Append(delta);
+                            if (!string.IsNullOrEmpty(textDelta))
+                                updates?.TryWrite(new ChatResponseUpdate
+                                {
+                                    Role = ChatRole.Assistant,
+                                    Contents = [new TextContent(textDelta)],
+                                    ModelId = resolvedModel
+                                });
+                        }, runToken);
+                        retryOutcome = "completed";
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw new TimeoutException(
+                            $"Codex CLI model turn exceeded {_turnTimeout.TotalSeconds:0} seconds.");
+                    }
+                    finally
+                    {
+                        var elapsedMs = Stopwatch.GetElapsedTime(retryStarted).TotalMilliseconds;
+                        var tags = new TagList { { "model", resolvedModel }, { "outcome", retryOutcome } };
+                        ModelCallDuration.Record(elapsedMs, tags);
+                        ModelCalls.Add(1, tags);
+                    }
+                    if (rawResponse.Length == 0)
+                        throw new InvalidOperationException("Codex CLI retry completed without an assistant response.");
+                    using var retryDocument = JsonDocument.Parse(rawResponse.ToString());
+                    assistant = ParseAssistantMessage(retryDocument.RootElement, toolNames);
+                }
                 if (assistant.Contents.Count == 1 && assistant.Contents[0] is FunctionCallContent functionCall)
                 {
                     updates?.TryWrite(new ChatResponseUpdate
