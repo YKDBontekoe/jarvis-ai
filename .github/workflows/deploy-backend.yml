@@ -95,10 +95,9 @@ jobs:
   deploy:
     needs: [prepare, build]
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.skip_deploy != true }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, jarvis-deploy]
     steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.2.2
+      - name: Deploy on the server runner
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
@@ -109,26 +108,19 @@ jobs:
           JARVIS_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/worker:${{ github.sha }}
           JARVIS_VOICE_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/voice-worker:${{ github.sha }}
           DEPLOY_COMPOSE_FILES: ${{ vars.DEPLOY_COMPOSE_FILES }}
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ secrets.DEPLOY_PORT || 22 }}
-          command_timeout: 30m
-          script_stop: true
-          envs: GHCR_TOKEN,GHCR_USER,GIT_SHA,GIT_REF,GITHUB_REPOSITORY,JARVIS_API_IMAGE,JARVIS_WORKER_IMAGE,JARVIS_VOICE_WORKER_IMAGE,DEPLOY_COMPOSE_FILES
-          script: |
-            set -euo pipefail
-            cd '${{ secrets.DEPLOY_PATH }}'
-            if [[ ! -d .git ]]; then
-              git init
-              git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-            fi
-            git_auth="$(printf 'x-access-token:%s' "${GHCR_TOKEN}" | base64 -w0)"
-            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${git_auth}" fetch --prune origin
-            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${git_auth}" fetch --force origin "${GIT_SHA}" || \
-              git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${git_auth}" fetch --force origin "${GIT_REF}"
-            git checkout --detach "${GIT_SHA}"
-            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
-            chmod +x scripts/deploy/remote-up.sh
-            scripts/deploy/remote-up.sh
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          cd "${DEPLOY_PATH}"
+          if [[ ! -d .git ]]; then
+            git init
+            git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          fi
+          git_auth="$(printf 'x-access-token:%s' "${GHCR_TOKEN}" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${git_auth}" fetch --prune origin
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${git_auth}" fetch --force origin "${GIT_SHA}" || \
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${git_auth}" fetch --force origin "${GIT_REF}"
+          git checkout --detach "${GIT_SHA}"
+          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+          chmod +x scripts/deploy/remote-up.sh
+          scripts/deploy/remote-up.sh
