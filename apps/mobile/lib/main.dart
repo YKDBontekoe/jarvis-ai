@@ -34,6 +34,7 @@ import 'features/persona/persona_screen.dart';
 import 'features/settings/model_settings_screen.dart';
 import 'features/settings/settings_view.dart';
 import 'features/shell/sidebar.dart';
+import 'features/channels/channels_screen.dart';
 import 'features/skills/skills_screen.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -674,6 +675,7 @@ class _ChatScreenState extends State<ChatScreen> {
       'persona' => PersonaScreen(http: _http),
       'learning' => LearningScreen(http: _http),
       'graph' => KnowledgeGraphScreen(http: _http),
+      'channels' => ChannelsScreen(http: _http),
       _ => null,
     };
     if (destination == 'sign_out') {

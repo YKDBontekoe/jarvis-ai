@@ -39,6 +39,9 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<MessageFeedbackEntity> MessageFeedback => Set<MessageFeedbackEntity>();
     public DbSet<GraphEntityEntity> GraphEntities => Set<GraphEntityEntity>();
     public DbSet<GraphRelationEntity> GraphRelations => Set<GraphRelationEntity>();
+    public DbSet<ChannelConnectionEntity> ChannelConnections => Set<ChannelConnectionEntity>();
+    public DbSet<ChannelMessageEntity> ChannelMessages => Set<ChannelMessageEntity>();
+    public DbSet<ChannelThreadEntity> ChannelThreads => Set<ChannelThreadEntity>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -448,6 +451,67 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.HasOne<MemoryEntity>().WithMany().HasForeignKey(x => x.SourceMemoryId).OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(x => new { x.OwnerId, x.SubjectId, x.Predicate, x.ValidTo });
             entity.HasIndex(x => new { x.OwnerId, x.ObjectId });
+        });
+
+        modelBuilder.Entity<ChannelConnectionEntity>(entity =>
+        {
+            entity.ToTable("channel_connections");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Kind).HasColumnName("kind").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Account).HasColumnName("account").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Enabled).HasColumnName("enabled");
+            entity.Property(x => x.AllowedSendersJson).HasColumnName("allowed_senders").HasColumnType("jsonb").IsRequired();
+            entity.Property(x => x.ForwardNotifications).HasColumnName("forward_notifications");
+            entity.Property(x => x.NotifyRecipient).HasColumnName("notify_recipient").HasMaxLength(40);
+            entity.Property(x => x.WebhookKey).HasColumnName("webhook_key").HasMaxLength(64).IsRequired();
+            entity.Property(x => x.LastInboundAt).HasColumnName("last_inbound_at");
+            entity.Property(x => x.LastOutboundAt).HasColumnName("last_outbound_at");
+            entity.Property(x => x.LastError).HasColumnName("last_error").HasMaxLength(500);
+            entity.Property(x => x.NotificationsForwardedUntil).HasColumnName("notifications_forwarded_until");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => x.WebhookKey).IsUnique();
+            entity.HasIndex(x => new { x.Kind, x.Account }).IsUnique();
+            entity.HasIndex(x => x.OwnerId);
+        });
+
+        modelBuilder.Entity<ChannelMessageEntity>(entity =>
+        {
+            entity.ToTable("channel_messages");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.ConnectionId).HasColumnName("connection_id");
+            entity.Property(x => x.Direction).HasColumnName("direction").HasMaxLength(4).IsRequired();
+            entity.Property(x => x.Peer).HasColumnName("peer").HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Text).HasColumnName("text").IsRequired();
+            entity.Property(x => x.ExternalId).HasColumnName("external_id").HasMaxLength(200);
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Error).HasColumnName("error").HasMaxLength(500);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.ProcessedAt).HasColumnName("processed_at");
+            entity.Property(x => x.LeaseUntil).HasColumnName("lease_until");
+            entity.HasOne<ChannelConnectionEntity>().WithMany().HasForeignKey(x => x.ConnectionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.ConnectionId, x.ExternalId }).IsUnique().HasFilter("external_id IS NOT NULL");
+            entity.HasIndex(x => new { x.Direction, x.Status, x.CreatedAt });
+            entity.HasIndex(x => new { x.ConnectionId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<ChannelThreadEntity>(entity =>
+        {
+            entity.ToTable("channel_threads");
+            entity.HasKey(x => new { x.ConnectionId, x.Peer });
+            entity.Property(x => x.ConnectionId).HasColumnName("connection_id");
+            entity.Property(x => x.Peer).HasColumnName("peer").HasMaxLength(80);
+            entity.Property(x => x.ConversationId).HasColumnName("conversation_id");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasOne<ChannelConnectionEntity>().WithMany().HasForeignKey(x => x.ConnectionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Conversation>().WithMany().HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Message>(entity =>

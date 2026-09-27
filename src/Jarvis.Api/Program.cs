@@ -48,5 +48,6 @@ api.MapSkillEndpoints(app.Logger);
 api.MapPersonaEndpoints();
 api.MapLearningEndpoints(app.Logger);
 api.MapKnowledgeGraphEndpoints();
+api.MapChannelEndpoints(app.Logger);
 
 app.Run();

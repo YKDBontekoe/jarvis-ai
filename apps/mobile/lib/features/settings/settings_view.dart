@@ -41,6 +41,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         destination: 'skills',
       ),
       (
+        title: 'WhatsApp & Signal',
+        subtitle: 'Chat with Jarvis from your phone',
+        icon: PhosphorIconsRegular.whatsappLogo,
+        destination: 'channels',
+      ),
+      (
         title: 'Integrations',
         subtitle: 'Manage MCP servers and credentials',
         icon: PhosphorIconsRegular.plugsConnected,

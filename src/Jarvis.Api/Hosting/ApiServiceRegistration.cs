@@ -18,6 +18,22 @@ namespace Jarvis.Api.Hosting;
 
 internal static class ApiServiceRegistration
 {
+    public static IServiceCollection AddJarvisChannels(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddSingleton(Channels.ChannelOptions.From(configuration));
+        services.AddHttpClient<Channels.WhatsAppCloudTransport>(client => client.Timeout = TimeSpan.FromSeconds(20));
+        services.AddHttpClient<Channels.SignalRestTransport>(client => client.Timeout = TimeSpan.FromSeconds(20));
+        services.AddHttpClient("signal", client => client.Timeout = TimeSpan.FromSeconds(15));
+        services.AddScoped<Channels.IChannelTransport>(provider => provider.GetRequiredService<Channels.WhatsAppCloudTransport>());
+        services.AddScoped<Channels.IChannelTransport>(provider => provider.GetRequiredService<Channels.SignalRestTransport>());
+        services.AddScoped<Channels.ChannelMessenger>();
+        services.AddScoped<Channels.ChannelMessageRouter>();
+        services.AddHostedService<Channels.ChannelInboundProcessor>();
+        services.AddHostedService<Channels.SignalReceiver>();
+        services.AddHostedService<Channels.ChannelNotificationForwarder>();
+        return services;
+    }
+
     public static void ValidateProductionConfiguration(this WebApplicationBuilder builder)
     {
         if (builder.Environment.IsDevelopment()) return;
@@ -91,6 +107,7 @@ internal static class ApiServiceRegistration
         services.AddHttpClient("firebase-messaging", client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddHostedService<NotificationPushWorker>();
         services.AddHostedService<NotificationRealtimeWorker>();
+        services.AddJarvisChannels(configuration);
         services.AddSignalR();
         services.AddOpenApi();
         services.AddCors(options => options.AddDefaultPolicy(policy => policy
