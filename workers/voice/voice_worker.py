@@ -355,6 +355,10 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
         except Exception:
             logger.exception("Could not speak the voice error.")
 
+    async def speak_error_turn() -> None:
+        async with turn_lock:
+            await speak_failure()
+
     async def process_transcript(transcript: str) -> None:
         try:
             async with turn_lock:
@@ -392,6 +396,8 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
                     speech_buffer += final_text[len(streamed_text):]
                 if speech_buffer.strip():
                     await codex.speak(speech_buffer)
+                elif not streamed_text.strip():
+                    await speak_failure()
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -434,7 +440,11 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
                 logger.exception("Codex voice returned an invalid audio chunk.")
         elif method == "thread/realtime/error":
             logger.error("Codex realtime error: %s", params.get("message", "unknown error"))
-            asyncio.create_task(speak_failure())
+            if current_turn is not None and not current_turn.done():
+                current_turn.cancel()
+            current_turn = asyncio.create_task(speak_error_turn())
+            turn_tasks.add(current_turn)
+            current_turn.add_done_callback(finish_turn)
 
     codex.start_notifications(on_codex_notification)
 
