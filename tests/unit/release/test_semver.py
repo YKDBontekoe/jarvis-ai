@@ -66,6 +66,54 @@ class SemVerTests(unittest.TestCase):
             semver.write_pubspec_version(pubspec, "1.2.3", "1002003")
             self.assertIn("version: 1.2.3+1002003", pubspec.read_text(encoding="utf-8"))
 
+    def test_latest_release_version(self) -> None:
+        self.assertEqual(
+            semver.latest_release_version(["v1.0.0", "v1.2.0", "v1.1.9"]),
+            "1.2.0",
+        )
+        self.assertIsNone(semver.latest_release_version([]))
+
+    def test_parse_pr_semver_bump(self) -> None:
+        body = """
+## SemVer impact
+- [ ] **SemVer bump: major**
+- [x] **SemVer bump: patch**
+- [ ] **SemVer bump: none**
+"""
+        self.assertEqual(semver.parse_pr_semver_bump(body), "patch")
+        self.assertEqual(
+            semver.parse_pr_semver_bump("- [x] **SemVer bump: none**"),
+            "none",
+        )
+
+    def test_plan_next_release_tag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            pubspec = Path(tmp) / "pubspec.yaml"
+            pubspec.write_text("name: demo\nversion: 1.0.0+1\n", encoding="utf-8")
+            self.assertEqual(
+                semver.plan_next_release_tag(
+                    bump="patch",
+                    tag_names=["v1.0.0"],
+                    pubspec_path=pubspec,
+                ),
+                "v1.0.1",
+            )
+            self.assertIsNone(
+                semver.plan_next_release_tag(
+                    bump="none",
+                    tag_names=["v1.0.0"],
+                    pubspec_path=pubspec,
+                )
+            )
+            self.assertEqual(
+                semver.plan_next_release_tag(
+                    bump="minor",
+                    tag_names=[],
+                    pubspec_path=pubspec,
+                ),
+                "v1.1.0",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

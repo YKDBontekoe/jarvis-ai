@@ -1,0 +1,80 @@
+name: Create release tag
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: create-release-tag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip when HEAD already has a release tag
+        id: existing
+        run: |
+          set -euo pipefail
+          if git describe --exact-match --tags HEAD 2>/dev/null | grep -Eq '^v[0-9]'; then
+            echo "skip=true" >> "${GITHUB_OUTPUT}"
+            echo "HEAD already points at $(git describe --exact-match --tags HEAD)."
+          else
+            echo "skip=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Load merged pull request body
+        if: steps.existing.outputs.skip != 'true'
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          pr_json="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" --paginate)"
+          count="$(jq 'length' <<<"${pr_json}")"
+          if [[ "${count}" -lt 1 ]]; then
+            echo "No pull request is associated with ${GITHUB_SHA}; skipping automatic tagging." >&2
+            echo "found=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          pr_number="$(jq -r '.[0].number' <<<"${pr_json}")"
+          body="$(jq -r '.[0].body // ""' <<<"${pr_json}")"
+          printf '%s' "${body}" > pr-body.md
+          echo "found=true" >> "${GITHUB_OUTPUT}"
+          echo "number=${pr_number}" >> "${GITHUB_OUTPUT}"
+
+      - name: Plan next SemVer tag
+        if: steps.existing.outputs.skip != 'true' && steps.pr.outputs.found == 'true'
+        id: plan
+        run: |
+          set -euo pipefail
+          git tag -l 'v*' > tag-names.txt
+          python3 scripts/release/semver.py \
+            --plan-release \
+            --pr-body-file pr-body.md \
+            --tag-names-file tag-names.txt \
+            --pubspec apps/mobile/pubspec.yaml \
+            --github-output
+
+      - name: Create and push release tag
+        if: >-
+          steps.existing.outputs.skip != 'true' &&
+          steps.pr.outputs.found == 'true' &&
+          steps.plan.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"

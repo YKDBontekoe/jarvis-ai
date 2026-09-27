@@ -187,7 +187,7 @@ Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit med
 
 ## GitHub Actions pipelines
 
-Releases use [Semantic Versioning 2.0.0](https://semver.org/): git tags must be `vMAJOR.MINOR.PATCH` (for example `v1.2.0`). Tag a release commit to run both pipelines, or start either workflow from **Actions** with `workflow_dispatch`. Pull requests use [`.github/pull_request_template.md`](.github/pull_request_template.md), including the required SemVer impact section.
+Releases use [Semantic Versioning 2.0.0](https://semver.org/): git tags are `vMAJOR.MINOR.PATCH` (for example `v1.2.0`). When a pull request merges to `main`, [`.github/workflows/create-release-tag.yml`](.github/workflows/create-release-tag.yml) reads the **SemVer bump** checkboxes in [`.github/pull_request_template.md`](.github/pull_request_template.md), creates the next `v*` tag on the merge commit, and pushes it. That tag triggers the iOS IPA and backend deploy workflows. You can still run either release workflow manually from **Actions** with `workflow_dispatch`, or push a `v*` tag yourself in an emergency.
 
 | Change | SemVer bump | Example tag |
 |--------|-------------|---------------|
@@ -213,7 +213,7 @@ Optional: [`scripts/altstore/generate_source.py`](scripts/altstore/generate_sour
 
 ### Backend GHCR images and SSH deploy
 
-[`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) builds `api`, `worker`, and `voice-worker` from the production Dockerfiles, pushes them to `ghcr.io/<owner>/jarvis-ai/<name>:<git-sha>` (plus the version tag and `latest` on `v*` tags), then SSHs to your server to pull those images and restart Compose. It does **not** run on every push to `main`.
+[`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) builds `api`, `worker`, and `voice-worker` from the production Dockerfiles, pushes them to `ghcr.io/<owner>/jarvis-ai/<name>:<git-sha>` (plus the version tag and `latest` on `v*` tags), then SSHs to your server to pull those images and restart Compose. It runs when a `v*` release tag is created (automatically after merge to `main`, or manually), not on every commit to `main`.
 
 Server bootstrap:
 
