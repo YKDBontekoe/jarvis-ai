@@ -380,8 +380,11 @@ class _RemindersScreenState extends State<RemindersScreen>
     ),
     body: ListScreenBody(
       loading: _loading,
-      error: _error,
-      isEmpty: _reminders.isEmpty && _notifications.isEmpty,
+      error: (_reminders.isNotEmpty || _notifications.isNotEmpty) ? _error : null,
+      isEmpty: _reminders.isEmpty &&
+          _notifications.isEmpty &&
+          !_remindersFailed &&
+          !_notificationsFailed,
       onRetry: _load,
       empty: TabBarView(
         controller: _tabs,

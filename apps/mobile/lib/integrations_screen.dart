@@ -20,6 +20,9 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   List<Map<String, dynamic>> _connections = [];
   List<Map<String, dynamic>> _managedServers = [];
   bool _loading = true;
+  bool _credentialsFailed = false;
+  bool _connectionsFailed = false;
+  bool _serversFailed = false;
   String? _error;
   int _requestRevision = 0;
 
@@ -33,6 +36,9 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     if (!mounted) return;
     final revision = ++_requestRevision;
     try {
+      var credentialsFailed = false;
+      var connectionsFailed = false;
+      var serversFailed = false;
       String? error;
       try {
         final response = await widget.http.get<List<dynamic>>(
@@ -41,6 +47,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         if (!mounted || revision != _requestRevision) return;
         setState(() => _providers = jsonMaps(response.data));
       } on DioException {
+        credentialsFailed = true;
         error = 'Could not load integration credentials.';
       }
       try {
@@ -50,6 +57,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         if (!mounted || revision != _requestRevision) return;
         setState(() => _connections = jsonMaps(connectionResponse.data));
       } on DioException {
+        connectionsFailed = true;
         error ??= 'Could not load integration connections.';
       }
       try {
@@ -59,10 +67,14 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         if (!mounted || revision != _requestRevision) return;
         setState(() => _managedServers = jsonMaps(serversResponse.data));
       } on DioException {
+        serversFailed = true;
         error ??= 'Could not load MCP servers.';
       }
       if (!mounted || revision != _requestRevision) return;
       setState(() {
+        _credentialsFailed = credentialsFailed;
+        _connectionsFailed = connectionsFailed;
+        _serversFailed = serversFailed;
         _loading = false;
         _error = error;
       });
@@ -332,7 +344,14 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       const SizedBox(height: 28),
       const SectionHeader('MCP connections'),
       for (final server in _managedServers) _managedServerCard(server),
-      if (_connections.isEmpty)
+      if ((_connectionsFailed || _serversFailed) &&
+          _connections.isEmpty &&
+          _managedServers.isEmpty)
+        const _MutedLine(
+          icon: PhosphorIconsRegular.cloudSlash,
+          text: 'Could not load MCP servers.',
+        )
+      else if (_connections.isEmpty && _managedServers.isEmpty)
         const _MutedLine(
           icon: PhosphorIconsRegular.cloudSlash,
           text: 'No MCP servers are configured on this Jarvis host.',
@@ -340,7 +359,12 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       for (final connection in _connections) _connectionCard(connection),
       const SizedBox(height: 28),
       const SectionHeader('Stored credentials'),
-      if (providers.isEmpty)
+      if (_credentialsFailed)
+        const _MutedLine(
+          icon: PhosphorIconsRegular.key,
+          text: 'Could not load integration credentials.',
+        )
+      else if (providers.isEmpty)
         const _MutedLine(
           icon: PhosphorIconsRegular.key,
           text: 'No integration credentials yet.',
@@ -355,13 +379,24 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     required String description,
     required String provider,
   }) {
-    final configured = _providers.any(
-      (item) =>
-          item['provider'] == provider &&
-          jsonStrings(item['secretNames']).contains(
-            'token',
-          ),
-    );
+    final configured = !_credentialsFailed &&
+        _providers.any(
+          (item) =>
+              item['provider'] == provider &&
+              jsonStrings(item['secretNames']).contains(
+                'token',
+              ),
+        );
+    final statusLabel = _credentialsFailed
+        ? 'Couldn’t load'
+        : configured
+        ? 'Token stored'
+        : 'Not configured';
+    final statusColor = _credentialsFailed
+        ? JarvisColors.danger
+        : configured
+        ? JarvisColors.success
+        : JarvisColors.muted;
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,8 +412,8 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
                 ),
               ),
               StatusPill(
-                label: configured ? 'Token stored' : 'Not configured',
-                color: configured ? JarvisColors.success : JarvisColors.muted,
+                label: statusLabel,
+                color: statusColor,
               ),
             ],
           ),
