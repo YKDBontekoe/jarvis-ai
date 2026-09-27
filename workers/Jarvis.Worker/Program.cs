@@ -34,6 +34,7 @@ builder.Services.AddSingleton<TemporalReminderScheduler>();
 builder.Services.AddSingleton<IFileProcessingScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
 builder.Services.AddSingleton<IConditionWatchScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
 builder.Services.AddSingleton<IDailyBriefingScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
+builder.Services.AddSingleton<Jarvis.Application.Learning.IHeartbeatScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
 builder.Services.AddHostedService<TemporalWorkflowReconciler>();
 builder.Services.AddScoped<IReminderService, ReminderService>();
 builder.Services.AddScoped<IConditionWatchService, ConditionWatchService>();
@@ -53,12 +54,14 @@ var conditionWatchActivities = new ConditionWatchActivities(
     host.Services.GetRequiredService<IServiceScopeFactory>(),
     host.Services.GetRequiredService<PublicJsonMetricReader>());
 var briefingActivities = new DailyBriefingActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
+var heartbeatActivities = new AssistantHeartbeatActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
 using var worker = new TemporalWorker(client, new TemporalWorkerOptions(TemporalReminderScheduler.TaskQueue)
     .AddWorkflow<ReminderWorkflow>()
     .AddWorkflow<FileProcessingWorkflow>()
     .AddWorkflow<JarvisTaskWorkflow>()
     .AddWorkflow<ConditionWatchWorkflow>()
     .AddWorkflow<DailyBriefingWorkflow>()
+    .AddWorkflow<AssistantHeartbeatWorkflow>()
     .AddActivity(activities.DeliverReminderAsync)
     .AddActivity(activities.FailReminderAsync)
     .AddActivity(fileActivities.ProcessStoredFileAsync)
@@ -69,7 +72,8 @@ using var worker = new TemporalWorker(client, new TemporalWorkerOptions(Temporal
     .AddActivity(conditionWatchActivities.CheckAsync)
     .AddActivity(conditionWatchActivities.FailAsync)
     .AddActivity(briefingActivities.ResolveScheduleAsync)
-    .AddActivity(briefingActivities.DeliverAsync));
+    .AddActivity(briefingActivities.DeliverAsync)
+    .AddActivity(heartbeatActivities.RunAsync));
 
 await host.StartAsync();
 try
@@ -163,6 +167,29 @@ internal sealed class DailyBriefingActivities(IServiceScopeFactory scopeFactory)
         await using var scope = scopeFactory.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<IDailyBriefingRepository>()
             .DeliverAsync(input, activity.CancellationToken);
+    }
+}
+
+internal sealed class AssistantHeartbeatActivities(IServiceScopeFactory scopeFactory) : AssistantHeartbeatActivityContract
+{
+    [Temporalio.Activities.Activity("RunAssistantHeartbeat")]
+    public override async Task<Jarvis.Application.Learning.HeartbeatRunResult> RunAsync(
+        Jarvis.Application.Learning.HeartbeatWorkflowInput input)
+    {
+        var cancellationToken = ActivityExecutionContext.Current.CancellationToken;
+        using var trace = JarvisWorkerTelemetry.Source.StartActivity("heartbeat.run");
+        using var heartbeat = new ActivityHeartbeat(input.OwnerId);
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var services = scope.ServiceProvider;
+        var settings = await services.GetRequiredService<Jarvis.Application.Settings.IOwnerSettingsStore>()
+            .GetAsync<Jarvis.Application.Settings.LearningSettings>(input.OwnerId,
+                Jarvis.Application.Settings.SettingsSections.Learning, cancellationToken);
+        if (settings is not { HeartbeatEnabled: true })
+            return new Jarvis.Application.Learning.HeartbeatRunResult(false, 0);
+        services.GetRequiredService<WorkerCurrentUser>().SetOwner(input.OwnerId);
+        await services.GetRequiredService<Jarvis.Agents.Learning.HeartbeatService>()
+            .RunAsync(input.OwnerId, cancellationToken);
+        return new Jarvis.Application.Learning.HeartbeatRunResult(true, settings.HeartbeatMinutes);
     }
 }
 

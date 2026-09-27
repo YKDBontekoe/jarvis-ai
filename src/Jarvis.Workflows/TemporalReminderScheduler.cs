@@ -8,7 +8,7 @@ using Temporalio.Client;
 namespace Jarvis.Workflows;
 
 public sealed class TemporalReminderScheduler(IConfiguration configuration) : IFileProcessingScheduler,
-    IConditionWatchScheduler, IDailyBriefingScheduler
+    IConditionWatchScheduler, IDailyBriefingScheduler, Jarvis.Application.Learning.IHeartbeatScheduler
 {
     public const string TaskQueue = "jarvis-workflows";
     private readonly SemaphoreSlim _clientLock = new(1, 1);
@@ -101,6 +101,22 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
                 IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
             });
     }
+
+    public async Task ScheduleHeartbeatAsync(Guid ownerId, CancellationToken cancellationToken)
+    {
+        var client = await GetClientAsync(cancellationToken);
+        await client.StartWorkflowAsync(
+            (AssistantHeartbeatWorkflow workflow) => workflow.RunAsync(
+                new Jarvis.Application.Learning.HeartbeatWorkflowInput(ownerId)),
+            new WorkflowOptions(id: Jarvis.Application.Learning.HeartbeatWorkflowIds.For(ownerId), taskQueue: TaskQueue)
+            {
+                IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
+            });
+    }
+
+    public Task CancelHeartbeatAsync(Guid ownerId, CancellationToken cancellationToken) =>
+        CancelAsync(Jarvis.Application.Learning.HeartbeatWorkflowIds.For(ownerId), cancellationToken);
 
     public async Task ResolveTaskApprovalAsync(string workflowId, string summary, CancellationToken cancellationToken)
     {

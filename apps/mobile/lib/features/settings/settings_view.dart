@@ -23,6 +23,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         destination: 'models',
       ),
       (
+        title: 'Learning & heartbeat',
+        subtitle: 'Continuous learning and proactive check-ins',
+        icon: PhosphorIconsRegular.pulse,
+        destination: 'learning',
+      ),
+      (
         title: 'Persona',
         subtitle: 'How Jarvis has learned to work with you',
         icon: PhosphorIconsRegular.userCircle,

@@ -46,5 +46,6 @@ api.MapMemoryEndpoints(app.Logger);
 api.MapModelSettingsEndpoints(app.Logger);
 api.MapSkillEndpoints(app.Logger);
 api.MapPersonaEndpoints();
+api.MapLearningEndpoints(app.Logger);
 
 app.Run();

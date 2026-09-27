@@ -4,6 +4,7 @@
 // non-streaming /chat/completions with native tool calls, and hashed bag-of-words /embeddings.
 import http from 'node:http';
 import crypto from 'node:crypto';
+import { reflect } from './fake_reflection.mjs';
 
 const PORT = Number(process.env.FAKE_OPENROUTER_PORT ?? 5199);
 const DIMENSIONS = 256;
@@ -112,6 +113,8 @@ function plan(body) {
   if (/Reply with the single word OK/.test(request)) return { text: 'OK' };
   if (/Extract at most three useful long-term memories/.test(system + all)) return { text: '[]' };
   if (/Reorder saved-memory candidates/.test(system + all)) return { text: '[]' };
+  if (/You are Jarvis reflecting on recent work with your user/.test(system))
+    return { text: JSON.stringify(reflect(request)) };
 
   if (trailingTools.length > 0) {
     const result = trailingTools.at(-1);

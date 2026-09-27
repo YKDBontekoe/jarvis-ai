@@ -33,7 +33,9 @@ public static class DependencyInjection
         }
 
         services.AddDbContext<JarvisDbContext>(options => options.UseNpgsql(connectionString, npgsql => npgsql.UseVector()));
-        services.AddScoped<IConversationStore, ConversationStore>();
+        services.AddScoped<ConversationStore>();
+        services.AddScoped<IConversationStore>(provider => provider.GetRequiredService<ConversationStore>());
+        services.AddScoped<IConversationHistory>(provider => provider.GetRequiredService<ConversationStore>());
         services.AddScoped<IConversationRunLock>(serviceProvider => new PostgresConversationRunLock(
             connectionString,
             serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PostgresConversationRunLock>>()));
