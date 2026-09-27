@@ -203,6 +203,8 @@ public sealed class ToolApprovalStore(JarvisDbContext db) : IToolApprovalStore
                 conversationId = approval.ConversationId,
                 taskId = approval.TaskId
             })));
+        if (status == "completed")
+            await ApprovalInboxCleanup.RemoveAsync(db, [id], cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
