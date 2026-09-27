@@ -312,7 +312,7 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
                 decided.DecidedAt is { } decidedAt &&
                 last.CreatedAt >= decidedAt)
             {
-                var session = await conversations.GetAgentSessionAsync(decided.ConversationId, ct);
+                var session = await conversations.GetAgentSessionAsync(decided.ConversationId, runCt);
                 if (session is not null &&
                     AgentSessionJson.TryGetPendingApprovals(session, out var pendingFromSession, out _))
                 {
@@ -322,26 +322,29 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
                         {
                             await approvals.CreateAsync(ownerId, decided.ConversationId, pendingRequest.RequestId,
                                 pendingRequest.ToolCallId, pendingRequest.ToolName, pendingRequest.ArgumentsJson,
-                                decided.TaskId, ct);
+                                decided.TaskId, runCt);
                         }
                         catch (InvalidOperationException)
                         {
                         }
                     }
                 }
-                var remaining = (await approvals.ListActionableForConversationAsync(ownerId, decided.ConversationId, ct))
+                if (!await TaskStillNeedsApprovalAsync(taskRepository, approvals, decided.TaskId, ownerId,
+                        approvalId, CancellationToken.None))
+                    return Results.Conflict(new { message = "This task was cancelled." });
+                var remaining = (await approvals.ListActionableForConversationAsync(ownerId, decided.ConversationId, runCt))
                     .Where(x => x.Id != approvalId)
                     .ToList();
                 if (remaining.Count != 0)
                 {
-                    await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
+                    await approvals.MarkResumeCompletedAsync(approvalId, ownerId, runCt);
                     return Results.Accepted("/api/v1/approvals", remaining.Select(ToApprovalDto));
                 }
                 if (decided.Approved == true)
                     await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId, last.Content, runCt);
                 else
                     await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId, last.Content, runCt);
-                await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
+                await approvals.MarkResumeCompletedAsync(approvalId, ownerId, runCt);
                 return Results.Ok(ToDto(last));
             }
         }
@@ -350,7 +353,10 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
             agent.ResumeReplyAsync(decided.ConversationId, decided.ToReply(), runCt), null, runCt, decided.TaskId);
         if (outcome.PendingApprovals.Count != 0)
         {
-            await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
+            if (!await TaskStillNeedsApprovalAsync(taskRepository, approvals, decided.TaskId, ownerId,
+                    approvalId, CancellationToken.None))
+                return Results.Conflict(new { message = "This task was cancelled." });
+            await approvals.MarkResumeCompletedAsync(approvalId, ownerId, runCt);
             return Results.Accepted("/api/v1/approvals", outcome.PendingApprovals.Select(ToApprovalDto));
         }
         if (decided.Approved == true)
@@ -363,7 +369,7 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
             await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId,
                 outcome.AssistantMessage?.Content ?? "The tool call was declined.", runCt);
         }
-        await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
+        await approvals.MarkResumeCompletedAsync(approvalId, ownerId, runCt);
         return Results.Ok(ToDto(outcome.AssistantMessage!));
     }
     catch (OperationCanceledException)
@@ -979,9 +985,24 @@ static async Task HeartbeatApprovalResumeAsync(IServiceScopeFactory scopes, ILog
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(2));
         while (await timer.WaitForNextTickAsync(cancellationToken))
         {
-            await using var scope = scopes.CreateAsyncScope();
-            await scope.ServiceProvider.GetRequiredService<IToolApprovalStore>()
-                .HeartbeatResumeAsync(approvalId, ownerId, cancellationToken);
+            try
+            {
+                await using var scope = scopes.CreateAsyncScope();
+                await scope.ServiceProvider.GetRequiredService<IToolApprovalStore>()
+                    .HeartbeatResumeAsync(approvalId, ownerId, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (ObjectDisposedException)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "Approval resume heartbeat failed for {ApprovalId}.", approvalId);
+            }
         }
     }
     catch (OperationCanceledException)
@@ -989,10 +1010,6 @@ static async Task HeartbeatApprovalResumeAsync(IServiceScopeFactory scopes, ILog
     }
     catch (ObjectDisposedException)
     {
-    }
-    catch (Exception exception)
-    {
-        logger.LogWarning(exception, "Approval resume heartbeat failed for {ApprovalId}.", approvalId);
     }
 }
 
@@ -1004,17 +1021,32 @@ static async Task WatchTaskCancellationAsync(IServiceScopeFactory scopes, ILogge
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(400));
         while (await timer.WaitForNextTickAsync(cancellationToken))
         {
-            await using var scope = scopes.CreateAsyncScope();
-            var tasks = scope.ServiceProvider.GetRequiredService<IJarvisTaskRepository>();
-            var task = await tasks.GetTaskAsync(taskId, ownerId, cancellationToken);
-            if (task is null || task.Status == "cancelled")
+            try
             {
-                try { abort.Cancel(); }
-                catch (ObjectDisposedException) { }
+                await using var scope = scopes.CreateAsyncScope();
+                var tasks = scope.ServiceProvider.GetRequiredService<IJarvisTaskRepository>();
+                var task = await tasks.GetTaskAsync(taskId, ownerId, cancellationToken);
+                if (task is null || task.Status == "cancelled")
+                {
+                    try { abort.Cancel(); }
+                    catch (ObjectDisposedException) { }
+                    return;
+                }
+                if (task.Status is "completed" or "failed")
+                    return;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
                 return;
             }
-            if (task.Status is "completed" or "failed")
+            catch (ObjectDisposedException)
+            {
                 return;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "Task cancellation watch failed for {TaskId}.", taskId);
+            }
         }
     }
     catch (OperationCanceledException)
@@ -1023,10 +1055,17 @@ static async Task WatchTaskCancellationAsync(IServiceScopeFactory scopes, ILogge
     catch (ObjectDisposedException)
     {
     }
-    catch (Exception exception)
-    {
-        logger.LogWarning(exception, "Task cancellation watch failed for {TaskId}.", taskId);
-    }
+}
+
+static async Task<bool> TaskStillNeedsApprovalAsync(IJarvisTaskRepository tasks, IToolApprovalStore approvals,
+    Guid? taskId, Guid ownerId, Guid approvalId, CancellationToken cancellationToken)
+{
+    if (taskId is null) return true;
+    var task = await tasks.GetTaskAsync(taskId.Value, ownerId, cancellationToken);
+    if (task is { Status: "needs_approval" }) return true;
+    await approvals.CancelIncompleteForTaskAsync(taskId.Value, ownerId, CancellationToken.None);
+    await approvals.MarkResumeFailedAsync(approvalId, ownerId, CancellationToken.None);
+    return false;
 }
 
 static MessageDto ToDto(Message message) => new(message.Id, message.Role, message.Content, message.CreatedAt);
