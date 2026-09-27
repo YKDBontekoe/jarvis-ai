@@ -40,3 +40,9 @@ public interface IConversationMemoryExtractor
 {
     Task ExtractAndStoreAsync(Guid ownerId, Guid sourceMessageId, string userMessage, CancellationToken cancellationToken);
 }
+
+public static class MemoryValidity
+{
+    public static DateTimeOffset? ForUpdate(DateTimeOffset? validUntil) =>
+        validUntil is { } until && until <= DateTimeOffset.UtcNow ? null : validUntil;
+}

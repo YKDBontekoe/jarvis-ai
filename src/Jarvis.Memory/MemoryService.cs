@@ -48,7 +48,7 @@ public sealed class MemoryService(IMemoryRepository repository) : IMemoryService
     {
         Validate(kind, content, importance, confidence);
         return await repository.UpdateAsync(id, ownerId, kind, content.Trim(), importance, confidence,
-            validUntil, isPinned, cancellationToken);
+            MemoryValidity.ForUpdate(validUntil), isPinned, cancellationToken);
     }
 
     public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>

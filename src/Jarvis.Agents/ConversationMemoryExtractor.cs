@@ -116,10 +116,11 @@ internal sealed class ConversationMemoryExtractor(
 
     private static IReadOnlyList<MemoryCandidate> Parse(string? json)
     {
-        if (string.IsNullOrWhiteSpace(json)) return [];
+        var text = MemoryExtractionJson.UnwrapArray(json);
+        if (text is null) return [];
         try
         {
-            return JsonSerializer.Deserialize<List<MemoryCandidate>>(json, new JsonSerializerOptions
+            return JsonSerializer.Deserialize<List<MemoryCandidate>>(text, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             })?.Take(3).ToArray() ?? [];

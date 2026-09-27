@@ -13,7 +13,7 @@ namespace Jarvis.Api.Realtime;
 public sealed class AgentRunCoordinator(
     IConversationStore conversations,
     IToolApprovalStore approvals,
-    IConversationMemoryExtractor memoryExtractor,
+    IServiceScopeFactory scopes,
     IHubContext<JarvisEventsHub> hub,
     ILogger<AgentRunCoordinator> logger)
 {
@@ -221,8 +221,7 @@ public sealed class AgentRunCoordinator(
             await PublishSafelyAsync(clients, "agent.waiting_for_approval", new { conversationId },
                 conversationId, cancellationToken);
             if (memorySourceId is { } approvedFlowSourceId && !string.IsNullOrWhiteSpace(memorySource))
-                await ExtractMemorySafelyAsync(ownerId, conversationId, approvedFlowSourceId, memorySource,
-                    cancellationToken);
+                QueueMemoryExtraction(ownerId, conversationId, approvedFlowSourceId, memorySource);
             return new AgentRunOutcome(preface, pending);
         }
 
@@ -232,7 +231,7 @@ public sealed class AgentRunCoordinator(
         var assistantMessage = new Message(conversationId, "assistant", answer.ToString(), messageId);
         await conversations.AddMessageAsync(assistantMessage, cancellationToken);
         if (memorySourceId is { } sourceMessageId && !string.IsNullOrWhiteSpace(memorySource))
-            await ExtractMemorySafelyAsync(ownerId, conversationId, sourceMessageId, memorySource, cancellationToken);
+            QueueMemoryExtraction(ownerId, conversationId, sourceMessageId, memorySource);
 
         await PublishSafelyAsync(clients, "message.completed", new
         {
@@ -264,22 +263,26 @@ public sealed class AgentRunCoordinator(
         }
     }
 
-    private async Task ExtractMemorySafelyAsync(Guid ownerId, Guid conversationId, Guid sourceMessageId,
-        string source, CancellationToken cancellationToken)
+    private void QueueMemoryExtraction(Guid ownerId, Guid conversationId, Guid sourceMessageId, string source)
     {
-        try
+        _ = Task.Run(async () =>
         {
-            await memoryExtractor.ExtractAndStoreAsync(ownerId, sourceMessageId, source, cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(exception,
-                "Memory extraction failed after the agent run for conversation {ConversationId}.", conversationId);
-        }
+            try
+            {
+                await using var scope = scopes.CreateAsyncScope();
+                using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+                await scope.ServiceProvider.GetRequiredService<IConversationMemoryExtractor>()
+                    .ExtractAndStoreAsync(ownerId, sourceMessageId, source, timeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception,
+                    "Memory extraction failed after the agent run for conversation {ConversationId}.", conversationId);
+            }
+        });
     }
 
     private static object ToApprovalEvent(ToolApprovalRecord approval) => new
