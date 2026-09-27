@@ -21,6 +21,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   List<Map<String, dynamic>> _managedServers = [];
   bool _loading = true;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -29,6 +30,8 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    final revision = ++_requestRevision;
     try {
       final response = await widget.http.get<List<dynamic>>(
         '/api/v1/integrations/credentials',
@@ -39,7 +42,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       final serversResponse = await widget.http.get<List<dynamic>>(
         '/api/v1/mcp-servers',
       );
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _providers = jsonMaps(response.data);
         _connections = jsonMaps(connectionResponse.data);
@@ -48,7 +51,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         _error = null;
       });
     } on DioException {
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(() {
           _loading = false;
           _error = 'Could not load integration credentials.';
@@ -194,11 +197,11 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     providerController.dispose();
     nameController.dispose();
     valueController.dispose();
-    if (saved == true) await _load();
+    if (saved == true && mounted) await _load();
   }
 
   String _problemMessage(Map<String, dynamic> data) {
-    final detail = data['detail'] as String?;
+    final detail = asJsonString(data['detail']);
     if (detail != null) return detail;
     final errors = data['errors'];
     if (errors is Map<String, dynamic>) {
@@ -219,11 +222,12 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       icon: PhosphorIconsRegular.key,
     );
     if (!confirmed) return;
+    if (!mounted) return;
     try {
       await widget.http.delete<void>(
         '/api/v1/integrations/${Uri.encodeComponent(provider)}/credentials/${Uri.encodeComponent(secretName)}',
       );
-      await _load();
+      if (mounted) await _load();
     } on DioException {
       if (mounted) setState(() => _error = 'Could not delete credential.');
     }
@@ -239,11 +243,12 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       icon: PhosphorIconsRegular.trash,
     );
     if (!confirmed) return;
+    if (!mounted) return;
     try {
       await widget.http.delete<void>(
         '/api/v1/integrations/${Uri.encodeComponent(provider)}/credentials',
       );
-      await _load();
+      if (mounted) await _load();
     } on DioException {
       if (mounted) {
         setState(() => _error = 'Could not remove integration credentials.');
@@ -285,7 +290,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
     final providers = _providers
         .where(
           (item) =>
-              !(item['provider'] as String? ?? '').startsWith('jarvis-mcp-'),
+              !(asJsonString(item['provider']) ?? '').startsWith('jarvis-mcp-'),
         )
         .toList();
     return [
@@ -392,9 +397,9 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   }
 
   Widget _managedServerCard(Map<String, dynamic> server) {
-    final id = server['id'] as String? ?? '';
-    final name = server['name'] as String? ?? 'MCP server';
-    final endpoint = server['endpoint'] as String? ?? '';
+    final id = asJsonString(server['id']) ?? '';
+    final name = asJsonString(server['name']) ?? 'MCP server';
+    final endpoint = asJsonString(server['endpoint']) ?? '';
     final tools =
         jsonStrings(server['allowedTools']);
     final hasToken = _providers.any(
@@ -502,7 +507,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   }
 
   Widget _providerCard(Map<String, dynamic> provider) {
-    final slug = provider['provider'] as String? ?? '';
+    final slug = asJsonString(provider['provider']) ?? '';
     final names =
         jsonStrings(provider['secretNames']);
     return SurfaceCard(
@@ -564,8 +569,8 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   }
 
   Widget _connectionCard(Map<String, dynamic> connection) {
-    final name = connection['name'] as String? ?? 'MCP server';
-    final state = connection['state'] as String? ?? 'unavailable';
+    final name = asJsonString(connection['name']) ?? 'MCP server';
+    final state = asJsonString(connection['state']) ?? 'unavailable';
     final toolCount = asJsonInt(connection['toolCount']);
     final issue = asJsonString(connection['issue']);
     final (icon, detail, label, color) = switch (state) {

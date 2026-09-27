@@ -26,6 +26,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   List<Map<String, dynamic>> _messages = [];
   bool _loading = true;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -35,6 +36,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
   Future<void> _load() async {
     if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
@@ -46,7 +48,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           '/api/v1/tasks/${widget.taskId}/messages',
         ),
       ]);
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         final task = responses[0].data;
         _task = task is Map ? Map<String, dynamic>.from(task) : null;
@@ -56,17 +58,19 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         }
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _error = error.response?.statusCode == 404
             ? 'This task is no longer available.'
             : 'Jarvis could not load the task details.';
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() => _error = 'Jarvis could not load the task details.');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -95,7 +99,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: Text(
-        _task?['title'] as String? ?? 'Task',
+        asJsonString(_task?['title']) ?? 'Task',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -120,10 +124,10 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
   Widget _buildDetails() {
     final task = _task!;
-    final status = task['status'] as String? ?? 'unknown';
+    final status = asJsonString(task['status']) ?? 'unknown';
     final style = statusStyle(status);
-    final conversationId = task['conversationId'] as String?;
-    final summary = task['summary'] as String?;
+    final conversationId = asJsonString(task['conversationId']);
+    final summary = asJsonString(task['summary']);
     final theme = Theme.of(context);
     return RefreshIndicator(
       onRefresh: _load,
@@ -144,7 +148,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              task['title'] as String? ?? 'Task',
+                              asJsonString(task['title']) ?? 'Task',
                               style: theme.textTheme.titleMedium,
                             ),
                             const SizedBox(height: 8),
@@ -245,9 +249,9 @@ class _TaskMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final role = message['role'] as String? ?? 'assistant';
+    final role = asJsonString(message['role']) ?? 'assistant';
     final isUser = role == 'user';
-    final content = message['content'] as String? ?? '';
+    final content = asJsonString(message['content']) ?? '';
     if (content.isEmpty) return const SizedBox.shrink();
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 12),

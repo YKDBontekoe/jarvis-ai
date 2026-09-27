@@ -24,3 +24,6 @@ int asJsonInt(dynamic value, [int fallback = 0]) => switch (value) {
   num number => number.toInt(),
   _ => fallback,
 };
+
+bool asJsonBool(dynamic value, [bool fallback = false]) =>
+    value is bool flag ? flag : fallback;

@@ -30,6 +30,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   bool _loading = true;
   bool _creating = false;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -38,6 +39,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
@@ -46,17 +49,19 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       final response = await widget.http.get<List<dynamic>>(
         '/api/v1/conversations',
       );
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(
           () => _conversations = jsonMaps(response.data),
         );
       }
     } on DioException {
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load conversations.');
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -90,7 +95,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   Future<void> _deleteConversation(Map<String, dynamic> conversation) async {
     final id = jsonString(conversation, 'id');
     if (id == null) return;
-    final title = conversation['title'] as String? ?? 'this conversation';
+    final title = asJsonString(conversation['title']) ?? 'this conversation';
     final confirmed = await showJarvisConfirm(
       context,
       title: 'Delete conversation?',
@@ -138,9 +143,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         ),
       ],
     ),
-    body: _loading
+    body: _loading && _conversations.isEmpty
         ? const LoadingState()
-        : _error != null
+        : _error != null && _conversations.isEmpty
         ? ErrorState(message: _error!, onRetry: _load)
         : _conversations.isEmpty
         ? const EmptyState(
@@ -179,7 +184,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              conversation['title'] as String? ??
+                              asJsonString(conversation['title']) ??
                                   'New conversation',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,

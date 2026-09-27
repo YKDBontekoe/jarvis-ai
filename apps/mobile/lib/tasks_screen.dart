@@ -22,6 +22,7 @@ class _TasksScreenState extends State<TasksScreen> {
   bool _loading = true;
   bool _creating = false;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -31,21 +32,26 @@ class _TasksScreenState extends State<TasksScreen> {
 
   Future<void> _load() async {
     if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final response = await widget.http.get<List<dynamic>>('/api/v1/tasks');
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(
           () => _tasks = jsonMaps(response.data),
         );
       }
     } on DioException {
-      if (mounted) setState(() => _error = 'Jarvis could not load tasks.');
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load tasks.');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -109,6 +115,11 @@ class _TasksScreenState extends State<TasksScreen> {
       prompt.dispose();
       return;
     }
+    if (!mounted) {
+      title.dispose();
+      prompt.dispose();
+      return;
+    }
 
     setState(() => _creating = true);
     try {
@@ -142,16 +153,17 @@ class _TasksScreenState extends State<TasksScreen> {
       icon: PhosphorIconsRegular.stopCircle,
     );
     if (!confirmed) return;
+    if (!mounted) return;
     try {
       await widget.http.delete('/api/v1/tasks/${task['id']}');
-      await _load();
+      if (mounted) await _load();
     } on DioException {
       if (mounted) _showError('Jarvis could not cancel that task.');
     }
   }
 
   Future<void> _openTask(Map<String, dynamic> task) async {
-    final taskId = task['id'] as String?;
+    final taskId = asJsonString(task['id']);
     if (taskId == null) return;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
@@ -259,7 +271,7 @@ class _TasksScreenState extends State<TasksScreen> {
 
   Widget _summary() {
     int count(bool Function(String status) test) => _tasks
-        .where((task) => test(task['status'] as String? ?? 'queued'))
+        .where((task) => test(asJsonString(task['status']) ?? 'queued'))
         .length;
     final stats = [
       ('Active', count(_activeStatuses.contains)),
@@ -302,10 +314,10 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Widget _taskCard(Map<String, dynamic> task) {
-    final status = task['status'] as String? ?? 'queued';
+    final status = asJsonString(task['status']) ?? 'queued';
     final style = statusStyle(status);
     final canCancel = ['queued', 'running', 'needs_approval'].contains(status);
-    final summary = task['summary'] as String?;
+    final summary = asJsonString(task['summary']);
     final date = _date(task['createdAt']);
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
@@ -321,7 +333,7 @@ class _TasksScreenState extends State<TasksScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  task['title'] as String? ?? 'Task',
+                  asJsonString(task['title']) ?? 'Task',
                   style: Theme.of(
                     context,
                   ).textTheme.titleSmall?.copyWith(fontSize: 15),

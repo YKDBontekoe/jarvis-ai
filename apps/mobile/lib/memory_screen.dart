@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
+import 'json_maps.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
 
@@ -33,6 +34,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
   String? _error;
   bool _searching = false;
   String? _selectedKind;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -41,6 +43,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   Future<void> _load({String? query}) async {
+    if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
@@ -75,9 +79,11 @@ class _MemoryScreenState extends State<MemoryScreen> {
           entries.add(record);
         }
       }
-      if (mounted) setState(() => _memories = entries);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _memories = entries);
+      }
     } on DioException catch (error) {
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(
           () => _error = error.response?.statusCode == 401
               ? 'Your sign-in has expired. Sign in again to manage memory.'
@@ -85,14 +91,16 @@ class _MemoryScreenState extends State<MemoryScreen> {
         );
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(
           () => _error =
               'Jarvis could not load memory. Check the API connection and try again.',
         );
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -209,12 +217,12 @@ class _MemoryScreenState extends State<MemoryScreen> {
   Future<void> _editMemory(Map<String, dynamic> memory) async {
     final formKey = GlobalKey<FormState>();
     final content = TextEditingController(
-      text: memory['content'] as String? ?? '',
+      text: asJsonString(memory['content']) ?? '',
     );
     var kind = _memoryKinds.contains(memory['kind'])
-        ? memory['kind'] as String
+        ? asJsonString(memory['kind']) ?? 'other'
         : 'other';
-    var pinned = memory['isPinned'] as bool? ?? false;
+    var pinned = asJsonBool(memory['isPinned']);
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -303,7 +311,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   Future<void> _togglePinned(Map<String, dynamic> memory) async {
-    final pinned = !(memory['isPinned'] as bool? ?? false);
+    final pinned = !asJsonBool(memory['isPinned']);
     try {
       await widget.http.put(
         '/api/v1/memory/${memory['id']}',
@@ -436,11 +444,11 @@ class _MemoryScreenState extends State<MemoryScreen> {
   );
 
   Widget _memoryCard(Map<String, dynamic> memory) {
-    final isPinned = memory['isPinned'] as bool? ?? false;
-    final validUntil = DateTime.tryParse(memory['validUntil'] as String? ?? '');
+    final isPinned = asJsonBool(memory['isPinned']);
+    final validUntil = DateTime.tryParse(asJsonString(memory['validUntil']) ?? '');
     final isSuperseded =
         validUntil != null && !validUntil.isAfter(DateTime.now());
-    final kind = memory['kind'] as String? ?? 'fact';
+    final kind = asJsonString(memory['kind']) ?? 'fact';
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(16, 10, 6, 14),
@@ -494,7 +502,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Text(
-              memory['content'] as String? ?? '',
+              asJsonString(memory['content']) ?? '',
               style: TextStyle(
                 fontSize: 15,
                 height: 1.5,

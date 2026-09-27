@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/json_maps.dart';
+import 'package:jarvis_mobile/oidc_issuer.dart';
 
 void main() {
   test('jsonMaps keeps object rows and skips invalid entries', () {
@@ -31,12 +32,33 @@ void main() {
     expect(jsonString({'name': 'x'}, 'id'), isNull);
   });
 
-  test('asJsonString and asJsonInt ignore the wrong JSON types', () {
+  test('asJsonString, asJsonInt, and asJsonBool ignore the wrong JSON types', () {
     expect(asJsonString('ok'), 'ok');
     expect(asJsonString(''), '');
     expect(asJsonString(1), isNull);
     expect(asJsonInt(3), 3);
     expect(asJsonInt(3.2), 3);
     expect(asJsonInt('3'), 0);
+    expect(asJsonBool(true), isTrue);
+    expect(asJsonBool('true'), isFalse);
+  });
+
+  test('normalizeOidcIssuer ignores a trailing slash', () {
+    expect(normalizeOidcIssuer('https://idp.example.com/'), 'https://idp.example.com');
+    expect(
+      normalizeOidcIssuer('https://idp.example.com/realms/foo/'),
+      'https://idp.example.com/realms/foo',
+    );
+    expect(
+      oidcIssuersMatch('https://idp.example.com', 'https://idp.example.com/'),
+      isTrue,
+    );
+    expect(
+      oidcIssuersMatch(
+        'https://idp.example.com/realms/foo',
+        'https://idp.example.com/realms/bar',
+      ),
+      isFalse,
+    );
   });
 }

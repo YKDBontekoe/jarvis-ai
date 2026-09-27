@@ -56,10 +56,10 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
     final buckets = <String, List<Map<String, dynamic>>>{};
     for (final conversation in widget.conversations) {
       if (jsonString(conversation, 'id') == null) continue;
-      final title = (conversation['title'] as String? ?? '').toLowerCase();
+      final title = (asJsonString(conversation['title']) ?? '').toLowerCase();
       if (query.isNotEmpty && !title.contains(query)) continue;
       final updated = DateTime.tryParse(
-        conversation['updatedAt'] as String? ?? '',
+        asJsonString(conversation['updatedAt']) ?? '',
       )?.toLocal();
       final day = updated == null
           ? null
@@ -221,7 +221,7 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     for (final conversation in items)
                       _ConversationRow(
                         title:
-                            conversation['title'] as String? ??
+                            asJsonString(conversation['title']) ??
                             'New conversation',
                         selected:
                             conversation['id'] == widget.selectedConversationId,

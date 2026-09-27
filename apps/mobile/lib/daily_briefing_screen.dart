@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 class DailyBriefingScreen extends StatefulWidget {
@@ -17,6 +18,7 @@ class DailyBriefingScreen extends StatefulWidget {
 class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
   bool _enabled = false;
   bool _loading = true;
+  bool _loaded = false;
   bool _saving = false;
   TimeOfDay _time = const TimeOfDay(hour: 8, minute: 0);
   final _zone = TextEditingController(text: 'UTC');
@@ -40,29 +42,45 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
       final response = await widget.http.get<Map<String, dynamic>>(
         '/api/v1/briefings/daily',
       );
-      final data = response.data ?? const <String, dynamic>{};
-      final time = (data['localTime'] as String? ?? '08:00:00').split(':');
+      final data = response.data;
+      if (data is! Map) {
+        throw const FormatException('Missing briefing settings.');
+      }
+      final map = Map<String, dynamic>.from(data);
+      final time = (asJsonString(map['localTime']) ?? '08:00:00').split(':');
       if (mounted) {
         setState(() {
-          _enabled = data['enabled'] as bool? ?? false;
+          _enabled = asJsonBool(map['enabled']);
           _time = TimeOfDay(
             hour: int.tryParse(time.first) ?? 8,
             minute: time.length > 1 ? int.tryParse(time[1]) ?? 0 : 0,
           );
-          _zone.text = data['timeZoneId'] as String? ?? 'UTC';
-          _loading = false;
+          _zone.text = asJsonString(map['timeZoneId']) ?? 'UTC';
+          _error = null;
+          _loaded = true;
         });
       }
     } on DioException catch (error) {
       if (mounted) {
         setState(() {
-          _error = error.response?.data is Map<String, dynamic>
-              ? ((error.response!.data as Map<String, dynamic>)['detail']
-                    as String?)
+          _error = error.response?.data is Map
+              ? asJsonString(
+                      Map<String, dynamic>.from(error.response!.data as Map)['detail'],
+                    ) ??
+                    'Could not load briefing settings.'
               : 'Could not load briefing settings.';
-          _loading = false;
+          _loaded = false;
         });
       }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = 'Could not load briefing settings.';
+          _loaded = false;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -96,10 +114,16 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
     } on DioException catch (error) {
       if (mounted) {
         final body = error.response?.data;
-        final detail = body is Map<String, dynamic>
-            ? body['detail'] as String? ??
-                  (body['errors'] as Map<String, dynamic>?)?.values.firstOrNull
-                      ?.toString()
+        final detail = body is Map
+            ? asJsonString(
+                    Map<String, dynamic>.from(body)['detail'],
+                  ) ??
+                  (body['errors'] is Map
+                      ? (Map<String, dynamic>.from(body['errors'] as Map)
+                            .values
+                            .firstOrNull
+                            ?.toString())
+                      : null)
             : null;
         setState(() => _error = detail ?? 'Could not save briefing settings.');
       }
@@ -115,6 +139,14 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
       appBar: AppBar(title: const Text('Morning briefing')),
       body: _loading
           ? const LoadingState()
+          : !_loaded
+          ? ErrorState(
+              message: _error ?? 'Could not load briefing settings.',
+              onRetry: () {
+                setState(() => _loading = true);
+                _load();
+              },
+            )
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
               children: [

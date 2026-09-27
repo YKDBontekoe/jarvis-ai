@@ -283,9 +283,9 @@ class _AuthSession {
       );
     }
     final refreshToken =
-        response['refresh_token'] as String? ?? previousRefreshToken;
+        asJsonString(response['refresh_token']) ?? previousRefreshToken;
     await _save(
-      response['access_token'] as String?,
+      asJsonString(response['access_token']),
       refreshToken,
       DateTime.now().add(Duration(seconds: expiresIn.toInt())),
     );
@@ -485,6 +485,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted && generation == _initGeneration) {
         setState(() {
           _error = 'Could not connect to Jarvis: $error';
+          if (_auth.enabled) _signedOut = true;
         });
       }
     }
@@ -779,7 +780,12 @@ class _ChatScreenState extends State<ChatScreen> {
     final conversationId = _conversationId;
     if (conversationId == null) return;
     final approvals = await _loadConversationApprovals(conversationId);
-    if (!mounted || _conversationId != conversationId) return;
+    if (!mounted ||
+        _signedOut ||
+        _signingOut ||
+        _conversationId != conversationId) {
+      return;
+    }
     setState(() {
       _entries.removeWhere((entry) {
         if (entry is! ApprovalEntry) return false;
@@ -1003,9 +1009,13 @@ class _ChatScreenState extends State<ChatScreen> {
     HubConnection hub,
     String conversationId,
   ) async {
+    final generation = _realtimeGeneration;
     try {
       await hub.invoke('JoinConversation', args: [conversationId]);
-      if (mounted && _hub == hub) {
+      if (mounted &&
+          _hub == hub &&
+          _conversationId == conversationId &&
+          _realtimeGeneration == generation) {
         setState(() {
           _connected = true;
           _homeRevision++;
@@ -1013,7 +1023,10 @@ class _ChatScreenState extends State<ChatScreen> {
         await _reloadConversationEntries(conversationId);
       }
     } catch (_) {
-      if (mounted && _hub == hub) {
+      if (mounted &&
+          _hub == hub &&
+          _conversationId == conversationId &&
+          _realtimeGeneration == generation) {
         setState(() {
           _connected = false;
           _error = 'Could not restore realtime updates. Retry the connection.';
@@ -1028,7 +1041,12 @@ class _ChatScreenState extends State<ChatScreen> {
         '/api/v1/conversations/$conversationId',
       );
       final approvals = await _loadConversationApprovals(conversationId);
-      if (!mounted || _conversationId != conversationId) return;
+      if (!mounted ||
+          _conversationId != conversationId ||
+          _signedOut ||
+          _signingOut) {
+        return;
+      }
       setState(() {
         _entries
           ..clear()
@@ -1071,9 +1089,21 @@ class _ChatScreenState extends State<ChatScreen> {
     _signingOut = true;
     _signedOut = true;
     _initGeneration++;
+    _realtimeGeneration++;
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      setState(() {
+        _signedOut = true;
+        _connected = false;
+        _sending = false;
+        _conversationId = null;
+        _entries.clear();
+        _recent = [];
+      });
+    }
     try {
     await _stopVoice();
-    _realtimeGeneration++;
     final hub = _hub;
     _hub = null;
     final pushToken = _pushToken;
@@ -1103,17 +1133,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     await _auth.signOut();
     await hub?.stop();
-    if (mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      Navigator.of(context).popUntil((route) => route.isFirst);
-      setState(() {
-        _signedOut = true;
-        _connected = false;
-        _sending = false;
-        _conversationId = null;
-        _entries.clear();
-      });
-    }
     } finally {
       _signingOut = false;
     }
@@ -1250,11 +1269,14 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<bool> _send([String? text]) async {
     final content = (text ?? _input.text).trim();
     final conversationId = _conversationId;
+    final generation = _realtimeGeneration;
     if (content.isEmpty ||
         conversationId == null ||
         _busy ||
         _voiceActive ||
-        _voiceStarting) {
+        _voiceStarting ||
+        _signedOut ||
+        _signingOut) {
       return false;
     }
     if (text == null) _input.clear();
@@ -1275,12 +1297,18 @@ class _ChatScreenState extends State<ChatScreen> {
         '/api/v1/conversations/$conversationId/messages',
         data: {'content': content},
       );
-      if (!mounted || _conversationId != conversationId) return true;
+      if (!mounted ||
+          _conversationId != conversationId ||
+          _realtimeGeneration != generation) {
+        return true;
+      }
       setState(() => _applyRunResult(response));
       unawaited(_loadRecent());
       return true;
     } on DioException catch (error) {
-      if (mounted && _conversationId == conversationId) {
+      if (mounted &&
+          _conversationId == conversationId &&
+          _realtimeGeneration == generation) {
         setState(() {
           _removePlaceholder();
           _settleToolRuns();
@@ -1291,7 +1319,9 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       return true;
     } finally {
-      if (mounted && _conversationId == conversationId) {
+      if (mounted &&
+          _conversationId == conversationId &&
+          _realtimeGeneration == generation) {
         setState(() => _sending = false);
       }
       _scrollToBottom();
@@ -1311,7 +1341,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _retry(MessageEntry message) async {
-    if (_busy || _voiceActive || _voiceStarting) return;
+    if (_busy || _voiceActive || _voiceStarting || _signedOut || _signingOut) {
+      return;
+    }
     setState(() => _entries.remove(message));
     final sent = await _send(message.content);
     if (!sent && mounted && !_entries.contains(message)) {
@@ -1321,7 +1353,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _decide(ApprovalEntry approval, bool approved) async {
     final conversationId = _conversationId;
-    if (conversationId == null || _busy) return;
+    if (conversationId == null || _busy || _signedOut || _signingOut) return;
+    final generation = _realtimeGeneration;
     void replace(ApprovalEntry Function(ApprovalEntry current) update) {
       final index = _entries.indexWhere(
         (entry) => entry is ApprovalEntry && entry.id == approval.id,
@@ -1350,7 +1383,11 @@ class _ChatScreenState extends State<ChatScreen> {
         '/api/v1/approvals/${approval.id}/decision',
         data: {'approved': approved},
       );
-      if (!mounted || _conversationId != conversationId) return;
+      if (!mounted ||
+          _conversationId != conversationId ||
+          _realtimeGeneration != generation) {
+        return;
+      }
       setState(() {
         replace(
           (current) => current.copyWith(
@@ -1361,7 +1398,11 @@ class _ChatScreenState extends State<ChatScreen> {
       });
       setState(() => _homeRevision++);
     } on DioException catch (error) {
-      if (!mounted || _conversationId != conversationId) return;
+      if (!mounted ||
+          _conversationId != conversationId ||
+          _realtimeGeneration != generation) {
+        return;
+      }
       final status = error.response?.statusCode;
       setState(() {
         _removePlaceholder();
@@ -1381,7 +1422,11 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       });
     } catch (_) {
-      if (!mounted || _conversationId != conversationId) return;
+      if (!mounted ||
+          _conversationId != conversationId ||
+          _realtimeGeneration != generation) {
+        return;
+      }
       setState(() {
         _removePlaceholder();
         _settleToolRuns();
@@ -1402,7 +1447,7 @@ class _ChatScreenState extends State<ChatScreen> {
       await _stopVoice();
       return;
     }
-    if (_voiceStarting || _sending) return;
+    if (_voiceStarting || _sending || _signedOut || _signingOut) return;
     final conversationId = _conversationId;
     if (conversationId == null || !_connected) {
       setState(() => _error = 'Connect to Jarvis before starting voice.');
@@ -1682,10 +1727,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _loadRecent() async {
-    if (_conversationId == null) return;
+    if (_signedOut || _signingOut) return;
     try {
       final response = await _http.get<List<dynamic>>('/api/v1/conversations');
-      if (!mounted) return;
+      if (!mounted || _signedOut || _signingOut) return;
       setState(
         () => _recent = jsonMaps(response.data)
             .where((item) => item['id'] is String)
@@ -2270,7 +2315,10 @@ class _ChatScreenState extends State<ChatScreen> {
     mark: const JarvisOrb(size: 56),
     ready: _conversationId != null,
     voiceStarting: _voiceStarting,
-    onTalk: _conversationId == null || _voiceStarting || _sending
+    onTalk: _conversationId == null ||
+            _voiceStarting ||
+            _sending ||
+            !_connected
         ? null
         : () => unawaited(_toggleVoice()),
     onOpenTasks: () => _openUtility('tasks'),

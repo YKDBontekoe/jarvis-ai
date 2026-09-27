@@ -23,6 +23,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
   bool _loading = true;
   String? _error;
   String? _processingId;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -32,6 +33,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
 
   Future<void> _load() async {
     if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
@@ -40,7 +42,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
       final response = await widget.http.get<List<dynamic>>(
         '/api/v1/approvals',
       );
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(
           () => _approvals = jsonMaps(response.data)
               .where(
@@ -52,11 +54,13 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         );
       }
     } on DioException {
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load pending approvals.');
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -86,7 +90,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
                 ),
                 const SizedBox(height: 14),
                 _ArgumentsBlock(
-                  _formatArguments(approval['argumentsJson'] as String?),
+                  _formatArguments(asJsonString(approval['argumentsJson'])),
                 ),
               ],
             ),
@@ -168,9 +172,9 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         const SizedBox(width: 8),
       ],
     ),
-    body: _loading
+    body: _loading && _approvals.isEmpty
         ? const LoadingState()
-        : _error != null
+        : _error != null && _approvals.isEmpty
         ? ErrorState(message: _error!, onRetry: _load)
         : _approvals.isEmpty
         ? const EmptyState(
@@ -201,7 +205,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  approval['toolName'] as String? ?? 'Unknown tool',
+                  asJsonString(approval['toolName']) ?? 'Unknown tool',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
@@ -227,7 +231,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
           ),
           const SizedBox(height: 8),
           _ArgumentsBlock(
-            _formatArguments(approval['argumentsJson'] as String?),
+            _formatArguments(asJsonString(approval['argumentsJson'])),
           ),
           const SizedBox(height: 16),
           Row(

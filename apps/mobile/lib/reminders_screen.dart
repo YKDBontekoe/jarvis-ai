@@ -27,6 +27,7 @@ class _RemindersScreenState extends State<RemindersScreen>
   List<Map<String, dynamic>> _notifications = [];
   bool _loading = true;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -35,6 +36,8 @@ class _RemindersScreenState extends State<RemindersScreen>
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
@@ -44,16 +47,20 @@ class _RemindersScreenState extends State<RemindersScreen>
         widget.http.get<List<dynamic>>('/api/v1/reminders'),
         widget.http.get<List<dynamic>>('/api/v1/notifications'),
       ]);
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(() {
           _reminders = jsonMaps(responses[0].data);
           _notifications = jsonMaps(responses[1].data);
         });
       }
     } on DioException {
-      if (mounted) setState(() => _error = 'Jarvis could not load reminders.');
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load reminders.');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -151,6 +158,10 @@ class _RemindersScreenState extends State<RemindersScreen>
       titleController.dispose();
       return;
     }
+    if (!mounted) {
+      titleController.dispose();
+      return;
+    }
 
     final localDueAt = DateTime(
       selectedDate.year,
@@ -191,9 +202,10 @@ class _RemindersScreenState extends State<RemindersScreen>
       icon: PhosphorIconsRegular.bellSlash,
     );
     if (!confirmed) return;
+    if (!mounted) return;
     try {
       await widget.http.delete('/api/v1/reminders/${reminder['id']}');
-      await _load();
+      if (mounted) await _load();
     } on DioException {
       if (mounted) _showError('Jarvis could not cancel that reminder.');
     }
@@ -214,8 +226,8 @@ class _RemindersScreenState extends State<RemindersScreen>
   Future<void> _openNotification(Map<String, dynamic> notification) async {
     await _markRead(notification);
     if (!mounted) return;
-    final type = notification['type'] as String?;
-    final sourceId = notification['sourceId'] as String?;
+    final type = asJsonString(notification['type']);
+    final sourceId = asJsonString(notification['sourceId']);
     if (opensApprovalScreen(type)) {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -341,9 +353,9 @@ class _RemindersScreenState extends State<RemindersScreen>
         ),
       ),
     ),
-    body: _loading
+    body: _loading && _reminders.isEmpty && _notifications.isEmpty
         ? const LoadingState()
-        : _error != null
+        : _error != null && _reminders.isEmpty && _notifications.isEmpty
         ? ErrorState(message: _error!, onRetry: _load)
         : TabBarView(
             controller: _tabs,
@@ -365,7 +377,7 @@ class _RemindersScreenState extends State<RemindersScreen>
           itemCount: _reminders.length,
           itemBuilder: (context, index) {
             final reminder = _reminders[index];
-            final status = reminder['status'] as String? ?? 'pending';
+            final status = asJsonString(reminder['status']) ?? 'pending';
             final pending = status == 'pending';
             final style = statusStyle(status);
             return ContentWidth(
@@ -385,7 +397,7 @@ class _RemindersScreenState extends State<RemindersScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            reminder['title'] as String? ?? '',
+                            asJsonString(reminder['title']) ?? '',
                             style: Theme.of(
                               context,
                             ).textTheme.titleSmall?.copyWith(fontSize: 15),
@@ -443,7 +455,7 @@ class _RemindersScreenState extends State<RemindersScreen>
           itemBuilder: (context, index) {
             final notification = _notifications[index];
             final unread = notification['readAt'] == null;
-            final body = notification['body'] as String? ?? '';
+            final body = asJsonString(notification['body']) ?? '';
             return ContentWidth(
               child: SurfaceCard(
                 margin: const EdgeInsets.only(bottom: 10),
@@ -461,7 +473,7 @@ class _RemindersScreenState extends State<RemindersScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            notification['title'] as String? ?? '',
+                            asJsonString(notification['title']) ?? '',
                             style: Theme.of(context).textTheme.titleSmall
                                 ?.copyWith(
                                   fontSize: 15,

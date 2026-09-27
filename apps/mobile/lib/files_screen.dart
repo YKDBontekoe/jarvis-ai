@@ -39,6 +39,7 @@ class _FilesScreenState extends State<FilesScreen> {
   bool _loading = true;
   bool _busy = false;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -47,21 +48,27 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final response = await widget.http.get<List<dynamic>>('/api/v1/files');
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(
           () => _files = jsonMaps(response.data),
         );
       }
     } on DioException {
-      if (mounted) setState(() => _error = 'Jarvis could not load your files.');
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load your files.');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -72,6 +79,7 @@ class _FilesScreenState extends State<FilesScreen> {
     );
     if (file == null) return;
     final bytes = await file.readAsBytes();
+    if (!mounted) return;
     if (bytes.isEmpty || bytes.length > _maxFileBytes) {
       _showError('Choose a non-empty file up to 20 MB.');
       return;
@@ -106,7 +114,7 @@ class _FilesScreenState extends State<FilesScreen> {
       await file_download.downloadAndOpen(
         widget.http,
         id,
-        file['fileName'] as String? ?? 'jarvis-file',
+        asJsonString(file['fileName']) ?? 'jarvis-file',
       );
     } on DioException {
       if (mounted) _showError('Jarvis could not download this file.');
@@ -130,6 +138,7 @@ class _FilesScreenState extends State<FilesScreen> {
       icon: PhosphorIconsRegular.trash,
     );
     if (!confirmed) return;
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       await widget.http.delete('/api/v1/files/$id');
@@ -148,7 +157,7 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   String _formatSize(dynamic value) {
-    final bytes = (value as num?)?.toInt() ?? 0;
+    final bytes = asJsonInt(value);
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
@@ -172,9 +181,9 @@ class _FilesScreenState extends State<FilesScreen> {
         ),
       ],
     ),
-    body: _loading
+    body: _loading && _files.isEmpty
         ? const LoadingState()
-        : _error != null
+        : _error != null && _files.isEmpty
         ? ErrorState(message: _error!, onRetry: _load)
         : _files.isEmpty
         ? const EmptyState(
@@ -188,9 +197,9 @@ class _FilesScreenState extends State<FilesScreen> {
             itemCount: _files.length,
             itemBuilder: (context, index) {
               final file = _files[index];
-              final name = file['fileName'] as String? ?? 'File';
+              final name = asJsonString(file['fileName']) ?? 'File';
               final icon = _fileIcon(name);
-              final status = file['processingStatus'] as String? ?? 'uploaded';
+              final status = asJsonString(file['processingStatus']) ?? 'uploaded';
               return ContentWidth(
                 child: SurfaceCard(
                   margin: const EdgeInsets.only(bottom: 10),

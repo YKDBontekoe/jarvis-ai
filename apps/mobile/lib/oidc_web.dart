@@ -4,6 +4,8 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:web/web.dart' as web;
+import 'json_maps.dart';
+import 'oidc_issuer.dart';
 
 const _stateKey = 'jarvis_oidc_state';
 const _verifierKey = 'jarvis_oidc_pkce_verifier';
@@ -134,10 +136,11 @@ Future<Map<String, String>> _loadMetadata(String issuer) async {
   final discovery = uri.replace(path: '$issuerPath$_openidDiscoverySuffix');
   final response = await _http.get<Map<String, dynamic>>(discovery.toString());
   final document = response.data;
-  final discoveredIssuer = document?['issuer'] as String?;
-  final authorizationEndpoint = document?['authorization_endpoint'] as String?;
-  final tokenEndpoint = document?['token_endpoint'] as String?;
-  if (discoveredIssuer != uri.toString() ||
+  final discoveredIssuer = asJsonString(document?['issuer']);
+  final authorizationEndpoint = asJsonString(document?['authorization_endpoint']);
+  final tokenEndpoint = asJsonString(document?['token_endpoint']);
+  if (discoveredIssuer == null ||
+      !oidcIssuersMatch(discoveredIssuer, uri.toString()) ||
       authorizationEndpoint == null ||
       tokenEndpoint == null) {
     throw StateError('The OIDC discovery document is incomplete.');
