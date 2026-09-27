@@ -219,9 +219,9 @@ Server bootstrap:
 
 1. Clone this repository to a persistent path such as `/opt/jarvis`.
 2. Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, mode `0600`, and fill in real secrets. Set `JARVIS_API_IMAGE`, `JARVIS_WORKER_IMAGE`, and `JARVIS_VOICE_WORKER_IMAGE` to the GHCR names for this repo (the deploy job overrides the tag with the git SHA).
-3. Install Docker with the Compose plugin. The checkout must be able to `git fetch` this repository (SSH deploy key or HTTPS credentials).
+3. Install Docker with the Compose plugin. The checkout must be able to `git fetch` this repository; the workflow uses its short-lived `GITHUB_TOKEN` for the fetch and GHCR pull.
 4. Add repository secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`, and optional `DEPLOY_PORT` (default `22`).
-5. Optional repository variable `DEPLOY_COMPOSE_FILES` lists extra Compose overlays relative to the repo root, for example `infra/compose/docker-compose.github.yml infra/compose/docker-compose.home-assistant.yml`.
+5. Set repository variable `DEPLOY_COMPOSE_FILES` to `infra/compose/docker-compose.production.tunnel.yml` when using a host-level reverse proxy or Cloudflare Tunnel instead of the bundled public Caddy edge. Optional overlays can be space-separated after it, for example `infra/compose/docker-compose.github.yml infra/compose/docker-compose.home-assistant.yml`.
 6. In GitHub → Packages, link the three container packages to this repository so `GITHUB_TOKEN` can push and the deploy job can pull. Keep packages private if the repo is private; the job logs into GHCR on the server with a short-lived token. For later manual pulls, `docker login ghcr.io` on the host with a PAT that has `read:packages`.
 
 `workflow_dispatch` accepts `skip_deploy` to build/push images without SSHing, and an optional extra `image_tag`. Production secrets stay in `.env.production` on the server and are never passed through GitHub Actions. `python3 -m unittest tests/unit/compose/test_production_images.py` checks that Compose interpolates the GHCR image variables.
