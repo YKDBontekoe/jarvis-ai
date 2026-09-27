@@ -111,6 +111,25 @@ class ToolRunEntry extends ChatEntry {
 
 enum ApprovalStatus { pending, submitting, approved, denied, failed }
 
+/// Turns a client-side "submitting" card into a stable terminal state when the
+/// HTTP decision call finishes out of band (realtime events, stale responses).
+ApprovalEntry resolveSubmittingApproval(
+  ApprovalEntry entry, {
+  ApprovalStatus? fallback,
+}) {
+  if (entry.status != ApprovalStatus.submitting) return entry;
+  if (fallback != null) {
+    return entry.copyWith(status: fallback);
+  }
+  final decision = entry.decision;
+  if (decision == null) {
+    return entry.copyWith(status: ApprovalStatus.pending, clearDecision: true);
+  }
+  return entry.copyWith(
+    status: decision ? ApprovalStatus.approved : ApprovalStatus.denied,
+  );
+}
+
 /// A tool call waiting for the user's decision, shown inline in the chat.
 class ApprovalEntry extends ChatEntry {
   const ApprovalEntry({
