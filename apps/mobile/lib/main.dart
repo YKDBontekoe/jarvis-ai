@@ -345,7 +345,7 @@ class _ChatScreenState extends State<ChatScreen> {
     BaseOptions(
       baseUrl: _apiBaseUrl,
       connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(minutes: 3),
+      receiveTimeout: const Duration(minutes: 20),
     ),
   );
   final _input = TextEditingController();
@@ -363,6 +363,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _voiceActive = false;
   bool _voiceStarting = false;
   int _voiceGeneration = 0;
+  CancelToken? _runCancel;
   int _selectedDestination = 0;
   int _homeRevision = 0;
   bool _showHome = true;
@@ -511,6 +512,7 @@ class _ChatScreenState extends State<ChatScreen> {
         !_signingOut;
     await _stopVoice();
     if (!isCurrent()) return;
+    _runCancel?.cancel();
     final previous = _hub;
     _hub = null;
     await previous?.stop();
@@ -1096,6 +1098,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _signedOut = true;
     _initGeneration++;
     _realtimeGeneration++;
+    _runCancel?.cancel();
     if (mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -1300,10 +1303,13 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     });
     _scrollToBottom();
+    final run = CancelToken();
+    _runCancel = run;
     try {
       final response = await _http.post<dynamic>(
         '/api/v1/conversations/$conversationId/messages',
         data: {'content': content},
+        cancelToken: run,
       );
       if (!mounted ||
           _conversationId != conversationId ||
@@ -1322,11 +1328,14 @@ class _ChatScreenState extends State<ChatScreen> {
           _settleToolRuns();
           final index = _entries.lastIndexOf(userMessage);
           if (index >= 0) _entries[index] = userMessage.copyWith(failed: true);
-          _error = _describeError(error);
+          _error = error.type == DioExceptionType.cancel
+              ? null
+              : _describeError(error);
         });
       }
       return true;
     } finally {
+      if (identical(_runCancel, run)) _runCancel = null;
       if (mounted &&
           _conversationId == conversationId &&
           _realtimeGeneration == generation) {
@@ -1391,10 +1400,13 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     });
     _scrollToBottom();
+    final run = CancelToken();
+    _runCancel = run;
     try {
       final response = await _http.post<dynamic>(
         '/api/v1/approvals/${approval.id}/decision',
         data: {'approved': approved},
+        cancelToken: run,
       );
       if (!mounted ||
           _conversationId != conversationId ||
@@ -1414,6 +1426,19 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted ||
           _conversationId != conversationId ||
           _realtimeGeneration != generation) {
+        return;
+      }
+      if (error.type == DioExceptionType.cancel) {
+        setState(() {
+          _removePlaceholder();
+          _settleToolRuns();
+          replace(
+            (current) => current.copyWith(
+              status: ApprovalStatus.pending,
+              clearError: true,
+            ),
+          );
+        });
         return;
       }
       final status = error.response?.statusCode;
@@ -1456,11 +1481,9 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       });
     } finally {
+      if (identical(_runCancel, run)) _runCancel = null;
       _scrollToBottom();
     }
-  }
-
-  Future<void> _toggleVoice() async {
     if (_voiceActive || _voiceStarting) {
       await _stopVoice();
       return;
@@ -2052,6 +2075,7 @@ class _ChatScreenState extends State<ChatScreen> {
               child: ChatComposer(
                 controller: _input,
                 onSend: () => unawaited(_send()),
+                onCancel: _busy ? () => _runCancel?.cancel() : null,
                 onVoice: _conversationId == null
                     ? null
                     : () => _selectDestination(2),

@@ -617,6 +617,7 @@ class ChatComposer extends StatefulWidget {
     required this.sending,
     required this.voiceActive,
     required this.voiceStarting,
+    this.onCancel,
     this.onAttach,
     this.hint = 'Ask Jarvis anything',
     super.key,
@@ -624,6 +625,7 @@ class ChatComposer extends StatefulWidget {
 
   final TextEditingController controller;
   final VoidCallback onSend;
+  final VoidCallback? onCancel;
   final VoidCallback? onVoice;
   final bool sending;
   final bool voiceActive;
@@ -737,7 +739,14 @@ class _ChatComposerState extends State<ChatComposer> {
                   onPressed: widget.onAttach,
                 ),
               const Spacer(),
-              if (widget.voiceActive || widget.voiceStarting)
+              if (widget.sending && widget.onCancel != null)
+                _ComposerIconButton(
+                  icon: PhosphorIconsRegular.stop,
+                  tooltip: 'Stop',
+                  danger: true,
+                  onPressed: widget.onCancel,
+                )
+              else if (widget.voiceActive || widget.voiceStarting)
                 _ComposerIconButton(
                   icon: PhosphorIconsRegular.stop,
                   tooltip: 'Stop voice',

@@ -264,6 +264,26 @@ void main() {
     expect(stopped, 1);
   });
 
+  testWidgets('composer stop cancels an in-flight send', (tester) async {
+    var cancelled = 0;
+    await tester.pumpWidget(
+      _host(
+        ChatComposer(
+          controller: TextEditingController(),
+          onSend: () {},
+          onCancel: () => cancelled++,
+          onVoice: null,
+          sending: true,
+          voiceActive: false,
+          voiceStarting: false,
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Stop'));
+    expect(cancelled, 1);
+  });
+
   testWidgets('suggestion chips send their prompt', (tester) async {
     String? selected;
     await tester.pumpWidget(

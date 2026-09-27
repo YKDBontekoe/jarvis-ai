@@ -198,6 +198,8 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
         start.ArgumentList.Add("--skip-git-repo-check");
         start.ArgumentList.Add("--sandbox");
         start.ArgumentList.Add("workspace-write");
+        start.ArgumentList.Add("-c");
+        start.ArgumentList.Add("sandbox_workspace_write.network_access=false");
         start.ArgumentList.Add("--disable");
         start.ArgumentList.Add("computer_use");
         start.ArgumentList.Add("--disable");

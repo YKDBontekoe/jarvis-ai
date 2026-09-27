@@ -322,7 +322,7 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
 
     await ctx.connect()
     await ctx.room.local_participant.set_attributes({"jarvis.voice.status": "starting"})
-    http = httpx.AsyncClient(timeout=httpx.Timeout(180, connect=5))
+    http = httpx.AsyncClient(timeout=httpx.Timeout(1200, connect=5))
     try:
         codex = await CodexRealtimeSession.start()
     except BaseException:
