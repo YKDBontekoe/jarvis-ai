@@ -181,7 +181,7 @@ public sealed class AgentRunCoordinator(
         if (approvalRequests.Count != 0)
         {
             Message? preface = null;
-            if (answer.Length > 0)
+            if (!string.IsNullOrWhiteSpace(answer.ToString()))
             {
                 preface = new Message(conversationId, "assistant", answer.ToString(), messageId);
                 await conversations.AddMessageAsync(preface, cancellationToken);

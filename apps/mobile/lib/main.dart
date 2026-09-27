@@ -1426,14 +1426,19 @@ class _ChatScreenState extends State<ChatScreen> {
                   status: ApprovalStatus.denied,
                   error: 'This approval is no longer pending.',
                 )
+              : status == 409
+              ? current.copyWith(
+                  status: ApprovalStatus.pending,
+                  error:
+                      'Decide the earlier pending tool call first, or this one was already handled.',
+                )
               : current.copyWith(
                   status: ApprovalStatus.failed,
-                  error: status == 409
-                      ? 'This approval was already handled elsewhere.'
-                      : 'Jarvis could not finish this step. You can retry.',
+                  error: 'Jarvis could not finish this step. You can retry.',
                 ),
         );
       });
+      if (status == 409) await _syncConversationApprovals();
     } catch (_) {
       if (!mounted ||
           _conversationId != conversationId ||

@@ -50,6 +50,12 @@ public sealed class AgentSessionJsonTests
         Assert.False(AgentSessionJson.TryGetCompletedAssistantText(
             """{"messages":[{"contents":[{"text":"User","$type":"text"}]},{"role":"user","contents":[{"text":"Still the user","$type":"text"}]}]}""",
             out _));
+        Assert.False(AgentSessionJson.TryGetCompletedAssistantText(
+            """{"stateBag":{"messages":[{"contents":[{"text":"Hello","$type":"text"}]},{"contents":[{"text":"   ","$type":"text"}]}]}}""",
+            out _));
+        Assert.True(AgentSessionJson.HasInFlightProgressAfterUser(
+            """{"stateBag":{"messages":[{"role":"user","contents":[{"text":"Hello","$type":"text"}]},{"role":"assistant","contents":[{"text":"  ","$type":"text"}]}]}}""",
+            "Hello"));
     }
 
     [Fact]

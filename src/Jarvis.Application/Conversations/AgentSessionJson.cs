@@ -133,6 +133,8 @@ public static class AgentSessionJson
             for (var index = lastUserIndex + 1; index < messages.GetArrayLength(); index++)
             {
                 if (HasToolContents(messages[index])) return true;
+                if (IsRole(messages[index], "assistant") && !TryGetPlainText(messages[index], out _))
+                    return true;
             }
 
             return false;
@@ -353,7 +355,7 @@ public static class AgentSessionJson
         }
 
         text = output.ToString();
-        return text.Length > 0;
+        return !string.IsNullOrWhiteSpace(text);
     }
 
     private static bool HasToolContents(JsonElement message)
