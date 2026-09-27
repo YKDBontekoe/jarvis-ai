@@ -3,7 +3,7 @@ using System.Net;
 namespace Jarvis.Application.Integrations;
 
 public sealed record UserMcpServer(string Id, string Name, string Endpoint,
-    IReadOnlyList<string> AllowedTools, DateTimeOffset UpdatedAt);
+    IReadOnlyList<string> AllowedTools, DateTimeOffset UpdatedAt, bool HasToken);
 
 public sealed record AddUserMcpServerRequest(string Name, string Endpoint, IReadOnlyList<string> AllowedTools);
 
@@ -50,7 +50,8 @@ public static class McpServerEndpointValidator
 
     public static bool IsPublic(IPAddress address)
     {
-        if (IPAddress.IsLoopback(address) || address.IsIPv4MappedToIPv6) return false;
+        if (address.IsIPv4MappedToIPv6) return IsPublic(address.MapToIPv4());
+        if (IPAddress.IsLoopback(address)) return false;
         if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
         {
             var bytes = address.GetAddressBytes();

@@ -43,4 +43,18 @@ public sealed class ToolApproval
         Approved = approved;
         DecidedAt = DateTimeOffset.UtcNow;
     }
+
+    public void Cancel()
+    {
+        if (Status != "pending") return;
+        Status = "cancelled";
+        DecidedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void AbortResume()
+    {
+        if (Status is not ("approved" or "rejected")) return;
+        if (ResumeStatus is "completed" or "cancelled") return;
+        ResumeStatus = "cancelled";
+    }
 }

@@ -20,7 +20,6 @@ public sealed class VoiceConversationCoordinator(
         if (transcript.Length > 32_000) transcript = transcript[..32_000];
 
         var clients = hub.Clients.Group(JarvisEventsHub.GroupName(conversationId));
-        await clients.SendAsync("voice.transcript", new { conversationId, text = transcript }, cancellationToken);
         string? spokenResponse = null;
 
         var accessorScope = scopeFactory.CreateAsyncScope();
@@ -36,18 +35,48 @@ public sealed class VoiceConversationCoordinator(
                 var services = accessorScope.ServiceProvider;
                 var conversations = services.GetRequiredService<IConversationStore>();
                 var tasks = services.GetRequiredService<IJarvisTaskRepository>();
+                var approvals = services.GetRequiredService<IToolApprovalStore>();
                 if (await conversations.GetAsync(conversationId, ownerId, cancellationToken) is null ||
                     await tasks.GetTaskByConversationIdAsync(conversationId, ownerId, cancellationToken) is not null)
                     return null;
 
                 var runLock = services.GetRequiredService<IConversationRunLock>();
                 await using var lease = await runLock.AcquireAsync(conversationId, cancellationToken);
-                var userMessage = new Message(conversationId, "user", transcript);
-                await conversations.AddMessageAsync(userMessage, cancellationToken);
+                var pendingApprovals = await approvals.ListActionableForConversationAsync(ownerId, conversationId,
+                    cancellationToken);
+                if (pendingApprovals.Count > 0)
+                {
+                    return pendingApprovals.Any(x => x.Status == "pending")
+                        ? "I need your approval before I can continue. Check the Jarvis app."
+                        : "I'm still finishing the last tool decision. Check the Jarvis app if it needs a retry.";
+                }
+
+                await clients.SendAsync("voice.transcript", new { conversationId, text = transcript },
+                    cancellationToken);
+                var existingMessages = await conversations.GetMessagesAsync(conversationId, cancellationToken);
+                var lastMessage = existingMessages.Count > 0 ? existingMessages[^1] : null;
+                var userMessage = lastMessage is { Role: "user" } && lastMessage.Content == transcript
+                    ? lastMessage
+                    : new Message(conversationId, "user", transcript);
+                if (!ReferenceEquals(userMessage, lastMessage))
+                    await conversations.AddMessageAsync(userMessage, cancellationToken);
+
+                var coordinator = services.GetRequiredService<AgentRunCoordinator>();
+                if (ReferenceEquals(userMessage, lastMessage) &&
+                    await coordinator.TryRecoverCompletedAssistantAsync(conversationId, transcript,
+                        cancellationToken) is { } recovered)
+                {
+                    await coordinator.PublishRecoveredAssistantAsync(conversationId, recovered, cancellationToken);
+                    return recovered.Content;
+                }
+
+                if (ReferenceEquals(userMessage, lastMessage) &&
+                    await coordinator.TryRecoverPendingApprovalsAsync(ownerId, conversationId, null,
+                        cancellationToken) is { PendingApprovals.Count: > 0 })
+                    return "I need your approval before I can continue. Check the Jarvis app.";
 
                 try
                 {
-                    var coordinator = services.GetRequiredService<AgentRunCoordinator>();
                     var agent = services.GetRequiredService<IJarvisAgent>();
                     var outcome = await coordinator.RunAsync(ownerId, conversationId,
                         agent.StreamReplyAsync(conversationId, userMessage, cancellationToken),
@@ -64,11 +93,20 @@ public sealed class VoiceConversationCoordinator(
                 catch (Exception exception)
                 {
                     logger.LogError(exception, "Voice agent run failed for conversation {ConversationId}.", conversationId);
-                    await clients.SendAsync("agent.failed", new
+                    try
                     {
-                        conversationId,
-                        message = "Jarvis could not complete this response."
-                    }, CancellationToken.None);
+                        await clients.SendAsync("agent.failed", new
+                        {
+                            conversationId,
+                            message = "Jarvis could not complete this response."
+                        }, CancellationToken.None);
+                    }
+                    catch (Exception publishException)
+                    {
+                        logger.LogWarning(publishException,
+                            "Could not publish agent.failed for conversation {ConversationId}.", conversationId);
+                    }
+                    spokenResponse = "I could not complete that. Check the Jarvis app.";
                 }
             }
             finally { accessor.HttpContext = priorContext; }

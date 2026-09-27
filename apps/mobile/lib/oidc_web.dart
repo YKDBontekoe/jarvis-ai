@@ -4,6 +4,8 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:web/web.dart' as web;
+import 'json_maps.dart';
+import 'oidc_issuer.dart';
 
 const _stateKey = 'jarvis_oidc_state';
 const _verifierKey = 'jarvis_oidc_pkce_verifier';
@@ -18,7 +20,7 @@ final _http = Dio(
 String currentRedirectUri(String configuredRedirectUri) {
   final redirectUri = configuredRedirectUri.isNotEmpty
       ? Uri.parse(configuredRedirectUri)
-      : Uri.base.replace(query: null, fragment: null);
+      : oidcRedirectOrigin(Uri.base);
   final localDevelopmentHost =
       redirectUri.host == 'localhost' ||
       redirectUri.host == '127.0.0.1' ||
@@ -56,14 +58,16 @@ Future<Map<String, dynamic>?> completeAuthorizationCode(
   session.removeItem(_verifierKey);
   web.window.history.replaceState(null, web.document.title, redirectUri);
 
-  if (error != null) throw StateError('The identity provider denied sign in.');
+  if (error != null) {
+    if (expectedState == null || verifier == null || returnedState != expectedState)
+      return null;
+    throw StateError('The identity provider denied sign in.');
+  }
   if (code == null ||
       expectedState == null ||
       verifier == null ||
       returnedState != expectedState) {
-    throw StateError(
-      'The identity provider returned an invalid sign-in response.',
-    );
+    return null;
   }
 
   final metadata = await _loadMetadata(issuer);
@@ -134,10 +138,11 @@ Future<Map<String, String>> _loadMetadata(String issuer) async {
   final discovery = uri.replace(path: '$issuerPath$_openidDiscoverySuffix');
   final response = await _http.get<Map<String, dynamic>>(discovery.toString());
   final document = response.data;
-  final discoveredIssuer = document?['issuer'] as String?;
-  final authorizationEndpoint = document?['authorization_endpoint'] as String?;
-  final tokenEndpoint = document?['token_endpoint'] as String?;
-  if (discoveredIssuer != uri.toString() ||
+  final discoveredIssuer = asJsonString(document?['issuer']);
+  final authorizationEndpoint = asJsonString(document?['authorization_endpoint']);
+  final tokenEndpoint = asJsonString(document?['token_endpoint']);
+  if (discoveredIssuer == null ||
+      !oidcIssuersMatch(discoveredIssuer, uri.toString()) ||
       authorizationEndpoint == null ||
       tokenEndpoint == null) {
     throw StateError('The OIDC discovery document is incomplete.');

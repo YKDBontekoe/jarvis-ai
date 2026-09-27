@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 class ConditionWatchesScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
   bool _loading = true;
   bool _creating = false;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -27,21 +29,27 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final response = await widget.http.get<List<dynamic>>('/api/v1/watches');
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(
-          () => _watches = (response.data ?? []).cast<Map<String, dynamic>>(),
+          () => _watches = jsonMaps(response.data),
         );
       }
     } on DioException {
-      if (mounted) setState(() => _error = 'Jarvis could not load watches.');
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load watches.');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -185,6 +193,12 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
       }
       return;
     }
+    if (!mounted) {
+      for (final controller in [title, url, jsonPath, threshold, interval]) {
+        controller.dispose();
+      }
+      return;
+    }
 
     setState(() => _creating = true);
     try {
@@ -216,9 +230,21 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
   }
 
   Future<void> _cancel(Map<String, dynamic> watch) async {
+    final title = asJsonString(watch['title']) ?? 'Condition watch';
+    final confirmed = await showJarvisConfirm(
+      context,
+      title: 'Stop watching?',
+      message: '“$title” will no longer be checked.',
+      cancelLabel: 'Keep watch',
+      confirmLabel: 'Stop watching',
+      destructive: true,
+      icon: PhosphorIconsRegular.stopCircle,
+    );
+    if (!confirmed) return;
+    if (!mounted) return;
     try {
       await widget.http.delete<void>('/api/v1/watches/${watch['id']}');
-      await _load();
+      if (mounted) await _load();
     } on DioException {
       if (mounted) _showError('Jarvis could not stop that watch.');
     }
@@ -253,18 +279,18 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
         ),
       ],
     ),
-    body: _loading && _watches.isEmpty
-        ? const LoadingState()
-        : _error != null && _watches.isEmpty
-        ? ErrorState(message: _error!, onRetry: _load)
-        : _watches.isEmpty
-        ? const EmptyState(
-            icon: PhosphorIconsRegular.pulse,
-            title: 'No watches yet',
-            message:
-                'No watches yet. Set a threshold and Jarvis will keep an eye on it.',
-          )
-        : RefreshIndicator(
+    body: ListScreenBody(
+      loading: _loading,
+      error: _error,
+      isEmpty: _watches.isEmpty,
+      onRetry: _load,
+      empty: const EmptyState(
+        icon: PhosphorIconsRegular.pulse,
+        title: 'No watches yet',
+        message:
+            'No watches yet. Set a threshold and Jarvis will keep an eye on it.',
+      ),
+      child: RefreshIndicator(
             onRefresh: _load,
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
@@ -273,10 +299,11 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
                   ContentWidth(child: _watchCard(_watches[index])),
             ),
           ),
+    ),
   );
 
   Widget _watchCard(Map<String, dynamic> watch) {
-    final status = watch['status'] as String? ?? '';
+    final status = asJsonString(watch['status']) ?? '';
     final active = status == 'active';
     final lastValue = watch['lastValue'];
     final style = statusStyle(status);
@@ -300,7 +327,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        watch['title'] as String? ?? 'Condition watch',
+                        asJsonString(watch['title']) ?? 'Condition watch',
                         style: Theme.of(
                           context,
                         ).textTheme.titleSmall?.copyWith(fontSize: 15),

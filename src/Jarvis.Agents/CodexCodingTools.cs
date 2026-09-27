@@ -9,14 +9,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Jarvis.Agents;
 
-/// <summary>Runs a coding task in a fresh detached worktree using the Codex CLI harness.</summary>
+/// <summary>Runs a coding task in an isolated snapshot using the Codex CLI harness.</summary>
 public sealed class CodexCodingTools(IConfiguration configuration, ILogger<CodexCodingTools> logger,
-    IAuditEventStore audit, ICurrentUser currentUser)
+    IAuditEventStore audit, ICurrentUser currentUser, CodexProcessLimiter processLimiter)
 {
     private const int MaxTaskLength = 16_000;
     private const int MaxResultLength = 24_000;
 
-    [Description("Implement or investigate a coding task in an allowlisted repository. Jarvis creates a fresh detached Git worktree; changes remain there for review and are never merged into the main checkout automatically. This action always requires user approval.")]
+    [Description("Implement or investigate a coding task in an allowlisted repository. Jarvis copies the current tree into an isolated Git snapshot without history, so deleted credentials in the object store are unreachable. Changes remain there for review and are never merged into the main checkout automatically. This action always requires user approval.")]
     public async Task<string> RunCodingTaskAsync(
         [Description("Repository name from the configured Jarvis coding repository allowlist.")] string repositoryName,
         [Description("The coding task to perform. Include the intended outcome and relevant constraints.")] string task,
@@ -55,27 +55,13 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
         var worktreePath = Path.Combine(repositoryWorktreeRoot, taskId);
         Directory.CreateDirectory(repositoryWorktreeRoot);
 
-        var head = await RunProcessAsync("git", repositoryPath,
-            ["rev-parse", "--verify", "HEAD"], cancellationToken);
         var files = await RunProcessAsync("git", repositoryPath,
             ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], cancellationToken);
         if (files.ExitCode != 0)
             throw new InvalidOperationException($"Could not list source files for the coding task: {Limit(files.StandardError, 1_500)}");
-        var hasSensitiveTrackedFiles = files.StandardOutput.Split('\0', StringSplitOptions.RemoveEmptyEntries)
-            .Any(IsSensitivePath);
-        var useGitWorktree = head.ExitCode == 0 && !hasSensitiveTrackedFiles;
-        var sourceMode = useGitWorktree ? "git-worktree" : "filtered-file-snapshot";
-        if (useGitWorktree)
-        {
-            var add = await RunProcessAsync("git", repositoryPath,
-                ["worktree", "add", "--detach", worktreePath, "HEAD"], cancellationToken);
-            if (add.ExitCode != 0)
-                throw new InvalidOperationException($"Could not create a coding worktree: {Limit(add.StandardError, 1_500)}");
-        }
-        else
-        {
-            await CreateSnapshotRepositoryAsync(repositoryPath, worktreePath, files.StandardOutput, cancellationToken);
-        }
+        // Never share the source repo object database: detached worktrees expose deleted blobs via git log/show.
+        const string sourceMode = "filtered-file-snapshot";
+        await CreateSnapshotRepositoryAsync(repositoryPath, worktreePath, files.StandardOutput, cancellationToken);
 
         var resultPath = Path.Combine(repositoryWorktreeRoot, $"{taskId}.result.txt");
         var executable = configuration["Codex:ExecutablePath"] ?? "codex";
@@ -85,70 +71,88 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
         var start = CreateMinimalProcessStart(executable, worktreePath);
         AddCodexCodingArguments(start, worktreePath, resultPath, codingModel);
         var metadata = JsonSerializer.Serialize(new { repository = repository.Name, sourceMode });
-        await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.started", "high",
-            true, null, metadata, cancellationToken);
-        using var process = new Process { StartInfo = start };
-        if (!process.Start())
-        {
-            await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.failed", "high",
-                false, null, metadata, CancellationToken.None);
-            throw new InvalidOperationException("Could not start the Codex CLI coding process.");
-        }
 
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
-        using var killOnCancellation = timeout.Token.Register(() =>
-        {
-            try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
-            catch (InvalidOperationException) { }
-            catch (System.ComponentModel.Win32Exception) { }
-        });
-
-        await process.StandardInput.WriteAsync(BuildPrompt(repository.Name, task).AsMemory(), timeout.Token);
-        process.StandardInput.Close();
-        var stderrTask = process.StandardError.ReadToEndAsync(timeout.Token);
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
+        await processLimiter.WaitAsync(cancellationToken);
+        var exitCode = -1;
+        var standardError = string.Empty;
         try
         {
-            await process.WaitForExitAsync(timeout.Token);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            logger.LogWarning("Codex coding task timed out for repository {RepositoryName}.", repository.Name);
-            await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.failed", "high",
-                false, null, metadata, CancellationToken.None);
-            return JsonSerializer.Serialize(new
+            await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.started", "high",
+                true, null, metadata, cancellationToken);
+            using var process = new Process { StartInfo = start };
+            if (!process.Start())
             {
-                completed = false,
-                reason = "Codex reached the coding-task time limit.",
-                worktreePath
+                await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.failed", "high",
+                    false, null, metadata, CancellationToken.None);
+                throw new InvalidOperationException("Could not start the Codex CLI coding process.");
+            }
+
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+            using var killOnCancellation = timeout.Token.Register(() =>
+            {
+                try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+                catch (InvalidOperationException) { }
+                catch (System.ComponentModel.Win32Exception) { }
             });
+
+            var stderrTask = process.StandardError.ReadToEndAsync();
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            await process.StandardInput.WriteAsync(BuildPrompt(repository.Name, task).AsMemory(), timeout.Token);
+            process.StandardInput.Close();
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                logger.LogWarning("Codex coding task timed out for repository {RepositoryName}.", repository.Name);
+                await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.failed", "high",
+                    false, null, metadata, CancellationToken.None);
+                try { await Task.WhenAll(stderrTask, stdoutTask).WaitAsync(TimeSpan.FromSeconds(2)); }
+                catch (TimeoutException) { }
+                catch (OperationCanceledException) { }
+                return JsonSerializer.Serialize(new
+                {
+                    completed = false,
+                    reason = "Codex reached the coding-task time limit.",
+                    worktreePath
+                });
+            }
+
+            try { standardError = await stderrTask.WaitAsync(TimeSpan.FromSeconds(2)); }
+            catch (TimeoutException) { standardError = string.Empty; }
+            try { _ = await stdoutTask.WaitAsync(TimeSpan.FromSeconds(2)); }
+            catch (TimeoutException) { }
+            exitCode = process.ExitCode;
+        }
+        finally
+        {
+            processLimiter.Release();
         }
 
-        var standardError = await stderrTask;
-        _ = await stdoutTask;
         var summary = File.Exists(resultPath)
             ? await File.ReadAllTextAsync(resultPath, cancellationToken)
             : string.Empty;
         var status = await RunProcessAsync("git", worktreePath, ["status", "--short"], cancellationToken);
         var diff = await RunProcessAsync("git", worktreePath, ["diff", "--stat", "HEAD"], cancellationToken);
         await audit.AppendAsync(currentUser.OwnerId, "codex",
-            process.ExitCode == 0 ? "coding_task.completed" : "coding_task.failed",
-            "high", process.ExitCode == 0, null, metadata, cancellationToken);
+            exitCode == 0 ? "coding_task.completed" : "coding_task.failed",
+            "high", exitCode == 0, null, metadata, cancellationToken);
         logger.LogInformation("Codex coding task finished for repository {RepositoryName} with exit code {ExitCode}.",
-            repository.Name, process.ExitCode);
+            repository.Name, exitCode);
 
         return JsonSerializer.Serialize(new
         {
-            completed = process.ExitCode == 0,
-            exitCode = process.ExitCode,
+            completed = exitCode == 0,
+            exitCode,
             repository = repository.Name,
             sourceMode,
             worktreePath,
             changedFiles = Limit(status.StandardOutput.Trim(), 4_000),
             diffSummary = Limit(diff.StandardOutput.Trim(), 4_000),
             summary = Limit(summary.Trim(), MaxResultLength),
-            error = process.ExitCode == 0 ? null : Limit(standardError.Trim(), 2_000)
+            error = exitCode == 0 ? null : Limit(standardError.Trim(), 2_000)
         });
     }
 
@@ -192,6 +196,8 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
         start.ArgumentList.Add("--skip-git-repo-check");
         start.ArgumentList.Add("--sandbox");
         start.ArgumentList.Add("workspace-write");
+        start.ArgumentList.Add("-c");
+        start.ArgumentList.Add("sandbox_workspace_write.network_access=false");
         start.ArgumentList.Add("--disable");
         start.ArgumentList.Add("computer_use");
         start.ArgumentList.Add("--disable");
@@ -219,10 +225,37 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
         using var process = new Process { StartInfo = start };
         if (!process.Start()) throw new InvalidOperationException($"Could not start {executable}.");
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-        return new ProcessResult(process.ExitCode, await stdoutTask, await stderrTask);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(60));
+        using var killOnCancellation = timeout.Token.Register(() =>
+        {
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+            catch (InvalidOperationException) { }
+            catch (Win32Exception) { }
+        });
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+            catch (InvalidOperationException) { }
+            catch (Win32Exception) { }
+            try { await Task.WhenAll(stdoutTask, stderrTask).WaitAsync(TimeSpan.FromSeconds(2)); }
+            catch (TimeoutException) { }
+            catch (OperationCanceledException) { }
+            throw;
+        }
+        string stdout;
+        string stderr;
+        try { stdout = await stdoutTask.WaitAsync(TimeSpan.FromSeconds(2)); }
+        catch (TimeoutException) { stdout = string.Empty; }
+        try { stderr = await stderrTask.WaitAsync(TimeSpan.FromSeconds(2)); }
+        catch (TimeoutException) { stderr = string.Empty; }
+        return new ProcessResult(process.ExitCode, stdout, stderr);
     }
 
     private static async Task CreateSnapshotRepositoryAsync(string repositoryPath, string worktreePath,
@@ -277,13 +310,15 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
             throw new InvalidOperationException($"Could not establish the isolated coding baseline: {Limit(committed.StandardError, 1_500)}");
     }
 
-    private static bool IsSensitivePath(string relativePath)
+    internal static bool IsSensitivePath(string relativePath)
     {
         var normalized = relativePath.Replace('\\', '/');
         var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (segments.Any(segment => segment.Equals(".ssh", StringComparison.OrdinalIgnoreCase) ||
                                     segment.Equals(".aws", StringComparison.OrdinalIgnoreCase) ||
                                     segment.Equals(".azure", StringComparison.OrdinalIgnoreCase) ||
+                                    segment.Equals(".kube", StringComparison.OrdinalIgnoreCase) ||
+                                    segment.Equals(".docker", StringComparison.OrdinalIgnoreCase) ||
                                     segment.Equals(".codex", StringComparison.OrdinalIgnoreCase) ||
                                     segment.Equals("secrets", StringComparison.OrdinalIgnoreCase)))
             return true;
@@ -306,9 +341,26 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
             return true;
 
         return name.Equals("id_rsa", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("id_dsa", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("id_ecdsa", StringComparison.OrdinalIgnoreCase) ||
                name.Equals("id_ed25519", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("id_rsa_sk", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("id_dsa_sk", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("id_ecdsa_sk", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("id_ed25519_sk", StringComparison.OrdinalIgnoreCase) ||
                name.Equals("auth.json", StringComparison.OrdinalIgnoreCase) ||
-               name.Equals("credentials.json", StringComparison.OrdinalIgnoreCase);
+               name.Equals("credentials.json", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("credentials", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("application_default_credentials.json", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".envrc", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".npmrc", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".yarnrc", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".yarnrc.yml", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".pypirc", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".netrc", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("_netrc", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".git-credentials", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals(".pgpass", StringComparison.OrdinalIgnoreCase);
     }
 
     private static StringComparison PathComparison => OperatingSystem.IsWindows()

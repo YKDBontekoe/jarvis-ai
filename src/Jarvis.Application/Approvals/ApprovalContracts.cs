@@ -18,11 +18,15 @@ public interface IToolApprovalStore
         string toolCallId, string toolName, string argumentsJson, Guid? taskId, CancellationToken cancellationToken);
     Task<ToolApprovalRecord?> GetActionableAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ToolApprovalRecord>> ListActionableAsync(Guid ownerId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ToolApprovalRecord>> ListActionableForConversationAsync(Guid ownerId, Guid conversationId,
+        CancellationToken cancellationToken);
     Task<bool> HasPendingForTaskAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken);
     Task<ToolApprovalRecord?> DecideAsync(Guid id, Guid ownerId, bool approved, CancellationToken cancellationToken);
     Task<bool> TryStartResumeAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+    Task HeartbeatResumeAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task MarkResumeCompletedAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task MarkResumeFailedAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+    Task CancelIncompleteForTaskAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken);
 }
 
 public static class ToolApprovalMapping

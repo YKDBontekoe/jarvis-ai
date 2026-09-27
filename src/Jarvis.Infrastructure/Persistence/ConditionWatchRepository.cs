@@ -37,6 +37,17 @@ public sealed class ConditionWatchRepository(JarvisDbContext db) : IConditionWat
             .OrderBy(x => x.CreatedAt).Take(200).ToListAsync(cancellationToken))
             .Select(x => x.ToRecord()).ToList();
 
+    public async Task<int> RequeueStaleActiveAsync(DateTimeOffset utcNow, CancellationToken cancellationToken)
+    {
+        var grace = ConditionWatch.ScheduleStaleGraceMinutes;
+        return await db.ConditionWatches.Where(x => x.Status == "active" &&
+                x.ScheduleDispatchedAt != null &&
+                (x.LastCheckedAt ?? x.ScheduleDispatchedAt)!.Value
+                    .AddMinutes(x.IntervalMinutes + grace) < utcNow)
+            .ExecuteUpdateAsync(update => update.SetProperty(x => x.ScheduleDispatchedAt, (DateTimeOffset?)null),
+                cancellationToken);
+    }
+
     public async Task MarkScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken)
     {
         var watch = await db.ConditionWatches.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);

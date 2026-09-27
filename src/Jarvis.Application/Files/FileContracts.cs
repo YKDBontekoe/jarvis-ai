@@ -10,6 +10,9 @@ public interface IFileRepository
     Task<IReadOnlyList<StoredFile>> ListQueuedForProcessingAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<StoredFile>> ListDeletingAsync(CancellationToken cancellationToken);
     Task MarkProcessingScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken);
+    Task<bool> RequeueForProcessingAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+    Task<int> RequeueStaleQueuedAsync(DateTimeOffset olderThan, CancellationToken cancellationToken);
+    Task<int> RequeueStaleProcessingAsync(DateTimeOffset olderThan, CancellationToken cancellationToken);
     Task<bool> MarkDeletingAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<bool> SetProcessingStatusAsync(Guid id, Guid ownerId, string status, CancellationToken cancellationToken);
@@ -33,6 +36,7 @@ public interface IFileSearchService
 public interface IFileProcessingScheduler
 {
     Task ScheduleAsync(Guid fileId, Guid ownerId, CancellationToken cancellationToken);
+    Task CancelAsync(Guid fileId, CancellationToken cancellationToken);
 }
 
 public interface IFileMalwareScanner
@@ -57,5 +61,6 @@ public interface IFileService
         Stream content, CancellationToken cancellationToken);
     Task<IReadOnlyList<StoredFile>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<(StoredFile File, Stream Content)?> OpenReadAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+    Task<bool> RetryIndexingAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<bool> DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
 }

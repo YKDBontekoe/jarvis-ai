@@ -1,5 +1,6 @@
 using Jarvis.Application.Files;
 using Jarvis.Application.Workflows;
+using Jarvis.Domain.Workflows;
 using Jarvis.Workflows;
 
 namespace Jarvis.Worker;
@@ -8,6 +9,7 @@ namespace Jarvis.Worker;
 /// Repairs the PostgreSQL-to-Temporal scheduling gap after a process interruption.
 /// Workflow IDs are stable and starts use Temporal's UseExisting conflict policy, so replaying
 /// these dispatches is safe while Temporal remains the durable execution source of truth.
+/// Dispatched work whose Temporal run died is requeued and restarted with AllowDuplicate.
 /// </summary>
 internal sealed class TemporalWorkflowReconciler(
     IServiceScopeFactory scopeFactory,
@@ -34,17 +36,33 @@ internal sealed class TemporalWorkflowReconciler(
             var scheduler = services.GetRequiredService<TemporalReminderScheduler>();
 
             var fileRepository = services.GetRequiredService<IFileRepository>();
+            var fileScheduler = services.GetRequiredService<IFileProcessingScheduler>();
             var storage = services.GetRequiredService<IObjectStorage>();
             var deletingFiles = await fileRepository.ListDeletingAsync(cancellationToken);
             foreach (var file in deletingFiles)
                 await TryScheduleAsync("file deletion", file.Id,
                     async () =>
                     {
+                        try
+                        {
+                            await fileScheduler.CancelAsync(file.Id, cancellationToken);
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        catch (Exception exception)
+                        {
+                            logger.LogDebug(exception, "File processing workflow for {FileId} was already stopped.",
+                                file.Id);
+                        }
                         await storage.DeleteAsync(file.ObjectKey, cancellationToken);
                         await fileRepository.DeleteAsync(file.Id, file.OwnerId, cancellationToken);
                     }, cancellationToken);
 
-            var reminders = await services.GetRequiredService<IReminderRepository>()
+            var reminderRepository = services.GetRequiredService<IReminderRepository>();
+            await reminderRepository.RequeueOverdueDispatchedAsync(DateTimeOffset.UtcNow, cancellationToken);
+            var reminders = await reminderRepository
                 .ListPendingForSchedulingAsync(cancellationToken);
             foreach (var reminder in reminders)
                 await TryScheduleAsync("reminder", reminder.Id,
@@ -57,7 +75,10 @@ internal sealed class TemporalWorkflowReconciler(
                             .MarkReminderScheduleDispatchedAsync(reminder.Id, cancellationToken);
                     }, cancellationToken);
 
-            var tasks = await services.GetRequiredService<IJarvisTaskRepository>()
+            var taskRepository = services.GetRequiredService<IJarvisTaskRepository>();
+            await taskRepository.RequeueStaleQueuedAsync(
+                DateTimeOffset.UtcNow.AddMinutes(-JarvisTask.QueuedDispatchStaleMinutes), cancellationToken);
+            var tasks = await taskRepository
                 .ListQueuedForSchedulingAsync(cancellationToken);
             foreach (var task in tasks)
                 await TryScheduleAsync("task", task.Id,
@@ -68,7 +89,30 @@ internal sealed class TemporalWorkflowReconciler(
                             .MarkTaskScheduleDispatchedAsync(task.Id, cancellationToken);
                     }, cancellationToken);
 
-            var watches = await services.GetRequiredService<IConditionWatchRepository>()
+            var terminalTasks = await services.GetRequiredService<IJarvisTaskRepository>()
+                .ListRecentlyTerminalAsync(DateTimeOffset.UtcNow.AddHours(-24), cancellationToken);
+            foreach (var task in terminalTasks)
+                await TryScheduleAsync("task cancel", task.Id,
+                    async () =>
+                    {
+                        try
+                        {
+                            await scheduler.CancelTaskAsync(task.WorkflowId, cancellationToken);
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        catch (Exception exception)
+                        {
+                            logger.LogDebug(exception, "Terminal task workflow {WorkflowId} was already stopped.",
+                                task.WorkflowId);
+                        }
+                    }, cancellationToken);
+
+            var watchRepository = services.GetRequiredService<IConditionWatchRepository>();
+            await watchRepository.RequeueStaleActiveAsync(DateTimeOffset.UtcNow, cancellationToken);
+            var watches = await watchRepository
                 .ListPendingForSchedulingAsync(cancellationToken);
             foreach (var watch in watches)
                 await TryScheduleAsync("condition watch", watch.Id,
@@ -81,6 +125,7 @@ internal sealed class TemporalWorkflowReconciler(
                     }, cancellationToken);
 
             var briefingRepository = services.GetRequiredService<IDailyBriefingRepository>();
+            await briefingRepository.RequeueStaleEnabledAsync(DateTimeOffset.UtcNow, cancellationToken);
             var briefings = await briefingRepository.ListPendingForSchedulingAsync(cancellationToken);
             foreach (var briefing in briefings)
                 await TryScheduleAsync("daily briefing", briefing.OwnerId,
@@ -108,8 +153,11 @@ internal sealed class TemporalWorkflowReconciler(
                             briefing.WorkflowId, cancellationToken);
                     }, cancellationToken);
 
+            await fileRepository.RequeueStaleQueuedAsync(
+                DateTimeOffset.UtcNow.AddMinutes(-FileIndexing.QueuedDispatchStaleMinutes), cancellationToken);
+            await fileRepository.RequeueStaleProcessingAsync(DateTimeOffset.UtcNow.AddMinutes(-60),
+                cancellationToken);
             var files = await fileRepository.ListQueuedForProcessingAsync(cancellationToken);
-            var fileScheduler = services.GetRequiredService<IFileProcessingScheduler>();
             foreach (var file in files)
                 await TryScheduleAsync("file", file.Id,
                     async () =>

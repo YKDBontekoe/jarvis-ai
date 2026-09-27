@@ -28,6 +28,7 @@ builder.Services.AddScoped<WorkerCurrentUser>();
 builder.Services.AddScoped<ICurrentUser>(services => services.GetRequiredService<WorkerCurrentUser>());
 builder.Services.AddScoped<IJarvisTaskRepository, WorkflowRepository>();
 builder.Services.AddScoped<IJarvisTaskService, JarvisTaskService>();
+builder.Services.AddSingleton<ITaskRunAbort, TaskRunAbort>();
 builder.Services.AddSingleton<TemporalReminderScheduler>();
 builder.Services.AddSingleton<IFileProcessingScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
 builder.Services.AddSingleton<IConditionWatchScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
@@ -50,6 +51,7 @@ var taskActivities = new JarvisTaskActivities(host.Services.GetRequiredService<I
 var conditionWatchActivities = new ConditionWatchActivities(
     host.Services.GetRequiredService<IServiceScopeFactory>(),
     host.Services.GetRequiredService<PublicJsonMetricReader>());
+var briefingActivities = new DailyBriefingActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
 using var worker = new TemporalWorker(client, new TemporalWorkerOptions(TemporalReminderScheduler.TaskQueue)
     .AddWorkflow<ReminderWorkflow>()
     .AddWorkflow<FileProcessingWorkflow>()
@@ -57,13 +59,16 @@ using var worker = new TemporalWorker(client, new TemporalWorkerOptions(Temporal
     .AddWorkflow<ConditionWatchWorkflow>()
     .AddWorkflow<DailyBriefingWorkflow>()
     .AddActivity(activities.DeliverReminderAsync)
+    .AddActivity(activities.FailReminderAsync)
     .AddActivity(fileActivities.ProcessStoredFileAsync)
     .AddActivity(taskActivities.RunTaskAsync)
     .AddActivity(taskActivities.CompleteApprovedTaskAsync)
     .AddActivity(taskActivities.FailTaskAsync)
+    .AddActivity(taskActivities.GetTaskStatusAsync)
     .AddActivity(conditionWatchActivities.CheckAsync)
     .AddActivity(conditionWatchActivities.FailAsync)
-    .AddActivity(new DailyBriefingActivities(host.Services.GetRequiredService<IServiceScopeFactory>()).DeliverAsync));
+    .AddActivity(briefingActivities.ResolveScheduleAsync)
+    .AddActivity(briefingActivities.DeliverAsync));
 
 await host.StartAsync();
 try
@@ -87,6 +92,17 @@ internal sealed class ReminderActivities(IServiceScopeFactory scopeFactory) : Re
         await using var scope = scopeFactory.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IReminderRepository>();
         await repository.CompleteAndNotifyAsync(reminder, activity.CancellationToken);
+    }
+
+    [Temporalio.Activities.Activity("FailReminder")]
+    public override async Task FailReminderAsync(ReminderWorkflowInput reminder)
+    {
+        var activity = ActivityExecutionContext.Current;
+        using var trace = JarvisWorkerTelemetry.Source.StartActivity("reminder.fail");
+        trace?.SetTag("jarvis.reminder.id", reminder.ReminderId);
+        await using var scope = scopeFactory.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<IReminderRepository>()
+            .MarkScheduleFailedAsync(reminder.ReminderId, activity.CancellationToken);
     }
 }
 
@@ -122,6 +138,20 @@ internal sealed class ConditionWatchActivities(IServiceScopeFactory scopeFactory
 
 internal sealed class DailyBriefingActivities(IServiceScopeFactory scopeFactory) : DailyBriefingActivityContract
 {
+    [Temporalio.Activities.Activity("ResolveDailyBriefingSchedule")]
+    public override async Task<DailyBriefingSchedule> ResolveScheduleAsync(DailyBriefingWorkflowInput input)
+    {
+        var activity = ActivityExecutionContext.Current;
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var preference = await scope.ServiceProvider.GetRequiredService<IDailyBriefingRepository>()
+            .GetAsync(input.OwnerId, activity.CancellationToken);
+        var lastDelivered = preference is not null && preference.WorkflowId == input.WorkflowId
+            ? preference.LastDeliveredDate
+            : null;
+        return DailyBriefingClock.ResolveNext(DateTimeOffset.UtcNow, input.LocalTime, input.TimeZoneId,
+            lastDelivered);
+    }
+
     [Temporalio.Activities.Activity("DeliverDailyBriefing")]
     public override async Task<bool> DeliverAsync(DailyBriefingActivityInput input)
     {
@@ -154,13 +184,11 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
 
         services.GetRequiredService<WorkerCurrentUser>().SetOwner(task.OwnerId);
         await tasks.MarkRunningAsync(task.Id, cancellationToken);
-        var approvals = services.GetRequiredService<IToolApprovalStore>();
-        if (await approvals.HasPendingForTaskAsync(task.Id, task.OwnerId, cancellationToken))
-        {
-            await tasks.MarkNeedsApprovalAsync(task.Id, cancellationToken);
-            return true;
-        }
+        task = await tasks.GetTaskByIdAsync(input.TaskId, cancellationToken);
+        if (task is null || task.Status is "completed" or "failed" or "cancelled") return false;
+        if (task.Status == "needs_approval") return true;
 
+        var approvals = services.GetRequiredService<IToolApprovalStore>();
         var conversations = services.GetRequiredService<IConversationStore>();
         var messages = await conversations.GetMessagesAsync(task.ConversationId, cancellationToken);
         var userMessage = messages.SingleOrDefault(x => x.Id == task.UserMessageId);
@@ -178,6 +206,32 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
             return false;
         }
 
+        var sessionJson = await conversations.GetAgentSessionAsync(task.ConversationId, cancellationToken);
+        if (sessionJson is not null &&
+            AgentSessionJson.TryGetCompletedAssistantTextAfterUser(sessionJson, userMessage.Content, out var recovered))
+        {
+            assistantMessage = new Message(task.ConversationId, "assistant", recovered, task.ResultMessageId);
+            await conversations.AddMessageAsync(assistantMessage, cancellationToken);
+            await tasks.CompleteAndNotifyAsync(task.Id, recovered, cancellationToken);
+            return false;
+        }
+
+        if (sessionJson is not null &&
+            AgentSessionJson.TryGetPendingApprovals(sessionJson, out var pendingFromSession, out var recoveredPreface))
+        {
+            await PersistTaskApprovalsAsync(conversations, approvals, tasks, task, pendingFromSession,
+                recoveredPreface, cancellationToken);
+            task = await tasks.GetTaskByIdAsync(input.TaskId, cancellationToken);
+            return task is { Status: "needs_approval" };
+        }
+
+        if (await approvals.HasPendingForTaskAsync(task.Id, task.OwnerId, cancellationToken))
+        {
+            await tasks.MarkNeedsApprovalAsync(task.Id, cancellationToken);
+            task = await tasks.GetTaskByIdAsync(input.TaskId, cancellationToken);
+            return task is { Status: "needs_approval" };
+        }
+
         var agent = services.GetRequiredService<IJarvisAgent>();
         var answer = new System.Text.StringBuilder();
         var approvalRequests = new List<AgentToolApprovalRequest>();
@@ -190,14 +244,20 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
 
         if (approvalRequests.Count != 0)
         {
-            foreach (var request in approvalRequests)
-                await approvals.CreateAsync(task.OwnerId, task.ConversationId, request.RequestId,
-                    request.ToolCallId, request.ToolName, request.ArgumentsJson, task.Id, cancellationToken);
-            await tasks.MarkNeedsApprovalAsync(task.Id, cancellationToken);
-            return true;
+            task = await tasks.GetTaskByIdAsync(input.TaskId, cancellationToken);
+            if (task is null || task.Status is "completed" or "failed" or "cancelled") return false;
+            await PersistTaskApprovalsAsync(conversations, approvals, tasks, task, approvalRequests,
+                answer.ToString(), cancellationToken);
+            task = await tasks.GetTaskByIdAsync(input.TaskId, cancellationToken);
+            return task is { Status: "needs_approval" };
         }
 
+        task = await tasks.GetTaskByIdAsync(input.TaskId, cancellationToken);
+        if (task is null || task.Status is "completed" or "failed" or "cancelled") return false;
+
         var result = answer.ToString();
+        if (string.IsNullOrWhiteSpace(result))
+            throw new InvalidOperationException("The agent completed without an assistant response.");
         assistantMessage = new Message(task.ConversationId, "assistant", result, task.ResultMessageId);
         await conversations.AddMessageAsync(assistantMessage, cancellationToken);
         try
@@ -217,6 +277,39 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
         return false;
     }
 
+    private async Task PersistTaskApprovalsAsync(IConversationStore conversations,
+        IToolApprovalStore approvals, IJarvisTaskRepository tasks, JarvisTaskRecord task,
+        IReadOnlyList<AgentToolApprovalRequest> requests, string preface, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(preface))
+        {
+            var existing = await conversations.GetMessagesAsync(task.ConversationId, cancellationToken);
+            var last = existing.Count > 0 ? existing[^1] : null;
+            if (last is not { Role: "assistant" } || last.Content != preface)
+                await conversations.AddMessageAsync(new Message(task.ConversationId, "assistant", preface),
+                    cancellationToken);
+        }
+
+        foreach (var request in requests)
+        {
+            try
+            {
+                await approvals.CreateAsync(task.OwnerId, task.ConversationId, request.RequestId,
+                    request.ToolCallId, request.ToolName, request.ArgumentsJson, task.Id, cancellationToken);
+            }
+            catch (InvalidOperationException exception)
+            {
+                logger.LogWarning(exception,
+                    "Task {TaskId} already has approval {RequestId}; continuing recovery.", task.Id,
+                    request.RequestId);
+            }
+        }
+        await tasks.MarkNeedsApprovalAsync(task.Id, cancellationToken);
+        var current = await tasks.GetTaskByIdAsync(task.Id, cancellationToken);
+        if (current is not { Status: "needs_approval" })
+            await approvals.CancelIncompleteForTaskAsync(task.Id, task.OwnerId, cancellationToken);
+    }
+
     [Temporalio.Activities.Activity("CompleteApprovedJarvisTask")]
     public override async Task CompleteApprovedTaskAsync(JarvisTaskApprovalInput input)
     {
@@ -227,7 +320,7 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
         var services = scope.ServiceProvider;
         var task = await services.GetRequiredService<IJarvisTaskRepository>()
             .GetTaskByIdAsync(input.TaskId, activity.CancellationToken);
-        if (task is null) return;
+        if (task is null || task.Status is "completed" or "failed" or "cancelled") return;
         await services.GetRequiredService<IJarvisTaskRepository>()
             .CompleteAndNotifyAsync(input.TaskId, input.Summary, activity.CancellationToken);
     }
@@ -241,6 +334,16 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
         await using var scope = scopeFactory.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<IJarvisTaskRepository>()
             .FailAsync(input.TaskId, "Jarvis could not complete this task.", activity.CancellationToken);
+    }
+
+    [Temporalio.Activities.Activity("GetJarvisTaskStatus")]
+    public override async Task<string?> GetTaskStatusAsync(JarvisTaskWorkflowInput input)
+    {
+        var activity = ActivityExecutionContext.Current;
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var task = await scope.ServiceProvider.GetRequiredService<IJarvisTaskRepository>()
+            .GetTaskByIdAsync(input.TaskId, activity.CancellationToken);
+        return task?.Status;
     }
 }
 
@@ -261,7 +364,7 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
         var services = scope.ServiceProvider;
         var files = services.GetRequiredService<IFileRepository>();
         var file = await files.GetAsync(input.FileId, input.OwnerId, cancellationToken);
-        if (file is null) return;
+        if (file is null || file.ProcessingStatus == "deleting") return;
 
         if (!await files.SetProcessingStatusAsync(input.FileId, input.OwnerId, "processing", cancellationToken))
             return;
@@ -279,7 +382,7 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
             var isImage = file.ContentType is "image/jpeg" or "image/png" or "image/webp";
             var extracted = isImage
                 ? await ExtractImageTextAsync(services, file, buffer, cancellationToken)
-                : ExtractText(file, buffer, cancellationToken);
+                : await ExtractTextAsync(file, buffer, cancellationToken);
             if (string.IsNullOrWhiteSpace(extracted))
             {
                 if (!isImage)
@@ -287,6 +390,8 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
                     await files.SetProcessingStatusAsync(input.FileId, input.OwnerId, "failed", cancellationToken);
                     return;
                 }
+
+                extracted = $"Image {file.FileName} contained no legible text.";
             }
 
             extracted = extracted.Length > MaxExtractedCharacters ? extracted[..MaxExtractedCharacters] : extracted;
@@ -307,12 +412,13 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
         }
         catch
         {
-            await files.SetProcessingStatusAsync(input.FileId, input.OwnerId, "failed", CancellationToken.None);
+            if (ActivityExecutionContext.Current.Info.Attempt >= FileProcessingWorkflow.MaximumProcessingAttempts)
+                await files.SetProcessingStatusAsync(input.FileId, input.OwnerId, "failed", CancellationToken.None);
             throw;
         }
     }
 
-    private static string ExtractText(StoredFile file, Stream content, CancellationToken cancellationToken)
+    private static async Task<string> ExtractTextAsync(StoredFile file, Stream content, CancellationToken cancellationToken)
     {
         if (file.ContentType == "application/pdf")
         {
@@ -329,9 +435,10 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
 
         if (!file.ContentType.StartsWith("text/", StringComparison.Ordinal) && file.ContentType != "application/json")
             return string.Empty;
-        using var reader = new StreamReader(content, new UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: true,
+        using var reader = new StreamReader(content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false,
+            throwOnInvalidBytes: false), detectEncodingFromByteOrderMarks: true,
             bufferSize: 8192, leaveOpen: true);
-        return reader.ReadToEnd();
+        return await reader.ReadToEndAsync(cancellationToken);
     }
 
     private static async Task<string> ExtractImageTextAsync(IServiceProvider services, StoredFile file,
@@ -384,7 +491,7 @@ internal sealed class ActivityHeartbeat : IDisposable
         activity.Heartbeat(resourceId);
         _timer = new Timer(_ =>
         {
-            try { ActivityExecutionContext.Current.Heartbeat(resourceId); }
+            try { activity.Heartbeat(resourceId); }
             catch (InvalidOperationException) { }
         }, null, TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(20));
     }

@@ -55,7 +55,7 @@ public sealed class FileService(
         var id = Guid.CreateVersion7();
         var objectKey = $"{ownerId:D}/{id:D}";
         await objects.PutAsync(objectKey, content, normalizedType, cancellationToken);
-        var processingStatus = IsIndexable(normalizedType) ? "queued" : "uploaded";
+        var processingStatus = FileIndexing.IsIndexable(normalizedType) ? "queued" : "uploaded";
         var file = new StoredFile(id, ownerId, objectKey, safeName, normalizedType, length,
             sha256, DateTimeOffset.UtcNow, processingStatus);
         StoredFile stored;
@@ -107,11 +107,46 @@ public sealed class FileService(
         return content is null ? null : (file, content);
     }
 
+    public async Task<bool> RetryIndexingAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+    {
+        var file = await repository.GetAsync(id, ownerId, cancellationToken);
+        if (file is null || file.ProcessingStatus == "deleting" || !FileIndexing.IsIndexable(file.ContentType))
+            return false;
+        if (!await repository.RequeueForProcessingAsync(id, ownerId, cancellationToken)) return false;
+        try
+        {
+            await scheduler.ScheduleAsync(id, ownerId, cancellationToken);
+            await repository.MarkProcessingScheduleDispatchedAsync(id, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "File {FileId} remains queued for Temporal indexing recovery.", id);
+        }
+        return true;
+    }
+
     public async Task<bool> DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
     {
         var file = await repository.GetAsync(id, ownerId, cancellationToken);
         if (file is null) return false;
         if (!await repository.MarkDeletingAsync(id, ownerId, cancellationToken)) return false;
+        try
+        {
+            await scheduler.CancelAsync(id, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "File {FileId} was marked deleting; Temporal will stop processing if the workflow is still running.", id);
+        }
         await objects.DeleteAsync(file.ObjectKey, cancellationToken);
         await repository.DeleteAsync(id, ownerId, cancellationToken);
         return true;
@@ -126,9 +161,6 @@ public sealed class FileService(
             throw new ArgumentException("File name must contain 1 to 255 printable characters.", nameof(fileName));
         return normalized;
     }
-
-    private static bool IsIndexable(string contentType) =>
-        contentType == "application/pdf" || contentType == "application/json" || contentType.StartsWith("text/", StringComparison.Ordinal);
 
     private static long ResolveMaxUploadBytes(IConfiguration configuration)
     {

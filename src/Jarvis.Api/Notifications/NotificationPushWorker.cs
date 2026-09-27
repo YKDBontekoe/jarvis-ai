@@ -92,7 +92,17 @@ public sealed class NotificationPushWorker(
                 .SingleOrDefaultAsync(x => x.Id == candidate.NotificationId, cancellationToken);
             var device = await db.PushDevices.AsNoTracking()
                 .SingleOrDefaultAsync(x => x.Id == candidate.DeviceId, cancellationToken);
-            if (notification is null || device is null)
+            if (notification is null || device is null || device.OwnerId != notification.OwnerId)
+            {
+                await db.PushDeliveries.Where(x => x.NotificationId == candidate.NotificationId &&
+                                                   x.DeviceId == candidate.DeviceId)
+                    .ExecuteDeleteAsync(cancellationToken);
+                continue;
+            }
+
+            if (notification.Type == "approval.required" && notification.SourceId is { } approvalId &&
+                !await db.ToolApprovals.AsNoTracking().AnyAsync(
+                    x => x.Id == approvalId && x.Status == "pending", cancellationToken))
             {
                 await db.PushDeliveries.Where(x => x.NotificationId == candidate.NotificationId &&
                                                    x.DeviceId == candidate.DeviceId)
@@ -118,10 +128,12 @@ public sealed class NotificationPushWorker(
                 }
 
                 var body = await response.Content.ReadAsStringAsync(cancellationToken);
-                var invalidToken = response.StatusCode == System.Net.HttpStatusCode.NotFound &&
-                                   body.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase);
+                var invalidToken = body.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase) ||
+                                   body.Contains("SENDER_ID_MISMATCH", StringComparison.OrdinalIgnoreCase);
                 if (invalidToken)
                 {
+                    await db.PushDeliveries.Where(x => x.DeviceId == device.Id)
+                        .ExecuteDeleteAsync(cancellationToken);
                     await db.PushDevices.Where(x => x.Id == device.Id)
                         .ExecuteDeleteAsync(cancellationToken);
                     logger.LogInformation("Removed an expired push token for owner {OwnerId}.", device.OwnerId);

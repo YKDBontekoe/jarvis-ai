@@ -65,10 +65,11 @@ public sealed class MemoryRepository(JarvisDbContext db) : IMemoryRepository
             .OrderByDescending(x => x.Importance).ThenByDescending(x => x.UpdatedAt)
             .Take(8).ToListAsync(cancellationToken)).Select(x => x.ToRecord()).ToList();
 
-    public async Task<MemoryRecord> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance,
+    public async Task<MemoryRecord?> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance,
         float confidence, DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken)
     {
-        var memory = await db.Memories.SingleAsync(x => x.Id == id && x.OwnerId == ownerId, cancellationToken);
+        var memory = await db.Memories.SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId, cancellationToken);
+        if (memory is null) return null;
         memory.Kind = kind;
         memory.Content = content;
         memory.Importance = importance;

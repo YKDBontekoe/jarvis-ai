@@ -15,6 +15,8 @@ void main() {
     expect(statusStyle('needs_approval').color, JarvisColors.warning);
     expect(statusStyle('running').label, 'In progress');
     expect(statusStyle('completed').color, JarvisColors.success);
+    expect(statusStyle('ready').label, 'Ready');
+    expect(statusStyle('ready').color, JarvisColors.success);
     expect(statusStyle('failed').color, JarvisColors.danger);
     expect(statusStyle('some_new_state').label, 'Some new state');
     expect(statusStyle('').label, 'Unknown');
@@ -52,6 +54,27 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.hasRunningAnimations, isFalse);
   });
+
+    testWidgets('list screen body keeps rows and shows a retry banner after a refresh error',
+        (tester) async {
+      var retried = false;
+      await tester.pumpWidget(
+        _host(
+          ListScreenBody(
+            loading: false,
+            error: 'Could not refresh.',
+            isEmpty: false,
+            empty: const Text('empty'),
+            onRetry: () => retried = true,
+            child: const Text('existing-row'),
+          ),
+        ),
+      );
+      expect(find.text('existing-row'), findsOneWidget);
+      expect(find.text('Could not refresh.'), findsOneWidget);
+      await tester.tap(find.text('Retry'));
+      expect(retried, isTrue);
+    });
 
   testWidgets('error state offers a retry action', (tester) async {
     var retried = false;

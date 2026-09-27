@@ -79,20 +79,39 @@ public sealed class ToolApprovalStore(JarvisDbContext db) : IToolApprovalStore
             x.Id == id && x.OwnerId == ownerId && (x.Status == "pending" ||
                 ((x.Status == "approved" || x.Status == "rejected") &&
                  (x.ResumeStatus == "pending" || x.ResumeStatus == "failed" ||
-                  (x.ResumeStatus == "running" && x.ResumeStartedAt < staleBefore)))), cancellationToken))?.ToRecord();
+                  (x.ResumeStatus == "running" && x.ResumeStartedAt < staleBefore)))) &&
+            (x.TaskId == null || db.Tasks.Any(task => task.Id == x.TaskId && task.Status == "needs_approval")),
+            cancellationToken))?.ToRecord();
     }
 
-    public async Task<IReadOnlyList<ToolApprovalRecord>> ListActionableAsync(Guid ownerId, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<ToolApprovalRecord>> ListActionableAsync(Guid ownerId,
+        CancellationToken cancellationToken) =>
+        MaterializeActionableAsync(
+            OrderedActionable(ActionableQuery(ownerId)).Take(100), cancellationToken);
+
+    public Task<IReadOnlyList<ToolApprovalRecord>> ListActionableForConversationAsync(Guid ownerId,
+        Guid conversationId, CancellationToken cancellationToken) =>
+        MaterializeActionableAsync(
+            OrderedActionable(ActionableQuery(ownerId).Where(x => x.ConversationId == conversationId)),
+            cancellationToken);
+
+    private IQueryable<ToolApproval> ActionableQuery(Guid ownerId)
     {
         var staleBefore = DateTimeOffset.UtcNow - ResumeRecoveryAge;
-        return (await db.ToolApprovals.AsNoTracking().Where(x => x.OwnerId == ownerId &&
+        return db.ToolApprovals.AsNoTracking().Where(x => x.OwnerId == ownerId &&
             (x.Status == "pending" ||
              ((x.Status == "approved" || x.Status == "rejected") &&
               (x.ResumeStatus == "pending" || x.ResumeStatus == "failed" ||
-               (x.ResumeStatus == "running" && x.ResumeStartedAt < staleBefore)))))
-            .OrderBy(x => x.Status == "pending" ? 0 : 1).ThenBy(x => x.CreatedAt).Take(100)
-            .ToListAsync(cancellationToken)).Select(x => x.ToRecord()).ToList();
+               (x.ResumeStatus == "running" && x.ResumeStartedAt < staleBefore)))) &&
+            (x.TaskId == null || db.Tasks.Any(task => task.Id == x.TaskId && task.Status == "needs_approval")));
     }
+
+    private static IQueryable<ToolApproval> OrderedActionable(IQueryable<ToolApproval> query) =>
+        query.OrderBy(x => x.Status == "pending" ? 0 : 1).ThenBy(x => x.CreatedAt);
+
+    private static async Task<IReadOnlyList<ToolApprovalRecord>> MaterializeActionableAsync(
+        IQueryable<ToolApproval> query, CancellationToken cancellationToken) =>
+        (await query.ToListAsync(cancellationToken)).Select(x => x.ToRecord()).ToList();
 
     public Task<bool> HasPendingForTaskAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken) =>
         db.ToolApprovals.AsNoTracking().AnyAsync(x => x.TaskId == taskId && x.OwnerId == ownerId &&
@@ -132,6 +151,34 @@ public sealed class ToolApprovalStore(JarvisDbContext db) : IToolApprovalStore
         return changed == 1;
     }
 
+    public async Task HeartbeatResumeAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+    {
+        await db.ToolApprovals.Where(x => x.Id == id && x.OwnerId == ownerId &&
+                (x.Status == "approved" || x.Status == "rejected") && x.ResumeStatus == "running")
+            .ExecuteUpdateAsync(update => update.SetProperty(x => x.ResumeStartedAt, DateTimeOffset.UtcNow),
+                cancellationToken);
+    }
+
+    public async Task CancelIncompleteForTaskAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken)
+    {
+        var approvals = await db.ToolApprovals.Where(x =>
+                x.TaskId == taskId && x.OwnerId == ownerId &&
+                (x.Status == "pending" ||
+                 ((x.Status == "approved" || x.Status == "rejected") &&
+                  x.ResumeStatus != "completed" && x.ResumeStatus != "cancelled")))
+            .ToListAsync(cancellationToken);
+        if (approvals.Count == 0) return;
+        var approvalIds = approvals.Select(x => x.Id).ToArray();
+        foreach (var approval in approvals)
+        {
+            await db.Entry(approval).ReloadAsync(cancellationToken);
+            approval.Cancel();
+            approval.AbortResume();
+        }
+        await ApprovalInboxCleanup.RemoveAsync(db, approvalIds, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     public Task MarkResumeCompletedAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
         SetResumeStatusAsync(id, ownerId, "completed", "approval.resume_completed", true, cancellationToken);
 
@@ -156,6 +203,8 @@ public sealed class ToolApprovalStore(JarvisDbContext db) : IToolApprovalStore
                 conversationId = approval.ConversationId,
                 taskId = approval.TaskId
             })));
+        if (status == "completed")
+            await ApprovalInboxCleanup.RemoveAsync(db, [id], cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }

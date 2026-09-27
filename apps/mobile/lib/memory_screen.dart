@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
+import 'json_maps.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
 
@@ -33,6 +34,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
   String? _error;
   bool _searching = false;
   String? _selectedKind;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -41,6 +43,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   Future<void> _load({String? query}) async {
+    if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
@@ -62,21 +66,41 @@ class _MemoryScreenState extends State<MemoryScreen> {
               },
             );
       final records = response.data ?? [];
-      final entries = records.map((item) {
-        final record = item as Map<String, dynamic>;
-        return _searching ? record['memory'] as Map<String, dynamic> : record;
-      }).toList();
-      if (mounted) setState(() => _memories = entries);
+      final entries = <Map<String, dynamic>>[];
+      for (final item in records) {
+        if (item is! Map) continue;
+        final record = Map<String, dynamic>.from(item);
+        if (_searching) {
+          final memory = record['memory'];
+          if (memory is Map) {
+            entries.add(Map<String, dynamic>.from(memory));
+          }
+        } else {
+          entries.add(record);
+        }
+      }
+      if (mounted && revision == _requestRevision) {
+        setState(() => _memories = entries);
+      }
     } on DioException catch (error) {
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(
           () => _error = error.response?.statusCode == 401
               ? 'Your sign-in has expired. Sign in again to manage memory.'
               : 'Jarvis could not load memory. Check the API connection and try again.',
         );
       }
+    } catch (_) {
+      if (mounted && revision == _requestRevision) {
+        setState(
+          () => _error =
+              'Jarvis could not load memory. Check the API connection and try again.',
+        );
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -152,6 +176,10 @@ class _MemoryScreenState extends State<MemoryScreen> {
       content.dispose();
       return;
     }
+    if (!mounted) {
+      content.dispose();
+      return;
+    }
     try {
       await widget.http.post(
         '/api/v1/memory',
@@ -182,6 +210,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
       icon: PhosphorIconsRegular.trash,
     );
     if (!delete) return;
+    if (!mounted) return;
     try {
       await widget.http.delete('/api/v1/memory/${memory['id']}');
       if (mounted) await _load(query: _searching ? _query.text.trim() : null);
@@ -193,12 +222,12 @@ class _MemoryScreenState extends State<MemoryScreen> {
   Future<void> _editMemory(Map<String, dynamic> memory) async {
     final formKey = GlobalKey<FormState>();
     final content = TextEditingController(
-      text: memory['content'] as String? ?? '',
+      text: asJsonString(memory['content']) ?? '',
     );
     var kind = _memoryKinds.contains(memory['kind'])
-        ? memory['kind'] as String
+        ? asJsonString(memory['kind']) ?? 'other'
         : 'other';
-    var pinned = memory['isPinned'] as bool? ?? false;
+    var pinned = asJsonBool(memory['isPinned']);
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -266,6 +295,10 @@ class _MemoryScreenState extends State<MemoryScreen> {
       content.dispose();
       return;
     }
+    if (!mounted) {
+      content.dispose();
+      return;
+    }
     try {
       await widget.http.put(
         '/api/v1/memory/${memory['id']}',
@@ -274,7 +307,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
           'content': content.text.trim(),
           'importance': memory['importance'] ?? 0.5,
           'confidence': memory['confidence'] ?? 0.8,
-          'validUntil': memory['validUntil'],
+          'validUntil': activeValidUntil(memory),
           'isPinned': pinned,
         },
       );
@@ -287,11 +320,18 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   Future<void> _togglePinned(Map<String, dynamic> memory) async {
-    final pinned = !(memory['isPinned'] as bool? ?? false);
+    final pinned = !asJsonBool(memory['isPinned']);
     try {
       await widget.http.put(
         '/api/v1/memory/${memory['id']}',
-        data: {...memory, 'isPinned': pinned},
+        data: {
+          'kind': memory['kind'],
+          'content': memory['content'],
+          'importance': memory['importance'] ?? 0.5,
+          'confidence': memory['confidence'] ?? 0.8,
+          'validUntil': activeValidUntil(memory),
+          'isPinned': pinned,
+        },
       );
       if (mounted) await _load(query: _searching ? _query.text.trim() : null);
     } on DioException {
@@ -377,20 +417,30 @@ class _MemoryScreenState extends State<MemoryScreen> {
             ),
           ),
         ),
-        if (_error != null)
+        if (_error != null && _memories.isNotEmpty)
           ContentWidth(
             child: InlineNotice(
               message: _error!,
               tone: NoticeTone.danger,
               margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               actions: [
-                TextButton(onPressed: _load, child: const Text('Retry')),
+                TextButton(
+                  onPressed: () =>
+                      _load(query: _searching ? _query.text.trim() : null),
+                  child: const Text('Retry'),
+                ),
               ],
             ),
           ),
         Expanded(
           child: _loading
               ? const LoadingState()
+              : _error != null && _memories.isEmpty
+              ? ErrorState(
+                  message: _error!,
+                  onRetry: () =>
+                      _load(query: _searching ? _query.text.trim() : null),
+                )
               : _memories.isEmpty
               ? EmptyState(
                   icon: _searching
@@ -420,11 +470,11 @@ class _MemoryScreenState extends State<MemoryScreen> {
   );
 
   Widget _memoryCard(Map<String, dynamic> memory) {
-    final isPinned = memory['isPinned'] as bool? ?? false;
-    final validUntil = DateTime.tryParse(memory['validUntil'] as String? ?? '');
+    final isPinned = asJsonBool(memory['isPinned']);
+    final validUntil = DateTime.tryParse(asJsonString(memory['validUntil']) ?? '');
     final isSuperseded =
         validUntil != null && !validUntil.isAfter(DateTime.now());
-    final kind = memory['kind'] as String? ?? 'fact';
+    final kind = asJsonString(memory['kind']) ?? 'fact';
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(16, 10, 6, 14),
@@ -478,7 +528,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Text(
-              memory['content'] as String? ?? '',
+              asJsonString(memory['content']) ?? '',
               style: TextStyle(
                 fontSize: 15,
                 height: 1.5,

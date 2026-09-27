@@ -25,7 +25,13 @@ public sealed class Reminder
     public DateTimeOffset? ScheduleDispatchedAt { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
 
+    public const int OverdueRescheduleGraceMinutes = 2;
+
     public void MarkScheduleDispatched() => ScheduleDispatchedAt ??= DateTimeOffset.UtcNow;
+
+    public bool IsOverdueDispatchStale(DateTimeOffset utcNow) =>
+        Status == "pending" && ScheduleDispatchedAt is not null &&
+        DueAt.AddMinutes(OverdueRescheduleGraceMinutes) < utcNow;
 
     public void Cancel()
     {

@@ -13,10 +13,110 @@ namespace Jarvis.Api.Realtime;
 public sealed class AgentRunCoordinator(
     IConversationStore conversations,
     IToolApprovalStore approvals,
-    IConversationMemoryExtractor memoryExtractor,
+    IServiceScopeFactory scopes,
     IHubContext<JarvisEventsHub> hub,
     ILogger<AgentRunCoordinator> logger)
 {
+    public async Task<Message?> TryRecoverCompletedAssistantAsync(Guid conversationId, string userContent,
+        CancellationToken cancellationToken)
+    {
+        var session = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
+        if (session is null ||
+            !AgentSessionJson.TryGetCompletedAssistantTextAfterUser(session, userContent, out var recovered))
+            return null;
+
+        var messages = await conversations.GetMessagesAsync(conversationId, cancellationToken);
+        var last = messages.Count > 0 ? messages[^1] : null;
+        if (last is { Role: "assistant" } && last.Content == recovered)
+            return last;
+        if (last is not { Role: "user" } || last.Content != userContent)
+            return null;
+
+        var assistant = new Message(conversationId, "assistant", recovered);
+        await conversations.AddMessageAsync(assistant, cancellationToken);
+        return assistant;
+    }
+
+    public async Task PublishRecoveredAssistantAsync(Guid conversationId, Message assistant,
+        CancellationToken cancellationToken)
+    {
+        var clients = hub.Clients.Group(JarvisEventsHub.GroupName(conversationId));
+        await PublishSafelyAsync(clients, "message.completed", new
+        {
+            id = assistant.Id,
+            role = assistant.Role,
+            content = assistant.Content,
+            createdAt = assistant.CreatedAt
+        }, conversationId, cancellationToken);
+        await PublishSafelyAsync(clients, "agent.completed", new { conversationId }, conversationId,
+            cancellationToken);
+    }
+
+    public async Task<AgentRunOutcome?> TryRecoverPendingApprovalsAsync(Guid ownerId, Guid conversationId,
+        Guid? taskId, CancellationToken cancellationToken)
+    {
+        var session = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
+        if (session is null ||
+            !AgentSessionJson.TryGetPendingApprovals(session, out var requests, out var preface))
+            return null;
+
+        var clients = hub.Clients.Group(JarvisEventsHub.GroupName(conversationId));
+        Message? prefaceMessage = null;
+        if (!string.IsNullOrWhiteSpace(preface))
+        {
+            var messages = await conversations.GetMessagesAsync(conversationId, cancellationToken);
+            var last = messages.Count > 0 ? messages[^1] : null;
+            if (last is { Role: "assistant" } && last.Content == preface)
+            {
+                prefaceMessage = last;
+            }
+            else
+            {
+                prefaceMessage = new Message(conversationId, "assistant", preface);
+                await conversations.AddMessageAsync(prefaceMessage, cancellationToken);
+                await PublishSafelyAsync(clients, "message.completed", new
+                {
+                    id = prefaceMessage.Id,
+                    role = prefaceMessage.Role,
+                    content = prefaceMessage.Content,
+                    createdAt = prefaceMessage.CreatedAt
+                }, conversationId, cancellationToken);
+            }
+        }
+
+        var pending = new List<ToolApprovalRecord>();
+        foreach (var request in requests)
+        {
+            try
+            {
+                var created = await approvals.CreateAsync(ownerId, conversationId, request.RequestId,
+                    request.ToolCallId, request.ToolName, request.ArgumentsJson, taskId, cancellationToken);
+                pending.Add(created.Approval);
+                await PublishSafelyAsync(clients, "tool.approval_required", ToApprovalEvent(created.Approval),
+                    conversationId, cancellationToken);
+                if (created.Created)
+                    await PublishSafelyAsync(hub.Clients.Group(JarvisEventsHub.OwnerGroupName(ownerId)),
+                        "notification.created",
+                        new
+                        {
+                            type = "approval.required",
+                            notificationId = created.NotificationId,
+                            title = "Approval needed",
+                            body = $"Jarvis is waiting for approval to run {created.Approval.ToolName}.",
+                            sourceId = created.Approval.Id
+                        }, conversationId, cancellationToken);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        if (pending.Count == 0) return null;
+        await PublishSafelyAsync(clients, "agent.waiting_for_approval", new { conversationId },
+            conversationId, cancellationToken);
+        return new AgentRunOutcome(prefaceMessage, pending);
+    }
+
     public async Task<AgentRunOutcome> RunAsync(Guid ownerId, Guid conversationId,
         IAsyncEnumerable<AgentStreamEvent> events, string? memorySource, CancellationToken cancellationToken,
         Guid? taskId = null, Guid? memorySourceId = null,
@@ -69,7 +169,8 @@ public sealed class AgentRunCoordinator(
         var activeToolSpans = new Dictionary<string, (Activity? Span, long StartedAt)>(StringComparer.Ordinal);
         var firstTextTokenSeen = false;
         var clients = hub.Clients.Group(JarvisEventsHub.GroupName(conversationId));
-        await clients.SendAsync("agent.started", new { conversationId }, cancellationToken);
+        await PublishSafelyAsync(clients, "agent.started", new { conversationId }, conversationId,
+            cancellationToken);
 
         try
         {
@@ -85,7 +186,8 @@ public sealed class AgentRunCoordinator(
                         _ => null
                     };
                     if (eventName is not null)
-                        await clients.SendAsync(eventName, new { conversationId, tool = toolProgress.ToolName }, cancellationToken);
+                        await PublishSafelyAsync(clients, eventName,
+                            new { conversationId, tool = toolProgress.ToolName }, conversationId, cancellationToken);
 
                     if (toolProgress.Phase == "started")
                     {
@@ -123,7 +225,9 @@ public sealed class AgentRunCoordinator(
                         activity?.SetTag("jarvis.time_to_first_token_ms", elapsed);
                     }
                     answer.Append(update.TextDelta);
-                    await clients.SendAsync("message.delta", new { conversationId, messageId, delta = update.TextDelta }, cancellationToken);
+                    await PublishSafelyAsync(clients, "message.delta",
+                        new { conversationId, messageId, delta = update.TextDelta }, conversationId,
+                        cancellationToken);
                     if (onTextDelta is not null)
                         await onTextDelta(update.TextDelta, cancellationToken);
                 }
@@ -146,53 +250,72 @@ public sealed class AgentRunCoordinator(
 
         if (approvalRequests.Count != 0)
         {
+            Message? preface = null;
+            if (!string.IsNullOrWhiteSpace(answer.ToString()))
+            {
+                preface = new Message(conversationId, "assistant", answer.ToString(), messageId);
+                await conversations.AddMessageAsync(preface, cancellationToken);
+                await PublishSafelyAsync(clients, "message.completed", new
+                {
+                    id = preface.Id,
+                    role = preface.Role,
+                    content = preface.Content,
+                    createdAt = preface.CreatedAt
+                }, conversationId, cancellationToken);
+            }
             foreach (var request in approvalRequests)
             {
                 var created = await approvals.CreateAsync(ownerId, conversationId, request.RequestId,
                     request.ToolCallId, request.ToolName, request.ArgumentsJson, taskId, cancellationToken);
                 var approval = created.Approval;
                 pending.Add(approval);
-                await clients.SendAsync("tool.approval_required", ToApprovalEvent(approval), cancellationToken);
+                await PublishSafelyAsync(clients, "tool.approval_required", ToApprovalEvent(approval),
+                    conversationId, cancellationToken);
                 if (created.Created)
-                    await hub.Clients.Group(JarvisEventsHub.OwnerGroupName(ownerId)).SendAsync("notification.created",
+                    await PublishSafelyAsync(hub.Clients.Group(JarvisEventsHub.OwnerGroupName(ownerId)),
+                        "notification.created",
                         new
                         {
-                        type = "approval.required",
-                        notificationId = created.NotificationId,
-                        title = "Approval needed",
+                            type = "approval.required",
+                            notificationId = created.NotificationId,
+                            title = "Approval needed",
                             body = $"Jarvis is waiting for approval to run {approval.ToolName}.",
                             sourceId = approval.Id
-                        }, cancellationToken);
+                        }, conversationId, cancellationToken);
             }
-            await clients.SendAsync("agent.waiting_for_approval", new { conversationId }, cancellationToken);
+            await PublishSafelyAsync(clients, "agent.waiting_for_approval", new { conversationId },
+                conversationId, cancellationToken);
             if (memorySourceId is { } approvedFlowSourceId && !string.IsNullOrWhiteSpace(memorySource))
-                await ExtractMemorySafelyAsync(ownerId, conversationId, approvedFlowSourceId, memorySource,
-                    cancellationToken);
-            return new AgentRunOutcome(null, pending);
+                QueueMemoryExtraction(ownerId, conversationId, approvedFlowSourceId, memorySource);
+            return new AgentRunOutcome(preface, pending);
         }
+
+        if (string.IsNullOrWhiteSpace(answer.ToString()))
+            throw new InvalidOperationException("The agent completed without an assistant response.");
 
         var assistantMessage = new Message(conversationId, "assistant", answer.ToString(), messageId);
         await conversations.AddMessageAsync(assistantMessage, cancellationToken);
         if (memorySourceId is { } sourceMessageId && !string.IsNullOrWhiteSpace(memorySource))
-            await ExtractMemorySafelyAsync(ownerId, conversationId, sourceMessageId, memorySource, cancellationToken);
+            QueueMemoryExtraction(ownerId, conversationId, sourceMessageId, memorySource);
 
-        await clients.SendAsync("message.completed", new
+        await PublishSafelyAsync(clients, "message.completed", new
         {
             id = assistantMessage.Id,
             role = assistantMessage.Role,
             content = assistantMessage.Content,
             createdAt = assistantMessage.CreatedAt
-        }, cancellationToken);
-        await clients.SendAsync("agent.completed", new { conversationId }, cancellationToken);
+        }, conversationId, cancellationToken);
+        await PublishSafelyAsync(clients, "agent.completed", new { conversationId }, conversationId,
+            cancellationToken);
         return new AgentRunOutcome(assistantMessage, []);
     }
 
-    private async Task ExtractMemorySafelyAsync(Guid ownerId, Guid conversationId, Guid sourceMessageId,
-        string source, CancellationToken cancellationToken)
+    private async Task PublishSafelyAsync(IClientProxy clients, string eventName, object payload,
+        Guid conversationId, CancellationToken cancellationToken)
     {
         try
         {
-            await memoryExtractor.ExtractAndStoreAsync(ownerId, sourceMessageId, source, cancellationToken);
+            await clients.SendAsync(eventName, payload, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -201,8 +324,30 @@ public sealed class AgentRunCoordinator(
         catch (Exception exception)
         {
             logger.LogWarning(exception,
-                "Memory extraction failed after the agent run for conversation {ConversationId}.", conversationId);
+                "Could not publish {EventName} for conversation {ConversationId}.", eventName, conversationId);
         }
+    }
+
+    private void QueueMemoryExtraction(Guid ownerId, Guid conversationId, Guid sourceMessageId, string source)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await using var scope = scopes.CreateAsyncScope();
+                using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+                await scope.ServiceProvider.GetRequiredService<IConversationMemoryExtractor>()
+                    .ExtractAndStoreAsync(ownerId, sourceMessageId, source, timeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception,
+                    "Memory extraction failed after the agent run for conversation {ConversationId}.", conversationId);
+            }
+        });
     }
 
     private static object ToApprovalEvent(ToolApprovalRecord approval) => new

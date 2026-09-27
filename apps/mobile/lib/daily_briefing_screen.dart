@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 class DailyBriefingScreen extends StatefulWidget {
@@ -17,11 +18,13 @@ class DailyBriefingScreen extends StatefulWidget {
 class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
   bool _enabled = false;
   bool _loading = true;
+  bool _loaded = false;
   bool _saving = false;
   TimeOfDay _time = const TimeOfDay(hour: 8, minute: 0);
   final _zone = TextEditingController(text: 'UTC');
   String? _error;
   String? _saved;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -36,39 +39,66 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    final revision = ++_requestRevision;
     try {
       final response = await widget.http.get<Map<String, dynamic>>(
         '/api/v1/briefings/daily',
       );
-      final data = response.data ?? const <String, dynamic>{};
-      final time = (data['localTime'] as String? ?? '08:00:00').split(':');
-      if (mounted) {
+      final data = response.data;
+      if (data is! Map) {
+        throw const FormatException('Missing briefing settings.');
+      }
+      final map = Map<String, dynamic>.from(data);
+      final time = (asJsonString(map['localTime']) ?? '08:00:00').split(':');
+      if (mounted && revision == _requestRevision) {
         setState(() {
-          _enabled = data['enabled'] as bool? ?? false;
+          _enabled = asJsonBool(map['enabled']);
           _time = TimeOfDay(
             hour: int.tryParse(time.first) ?? 8,
             minute: time.length > 1 ? int.tryParse(time[1]) ?? 0 : 0,
           );
-          _zone.text = data['timeZoneId'] as String? ?? 'UTC';
-          _loading = false;
+          _zone.text = asJsonString(map['timeZoneId']) ?? 'UTC';
+          _error = null;
+          _loaded = true;
         });
       }
     } on DioException catch (error) {
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(() {
-          _error = error.response?.data is Map<String, dynamic>
-              ? ((error.response!.data as Map<String, dynamic>)['detail']
-                    as String?)
+          _error = error.response?.data is Map
+              ? asJsonString(
+                      Map<String, dynamic>.from(error.response!.data as Map)['detail'],
+                    ) ??
+                    'Could not load briefing settings.'
               : 'Could not load briefing settings.';
-          _loading = false;
+          _loaded = false;
         });
+      }
+    } catch (_) {
+      if (mounted && revision == _requestRevision) {
+        setState(() {
+          _error = 'Could not load briefing settings.';
+          _loaded = false;
+        });
+      }
+    } finally {
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
       }
     }
   }
 
   Future<void> _chooseTime() async {
     final selected = await showTimePicker(context: context, initialTime: _time);
-    if (selected != null && mounted) setState(() => _time = selected);
+    if (selected != null && mounted) _discardSavedNotice(() => _time = selected);
+  }
+
+  void _discardSavedNotice([VoidCallback? apply]) {
+    setState(() {
+      apply?.call();
+      _saved = null;
+    });
   }
 
   Future<void> _save() async {
@@ -95,12 +125,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
       if (mounted) setState(() => _saved = 'Briefing settings saved.');
     } on DioException catch (error) {
       if (mounted) {
-        final body = error.response?.data;
-        final detail = body is Map<String, dynamic>
-            ? body['detail'] as String? ??
-                  (body['errors'] as Map<String, dynamic>?)?.values.firstOrNull
-                      ?.toString()
-            : null;
+        final detail = firstProblemMessage(error.response?.data);
         setState(() => _error = detail ?? 'Could not save briefing settings.');
       }
     } finally {
@@ -115,6 +140,14 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
       appBar: AppBar(title: const Text('Morning briefing')),
       body: _loading
           ? const LoadingState()
+          : !_loaded
+          ? ErrorState(
+              message: _error ?? 'Could not load briefing settings.',
+              onRetry: () {
+                setState(() => _loading = true);
+                _load();
+              },
+            )
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
               children: [
@@ -171,7 +204,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
                               title: const Text('Send a daily briefing'),
                               value: _enabled,
                               onChanged: (value) =>
-                                  setState(() => _enabled = value),
+                                  _discardSavedNotice(() => _enabled = value),
                             ),
                             const Divider(indent: 16, endIndent: 16),
                             ListTile(
@@ -188,7 +221,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
                         controller: _zone,
                         textCapitalization: TextCapitalization.none,
                         autocorrect: false,
-                        onChanged: (_) => setState(() {}),
+                        onChanged: (_) => _discardSavedNotice(),
                         decoration: const InputDecoration(
                           labelText: 'Time zone',
                           hintText: 'Europe/Amsterdam',

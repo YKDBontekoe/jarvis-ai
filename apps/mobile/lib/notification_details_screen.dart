@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'features/chat/chat_widgets.dart';
+import 'json_maps.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
 
@@ -28,9 +29,13 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
   bool _loading = true;
   String? _error;
 
-  bool get _isReminder => widget.notificationType == 'reminder.due';
+  bool get _isReminder =>
+      widget.notificationType == 'reminder.due' ||
+      widget.notificationType == 'reminder.failed';
   bool get _isWatch => widget.notificationType.startsWith('watch.');
-  bool get _isTask => widget.notificationType == 'task.completed';
+  bool get _isTask =>
+      widget.notificationType == 'task.completed' ||
+      widget.notificationType == 'task.failed';
 
   @override
   void initState() {
@@ -41,8 +46,10 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
   Future<void> _load() async {
     try {
       final path = switch (widget.notificationType) {
-        'reminder.due' => '/api/v1/reminders/${widget.sourceId}',
-        'task.completed' => '/api/v1/tasks/${widget.sourceId}',
+        'reminder.due' ||
+        'reminder.failed' => '/api/v1/reminders/${widget.sourceId}',
+        'task.completed' ||
+        'task.failed' => '/api/v1/tasks/${widget.sourceId}',
         'watch.triggered' ||
         'watch.failed' => '/api/v1/watches/${widget.sourceId}',
         _ => null,
@@ -52,7 +59,13 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
         return;
       }
       final response = await widget.http.get<Map<String, dynamic>>(path);
-      if (mounted) setState(() => _item = response.data);
+      final data = response.data;
+      if (!mounted) return;
+      if (data is! Map) {
+        setState(() => _error = 'Jarvis returned an invalid item.');
+        return;
+      }
+      setState(() => _item = Map<String, dynamic>.from(data));
     } on DioException catch (error) {
       if (!mounted) return;
       setState(
@@ -89,11 +102,20 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
     ),
     body: _loading
         ? const LoadingState()
-        : _error != null
+        : _error != null && _item == null
+        ? (_error == 'This item is no longer available.' ||
+                  _error == 'This notification has no linked item.'
+              ? EmptyState(
+                  icon: PhosphorIconsRegular.linkBreak,
+                  title: 'Nothing to show',
+                  message: _error!,
+                )
+              : ErrorState(message: _error!, onRetry: _load))
+        : _item == null
         ? EmptyState(
             icon: PhosphorIconsRegular.linkBreak,
             title: 'Nothing to show',
-            message: _error,
+            message: _error ?? 'This item is no longer available.',
           )
         : _buildDetails(),
   );
@@ -124,16 +146,16 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
   Widget _buildDetails() {
     final item = _item!;
     final title =
-        item['title'] as String? ??
+        asJsonString(item['title']) ??
         (_isReminder
             ? 'Reminder'
             : _isWatch
             ? 'Condition watch'
             : 'Task');
-    final status = item['status'] as String? ?? '';
+    final status = asJsonString(item['status']) ?? '';
     final detail = switch (widget.notificationType) {
-      'reminder.due' => _date(item['dueAt']),
-      'task.completed' => item['summary'] as String? ?? '',
+      'reminder.due' || 'reminder.failed' => _date(item['dueAt']),
+      'task.completed' || 'task.failed' => asJsonString(item['summary']) ?? '',
       'watch.triggered' || 'watch.failed' => _watchCondition(item),
       _ => '',
     };
@@ -168,14 +190,14 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
                     PhosphorIconsRegular.chartLine,
                     'Latest value: ${item['lastValue']}',
                   ),
-                  if ((item['lastCheckedAt'] as String?) != null)
+                  if (asJsonString(item['lastCheckedAt']) != null)
                     _fact(
                       PhosphorIconsRegular.clockCounterClockwise,
                       'Checked ${_date(item['lastCheckedAt'])}',
                     ),
                 ],
                 if ((_isTask || _isWatch) &&
-                    (item['createdAt'] as String?) != null)
+                    asJsonString(item['createdAt']) != null)
                   _fact(
                     PhosphorIconsRegular.calendarBlank,
                     'Created ${_date(item['createdAt'])}',

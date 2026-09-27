@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 typedef ConversationPickerResult = ({
@@ -29,6 +30,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   bool _loading = true;
   bool _creating = false;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -37,6 +39,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
@@ -45,18 +49,19 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       final response = await widget.http.get<List<dynamic>>(
         '/api/v1/conversations',
       );
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(
-          () => _conversations = (response.data ?? [])
-              .cast<Map<String, dynamic>>(),
+          () => _conversations = jsonMaps(response.data),
         );
       }
     } on DioException {
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load conversations.');
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -67,8 +72,10 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         '/api/v1/conversations',
         data: const {'title': 'New conversation'},
       );
-      final id = response.data?['id'] as String?;
-      if (id == null) throw const FormatException('Missing conversation ID.');
+      final id = response.data?['id'];
+      if (id is! String || id.isEmpty) {
+        throw const FormatException('Missing conversation ID.');
+      }
       if (mounted) {
         Navigator.of(context).pop((conversationId: id, deletedCurrent: false));
       }
@@ -86,8 +93,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   }
 
   Future<void> _deleteConversation(Map<String, dynamic> conversation) async {
-    final id = conversation['id'] as String;
-    final title = conversation['title'] as String? ?? 'this conversation';
+    final id = jsonString(conversation, 'id');
+    if (id == null) return;
+    final title = asJsonString(conversation['title']) ?? 'this conversation';
     final confirmed = await showJarvisConfirm(
       context,
       title: 'Delete conversation?',
@@ -99,6 +107,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       icon: PhosphorIconsRegular.trash,
     );
     if (!confirmed) return;
+    if (!mounted) return;
     try {
       await widget.http.delete('/api/v1/conversations/$id');
       if (!mounted) return;
@@ -135,22 +144,23 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         ),
       ],
     ),
-    body: _loading
-        ? const LoadingState()
-        : _error != null
-        ? ErrorState(message: _error!, onRetry: _load)
-        : _conversations.isEmpty
-        ? const EmptyState(
-            icon: PhosphorIconsRegular.chatsCircle,
-            title: 'No conversations yet.',
-            message: 'Start a new conversation and it will appear here.',
-          )
-        : ListView.builder(
+    body: ListScreenBody(
+      loading: _loading,
+      error: _error,
+      isEmpty: _conversations.isEmpty,
+      onRetry: _load,
+      empty: const EmptyState(
+        icon: PhosphorIconsRegular.chatsCircle,
+        title: 'No conversations yet.',
+        message: 'Start a new conversation and it will appear here.',
+      ),
+      child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             itemCount: _conversations.length,
             itemBuilder: (context, index) {
               final conversation = _conversations[index];
-              final id = conversation['id'] as String;
+              final id = jsonString(conversation, 'id');
+              if (id == null) return const SizedBox.shrink();
               final selected = id == widget.selectedConversationId;
               return ContentWidth(
                 child: SurfaceCard(
@@ -175,7 +185,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              conversation['title'] as String? ??
+                              asJsonString(conversation['title']) ??
                                   'New conversation',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -211,6 +221,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
               );
             },
           ),
+    ),
   );
 
   String _formatDate(Object? value) {

@@ -12,6 +12,7 @@ namespace Jarvis.Agents;
 public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcpToolHost,
     IConversationStore conversations, IJarvisTaskRepository tasks, ICurrentUser currentUser) : IJarvisAgent
 {
+    private static readonly JsonSerializerOptions ArgumentsJsonOptions = new(JsonSerializerDefaults.Web);
     private AIAgent? _agent;
 
     public async IAsyncEnumerable<AgentStreamEvent> StreamReplyAsync(
@@ -20,9 +21,17 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcp
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var agent = await GetAgentAsync(conversationId, cancellationToken);
+        var sessionJson = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
+        ChatMessage[] input = [new ChatMessage(ChatRole.User, currentUserMessage.Content)];
+        if (sessionJson is not null &&
+            AgentSessionJson.HasInFlightProgressAfterUser(sessionJson, currentUserMessage.Content))
+            input = [];
+        else if (sessionJson is not null &&
+                 AgentSessionJson.TryAbandonIncompleteTurn(sessionJson, currentUserMessage.Content, out var truncated))
+            await conversations.SaveAgentSessionAsync(conversationId, truncated, cancellationToken);
+
         var session = await LoadSessionAsync(agent, conversationId, cancellationToken);
-        await foreach (var update in RunAndSaveAsync(agent, conversationId,
-            [new ChatMessage(ChatRole.User, currentUserMessage.Content)], session, cancellationToken))
+        await foreach (var update in RunAndSaveAsync(agent, conversationId, input, session, cancellationToken))
             yield return update;
     }
 
@@ -32,14 +41,25 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcp
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var agent = await GetAgentAsync(conversationId, cancellationToken);
+        var sessionJson = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
+        ChatMessage[] input;
+        if (sessionJson is not null &&
+            AgentSessionJson.HasAnsweredApproval(sessionJson, approval.RequestId, approval.ToolCallId))
+        {
+            input = [];
+        }
+        else
+        {
+            var arguments = ToolCallArguments.Parse(approval.ArgumentsJson);
+            var functionCall = new FunctionCallContent(approval.ToolCallId, approval.ToolName, arguments);
+            var approvalRequest = new ToolApprovalRequestContent(approval.RequestId, functionCall);
+            var response = approvalRequest.CreateResponse(approval.Approved,
+                approval.Approved ? null : "The user rejected this tool call.");
+            input = [new ChatMessage(ChatRole.User, [response])];
+        }
+
         var session = await LoadSessionAsync(agent, conversationId, cancellationToken);
-        var arguments = JsonSerializer.Deserialize<Dictionary<string, object?>>(approval.ArgumentsJson) ?? [];
-        var functionCall = new FunctionCallContent(approval.ToolCallId, approval.ToolName, arguments);
-        var approvalRequest = new ToolApprovalRequestContent(approval.RequestId, functionCall);
-        var response = approvalRequest.CreateResponse(approval.Approved,
-            approval.Approved ? null : "The user rejected this tool call.");
-        await foreach (var update in RunAndSaveAsync(agent, conversationId,
-            [new ChatMessage(ChatRole.User, [response])], session, cancellationToken))
+        await foreach (var update in RunAndSaveAsync(agent, conversationId, input, session, cancellationToken))
             yield return update;
     }
 
@@ -69,45 +89,72 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcp
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var activeTools = new Dictionary<string, string>(StringComparer.Ordinal);
-        await foreach (var update in agent.RunStreamingAsync(input, session, cancellationToken: cancellationToken))
+        var streamCompleted = false;
+        try
         {
-            var approvalRequests = update.Contents.OfType<ToolApprovalRequestContent>().ToArray();
-            var approvalCallIds = approvalRequests
-                .Select(request => request.ToolCall)
-                .OfType<FunctionCallContent>()
-                .Select(call => call.CallId)
-                .ToHashSet(StringComparer.Ordinal);
-
-            foreach (var text in update.Contents.OfType<TextContent>())
+            await foreach (var update in agent.RunStreamingAsync(input, session, cancellationToken: cancellationToken))
             {
-                if (!string.IsNullOrEmpty(text.Text)) yield return new AgentStreamEvent(TextDelta: text.Text);
+                var checkpoint = false;
+                var approvalRequests = update.Contents.OfType<ToolApprovalRequestContent>().ToArray();
+                var approvalCallIds = approvalRequests
+                    .Select(request => request.ToolCall)
+                    .OfType<FunctionCallContent>()
+                    .Select(call => call.CallId)
+                    .ToHashSet(StringComparer.Ordinal);
+
+                foreach (var text in update.Contents.OfType<TextContent>())
+                {
+                    if (!string.IsNullOrEmpty(text.Text)) yield return new AgentStreamEvent(TextDelta: text.Text);
+                }
+
+                foreach (var call in update.Contents.OfType<FunctionCallContent>())
+                {
+                    if (call.InformationalOnly || approvalCallIds.Contains(call.CallId)) continue;
+                    if (!activeTools.TryAdd(call.CallId, call.Name)) continue;
+                    yield return new AgentStreamEvent(ToolProgress: new AgentToolProgress(call.CallId, call.Name, "started"));
+                }
+
+                foreach (var result in update.Contents.OfType<FunctionResultContent>())
+                {
+                    if (!activeTools.Remove(result.CallId, out var toolName)) continue;
+                    yield return new AgentStreamEvent(ToolProgress: new AgentToolProgress(result.CallId, toolName,
+                        result.Exception is null ? "completed" : "failed"));
+                    checkpoint = true;
+                }
+
+                foreach (var request in approvalRequests)
+                {
+                    if (request.ToolCall is not FunctionCallContent functionCall) continue;
+                    yield return new AgentStreamEvent(ApprovalRequest: new AgentToolApprovalRequest(
+                        request.RequestId,
+                        functionCall.CallId,
+                        functionCall.Name,
+                        JsonSerializer.Serialize(functionCall.Arguments ?? new Dictionary<string, object?>(),
+                            ArgumentsJsonOptions)));
+                    checkpoint = true;
+                }
+
+                if (checkpoint)
+                    await SaveSessionAsync(agent, conversationId, session, cancellationToken);
             }
 
-            foreach (var call in update.Contents.OfType<FunctionCallContent>())
+            streamCompleted = true;
+        }
+        finally
+        {
+            try
             {
-                if (call.InformationalOnly || approvalCallIds.Contains(call.CallId)) continue;
-                if (!activeTools.TryAdd(call.CallId, call.Name)) continue;
-                yield return new AgentStreamEvent(ToolProgress: new AgentToolProgress(call.CallId, call.Name, "started"));
+                await SaveSessionAsync(agent, conversationId, session, CancellationToken.None);
             }
-
-            foreach (var result in update.Contents.OfType<FunctionResultContent>())
+            catch (Exception) when (!streamCompleted)
             {
-                if (!activeTools.Remove(result.CallId, out var toolName)) continue;
-                yield return new AgentStreamEvent(ToolProgress: new AgentToolProgress(result.CallId, toolName,
-                    result.Exception is null ? "completed" : "failed"));
-            }
-
-            foreach (var request in approvalRequests)
-            {
-                if (request.ToolCall is not FunctionCallContent functionCall) continue;
-                yield return new AgentStreamEvent(ApprovalRequest: new AgentToolApprovalRequest(
-                    request.RequestId,
-                    functionCall.CallId,
-                    functionCall.Name,
-                    JsonSerializer.Serialize(functionCall.Arguments)));
             }
         }
+    }
 
+    private async Task SaveSessionAsync(AIAgent agent, Guid conversationId, AgentSession session,
+        CancellationToken cancellationToken)
+    {
         var serialized = await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken);
         await conversations.SaveAgentSessionAsync(conversationId, serialized.GetRawText(), cancellationToken);
     }

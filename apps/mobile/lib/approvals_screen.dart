@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 class ApprovalsScreen extends StatefulWidget {
@@ -22,6 +23,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
   bool _loading = true;
   String? _error;
   String? _processingId;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -31,6 +33,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
 
   Future<void> _load() async {
     if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
@@ -39,10 +42,9 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
       final response = await widget.http.get<List<dynamic>>(
         '/api/v1/approvals',
       );
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(
-          () => _approvals = (response.data ?? [])
-              .cast<Map<String, dynamic>>()
+          () => _approvals = jsonMaps(response.data)
               .where(
                 (approval) =>
                     widget.conversationId == null ||
@@ -52,16 +54,19 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         );
       }
     } on DioException {
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load pending approvals.');
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
   Future<void> _decide(Map<String, dynamic> approval, bool approved) async {
-    final id = approval['id'] as String;
+    final id = jsonString(approval, 'id');
+    if (id == null) return;
     final retrying = approval['status'] != 'pending';
     if (approved) {
       final confirmed = await showDialog<bool>(
@@ -85,7 +90,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
                 ),
                 const SizedBox(height: 14),
                 _ArgumentsBlock(
-                  _formatArguments(approval['argumentsJson'] as String?),
+                  _formatArguments(asJsonString(approval['argumentsJson'])),
                 ),
               ],
             ),
@@ -137,6 +142,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(message)));
+        await _load();
       }
     } finally {
       if (mounted) setState(() => _processingId = null);
@@ -167,22 +173,23 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         const SizedBox(width: 8),
       ],
     ),
-    body: _loading
-        ? const LoadingState()
-        : _error != null
-        ? ErrorState(message: _error!, onRetry: _load)
-        : _approvals.isEmpty
-        ? const EmptyState(
-            icon: PhosphorIconsRegular.shieldCheck,
-            title: 'All clear',
-            message: 'No tool calls are waiting for approval.',
-          )
-        : ListView.builder(
+    body: ListScreenBody(
+      loading: _loading,
+      error: _error,
+      isEmpty: _approvals.isEmpty,
+      onRetry: _load,
+      empty: const EmptyState(
+        icon: PhosphorIconsRegular.shieldCheck,
+        title: 'All clear',
+        message: 'No tool calls are waiting for approval.',
+      ),
+      child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             itemCount: _approvals.length,
             itemBuilder: (context, index) =>
                 ContentWidth(child: _approvalCard(_approvals[index])),
           ),
+    ),
   );
 
   Widget _approvalCard(Map<String, dynamic> approval) {
@@ -200,7 +207,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  approval['toolName'] as String? ?? 'Unknown tool',
+                  asJsonString(approval['toolName']) ?? 'Unknown tool',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
@@ -226,7 +233,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
           ),
           const SizedBox(height: 8),
           _ArgumentsBlock(
-            _formatArguments(approval['argumentsJson'] as String?),
+            _formatArguments(asJsonString(approval['argumentsJson'])),
           ),
           const SizedBox(height: 16),
           Row(

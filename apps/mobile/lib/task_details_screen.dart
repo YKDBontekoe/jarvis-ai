@@ -4,6 +4,7 @@ import 'ui/phosphor_icons.dart';
 import 'approvals_screen.dart';
 import 'features/chat/chat_widgets.dart';
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 class TaskDetailsScreen extends StatefulWidget {
@@ -25,6 +26,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   List<Map<String, dynamic>> _messages = [];
   bool _loading = true;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -34,32 +36,53 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
   Future<void> _load() async {
     if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final responses = await Future.wait<Response<dynamic>>([
-        widget.http.get<Map<String, dynamic>>('/api/v1/tasks/${widget.taskId}'),
-        widget.http.get<List<dynamic>>(
+      Map<String, dynamic>? task;
+      try {
+        final taskResponse = await widget.http.get<Map<String, dynamic>>(
+          '/api/v1/tasks/${widget.taskId}',
+        );
+        final data = taskResponse.data;
+        task = data is Map ? Map<String, dynamic>.from(data) : null;
+      } on DioException catch (error) {
+        if (!mounted || revision != _requestRevision) return;
+        setState(() {
+          _error = error.response?.statusCode == 404
+              ? 'This task is no longer available.'
+              : 'Jarvis could not load the task details.';
+        });
+        return;
+      }
+      if (!mounted || revision != _requestRevision) return;
+      setState(() {
+        _task = task;
+        if (_task == null) {
+          _error = 'Jarvis returned an invalid task.';
+        }
+      });
+      if (task == null) return;
+      try {
+        final messagesResponse = await widget.http.get<List<dynamic>>(
           '/api/v1/tasks/${widget.taskId}/messages',
-        ),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _task = responses[0].data as Map<String, dynamic>?;
-        _messages = (responses[1].data as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>();
-      });
-    } on DioException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _error = error.response?.statusCode == 404
-            ? 'This task is no longer available.'
-            : 'Jarvis could not load the task details.';
-      });
+        );
+        if (!mounted || revision != _requestRevision) return;
+        setState(() => _messages = jsonMaps(messagesResponse.data));
+      } on DioException {
+        if (!mounted || revision != _requestRevision) return;
+        setState(() => _error = 'Jarvis could not load the task activity.');
+      }
+    } catch (_) {
+      if (!mounted || revision != _requestRevision) return;
+      setState(() => _error = 'Jarvis could not load the task details.');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -88,7 +111,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: Text(
-        _task?['title'] as String? ?? 'Task',
+        asJsonString(_task?['title']) ?? 'Task',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -103,17 +126,20 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     ),
     body: _loading && _task == null
         ? const LoadingState()
-        : _error != null && _task == null
-        ? ErrorState(message: _error!, onRetry: _load)
+        : _task == null
+        ? ErrorState(
+            message: _error ?? 'Jarvis could not load the task details.',
+            onRetry: _load,
+          )
         : _buildDetails(),
   );
 
   Widget _buildDetails() {
     final task = _task!;
-    final status = task['status'] as String? ?? 'unknown';
+    final status = asJsonString(task['status']) ?? 'unknown';
     final style = statusStyle(status);
-    final conversationId = task['conversationId'] as String?;
-    final summary = task['summary'] as String?;
+    final conversationId = asJsonString(task['conversationId']);
+    final summary = asJsonString(task['summary']);
     final theme = Theme.of(context);
     return RefreshIndicator(
       onRefresh: _load,
@@ -134,7 +160,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              task['title'] as String? ?? 'Task',
+                              asJsonString(task['title']) ?? 'Task',
                               style: theme.textTheme.titleMedium,
                             ),
                             const SizedBox(height: 8),
@@ -235,9 +261,9 @@ class _TaskMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final role = message['role'] as String? ?? 'assistant';
+    final role = asJsonString(message['role']) ?? 'assistant';
     final isUser = role == 'user';
-    final content = message['content'] as String? ?? '';
+    final content = asJsonString(message['content']) ?? '';
     if (content.isEmpty) return const SizedBox.shrink();
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 12),

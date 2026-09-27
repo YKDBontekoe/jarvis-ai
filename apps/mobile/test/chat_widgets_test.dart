@@ -33,6 +33,52 @@ void main() {
     });
   });
 
+  group('appendAssistantDelta', () {
+    test('keeps writing the preface when an approval card is last', () {
+      final entries = <ChatEntry>[
+        const MessageEntry(role: 'user', content: 'Remind me'),
+        const MessageEntry(
+          role: 'assistant',
+          content: 'I can schedule that.',
+          pending: true,
+        ),
+        const ApprovalEntry(
+          id: 'a1',
+          toolName: 'CreateReminder',
+          argumentsJson: '{}',
+        ),
+      ];
+      appendAssistantDelta(entries, ' Checking the calendar.');
+      expect(entries, hasLength(3));
+      final pending = entries[1] as MessageEntry;
+      expect(pending.content, 'I can schedule that. Checking the calendar.');
+      expect(pending.pending, isTrue);
+    });
+
+    test('ignores stale deltas after the assistant turn completed', () {
+      final entries = <ChatEntry>[
+        const MessageEntry(role: 'user', content: 'Hi'),
+        const MessageEntry(role: 'assistant', content: 'Hello.'),
+      ];
+      appendAssistantDelta(entries, ' extra');
+      expect(entries, hasLength(2));
+      expect((entries[1] as MessageEntry).content, 'Hello.');
+    });
+
+    test('starts a pending bubble after the latest user message', () {
+      final entries = <ChatEntry>[
+        const MessageEntry(role: 'user', content: 'Hi'),
+        const MessageEntry(role: 'assistant', content: 'Hello.'),
+        const MessageEntry(role: 'user', content: 'And then?'),
+      ];
+      appendAssistantDelta(entries, 'Next.');
+      expect(entries, hasLength(4));
+      final pending = entries.last as MessageEntry;
+      expect(pending.content, 'Next.');
+      expect(pending.pending, isTrue);
+    });
+  });
+
   group('ApprovalEntry.fromJson', () {
     test('reads API approvals and marks resumed decisions for retry', () {
       final approval = ApprovalEntry.fromJson({
@@ -56,6 +102,16 @@ void main() {
       expect(approval.id, 'a2');
       expect(approval.retry, isFalse);
       expect(approval.arguments, isEmpty);
+    });
+
+    test('reads Map payloads that are not Map<String, dynamic>', () {
+      final approval = ApprovalEntry.fromJson(<dynamic, dynamic>{
+        'id': 'a3',
+        'toolName': 'SearchMemory',
+        'argumentsJson': '{"query":"hello"}',
+      })!;
+      expect(approval.id, 'a3');
+      expect(approval.arguments['query'], 'hello');
     });
 
     test('rejects payloads without an id', () {
@@ -174,6 +230,94 @@ void main() {
     expect(decisions, [true, false]);
   });
 
+  test('copyWith can clear a leftover decision after a cancelled decline', () {
+    const approval = ApprovalEntry(
+      id: 'a1',
+      toolName: 'ForgetMemory',
+      argumentsJson: '{}',
+      status: ApprovalStatus.submitting,
+      decision: false,
+    );
+    final reset = approval.copyWith(
+      status: ApprovalStatus.pending,
+      clearDecision: true,
+    );
+    expect(reset.decision, isNull);
+    expect(reset.status, ApprovalStatus.pending);
+  });
+
+  testWidgets('pending Approve ignores a leftover decline decision', (
+    tester,
+  ) async {
+    final decisions = <bool>[];
+    await tester.pumpWidget(
+      _host(
+        ApprovalCard(
+          approval: const ApprovalEntry(
+            id: 'a1',
+            toolName: 'ForgetMemory',
+            argumentsJson: '{}',
+            decision: false,
+          ),
+          onDecide: decisions.add,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Approve'));
+    expect(decisions, [true]);
+  });
+
+  testWidgets('declined retry still resubmits the previous decline', (
+    tester,
+  ) async {
+    final decisions = <bool>[];
+    await tester.pumpWidget(
+      _host(
+        ApprovalCard(
+          approval: const ApprovalEntry(
+            id: 'a3',
+            toolName: 'ForgetMemory',
+            argumentsJson: '{}',
+            retry: true,
+            decision: false,
+          ),
+          onDecide: decisions.add,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Retry'));
+    expect(decisions, [false]);
+  });
+
+  testWidgets('failed approval cards retry the leftover decision and hide Decline', (
+    tester,
+  ) async {
+    final decisions = <bool>[];
+    await tester.pumpWidget(
+      _host(
+        ApprovalCard(
+          approval: const ApprovalEntry(
+            id: 'a4',
+            toolName: 'ForgetMemory',
+            argumentsJson: '{}',
+            status: ApprovalStatus.failed,
+            decision: false,
+            error: 'Jarvis could not finish this step. You can retry.',
+          ),
+          onDecide: decisions.add,
+        ),
+      ),
+    );
+
+    expect(find.text('Declined, but not finished'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('Decline'), findsNothing);
+    await tester.tap(find.text('Retry'));
+    expect(decisions, [false]);
+  });
+
   testWidgets('decided and retryable approval cards change their actions', (
     tester,
   ) async {
@@ -200,13 +344,24 @@ void main() {
               ),
               onDecide: (_) {},
             ),
+            ApprovalCard(
+              approval: const ApprovalEntry(
+                id: 'a3',
+                toolName: 'ForgetMemory',
+                argumentsJson: '{}',
+                retry: true,
+                decision: false,
+              ),
+              onDecide: (_) {},
+            ),
           ],
         ),
       ),
     );
     expect(find.text('Approved'), findsOneWidget);
     expect(find.text('Approved, but not finished'), findsOneWidget);
-    expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('Declined, but not finished'), findsOneWidget);
+    expect(find.text('Retry'), findsNWidgets(2));
     expect(find.text('Decline'), findsNothing);
   });
 
@@ -233,6 +388,66 @@ void main() {
     await tester.pump();
     await tester.tap(find.byTooltip('Send'));
     expect(sent, 1);
+  });
+
+  testWidgets('composer stop stays enabled while voice is starting', (tester) async {
+    var stopped = 0;
+    await tester.pumpWidget(
+      _host(
+        ChatComposer(
+          controller: TextEditingController(),
+          onSend: () {},
+          onVoice: () => stopped++,
+          sending: false,
+          voiceActive: false,
+          voiceStarting: true,
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Stop voice'));
+    expect(stopped, 1);
+  });
+
+  testWidgets('composer stop cancels an in-flight send', (tester) async {
+    var cancelled = 0;
+    await tester.pumpWidget(
+      _host(
+        ChatComposer(
+          controller: TextEditingController(),
+          onSend: () {},
+          onCancel: () => cancelled++,
+          onVoice: null,
+          sending: true,
+          voiceActive: false,
+          voiceStarting: false,
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Stop'));
+    expect(cancelled, 1);
+  });
+
+  testWidgets('composer awaiting approval disables send without a spinner', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        ChatComposer(
+          controller: TextEditingController(text: 'Approve first'),
+          onSend: () {},
+          onVoice: null,
+          sending: false,
+          awaitingApproval: true,
+          voiceActive: false,
+          voiceStarting: false,
+        ),
+      ),
+    );
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(tester.widget<IconButton>(find.byTooltip('Send')).onPressed, isNull);
   });
 
   testWidgets('suggestion chips send their prompt', (tester) async {

@@ -32,7 +32,13 @@ public sealed class JarvisTask
     public DateTimeOffset? CompletedAt { get; private set; }
     public string? Summary { get; private set; }
 
+    public const int QueuedDispatchStaleMinutes = 15;
+
     public void MarkScheduleDispatched() => ScheduleDispatchedAt ??= DateTimeOffset.UtcNow;
+
+    public bool IsQueuedDispatchStale(DateTimeOffset utcNow) =>
+        Status == "queued" && ScheduleDispatchedAt is not null &&
+        ScheduleDispatchedAt.Value.AddMinutes(QueuedDispatchStaleMinutes) < utcNow;
 
     public void AttachConversation(Guid conversationId)
     {
@@ -56,7 +62,7 @@ public sealed class JarvisTask
 
     public void Complete(string summary)
     {
-        if (Status is "completed" or "cancelled") return;
+        if (Status is "completed" or "failed" or "cancelled") return;
         Status = "completed";
         Summary = summary;
         CompletedAt = DateTimeOffset.UtcNow;
@@ -64,7 +70,7 @@ public sealed class JarvisTask
 
     public void Fail(string summary)
     {
-        if (Status is "completed" or "cancelled") return;
+        if (Status is "completed" or "failed" or "cancelled") return;
         Status = "failed";
         Summary = summary;
         CompletedAt = DateTimeOffset.UtcNow;

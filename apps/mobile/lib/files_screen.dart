@@ -1,12 +1,15 @@
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'file_download_stub.dart'
     if (dart.library.io) 'file_download_io.dart'
+    if (dart.library.js_interop) 'file_download_web.dart'
     as file_download;
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 const _allowedExtensions = [
@@ -38,6 +41,7 @@ class _FilesScreenState extends State<FilesScreen> {
   bool _loading = true;
   bool _busy = false;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -46,21 +50,27 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final response = await widget.http.get<List<dynamic>>('/api/v1/files');
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(
-          () => _files = (response.data ?? []).cast<Map<String, dynamic>>(),
+          () => _files = jsonMaps(response.data),
         );
       }
     } on DioException {
-      if (mounted) setState(() => _error = 'Jarvis could not load your files.');
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load your files.');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -71,6 +81,7 @@ class _FilesScreenState extends State<FilesScreen> {
     );
     if (file == null) return;
     final bytes = await file.readAsBytes();
+    if (!mounted) return;
     if (bytes.isEmpty || bytes.length > _maxFileBytes) {
       _showError('Choose a non-empty file up to 20 MB.');
       return;
@@ -98,12 +109,14 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   Future<void> _download(Map<String, dynamic> file) async {
+    final id = jsonString(file, 'id');
+    if (id == null) return;
     setState(() => _busy = true);
     try {
       await file_download.downloadAndOpen(
         widget.http,
-        file['id'] as String,
-        file['fileName'] as String? ?? 'jarvis-file',
+        id,
+        asJsonString(file['fileName']) ?? 'jarvis-file',
       );
     } on DioException {
       if (mounted) _showError('Jarvis could not download this file.');
@@ -114,7 +127,23 @@ class _FilesScreenState extends State<FilesScreen> {
     }
   }
 
+  Future<void> _retryIndexing(Map<String, dynamic> file) async {
+    final id = jsonString(file, 'id');
+    if (id == null) return;
+    setState(() => _busy = true);
+    try {
+      await widget.http.post('/api/v1/files/$id/reprocess');
+      await _load();
+    } on DioException {
+      if (mounted) _showError('Jarvis could not retry indexing this file.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _delete(Map<String, dynamic> file) async {
+    final id = jsonString(file, 'id');
+    if (id == null) return;
     final confirmed = await showJarvisConfirm(
       context,
       title: 'Delete file?',
@@ -125,9 +154,10 @@ class _FilesScreenState extends State<FilesScreen> {
       icon: PhosphorIconsRegular.trash,
     );
     if (!confirmed) return;
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
-      await widget.http.delete('/api/v1/files/${file['id']}');
+      await widget.http.delete('/api/v1/files/$id');
       await _load();
     } on DioException {
       if (mounted) _showError('Jarvis could not delete this file.');
@@ -143,7 +173,7 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   String _formatSize(dynamic value) {
-    final bytes = (value as num?)?.toInt() ?? 0;
+    final bytes = asJsonInt(value);
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
@@ -167,25 +197,25 @@ class _FilesScreenState extends State<FilesScreen> {
         ),
       ],
     ),
-    body: _loading
-        ? const LoadingState()
-        : _error != null
-        ? ErrorState(message: _error!, onRetry: _load)
-        : _files.isEmpty
-        ? const EmptyState(
-            icon: PhosphorIconsRegular.folderOpen,
-            title: 'No files yet',
-            message:
-                'Your files will be stored privately with Jarvis. PDFs and text are indexed so Jarvis can search them.',
-          )
-        : ListView.builder(
+    body: ListScreenBody(
+      loading: _loading,
+      error: _error,
+      isEmpty: _files.isEmpty,
+      onRetry: _load,
+      empty: const EmptyState(
+        icon: PhosphorIconsRegular.folderOpen,
+        title: 'No files yet',
+        message:
+            'Your files will be stored privately with Jarvis. PDFs and text are indexed so Jarvis can search them.',
+      ),
+      child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             itemCount: _files.length,
             itemBuilder: (context, index) {
               final file = _files[index];
-              final name = file['fileName'] as String? ?? 'File';
+              final name = asJsonString(file['fileName']) ?? 'File';
               final icon = _fileIcon(name);
-              final status = file['processingStatus'] as String? ?? 'uploaded';
+              final status = asJsonString(file['processingStatus']) ?? 'uploaded';
               return ContentWidth(
                 child: SurfaceCard(
                   margin: const EdgeInsets.only(bottom: 10),
@@ -226,20 +256,40 @@ class _FilesScreenState extends State<FilesScreen> {
                       PopupMenuButton<String>(
                         enabled: !_busy,
                         icon: const Icon(PhosphorIconsRegular.dotsThree),
-                        onSelected: (action) =>
-                            action == 'open' ? _download(file) : _delete(file),
-                        itemBuilder: (context) => const [
+                        onSelected: (action) {
+                          if (action == 'open') {
+                            _download(file);
+                          } else if (action == 'retry') {
+                            _retryIndexing(file);
+                          } else if (action == 'delete') {
+                            _delete(file);
+                          }
+                        },
+                        itemBuilder: (context) => [
                           PopupMenuItem(
                             value: 'open',
                             child: ListTile(
-                              leading: Icon(
+                              leading: const Icon(
                                 PhosphorIconsRegular.arrowSquareOut,
                               ),
-                              title: Text('Download and open'),
+                              title: Text(
+                                kIsWeb ? 'Download' : 'Download and open',
+                              ),
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
-                          PopupMenuItem(
+                          if (status == 'failed')
+                            const PopupMenuItem(
+                              value: 'retry',
+                              child: ListTile(
+                                leading: Icon(
+                                  PhosphorIconsRegular.arrowsClockwise,
+                                ),
+                                title: Text('Retry indexing'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          const PopupMenuItem(
                             value: 'delete',
                             child: ListTile(
                               leading: Icon(
@@ -261,6 +311,7 @@ class _FilesScreenState extends State<FilesScreen> {
               );
             },
           ),
+    ),
   );
 
   IconData _fileIcon(String name) =>

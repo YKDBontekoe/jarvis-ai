@@ -1,8 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
+
 import 'approvals_screen.dart';
+import 'daily_briefing_screen.dart';
 import 'notification_details_screen.dart';
+import 'notification_routing.dart';
+import 'json_maps.dart';
 import 'task_details_screen.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -22,7 +26,10 @@ class _RemindersScreenState extends State<RemindersScreen>
   List<Map<String, dynamic>> _reminders = [];
   List<Map<String, dynamic>> _notifications = [];
   bool _loading = true;
+  bool _remindersFailed = false;
+  bool _notificationsFailed = false;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -31,26 +38,50 @@ class _RemindersScreenState extends State<RemindersScreen>
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
+      _remindersFailed = false;
+      _notificationsFailed = false;
     });
     try {
-      final responses = await Future.wait([
-        widget.http.get<List<dynamic>>('/api/v1/reminders'),
-        widget.http.get<List<dynamic>>('/api/v1/notifications'),
-      ]);
-      if (mounted) {
+      var remindersFailed = false;
+      var notificationsFailed = false;
+      try {
+        final reminders = await widget.http.get<List<dynamic>>('/api/v1/reminders');
+        if (mounted && revision == _requestRevision) {
+          setState(() => _reminders = jsonMaps(reminders.data));
+        }
+      } on DioException {
+        remindersFailed = true;
+      }
+      try {
+        final notifications = await widget.http.get<List<dynamic>>(
+          '/api/v1/notifications',
+        );
+        if (mounted && revision == _requestRevision) {
+          setState(() => _notifications = jsonMaps(notifications.data));
+        }
+      } on DioException {
+        notificationsFailed = true;
+      }
+      if (mounted && revision == _requestRevision) {
         setState(() {
-          _reminders = (responses[0].data ?? []).cast<Map<String, dynamic>>();
-          _notifications = (responses[1].data ?? [])
-              .cast<Map<String, dynamic>>();
+          _remindersFailed = remindersFailed;
+          _notificationsFailed = notificationsFailed;
+          _error = remindersFailed
+              ? 'Jarvis could not load reminders.'
+              : notificationsFailed
+              ? 'Jarvis could not load notifications.'
+              : null;
         });
       }
-    } on DioException {
-      if (mounted) setState(() => _error = 'Jarvis could not load reminders.');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -148,6 +179,10 @@ class _RemindersScreenState extends State<RemindersScreen>
       titleController.dispose();
       return;
     }
+    if (!mounted) {
+      titleController.dispose();
+      return;
+    }
 
     final localDueAt = DateTime(
       selectedDate.year,
@@ -156,6 +191,11 @@ class _RemindersScreenState extends State<RemindersScreen>
       selectedTime.hour,
       selectedTime.minute,
     );
+    if (!localDueAt.isAfter(DateTime.now())) {
+      titleController.dispose();
+      if (mounted) _showError('Choose a time in the future.');
+      return;
+    }
     try {
       await widget.http.post(
         '/api/v1/reminders',
@@ -169,7 +209,8 @@ class _RemindersScreenState extends State<RemindersScreen>
       if (mounted) {
         final message = error.response?.statusCode == 503
             ? 'The reminder service is unavailable. Try again shortly.'
-            : 'Jarvis could not create that reminder.';
+            : firstProblemMessage(error.response?.data) ??
+                  'Jarvis could not create that reminder.';
         _showError(message);
       }
     } finally {
@@ -188,9 +229,10 @@ class _RemindersScreenState extends State<RemindersScreen>
       icon: PhosphorIconsRegular.bellSlash,
     );
     if (!confirmed) return;
+    if (!mounted) return;
     try {
       await widget.http.delete('/api/v1/reminders/${reminder['id']}');
-      await _load();
+      if (mounted) await _load();
     } on DioException {
       if (mounted) _showError('Jarvis could not cancel that reminder.');
     }
@@ -211,39 +253,41 @@ class _RemindersScreenState extends State<RemindersScreen>
   Future<void> _openNotification(Map<String, dynamic> notification) async {
     await _markRead(notification);
     if (!mounted) return;
-    final type = notification['type'];
-    final sourceId = notification['sourceId'] as String?;
-    if (type == 'approval.required') {
+    final type = asJsonString(notification['type']);
+    final sourceId = asJsonString(notification['sourceId']);
+    if (opensApprovalScreen(type)) {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) => ApprovalsScreen(http: widget.http),
         ),
       );
-      return;
-    }
-    if (type == 'task.completed' && sourceId != null) {
+    } else if (opensDailyBriefing(type)) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => DailyBriefingScreen(http: widget.http),
+        ),
+      );
+    } else if (opensTaskDetails(type) && sourceId != null) {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) =>
               TaskDetailsScreen(http: widget.http, taskId: sourceId),
         ),
       );
-      return;
-    }
-    if (sourceId == null ||
-        type is! String ||
-        (type != 'reminder.due' && type != 'task.completed')) {
-      return;
-    }
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => NotificationDetailsScreen(
-          http: widget.http,
-          notificationType: type,
-          sourceId: sourceId,
+    } else if (sourceId != null && opensNotificationDetails(type)) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => NotificationDetailsScreen(
+            http: widget.http,
+            notificationType: type!,
+            sourceId: sourceId,
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      return;
+    }
+    if (mounted) await _load();
   }
 
   void _showError(String message) {
@@ -253,7 +297,7 @@ class _RemindersScreenState extends State<RemindersScreen>
   }
 
   String _formatDate(dynamic raw) {
-    final date = DateTime.tryParse(raw as String? ?? '')?.toLocal();
+    final date = DateTime.tryParse(asJsonString(raw) ?? '')?.toLocal();
     if (date == null) return '';
     final dateLabel = MaterialLocalizations.of(context).formatMediumDate(date);
     final timeLabel = MaterialLocalizations.of(
@@ -334,20 +378,34 @@ class _RemindersScreenState extends State<RemindersScreen>
         ),
       ),
     ),
-    body: _loading
-        ? const LoadingState()
-        : _error != null
-        ? ErrorState(message: _error!, onRetry: _load)
-        : TabBarView(
-            controller: _tabs,
-            children: [_buildReminders(), _buildNotifications()],
-          ),
+    body: ListScreenBody(
+      loading: _loading,
+      error: (_reminders.isNotEmpty || _notifications.isNotEmpty) ? _error : null,
+      isEmpty: _reminders.isEmpty &&
+          _notifications.isEmpty &&
+          !_remindersFailed &&
+          !_notificationsFailed,
+      onRetry: _load,
+      empty: TabBarView(
+        controller: _tabs,
+        children: [_buildReminders(), _buildNotifications()],
+      ),
+      child: TabBarView(
+        controller: _tabs,
+        children: [_buildReminders(), _buildNotifications()],
+      ),
+    ),
   );
 
   int get _unreadCount =>
       _notifications.where((item) => item['readAt'] == null).length;
 
-  Widget _buildReminders() => _reminders.isEmpty
+  Widget _buildReminders() => _remindersFailed && _reminders.isEmpty
+      ? ErrorState(
+          message: 'Jarvis could not load reminders.',
+          onRetry: _load,
+        )
+      : _reminders.isEmpty
       ? const EmptyState(
           icon: PhosphorIconsRegular.alarm,
           title: 'No reminders yet.',
@@ -358,7 +416,7 @@ class _RemindersScreenState extends State<RemindersScreen>
           itemCount: _reminders.length,
           itemBuilder: (context, index) {
             final reminder = _reminders[index];
-            final status = reminder['status'] as String? ?? 'pending';
+            final status = asJsonString(reminder['status']) ?? 'pending';
             final pending = status == 'pending';
             final style = statusStyle(status);
             return ContentWidth(
@@ -378,7 +436,7 @@ class _RemindersScreenState extends State<RemindersScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            reminder['title'] as String? ?? '',
+                            asJsonString(reminder['title']) ?? '',
                             style: Theme.of(
                               context,
                             ).textTheme.titleSmall?.copyWith(fontSize: 15),
@@ -416,14 +474,20 @@ class _RemindersScreenState extends State<RemindersScreen>
         );
 
   IconData _notificationIcon(Object? type) => switch (type) {
-    'reminder.due' => PhosphorIconsRegular.alarm,
+    'reminder.due' || 'reminder.failed' => PhosphorIconsRegular.alarm,
     'task.completed' => PhosphorIconsRegular.checkCircle,
+    'task.failed' => PhosphorIconsRegular.warningCircle,
     'approval.required' => PhosphorIconsRegular.shieldCheck,
     'watch.triggered' || 'watch.failed' => PhosphorIconsRegular.pulse,
     _ => PhosphorIconsRegular.bell,
   };
 
-  Widget _buildNotifications() => _notifications.isEmpty
+  Widget _buildNotifications() => _notificationsFailed && _notifications.isEmpty
+      ? ErrorState(
+          message: 'Jarvis could not load notifications.',
+          onRetry: _load,
+        )
+      : _notifications.isEmpty
       ? const EmptyState(
           icon: PhosphorIconsRegular.bell,
           title: 'No notifications yet.',
@@ -435,7 +499,7 @@ class _RemindersScreenState extends State<RemindersScreen>
           itemBuilder: (context, index) {
             final notification = _notifications[index];
             final unread = notification['readAt'] == null;
-            final body = notification['body'] as String? ?? '';
+            final body = asJsonString(notification['body']) ?? '';
             return ContentWidth(
               child: SurfaceCard(
                 margin: const EdgeInsets.only(bottom: 10),
@@ -453,7 +517,7 @@ class _RemindersScreenState extends State<RemindersScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            notification['title'] as String? ?? '',
+                            asJsonString(notification['title']) ?? '',
                             style: Theme.of(context).textTheme.titleSmall
                                 ?.copyWith(
                                   fontSize: 15,

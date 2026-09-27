@@ -19,12 +19,15 @@ public sealed class FileProcessingWorkflow
         new ActivityOptions
         {
             StartToCloseTimeout = TimeSpan.FromMinutes(10),
+            HeartbeatTimeout = TimeSpan.FromMinutes(1),
             RetryPolicy = new Temporalio.Common.RetryPolicy
             {
                 InitialInterval = TimeSpan.FromSeconds(3),
                 MaximumInterval = TimeSpan.FromMinutes(1),
                 BackoffCoefficient = 2,
-                MaximumAttempts = 5
+                MaximumAttempts = MaximumProcessingAttempts
             }
         });
+
+    public const int MaximumProcessingAttempts = 5;
 }

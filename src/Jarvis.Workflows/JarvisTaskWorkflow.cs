@@ -15,6 +15,9 @@ public abstract class JarvisTaskActivityContract
 
     [Activity("FailJarvisTask")]
     public abstract Task FailTaskAsync(JarvisTaskWorkflowInput input);
+
+    [Activity("GetJarvisTaskStatus")]
+    public abstract Task<string?> GetTaskStatusAsync(JarvisTaskWorkflowInput input);
 }
 
 [Workflow]
@@ -38,7 +41,8 @@ public sealed class JarvisTaskWorkflow
                 (JarvisTaskActivityContract activities) => activities.RunTaskAsync(input),
                 new ActivityOptions
                 {
-                    StartToCloseTimeout = TimeSpan.FromMinutes(15),
+                    StartToCloseTimeout = TimeSpan.FromMinutes(75),
+                    HeartbeatTimeout = TimeSpan.FromMinutes(1),
                     RetryPolicy = new Temporalio.Common.RetryPolicy
                     {
                         InitialInterval = TimeSpan.FromSeconds(2),
@@ -48,7 +52,51 @@ public sealed class JarvisTaskWorkflow
                 });
 
             if (!waitingForApproval) return;
-            await Workflow.WaitConditionAsync(() => _approvalSummary is not null);
+            if (Workflow.Patched("task-approval-ignore-poll-errors"))
+            {
+                while (_approvalSummary is null)
+                {
+                    var signaled = await Workflow.WaitConditionAsync(
+                        () => _approvalSummary is not null, TimeSpan.FromMinutes(2));
+                    if (signaled) break;
+                    try
+                    {
+                        var status = await Workflow.ExecuteActivityAsync(
+                            (JarvisTaskActivityContract activities) => activities.GetTaskStatusAsync(input),
+                            new ActivityOptions
+                            {
+                                StartToCloseTimeout = TimeSpan.FromSeconds(20),
+                                RetryPolicy = new Temporalio.Common.RetryPolicy { MaximumAttempts = 3 }
+                            });
+                        if (status is null or "cancelled" or "failed" or "completed") return;
+                    }
+                    catch (Exception) when (!Workflow.CancellationToken.IsCancellationRequested)
+                    {
+                    }
+                }
+            }
+            else if (Workflow.Patched("task-approval-poll-terminal"))
+            {
+                while (_approvalSummary is null)
+                {
+                    var signaled = await Workflow.WaitConditionAsync(
+                        () => _approvalSummary is not null, TimeSpan.FromMinutes(2));
+                    if (signaled) break;
+                    var status = await Workflow.ExecuteActivityAsync(
+                        (JarvisTaskActivityContract activities) => activities.GetTaskStatusAsync(input),
+                        new ActivityOptions
+                        {
+                            StartToCloseTimeout = TimeSpan.FromSeconds(20),
+                            RetryPolicy = new Temporalio.Common.RetryPolicy { MaximumAttempts = 3 }
+                        });
+                    if (status is null or "cancelled" or "failed" or "completed") return;
+                }
+            }
+            else
+            {
+                await Workflow.WaitConditionAsync(() => _approvalSummary is not null);
+            }
+
             await Workflow.ExecuteActivityAsync(
                 (JarvisTaskActivityContract activities) => activities.CompleteApprovedTaskAsync(
                     new JarvisTaskApprovalInput(input.TaskId, _approvalSummary!)),

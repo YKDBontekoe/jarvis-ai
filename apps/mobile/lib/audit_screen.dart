@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
+import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
 class AuditScreen extends StatefulWidget {
@@ -18,6 +19,7 @@ class _AuditScreenState extends State<AuditScreen> {
   List<Map<String, dynamic>> _events = [];
   bool _loading = true;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -26,6 +28,8 @@ class _AuditScreenState extends State<AuditScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
+    final revision = ++_requestRevision;
     setState(() {
       _loading = true;
       _error = null;
@@ -35,17 +39,19 @@ class _AuditScreenState extends State<AuditScreen> {
         '/api/v1/audit',
         queryParameters: const {'limit': 150},
       );
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(
-          () => _events = (response.data ?? []).cast<Map<String, dynamic>>(),
+          () => _events = jsonMaps(response.data),
         );
       }
     } on DioException {
-      if (mounted) {
+      if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load the audit log.');
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -62,18 +68,18 @@ class _AuditScreenState extends State<AuditScreen> {
         const SizedBox(width: 8),
       ],
     ),
-    body: _loading && _events.isEmpty
-        ? const LoadingState()
-        : _error != null && _events.isEmpty
-        ? ErrorState(message: _error!, onRetry: _load)
-        : _events.isEmpty
-        ? const EmptyState(
-            icon: PhosphorIconsRegular.listChecks,
-            title: 'No audited actions yet.',
-            message:
-                'Approvals, tasks, reminders, files, and memory changes are recorded here.',
-          )
-        : RefreshIndicator(
+    body: ListScreenBody(
+      loading: _loading,
+      error: _error,
+      isEmpty: _events.isEmpty,
+      onRetry: _load,
+      empty: const EmptyState(
+        icon: PhosphorIconsRegular.listChecks,
+        title: 'No audited actions yet.',
+        message:
+            'Approvals, tasks, reminders, files, and memory changes are recorded here.',
+      ),
+      child: RefreshIndicator(
             onRefresh: _load,
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
@@ -87,6 +93,7 @@ class _AuditScreenState extends State<AuditScreen> {
               ),
             ),
           ),
+    ),
   );
 }
 
@@ -103,12 +110,12 @@ class _AuditRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final success = event['success'] as bool? ?? false;
+    final success = asJsonBool(event['success']);
     final timestamp = DateTime.tryParse(
-      event['timestamp'] as String? ?? '',
+      asJsonString(event['timestamp']) ?? '',
     )?.toLocal();
-    final metadata = event['metadataJson'] as String?;
-    final risk = event['riskClass'] as String? ?? 'unknown risk';
+    final metadata = asJsonString(event['metadataJson']);
+    final risk = asJsonString(event['riskClass']) ?? 'unknown risk';
     final color = success ? JarvisColors.success : JarvisColors.danger;
     return IntrinsicHeight(
       child: Row(
@@ -162,7 +169,7 @@ class _AuditRow extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          (event['action'] as String? ?? 'action').replaceAll(
+                          (asJsonString(event['action']) ?? 'action').replaceAll(
                             '.',
                             ' ',
                           ),
@@ -182,7 +189,7 @@ class _AuditRow extends StatelessWidget {
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      _Tag(event['tool'] as String? ?? 'Jarvis'),
+                      _Tag(asJsonString(event['tool']) ?? 'Jarvis'),
                       StatusPill(label: risk, color: _riskColor(risk)),
                     ],
                   ),

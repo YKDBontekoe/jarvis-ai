@@ -33,6 +33,8 @@ public sealed record SaveDailyBriefingRequest(bool Enabled, TimeOnly LocalTime, 
 public sealed record DailyBriefingWorkflowInput(Guid OwnerId, string WorkflowId, TimeOnly LocalTime, string TimeZoneId);
 public sealed record DailyBriefingActivityInput(Guid OwnerId, string WorkflowId, DateOnly LocalDate,
     string TimeZoneId, DateTimeOffset LocalDayStart, DateTimeOffset NextLocalDayStart);
+public sealed record DailyBriefingSchedule(DateTimeOffset FireAt, DateOnly LocalDate,
+    DateTimeOffset LocalDayStart, DateTimeOffset NextLocalDayStart);
 
 public interface IDailyBriefingRepository
 {
@@ -40,6 +42,7 @@ public interface IDailyBriefingRepository
     Task<(DailyBriefingPreferenceRecord Preference, string PreviousWorkflowId)> SaveAsync(Guid ownerId,
         SaveDailyBriefingRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<DailyBriefingPreferenceRecord>> ListPendingForSchedulingAsync(CancellationToken cancellationToken);
+    Task<int> RequeueStaleEnabledAsync(DateTimeOffset utcNow, CancellationToken cancellationToken);
     Task MarkScheduleDispatchedAsync(Guid ownerId, string workflowId, CancellationToken cancellationToken);
     Task<bool> DeliverAsync(DailyBriefingActivityInput input, CancellationToken cancellationToken);
 }
@@ -65,6 +68,7 @@ public interface IConditionWatchRepository
     Task<ConditionWatchRecord?> GetForExecutionAsync(Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<ConditionWatchRecord>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ConditionWatchRecord>> ListPendingForSchedulingAsync(CancellationToken cancellationToken);
+    Task<int> RequeueStaleActiveAsync(DateTimeOffset utcNow, CancellationToken cancellationToken);
     Task MarkScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken);
     Task<bool> CancelAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<ConditionWatchCheckResult> RecordCheckAsync(Guid id, double value, DateTimeOffset checkedAt,
@@ -93,6 +97,7 @@ public interface IReminderRepository
     Task<ReminderRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ReminderRecord>> ListRemindersAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ReminderRecord>> ListPendingForSchedulingAsync(CancellationToken cancellationToken);
+    Task<int> RequeueOverdueDispatchedAsync(DateTimeOffset utcNow, CancellationToken cancellationToken);
     Task MarkReminderScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken);
     Task<ReminderRecord?> CancelAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task MarkScheduleFailedAsync(Guid id, CancellationToken cancellationToken);
@@ -116,10 +121,14 @@ public interface IPushDeviceRepository
 public interface IJarvisTaskRepository
 {
     Task<JarvisTaskRecord> CreateAsync(Guid ownerId, string title, string prompt, Guid conversationId, CancellationToken cancellationToken);
+    Task<JarvisTaskRecord> CreateWithConversationAsync(Guid ownerId, string title, string prompt, CancellationToken cancellationToken);
     Task<JarvisTaskRecord?> GetTaskAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<JarvisTaskRecord?> GetTaskByIdAsync(Guid id, CancellationToken cancellationToken);
     Task<JarvisTaskRecord?> GetTaskByConversationIdAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<JarvisTaskRecord>> ListQueuedForSchedulingAsync(CancellationToken cancellationToken);
+    Task<int> RequeueStaleQueuedAsync(DateTimeOffset olderThan, CancellationToken cancellationToken);
+    Task<IReadOnlyList<JarvisTaskRecord>> ListRecentlyTerminalAsync(DateTimeOffset completedAfter,
+        CancellationToken cancellationToken);
     Task MarkTaskScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<JarvisTaskRecord>> ListActiveAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<JarvisTaskRecord>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
@@ -137,6 +146,7 @@ public interface IJarvisTaskService
     Task<IReadOnlyList<JarvisTaskRecord>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<bool> CancelAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task CompleteAfterApprovalAsync(Guid? taskId, Guid ownerId, string summary, CancellationToken cancellationToken);
+    Task FailAfterRejectedApprovalAsync(Guid? taskId, Guid ownerId, string summary, CancellationToken cancellationToken);
 }
 
 public interface IReminderService

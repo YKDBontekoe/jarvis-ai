@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Channels;
+using Jarvis.Application.Conversations;
 using Microsoft.Extensions.AI;
 
 namespace Jarvis.Agents;
@@ -15,7 +16,8 @@ namespace Jarvis.Agents;
 /// under Agent Framework's normal execution and approval pipeline.
 /// </summary>
 public sealed class CodexCliChatClient(string executablePath, string? model = null, string? visionModel = null,
-    IReadOnlyDictionary<string, string>? modelClasses = null, bool enableWebSearch = true) : IChatClient
+    IReadOnlyDictionary<string, string>? modelClasses = null, bool enableWebSearch = true,
+    int turnTimeoutSeconds = 300, CodexProcessLimiter? processLimiter = null) : IChatClient
 {
     private static readonly ActivitySource ActivitySource = new("Jarvis.CodexChatClient");
     private static readonly Meter Meter = new("Jarvis.CodexChatClient");
@@ -51,7 +53,8 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
     private readonly Dictionary<string, string> _modelClasses = (modelClasses ?? new Dictionary<string, string>())
         .Where(item => !string.IsNullOrWhiteSpace(item.Key) && !string.IsNullOrWhiteSpace(item.Value))
         .ToDictionary(item => item.Key.Trim(), item => item.Value.Trim(), StringComparer.OrdinalIgnoreCase);
-    private readonly SemaphoreSlim _processSlots = new(2, 2);
+    private readonly CodexProcessLimiter _processSlots = processLimiter ?? new CodexProcessLimiter();
+    private readonly TimeSpan _turnTimeout = TimeSpan.FromSeconds(turnTimeoutSeconds);
     private readonly SemaphoreSlim _modelCatalogLock = new(1, 1);
     private readonly object _modelCatalogSync = new();
     private AvailableModel[]? _modelCatalog;
@@ -110,7 +113,7 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
 
     public void Dispose()
     {
-        _processSlots.Dispose();
+        if (processLimiter is null) _processSlots.Dispose();
         _modelCatalogLock.Dispose();
     }
 
@@ -135,28 +138,31 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
             using var process = new Process { StartInfo = CreateAppServerStart(executablePath, scratch, enableWebSearch) };
             if (!process.Start()) throw new InvalidOperationException("Could not start the Codex CLI app-server.");
 
-            using var killOnCancellation = cancellationToken.Register(() =>
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(_turnTimeout);
+            var runToken = timeout.Token;
+            using var killOnCancellation = runToken.Register(() =>
             {
                 try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
                 catch (InvalidOperationException) { }
                 catch (System.ComponentModel.Win32Exception) { }
             });
-            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            var stderrTask = process.StandardError.ReadToEndAsync();
             using var writer = process.StandardInput;
             using var reader = process.StandardOutput;
             try
             {
                 var rpc = new AppServerConnection(writer, reader, stderrTask);
-                await rpc.InitializeAsync(cancellationToken);
+                await rpc.InitializeAsync(runToken);
                 var modality = prompt.Images.Count > 0 ? "image" : "text";
                 var hasVisionClass = _modelClasses.ContainsKey("vision");
                 var selectedModel = prompt.Images.Count > 0
                     ? visionModel ?? (hasVisionClass ? "vision" : requestedModel)
                     : requestedModel;
-                var modelCatalog = await GetModelCatalogAsync(rpc, cancellationToken);
+                var modelCatalog = await GetModelCatalogAsync(rpc, runToken);
                 var resolvedModel = ResolveModel(modelCatalog, ResolveModelSelector(selectedModel), modality,
                     allowCompatibleFallback: prompt.Images.Count > 0 && visionModel is null && !hasVisionClass);
-                var threadId = await rpc.StartThreadAsync(scratch, resolvedModel, cancellationToken);
+                var threadId = await rpc.StartThreadAsync(scratch, resolvedModel, runToken);
                 var rawResponse = new StringBuilder();
                 var textDecoder = new StructuredTextStreamDecoder();
 
@@ -183,13 +189,19 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
                                 ModelId = resolvedModel
                             });
                         }
-                    }, cancellationToken);
+                    }, runToken);
                     modelOutcome = "completed";
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
                     modelOutcome = "cancelled";
                     throw;
+                }
+                catch (OperationCanceledException)
+                {
+                    modelOutcome = "timeout";
+                    throw new TimeoutException(
+                        $"Codex CLI model turn exceeded {_turnTimeout.TotalSeconds:0} seconds.");
                 }
                 finally
                 {
@@ -250,6 +262,9 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
                 try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
                 catch (InvalidOperationException) { }
                 catch (System.ComponentModel.Win32Exception) { }
+                try { await stderrTask.WaitAsync(TimeSpan.FromSeconds(2)); }
+                catch (TimeoutException) { }
+                catch (OperationCanceledException) { }
             }
         }
         finally
@@ -330,11 +345,16 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
             throw new InvalidOperationException($"Codex CLI requested an unknown Jarvis tool: {name}");
 
         var argumentsJson = root.GetProperty("argumentsJson").GetString() ?? "{}";
-        using var argumentsDocument = JsonDocument.Parse(argumentsJson);
-        if (argumentsDocument.RootElement.ValueKind != JsonValueKind.Object)
-            throw new InvalidOperationException("Codex CLI returned tool arguments that were not a JSON object.");
-        var arguments = JsonSerializer.Deserialize<Dictionary<string, object?>>(
-            argumentsDocument.RootElement.GetRawText(), JsonOptions) ?? [];
+        Dictionary<string, object?> arguments;
+        try
+        {
+            arguments = ToolCallArguments.Parse(argumentsJson);
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidOperationException("Codex CLI returned tool arguments that were not a JSON object.",
+                exception);
+        }
         return new ChatMessage(ChatRole.Assistant,
             [new FunctionCallContent(Guid.NewGuid().ToString("N"), name, arguments)]);
     }
@@ -632,7 +652,15 @@ public sealed class CodexCliChatClient(string executablePath, string? model = nu
             var line = await reader.ReadLineAsync(cancellationToken);
             if (line is null)
             {
-                var stderr = await stderrTask;
+                string stderr;
+                try
+                {
+                    stderr = await stderrTask.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
+                }
+                catch (TimeoutException)
+                {
+                    stderr = "";
+                }
                 throw new InvalidOperationException("Codex CLI app-server exited unexpectedly: " + Limit(stderr.Trim(), 2_000));
             }
             return JsonDocument.Parse(line);

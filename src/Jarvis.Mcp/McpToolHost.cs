@@ -2,6 +2,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
+using Jarvis.Application;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Integrations;
 using System.Net;
@@ -145,10 +146,10 @@ public sealed class McpToolHost(IConfiguration configuration, ILogger<McpToolHos
                 statuses.Add(new McpServerConnectionStatus(server.Name, "connected", selected.Length, null));
                 logger.LogInformation("Connected MCP server {ServerName}; enabled {ToolCount} allowlisted tools.", server.Name, selected.Length);
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            catch (Exception exception) when (CancellationExceptions.Unwrap(exception) is { } canceled)
             {
                 if (client is not null) await client.DisposeAsync();
-                throw;
+                throw canceled;
             }
             catch (Exception exception)
             {

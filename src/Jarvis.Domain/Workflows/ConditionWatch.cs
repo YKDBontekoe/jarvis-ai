@@ -36,7 +36,13 @@ public sealed class ConditionWatch
     public double? LastValue { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
 
+    public const int ScheduleStaleGraceMinutes = 30;
+
     public void MarkScheduleDispatched() => ScheduleDispatchedAt ??= DateTimeOffset.UtcNow;
+
+    public bool IsScheduleStale(DateTimeOffset utcNow) =>
+        Status == "active" && ScheduleDispatchedAt is not null &&
+        (LastCheckedAt ?? ScheduleDispatchedAt.Value).AddMinutes(IntervalMinutes + ScheduleStaleGraceMinutes) < utcNow;
 
     public bool RecordCheck(double value, DateTimeOffset checkedAt)
     {

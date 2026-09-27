@@ -1,6 +1,10 @@
 using Jarvis.Infrastructure.Persistence;
 using Jarvis.Application.Files;
+using Jarvis.Application.Conversations;
+using Jarvis.Application.Approvals;
+using Jarvis.Domain.Approvals;
 using Jarvis.Domain.Files;
+using Jarvis.Domain.Workflows;
 using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
@@ -69,7 +73,7 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
         await using var database = CreateDbContext();
         var store = new ConversationStore(database);
         var conversation = await store.CreateAsync(Guid.CreateVersion7(), "Session verification", CancellationToken.None);
-        const string state = """{"stateBag":{"messages":[{"contents":[{"$type":"functionCall","name":"AddMcpServer","callId":"approval-1","arguments":{"name":"Verification"}}]}]}}""";
+        const string state = """{"stateBag":{"messages":[{"contents":[{"$id":"1","$type":"functionCall","name":"AddMcpServer","callId":"approval-1","arguments":{"name":"Verification"}}]}]}}""";
         await store.SaveAgentSessionAsync(conversation.Id, state, CancellationToken.None);
         database.ChangeTracker.Clear();
 
@@ -105,6 +109,174 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
         var hit = Assert.Single(hits);
         Assert.Equal(expectedId, hit.FileId);
         Assert.Equal("invoice.txt", hit.FileName);
+    }
+
+    [Fact]
+    public async Task Deleting_a_conversation_removes_its_approval_notifications()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var store = new ConversationStore(database);
+        var conversation = await store.CreateAsync(owner, "Needs approval", CancellationToken.None);
+        var approval = new ToolApproval(owner, conversation.Id, "req-1", "call-1", "ForgetMemory", "{}");
+        var approvalNotification = new Notification(Guid.CreateVersion7(), owner, "approval.required",
+            "Approval needed", "ForgetMemory", approval.Id);
+        var reminderNotification = new Notification(Guid.CreateVersion7(), owner, "reminder.fired",
+            "Reminder", "Standup", Guid.CreateVersion7());
+        database.ToolApprovals.Add(approval);
+        database.Notifications.Add(approvalNotification);
+        database.Notifications.Add(reminderNotification);
+        await database.SaveChangesAsync();
+
+        Assert.Equal(ConversationDeleteResult.Deleted,
+            await store.DeleteAsync(conversation.Id, owner, CancellationToken.None));
+        database.ChangeTracker.Clear();
+
+        Assert.Empty(await database.Notifications.Where(x => x.Id == approvalNotification.Id).ToListAsync());
+        Assert.Single(await database.Notifications.Where(x => x.Id == reminderNotification.Id).ToListAsync());
+        Assert.Empty(await database.ToolApprovals.Where(x => x.Id == approval.Id).ToListAsync());
+        Assert.Single(await database.AuditEvents.Where(x =>
+            x.OwnerId == owner && x.Action == "conversation.deleted").ToListAsync());
+    }
+
+    [Fact]
+    public async Task Terminal_file_status_does_not_overwrite_a_requeued_file()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var files = new FileRepository(database);
+        var id = Guid.CreateVersion7();
+        await files.CreateAsync(new StoredFile(id, owner, id.ToString(), "notes.txt", "text/plain",
+            32, new string('0', 64), DateTimeOffset.UtcNow, "queued"), CancellationToken.None);
+
+        Assert.True(await files.SetProcessingStatusAsync(id, owner, "processing", CancellationToken.None));
+        Assert.True(await files.RequeueForProcessingAsync(id, owner, CancellationToken.None));
+        Assert.False(await files.SetProcessingStatusAsync(id, owner, "failed", CancellationToken.None));
+        Assert.Equal("queued", (await files.GetAsync(id, owner, CancellationToken.None))!.ProcessingStatus);
+
+        Assert.True(await files.SetProcessingStatusAsync(id, owner, "processing", CancellationToken.None));
+        Assert.True(await files.SetProcessingStatusAsync(id, owner, "ready", CancellationToken.None));
+        Assert.Equal("ready", (await files.GetAsync(id, owner, CancellationToken.None))!.ProcessingStatus);
+    }
+
+    [Fact]
+    public async Task Cancelling_incomplete_task_approvals_removes_their_inbox_and_push()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var conversations = new ConversationStore(database);
+        var tasks = new WorkflowRepository(database);
+        var approvals = new ToolApprovalStore(database);
+        var conversation = await conversations.CreateAsync(owner, "Task chat", CancellationToken.None);
+        var task = await tasks.CreateAsync(owner, "Research", "Look this up", conversation.Id, CancellationToken.None);
+        database.PushDevices.Add(new PushDevice(owner, "fcm-token", "android"));
+        await database.SaveChangesAsync();
+
+        var created = await approvals.CreateAsync(owner, conversation.Id, "req-1", "call-1",
+            "ForgetMemory", "{}", task.Id, CancellationToken.None);
+        Assert.True(created.Created);
+        Assert.NotNull(created.NotificationId);
+        Assert.NotEmpty(await database.PushDeliveries.Where(x => x.NotificationId == created.NotificationId)
+            .ToListAsync());
+
+        await approvals.CancelIncompleteForTaskAsync(task.Id, owner, CancellationToken.None);
+        database.ChangeTracker.Clear();
+
+        Assert.Empty(await database.Notifications.Where(x => x.Id == created.NotificationId).ToListAsync());
+        Assert.Empty(await database.PushDeliveries.Where(x => x.NotificationId == created.NotificationId)
+            .ToListAsync());
+        Assert.Equal("cancelled",
+            (await database.ToolApprovals.SingleAsync(x => x.Id == created.Approval.Id)).Status);
+    }
+
+    [Fact]
+    public async Task Cancelling_a_task_clears_decided_incomplete_approval_inbox()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var conversations = new ConversationStore(database);
+        var tasks = new WorkflowRepository(database);
+        var approvals = new ToolApprovalStore(database);
+        var conversation = await conversations.CreateAsync(owner, "Task chat", CancellationToken.None);
+        var task = await tasks.CreateAsync(owner, "Research", "Look this up", conversation.Id, CancellationToken.None);
+        database.PushDevices.Add(new PushDevice(owner, "fcm-token", "android"));
+        await database.SaveChangesAsync();
+
+        var created = await approvals.CreateAsync(owner, conversation.Id, "req-2", "call-2",
+            "ForgetMemory", "{}", task.Id, CancellationToken.None);
+        Assert.True(created.Created);
+        Assert.NotNull(created.NotificationId);
+        Assert.NotNull(await approvals.DecideAsync(created.Approval.Id, owner, true, CancellationToken.None));
+
+        Assert.True(await tasks.CancelTaskAsync(task.Id, owner, CancellationToken.None));
+        database.ChangeTracker.Clear();
+
+        Assert.Empty(await database.Notifications.Where(x => x.Id == created.NotificationId).ToListAsync());
+        Assert.Empty(await database.PushDeliveries.Where(x => x.NotificationId == created.NotificationId)
+            .ToListAsync());
+        var stored = await database.ToolApprovals.SingleAsync(x => x.Id == created.Approval.Id);
+        Assert.Equal("approved", stored.Status);
+        Assert.Equal("cancelled", stored.ResumeStatus);
+    }
+
+    [Fact]
+    public async Task Completing_a_resume_removes_its_inbox_and_keeps_other_pending()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var conversations = new ConversationStore(database);
+        var approvals = new ToolApprovalStore(database);
+        var conversation = await conversations.CreateAsync(owner, "Chat", CancellationToken.None);
+        database.PushDevices.Add(new PushDevice(owner, "fcm-token", "android"));
+        await database.SaveChangesAsync();
+
+        var completed = await approvals.CreateAsync(owner, conversation.Id, "req-1", "call-1",
+            "CreateReminder", "{}", null, CancellationToken.None);
+        var pending = await approvals.CreateAsync(owner, conversation.Id, "req-2", "call-2",
+            "ForgetMemory", "{}", null, CancellationToken.None);
+        Assert.True(completed.Created);
+        Assert.NotNull(completed.NotificationId);
+        Assert.NotNull(pending.NotificationId);
+
+        Assert.NotNull(await approvals.DecideAsync(completed.Approval.Id, owner, true, CancellationToken.None));
+        Assert.True(await approvals.TryStartResumeAsync(completed.Approval.Id, owner, CancellationToken.None));
+        await approvals.MarkResumeCompletedAsync(completed.Approval.Id, owner, CancellationToken.None);
+        database.ChangeTracker.Clear();
+
+        Assert.Empty(await database.Notifications.Where(x => x.Id == completed.NotificationId).ToListAsync());
+        Assert.Empty(await database.PushDeliveries.Where(x => x.NotificationId == completed.NotificationId)
+            .ToListAsync());
+        Assert.Single(await database.Notifications.Where(x => x.Id == pending.NotificationId).ToListAsync());
+        Assert.NotEmpty(await database.PushDeliveries.Where(x => x.NotificationId == pending.NotificationId)
+            .ToListAsync());
+        Assert.Equal("completed",
+            (await database.ToolApprovals.SingleAsync(x => x.Id == completed.Approval.Id)).ResumeStatus);
+    }
+
+    [Fact]
+    public async Task Failed_resume_keeps_inbox_for_retry()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var conversations = new ConversationStore(database);
+        var approvals = new ToolApprovalStore(database);
+        var conversation = await conversations.CreateAsync(owner, "Chat", CancellationToken.None);
+        database.PushDevices.Add(new PushDevice(owner, "fcm-token", "android"));
+        await database.SaveChangesAsync();
+
+        var created = await approvals.CreateAsync(owner, conversation.Id, "req-1", "call-1",
+            "CreateReminder", "{}", null, CancellationToken.None);
+        Assert.NotNull(created.NotificationId);
+        Assert.NotNull(await approvals.DecideAsync(created.Approval.Id, owner, true, CancellationToken.None));
+        Assert.True(await approvals.TryStartResumeAsync(created.Approval.Id, owner, CancellationToken.None));
+        await approvals.MarkResumeFailedAsync(created.Approval.Id, owner, CancellationToken.None);
+        database.ChangeTracker.Clear();
+
+        Assert.Single(await database.Notifications.Where(x => x.Id == created.NotificationId).ToListAsync());
+        Assert.NotEmpty(await database.PushDeliveries.Where(x => x.NotificationId == created.NotificationId)
+            .ToListAsync());
+        Assert.Equal("failed",
+            (await database.ToolApprovals.SingleAsync(x => x.Id == created.Approval.Id)).ResumeStatus);
     }
 
     private JarvisDbContext CreateDbContext()

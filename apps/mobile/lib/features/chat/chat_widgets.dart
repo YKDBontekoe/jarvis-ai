@@ -345,6 +345,8 @@ class ApprovalCard extends StatelessWidget {
     final decided =
         approval.status == ApprovalStatus.approved ||
         approval.status == ApprovalStatus.denied;
+    final needsRetry =
+        approval.retry || approval.status == ApprovalStatus.failed;
     final accent = switch (approval.status) {
       ApprovalStatus.approved => JarvisColors.success,
       ApprovalStatus.denied => JarvisColors.muted,
@@ -389,8 +391,10 @@ class ApprovalCard extends StatelessWidget {
                         ApprovalStatus.approved => 'Approved',
                         ApprovalStatus.denied => 'Declined',
                         _ =>
-                          approval.retry
-                              ? 'Approved, but not finished'
+                          needsRetry
+                              ? (approval.decision == false
+                                  ? 'Declined, but not finished'
+                                  : 'Approved, but not finished')
                               : 'Jarvis needs your approval',
                       },
                       style: const TextStyle(
@@ -477,7 +481,7 @@ class ApprovalCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        if (!approval.retry)
+                        if (!needsRetry)
                           OutlinedButton(
                             onPressed: submitting
                                 ? null
@@ -491,7 +495,11 @@ class ApprovalCard extends StatelessWidget {
                         FilledButton.icon(
                           onPressed: submitting
                               ? null
-                              : () => onDecide(approval.decision ?? true),
+                              : () => onDecide(
+                                  needsRetry
+                                      ? (approval.decision ?? true)
+                                      : true,
+                                ),
                           style: FilledButton.styleFrom(
                             minimumSize: const Size(0, 42),
                           ),
@@ -503,19 +511,12 @@ class ApprovalCard extends StatelessWidget {
                                   ),
                                 )
                               : Icon(
-                                  approval.retry ||
-                                          approval.status ==
-                                              ApprovalStatus.failed
+                                  needsRetry
                                       ? PhosphorIconsRegular.arrowsClockwise
                                       : PhosphorIconsRegular.check,
                                   size: 18,
                                 ),
-                          label: Text(
-                            approval.retry ||
-                                    approval.status == ApprovalStatus.failed
-                                ? 'Retry'
-                                : 'Approve',
-                          ),
+                          label: Text(needsRetry ? 'Retry' : 'Approve'),
                         ),
                       ],
                     ),
@@ -617,15 +618,19 @@ class ChatComposer extends StatefulWidget {
     required this.sending,
     required this.voiceActive,
     required this.voiceStarting,
+    this.onCancel,
     this.onAttach,
+    this.awaitingApproval = false,
     this.hint = 'Ask Jarvis anything',
     super.key,
   });
 
   final TextEditingController controller;
   final VoidCallback onSend;
+  final VoidCallback? onCancel;
   final VoidCallback? onVoice;
   final bool sending;
+  final bool awaitingApproval;
   final bool voiceActive;
   final bool voiceStarting;
 
@@ -673,6 +678,7 @@ class _ChatComposerState extends State<ChatComposer> {
   bool get _canSend =>
       _inputEnabled &&
       !widget.sending &&
+      !widget.awaitingApproval &&
       widget.controller.text.trim().isNotEmpty;
 
   @override
@@ -690,6 +696,7 @@ class _ChatComposerState extends State<ChatComposer> {
         widget.onVoice != null &&
         !hasText &&
         !widget.sending &&
+        !widget.awaitingApproval &&
         !widget.voiceActive;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -737,12 +744,19 @@ class _ChatComposerState extends State<ChatComposer> {
                   onPressed: widget.onAttach,
                 ),
               const Spacer(),
-              if (widget.voiceActive || widget.voiceStarting)
+              if (widget.sending && widget.onCancel != null)
+                _ComposerIconButton(
+                  icon: PhosphorIconsRegular.stop,
+                  tooltip: 'Stop',
+                  danger: true,
+                  onPressed: widget.onCancel,
+                )
+              else if (widget.voiceActive || widget.voiceStarting)
                 _ComposerIconButton(
                   icon: PhosphorIconsRegular.stop,
                   tooltip: 'Stop voice',
                   danger: true,
-                  onPressed: widget.voiceStarting ? null : widget.onVoice,
+                  onPressed: widget.onVoice,
                 )
               else
                 AnimatedSwitcher(

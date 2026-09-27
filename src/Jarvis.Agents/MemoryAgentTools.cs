@@ -4,11 +4,12 @@ using System.Text.RegularExpressions;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Memory;
+using Microsoft.Extensions.Logging;
 
 namespace Jarvis.Agents;
 
 internal sealed partial class MemoryAgentTools(IMemoryService memories, MemoryReranker reranker,
-    IAuditEventStore audit, ICurrentUser currentUser)
+    IAuditEventStore audit, ICurrentUser currentUser, ILogger<MemoryAgentTools> logger)
 {
     private const int MaxResultCharacters = 8_000;
     private static readonly HashSet<string> SupportedKinds = new(StringComparer.Ordinal)
@@ -60,8 +61,16 @@ internal sealed partial class MemoryAgentTools(IMemoryService memories, MemoryRe
 
         var record = await memories.CreateAsync(currentUser.OwnerId, normalizedKind, text, importance: pin ? 0.9f : 0.7f,
             confidence: 0.95f, validUntil: null, isPinned: pin, cancellationToken, sourceType: "user");
-        await audit.AppendAsync(currentUser.OwnerId, "memory", "memory.created", "moderate", true, null,
-            JsonSerializer.Serialize(new { resourceId = record.Id, kind = record.Kind, source = "agent" }), cancellationToken);
+        try
+        {
+            await audit.AppendAsync(currentUser.OwnerId, "memory", "memory.created", "moderate", true, null,
+                JsonSerializer.Serialize(new { resourceId = record.Id, kind = record.Kind, source = "agent" }),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(exception, "Could not append memory.created audit for {MemoryId}.", record.Id);
+        }
         return $"Saved {(pin ? "pinned " : string.Empty)}{record.Kind} memory (memory ID {record.Id}).";
     }
 
@@ -76,8 +85,15 @@ internal sealed partial class MemoryAgentTools(IMemoryService memories, MemoryRe
         if (record is null) return $"Memory {id} was not found.";
 
         await memories.DeleteAsync(id, currentUser.OwnerId, cancellationToken);
-        await audit.AppendAsync(currentUser.OwnerId, "memory", "memory.deleted", "high", true, null,
-            JsonSerializer.Serialize(new { resourceId = id, source = "agent" }), cancellationToken);
+        try
+        {
+            await audit.AppendAsync(currentUser.OwnerId, "memory", "memory.deleted", "high", true, null,
+                JsonSerializer.Serialize(new { resourceId = id, source = "agent" }), cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(exception, "Could not append memory.deleted audit for {MemoryId}.", id);
+        }
         return $"Forgot memory {id}.";
     }
 

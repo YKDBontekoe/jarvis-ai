@@ -75,7 +75,8 @@ internal sealed class ConversationMemoryExtractor(
             var kind = candidate.Kind?.Trim().ToLowerInvariant();
             var content = candidate.Content?.Trim();
             if (kind is null || !SupportedKinds.Contains(kind) || string.IsNullOrWhiteSpace(content) ||
-                content.Length > 500 || candidate.Confidence is < 0.82f or > 1f || candidate.Importance is < 0f or > 1f)
+                content.Length > 500 || candidate.Confidence is < 0.82f or > 1f || candidate.Importance is < 0f or > 1f ||
+                MemoryAgentTools.LooksLikeSecret(content))
                 continue;
 
             var normalized = Normalize(kind, content);
@@ -116,10 +117,11 @@ internal sealed class ConversationMemoryExtractor(
 
     private static IReadOnlyList<MemoryCandidate> Parse(string? json)
     {
-        if (string.IsNullOrWhiteSpace(json)) return [];
+        var text = MemoryExtractionJson.UnwrapArray(json);
+        if (text is null) return [];
         try
         {
-            return JsonSerializer.Deserialize<List<MemoryCandidate>>(json, new JsonSerializerOptions
+            return JsonSerializer.Deserialize<List<MemoryCandidate>>(text, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             })?.Take(3).ToArray() ?? [];

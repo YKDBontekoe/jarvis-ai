@@ -1,6 +1,5 @@
 using Jarvis.Application.Workflows;
 using Jarvis.Application.Files;
-using Jarvis.Application.Conversations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Temporalio.Api.Enums.V1;
@@ -23,15 +22,30 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
             new WorkflowOptions(id: workflowId, taskQueue: TaskQueue)
             {
                 IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
-                IdReusePolicy = WorkflowIdReusePolicy.RejectDuplicate
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
             });
     }
 
     public async Task CancelAsync(string workflowId, CancellationToken cancellationToken)
     {
         var client = await GetClientAsync(cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        await client.GetWorkflowHandle(workflowId).CancelAsync(new WorkflowCancelOptions());
+        Exception? last = null;
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await client.GetWorkflowHandle(workflowId).CancelAsync(new WorkflowCancelOptions());
+                return;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                last = exception;
+                if (attempt == 3) break;
+                await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), cancellationToken);
+            }
+        }
+        throw last!;
     }
 
     public async Task ScheduleAsync(Guid fileId, Guid ownerId, CancellationToken cancellationToken)
@@ -42,9 +56,12 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
             new WorkflowOptions(id: $"jarvis:file:{fileId:N}", taskQueue: TaskQueue)
             {
                 IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
-                IdReusePolicy = WorkflowIdReusePolicy.RejectDuplicate
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
             });
     }
+
+    public Task CancelAsync(Guid fileId, CancellationToken cancellationToken) =>
+        CancelAsync($"jarvis:file:{fileId:N}", cancellationToken);
 
     public async Task ScheduleTaskAsync(JarvisTaskRecord task, CancellationToken cancellationToken)
     {
@@ -54,16 +71,12 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
             new WorkflowOptions(id: task.WorkflowId, taskQueue: TaskQueue)
             {
                 IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
-                IdReusePolicy = WorkflowIdReusePolicy.RejectDuplicate
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
             });
     }
 
-    public async Task CancelTaskAsync(string workflowId, CancellationToken cancellationToken)
-    {
-        var client = await GetClientAsync(cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-        await client.GetWorkflowHandle(workflowId).CancelAsync(new WorkflowCancelOptions());
-    }
+    public async Task CancelTaskAsync(string workflowId, CancellationToken cancellationToken) =>
+        await CancelAsync(workflowId, cancellationToken);
 
     public async Task ScheduleAsync(ConditionWatchRecord watch, CancellationToken cancellationToken)
     {
@@ -73,7 +86,7 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
             new WorkflowOptions(id: watch.WorkflowId, taskQueue: TaskQueue)
             {
                 IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
-                IdReusePolicy = WorkflowIdReusePolicy.RejectDuplicate
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
             });
     }
 
@@ -85,7 +98,7 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
             new WorkflowOptions(id: briefing.WorkflowId, taskQueue: TaskQueue)
             {
                 IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
-                IdReusePolicy = WorkflowIdReusePolicy.RejectDuplicate
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
             });
     }
 
@@ -156,15 +169,29 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
     {
         var reminder = await reminders.GetAsync(id, ownerId, cancellationToken);
         if (reminder is null || reminder.Status != "pending") return null;
-        await scheduler.CancelAsync(reminder.WorkflowId, cancellationToken);
-        return await reminders.CancelAsync(id, ownerId, cancellationToken);
+        var cancelled = await reminders.CancelAsync(id, ownerId, cancellationToken);
+        if (cancelled is null) return null;
+        try
+        {
+            await scheduler.CancelAsync(reminder.WorkflowId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "Reminder {ReminderId} was cancelled in storage; Temporal will stop it if the workflow is still running.", id);
+        }
+        return cancelled;
     }
 }
 
 public sealed class JarvisTaskService(
     IJarvisTaskRepository tasks,
-    IConversationStore conversations,
     TemporalReminderScheduler scheduler,
+    ITaskRunAbort taskRunAbort,
     ILogger<JarvisTaskService> logger) : IJarvisTaskService
 {
     public async Task<JarvisTaskRecord> CreateAsync(Guid ownerId, string title, string prompt, CancellationToken cancellationToken)
@@ -174,11 +201,7 @@ public sealed class JarvisTaskService(
         if (title.Length is < 1 or > 200) throw new ArgumentException("Task title must contain 1 to 200 characters.", nameof(title));
         if (prompt.Length is < 1 or > 32_000) throw new ArgumentException("Task instructions must contain 1 to 32,000 characters.", nameof(prompt));
 
-        var conversation = await conversations.CreateAsync(ownerId, title, cancellationToken);
-        var task = await tasks.CreateAsync(ownerId, title, prompt, conversation.Id, cancellationToken);
-        await conversations.AddMessageAsync(
-            new Jarvis.Domain.Conversations.Message(conversation.Id, "user", prompt, task.UserMessageId),
-            cancellationToken);
+        var task = await tasks.CreateWithConversationAsync(ownerId, title, prompt, cancellationToken);
         try
         {
             await scheduler.ScheduleTaskAsync(task, cancellationToken);
@@ -202,8 +225,22 @@ public sealed class JarvisTaskService(
     {
         var task = await tasks.GetTaskAsync(id, ownerId, cancellationToken);
         if (task is null || task.Status is "completed" or "failed" or "cancelled") return false;
-        await scheduler.CancelTaskAsync(task.WorkflowId, cancellationToken);
-        return await tasks.CancelTaskAsync(id, ownerId, cancellationToken);
+        if (!await tasks.CancelTaskAsync(id, ownerId, cancellationToken)) return false;
+        taskRunAbort.Abort(id);
+        try
+        {
+            await scheduler.CancelTaskAsync(task.WorkflowId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "Task {TaskId} was cancelled in storage; Temporal will stop it if the workflow is still running.", id);
+        }
+        return true;
     }
 
     public async Task CompleteAfterApprovalAsync(Guid? taskId, Guid ownerId, string summary, CancellationToken cancellationToken)
@@ -211,7 +248,43 @@ public sealed class JarvisTaskService(
         if (taskId is null) return;
         var task = await tasks.GetTaskAsync(taskId.Value, ownerId, cancellationToken);
         if (task is null || task.Status != "needs_approval") return;
-        await scheduler.ResolveTaskApprovalAsync(task.WorkflowId, summary, cancellationToken);
+        await tasks.CompleteAndNotifyAsync(task.Id, summary, cancellationToken);
+        try
+        {
+            await scheduler.ResolveTaskApprovalAsync(task.WorkflowId, summary, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "Task {TaskId} was completed after approval; Temporal will stop waiting if the workflow is still running.",
+                task.Id);
+        }
+    }
+
+    public async Task FailAfterRejectedApprovalAsync(Guid? taskId, Guid ownerId, string summary, CancellationToken cancellationToken)
+    {
+        if (taskId is null) return;
+        var task = await tasks.GetTaskAsync(taskId.Value, ownerId, cancellationToken);
+        if (task is null || task.Status != "needs_approval") return;
+        await tasks.FailAsync(task.Id, summary, cancellationToken);
+        try
+        {
+            await scheduler.CancelTaskAsync(task.WorkflowId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "Task {TaskId} was marked failed after a rejected approval; Temporal will stop it if the workflow is still running.",
+                task.Id);
+        }
     }
 }
 

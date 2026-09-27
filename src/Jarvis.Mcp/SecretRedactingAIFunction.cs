@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Jarvis.Application;
 using Microsoft.Extensions.AI;
 
 namespace Jarvis.Mcp;
@@ -27,9 +28,9 @@ internal sealed class SecretRedactingAIFunction : DelegatingAIFunction
                 : JsonSerializer.SerializeToNode(result, result.GetType(), JsonOptions);
             return RedactNode(node);
         }
-        catch (OperationCanceledException)
+        catch (Exception exception) when (CancellationExceptions.Unwrap(exception) is { } canceled)
         {
-            throw;
+            throw canceled;
         }
         catch (Exception exception)
         {

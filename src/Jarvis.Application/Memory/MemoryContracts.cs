@@ -12,7 +12,7 @@ public interface IMemoryRepository
     Task<MemoryRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<MemoryRecord>> ListAsync(Guid ownerId, string? kind, CancellationToken cancellationToken);
     Task<IReadOnlyList<MemoryRecord>> ListPinnedAsync(Guid ownerId, CancellationToken cancellationToken);
-    Task<MemoryRecord> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance, float confidence,
+    Task<MemoryRecord?> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance, float confidence,
         DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken);
     Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<MemoryRecord>> SearchTextAsync(Guid ownerId, string query, string? kind, CancellationToken cancellationToken);
@@ -30,7 +30,7 @@ public interface IMemoryService
     Task<MemoryRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<MemoryRecord>> ListAsync(Guid ownerId, string? kind, CancellationToken cancellationToken);
     Task<IReadOnlyList<MemoryRecord>> ListPinnedAsync(Guid ownerId, CancellationToken cancellationToken);
-    Task<MemoryRecord> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance, float confidence,
+    Task<MemoryRecord?> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance, float confidence,
         DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken);
     Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<MemorySearchHit>> SearchAsync(Guid ownerId, string query, CancellationToken cancellationToken, string? kind = null);
@@ -39,4 +39,10 @@ public interface IMemoryService
 public interface IConversationMemoryExtractor
 {
     Task ExtractAndStoreAsync(Guid ownerId, Guid sourceMessageId, string userMessage, CancellationToken cancellationToken);
+}
+
+public static class MemoryValidity
+{
+    public static DateTimeOffset? ForUpdate(DateTimeOffset? validUntil) =>
+        validUntil is { } until && until <= DateTimeOffset.UtcNow ? null : validUntil;
 }

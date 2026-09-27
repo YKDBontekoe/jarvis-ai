@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Security.Cryptography;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -16,6 +15,7 @@ using Jarvis.Application.Memory;
 using Jarvis.Application.Workflows;
 using Jarvis.Application.Files;
 using Jarvis.Application.Integrations;
+using Jarvis.Application.Security;
 using Jarvis.Domain.Conversations;
 using Jarvis.Infrastructure;
 using Jarvis.Infrastructure.Persistence;
@@ -25,6 +25,7 @@ using Jarvis.Workflows;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -88,6 +89,7 @@ builder.Services.AddScoped<IConditionWatchService, ConditionWatchService>();
 builder.Services.AddScoped<IDailyBriefingService, DailyBriefingService>();
 builder.Services.AddScoped<IJarvisTaskRepository, WorkflowRepository>();
 builder.Services.AddScoped<IJarvisTaskService, JarvisTaskService>();
+builder.Services.AddSingleton<ITaskRunAbort, TaskRunAbort>();
 builder.Services.AddJarvisAgent(builder.Configuration);
 builder.Services.AddScoped<McpToolHost>();
 builder.Services.AddScoped<AgentRunCoordinator>();
@@ -95,6 +97,7 @@ builder.Services.AddSingleton<VoiceConversationCoordinator>();
 builder.Services.AddHttpClient<LiveKitAgentDispatchClient>();
 builder.Services.AddHttpClient("firebase-messaging", client => client.Timeout = TimeSpan.FromSeconds(15));
 builder.Services.AddHostedService<NotificationPushWorker>();
+builder.Services.AddHostedService<NotificationRealtimeWorker>();
 builder.Services.AddSignalR();
 builder.Services.AddOpenApi();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
@@ -152,7 +155,7 @@ api.MapGet("/conversations/{conversationId:guid}", async (Guid conversationId, I
 }).WithName("GetConversation");
 
 api.MapDelete("/conversations/{conversationId:guid}", async (Guid conversationId,
-    IConversationStore store, IConversationRunLock runLock, IAuditEventStore audit,
+    IConversationStore store, IConversationRunLock runLock,
     ICurrentUser currentUser, CancellationToken ct) =>
 {
     await using var lease = await runLock.AcquireAsync(conversationId, ct);
@@ -160,8 +163,6 @@ api.MapDelete("/conversations/{conversationId:guid}", async (Guid conversationId
     if (result == ConversationDeleteResult.NotFound) return Results.NotFound();
     if (result == ConversationDeleteResult.TaskBacked)
         return Results.Conflict(new { message = "Task conversations are managed from the Tasks section." });
-    await audit.AppendAsync(currentUser.OwnerId, "conversations", "conversation.deleted", "moderate", true,
-        null, JsonSerializer.Serialize(new { resourceId = conversationId }), ct);
     return Results.NoContent();
 }).WithName("DeleteConversation");
 
@@ -171,6 +172,7 @@ api.MapPost("/conversations/{conversationId:guid}/messages", async (
     IConversationStore store,
     IConversationRunLock runLock,
     IJarvisTaskRepository tasks,
+    IToolApprovalStore approvals,
     ICurrentUser currentUser,
     IJarvisAgent agent,
     AgentRunCoordinator coordinator,
@@ -187,8 +189,33 @@ api.MapPost("/conversations/{conversationId:guid}/messages", async (
         return Results.Conflict(new { message = "Long-running task sessions are managed from the Tasks section." });
 
     await using var runLease = await runLock.AcquireAsync(conversationId, ct);
-    var userMessage = new Message(conversationId, "user", content);
-    await store.AddMessageAsync(userMessage, ct);
+    var existingMessages = await store.GetMessagesAsync(conversationId, ct);
+    var lastMessage = existingMessages.Count > 0 ? existingMessages[^1] : null;
+    var isSameUserTurn = lastMessage is { Role: "user" } && lastMessage.Content == content;
+    var pendingApprovals = await approvals.ListActionableForConversationAsync(currentUser.OwnerId, conversationId, ct);
+    if (pendingApprovals.Count > 0)
+    {
+        if (!isSameUserTurn)
+            return Results.Conflict(new { message = "Decide the pending tool call for this conversation first." });
+        var stillPending = pendingApprovals.Where(x => x.Status == "pending").ToList();
+        if (stillPending.Count > 0)
+            return Results.Accepted("/api/v1/approvals", stillPending.Select(ToApprovalDto));
+        return Results.Conflict(new { message = "A previous tool decision is still finishing for this conversation." });
+    }
+
+    var userMessage = isSameUserTurn ? lastMessage! : new Message(conversationId, "user", content);
+    if (!isSameUserTurn)
+        await store.AddMessageAsync(userMessage, ct);
+    if (ReferenceEquals(userMessage, lastMessage) &&
+        await coordinator.TryRecoverCompletedAssistantAsync(conversationId, content, ct) is { } recovered)
+    {
+        await coordinator.PublishRecoveredAssistantAsync(conversationId, recovered, ct);
+        return Results.Ok(ToDto(recovered));
+    }
+    if (ReferenceEquals(userMessage, lastMessage) &&
+        await coordinator.TryRecoverPendingApprovalsAsync(currentUser.OwnerId, conversationId, null, ct)
+            is { PendingApprovals.Count: > 0 } recoveredApprovals)
+        return Results.Accepted("/api/v1/approvals", recoveredApprovals.PendingApprovals.Select(ToApprovalDto));
     try
     {
         var outcome = await coordinator.RunAsync(currentUser.OwnerId, conversationId,
@@ -205,8 +232,8 @@ api.MapPost("/conversations/{conversationId:guid}/messages", async (
     catch (Exception exception)
     {
         app.Logger.LogError(exception, "Agent run failed for conversation {ConversationId}", conversationId);
-        await hub.Clients.Group(JarvisEventsHub.GroupName(conversationId))
-            .SendAsync("agent.failed", new { conversationId, message = "Jarvis could not complete this response." }, CancellationToken.None);
+        await PublishAgentFailedAsync(hub, app.Logger, conversationId,
+            "Jarvis could not complete this response.");
         return Results.Problem("Jarvis could not complete this response.", statusCode: StatusCodes.Status502BadGateway);
     }
 
@@ -227,6 +254,10 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     ILogger<AgentRunCoordinator> logger,
     IConversationRunLock runLock,
     IJarvisTaskService tasks,
+    IJarvisTaskRepository taskRepository,
+    ITaskRunAbort taskRunAbort,
+    IServiceScopeFactory scopes,
+    IHubContext<JarvisEventsHub> hub,
     CancellationToken ct) =>
 {
     var ownerId = currentUser.OwnerId;
@@ -236,6 +267,19 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     pending = await approvals.GetActionableAsync(approvalId, ownerId, ct);
     if (pending is null) return Results.Conflict(new { message = "This approval is already complete or being resumed." });
     if (await conversations.GetAsync(pending.ConversationId, ownerId, ct) is null) return Results.NotFound();
+    if (pending.Status == "pending")
+    {
+        var earlier = (await approvals.ListActionableForConversationAsync(ownerId, pending.ConversationId, ct))
+            .FirstOrDefault(x => x.Status == "pending");
+        if (earlier is not null && earlier.Id != pending.Id)
+            return Results.Conflict(new { message = "Decide the earlier pending tool call for this conversation first." });
+    }
+    if (pending.TaskId is { } boundTaskId)
+    {
+        var task = await taskRepository.GetTaskAsync(boundTaskId, ownerId, ct);
+        if (task is null || task.Status != "needs_approval")
+            return Results.Conflict(new { message = "This approval is no longer attached to an active task." });
+    }
     ToolApprovalRecord? decided;
     if (pending.Status == "pending")
         decided = await approvals.DecideAsync(approvalId, ownerId, request.Approved, ct);
@@ -247,31 +291,109 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     if (!await approvals.TryStartResumeAsync(approvalId, ownerId, ct))
         return Results.Conflict(new { message = "This approval is already being resumed." });
 
+    using var abort = CancellationTokenSource.CreateLinkedTokenSource(ct);
+    using var abortLease = decided.TaskId is { } resumeTaskId
+        ? taskRunAbort.Register(resumeTaskId, abort)
+        : null;
+    var runCt = abort.Token;
+    using var watchCts = CancellationTokenSource.CreateLinkedTokenSource(runCt);
+    if (decided.TaskId is { } watchTaskId)
+        _ = WatchTaskCancellationAsync(scopes, logger, watchTaskId, ownerId, abort, watchCts.Token);
+    using var heartbeatCts = CancellationTokenSource.CreateLinkedTokenSource(runCt);
+    _ = HeartbeatApprovalResumeAsync(scopes, logger, approvalId, ownerId, heartbeatCts.Token);
+
     try
     {
+        if (pending.Status != "pending")
+        {
+            var messages = await conversations.GetMessagesAsync(decided.ConversationId, runCt);
+            var last = messages.Count > 0 ? messages[^1] : null;
+            if (last is { Role: "assistant" } &&
+                decided.DecidedAt is { } decidedAt &&
+                last.CreatedAt >= decidedAt)
+            {
+                var session = await conversations.GetAgentSessionAsync(decided.ConversationId, runCt);
+                if (session is not null &&
+                    AgentSessionJson.TryGetPendingApprovals(session, out var pendingFromSession, out _))
+                {
+                    foreach (var pendingRequest in pendingFromSession)
+                    {
+                        try
+                        {
+                            await approvals.CreateAsync(ownerId, decided.ConversationId, pendingRequest.RequestId,
+                                pendingRequest.ToolCallId, pendingRequest.ToolName, pendingRequest.ArgumentsJson,
+                                decided.TaskId, runCt);
+                        }
+                        catch (InvalidOperationException)
+                        {
+                        }
+                    }
+                }
+                if (!await TaskStillNeedsApprovalAsync(taskRepository, approvals, decided.TaskId, ownerId,
+                        approvalId, CancellationToken.None))
+                    return Results.Conflict(new { message = "This task was cancelled." });
+                var remaining = (await approvals.ListActionableForConversationAsync(ownerId, decided.ConversationId, CancellationToken.None))
+                    .Where(x => x.Id != approvalId)
+                    .ToList();
+                if (remaining.Count != 0)
+                {
+                    await approvals.MarkResumeCompletedAsync(approvalId, ownerId, CancellationToken.None);
+                    return Results.Accepted("/api/v1/approvals", remaining.Select(ToApprovalDto));
+                }
+                if (decided.Approved == true)
+                    await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId, last.Content, CancellationToken.None);
+                else
+                    await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId, last.Content, CancellationToken.None);
+                await approvals.MarkResumeCompletedAsync(approvalId, ownerId, CancellationToken.None);
+                return Results.Ok(ToDto(last));
+            }
+        }
+
         var outcome = await coordinator.RunAsync(ownerId, decided.ConversationId,
-            agent.ResumeReplyAsync(decided.ConversationId, decided.ToReply(), ct), null, ct, decided.TaskId);
+            agent.ResumeReplyAsync(decided.ConversationId, decided.ToReply(), runCt), null, runCt, decided.TaskId);
         if (outcome.PendingApprovals.Count != 0)
         {
-            await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
+            if (!await TaskStillNeedsApprovalAsync(taskRepository, approvals, decided.TaskId, ownerId,
+                    approvalId, CancellationToken.None))
+                return Results.Conflict(new { message = "This task was cancelled." });
+            await approvals.MarkResumeCompletedAsync(approvalId, ownerId, CancellationToken.None);
             return Results.Accepted("/api/v1/approvals", outcome.PendingApprovals.Select(ToApprovalDto));
         }
-        await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId,
-            outcome.AssistantMessage?.Content ?? "The approved task step finished.", ct);
-        await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
+        if (decided.Approved == true)
+        {
+            await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId,
+                outcome.AssistantMessage?.Content ?? "The approved task step finished.", CancellationToken.None);
+        }
+        else
+        {
+            await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId,
+                outcome.AssistantMessage?.Content ?? "The tool call was declined.", CancellationToken.None);
+        }
+        await approvals.MarkResumeCompletedAsync(approvalId, ownerId, CancellationToken.None);
         return Results.Ok(ToDto(outcome.AssistantMessage!));
     }
-    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+    catch (OperationCanceledException)
     {
         await approvals.MarkResumeFailedAsync(approvalId, ownerId, CancellationToken.None);
-        throw;
+        if (ct.IsCancellationRequested) throw;
+        await PublishAgentFailedAsync(hub, logger, decided.ConversationId, "This task was cancelled.");
+        return Results.Conflict(new { message = "This task was cancelled." });
     }
     catch (Exception exception)
     {
         await approvals.MarkResumeFailedAsync(approvalId, ownerId, CancellationToken.None);
         logger.LogError(exception, "Tool approval {ApprovalId} was decided but its agent resume failed.", approvalId);
+        await PublishAgentFailedAsync(hub, logger, decided.ConversationId,
+            "Jarvis could not complete this response.");
         return Results.Problem("Jarvis could not resume this decided tool call. It can be retried from Tool approvals.",
             statusCode: StatusCodes.Status502BadGateway);
+    }
+    finally
+    {
+        try { watchCts.Cancel(); }
+        catch (ObjectDisposedException) { }
+        try { heartbeatCts.Cancel(); }
+        catch (ObjectDisposedException) { }
     }
 }).WithName("DecideToolApproval");
 
@@ -386,7 +508,8 @@ api.MapDelete("/mcp-servers/{id}", async (string id, IUserMcpServerRegistry serv
 
 api.MapGet("/integrations/credentials", async (IIntegrationCredentialStore credentials,
     ICurrentUser currentUser, CancellationToken ct) =>
-    Results.Ok(await credentials.ListAsync(currentUser.OwnerId, ct)))
+    Results.Ok((await credentials.ListAsync(currentUser.OwnerId, ct))
+        .Where(status => !IntegrationCredentialProviders.IsUserMcpManaged(status.Provider))))
     .WithName("ListIntegrationCredentialStatuses");
 
 api.MapGet("/integrations/connections", async (McpToolHost mcpToolHost, CancellationToken ct) =>
@@ -398,6 +521,7 @@ api.MapGet("/integrations/connections", async (McpToolHost mcpToolHost, Cancella
 api.MapGet("/integrations/{provider}/credentials", async (string provider,
     IIntegrationCredentialStore credentials, ICurrentUser currentUser, CancellationToken ct) =>
 {
+    if (IntegrationCredentialProviders.IsUserMcpManaged(provider)) return Results.NotFound();
     var status = await credentials.GetStatusAsync(currentUser.OwnerId, provider, ct);
     return status is null ? Results.NotFound() : Results.Ok(status);
 }).WithName("GetIntegrationCredentialStatus");
@@ -406,6 +530,7 @@ api.MapPut("/integrations/{provider}/credentials", async (string provider,
     SaveIntegrationCredentialsRequest request, IIntegrationCredentialStore credentials,
     ICurrentUser currentUser, CancellationToken ct) =>
 {
+    if (RejectUserMcpCredentialRoute(provider) is { } rejected) return rejected;
     try
     {
         await credentials.SaveAsync(currentUser.OwnerId, provider, request.Secrets, ct);
@@ -421,10 +546,15 @@ api.MapPut("/integrations/{provider}/credentials/{secretName}", async (string pr
     SaveIntegrationSecretRequest request, IIntegrationCredentialStore credentials,
     ICurrentUser currentUser, CancellationToken ct) =>
 {
+    if (RejectUserMcpCredentialRoute(provider, secretName) is { } rejected) return rejected;
     try
     {
+        if (IntegrationCredentialProviders.IsUserMcpManaged(provider) &&
+            !await UserMcpServerExistsAsync(credentials, currentUser.OwnerId, provider, ct))
+            return Results.NotFound();
         await credentials.SaveSecretAsync(currentUser.OwnerId, provider, secretName, request.Value, ct);
-        return Results.Ok(await credentials.GetStatusAsync(currentUser.OwnerId, provider, ct));
+        return Results.Ok(PublicCredentialStatus(
+            (await credentials.GetStatusAsync(currentUser.OwnerId, provider, ct))!));
     }
     catch (ArgumentException exception)
     {
@@ -435,8 +565,12 @@ api.MapPut("/integrations/{provider}/credentials/{secretName}", async (string pr
 api.MapDelete("/integrations/{provider}/credentials/{secretName}", async (string provider, string secretName,
     IIntegrationCredentialStore credentials, ICurrentUser currentUser, CancellationToken ct) =>
 {
+    if (RejectUserMcpCredentialRoute(provider, secretName) is { } rejected) return rejected;
     try
     {
+        if (IntegrationCredentialProviders.IsUserMcpManaged(provider) &&
+            !await UserMcpServerExistsAsync(credentials, currentUser.OwnerId, provider, ct))
+            return Results.NotFound();
         return await credentials.DeleteSecretAsync(currentUser.OwnerId, provider, secretName, ct)
             ? Results.NoContent() : Results.NotFound();
     }
@@ -448,8 +582,10 @@ api.MapDelete("/integrations/{provider}/credentials/{secretName}", async (string
 
 api.MapDelete("/integrations/{provider}/credentials", async (string provider,
     IIntegrationCredentialStore credentials, ICurrentUser currentUser, CancellationToken ct) =>
-    await credentials.DeleteAsync(currentUser.OwnerId, provider, ct) ? Results.NoContent() : Results.NotFound())
-    .WithName("DeleteIntegrationCredentials");
+{
+    if (RejectUserMcpCredentialRoute(provider) is { } rejected) return rejected;
+    return await credentials.DeleteAsync(currentUser.OwnerId, provider, ct) ? Results.NoContent() : Results.NotFound();
+}).WithName("DeleteIntegrationCredentials");
 
 api.MapGet("/briefings/daily", async (IDailyBriefingService briefings, ICurrentUser currentUser,
     CancellationToken ct) =>
@@ -612,9 +748,7 @@ api.MapPost("/voice/internal/{conversationId:guid}/transcript", async (Guid conv
 {
     var expectedSecret = configuration["Voice:WorkerSecret"];
     var suppliedSecret = httpRequest.Headers["X-Jarvis-Voice-Secret"].ToString();
-    if (string.IsNullOrWhiteSpace(expectedSecret) || string.IsNullOrWhiteSpace(suppliedSecret) ||
-        !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expectedSecret),
-            Encoding.UTF8.GetBytes(suppliedSecret)))
+    if (!SecretComparer.FixedTimeEquals(expectedSecret, suppliedSecret))
         return Results.Unauthorized();
     if (request.OwnerId == Guid.Empty || string.IsNullOrWhiteSpace(request.Transcript) ||
         request.Transcript.Length > 32_000)
@@ -682,6 +816,11 @@ api.MapGet("/files/search", async (string? query, IFileSearchService files, ICur
     return Results.Ok(hits.Select(hit => new FileSearchHitDto(hit.FileId, hit.FileName, hit.ChunkIndex, hit.Content, hit.Score)));
 }).WithName("SearchFiles");
 
+api.MapPost("/files/{id:guid}/reprocess", async (Guid id, IFileService files, ICurrentUser currentUser,
+    CancellationToken ct) =>
+    await files.RetryIndexingAsync(id, currentUser.OwnerId, ct) ? Results.NoContent() : Results.NotFound())
+    .WithName("RetryFileIndexing");
+
 api.MapPost("/files", async (IFormFile? file, IFileService files, IAuditEventStore audit,
     ICurrentUser currentUser, CancellationToken ct) =>
 {
@@ -691,8 +830,8 @@ api.MapPost("/files", async (IFormFile? file, IFileService files, IAuditEventSto
     {
         var stored = await files.UploadAsync(currentUser.OwnerId, file.FileName, file.ContentType,
             file.Length, content, ct);
-        await audit.AppendAsync(currentUser.OwnerId, "files", "file.uploaded", "moderate", true, null,
-            JsonSerializer.Serialize(new { resourceId = stored.Id }), ct);
+        await TryAppendAuditAsync(audit, app.Logger, currentUser.OwnerId, "files", "file.uploaded",
+            "moderate", true, null, JsonSerializer.Serialize(new { resourceId = stored.Id }), ct);
         return Results.Created($"/api/v1/files/{stored.Id}", ToFileDto(stored));
     }
     catch (ArgumentException exception)
@@ -701,8 +840,8 @@ api.MapPost("/files", async (IFormFile? file, IFileService files, IAuditEventSto
     }
     catch (MalwareDetectedException)
     {
-        await audit.AppendAsync(currentUser.OwnerId, "files", "file.malware_rejected", "high", false,
-            null, null, ct);
+        await TryAppendAuditAsync(audit, app.Logger, currentUser.OwnerId, "files", "file.malware_rejected",
+            "high", false, null, null, ct);
         return Results.UnprocessableEntity(new { message = "The uploaded file was rejected by malware scanning." });
     }
     catch (Exception exception) when (exception is not OperationCanceledException)
@@ -744,6 +883,8 @@ api.MapGet("/memory", async (IMemoryService memory, ICurrentUser currentUser, st
 api.MapGet("/memory/search", async (IMemoryService memory, ICurrentUser currentUser, string query,
     string? kind, CancellationToken ct) =>
 {
+    if (string.IsNullOrWhiteSpace(query) || query.Length > 2_000)
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["query"] = ["Query must contain 1 to 2,000 characters."] });
     if (!IsMemoryKindValid(kind)) return Results.ValidationProblem(new Dictionary<string, string[]>
         { ["kind"] = ["Choose a supported memory category."] });
     return Results.Ok((await memory.SearchAsync(currentUser.OwnerId, query, ct, kind))
@@ -757,8 +898,8 @@ api.MapPost("/memory", async (IMemoryService memory, IAuditEventStore audit,
     if (!ValidateMemoryRequest(request, out var errors)) return Results.ValidationProblem(errors);
     var record = await memory.CreateAsync(currentUser.OwnerId, request.Kind!, request.Content!, request.Importance,
         request.Confidence, request.ValidUntil, request.IsPinned, ct);
-    await audit.AppendAsync(currentUser.OwnerId, "memory", "memory.created", "moderate", true, null,
-        JsonSerializer.Serialize(new { resourceId = record.Id, kind = record.Kind }), ct);
+    await TryAppendAuditAsync(audit, app.Logger, currentUser.OwnerId, "memory", "memory.created", "moderate",
+        true, null, JsonSerializer.Serialize(new { resourceId = record.Id, kind = record.Kind }), ct);
     return Results.Created($"/api/v1/memory/{record.Id}", ToMemoryDto(record));
 }).WithName("CreateMemory");
 
@@ -775,8 +916,9 @@ api.MapPut("/memory/{id:guid}", async (Guid id, IMemoryService memory, IAuditEve
     if (await memory.GetAsync(id, currentUser.OwnerId, ct) is null) return Results.NotFound();
     var record = await memory.UpdateAsync(id, currentUser.OwnerId, request.Kind!, request.Content!, request.Importance,
         request.Confidence, request.ValidUntil, request.IsPinned, ct);
-    await audit.AppendAsync(currentUser.OwnerId, "memory", "memory.updated", "moderate", true, null,
-        JsonSerializer.Serialize(new { resourceId = id, kind = record.Kind }), ct);
+    if (record is null) return Results.NotFound();
+    await TryAppendAuditAsync(audit, app.Logger, currentUser.OwnerId, "memory", "memory.updated", "moderate",
+        true, null, JsonSerializer.Serialize(new { resourceId = id, kind = record.Kind }), ct);
     return Results.Ok(ToMemoryDto(record));
 }).WithName("UpdateMemory");
 
@@ -785,12 +927,146 @@ api.MapDelete("/memory/{id:guid}", async (Guid id, IMemoryService memory, IAudit
 {
     if (await memory.GetAsync(id, currentUser.OwnerId, ct) is null) return Results.NotFound();
     await memory.DeleteAsync(id, currentUser.OwnerId, ct);
-    await audit.AppendAsync(currentUser.OwnerId, "memory", "memory.deleted", "high", true, null,
-        JsonSerializer.Serialize(new { resourceId = id }), ct);
+    await TryAppendAuditAsync(audit, app.Logger, currentUser.OwnerId, "memory", "memory.deleted", "high",
+        true, null, JsonSerializer.Serialize(new { resourceId = id }), ct);
     return Results.NoContent();
 }).WithName("DeleteMemory");
 
 app.Run();
+
+static IResult? RejectUserMcpCredentialRoute(string provider, string? secretName = null)
+{
+    if (!IntegrationCredentialProviders.IsUserMcpManaged(provider)) return null;
+    if (IntegrationCredentialProviders.IsUserMcpTokenSecret(secretName)) return null;
+    return Results.ValidationProblem(new Dictionary<string, string[]>
+    {
+        ["provider"] = ["MCP servers are managed from /api/v1/mcp-servers, not integration credentials."]
+    });
+}
+
+static async Task<bool> UserMcpServerExistsAsync(IIntegrationCredentialStore credentials, Guid ownerId,
+    string provider, CancellationToken cancellationToken)
+{
+    var secrets = await credentials.GetSecretsAsync(ownerId, provider, cancellationToken);
+    return secrets is not null &&
+           secrets.ContainsKey(IntegrationCredentialProviders.UserMcpConfigSecret);
+}
+
+static IntegrationCredentialStatus PublicCredentialStatus(IntegrationCredentialStatus status) =>
+    IntegrationCredentialProviders.IsUserMcpManaged(status.Provider)
+        ? status with
+        {
+            SecretNames = status.SecretNames
+                .Where(IntegrationCredentialProviders.IsUserMcpTokenSecret)
+                .ToArray()
+        }
+        : status;
+
+static async Task PublishAgentFailedAsync(IHubContext<JarvisEventsHub> hub, ILogger logger, Guid conversationId,
+    string message)
+{
+    try
+    {
+        await hub.Clients.Group(JarvisEventsHub.GroupName(conversationId))
+            .SendAsync("agent.failed", new { conversationId, message }, CancellationToken.None);
+    }
+    catch (Exception exception)
+    {
+        logger.LogWarning(exception, "Could not publish agent.failed for conversation {ConversationId}.",
+            conversationId);
+    }
+}
+
+static async Task HeartbeatApprovalResumeAsync(IServiceScopeFactory scopes, ILogger logger, Guid approvalId,
+    Guid ownerId, CancellationToken cancellationToken)
+{
+    try
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(2));
+        while (await timer.WaitForNextTickAsync(cancellationToken))
+        {
+            try
+            {
+                await using var scope = scopes.CreateAsyncScope();
+                await scope.ServiceProvider.GetRequiredService<IToolApprovalStore>()
+                    .HeartbeatResumeAsync(approvalId, ownerId, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (ObjectDisposedException)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "Approval resume heartbeat failed for {ApprovalId}.", approvalId);
+            }
+        }
+    }
+    catch (OperationCanceledException)
+    {
+    }
+    catch (ObjectDisposedException)
+    {
+    }
+}
+
+static async Task WatchTaskCancellationAsync(IServiceScopeFactory scopes, ILogger logger, Guid taskId, Guid ownerId,
+    CancellationTokenSource abort, CancellationToken cancellationToken)
+{
+    try
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(400));
+        while (await timer.WaitForNextTickAsync(cancellationToken))
+        {
+            try
+            {
+                await using var scope = scopes.CreateAsyncScope();
+                var tasks = scope.ServiceProvider.GetRequiredService<IJarvisTaskRepository>();
+                var task = await tasks.GetTaskAsync(taskId, ownerId, cancellationToken);
+                if (task is null || task.Status == "cancelled")
+                {
+                    try { abort.Cancel(); }
+                    catch (ObjectDisposedException) { }
+                    return;
+                }
+                if (task.Status is "completed" or "failed")
+                    return;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (ObjectDisposedException)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "Task cancellation watch failed for {TaskId}.", taskId);
+            }
+        }
+    }
+    catch (OperationCanceledException)
+    {
+    }
+    catch (ObjectDisposedException)
+    {
+    }
+}
+
+static async Task<bool> TaskStillNeedsApprovalAsync(IJarvisTaskRepository tasks, IToolApprovalStore approvals,
+    Guid? taskId, Guid ownerId, Guid approvalId, CancellationToken cancellationToken)
+{
+    if (taskId is null) return true;
+    var task = await tasks.GetTaskAsync(taskId.Value, ownerId, cancellationToken);
+    if (task is { Status: "needs_approval" }) return true;
+    await approvals.CancelIncompleteForTaskAsync(taskId.Value, ownerId, CancellationToken.None);
+    await approvals.MarkResumeFailedAsync(approvalId, ownerId, CancellationToken.None);
+    return false;
+}
 
 static MessageDto ToDto(Message message) => new(message.Id, message.Role, message.Content, message.CreatedAt);
 static async Task WriteVoiceStreamEventAsync(Stream stream, object value, CancellationToken cancellationToken)
@@ -799,6 +1075,21 @@ static async Task WriteVoiceStreamEventAsync(Stream stream, object value, Cancel
     await stream.WriteAsync(data, cancellationToken);
     await stream.WriteAsync(new byte[] { (byte)'\n' }, cancellationToken);
     await stream.FlushAsync(cancellationToken);
+}
+
+static async Task TryAppendAuditAsync(IAuditEventStore audit, ILogger logger, Guid ownerId, string tool,
+    string action, string riskClass, bool success, Guid? approvalId, string? metadataJson,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        await audit.AppendAsync(ownerId, tool, action, riskClass, success, approvalId, metadataJson,
+            cancellationToken);
+    }
+    catch (Exception exception) when (exception is not OperationCanceledException)
+    {
+        logger.LogWarning(exception, "Could not append audit event {Action}.", action);
+    }
 }
 static ToolApprovalDto ToApprovalDto(ToolApprovalRecord approval) => new(approval.Id, approval.ConversationId,
     approval.ToolName, approval.ArgumentsJson, approval.Status, approval.Approved, approval.ResumeStatus,

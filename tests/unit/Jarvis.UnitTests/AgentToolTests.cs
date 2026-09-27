@@ -110,6 +110,18 @@ public sealed class AgentToolTests
     }
 
     [Fact]
+    public async Task Remember_still_succeeds_when_audit_append_fails()
+    {
+        var memories = new FakeMemoryService();
+        var tools = CreateMemoryTools(memories, new ThrowingAuditStore());
+
+        var result = await tools.RememberAsync("The user prefers oat milk.", "preference");
+
+        Assert.StartsWith("Saved", result);
+        Assert.Single(memories.Items);
+    }
+
+    [Fact]
     public async Task Remember_refuses_secrets_and_normalizes_unknown_kinds()
     {
         var memories = new FakeMemoryService();
@@ -208,8 +220,9 @@ public sealed class AgentToolTests
         Assert.Equal(["ListReminders", "CancelReminder"], client.ToolNamesCalled);
     }
 
-    private static MemoryAgentTools CreateMemoryTools(FakeMemoryService memories, FakeAuditStore audit) =>
-        new(memories, new MemoryReranker(new EchoContextClient(), NullLogger<MemoryReranker>.Instance), audit, new FixedUser());
+    private static MemoryAgentTools CreateMemoryTools(FakeMemoryService memories, IAuditEventStore audit) =>
+        new(memories, new MemoryReranker(new EchoContextClient(), NullLogger<MemoryReranker>.Instance), audit,
+            new FixedUser(), NullLogger<MemoryAgentTools>.Instance);
 
     private sealed class FixedUser : ICurrentUser
     {
@@ -287,7 +300,7 @@ public sealed class AgentToolTests
             Task.FromResult<IReadOnlyList<MemoryRecord>>(Items.ToArray());
         public Task<IReadOnlyList<MemoryRecord>> ListPinnedAsync(Guid ownerId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<MemoryRecord>>(Items.Where(item => item.IsPinned).ToArray());
-        public Task<MemoryRecord> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance,
+        public Task<MemoryRecord?> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance,
             float confidence, DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
     }
@@ -308,6 +321,16 @@ public sealed class AgentToolTests
             throw new NotSupportedException();
     }
 
+    private sealed class ThrowingAuditStore : IAuditEventStore
+    {
+        public Task<AuditEventRecord> AppendAsync(Guid ownerId, string tool, string action, string riskClass, bool success,
+            Guid? approvalId, string? metadataJson, CancellationToken cancellationToken, Guid? agentRunId = null) =>
+            throw new InvalidOperationException("Audit store is unavailable.");
+
+        public Task<IReadOnlyList<AuditEventRecord>> ListAsync(Guid ownerId, int limit, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+    }
+
     private sealed class FakeBriefingRepository(DailyBriefingPreferenceRecord? preference) : IDailyBriefingRepository
     {
         public Task<DailyBriefingPreferenceRecord?> GetAsync(Guid ownerId, CancellationToken cancellationToken) =>
@@ -316,6 +339,8 @@ public sealed class AgentToolTests
             SaveDailyBriefingRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<DailyBriefingPreferenceRecord>> ListPendingForSchedulingAsync(
             CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<int> RequeueStaleEnabledAsync(DateTimeOffset utcNow, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
         public Task MarkScheduleDispatchedAsync(Guid ownerId, string workflowId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
         public Task<bool> DeliverAsync(DailyBriefingActivityInput input, CancellationToken cancellationToken) =>

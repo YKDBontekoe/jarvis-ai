@@ -42,7 +42,8 @@ public sealed class JarvisAgentFactory(IServiceProvider services, IConfiguration
         var clock = services.GetService<TimeProvider>() ?? TimeProvider.System;
         var taskTools = new TaskAgentTools(services.GetRequiredService<IJarvisTaskService>(), currentUser);
         var memoryTools = new MemoryAgentTools(services.GetRequiredService<IMemoryService>(),
-            services.GetRequiredService<MemoryReranker>(), auditEvents, currentUser);
+            services.GetRequiredService<MemoryReranker>(), auditEvents, currentUser,
+            loggerFactory.CreateLogger<MemoryAgentTools>());
         var watchTools = new ConditionWatchAgentTools(services.GetRequiredService<IConditionWatchService>(), currentUser);
         var reminderTools = new ReminderAgentTools(services.GetRequiredService<IReminderService>(), currentUser);
         var fileTools = new FileAgentTools(services.GetRequiredService<IFileSearchService>(),
@@ -79,7 +80,8 @@ public sealed class JarvisAgentFactory(IServiceProvider services, IConfiguration
         {
             var codingTool = AIFunctionFactory.Create(new CodexCodingTools(configuration,
                 services.GetRequiredService<ILogger<CodexCodingTools>>(),
-                auditEvents, currentUser).RunCodingTaskAsync);
+                auditEvents, currentUser,
+                services.GetRequiredService<CodexProcessLimiter>()).RunCodingTaskAsync);
             tools.Add(new ApprovalRequiredAIFunction(codingTool));
         }
 
