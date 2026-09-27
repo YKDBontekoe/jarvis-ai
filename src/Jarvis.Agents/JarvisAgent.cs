@@ -9,7 +9,7 @@ using Microsoft.Extensions.AI;
 
 namespace Jarvis.Agents;
 
-public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcpToolHost,
+public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClient chatClient, McpToolHost mcpToolHost,
     IConversationStore conversations, IJarvisTaskRepository tasks, ICurrentUser currentUser) : IJarvisAgent
 {
     private static readonly JsonSerializerOptions ArgumentsJsonOptions = new(JsonSerializerDefaults.Web);
@@ -67,8 +67,9 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, McpToolHost mcp
     {
         if (_agent is not null) return _agent;
         await mcpToolHost.InitializeAsync(cancellationToken);
-        var task = await tasks.GetTaskByConversationIdAsync(conversationId, currentUser.OwnerId, cancellationToken);
-        return _agent = agentFactory.Create(mcpToolHost.Tools, task?.Id);
+        var ownerId = currentUser.OwnerId;
+        var task = await tasks.GetTaskByConversationIdAsync(conversationId, ownerId, cancellationToken);
+        return _agent = agentFactory.Create(chatClient, mcpToolHost.Tools, new AgentBuildContext(ownerId, task?.Id));
     }
 
     private async Task<AgentSession> LoadSessionAsync(AIAgent agent, Guid conversationId,

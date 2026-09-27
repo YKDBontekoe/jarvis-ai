@@ -7,8 +7,6 @@ namespace Jarvis.Memory;
 
 public sealed class MemoryService(IMemoryRepository repository) : IMemoryService
 {
-    private static readonly HashSet<string> Kinds = ["preference", "fact", "decision", "project", "event", "relationship", "technical", "routine", "other"];
-
     public async Task<MemoryRecord> CreateAsync(Guid ownerId, string kind, string content, float importance,
         float confidence, DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken,
         string sourceType = "user", Guid? sourceId = null)
@@ -36,7 +34,7 @@ public sealed class MemoryService(IMemoryRepository repository) : IMemoryService
 
     public Task<IReadOnlyList<MemoryRecord>> ListAsync(Guid ownerId, string? kind, CancellationToken cancellationToken)
     {
-        if (kind is not null && !Kinds.Contains(kind)) throw new ArgumentException("Unknown memory kind.", nameof(kind));
+        if (!MemoryKinds.IsValidFilter(kind)) throw new ArgumentException("Unknown memory kind.", nameof(kind));
         return repository.ListAsync(ownerId, kind, cancellationToken);
     }
 
@@ -64,7 +62,7 @@ public sealed class MemoryService(IMemoryRepository repository) : IMemoryService
         try
         {
             if (string.IsNullOrWhiteSpace(query)) return hits;
-            if (kind is not null && !Kinds.Contains(kind))
+            if (!MemoryKinds.IsValidFilter(kind))
                 throw new ArgumentException("Unknown memory kind.", nameof(kind));
             if (!await repository.HasActiveMemoriesAsync(ownerId, cancellationToken)) return hits;
 
@@ -116,7 +114,7 @@ public sealed class MemoryService(IMemoryRepository repository) : IMemoryService
 
     private static void Validate(string kind, string content, float importance, float confidence)
     {
-        if (!Kinds.Contains(kind)) throw new ArgumentException("Unknown memory kind.", nameof(kind));
+        if (!MemoryKinds.IsValid(kind)) throw new ArgumentException("Unknown memory kind.", nameof(kind));
         if (string.IsNullOrWhiteSpace(content) || content.Length > 8_000) throw new ArgumentException("Memory content must contain 1 to 8,000 characters.", nameof(content));
         if (importance is < 0 or > 1 || confidence is < 0 or > 1) throw new ArgumentOutOfRangeException(nameof(importance), "Importance and confidence must be between zero and one.");
     }

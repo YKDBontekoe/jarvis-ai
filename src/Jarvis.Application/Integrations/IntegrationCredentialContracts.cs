@@ -5,13 +5,25 @@ public sealed record IntegrationCredentialStatus(string Provider, IReadOnlyList<
 
 public static class IntegrationCredentialProviders
 {
+    public const string ReservedPrefix = "jarvis-";
     public const string UserMcpPrefix = "jarvis-mcp-";
+    public const string OpenRouter = "jarvis-model-openrouter";
+    public const string ChannelPrefix = "jarvis-channel-";
+    public const string RemoteAgentPrefix = "jarvis-agent-";
     public const string UserMcpConfigSecret = "server_config";
     public const string UserMcpTokenSecret = "token";
 
     public static bool IsUserMcpManaged(string? provider) =>
         !string.IsNullOrEmpty(provider) &&
         provider.StartsWith(UserMcpPrefix, StringComparison.Ordinal);
+
+    /// <summary>Providers whose secrets belong to a Jarvis feature screen rather than the generic credential API.</summary>
+    public static bool IsSystemManaged(string? provider) =>
+        IsReserved(provider) && !IsUserMcpManaged(provider);
+
+    public static bool IsReserved(string? provider) =>
+        !string.IsNullOrEmpty(provider) &&
+        provider.StartsWith(ReservedPrefix, StringComparison.Ordinal);
 
     public static bool IsUserMcpTokenSecret(string? secretName) =>
         string.Equals(secretName, UserMcpTokenSecret, StringComparison.Ordinal);

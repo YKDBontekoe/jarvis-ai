@@ -33,6 +33,8 @@ public static class DependencyInjection
             .Build());
         services.AddScoped<IConversationMemoryExtractor, ConversationMemoryExtractor>();
         services.AddScoped<MemoryReranker>();
+        services.AddScoped<IAgentToolContributor, CoreAgentTools>();
+        services.AddScoped<IAgentContextContributor, CoreAgentContext>();
         services.AddScoped<JarvisAgentFactory>();
         services.AddScoped<IJarvisAgent, JarvisAgent>();
         return services;
