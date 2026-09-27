@@ -21,6 +21,9 @@ concurrency:
 jobs:
   release-ipa:
     runs-on: macos-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build: ${{ steps.version.outputs.build }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -114,6 +117,7 @@ jobs:
           scripts/ios/package_unsigned_ipa.sh "${APP_PATH}" dist/Jarvis.ipa
 
       - name: Create GitHub Release
+        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
@@ -123,3 +127,53 @@ jobs:
             Download the IPA from this release and import it in LiveContainer on your device.
           generate_release_notes: true
           files: dist/Jarvis.ipa
+
+      - name: Upload IPA artifact for server publishing
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-altstore-ipa
+          path: dist/Jarvis.ipa
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-source:
+    needs: release-ipa
+    runs-on: [self-hosted, linux, x64, jarvis-deploy]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download IPA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: jarvis-altstore-ipa
+          path: dist
+
+      - name: Publish IPA and source JSON on the server
+        env:
+          VERSION: ${{ needs.release-ipa.outputs.version }}
+          BUILD_VERSION: ${{ needs.release-ipa.outputs.build }}
+          ALTSTORE_CONTENT_DIR: /home/ykdbonte/.jarvis/altstore
+          SOURCE_BASE_URL: https://jarvis.ykdbonte.dev/altstore
+        run: |
+          set -euo pipefail
+          mkdir -p "${ALTSTORE_CONTENT_DIR}"
+          chmod 0755 "${ALTSTORE_CONTENT_DIR}"
+          IPA_NAME="Jarvis-${VERSION}.ipa"
+          install -m 0644 dist/Jarvis.ipa "${ALTSTORE_CONTENT_DIR}/${IPA_NAME}.tmp"
+          mv "${ALTSTORE_CONTENT_DIR}/${IPA_NAME}.tmp" "${ALTSTORE_CONTENT_DIR}/${IPA_NAME}"
+          install -m 0644 altstore/icon.png "${ALTSTORE_CONTENT_DIR}/icon.png.tmp"
+          mv "${ALTSTORE_CONTENT_DIR}/icon.png.tmp" "${ALTSTORE_CONTENT_DIR}/icon.png"
+          python3 scripts/altstore/generate_source.py \
+            --ipa "${ALTSTORE_CONTENT_DIR}/${IPA_NAME}" \
+            --download-url "${SOURCE_BASE_URL}/${IPA_NAME}" \
+            --icon-url "${SOURCE_BASE_URL}/icon.png" \
+            --website https://jarvis.ykdbonte.dev \
+            --version "${VERSION}" \
+            --build-version "${BUILD_VERSION}" \
+            --changelog "Jarvis ${VERSION}" \
+            --previous-source "${ALTSTORE_CONTENT_DIR}/source.json" \
+            --output "${ALTSTORE_CONTENT_DIR}/source.json.tmp"
+          chmod 0644 "${ALTSTORE_CONTENT_DIR}/source.json.tmp"
+          mv "${ALTSTORE_CONTENT_DIR}/source.json.tmp" "${ALTSTORE_CONTENT_DIR}/source.json"
+          echo "Published ${SOURCE_BASE_URL}/source.json"

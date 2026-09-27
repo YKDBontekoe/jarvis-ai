@@ -209,7 +209,7 @@ Local packaging uses the same layout as CI: `flutter build ios --release --no-co
 
 Push notifications and some entitlements may be limited without a normal signed distribution profile; in-app chat, OIDC, and SignalR still depend on your configured `JARVIS_API_URL` and identity provider.
 
-The **Publish AltStore source** workflow builds the current iOS app and publishes both the IPA and generated `source.json` to the Jarvis server. Add `https://jarvis.ykdbonte.dev/altstore/source.json` to AltStore. Each workflow run uses a unique IPA build number and keeps earlier IPA versions available for existing source entries. The feed and download are public; keep private data out of the IPA and source metadata.
+The iOS release workflow publishes both the IPA and generated `source.json` to the Jarvis server. It updates automatically for `v*` releases; a manual workflow run also publishes the selected version without creating a GitHub Release. Add `https://jarvis.ykdbonte.dev/altstore/source.json` to AltStore. Each run keeps earlier IPA versions available for existing source entries. The feed and download are public; keep private data out of the IPA and source metadata.
 
 The self-hosted runner serves `/home/ykdbonte/.jarvis/altstore` through the host Caddy route at `/altstore/*`. The public endpoint is independent of GitHub repository visibility, and the workflow updates the source only after the IPA artifact is ready.
 
