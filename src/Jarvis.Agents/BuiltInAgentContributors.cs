@@ -21,6 +21,7 @@ internal sealed class CoreAgentTools(
     IFileSearchService fileSearch,
     IFileRepository fileRepository,
     IUserMcpServerRegistry mcpServers,
+    IOwnerMcpPolicyStore mcpPolicy,
     McpToolHost mcpToolHost,
     IAuditEventStore auditEvents,
     ICurrentUser currentUser,
@@ -39,7 +40,7 @@ internal sealed class CoreAgentTools(
         var reminderTools = new ReminderAgentTools(reminderService, currentUser);
         var fileTools = new FileAgentTools(fileSearch, fileRepository, currentUser);
         var clockTools = new ClockAgentTools(timeProvider ?? TimeProvider.System);
-        var mcpServerTools = new McpServerAgentTools(mcpServers, currentUser, mcpToolHost);
+        var mcpServerTools = new McpServerAgentTools(mcpServers, mcpPolicy, configuration, currentUser, mcpToolHost);
 
         yield return AIFunctionFactory.Create(clockTools.GetCurrentTime);
         yield return AIFunctionFactory.Create(reminderTools.CreateReminderAsync);
@@ -58,9 +59,15 @@ internal sealed class CoreAgentTools(
         if (!context.IsBackgroundTask)
             yield return AIFunctionFactory.Create(taskTools.CreateTaskAsync);
         yield return AIFunctionFactory.Create(mcpServerTools.ListMcpServersAsync);
+        yield return AIFunctionFactory.Create(mcpServerTools.ListMcpConnectionsAsync);
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.DiscoverMcpServerToolsAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.AddMcpServerAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.UpdateMcpServerAsync));
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.SetMcpServerEnabledAsync));
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.SetMcpServerToolsAsync));
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.InvokeMcpToolAsync));
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.ReadMcpResourceAsync));
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.GetMcpPromptAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.RemoveMcpServerAsync));
 
         if ((configuration.GetSection("Coding:Repositories").Get<CodingRepositoryOption[]>() ?? []).Length > 0)

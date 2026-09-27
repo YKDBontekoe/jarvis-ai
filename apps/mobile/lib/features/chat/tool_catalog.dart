@@ -94,6 +94,11 @@ const _catalog = <String, ToolDescription>{
     'Checked integrations',
     PhosphorIconsRegular.plugsConnected,
   ),
+  'ListMcpConnections': ToolDescription(
+    'Checking live integrations',
+    'Checked live integrations',
+    PhosphorIconsRegular.plugsConnected,
+  ),
   'DiscoverMcpServerTools': ToolDescription(
     'Discovering integration tools',
     'Discovered integration tools',
@@ -108,6 +113,31 @@ const _catalog = <String, ToolDescription>{
     'Updating an integration',
     'Updated an integration',
     PhosphorIconsRegular.linkSimple,
+  ),
+  'SetMcpServerEnabled': ToolDescription(
+    'Updating an integration',
+    'Updated an integration',
+    PhosphorIconsRegular.plugsConnected,
+  ),
+  'SetMcpServerTools': ToolDescription(
+    'Choosing integration tools',
+    'Chose integration tools',
+    PhosphorIconsRegular.listChecks,
+  ),
+  'InvokeMcpTool': ToolDescription(
+    'Using an integration',
+    'Used an integration',
+    PhosphorIconsRegular.plugsConnected,
+  ),
+  'ReadMcpResource': ToolDescription(
+    'Reading an integration resource',
+    'Read an integration resource',
+    PhosphorIconsRegular.fileText,
+  ),
+  'GetMcpPrompt': ToolDescription(
+    'Fetching an integration prompt',
+    'Fetched an integration prompt',
+    PhosphorIconsRegular.chatText,
   ),
   'RemoveMcpServer': ToolDescription(
     'Removing an integration',

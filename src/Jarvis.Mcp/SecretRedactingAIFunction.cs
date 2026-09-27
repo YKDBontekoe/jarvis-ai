@@ -68,10 +68,23 @@ internal sealed class SecretRedactingAIFunction : DelegatingAIFunction
         }
     }
 
-    private string RedactText(string value)
+    private string RedactText(string value) => McpSecretRedactor.Redact(value, _secrets);
+}
+
+internal static class McpSecretRedactor
+{
+    public static string Redact(string value, IEnumerable<string>? secrets)
     {
-        foreach (var secret in _secrets)
+        if (string.IsNullOrEmpty(value) || secrets is null) return value;
+        foreach (var secret in secrets.Where(secret => !string.IsNullOrEmpty(secret))
+                     .Distinct(StringComparer.Ordinal).OrderByDescending(secret => secret.Length))
             value = value.Replace(secret, "[REDACTED]", StringComparison.Ordinal);
         return value;
+    }
+
+    public static string Bound(string value, int max)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length <= max) return value;
+        return value[..max] + "\n[truncated]";
     }
 }
