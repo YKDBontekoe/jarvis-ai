@@ -28,6 +28,7 @@ import 'integrations_screen.dart';
 import 'features/chat/chat_entries.dart';
 import 'features/chat/chat_widgets.dart';
 import 'features/home/home_overview.dart';
+import 'features/persona/persona_screen.dart';
 import 'features/settings/model_settings_screen.dart';
 import 'features/settings/settings_view.dart';
 import 'features/shell/sidebar.dart';
@@ -536,6 +537,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 (message) => MessageEntry(
                   role: message['role'] as String,
                   content: message['content'] as String,
+                  id: asJsonString(message['id']),
                 ),
               ),
         )
@@ -667,6 +669,7 @@ class _ChatScreenState extends State<ChatScreen> {
       'integrations' => IntegrationsScreen(http: _http),
       'models' => ModelSettingsScreen(http: _http),
       'skills' => SkillsScreen(http: _http),
+      'persona' => PersonaScreen(http: _http),
       _ => null,
     };
     if (destination == 'sign_out') {
@@ -746,7 +749,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _appendDelta(String delta) => appendAssistantDelta(_entries, delta);
 
-  void _completeAssistant(String content) {
+  void _completeAssistant(String content, {String? id}) {
     final index = _entries.lastIndexWhere(
       (entry) => entry is MessageEntry && !entry.isUser && entry.pending,
     );
@@ -762,12 +765,15 @@ class _ChatScreenState extends State<ChatScreen> {
       _settleToolRuns();
       return;
     }
-    final message = MessageEntry(role: 'assistant', content: content);
+    final message = MessageEntry(role: 'assistant', content: content, id: id);
     if (index >= 0) {
       _entries[index] = message;
     } else {
       final last = _entries.isEmpty ? null : _entries.last;
       if (last is MessageEntry && !last.isUser && last.content == content) {
+        if (last.id == null && id != null) {
+          _entries[_entries.length - 1] = last.copyWith(id: id);
+        }
         _settleToolRuns();
         return;
       }
@@ -897,8 +903,11 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     hub.on('message.completed', (arguments) {
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
-      final content = asJsonString(_payload(arguments)?['content']) ?? '';
-      setState(() => _completeAssistant(content));
+      final payload = _payload(arguments);
+      final content = asJsonString(payload?['content']) ?? '';
+      setState(
+        () => _completeAssistant(content, id: asJsonString(payload?['id'])),
+      );
       _scrollToBottom();
     });
     hub.on('tool.started', (arguments) {
@@ -1123,6 +1132,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   (message) => MessageEntry(
                     role: message['role'] as String,
                     content: message['content'] as String,
+                    id: asJsonString(message['id']),
                   ),
                 ),
           );
@@ -1503,7 +1513,46 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
     final content = data is Map ? asJsonString(data['content']) ?? '' : '';
-    _completeAssistant(content);
+    _completeAssistant(content, id: data is Map ? asJsonString(data['id']) : null);
+  }
+
+  Future<void> _rate(MessageEntry message, String rating) async {
+    final conversationId = _conversationId;
+    final messageId = message.id;
+    if (conversationId == null || messageId == null) return;
+    String? note;
+    if (rating == 'down') {
+      note = await showFeedbackNoteDialog(context);
+      if (note == null) return;
+    }
+    try {
+      await _http.post<void>(
+        '/api/v1/conversations/$conversationId/messages/$messageId/feedback',
+        data: {'rating': rating, if (note != null && note.isNotEmpty) 'note': note},
+      );
+      if (!mounted) return;
+      setState(() {
+        final index = _entries.indexWhere(
+          (entry) => entry is MessageEntry && entry.id == messageId,
+        );
+        if (index >= 0) {
+          _entries[index] = (_entries[index] as MessageEntry).copyWith(
+            rating: rating,
+          );
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            rating == 'up'
+                ? 'Thanks — Jarvis will keep doing this.'
+                : 'Thanks — Jarvis will learn from this.',
+          ),
+        ),
+      );
+    } on DioException catch (error) {
+      if (mounted) setState(() => _error = _describeError(error));
+    }
   }
 
   Future<void> _retry(MessageEntry message) async {
@@ -2373,6 +2422,9 @@ class _ChatScreenState extends State<ChatScreen> {
       key: ObjectKey(entry),
       message: entry,
       onRetry: entry.failed ? () => unawaited(_retry(entry)) : null,
+      onRate: entry.id == null || _conversationId == null
+          ? null
+          : (rating) => unawaited(_rate(entry, rating)),
     ),
     ToolRunEntry() => ToolRunView(run: entry),
     ApprovalEntry() => ApprovalCard(

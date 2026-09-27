@@ -40,6 +40,8 @@ public static class DependencyInjection
         services.AddScoped<IAgentContextContributor, CoreAgentContext>();
         services.AddScoped<IAgentToolContributor, Skills.SkillToolContributor>();
         services.AddScoped<IAgentContextContributor, Skills.SkillContextContributor>();
+        services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();
+        services.AddScoped<IAgentContextContributor, Persona.PersonaContextContributor>();
         services.AddScoped<JarvisAgentFactory>();
         services.AddScoped<IJarvisAgent, JarvisAgent>();
         return services;

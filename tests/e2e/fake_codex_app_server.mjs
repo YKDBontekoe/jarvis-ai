@@ -158,6 +158,16 @@ function plan(prompt) {
       : last);
   }
 
+  if (/^from now on\b|\balways (answer|reply)\b/.test(lower) && has('LearnPreference')) {
+    if (results.length === 0) {
+      const statement = request.replace(/^from now on,?\s*/i, '').replace(/^\w/, c => c.toUpperCase());
+      const category = /dutch|english|language/i.test(request) ? 'language'
+        : /short|brief|bullet|table|format/i.test(request) ? 'format' : 'workstyle';
+      return call('LearnPreference', { category, statement, confidence: 0.95 });
+    }
+    return text(`Understood — I'll remember that. ${last}`);
+  }
+
   if (/\buse (my|the) ([a-z-]+) skill\b/.test(lower) && has('LoadSkill')) {
     const name = lower.match(/\buse (?:my|the) ([a-z-]+) skill\b/)[1];
     if (results.length === 0) return call('LoadSkill', { name });

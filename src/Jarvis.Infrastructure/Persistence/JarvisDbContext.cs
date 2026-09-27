@@ -36,6 +36,7 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<OwnerSettingEntity> OwnerSettings => Set<OwnerSettingEntity>();
     public DbSet<SkillEntity> Skills => Set<SkillEntity>();
     public DbSet<SkillRevisionEntity> SkillRevisions => Set<SkillRevisionEntity>();
+    public DbSet<MessageFeedbackEntity> MessageFeedback => Set<MessageFeedbackEntity>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -387,6 +388,23 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.HasOne<SkillEntity>().WithMany().HasForeignKey(x => x.SkillId).OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(x => new { x.SkillId, x.Version }).IsUnique();
+        });
+
+        modelBuilder.Entity<MessageFeedbackEntity>(entity =>
+        {
+            entity.ToTable("message_feedback");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.ConversationId).HasColumnName("conversation_id");
+            entity.Property(x => x.MessageId).HasColumnName("message_id");
+            entity.Property(x => x.Rating).HasColumnName("rating").HasMaxLength(10).IsRequired();
+            entity.Property(x => x.Note).HasColumnName("note").HasMaxLength(1_000);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.ProcessedAt).HasColumnName("processed_at");
+            entity.HasOne<Message>().WithMany().HasForeignKey(x => x.MessageId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.OwnerId, x.MessageId }).IsUnique();
+            entity.HasIndex(x => new { x.OwnerId, x.ProcessedAt });
         });
 
         modelBuilder.Entity<Message>(entity =>

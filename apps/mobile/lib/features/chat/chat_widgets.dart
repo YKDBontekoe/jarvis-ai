@@ -10,10 +10,18 @@ import 'chat_entries.dart';
 import 'tool_catalog.dart';
 
 class MessageBubble extends StatefulWidget {
-  const MessageBubble({required this.message, this.onRetry, super.key});
+  const MessageBubble({
+    required this.message,
+    this.onRetry,
+    this.onRate,
+    super.key,
+  });
 
   final MessageEntry message;
   final VoidCallback? onRetry;
+
+  /// Rates an assistant reply `up` or `down`; hidden until the reply is stored.
+  final ValueChanged<String>? onRate;
 
   @override
   State<MessageBubble> createState() => _MessageBubbleState();
@@ -60,7 +68,24 @@ class _MessageBubbleState extends State<MessageBubble> {
                 if (!message.pending)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: _CopyButton(copied: _copied, onPressed: _copy),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _CopyButton(copied: _copied, onPressed: _copy),
+                        if (widget.onRate != null) ...[
+                          _RateButton(
+                            rating: 'up',
+                            selected: message.rating == 'up',
+                            onPressed: () => widget.onRate!('up'),
+                          ),
+                          _RateButton(
+                            rating: 'down',
+                            selected: message.rating == 'down',
+                            onPressed: () => widget.onRate!('down'),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
               ],
             ),
@@ -128,6 +153,74 @@ class _MessageBubbleState extends State<MessageBubble> {
       ),
     ),
   );
+}
+
+class _RateButton extends StatelessWidget {
+  const _RateButton({
+    required this.rating,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final String rating;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final up = rating == 'up';
+    return IconButton(
+      tooltip: up ? 'Good reply' : 'Could be better',
+      onPressed: onPressed,
+      visualDensity: VisualDensity.compact,
+      iconSize: 16,
+      color: selected
+          ? (up ? JarvisColors.success : JarvisColors.danger)
+          : JarvisColors.muted,
+      icon: Icon(
+        up
+            ? (selected
+                  ? PhosphorIconsFill.thumbsUp
+                  : PhosphorIconsRegular.thumbsUp)
+            : (selected
+                  ? PhosphorIconsFill.thumbsDown
+                  : PhosphorIconsRegular.thumbsDown),
+      ),
+    );
+  }
+}
+
+/// Asks what Jarvis should do differently; returns null when cancelled.
+Future<String?> showFeedbackNoteDialog(BuildContext context) async {
+  final controller = TextEditingController();
+  final note = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('What should Jarvis do differently?'),
+      content: TextField(
+        key: const Key('feedback-note'),
+        controller: controller,
+        autofocus: true,
+        maxLines: 3,
+        maxLength: 1000,
+        decoration: const InputDecoration(
+          hintText: 'e.g. Shorter answers, use metric units, skip the intro',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+          child: const Text('Send feedback'),
+        ),
+      ],
+    ),
+  );
+  controller.dispose();
+  return note;
 }
 
 class _CopyButton extends StatelessWidget {

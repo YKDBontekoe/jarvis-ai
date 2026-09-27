@@ -45,5 +45,6 @@ api.MapFileEndpoints(app.Logger);
 api.MapMemoryEndpoints(app.Logger);
 api.MapModelSettingsEndpoints(app.Logger);
 api.MapSkillEndpoints(app.Logger);
+api.MapPersonaEndpoints();
 
 app.Run();

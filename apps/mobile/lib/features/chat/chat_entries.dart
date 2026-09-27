@@ -11,24 +11,39 @@ class MessageEntry extends ChatEntry {
     required this.content,
     this.pending = false,
     this.failed = false,
+    this.id,
+    this.rating,
   });
 
   final String role;
   final String content;
   final bool pending;
 
+  /// Server message id, known once the reply is stored; needed for feedback.
+  final String? id;
+
+  /// The owner's feedback on an assistant reply: `up`, `down`, or null.
+  final String? rating;
+
   /// A user message whose request did not complete and can be retried.
   final bool failed;
 
   bool get isUser => role == 'user';
 
-  MessageEntry copyWith({String? content, bool? pending, bool? failed}) =>
-      MessageEntry(
-        role: role,
-        content: content ?? this.content,
-        pending: pending ?? this.pending,
-        failed: failed ?? this.failed,
-      );
+  MessageEntry copyWith({
+    String? content,
+    bool? pending,
+    bool? failed,
+    String? id,
+    String? rating,
+  }) => MessageEntry(
+    role: role,
+    content: content ?? this.content,
+    pending: pending ?? this.pending,
+    failed: failed ?? this.failed,
+    id: id ?? this.id,
+    rating: rating ?? this.rating,
+  );
 }
 
 /// Continues the in-flight assistant reply even when approval cards sit after it.
@@ -38,7 +53,9 @@ void appendAssistantDelta(List<ChatEntry> entries, String delta) {
   );
   if (pendingIndex >= 0) {
     final pending = entries[pendingIndex] as MessageEntry;
-    entries[pendingIndex] = pending.copyWith(content: '${pending.content}$delta');
+    entries[pendingIndex] = pending.copyWith(
+      content: '${pending.content}$delta',
+    );
     return;
   }
   final lastAssistant = entries.lastIndexWhere(
