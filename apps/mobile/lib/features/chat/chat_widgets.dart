@@ -345,6 +345,8 @@ class ApprovalCard extends StatelessWidget {
     final decided =
         approval.status == ApprovalStatus.approved ||
         approval.status == ApprovalStatus.denied;
+    final needsRetry =
+        approval.retry || approval.status == ApprovalStatus.failed;
     final accent = switch (approval.status) {
       ApprovalStatus.approved => JarvisColors.success,
       ApprovalStatus.denied => JarvisColors.muted,
@@ -389,7 +391,7 @@ class ApprovalCard extends StatelessWidget {
                         ApprovalStatus.approved => 'Approved',
                         ApprovalStatus.denied => 'Declined',
                         _ =>
-                          approval.retry
+                          needsRetry
                               ? (approval.decision == false
                                   ? 'Declined, but not finished'
                                   : 'Approved, but not finished')
@@ -479,7 +481,7 @@ class ApprovalCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        if (!approval.retry)
+                        if (!needsRetry)
                           OutlinedButton(
                             onPressed: submitting
                                 ? null
@@ -494,9 +496,7 @@ class ApprovalCard extends StatelessWidget {
                           onPressed: submitting
                               ? null
                               : () => onDecide(
-                                  approval.retry ||
-                                          approval.status ==
-                                              ApprovalStatus.failed
+                                  needsRetry
                                       ? (approval.decision ?? true)
                                       : true,
                                 ),
@@ -511,19 +511,12 @@ class ApprovalCard extends StatelessWidget {
                                   ),
                                 )
                               : Icon(
-                                  approval.retry ||
-                                          approval.status ==
-                                              ApprovalStatus.failed
+                                  needsRetry
                                       ? PhosphorIconsRegular.arrowsClockwise
                                       : PhosphorIconsRegular.check,
                                   size: 18,
                                 ),
-                          label: Text(
-                            approval.retry ||
-                                    approval.status == ApprovalStatus.failed
-                                ? 'Retry'
-                                : 'Approve',
-                          ),
+                          label: Text(needsRetry ? 'Retry' : 'Approve'),
                         ),
                       ],
                     ),

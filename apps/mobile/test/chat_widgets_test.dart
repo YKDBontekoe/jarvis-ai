@@ -245,6 +245,33 @@ void main() {
     expect(decisions, [false]);
   });
 
+  testWidgets('failed approval cards retry the leftover decision and hide Decline', (
+    tester,
+  ) async {
+    final decisions = <bool>[];
+    await tester.pumpWidget(
+      _host(
+        ApprovalCard(
+          approval: const ApprovalEntry(
+            id: 'a4',
+            toolName: 'ForgetMemory',
+            argumentsJson: '{}',
+            status: ApprovalStatus.failed,
+            decision: false,
+            error: 'Jarvis could not finish this step. You can retry.',
+          ),
+          onDecide: decisions.add,
+        ),
+      ),
+    );
+
+    expect(find.text('Declined, but not finished'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('Decline'), findsNothing);
+    await tester.tap(find.text('Retry'));
+    expect(decisions, [false]);
+  });
+
   testWidgets('decided and retryable approval cards change their actions', (
     tester,
   ) async {
