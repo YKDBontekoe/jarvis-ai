@@ -32,7 +32,13 @@ public sealed class JarvisTask
     public DateTimeOffset? CompletedAt { get; private set; }
     public string? Summary { get; private set; }
 
+    public const int QueuedDispatchStaleMinutes = 15;
+
     public void MarkScheduleDispatched() => ScheduleDispatchedAt ??= DateTimeOffset.UtcNow;
+
+    public bool IsQueuedDispatchStale(DateTimeOffset utcNow) =>
+        Status == "queued" && ScheduleDispatchedAt is not null &&
+        ScheduleDispatchedAt.Value.AddMinutes(QueuedDispatchStaleMinutes) < utcNow;
 
     public void AttachConversation(Guid conversationId)
     {

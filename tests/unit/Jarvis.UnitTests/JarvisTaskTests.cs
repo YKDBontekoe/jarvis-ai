@@ -41,4 +41,17 @@ public sealed class JarvisTaskTests
         cancelled.Fail("Too late.");
         Assert.Equal("cancelled", cancelled.Status);
     }
+
+    [Fact]
+    public void Queued_dispatched_tasks_become_stale_after_the_recovery_window()
+    {
+        var task = new JarvisTask(Guid.CreateVersion7(), "Queued", "Start later");
+        var now = DateTimeOffset.UtcNow;
+        Assert.False(task.IsQueuedDispatchStale(now));
+        task.MarkScheduleDispatched();
+        Assert.False(task.IsQueuedDispatchStale(now));
+        Assert.True(task.IsQueuedDispatchStale(now.AddMinutes(JarvisTask.QueuedDispatchStaleMinutes + 1)));
+        task.MarkRunning();
+        Assert.False(task.IsQueuedDispatchStale(now.AddMinutes(JarvisTask.QueuedDispatchStaleMinutes + 1)));
+    }
 }

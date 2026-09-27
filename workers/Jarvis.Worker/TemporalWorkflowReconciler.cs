@@ -1,5 +1,6 @@
 using Jarvis.Application.Files;
 using Jarvis.Application.Workflows;
+using Jarvis.Domain.Workflows;
 using Jarvis.Workflows;
 
 namespace Jarvis.Worker;
@@ -8,6 +9,7 @@ namespace Jarvis.Worker;
 /// Repairs the PostgreSQL-to-Temporal scheduling gap after a process interruption.
 /// Workflow IDs are stable and starts use Temporal's UseExisting conflict policy, so replaying
 /// these dispatches is safe while Temporal remains the durable execution source of truth.
+/// Dispatched work whose Temporal run died is requeued and restarted with AllowDuplicate.
 /// </summary>
 internal sealed class TemporalWorkflowReconciler(
     IServiceScopeFactory scopeFactory,
@@ -58,7 +60,9 @@ internal sealed class TemporalWorkflowReconciler(
                         await fileRepository.DeleteAsync(file.Id, file.OwnerId, cancellationToken);
                     }, cancellationToken);
 
-            var reminders = await services.GetRequiredService<IReminderRepository>()
+            var reminderRepository = services.GetRequiredService<IReminderRepository>();
+            await reminderRepository.RequeueOverdueDispatchedAsync(DateTimeOffset.UtcNow, cancellationToken);
+            var reminders = await reminderRepository
                 .ListPendingForSchedulingAsync(cancellationToken);
             foreach (var reminder in reminders)
                 await TryScheduleAsync("reminder", reminder.Id,
@@ -71,7 +75,10 @@ internal sealed class TemporalWorkflowReconciler(
                             .MarkReminderScheduleDispatchedAsync(reminder.Id, cancellationToken);
                     }, cancellationToken);
 
-            var tasks = await services.GetRequiredService<IJarvisTaskRepository>()
+            var taskRepository = services.GetRequiredService<IJarvisTaskRepository>();
+            await taskRepository.RequeueStaleQueuedAsync(
+                DateTimeOffset.UtcNow.AddMinutes(-JarvisTask.QueuedDispatchStaleMinutes), cancellationToken);
+            var tasks = await taskRepository
                 .ListQueuedForSchedulingAsync(cancellationToken);
             foreach (var task in tasks)
                 await TryScheduleAsync("task", task.Id,
@@ -103,7 +110,9 @@ internal sealed class TemporalWorkflowReconciler(
                         }
                     }, cancellationToken);
 
-            var watches = await services.GetRequiredService<IConditionWatchRepository>()
+            var watchRepository = services.GetRequiredService<IConditionWatchRepository>();
+            await watchRepository.RequeueStaleActiveAsync(DateTimeOffset.UtcNow, cancellationToken);
+            var watches = await watchRepository
                 .ListPendingForSchedulingAsync(cancellationToken);
             foreach (var watch in watches)
                 await TryScheduleAsync("condition watch", watch.Id,

@@ -101,6 +101,12 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
             .OrderBy(x => x.CreatedAt).Take(200).ToListAsync(cancellationToken))
             .Select(x => x.ToRecord()).ToList();
 
+    public async Task<int> RequeueStaleQueuedAsync(DateTimeOffset olderThan, CancellationToken cancellationToken) =>
+        await db.Tasks.Where(x => x.Status == "queued" && x.ScheduleDispatchedAt != null &&
+                x.ScheduleDispatchedAt < olderThan)
+            .ExecuteUpdateAsync(update => update.SetProperty(x => x.ScheduleDispatchedAt, (DateTimeOffset?)null),
+                cancellationToken);
+
     public async Task<IReadOnlyList<JarvisTaskRecord>> ListRecentlyTerminalAsync(DateTimeOffset completedAfter,
         CancellationToken cancellationToken) =>
         (await db.Tasks.AsNoTracking().Where(x =>
@@ -233,6 +239,12 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         (await db.Reminders.AsNoTracking().Where(x => x.Status == "pending" && x.ScheduleDispatchedAt == null)
             .OrderBy(x => x.CreatedAt).Take(300).ToListAsync(cancellationToken))
             .Select(x => x.ToRecord()).ToList();
+
+    public async Task<int> RequeueOverdueDispatchedAsync(DateTimeOffset utcNow, CancellationToken cancellationToken) =>
+        await db.Reminders.Where(x => x.Status == "pending" && x.ScheduleDispatchedAt != null &&
+                x.DueAt < utcNow.AddMinutes(-Reminder.OverdueRescheduleGraceMinutes))
+            .ExecuteUpdateAsync(update => update.SetProperty(x => x.ScheduleDispatchedAt, (DateTimeOffset?)null),
+                cancellationToken);
 
     public async Task MarkReminderScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken)
     {

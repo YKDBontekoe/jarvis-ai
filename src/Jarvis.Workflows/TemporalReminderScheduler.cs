@@ -22,7 +22,7 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
             new WorkflowOptions(id: workflowId, taskQueue: TaskQueue)
             {
                 IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
-                IdReusePolicy = WorkflowIdReusePolicy.RejectDuplicate
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
             });
     }
 
@@ -71,7 +71,7 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
             new WorkflowOptions(id: task.WorkflowId, taskQueue: TaskQueue)
             {
                 IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
-                IdReusePolicy = WorkflowIdReusePolicy.RejectDuplicate
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
             });
     }
 
@@ -86,7 +86,7 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
             new WorkflowOptions(id: watch.WorkflowId, taskQueue: TaskQueue)
             {
                 IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
-                IdReusePolicy = WorkflowIdReusePolicy.RejectDuplicate
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
             });
     }
 

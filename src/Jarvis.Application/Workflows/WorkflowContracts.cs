@@ -67,6 +67,7 @@ public interface IConditionWatchRepository
     Task<ConditionWatchRecord?> GetForExecutionAsync(Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<ConditionWatchRecord>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ConditionWatchRecord>> ListPendingForSchedulingAsync(CancellationToken cancellationToken);
+    Task<int> RequeueStaleActiveAsync(DateTimeOffset utcNow, CancellationToken cancellationToken);
     Task MarkScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken);
     Task<bool> CancelAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<ConditionWatchCheckResult> RecordCheckAsync(Guid id, double value, DateTimeOffset checkedAt,
@@ -95,6 +96,7 @@ public interface IReminderRepository
     Task<ReminderRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ReminderRecord>> ListRemindersAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ReminderRecord>> ListPendingForSchedulingAsync(CancellationToken cancellationToken);
+    Task<int> RequeueOverdueDispatchedAsync(DateTimeOffset utcNow, CancellationToken cancellationToken);
     Task MarkReminderScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken);
     Task<ReminderRecord?> CancelAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task MarkScheduleFailedAsync(Guid id, CancellationToken cancellationToken);
@@ -123,6 +125,7 @@ public interface IJarvisTaskRepository
     Task<JarvisTaskRecord?> GetTaskByIdAsync(Guid id, CancellationToken cancellationToken);
     Task<JarvisTaskRecord?> GetTaskByConversationIdAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<JarvisTaskRecord>> ListQueuedForSchedulingAsync(CancellationToken cancellationToken);
+    Task<int> RequeueStaleQueuedAsync(DateTimeOffset olderThan, CancellationToken cancellationToken);
     Task<IReadOnlyList<JarvisTaskRecord>> ListRecentlyTerminalAsync(DateTimeOffset completedAfter,
         CancellationToken cancellationToken);
     Task MarkTaskScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken);
