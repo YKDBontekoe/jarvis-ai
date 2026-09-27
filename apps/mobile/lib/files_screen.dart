@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
@@ -265,13 +266,15 @@ class _FilesScreenState extends State<FilesScreen> {
                           }
                         },
                         itemBuilder: (context) => [
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'open',
                             child: ListTile(
-                              leading: Icon(
+                              leading: const Icon(
                                 PhosphorIconsRegular.arrowSquareOut,
                               ),
-                              title: Text('Download and open'),
+                              title: Text(
+                                kIsWeb ? 'Download' : 'Download and open',
+                              ),
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
