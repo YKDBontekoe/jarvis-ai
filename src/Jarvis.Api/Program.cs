@@ -255,6 +255,7 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     IJarvisTaskRepository taskRepository,
     ITaskRunAbort taskRunAbort,
     IServiceScopeFactory scopes,
+    IHubContext<JarvisEventsHub> hub,
     CancellationToken ct) =>
 {
     var ownerId = currentUser.OwnerId;
@@ -296,6 +297,8 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     using var watchCts = CancellationTokenSource.CreateLinkedTokenSource(runCt);
     if (decided.TaskId is { } watchTaskId)
         _ = WatchTaskCancellationAsync(scopes, logger, watchTaskId, ownerId, abort, watchCts.Token);
+    using var heartbeatCts = CancellationTokenSource.CreateLinkedTokenSource(runCt);
+    _ = HeartbeatApprovalResumeAsync(scopes, logger, approvalId, ownerId, heartbeatCts.Token);
 
     try
     {
@@ -332,11 +335,11 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
                     await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
                     return Results.Accepted("/api/v1/approvals", remaining.Select(ToApprovalDto));
                 }
+                await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
                 if (decided.Approved == true)
                     await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId, last.Content, runCt);
                 else
                     await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId, last.Content, runCt);
-                await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
                 return Results.Ok(ToDto(last));
             }
         }
@@ -348,6 +351,7 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
             await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
             return Results.Accepted("/api/v1/approvals", outcome.PendingApprovals.Select(ToApprovalDto));
         }
+        await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
         if (decided.Approved == true)
         {
             await tasks.CompleteAfterApprovalAsync(decided.TaskId, ownerId,
@@ -358,12 +362,17 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
             await tasks.FailAfterRejectedApprovalAsync(decided.TaskId, ownerId,
                 outcome.AssistantMessage?.Content ?? "The tool call was declined.", runCt);
         }
-        await approvals.MarkResumeCompletedAsync(approvalId, ownerId, ct);
         return Results.Ok(ToDto(outcome.AssistantMessage!));
     }
     catch (OperationCanceledException)
     {
         await approvals.MarkResumeFailedAsync(approvalId, ownerId, CancellationToken.None);
+        await hub.Clients.Group(JarvisEventsHub.GroupName(decided.ConversationId))
+            .SendAsync("agent.failed", new
+            {
+                conversationId = decided.ConversationId,
+                message = "This task was cancelled."
+            }, CancellationToken.None);
         if (ct.IsCancellationRequested) throw;
         return Results.Conflict(new { message = "This task was cancelled." });
     }
@@ -371,12 +380,20 @@ api.MapPost("/approvals/{approvalId:guid}/decision", async (
     {
         await approvals.MarkResumeFailedAsync(approvalId, ownerId, CancellationToken.None);
         logger.LogError(exception, "Tool approval {ApprovalId} was decided but its agent resume failed.", approvalId);
+        await hub.Clients.Group(JarvisEventsHub.GroupName(decided.ConversationId))
+            .SendAsync("agent.failed", new
+            {
+                conversationId = decided.ConversationId,
+                message = "Jarvis could not complete this response."
+            }, CancellationToken.None);
         return Results.Problem("Jarvis could not resume this decided tool call. It can be retried from Tool approvals.",
             statusCode: StatusCodes.Status502BadGateway);
     }
     finally
     {
         try { watchCts.Cancel(); }
+        catch (ObjectDisposedException) { }
+        try { heartbeatCts.Cancel(); }
         catch (ObjectDisposedException) { }
     }
 }).WithName("DecideToolApproval");
@@ -901,6 +918,31 @@ api.MapDelete("/memory/{id:guid}", async (Guid id, IMemoryService memory, IAudit
 }).WithName("DeleteMemory");
 
 app.Run();
+
+static async Task HeartbeatApprovalResumeAsync(IServiceScopeFactory scopes, ILogger logger, Guid approvalId,
+    Guid ownerId, CancellationToken cancellationToken)
+{
+    try
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(2));
+        while (await timer.WaitForNextTickAsync(cancellationToken))
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<IToolApprovalStore>()
+                .HeartbeatResumeAsync(approvalId, ownerId, cancellationToken);
+        }
+    }
+    catch (OperationCanceledException)
+    {
+    }
+    catch (ObjectDisposedException)
+    {
+    }
+    catch (Exception exception)
+    {
+        logger.LogWarning(exception, "Approval resume heartbeat failed for {ApprovalId}.", approvalId);
+    }
+}
 
 static async Task WatchTaskCancellationAsync(IServiceScopeFactory scopes, ILogger logger, Guid taskId, Guid ownerId,
     CancellationTokenSource abort, CancellationToken cancellationToken)

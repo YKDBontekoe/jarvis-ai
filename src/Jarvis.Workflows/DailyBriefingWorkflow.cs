@@ -60,6 +60,7 @@ public sealed class DailyBriefingWorkflow
                     input.TimeZoneId, dayStart, nextDayStart);
             }
 
+            var sameDayAttempts = 0;
             while (true)
             {
                 try
@@ -73,6 +74,17 @@ public sealed class DailyBriefingWorkflow
                 {
                     // Keep the daily schedule alive if data access or push delivery is temporarily unavailable.
                     if (!Workflow.Patched("daily-briefing-retry-same-day")) break;
+                    if (Workflow.Patched("daily-briefing-abandon-stale-day"))
+                    {
+                        sameDayAttempts++;
+                        var now = new DateTimeOffset(DateTime.SpecifyKind(Workflow.UtcNow, DateTimeKind.Utc));
+                        if (sameDayAttempts >= 12 || now >= delivery.NextLocalDayStart)
+                        {
+                            var wait = delivery.NextLocalDayStart - now;
+                            if (wait > TimeSpan.Zero) await Workflow.DelayAsync(wait);
+                            break;
+                        }
+                    }
                     await Workflow.DelayAsync(TimeSpan.FromMinutes(5));
                 }
             }

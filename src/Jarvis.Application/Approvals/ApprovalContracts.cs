@@ -23,8 +23,10 @@ public interface IToolApprovalStore
     Task<bool> HasPendingForTaskAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken);
     Task<ToolApprovalRecord?> DecideAsync(Guid id, Guid ownerId, bool approved, CancellationToken cancellationToken);
     Task<bool> TryStartResumeAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+    Task HeartbeatResumeAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task MarkResumeCompletedAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task MarkResumeFailedAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+    Task CancelIncompleteForTaskAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken);
 }
 
 public static class ToolApprovalMapping

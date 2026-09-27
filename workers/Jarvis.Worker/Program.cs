@@ -293,6 +293,9 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
             }
         }
         await tasks.MarkNeedsApprovalAsync(task.Id, cancellationToken);
+        var current = await tasks.GetTaskByIdAsync(task.Id, cancellationToken);
+        if (current is not { Status: "needs_approval" })
+            await approvals.CancelIncompleteForTaskAsync(task.Id, task.OwnerId, cancellationToken);
     }
 
     [Temporalio.Activities.Activity("CompleteApprovedJarvisTask")]
@@ -305,7 +308,7 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
         var services = scope.ServiceProvider;
         var task = await services.GetRequiredService<IJarvisTaskRepository>()
             .GetTaskByIdAsync(input.TaskId, activity.CancellationToken);
-        if (task is null) return;
+        if (task is null || task.Status is "completed" or "failed" or "cancelled") return;
         await services.GetRequiredService<IJarvisTaskRepository>()
             .CompleteAndNotifyAsync(input.TaskId, input.Summary, activity.CancellationToken);
     }

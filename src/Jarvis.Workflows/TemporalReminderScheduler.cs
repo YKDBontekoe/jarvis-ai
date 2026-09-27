@@ -248,7 +248,21 @@ public sealed class JarvisTaskService(
         if (taskId is null) return;
         var task = await tasks.GetTaskAsync(taskId.Value, ownerId, cancellationToken);
         if (task is null || task.Status != "needs_approval") return;
-        await scheduler.ResolveTaskApprovalAsync(task.WorkflowId, summary, cancellationToken);
+        await tasks.CompleteAndNotifyAsync(task.Id, summary, cancellationToken);
+        try
+        {
+            await scheduler.ResolveTaskApprovalAsync(task.WorkflowId, summary, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "Task {TaskId} was completed after approval; Temporal will stop waiting if the workflow is still running.",
+                task.Id);
+        }
     }
 
     public async Task FailAfterRejectedApprovalAsync(Guid? taskId, Guid ownerId, string summary, CancellationToken cancellationToken)

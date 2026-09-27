@@ -16,6 +16,19 @@ public sealed class JarvisTaskTests
     }
 
     [Fact]
+    public void Needs_approval_tasks_can_be_completed()
+    {
+        var task = new JarvisTask(Guid.CreateVersion7(), "Draft", "Write the draft");
+        task.MarkRunning();
+        task.MarkNeedsApproval();
+        task.Complete("Approved work finished.");
+        Assert.Equal("completed", task.Status);
+        Assert.Equal("Approved work finished.", task.Summary);
+        task.Fail("Too late.");
+        Assert.Equal("completed", task.Status);
+    }
+
+    [Fact]
     public void Completed_and_cancelled_tasks_cannot_be_failed()
     {
         var completed = new JarvisTask(Guid.CreateVersion7(), "One", "Do one");

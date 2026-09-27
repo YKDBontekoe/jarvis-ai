@@ -151,6 +151,31 @@ public sealed class ToolApprovalStore(JarvisDbContext db) : IToolApprovalStore
         return changed == 1;
     }
 
+    public async Task HeartbeatResumeAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+    {
+        await db.ToolApprovals.Where(x => x.Id == id && x.OwnerId == ownerId &&
+                (x.Status == "approved" || x.Status == "rejected") && x.ResumeStatus == "running")
+            .ExecuteUpdateAsync(update => update.SetProperty(x => x.ResumeStartedAt, DateTimeOffset.UtcNow),
+                cancellationToken);
+    }
+
+    public async Task CancelIncompleteForTaskAsync(Guid taskId, Guid ownerId, CancellationToken cancellationToken)
+    {
+        var approvals = await db.ToolApprovals.Where(x =>
+                x.TaskId == taskId && x.OwnerId == ownerId &&
+                (x.Status == "pending" ||
+                 ((x.Status == "approved" || x.Status == "rejected") &&
+                  x.ResumeStatus != "completed" && x.ResumeStatus != "cancelled")))
+            .ToListAsync(cancellationToken);
+        if (approvals.Count == 0) return;
+        foreach (var approval in approvals)
+        {
+            approval.Cancel();
+            approval.AbortResume();
+        }
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     public Task MarkResumeCompletedAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
         SetResumeStatusAsync(id, ownerId, "completed", "approval.resume_completed", true, cancellationToken);
 
