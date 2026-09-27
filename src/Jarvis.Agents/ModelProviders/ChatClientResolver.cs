@@ -117,27 +117,3 @@ internal sealed class ChatClientResolver(
         }
     }
 }
-
-/// <summary>Applies an owner-selected Codex model id to each chat request.</summary>
-internal sealed class ModelSelectingChatClient(IChatClient inner, string modelId) : IChatClient
-{
-    public void Dispose() => inner.Dispose();
-
-    public object? GetService(Type serviceType, object? serviceKey = null) =>
-        inner.GetService(serviceType, serviceKey);
-
-    public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
-        CancellationToken cancellationToken = default) =>
-        inner.GetResponseAsync(messages, WithModel(options), cancellationToken);
-
-    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
-        ChatOptions? options = null, CancellationToken cancellationToken = default) =>
-        inner.GetStreamingResponseAsync(messages, WithModel(options), cancellationToken);
-
-    private ChatOptions WithModel(ChatOptions? options)
-    {
-        if (options is null) return new ChatOptions { ModelId = modelId };
-        options.ModelId = modelId;
-        return options;
-    }
-}

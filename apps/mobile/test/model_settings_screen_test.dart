@@ -18,10 +18,29 @@ Map<String, Object?> _settings({
   'providers': ['codex', 'openrouter'],
 };
 
+Map<String, Object?> _codex({
+  String installed = '0.145.0',
+  String latest = '0.145.0',
+  bool updateAvailable = false,
+  List<Map<String, Object?>> models = const [],
+}) => {
+  'installedVersion': installed,
+  'latestVersion': latest,
+  'updateAvailable': updateAvailable,
+  'canUpdate': true,
+  'usingManagedInstall': false,
+  'updateBlockedReason': null,
+  'error': null,
+  'models': models,
+};
+
 void main() {
   late FixtureHttp http;
 
-  setUp(() => http = FixtureHttp());
+  setUp(() {
+    http = FixtureHttp();
+    http.on('GET', '/api/v1/settings/models/codex', _codex());
+  });
 
   Future<void> show(WidgetTester tester) async {
     tester.view.physicalSize = const Size(900, 1600);
@@ -136,10 +155,12 @@ void main() {
     await tester.tap(find.text('Save key'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.text('Embedding model (optional)'),
-      'openai/text-embedding-3-small',
+    final embedding = find.widgetWithText(
+      TextField,
+      'Embedding model (optional)',
     );
+    await tester.ensureVisible(embedding);
+    await tester.enterText(embedding, 'openai/text-embedding-3-small');
     await tester.tap(find.byKey(const Key('save-models')));
     await tester.pumpAndSettle();
 
@@ -166,5 +187,89 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Connected to gpt-5 in 842 ms.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'loads Codex models from the installed CLI and saves the choice',
+    (tester) async {
+      http.on('GET', '/api/v1/settings/models', _settings());
+      http.on(
+        'GET',
+        '/api/v1/settings/models/codex',
+        _codex(
+          models: [
+            {
+              'id': 'gpt-5.4',
+              'model': 'gpt-5.4',
+              'displayName': 'GPT-5.4',
+              'description': 'Default',
+              'isDefault': true,
+              'hidden': false,
+              'supportsImages': true,
+              'inputModalities': ['text', 'image'],
+            },
+            {
+              'id': 'gpt-5.4-mini',
+              'model': 'gpt-5.4-mini',
+              'displayName': 'GPT-5.4 Mini',
+              'description': 'Faster',
+              'isDefault': false,
+              'hidden': false,
+              'supportsImages': false,
+              'inputModalities': ['text'],
+            },
+          ],
+        ),
+      );
+      http.on(
+        'PUT',
+        '/api/v1/settings/models',
+        _settings(chatModel: 'gpt-5.4-mini'),
+      );
+      await show(tester);
+
+      expect(find.textContaining('Installed 0.145.0'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('browse-codex-models')));
+      await tester.tap(find.byKey(const Key('browse-codex-models')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('GPT-5.4 Mini'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('save-models')));
+      await tester.pumpAndSettle();
+
+      final saved =
+          http.sent('PUT', '/api/v1/settings/models').single.body
+              as Map<String, dynamic>;
+      expect(saved['provider'], 'codex');
+      expect(saved['chatModel'], 'gpt-5.4-mini');
+    },
+  );
+
+  testWidgets('updates Codex when a newer release is published', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/settings/models', _settings());
+    http.on(
+      'GET',
+      '/api/v1/settings/models/codex',
+      _codex(latest: '0.157.0', updateAvailable: true),
+    );
+    http.on(
+      'POST',
+      '/api/v1/settings/models/codex/update',
+      _codex(installed: '0.157.0', latest: '0.157.0'),
+    );
+    await show(tester);
+
+    await tester.ensureVisible(find.byKey(const Key('update-codex')));
+    await tester.tap(find.byKey(const Key('update-codex')));
+    await tester.pumpAndSettle();
+
+    expect(
+      http.sent('POST', '/api/v1/settings/models/codex/update'),
+      hasLength(1),
+    );
+    expect(find.textContaining('Codex 0.157.0 is installed'), findsOneWidget);
+    expect(find.text('Up to date'), findsOneWidget);
   });
 }
