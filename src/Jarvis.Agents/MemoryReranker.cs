@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Jarvis.Agents.ModelProviders;
 using Jarvis.Application.Memory;
 using Jarvis.Domain.Memory;
 using Microsoft.Extensions.AI;
@@ -6,9 +7,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Jarvis.Agents;
 
-internal sealed class MemoryReranker(IChatClient chatClient, ILogger<MemoryReranker> logger)
+internal sealed class MemoryReranker(IChatClientResolver chatClients, ILogger<MemoryReranker> logger)
 {
-    public async Task<IReadOnlyList<MemorySearchHit>> RerankAsync(string query,
+    public async Task<IReadOnlyList<MemorySearchHit>> RerankAsync(Guid ownerId, string query,
         IReadOnlyList<MemorySearchHit> hits, CancellationToken cancellationToken)
     {
         var candidates = hits.Take(8).ToArray();
@@ -31,6 +32,7 @@ internal sealed class MemoryReranker(IChatClient chatClient, ILogger<MemoryReran
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(8));
+            var chatClient = await chatClients.GetChatClientAsync(ownerId, ModelPurpose.Background, timeout.Token);
             var response = await chatClient.GetResponseAsync(
             [
                 new ChatMessage(ChatRole.System, """

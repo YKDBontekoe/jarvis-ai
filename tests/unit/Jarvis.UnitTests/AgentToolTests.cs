@@ -221,7 +221,8 @@ public sealed class AgentToolTests
     }
 
     private static MemoryAgentTools CreateMemoryTools(FakeMemoryService memories, IAuditEventStore audit) =>
-        new(memories, new MemoryReranker(new EchoContextClient(), NullLogger<MemoryReranker>.Instance), audit,
+        new(memories, new MemoryReranker(new FixedChatClientResolver(new EchoContextClient()),
+                NullLogger<MemoryReranker>.Instance), audit,
             new FixedUser(), NullLogger<MemoryAgentTools>.Instance);
 
     private sealed class FixedUser : ICurrentUser

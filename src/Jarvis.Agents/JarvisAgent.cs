@@ -3,13 +3,14 @@ using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Conversations;
+using Jarvis.Agents.ModelProviders;
 using Jarvis.Mcp;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
 namespace Jarvis.Agents;
 
-public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClient chatClient, McpToolHost mcpToolHost,
+public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientResolver chatClients, McpToolHost mcpToolHost,
     IConversationStore conversations, IJarvisTaskRepository tasks, ICurrentUser currentUser) : IJarvisAgent
 {
     private static readonly JsonSerializerOptions ArgumentsJsonOptions = new(JsonSerializerDefaults.Web);
@@ -69,6 +70,7 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClient cha
         await mcpToolHost.InitializeAsync(cancellationToken);
         var ownerId = currentUser.OwnerId;
         var task = await tasks.GetTaskByConversationIdAsync(conversationId, ownerId, cancellationToken);
+        var chatClient = await chatClients.GetChatClientAsync(ownerId, ModelPurpose.Chat, cancellationToken);
         return _agent = agentFactory.Create(chatClient, mcpToolHost.Tools, new AgentBuildContext(ownerId, task?.Id));
     }
 

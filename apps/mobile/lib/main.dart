@@ -28,6 +28,8 @@ import 'integrations_screen.dart';
 import 'features/chat/chat_entries.dart';
 import 'features/chat/chat_widgets.dart';
 import 'features/home/home_overview.dart';
+import 'features/settings/model_settings_screen.dart';
+import 'features/settings/settings_view.dart';
 import 'features/shell/sidebar.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -662,6 +664,7 @@ class _ChatScreenState extends State<ChatScreen> {
       'watches' => ConditionWatchesScreen(http: _http),
       'briefing' => DailyBriefingScreen(http: _http),
       'integrations' => IntegrationsScreen(http: _http),
+      'models' => ModelSettingsScreen(http: _http),
       _ => null,
     };
     if (destination == 'sign_out') {
@@ -2491,155 +2494,10 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _settingsBody() => SafeArea(
-    child: ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-      children: [
-        ContentWidth(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SurfaceCard(
-                child: Row(
-                  children: [
-                    const JarvisOrb(size: 44, glow: false),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Your assistant',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _connected
-                                ? 'Live updates connected'
-                                : 'Offline — live updates paused',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              _settingsGroup('Assistant', [
-                _settingsTile(
-                  'Integrations',
-                  'Manage MCP servers and credentials',
-                  PhosphorIconsRegular.plugsConnected,
-                  'integrations',
-                ),
-                _settingsTile(
-                  'Approvals',
-                  'Review actions Jarvis needs permission to run',
-                  PhosphorIconsRegular.shieldCheck,
-                  'approvals',
-                ),
-                _settingsTile(
-                  'Morning briefing',
-                  'Choose your daily briefing schedule and time zone',
-                  PhosphorIconsRegular.sunHorizon,
-                  'briefing',
-                ),
-              ]),
-              _settingsGroup('Automations', [
-                _settingsTile(
-                  'Reminders and notifications',
-                  'View scheduled reminders and alerts',
-                  PhosphorIconsRegular.bell,
-                  'reminders',
-                ),
-                _settingsTile(
-                  'Condition watches',
-                  'Manage threshold alerts',
-                  PhosphorIconsRegular.pulse,
-                  'watches',
-                ),
-              ]),
-              _settingsGroup('Data', [
-                _settingsTile(
-                  'Files',
-                  'Browse uploaded documents',
-                  PhosphorIconsRegular.folderOpen,
-                  'files',
-                ),
-                _settingsTile(
-                  'Audit log',
-                  'Review Jarvis activity',
-                  PhosphorIconsRegular.listChecks,
-                  'audit',
-                ),
-              ]),
-              if (_auth.enabled)
-                _settingsGroup('Account', [
-                  ListTile(
-                    leading: const IconBadge(
-                      icon: PhosphorIconsRegular.signOut,
-                      color: JarvisColors.danger,
-                      size: 34,
-                    ),
-                    title: const Text(
-                      'Sign out',
-                      style: TextStyle(color: JarvisColors.danger),
-                    ),
-                    onTap: () => unawaited(_signOut()),
-                  ),
-                ]),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _settingsGroup(String title, List<Widget> tiles) => Padding(
-    padding: const EdgeInsets.only(top: 24),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
-          child: Text(
-            title.toUpperCase(),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: JarvisColors.muted,
-              letterSpacing: .8,
-            ),
-          ),
-        ),
-        SurfaceCard(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(
-            children: [
-              for (final (index, tile) in tiles.indexed) ...[
-                if (index > 0) const Divider(indent: 64),
-                tile,
-              ],
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _settingsTile(
-    String title,
-    String subtitle,
-    IconData icon,
-    String destination,
-  ) => ListTile(
-    leading: IconBadge(icon: icon, size: 34),
-    title: Text(title),
-    subtitle: Text(subtitle),
-    trailing: const Icon(
-      PhosphorIconsRegular.caretRight,
-      size: 16,
-      color: JarvisColors.muted,
-    ),
-    onTap: () => _openUtility(destination),
+  Widget _settingsBody() => SettingsView(
+    connected: _connected,
+    onOpen: _openUtility,
+    onSignOut: _auth.enabled ? () => unawaited(_signOut()) : null,
   );
 
   Widget _welcome() => HomeOverview(

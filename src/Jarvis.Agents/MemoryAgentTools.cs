@@ -21,7 +21,7 @@ internal sealed partial class MemoryAgentTools(IMemoryService memories, MemoryRe
         if (string.IsNullOrWhiteSpace(query)) return "Provide a search phrase for the user's saved memories.";
 
         var hits = await memories.SearchAsync(currentUser.OwnerId, query, cancellationToken);
-        hits = await reranker.RerankAsync(query, hits, cancellationToken);
+        hits = await reranker.RerankAsync(currentUser.OwnerId, query, hits, cancellationToken);
         if (hits.Count == 0) return "No matching saved memories were found.";
 
         var result = new System.Text.StringBuilder(

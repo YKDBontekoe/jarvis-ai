@@ -86,6 +86,7 @@ internal static class ApiServiceRegistration
         services.AddScoped<ApprovalDecisionService>();
         services.AddSingleton<VoiceConversationCoordinator>();
         services.AddHttpClient<LiveKitAgentDispatchClient>();
+        services.AddHttpClient<Jarvis.Agents.ModelProviders.OpenRouterCatalog>(client => client.Timeout = TimeSpan.FromSeconds(20));
         services.AddHttpClient("firebase-messaging", client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddHostedService<NotificationPushWorker>();
         services.AddHostedService<NotificationRealtimeWorker>();

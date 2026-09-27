@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Memory;
+using Jarvis.Agents.ModelProviders;
 
 namespace Jarvis.Agents;
 
@@ -31,6 +32,8 @@ public static class DependencyInjection
                 sourceName: "Jarvis.CodexChatClient",
                 configure: telemetry => telemetry.EnableSensitiveData = false)
             .Build());
+        services.AddSingleton<OpenAiCompatibleClientFactory>();
+        services.AddScoped<IChatClientResolver, ChatClientResolver>();
         services.AddScoped<IConversationMemoryExtractor, ConversationMemoryExtractor>();
         services.AddScoped<MemoryReranker>();
         services.AddScoped<IAgentToolContributor, CoreAgentTools>();

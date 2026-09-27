@@ -33,6 +33,7 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<FileContentChunkEntity> FileContentChunks => Set<FileContentChunkEntity>();
     public DbSet<IntegrationCredential> IntegrationCredentials => Set<IntegrationCredential>();
     public DbSet<DailyBriefingPreference> DailyBriefings => Set<DailyBriefingPreference>();
+    public DbSet<OwnerSettingEntity> OwnerSettings => Set<OwnerSettingEntity>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -336,6 +337,17 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             entity.HasIndex(x => x.WorkflowId).IsUnique();
             entity.HasIndex(x => new { x.Enabled, x.ScheduleDispatchedAt });
+        });
+
+        modelBuilder.Entity<OwnerSettingEntity>(entity =>
+        {
+            entity.ToTable("owner_settings");
+            entity.HasKey(x => new { x.OwnerId, x.Section });
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Section).HasColumnName("section").HasMaxLength(60);
+            entity.Property(x => x.ValueJson).HasColumnName("value").HasColumnType("jsonb").IsRequired();
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => x.Section);
         });
 
         modelBuilder.Entity<Message>(entity =>

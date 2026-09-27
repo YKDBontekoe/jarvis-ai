@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Jarvis.Agents.ModelProviders;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Memory;
 using Jarvis.Domain.Memory;
@@ -8,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Jarvis.Agents;
 
 internal sealed class ConversationMemoryExtractor(
-    IChatClient chatClient,
+    IChatClientResolver chatClients,
     IMemoryService memories,
     IAuditEventStore auditEvents,
     ILogger<ConversationMemoryExtractor> logger) : IConversationMemoryExtractor
@@ -28,6 +29,7 @@ internal sealed class ConversationMemoryExtractor(
                 .Where(memory => memory.ValidUntil is null || memory.ValidUntil > DateTimeOffset.UtcNow)
                 .ToArray();
 
+        var chatClient = await chatClients.GetChatClientAsync(ownerId, ModelPurpose.Background, cancellationToken);
         var response = await chatClient.GetResponseAsync(
             [
                 new ChatMessage(ChatRole.System, """
