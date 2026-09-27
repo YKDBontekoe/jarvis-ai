@@ -88,19 +88,21 @@ public sealed class WorkflowSchedulingRecoveryTests : IAsyncLifetime
     {
         await using var database = CreateDbContext();
         var now = DateTimeOffset.UtcNow;
+        var checkAt = new DateTimeOffset(now.Year, now.Month, now.Day, 21, 0, 0, TimeSpan.Zero);
         var stale = new DailyBriefingPreference(Guid.CreateVersion7(), true, new TimeOnly(8, 0), "UTC");
         stale.MarkScheduleDispatched();
-        stale.MarkDelivered(DateOnly.FromDateTime(now.UtcDateTime.AddDays(-2)));
+        stale.MarkDelivered(DateOnly.FromDateTime(checkAt.UtcDateTime.AddDays(-2)));
         var fresh = new DailyBriefingPreference(Guid.CreateVersion7(), true, new TimeOnly(8, 0), "UTC");
         fresh.MarkScheduleDispatched();
-        fresh.MarkDelivered(DateOnly.FromDateTime(now.UtcDateTime));
+        fresh.MarkDelivered(DateOnly.FromDateTime(checkAt.UtcDateTime));
         database.DailyBriefings.AddRange(stale, fresh);
         await database.SaveChangesAsync();
         await database.DailyBriefings.Where(x => x.OwnerId == stale.OwnerId)
-            .ExecuteUpdateAsync(update => update.SetProperty(x => x.ScheduleDispatchedAt, now.AddDays(-2)));
+            .ExecuteUpdateAsync(update => update.SetProperty(x => x.ScheduleDispatchedAt, checkAt.AddDays(-2)));
+        database.ChangeTracker.Clear();
 
         var briefings = new DailyBriefingRepository(database);
-        Assert.Equal(1, await briefings.RequeueStaleEnabledAsync(now, CancellationToken.None));
+        Assert.Equal(1, await briefings.RequeueStaleEnabledAsync(checkAt, CancellationToken.None));
         var pending = await briefings.ListPendingForSchedulingAsync(CancellationToken.None);
         Assert.Equal(stale.OwnerId, Assert.Single(pending).OwnerId);
     }
