@@ -57,6 +57,13 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
           _error = 'Could not load integration credentials.';
         });
       }
+    } catch (_) {
+      if (mounted && revision == _requestRevision) {
+        setState(() {
+          _loading = false;
+          _error = 'Could not load integration credentials.';
+        });
+      }
     }
   }
 
