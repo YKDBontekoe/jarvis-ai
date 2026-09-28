@@ -41,6 +41,7 @@ abstract final class PhosphorIconsRegular {
   static const check = IconData(0xe182, fontFamily: 'PhosphorRegular');
   static const checkCircle = IconData(0xe184, fontFamily: 'PhosphorRegular');
   static const circle = IconData(0xe18a, fontFamily: 'PhosphorRegular');
+  static const circleHalf = IconData(0xe18c, fontFamily: 'PhosphorRegular');
   static const clipboardText = IconData(0xe198, fontFamily: 'PhosphorRegular');
   static const clock = IconData(0xe19a, fontFamily: 'PhosphorRegular');
   static const clockCounterClockwise = IconData(
@@ -116,6 +117,7 @@ abstract final class PhosphorIconsRegular {
   );
   static const minusCircle = IconData(0xe32c, fontFamily: 'PhosphorRegular');
   static const monitor = IconData(0xe32e, fontFamily: 'PhosphorRegular');
+  static const moon = IconData(0xe3d6, fontFamily: 'PhosphorRegular');
   static const network = IconData(0xedde, fontFamily: 'PhosphorRegular');
   static const notebook = IconData(0xe34e, fontFamily: 'PhosphorRegular');
   static const notepad = IconData(0xe63e, fontFamily: 'PhosphorRegular');
@@ -149,6 +151,7 @@ abstract final class PhosphorIconsRegular {
   static const star = IconData(0xe46a, fontFamily: 'PhosphorRegular');
   static const stop = IconData(0xe46c, fontFamily: 'PhosphorRegular');
   static const stopCircle = IconData(0xe46e, fontFamily: 'PhosphorRegular');
+  static const sun = IconData(0xe5b4, fontFamily: 'PhosphorRegular');
   static const sunHorizon = IconData(0xe5b6, fontFamily: 'PhosphorRegular');
   static const table = IconData(0xe476, fontFamily: 'PhosphorRegular');
   static const terminalWindow = IconData(0xeae8, fontFamily: 'PhosphorRegular');

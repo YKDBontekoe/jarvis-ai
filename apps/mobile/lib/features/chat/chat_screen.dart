@@ -133,7 +133,7 @@ class _ChatScreenState extends _ChatScreenController
               ? null
               : Drawer(
                   width: math.min(330, constraints.maxWidth * .86),
-                  backgroundColor: JarvisColors.canvas,
+                  backgroundColor: JarvisColors.of(context).canvas,
                   surfaceTintColor: Colors.transparent,
                   shape: const RoundedRectangleBorder(
                     borderRadius: BorderRadius.horizontal(

@@ -23,12 +23,12 @@ part 'channel_thread_screen.dart';
       'signal' => (
         label: 'Signal',
         icon: PhosphorIconsRegular.chatsCircle,
-        color: JarvisColors.info,
+        color: JarvisColors.light.info,
       ),
       _ => (
         label: kind,
         icon: PhosphorIconsRegular.broadcast,
-        color: JarvisColors.muted,
+        color: JarvisColors.light.muted,
       ),
     };
 
@@ -196,10 +196,10 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
           ].where((part) => part.isNotEmpty).join(' · '),
         ),
         isThreeLine: error != null,
-        trailing: const Icon(
+        trailing: Icon(
           PhosphorIconsRegular.caretRight,
           size: 16,
-          color: JarvisColors.muted,
+          color: JarvisColors.of(context).muted,
         ),
         onTap: () => unawaited(_open(channel)),
       ),
@@ -227,9 +227,9 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
               ),
               ListTile(
                 key: const Key('connect-signal'),
-                leading: const IconBadge(
+                leading: IconBadge(
                   icon: PhosphorIconsRegular.chatsCircle,
-                  color: JarvisColors.info,
+                  color: JarvisColors.of(context).info,
                 ),
                 title: const Text('Signal'),
                 subtitle: const Text('Link through signal-cli on this server'),

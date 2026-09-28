@@ -1,36 +1,216 @@
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import 'ui/phosphor_icons.dart';
 
-class JarvisColors {
-  static const canvas = Color(0xfffaf9f6);
-  static const background = canvas;
-  static const surface = Color(0xffffffff);
-  static const surfaceMuted = Color(0xfff3f1ec);
-  static const surfaceRaised = Color(0xffebe8e2);
-  static const outline = Color(0xffe8e5df);
-  static const outlineStrong = Color(0xffd9d5cd);
+/// Semantic Jarvis palette. Read it from the ambient [Theme] with [JarvisColors.of]
+/// so screens follow light, dark, and device appearance.
+@immutable
+class JarvisColors extends ThemeExtension<JarvisColors> {
+  const JarvisColors({
+    required this.brightness,
+    required this.canvas,
+    required this.surface,
+    required this.surfaceMuted,
+    required this.surfaceRaised,
+    required this.outline,
+    required this.outlineStrong,
+    required this.ink,
+    required this.inkSoft,
+    required this.muted,
+    required this.onInk,
+    required this.accent,
+    required this.accentDeep,
+    required this.accentSoft,
+    required this.violet,
+    required this.sky,
+    required this.rose,
+    required this.success,
+    required this.successSoft,
+    required this.warning,
+    required this.warningSoft,
+    required this.danger,
+    required this.dangerSoft,
+    required this.info,
+    required this.infoSoft,
+  });
 
-  static const ink = Color(0xff1c1b19);
-  static const inkSoft = Color(0xff5b5853);
-  static const muted = Color(0xff8f8b84);
+  final Brightness brightness;
+  final Color canvas;
+  Color get background => canvas;
+  final Color surface;
+  final Color surfaceMuted;
+  final Color surfaceRaised;
+  final Color outline;
+  final Color outlineStrong;
+  final Color ink;
+  final Color inkSoft;
+  final Color muted;
+  final Color onInk;
+  final Color accent;
+  final Color accentDeep;
+  final Color accentSoft;
+  final Color violet;
+  final Color sky;
+  final Color rose;
+  final Color success;
+  final Color successSoft;
+  final Color warning;
+  final Color warningSoft;
+  final Color danger;
+  final Color dangerSoft;
+  final Color info;
+  final Color infoSoft;
 
-  static const accent = Color(0xff4f46e5);
-  static const accentDeep = Color(0xff3730a3);
-  static const accentSoft = Color(0xffeef0ff);
-  static const violet = Color(0xff8b7cf6);
-  static const sky = Color(0xff38bdf8);
-  static const rose = Color(0xfff0a6c8);
+  bool get isDark => brightness == Brightness.dark;
 
-  static const success = Color(0xff16a34a);
-  static const successSoft = Color(0xffeaf6ee);
-  static const warning = Color(0xffd97706);
-  static const warningSoft = Color(0xfffcf4e6);
-  static const danger = Color(0xffdc2626);
-  static const dangerSoft = Color(0xfffcebeb);
-  static const info = Color(0xff2563eb);
-  static const infoSoft = Color(0xffecf2fe);
+  static JarvisColors of(BuildContext context) =>
+      Theme.of(context).extension<JarvisColors>() ?? light;
+
+  static const light = JarvisColors(
+    brightness: Brightness.light,
+    canvas: Color(0xfffaf9f6),
+    surface: Color(0xffffffff),
+    surfaceMuted: Color(0xfff3f1ec),
+    surfaceRaised: Color(0xffebe8e2),
+    outline: Color(0xffe8e5df),
+    outlineStrong: Color(0xffd9d5cd),
+    ink: Color(0xff1c1b19),
+    inkSoft: Color(0xff5b5853),
+    muted: Color(0xff8f8b84),
+    onInk: Color(0xffffffff),
+    accent: Color(0xff4f46e5),
+    accentDeep: Color(0xff3730a3),
+    accentSoft: Color(0xffeef0ff),
+    violet: Color(0xff8b7cf6),
+    sky: Color(0xff38bdf8),
+    rose: Color(0xfff0a6c8),
+    success: Color(0xff16a34a),
+    successSoft: Color(0xffeaf6ee),
+    warning: Color(0xffd97706),
+    warningSoft: Color(0xfffcf4e6),
+    danger: Color(0xffdc2626),
+    dangerSoft: Color(0xfffcebeb),
+    info: Color(0xff2563eb),
+    infoSoft: Color(0xffecf2fe),
+  );
+
+  static const dark = JarvisColors(
+    brightness: Brightness.dark,
+    canvas: Color(0xff12110f),
+    surface: Color(0xff1c1b18),
+    surfaceMuted: Color(0xff24231f),
+    surfaceRaised: Color(0xff2e2c27),
+    outline: Color(0xff3a3832),
+    outlineStrong: Color(0xff4a4740),
+    ink: Color(0xfff4f1ea),
+    inkSoft: Color(0xffb7b2a8),
+    muted: Color(0xff8c877e),
+    onInk: Color(0xff12110f),
+    accent: Color(0xff8b85ff),
+    accentDeep: Color(0xffc7c4ff),
+    accentSoft: Color(0xff222044),
+    violet: Color(0xffa99cff),
+    sky: Color(0xff7dd3fc),
+    rose: Color(0xfff5bdd6),
+    success: Color(0xff4ade80),
+    successSoft: Color(0xff16301f),
+    warning: Color(0xfffbbf24),
+    warningSoft: Color(0xff3a2a12),
+    danger: Color(0xfff87171),
+    dangerSoft: Color(0xff3a1c1c),
+    info: Color(0xff60a5fa),
+    infoSoft: Color(0xff1a2740),
+  );
+
+  @override
+  JarvisColors copyWith({
+    Brightness? brightness,
+    Color? canvas,
+    Color? surface,
+    Color? surfaceMuted,
+    Color? surfaceRaised,
+    Color? outline,
+    Color? outlineStrong,
+    Color? ink,
+    Color? inkSoft,
+    Color? muted,
+    Color? onInk,
+    Color? accent,
+    Color? accentDeep,
+    Color? accentSoft,
+    Color? violet,
+    Color? sky,
+    Color? rose,
+    Color? success,
+    Color? successSoft,
+    Color? warning,
+    Color? warningSoft,
+    Color? danger,
+    Color? dangerSoft,
+    Color? info,
+    Color? infoSoft,
+  }) => JarvisColors(
+    brightness: brightness ?? this.brightness,
+    canvas: canvas ?? this.canvas,
+    surface: surface ?? this.surface,
+    surfaceMuted: surfaceMuted ?? this.surfaceMuted,
+    surfaceRaised: surfaceRaised ?? this.surfaceRaised,
+    outline: outline ?? this.outline,
+    outlineStrong: outlineStrong ?? this.outlineStrong,
+    ink: ink ?? this.ink,
+    inkSoft: inkSoft ?? this.inkSoft,
+    muted: muted ?? this.muted,
+    onInk: onInk ?? this.onInk,
+    accent: accent ?? this.accent,
+    accentDeep: accentDeep ?? this.accentDeep,
+    accentSoft: accentSoft ?? this.accentSoft,
+    violet: violet ?? this.violet,
+    sky: sky ?? this.sky,
+    rose: rose ?? this.rose,
+    success: success ?? this.success,
+    successSoft: successSoft ?? this.successSoft,
+    warning: warning ?? this.warning,
+    warningSoft: warningSoft ?? this.warningSoft,
+    danger: danger ?? this.danger,
+    dangerSoft: dangerSoft ?? this.dangerSoft,
+    info: info ?? this.info,
+    infoSoft: infoSoft ?? this.infoSoft,
+  );
+
+  @override
+  JarvisColors lerp(ThemeExtension<JarvisColors>? other, double t) {
+    if (other is! JarvisColors) return this;
+    Color mix(Color a, Color b) => Color.lerp(a, b, t)!;
+    return JarvisColors(
+      brightness: t < .5 ? brightness : other.brightness,
+      canvas: mix(canvas, other.canvas),
+      surface: mix(surface, other.surface),
+      surfaceMuted: mix(surfaceMuted, other.surfaceMuted),
+      surfaceRaised: mix(surfaceRaised, other.surfaceRaised),
+      outline: mix(outline, other.outline),
+      outlineStrong: mix(outlineStrong, other.outlineStrong),
+      ink: mix(ink, other.ink),
+      inkSoft: mix(inkSoft, other.inkSoft),
+      muted: mix(muted, other.muted),
+      onInk: mix(onInk, other.onInk),
+      accent: mix(accent, other.accent),
+      accentDeep: mix(accentDeep, other.accentDeep),
+      accentSoft: mix(accentSoft, other.accentSoft),
+      violet: mix(violet, other.violet),
+      sky: mix(sky, other.sky),
+      rose: mix(rose, other.rose),
+      success: mix(success, other.success),
+      successSoft: mix(successSoft, other.successSoft),
+      warning: mix(warning, other.warning),
+      warningSoft: mix(warningSoft, other.warningSoft),
+      danger: mix(danger, other.danger),
+      dangerSoft: mix(dangerSoft, other.dangerSoft),
+      info: mix(info, other.info),
+      infoSoft: mix(infoSoft, other.infoSoft),
+    );
+  }
 }
 
 class JarvisRadii {
@@ -42,33 +222,80 @@ class JarvisRadii {
 
 /// Editorial serif for greetings and hero headlines; everything else is Inter.
 class JarvisType {
-  static const serif = TextStyle(
+  static TextStyle serif([Color color = const Color(0xff1c1b19)]) => TextStyle(
     fontFamily: 'InstrumentSerif',
-    color: JarvisColors.ink,
+    color: color,
     fontWeight: FontWeight.w400,
     letterSpacing: -.4,
     height: 1.1,
   );
+
+  static TextStyle serifOf(BuildContext context) =>
+      serif(JarvisColors.of(context).ink);
 }
 
 class JarvisShadows {
-  static const soft = [
-    BoxShadow(color: Color(0x08111113), blurRadius: 2, offset: Offset(0, 1)),
-    BoxShadow(color: Color(0x0a111113), blurRadius: 12, offset: Offset(0, 4)),
-  ];
+  static List<BoxShadow> soft([Brightness brightness = Brightness.light]) =>
+      brightness == Brightness.dark
+      ? const [
+          BoxShadow(
+            color: Color(0x66000000),
+            blurRadius: 2,
+            offset: Offset(0, 1),
+          ),
+          BoxShadow(
+            color: Color(0x3d000000),
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
+        ]
+      : const [
+          BoxShadow(
+            color: Color(0x08111113),
+            blurRadius: 2,
+            offset: Offset(0, 1),
+          ),
+          BoxShadow(
+            color: Color(0x0a111113),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ];
 
-  static const floating = [
-    BoxShadow(color: Color(0x0a111113), blurRadius: 2, offset: Offset(0, 1)),
-    BoxShadow(color: Color(0x10111113), blurRadius: 24, offset: Offset(0, 8)),
-  ];
+  static List<BoxShadow> floating([Brightness brightness = Brightness.light]) =>
+      brightness == Brightness.dark
+      ? const [
+          BoxShadow(
+            color: Color(0x73000000),
+            blurRadius: 2,
+            offset: Offset(0, 1),
+          ),
+          BoxShadow(
+            color: Color(0x52000000),
+            blurRadius: 28,
+            offset: Offset(0, 10),
+          ),
+        ]
+      : const [
+          BoxShadow(
+            color: Color(0x0a111113),
+            blurRadius: 2,
+            offset: Offset(0, 1),
+          ),
+          BoxShadow(
+            color: Color(0x10111113),
+            blurRadius: 24,
+            offset: Offset(0, 8),
+          ),
+        ];
 }
 
 const _fontFamily = 'Inter';
 
-TextTheme _textTheme() {
-  const base = TextStyle(
+TextTheme _textTheme(JarvisColors colors) {
+  final base = TextStyle(
     fontFamily: _fontFamily,
-    color: JarvisColors.ink,
+    color: colors.ink,
     letterSpacing: -.1,
   );
   return TextTheme(
@@ -110,7 +337,7 @@ TextTheme _textTheme() {
     bodySmall: base.copyWith(
       fontSize: 12.5,
       height: 1.4,
-      color: JarvisColors.inkSoft,
+      color: colors.inkSoft,
     ),
     labelLarge: base.copyWith(fontSize: 14, fontWeight: FontWeight.w500),
     labelMedium: base.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600),
@@ -118,36 +345,40 @@ TextTheme _textTheme() {
       fontSize: 11,
       fontWeight: FontWeight.w500,
       letterSpacing: .4,
-      color: JarvisColors.muted,
+      color: colors.muted,
     ),
   );
 }
 
-ThemeData buildJarvisTheme() {
+ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
+  final colors = brightness == Brightness.dark
+      ? JarvisColors.dark
+      : JarvisColors.light;
   final scheme =
       ColorScheme.fromSeed(
-        seedColor: JarvisColors.accent,
-        brightness: Brightness.light,
+        seedColor: colors.accent,
+        brightness: brightness,
       ).copyWith(
-        primary: JarvisColors.accent,
+        primary: colors.accent,
         onPrimary: Colors.white,
-        primaryContainer: JarvisColors.accentSoft,
-        onPrimaryContainer: JarvisColors.accentDeep,
-        secondary: JarvisColors.violet,
-        surface: JarvisColors.surface,
-        onSurface: JarvisColors.ink,
-        onSurfaceVariant: JarvisColors.inkSoft,
-        surfaceContainerLowest: JarvisColors.surface,
-        surfaceContainerLow: JarvisColors.canvas,
-        surfaceContainer: JarvisColors.surfaceMuted,
-        surfaceContainerHigh: JarvisColors.surfaceMuted,
-        surfaceContainerHighest: JarvisColors.surfaceRaised,
-        error: JarvisColors.danger,
-        outline: JarvisColors.outlineStrong,
-        outlineVariant: JarvisColors.outline,
+        primaryContainer: colors.accentSoft,
+        onPrimaryContainer: colors.accentDeep,
+        secondary: colors.violet,
+        surface: colors.surface,
+        onSurface: colors.ink,
+        onSurfaceVariant: colors.inkSoft,
+        surfaceContainerLowest: colors.surface,
+        surfaceContainerLow: colors.canvas,
+        surfaceContainer: colors.surfaceMuted,
+        surfaceContainerHigh: colors.surfaceMuted,
+        surfaceContainerHighest: colors.surfaceRaised,
+        error: colors.danger,
+        onError: Colors.white,
+        outline: colors.outlineStrong,
+        outlineVariant: colors.outline,
         surfaceTint: Colors.transparent,
       );
-  final text = _textTheme();
+  final text = _textTheme(colors);
   final buttonShape = RoundedRectangleBorder(
     borderRadius: BorderRadius.circular(JarvisRadii.md),
   );
@@ -159,20 +390,24 @@ ThemeData buildJarvisTheme() {
   );
   final fieldBorder = OutlineInputBorder(
     borderRadius: BorderRadius.circular(JarvisRadii.md),
-    borderSide: const BorderSide(color: JarvisColors.outline),
+    borderSide: BorderSide(color: colors.outline),
   );
+  final overlay = colors.isDark
+      ? SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent)
+      : SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent);
 
   return ThemeData(
-    brightness: Brightness.light,
+    brightness: brightness,
     useMaterial3: true,
     fontFamily: _fontFamily,
     colorScheme: scheme,
     textTheme: text,
-    scaffoldBackgroundColor: JarvisColors.canvas,
+    scaffoldBackgroundColor: colors.canvas,
     splashFactory: InkRipple.splashFactory,
-    splashColor: JarvisColors.ink.withValues(alpha: .04),
-    hoverColor: JarvisColors.ink.withValues(alpha: .03),
-    highlightColor: JarvisColors.ink.withValues(alpha: .04),
+    splashColor: colors.ink.withValues(alpha: .04),
+    hoverColor: colors.ink.withValues(alpha: .03),
+    highlightColor: colors.ink.withValues(alpha: .04),
+    extensions: [colors],
     actionIconTheme: ActionIconThemeData(
       backButtonIconBuilder: (_) =>
           const _RoundIcon(PhosphorIconsRegular.arrowLeft),
@@ -190,45 +425,40 @@ ThemeData buildJarvisTheme() {
       },
     ),
     appBarTheme: AppBarTheme(
-      backgroundColor: JarvisColors.canvas,
-      foregroundColor: JarvisColors.ink,
+      backgroundColor: colors.canvas,
+      foregroundColor: colors.ink,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
       titleSpacing: 20,
-      systemOverlayStyle: SystemUiOverlayStyle.dark.copyWith(
-        statusBarColor: Colors.transparent,
-      ),
-      iconTheme: const IconThemeData(color: JarvisColors.ink, size: 20),
-      actionsIconTheme: const IconThemeData(
-        color: JarvisColors.inkSoft,
-        size: 20,
-      ),
+      systemOverlayStyle: overlay,
+      iconTheme: IconThemeData(color: colors.ink, size: 20),
+      actionsIconTheme: IconThemeData(color: colors.inkSoft, size: 20),
       titleTextStyle: text.titleLarge,
     ),
-    iconTheme: const IconThemeData(color: JarvisColors.inkSoft, size: 20),
+    iconTheme: IconThemeData(color: colors.inkSoft, size: 20),
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(
         iconSize: 20,
-        foregroundColor: JarvisColors.inkSoft,
-        highlightColor: JarvisColors.ink.withValues(alpha: .05),
+        foregroundColor: colors.inkSoft,
+        highlightColor: colors.ink.withValues(alpha: .05),
       ),
     ),
     cardTheme: CardThemeData(
-      color: JarvisColors.surface,
+      color: colors.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 10),
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(JarvisRadii.lg),
-        side: const BorderSide(color: JarvisColors.outline),
+        side: BorderSide(color: colors.outline),
       ),
     ),
     listTileTheme: ListTileThemeData(
-      iconColor: JarvisColors.inkSoft,
-      textColor: JarvisColors.ink,
+      iconColor: colors.inkSoft,
+      textColor: colors.ink,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       minVerticalPadding: 12,
       horizontalTitleGap: 14,
@@ -237,15 +467,15 @@ ThemeData buildJarvisTheme() {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(JarvisRadii.lg),
       ),
-      selectedColor: JarvisColors.ink,
-      selectedTileColor: JarvisColors.surfaceMuted,
+      selectedColor: colors.ink,
+      selectedTileColor: colors.surfaceMuted,
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: JarvisColors.ink,
-        foregroundColor: Colors.white,
-        disabledBackgroundColor: JarvisColors.surfaceRaised,
-        disabledForegroundColor: JarvisColors.muted,
+        backgroundColor: colors.ink,
+        foregroundColor: colors.onInk,
+        disabledBackgroundColor: colors.surfaceRaised,
+        disabledForegroundColor: colors.muted,
         minimumSize: const Size(64, 44),
         padding: const EdgeInsets.symmetric(horizontal: 18),
         shape: buttonShape,
@@ -255,26 +485,26 @@ ThemeData buildJarvisTheme() {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: JarvisColors.ink,
-        backgroundColor: JarvisColors.surface,
+        foregroundColor: colors.ink,
+        backgroundColor: colors.surface,
         minimumSize: const Size(64, 44),
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        side: const BorderSide(color: JarvisColors.outline),
+        side: BorderSide(color: colors.outline),
         shape: buttonShape,
         textStyle: buttonText,
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: JarvisColors.ink,
+        foregroundColor: colors.ink,
         textStyle: buttonText,
         shape: buttonShape,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
-      backgroundColor: JarvisColors.ink,
-      foregroundColor: Colors.white,
+      backgroundColor: colors.ink,
+      foregroundColor: colors.onInk,
       elevation: 0,
       focusElevation: 0,
       hoverElevation: 2,
@@ -285,9 +515,9 @@ ThemeData buildJarvisTheme() {
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: JarvisColors.surface,
+      backgroundColor: colors.surface,
       surfaceTintColor: Colors.transparent,
-      indicatorColor: JarvisColors.accentSoft,
+      indicatorColor: colors.accentSoft,
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           fontFamily: _fontFamily,
@@ -296,30 +526,28 @@ ThemeData buildJarvisTheme() {
               ? FontWeight.w600
               : FontWeight.w500,
           color: states.contains(WidgetState.selected)
-              ? JarvisColors.ink
-              : JarvisColors.muted,
+              ? colors.ink
+              : colors.muted,
         ),
       ),
     ),
     navigationRailTheme: NavigationRailThemeData(
-      backgroundColor: JarvisColors.surface,
-      indicatorColor: JarvisColors.surfaceMuted,
+      backgroundColor: colors.surface,
+      indicatorColor: colors.surfaceMuted,
       indicatorShape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(JarvisRadii.md),
       ),
-      selectedIconTheme: const IconThemeData(color: JarvisColors.ink),
-      unselectedIconTheme: const IconThemeData(color: JarvisColors.muted),
-      selectedLabelTextStyle: text.labelMedium?.copyWith(
-        color: JarvisColors.ink,
-      ),
+      selectedIconTheme: IconThemeData(color: colors.ink),
+      unselectedIconTheme: IconThemeData(color: colors.muted),
+      selectedLabelTextStyle: text.labelMedium?.copyWith(color: colors.ink),
       unselectedLabelTextStyle: text.labelMedium?.copyWith(
-        color: JarvisColors.muted,
+        color: colors.muted,
         fontWeight: FontWeight.w500,
       ),
     ),
     tabBarTheme: TabBarThemeData(
-      labelColor: JarvisColors.ink,
-      unselectedLabelColor: JarvisColors.muted,
+      labelColor: colors.ink,
+      unselectedLabelColor: colors.muted,
       labelStyle: text.labelLarge,
       unselectedLabelStyle: text.labelLarge?.copyWith(
         fontWeight: FontWeight.w500,
@@ -327,84 +555,86 @@ ThemeData buildJarvisTheme() {
       indicatorSize: TabBarIndicatorSize.tab,
       dividerColor: Colors.transparent,
       indicator: BoxDecoration(
-        color: JarvisColors.surface,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(JarvisRadii.sm),
-        boxShadow: JarvisShadows.soft,
+        boxShadow: JarvisShadows.soft(brightness),
       ),
       overlayColor: WidgetStateProperty.all(Colors.transparent),
     ),
     chipTheme: ChipThemeData(
-      backgroundColor: JarvisColors.surface,
-      selectedColor: JarvisColors.surfaceRaised,
-      secondarySelectedColor: JarvisColors.surfaceRaised,
-      checkmarkColor: JarvisColors.ink,
-      side: const BorderSide(color: JarvisColors.outline),
+      backgroundColor: colors.surface,
+      selectedColor: colors.surfaceRaised,
+      secondarySelectedColor: colors.surfaceRaised,
+      checkmarkColor: colors.ink,
+      side: BorderSide(color: colors.outline),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
-      labelStyle: const TextStyle(
+      labelStyle: TextStyle(
         fontFamily: _fontFamily,
         fontSize: 13,
         fontWeight: FontWeight.w500,
-        color: JarvisColors.inkSoft,
+        color: colors.inkSoft,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       showCheckmark: false,
     ),
-    dividerTheme: const DividerThemeData(
-      color: JarvisColors.outline,
+    dividerTheme: DividerThemeData(
+      color: colors.outline,
       thickness: 1,
       space: 1,
     ),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(
-      color: JarvisColors.ink,
-      linearTrackColor: JarvisColors.surfaceRaised,
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      color: colors.ink,
+      linearTrackColor: colors.surfaceRaised,
       circularTrackColor: Colors.transparent,
-      borderRadius: BorderRadius.all(Radius.circular(4)),
+      borderRadius: const BorderRadius.all(Radius.circular(4)),
     ),
     switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.all(Colors.white),
+      thumbColor: WidgetStateProperty.all(colors.surface),
       trackColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
-            ? JarvisColors.ink
-            : JarvisColors.outlineStrong,
+            ? colors.ink
+            : colors.outlineStrong,
       ),
       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: JarvisColors.surface,
+      backgroundColor: colors.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(JarvisRadii.xl),
       ),
       titleTextStyle: text.titleLarge,
-      contentTextStyle: text.bodyMedium?.copyWith(color: JarvisColors.inkSoft),
+      contentTextStyle: text.bodyMedium?.copyWith(color: colors.inkSoft),
       actionsPadding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
     ),
-    bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: JarvisColors.surface,
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: colors.surface,
       surfaceTintColor: Colors.transparent,
       showDragHandle: true,
-      dragHandleColor: JarvisColors.outlineStrong,
-      shape: RoundedRectangleBorder(
+      dragHandleColor: colors.outlineStrong,
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
     ),
     popupMenuTheme: PopupMenuThemeData(
-      color: JarvisColors.surface,
+      color: colors.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 8,
-      shadowColor: const Color(0x22111113),
+      shadowColor: colors.isDark
+          ? const Color(0x66000000)
+          : const Color(0x22111113),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(JarvisRadii.md),
-        side: const BorderSide(color: JarvisColors.outline),
+        side: BorderSide(color: colors.outline),
       ),
       textStyle: text.bodyMedium,
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: JarvisColors.ink,
-      contentTextStyle: text.bodyMedium?.copyWith(color: Colors.white),
-      actionTextColor: Colors.white,
+      backgroundColor: colors.ink,
+      contentTextStyle: text.bodyMedium?.copyWith(color: colors.onInk),
+      actionTextColor: colors.onInk,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(JarvisRadii.md),
@@ -412,12 +642,12 @@ ThemeData buildJarvisTheme() {
     ),
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(
-        color: JarvisColors.ink,
+        color: colors.ink,
         borderRadius: BorderRadius.circular(8),
       ),
-      textStyle: const TextStyle(
+      textStyle: TextStyle(
         fontFamily: _fontFamily,
-        color: Colors.white,
+        color: colors.onInk,
         fontSize: 12,
         fontWeight: FontWeight.w500,
       ),
@@ -425,39 +655,39 @@ ThemeData buildJarvisTheme() {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: JarvisColors.surface,
-      hintStyle: text.bodyMedium?.copyWith(color: JarvisColors.muted),
-      labelStyle: text.bodyMedium?.copyWith(color: JarvisColors.inkSoft),
+      fillColor: colors.surface,
+      hintStyle: text.bodyMedium?.copyWith(color: colors.muted),
+      labelStyle: text.bodyMedium?.copyWith(color: colors.inkSoft),
       floatingLabelStyle: text.bodyMedium?.copyWith(
-        color: JarvisColors.ink,
+        color: colors.ink,
         fontWeight: FontWeight.w500,
       ),
       helperStyle: text.bodySmall,
-      prefixIconColor: JarvisColors.muted,
-      suffixIconColor: JarvisColors.muted,
+      prefixIconColor: colors.muted,
+      suffixIconColor: colors.muted,
       border: fieldBorder,
       enabledBorder: fieldBorder,
       disabledBorder: fieldBorder,
       focusedBorder: fieldBorder.copyWith(
-        borderSide: const BorderSide(color: JarvisColors.ink, width: 1.2),
+        borderSide: BorderSide(color: colors.ink, width: 1.2),
       ),
       errorBorder: fieldBorder.copyWith(
-        borderSide: const BorderSide(color: JarvisColors.danger),
+        borderSide: BorderSide(color: colors.danger),
       ),
       focusedErrorBorder: fieldBorder.copyWith(
-        borderSide: const BorderSide(color: JarvisColors.danger, width: 1.5),
+        borderSide: BorderSide(color: colors.danger, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
     ),
     textSelectionTheme: TextSelectionThemeData(
-      cursorColor: JarvisColors.accent,
-      selectionColor: JarvisColors.accent.withValues(alpha: .18),
-      selectionHandleColor: JarvisColors.accent,
+      cursorColor: colors.accent,
+      selectionColor: colors.accent.withValues(alpha: .18),
+      selectionHandleColor: colors.accent,
     ),
   );
 }
 
-/// Back/close glyph drawn on a soft white disc, matching the shell's round
+/// Back/close glyph drawn on a soft disc, matching the shell's round
 /// top bar buttons.
 class _RoundIcon extends StatelessWidget {
   const _RoundIcon(this.icon);
@@ -465,15 +695,18 @@ class _RoundIcon extends StatelessWidget {
   final IconData icon;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: 36,
-    height: 36,
-    decoration: BoxDecoration(
-      color: JarvisColors.surface,
-      shape: BoxShape.circle,
-      border: Border.all(color: JarvisColors.outline),
-      boxShadow: JarvisShadows.soft,
-    ),
-    child: Icon(icon, size: 18, color: JarvisColors.ink),
-  );
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: colors.surface,
+        shape: BoxShape.circle,
+        border: Border.all(color: colors.outline),
+        boxShadow: JarvisShadows.soft(colors.brightness),
+      ),
+      child: Icon(icon, size: 18, color: colors.ink),
+    );
+  }
 }

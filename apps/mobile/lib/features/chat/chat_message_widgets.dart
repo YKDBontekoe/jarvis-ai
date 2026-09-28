@@ -101,8 +101,8 @@ class _MessageBubbleState extends State<MessageBubble> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             decoration: BoxDecoration(
               color: message.failed
-                  ? JarvisColors.dangerSoft
-                  : JarvisColors.surfaceRaised,
+                  ? JarvisColors.of(context).dangerSoft
+                  : JarvisColors.of(context).surfaceRaised,
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(20),
                 topRight: Radius.circular(20),
@@ -111,7 +111,8 @@ class _MessageBubbleState extends State<MessageBubble> {
               ),
               border: message.failed
                   ? Border.all(
-                      color: JarvisColors.danger.withValues(alpha: .35),
+                      color: JarvisColors.of(context).danger
+                          .withValues(alpha: .35),
                     )
                   : null,
             ),
@@ -120,7 +121,7 @@ class _MessageBubbleState extends State<MessageBubble> {
               style: TextStyle(
                 fontSize: 15.5,
                 height: 1.45,
-                color: JarvisColors.ink,
+                color: JarvisColors.of(context).ink,
               ),
             ),
           ),
@@ -130,7 +131,7 @@ class _MessageBubbleState extends State<MessageBubble> {
               child: TextButton.icon(
                 onPressed: widget.onRetry,
                 style: TextButton.styleFrom(
-                  foregroundColor: JarvisColors.danger,
+                  foregroundColor: JarvisColors.of(context).danger,
                   visualDensity: VisualDensity.compact,
                   textStyle: const TextStyle(
                     fontSize: 13,
@@ -170,8 +171,10 @@ class _RateButton extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       iconSize: 16,
       color: selected
-          ? (up ? JarvisColors.success : JarvisColors.danger)
-          : JarvisColors.muted,
+          ? (up
+                ? JarvisColors.of(context).success
+                : JarvisColors.of(context).danger)
+          : JarvisColors.of(context).muted,
       icon: Icon(
         up
             ? (selected
@@ -230,7 +233,9 @@ class _CopyButton extends StatelessWidget {
     child: TextButton.icon(
       onPressed: onPressed,
       style: TextButton.styleFrom(
-        foregroundColor: copied ? JarvisColors.success : JarvisColors.muted,
+        foregroundColor: copied
+            ? JarvisColors.of(context).success
+            : JarvisColors.of(context).muted,
         visualDensity: VisualDensity.compact,
         minimumSize: const Size(0, 30),
         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -253,78 +258,88 @@ class JarvisMarkdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    const body = TextStyle(
+    final body = TextStyle(
       fontSize: 15.5,
       height: 1.6,
-      color: JarvisColors.ink,
+      color: JarvisColors.of(context).ink,
       letterSpacing: -.1,
     );
     final sheet = MarkdownStyleSheet.fromTheme(theme).copyWith(
       p: body,
-      listBullet: body.copyWith(color: JarvisColors.muted),
-      h1: const TextStyle(
+      listBullet: body.copyWith(color: JarvisColors.of(context).muted),
+      h1: TextStyle(
         fontSize: 22,
         fontWeight: FontWeight.w700,
         height: 1.3,
         letterSpacing: -.5,
-        color: JarvisColors.ink,
+        color: JarvisColors.of(context).ink,
       ),
-      h2: const TextStyle(
+      h2: TextStyle(
         fontSize: 19,
         fontWeight: FontWeight.w700,
         height: 1.3,
         letterSpacing: -.4,
-        color: JarvisColors.ink,
+        color: JarvisColors.of(context).ink,
       ),
-      h3: const TextStyle(
+      h3: TextStyle(
         fontSize: 17,
         fontWeight: FontWeight.w600,
         height: 1.3,
-        color: JarvisColors.ink,
+        color: JarvisColors.of(context).ink,
       ),
       strong: const TextStyle(fontWeight: FontWeight.w700),
-      a: const TextStyle(
-        color: JarvisColors.ink,
+      a: TextStyle(
+        color: JarvisColors.of(context).ink,
         fontWeight: FontWeight.w500,
         decoration: TextDecoration.underline,
-        decorationColor: JarvisColors.outlineStrong,
+        decorationColor: JarvisColors.of(context).outlineStrong,
       ),
-      code: const TextStyle(
+      code: TextStyle(
         fontFamily: 'monospace',
         fontSize: 13.5,
-        backgroundColor: JarvisColors.surfaceMuted,
-        color: JarvisColors.ink,
+        backgroundColor: JarvisColors.of(context).surfaceMuted,
+        color: JarvisColors.of(context).ink,
       ),
       codeblockPadding: const EdgeInsets.all(16),
       codeblockDecoration: BoxDecoration(
-        color: JarvisColors.canvas,
+        color: JarvisColors.of(context).canvas,
         borderRadius: BorderRadius.circular(JarvisRadii.md),
-        border: Border.all(color: JarvisColors.outline),
+        border: Border.all(color: JarvisColors.of(context).outline),
       ),
-      blockquote: const TextStyle(color: JarvisColors.inkSoft, height: 1.55),
+      blockquote: TextStyle(
+        color: JarvisColors.of(context).inkSoft,
+        height: 1.55,
+      ),
       blockquotePadding: const EdgeInsets.fromLTRB(14, 8, 12, 8),
-      blockquoteDecoration: const BoxDecoration(
+      blockquoteDecoration: BoxDecoration(
         border: Border(
-          left: BorderSide(color: JarvisColors.outlineStrong, width: 2),
+          left: BorderSide(
+            color: JarvisColors.of(context).outlineStrong,
+            width: 2,
+          ),
         ),
       ),
-      tableHead: const TextStyle(
+      tableHead: TextStyle(
         fontWeight: FontWeight.w600,
-        color: JarvisColors.ink,
+        color: JarvisColors.of(context).ink,
       ),
-      tableBody: const TextStyle(fontSize: 14.5, color: JarvisColors.ink),
+      tableBody: TextStyle(fontSize: 14.5, color: JarvisColors.of(context).ink),
       tableHeadAlign: TextAlign.left,
       tableBorder: TableBorder.all(
-        color: JarvisColors.outline,
+        color: JarvisColors.of(context).outline,
         borderRadius: BorderRadius.circular(10),
       ),
-      tableCellsDecoration: const BoxDecoration(color: JarvisColors.surface),
+      tableCellsDecoration: BoxDecoration(
+        color: JarvisColors.of(context).surface,
+      ),
       tableCellsPadding: const EdgeInsets.symmetric(
         horizontal: 12,
         vertical: 8,
       ),
-      horizontalRuleDecoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: JarvisColors.outline)),
+      horizontalRuleDecoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: JarvisColors.of(context).outline),
+        ),
       ),
     );
     return MarkdownBody(
@@ -371,9 +386,9 @@ class _TypingIndicatorState extends State<TypingIndicator>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: JarvisColors.surface,
+            color: JarvisColors.of(context).surface,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: JarvisColors.outline),
+            border: Border.all(color: JarvisColors.of(context).outline),
           ),
           child: AnimatedBuilder(
             animation: _controller,
@@ -392,8 +407,8 @@ class _TypingIndicatorState extends State<TypingIndicator>
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Color.lerp(
-                          JarvisColors.outlineStrong,
-                          JarvisColors.inkSoft,
+                          JarvisColors.of(context).outlineStrong,
+                          JarvisColors.of(context).inkSoft,
                           _pulse((_controller.value + i * .18) % 1),
                         ),
                       ),

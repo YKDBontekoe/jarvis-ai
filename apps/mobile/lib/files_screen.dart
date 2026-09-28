@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
 import 'ui/phosphor_icons.dart';
 
 import 'file_download_stub.dart'
@@ -59,9 +60,7 @@ class _FilesScreenState extends State<FilesScreen> {
     try {
       final response = await widget.http.get<dynamic>('/api/v1/files');
       if (mounted && revision == _requestRevision) {
-        setState(
-          () => _files = jsonMaps(response.data),
-        );
+        setState(() => _files = jsonMaps(response.data));
       }
     } on DioException {
       if (mounted && revision == _requestRevision) {
@@ -184,9 +183,8 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _formatSize(dynamic value) {
@@ -222,112 +220,110 @@ class _FilesScreenState extends State<FilesScreen> {
       empty: const EmptyState(
         icon: PhosphorIconsRegular.folderOpen,
         title: 'No files yet',
-        message:
-            'Your files will be stored privately with Jarvis. PDFs and text are indexed so Jarvis can search them.',
+        message: 'Your files will be stored privately with Jarvis. PDFs and text are indexed so Jarvis can search them.',
       ),
       child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-            itemCount: _files.length,
-            itemBuilder: (context, index) {
-              final file = _files[index];
-              final name = asJsonString(file['fileName']) ?? 'File';
-              final icon = _fileIcon(name);
-              final status = asJsonString(file['processingStatus']) ?? 'uploaded';
-              return ContentWidth(
-                child: SurfaceCard(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
-                  onTap: _busy ? null : () => _download(file),
-                  child: Row(
-                    children: [
-                      IconBadge(icon: icon, size: 44),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+        itemCount: _files.length,
+        itemBuilder: (context, index) {
+          final file = _files[index];
+          final name = asJsonString(file['fileName']) ?? 'File';
+          final icon = _fileIcon(name);
+          final status = asJsonString(file['processingStatus']) ?? 'uploaded';
+          return ContentWidth(
+            child: SurfaceCard(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
+              onTap: _busy ? null : () => _download(file),
+              child: Row(
+                children: [
+                  IconBadge(icon: icon, size: 44),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontSize: 15),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(
-                                context,
-                              ).textTheme.titleSmall?.copyWith(fontSize: 15),
+                              _formatSize(file['sizeBytes']),
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Text(
-                                  _formatSize(file['sizeBytes']),
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                StatusPill.forStatus(status),
-                              ],
-                            ),
+                            StatusPill.forStatus(status),
                           ],
                         ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuButton<String>(
+                    enabled: !_busy,
+                    icon: const Icon(PhosphorIconsRegular.dotsThree),
+                    onSelected: (action) {
+                      if (action == 'open') {
+                        _download(file);
+                      } else if (action == 'retry') {
+                        _retryIndexing(file);
+                      } else if (action == 'delete') {
+                        _delete(file);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'open',
+                        child: ListTile(
+                          leading: const Icon(
+                            PhosphorIconsRegular.arrowSquareOut,
+                          ),
+                          title: Text(
+                            kIsWeb ? 'Download' : 'Download and open',
+                          ),
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
-                      PopupMenuButton<String>(
-                        enabled: !_busy,
-                        icon: const Icon(PhosphorIconsRegular.dotsThree),
-                        onSelected: (action) {
-                          if (action == 'open') {
-                            _download(file);
-                          } else if (action == 'retry') {
-                            _retryIndexing(file);
-                          } else if (action == 'delete') {
-                            _delete(file);
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          PopupMenuItem(
-                            value: 'open',
-                            child: ListTile(
-                              leading: const Icon(
-                                PhosphorIconsRegular.arrowSquareOut,
-                              ),
-                              title: Text(
-                                kIsWeb ? 'Download' : 'Download and open',
-                              ),
-                              contentPadding: EdgeInsets.zero,
+                      if (status == 'failed')
+                        const PopupMenuItem(
+                          value: 'retry',
+                          child: ListTile(
+                            leading: Icon(PhosphorIconsRegular.arrowsClockwise),
+                            title: Text('Retry indexing'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: ListTile(
+                          leading: Icon(
+                            PhosphorIconsRegular.trash,
+                            color: JarvisColors.of(context).danger,
+                          ),
+                          title: Text(
+                            'Delete',
+                            style: TextStyle(
+                              color: JarvisColors.of(context).danger,
                             ),
                           ),
-                          if (status == 'failed')
-                            const PopupMenuItem(
-                              value: 'retry',
-                              child: ListTile(
-                                leading: Icon(
-                                  PhosphorIconsRegular.arrowsClockwise,
-                                ),
-                                title: Text('Retry indexing'),
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-                          const PopupMenuItem(
-                            value: 'delete',
-                            child: ListTile(
-                              leading: Icon(
-                                PhosphorIconsRegular.trash,
-                                color: JarvisColors.danger,
-                              ),
-                              title: Text(
-                                'Delete',
-                                style: TextStyle(color: JarvisColors.danger),
-                              ),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                        ],
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
                     ],
                   ),
-                ),
-              );
-            },
-          ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     ),
   );
 
