@@ -80,12 +80,11 @@ class _SkillsScreenState extends State<SkillsScreen> {
   }
 
   Future<void> _open(Map<String, dynamic> skill) async {
+    final id = asJsonString(skill['id']);
+    if (id == null) return;
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => SkillDetailScreen(
-          http: widget.http,
-          skillId: asJsonString(skill['id']) ?? '',
-        ),
+        builder: (_) => SkillDetailScreen(http: widget.http, skillId: id),
       ),
     );
     if (mounted) unawaited(_load());

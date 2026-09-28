@@ -32,6 +32,10 @@ String? jsonString(Map<dynamic, dynamic> map, String key) {
   return value is String && value.isNotEmpty ? value : null;
 }
 
+/// Non-empty string `id` from a JSON object. Wrong types and blanks are null.
+String? jsonId(Map<dynamic, dynamic>? map) =>
+    map == null ? null : jsonString(map, 'id');
+
 String? asJsonString(dynamic value) => value is String ? value : null;
 
 int asJsonInt(dynamic value, [int fallback = 0]) => switch (value) {

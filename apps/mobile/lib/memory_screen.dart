@@ -191,6 +191,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
       if (mounted) await _load(query: _searching ? _query.text.trim() : null);
     } on DioException {
       if (mounted) _showError('Jarvis could not save this memory.');
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not save this memory.');
     } finally {
       content.dispose();
     }
@@ -208,10 +210,14 @@ class _MemoryScreenState extends State<MemoryScreen> {
     );
     if (!delete) return;
     if (!mounted) return;
+    final id = jsonId(memory);
+    if (id == null) return;
     try {
-      await widget.http.delete('/api/v1/memory/${memory['id']}');
+      await widget.http.delete('/api/v1/memory/$id');
       if (mounted) await _load(query: _searching ? _query.text.trim() : null);
     } on DioException {
+      if (mounted) _showError('Jarvis could not delete this memory.');
+    } catch (_) {
       if (mounted) _showError('Jarvis could not delete this memory.');
     }
   }
@@ -296,9 +302,14 @@ class _MemoryScreenState extends State<MemoryScreen> {
       content.dispose();
       return;
     }
+    final id = jsonId(memory);
+    if (id == null) {
+      content.dispose();
+      return;
+    }
     try {
       await widget.http.put(
-        '/api/v1/memory/${memory['id']}',
+        '/api/v1/memory/$id',
         data: {
           'kind': kind,
           'content': content.text.trim(),
@@ -311,16 +322,20 @@ class _MemoryScreenState extends State<MemoryScreen> {
       if (mounted) await _load(query: _searching ? _query.text.trim() : null);
     } on DioException {
       if (mounted) _showError('Jarvis could not correct this memory.');
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not correct this memory.');
     } finally {
       content.dispose();
     }
   }
 
   Future<void> _togglePinned(Map<String, dynamic> memory) async {
+    final id = jsonId(memory);
+    if (id == null) return;
     final pinned = !asJsonBool(memory['isPinned']);
     try {
       await widget.http.put(
-        '/api/v1/memory/${memory['id']}',
+        '/api/v1/memory/$id',
         data: {
           'kind': memory['kind'],
           'content': memory['content'],
@@ -332,6 +347,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
       );
       if (mounted) await _load(query: _searching ? _query.text.trim() : null);
     } on DioException {
+      if (mounted) _showError('Jarvis could not update this memory.');
+    } catch (_) {
       if (mounted) _showError('Jarvis could not update this memory.');
     }
   }

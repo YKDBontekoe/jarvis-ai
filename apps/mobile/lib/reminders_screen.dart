@@ -169,22 +169,28 @@ class _RemindersScreenState extends State<RemindersScreen>
     );
     if (!confirmed) return;
     if (!mounted) return;
+    final id = jsonId(reminder);
+    if (id == null) return;
     try {
-      await widget.http.delete('/api/v1/reminders/${reminder['id']}');
+      await widget.http.delete('/api/v1/reminders/$id');
       if (mounted) await _load();
     } on DioException {
+      if (mounted) _showError('Jarvis could not cancel that reminder.');
+    } catch (_) {
       if (mounted) _showError('Jarvis could not cancel that reminder.');
     }
   }
 
   Future<void> _markRead(Map<String, dynamic> notification) async {
     if (notification['readAt'] != null) return;
+    final id = jsonId(notification);
+    if (id == null) return;
     try {
-      await widget.http.post(
-        '/api/v1/notifications/${notification['id']}/read',
-      );
+      await widget.http.post('/api/v1/notifications/$id/read');
       if (mounted) await _load();
     } on DioException {
+      if (mounted) _showError('Jarvis could not update that notification.');
+    } catch (_) {
       if (mounted) _showError('Jarvis could not update that notification.');
     }
   }

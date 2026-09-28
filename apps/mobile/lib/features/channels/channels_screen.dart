@@ -91,12 +91,11 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
   }
 
   Future<void> _open(Map<String, dynamic> channel) async {
+    final id = asJsonString(channel['id']);
+    if (id == null) return;
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => ChannelDetailScreen(
-          http: widget.http,
-          channelId: asJsonString(channel['id']) ?? '',
-        ),
+        builder: (_) => ChannelDetailScreen(http: widget.http, channelId: id),
       ),
     );
     if (mounted) unawaited(_load());

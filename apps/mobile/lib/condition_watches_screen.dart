@@ -206,6 +206,16 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
 
     setState(() => _creating = true);
     try {
+      final parsedThreshold = double.tryParse(threshold.text);
+      final parsedInterval = int.tryParse(interval.text);
+      if (parsedThreshold == null ||
+          !parsedThreshold.isFinite ||
+          parsedInterval == null ||
+          parsedInterval < 5 ||
+          parsedInterval > 1440) {
+        _showError('Check the threshold and interval.');
+        return;
+      }
       await widget.http.post<void>(
         '/api/v1/watches',
         data: {
@@ -213,8 +223,8 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
           'url': url.text.trim(),
           'jsonPath': jsonPath.text.trim(),
           'comparison': comparison,
-          'threshold': double.parse(threshold.text),
-          'intervalMinutes': int.parse(interval.text),
+          'threshold': parsedThreshold,
+          'intervalMinutes': parsedInterval,
         },
       );
       await _load();
@@ -224,6 +234,10 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
             ? 'The durable watch service is unavailable. Try again shortly.'
             : 'Jarvis could not start that watch. Check that the URL is public HTTPS and returns JSON.';
         _showError(message);
+      }
+    } catch (_) {
+      if (mounted) {
+        _showError('Jarvis could not start that watch.');
       }
     } finally {
       for (final controller in [title, url, jsonPath, threshold, interval]) {
@@ -246,10 +260,14 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
     );
     if (!confirmed) return;
     if (!mounted) return;
+    final id = jsonId(watch);
+    if (id == null) return;
     try {
-      await widget.http.delete<void>('/api/v1/watches/${watch['id']}');
+      await widget.http.delete<void>('/api/v1/watches/$id');
       if (mounted) await _load();
     } on DioException {
+      if (mounted) _showError('Jarvis could not stop that watch.');
+    } catch (_) {
       if (mounted) _showError('Jarvis could not stop that watch.');
     }
   }

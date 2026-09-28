@@ -108,6 +108,10 @@ class _PersonaScreenState extends State<PersonaScreen> {
               'Jarvis could not save that change.',
         );
       }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Jarvis could not save that change.');
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -149,25 +153,35 @@ class _PersonaScreenState extends State<PersonaScreen> {
       ),
     );
     if (result == null) return;
+    final id = jsonId(trait);
+    if (id == null) return;
     await _mutate(
       () => widget.http.patch<void>(
-        '/api/v1/persona/traits/${trait['id']}',
+        '/api/v1/persona/traits/$id',
         data: {'statement': result.$2},
       ),
     );
   }
 
-  Future<void> _togglePin(Map<String, dynamic> trait) => _mutate(
-    () => widget.http.patch<void>(
-      '/api/v1/persona/traits/${trait['id']}',
-      data: {'pinned': !asJsonBool(trait['pinned'])},
-    ),
-  );
+  Future<void> _togglePin(Map<String, dynamic> trait) async {
+    final id = jsonId(trait);
+    if (id == null) return;
+    await _mutate(
+      () => widget.http.patch<void>(
+        '/api/v1/persona/traits/$id',
+        data: {'pinned': !asJsonBool(trait['pinned'])},
+      ),
+    );
+  }
 
-  Future<void> _remove(Map<String, dynamic> trait) => _mutate(
-    () => widget.http.delete<void>('/api/v1/persona/traits/${trait['id']}'),
-    'Jarvis forgot that preference.',
-  );
+  Future<void> _remove(Map<String, dynamic> trait) async {
+    final id = jsonId(trait);
+    if (id == null) return;
+    await _mutate(
+      () => widget.http.delete<void>('/api/v1/persona/traits/$id'),
+      'Jarvis forgot that preference.',
+    );
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(

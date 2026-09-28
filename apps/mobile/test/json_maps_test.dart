@@ -39,6 +39,14 @@ void main() {
     expect(jsonString({'name': 'x'}, 'id'), isNull);
   });
 
+  test('jsonId rejects missing, blank, and non-string ids', () {
+    expect(jsonId({'id': 'abc'}), 'abc');
+    expect(jsonId({'id': ''}), isNull);
+    expect(jsonId({'id': 1}), isNull);
+    expect(jsonId({'name': 'x'}), isNull);
+    expect(jsonId(null), isNull);
+  });
+
   test('firstProblemMessage reads ASP.NET detail and error lists', () {
     expect(
       firstProblemMessage({

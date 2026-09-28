@@ -219,6 +219,9 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
             firstProblemMessage(error.response?.data) ??
             'Jarvis could not save that change.',
       );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Jarvis could not save that change.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }

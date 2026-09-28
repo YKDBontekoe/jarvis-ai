@@ -158,10 +158,14 @@ class _TasksScreenState extends State<TasksScreen> {
     );
     if (!confirmed) return;
     if (!mounted) return;
+    final id = jsonId(task);
+    if (id == null) return;
     try {
-      await widget.http.delete('/api/v1/tasks/${task['id']}');
+      await widget.http.delete('/api/v1/tasks/$id');
       if (mounted) await _load();
     } on DioException {
+      if (mounted) _showError('Jarvis could not cancel that task.');
+    } catch (_) {
       if (mounted) _showError('Jarvis could not cancel that task.');
     }
   }
