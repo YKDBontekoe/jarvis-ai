@@ -3,6 +3,7 @@ using Jarvis.Application.Settings;
 using Jarvis.Application.Usage;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using ChatCompletionOptions = OpenAI.Chat.ChatCompletionOptions;
 
 namespace Jarvis.Agents.ModelProviders;
 
@@ -53,7 +54,6 @@ internal sealed class ChatClientResolver(
             var model = purpose switch
             {
                 ModelPurpose.Background => settings.FastModel ?? settings.ChatModel,
-                ModelPurpose.Reasoning => settings.ReasoningModel ?? settings.ChatModel,
                 _ => settings.ChatModel
             };
             if (model is not null)
@@ -68,6 +68,8 @@ internal sealed class ChatClientResolver(
         }
         else if (ResolveCodexModelOverride(settings, purpose) is { } codexModel)
             client = new SelectedModelChatClient(codexClient, codexModel);
+        if ((purpose is ModelPurpose.Chat or ModelPurpose.Reasoning) && settings.ReasoningEffort is { } effort)
+            client = new ReasoningEffortChatClient(client, effort);
         client = new UsageRecordingChatClient(client, usage, prices, ownerId, provider, PurposeName(purpose), logger);
         _chatClients[(ownerId, purpose)] = client;
         return client;
@@ -115,7 +117,7 @@ internal sealed class ChatClientResolver(
         {
             ModelPurpose.Chat => settings.ChatModel,
             ModelPurpose.Background => settings.FastModel ?? settings.ChatModel,
-            ModelPurpose.Reasoning => settings.ReasoningModel ?? settings.ChatModel,
+            ModelPurpose.Reasoning => settings.ChatModel,
             _ => null
         };
 
@@ -149,6 +151,40 @@ internal sealed class ChatClientResolver(
         {
             options ??= new ChatOptions();
             options.ModelId = modelId;
+            return options;
+        }
+    }
+
+    /// <summary>Applies an owner-selected effort without changing the shared provider client's defaults.</summary>
+    private sealed class ReasoningEffortChatClient(IChatClient inner, string effort) : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            inner.GetResponseAsync(messages, WithEffort(options), cancellationToken);
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+            inner.GetStreamingResponseAsync(messages, WithEffort(options), cancellationToken);
+
+        public object? GetService(Type serviceType, object? serviceKey = null) =>
+            serviceType.IsInstanceOfType(this) ? this : inner.GetService(serviceType, serviceKey);
+
+        public void Dispose() { }
+
+        private ChatOptions WithEffort(ChatOptions? options)
+        {
+            options ??= new ChatOptions();
+            options.AdditionalProperties ??= new AdditionalPropertiesDictionary();
+            options.AdditionalProperties["reasoning_effort"] = effort;
+            var originalFactory = options.RawRepresentationFactory;
+            options.RawRepresentationFactory = client =>
+            {
+                var raw = originalFactory?.Invoke(client) as ChatCompletionOptions ?? new ChatCompletionOptions();
+#pragma warning disable SCME0001 // OpenRouter accepts reasoning_effort as an extra Chat Completions field.
+                raw.Patch.Set("$.reasoning_effort"u8, effort);
+#pragma warning restore SCME0001
+                return raw;
+            };
             return options;
         }
     }

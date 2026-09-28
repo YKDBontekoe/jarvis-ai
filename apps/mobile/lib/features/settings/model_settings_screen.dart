@@ -27,8 +27,9 @@ abstract class _ModelSettingsController extends State<ModelSettingsScreen> {
   final _key = TextEditingController();
   final _chat = TextEditingController();
   final _fast = TextEditingController();
-  final _reasoning = TextEditingController();
   final _embedding = TextEditingController();
+  String _reasoningEffort = '';
+  List<String> _openRouterReasoningEfforts = const [];
   String _provider = 'codex';
   bool _keyConfigured = false;
   bool _loading = true;
@@ -54,6 +55,8 @@ abstract class _ModelSettingsController extends State<ModelSettingsScreen> {
   Future<void> _pickCodex(TextEditingController controller);
   Future<void> _pick(TextEditingController controller, String title);
   List<Map<String, dynamic>> get _visibleCodexModels;
+  List<String> get _reasoningEfforts;
+  String? get _defaultReasoningEffort;
 }
 
 class _ModelSettingsScreenState extends _ModelSettingsController
@@ -69,7 +72,6 @@ class _ModelSettingsScreenState extends _ModelSettingsController
     _key.dispose();
     _chat.dispose();
     _fast.dispose();
-    _reasoning.dispose();
     _embedding.dispose();
     super.dispose();
   }
@@ -80,7 +82,7 @@ class _ModelSettingsScreenState extends _ModelSettingsController
     _provider = asJsonString(data['provider']) ?? 'codex';
     _chat.text = asJsonString(data['chatModel']) ?? '';
     _fast.text = asJsonString(data['fastModel']) ?? '';
-    _reasoning.text = asJsonString(data['reasoningModel']) ?? '';
+    _reasoningEffort = asJsonString(data['reasoningEffort']) ?? '';
     _embedding.text = asJsonString(data['embeddingModel']) ?? '';
   }
 
@@ -97,6 +99,9 @@ class _ModelSettingsScreenState extends _ModelSettingsController
         _error = null;
       });
       await _loadCodex(revision);
+      if (_provider == 'openrouter' && _chat.text.trim().isNotEmpty) {
+        unawaited(_loadOpenRouterReasoningEfforts(_chat.text.trim(), revision));
+      }
     } on DioException catch (error) {
       if (!mounted || revision != _requestRevision) return;
       setState(() {
@@ -145,6 +150,10 @@ class _ModelSettingsScreenState extends _ModelSettingsController
       setState(() {
         _applyCodex(data);
         _codexLoading = false;
+        final efforts = _effortsForCodexModel(_catalogModel(_chat.text));
+        if (_reasoningEffort.isNotEmpty && !efforts.contains(_reasoningEffort)) {
+          _reasoningEffort = '';
+        }
       });
     } on DioException catch (error) {
       if (!mounted || expected != _requestRevision) return;
@@ -161,6 +170,40 @@ class _ModelSettingsScreenState extends _ModelSettingsController
         _codexError =
             'Could not load the models supported by the installed Codex CLI.';
       });
+    }
+  }
+
+  Future<void> _loadOpenRouterReasoningEfforts(
+    String model,
+    int revision,
+  ) async {
+    try {
+      final response = await widget.http.get<dynamic>(
+        '/api/v1/settings/models/openrouter/catalog',
+        queryParameters: {'search': model},
+      );
+      if (!mounted || revision != _requestRevision) return;
+      final models = jsonMaps(response.data);
+      final selected = models.where(
+        (candidate) => asJsonString(candidate['id']) == model,
+      );
+      final efforts = selected.isEmpty
+          ? <String>[]
+          : (selected.first['supportedReasoningEfforts'] as List<dynamic>? ??
+                    const [])
+                .map(asJsonString)
+                .whereType<String>()
+                .toList();
+      setState(() {
+        _openRouterReasoningEfforts = efforts;
+        if (_reasoningEffort.isNotEmpty &&
+            !efforts.contains(_reasoningEffort)) {
+          _reasoningEffort = '';
+        }
+      });
+    } catch (_) {
+      if (!mounted || revision != _requestRevision) return;
+      setState(() => _openRouterReasoningEfforts = const []);
     }
   }
 
@@ -209,6 +252,37 @@ class _ModelSettingsScreenState extends _ModelSettingsController
     ];
   }
 
+  Map<String, dynamic>? _catalogModel(String selected) {
+    final id = selected.trim();
+    if (id.isEmpty) {
+      for (final model in _codexModels) {
+        if (asJsonBool(model['isDefault'])) return model;
+      }
+      return null;
+    }
+    for (final model in _codexModels) {
+      if ((asJsonString(model['model']) ?? asJsonString(model['id'])) == id) {
+        return model;
+      }
+    }
+    return null;
+  }
+
+  List<String> _effortsForCodexModel(Map<String, dynamic>? model) =>
+      jsonMaps(model?['supportedReasoningEfforts'])
+          .map((effort) => asJsonString(effort['reasoningEffort']))
+          .whereType<String>()
+          .toList();
+
+  @override
+  List<String> get _reasoningEfforts => _provider == 'openrouter'
+      ? _openRouterReasoningEfforts
+      : _effortsForCodexModel(_catalogModel(_chat.text));
+
+  @override
+  String? get _defaultReasoningEffort =>
+      asJsonString(_catalogModel(_chat.text)?['defaultReasoningEffort']);
+
   @override
   Future<void> _pickCodex(TextEditingController controller) async {
     final selected = controller.text.trim();
@@ -222,12 +296,21 @@ class _ModelSettingsScreenState extends _ModelSettingsController
     final picked = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => CodexModelPicker(
-        models: models,
-        selected: selected,
-      ),
+      builder: (_) => CodexModelPicker(models: models, selected: selected),
     );
-    if (picked != null && mounted) setState(() => controller.text = picked);
+    if (picked != null && mounted) {
+      setState(() {
+        controller.text = picked;
+        if (controller == _chat) {
+          final selectedModel = _catalogModel(picked);
+          final efforts = _effortsForCodexModel(selectedModel);
+          if (_reasoningEffort.isNotEmpty &&
+              !efforts.contains(_reasoningEffort)) {
+            _reasoningEffort = '';
+          }
+        }
+      });
+    }
   }
 
   Future<void> _run(
@@ -305,7 +388,7 @@ class _ModelSettingsScreenState extends _ModelSettingsController
         'provider': _provider,
         'chatModel': _chat.text.trim(),
         'fastModel': _fast.text.trim(),
-        'reasoningModel': _reasoning.text.trim(),
+        'reasoningEffort': _reasoningEffort,
         'embeddingModel': _embedding.text.trim(),
       },
     ),
@@ -351,7 +434,13 @@ class _ModelSettingsScreenState extends _ModelSettingsController
       isScrollControlled: true,
       builder: (_) => OpenRouterModelPicker(http: widget.http, title: title),
     );
-    if (picked != null && mounted) setState(() => controller.text = picked);
+    if (picked != null && mounted) {
+      setState(() => controller.text = picked);
+      if (controller == _chat) {
+        final effortRevision = _requestRevision;
+        await _loadOpenRouterReasoningEfforts(picked, effortRevision);
+      }
+    }
   }
 
   @override

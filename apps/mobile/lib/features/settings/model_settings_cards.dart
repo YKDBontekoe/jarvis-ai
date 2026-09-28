@@ -243,11 +243,12 @@ mixin _ModelSettingsCards on _ModelSettingsController {
     }
 
     final chatSelected = _chat.text.trim();
-    final reasoningSelected = _reasoning.text.trim();
     final codexChatHelper = codexFieldHelper(chatSelected);
-    final codexReasoningHelper =
-        'Used for reflection, dreaming, and durable background tasks. '
-        '${codexFieldHelper(reasoningSelected)}';
+    final reasoningEfforts = _reasoningEfforts;
+    final defaultEffort = _defaultReasoningEffort;
+    final selectedEffort = reasoningEfforts.contains(_reasoningEffort)
+        ? _reasoningEffort
+        : '';
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -268,15 +269,33 @@ mixin _ModelSettingsCards on _ModelSettingsController {
               'Fast model (optional)',
               'Used for memory extraction and reranking. Defaults to the chat model.',
             ),
-          field(
-            _reasoning,
-            'Reasoning model (optional)',
-            openRouter
-                ? 'Used for reflection, dreaming, and durable background tasks. Defaults to the chat model.'
-                : codexReasoningHelper,
-            key: const Key('reasoning-model'),
-            codexModels: codexPicker,
-            browseCodexKey: 'browse-codex-reasoning-models',
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: DropdownButtonFormField<String>(
+              key: const Key('reasoning-effort'),
+              initialValue: selectedEffort,
+              decoration: InputDecoration(
+                labelText: 'Reasoning effort',
+                helperText: reasoningEfforts.isEmpty
+                    ? 'The selected model does not advertise adjustable reasoning levels. Its default will be used.'
+                    : 'Applied to the selected chat model for reflection, dreaming, and other reasoning tasks. The model default is used unless you choose a level.',
+                helperMaxLines: 3,
+              ),
+              items: [
+                DropdownMenuItem(
+                  value: '',
+                  child: Text(
+                    defaultEffort == null
+                        ? 'Model default'
+                        : 'Model default ($defaultEffort)',
+                  ),
+                ),
+                for (final effort in reasoningEfforts)
+                  DropdownMenuItem(value: effort, child: Text(effort)),
+              ],
+              onChanged: (value) =>
+                  setState(() => _reasoningEffort = value ?? ''),
+            ),
           ),
           field(
             _embedding,

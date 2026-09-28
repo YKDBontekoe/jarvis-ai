@@ -45,7 +45,7 @@ public sealed class CodexInstallationTests : IDisposable
         using var document = JsonDocument.Parse("""
             [
               {"id":"gpt-5.4-mini","model":"gpt-5.4-mini","displayName":"GPT-5.4 Mini","hidden":false,"isDefault":false,"inputModalities":["text"]},
-              {"id":"gpt-5.4","model":"gpt-5.4","displayName":"GPT-5.4","description":"Default","hidden":false,"isDefault":true,"inputModalities":["text","image"]},
+              {"id":"gpt-5.4","model":"gpt-5.4","displayName":"GPT-5.4","description":"Default","hidden":false,"isDefault":true,"inputModalities":["text","image"],"supportedReasoningEfforts":[{"reasoningEffort":"low","description":"Lower latency"},{"reasoningEffort":"high","description":"More reasoning"}],"defaultReasoningEffort":"medium"},
               {"model":"legacy","hidden":true,"isDefault":false},
               {"displayName":"missing id"}
             ]
@@ -56,6 +56,8 @@ public sealed class CodexInstallationTests : IDisposable
         Assert.Equal(["gpt-5.4", "gpt-5.4-mini", "legacy"], models.Select(model => model.Model));
         Assert.True(models[0].IsDefault);
         Assert.True(models[0].SupportsImages);
+        Assert.Equal(["low", "high"], models[0].SupportedReasoningEfforts.Select(effort => effort.ReasoningEffort));
+        Assert.Equal("medium", models[0].DefaultReasoningEffort);
         Assert.False(models[1].SupportsImages);
         Assert.Equal(["text", "image"], models[2].InputModalities);
         Assert.True(models[2].Hidden);

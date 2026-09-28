@@ -7,7 +7,8 @@ using Microsoft.Extensions.AI;
 namespace Jarvis.Agents.ModelProviders;
 
 public sealed record OpenRouterModel(string Id, string Name, int? ContextLength, decimal? PromptPricePerMillion,
-    decimal? CompletionPricePerMillion, bool SupportsTools, bool SupportsImages);
+    decimal? CompletionPricePerMillion, bool SupportsTools, bool SupportsImages,
+    IReadOnlyList<string> SupportedReasoningEfforts);
 
 public sealed record ModelConnectionTest(bool Ok, string Provider, string? Model, long LatencyMs, string? Error);
 
@@ -117,7 +118,11 @@ public sealed class OpenRouterCatalog(HttpClient http, OpenAiCompatibleClientFac
                          architecture.TryGetProperty("input_modalities", out var modalities) &&
                          modalities.ValueKind == JsonValueKind.Array &&
                          modalities.EnumerateArray().Any(value => value.GetString() == "image");
-            models.Add(new OpenRouterModel(id, name, context, prompt, completion, parameters.Contains("tools"), images));
+            var reasoningEfforts = parameters.Contains("reasoning") || parameters.Contains("reasoning_effort")
+                ? new[] { "low", "medium", "high" }
+                : [];
+            models.Add(new OpenRouterModel(id, name, context, prompt, completion, parameters.Contains("tools"), images,
+                reasoningEfforts));
         }
         return models.OrderBy(model => model.Name, StringComparer.OrdinalIgnoreCase).ToArray();
     }

@@ -14,7 +14,11 @@ public sealed record CodexSupportedModel(
     bool IsDefault,
     bool Hidden,
     bool SupportsImages,
-    IReadOnlyList<string> InputModalities);
+    IReadOnlyList<string> InputModalities,
+    IReadOnlyList<ReasoningEffortOption> SupportedReasoningEfforts,
+    string? DefaultReasoningEffort);
+
+public sealed record ReasoningEffortOption(string ReasoningEffort, string Description);
 
 public sealed record CodexRealtimeVoice(string Id, string Name, bool IsDefault);
 
@@ -151,9 +155,20 @@ public sealed partial class CodexInstallation(
             {
                 modalities = ["text", "image"];
             }
+            var efforts = item.TryGetProperty("supportedReasoningEfforts", out var effortsElement) &&
+                          effortsElement.ValueKind == JsonValueKind.Array
+                ? effortsElement.EnumerateArray()
+                    .Select(value => new ReasoningEffortOption(
+                        ReadString(value, "reasoningEffort") ?? string.Empty,
+                        ReadString(value, "description") ?? string.Empty))
+                    .Where(value => !string.IsNullOrWhiteSpace(value.ReasoningEffort))
+                    .ToArray()
+                : [];
+            var defaultEffort = ReadString(item, "defaultReasoningEffort");
             models.Add(new CodexSupportedModel(id, model, displayName,
                 string.IsNullOrWhiteSpace(description) ? null : description,
-                isDefault, hidden, modalities.Contains("image", StringComparer.OrdinalIgnoreCase), modalities));
+                isDefault, hidden, modalities.Contains("image", StringComparer.OrdinalIgnoreCase), modalities,
+                efforts, defaultEffort));
         }
         return models
             .OrderByDescending(model => model.IsDefault)

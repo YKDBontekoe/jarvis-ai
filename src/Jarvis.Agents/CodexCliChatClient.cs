@@ -81,6 +81,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
         var tools = options?.Tools?.OfType<AIFunction>().ToArray() ?? [];
         var prompt = BuildPrompt(messages, options, tools, enableWebSearch);
         return await RunCodexAsync(prompt, options?.ModelId ?? model,
+            GetReasoningEffort(options),
             tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal), null, cancellationToken);
     }
 
@@ -96,6 +97,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
             SingleWriter = true
         });
         var runTask = RunCodexAsync(prompt, options?.ModelId ?? model,
+            GetReasoningEffort(options),
             tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal), updates.Writer, cancellationToken);
         try
         {
@@ -111,6 +113,12 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
 
     public object? GetService(Type serviceType, object? serviceKey = null) =>
         serviceType.IsInstanceOfType(this) ? this : null;
+
+    private static string? GetReasoningEffort(ChatOptions? options) =>
+        options?.AdditionalProperties is not null &&
+        options.AdditionalProperties.TryGetValue("reasoning_effort", out var effort)
+            ? effort?.ToString()
+            : null;
 
     public void Dispose()
     {
@@ -128,7 +136,8 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
         return selector;
     }
 
-    private async Task<ChatResponse> RunCodexAsync(PromptPayload prompt, string? requestedModel, IReadOnlySet<string> toolNames,
+    private async Task<ChatResponse> RunCodexAsync(PromptPayload prompt, string? requestedModel,
+        string? reasoningEffort, IReadOnlySet<string> toolNames,
         ChannelWriter<ChatResponseUpdate>? updates, CancellationToken cancellationToken)
     {
         await _processSlots.WaitAsync(cancellationToken);
@@ -177,7 +186,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                 var webSearches = 0;
                 try
                 {
-                    var turn = await rpc.RunTurnAsync(threadId, prompt, resolvedModel, delta =>
+                    var turn = await rpc.RunTurnAsync(threadId, prompt, resolvedModel, reasoningEffort, delta =>
                     {
                         if (rawResponse.Length + delta.Length > MaxOutputLength)
                             throw new InvalidOperationException("Codex CLI response exceeded the output size limit.");
@@ -256,7 +265,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                     var retryOutcome = "failed";
                     try
                     {
-                        var retry = await rpc.RunTurnAsync(threadId, retryPrompt, resolvedModel, delta =>
+                        var retry = await rpc.RunTurnAsync(threadId, retryPrompt, resolvedModel, reasoningEffort, delta =>
                         {
                             if (rawResponse.Length + delta.Length > MaxOutputLength)
                                 throw new InvalidOperationException("Codex CLI response exceeded the output size limit.");
@@ -662,7 +671,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
         }
 
         public async Task<CodexTurnMetrics> RunTurnAsync(string threadId, PromptPayload prompt, string modelId,
-            Action<string> onDelta, CancellationToken cancellationToken)
+            string? reasoningEffort, Action<string> onDelta, CancellationToken cancellationToken)
         {
             _latestUsage = null;
             var webSearches = 0;
@@ -673,6 +682,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
             {
                 threadId,
                 model = modelId,
+                effort = reasoningEffort,
                 approvalPolicy = "never",
                 sandboxPolicy = new { type = "readOnly", networkAccess = false },
                 input = new object[] { new { type = "text", text = prompt.Text } }

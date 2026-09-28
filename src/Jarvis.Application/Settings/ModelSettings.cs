@@ -10,7 +10,7 @@ public sealed partial record ModelSettings(
     string Provider,
     string? ChatModel = null,
     string? FastModel = null,
-    string? ReasoningModel = null,
+    string? ReasoningEffort = null,
     string? EmbeddingModel = null)
 {
     public const string Codex = "codex";
@@ -34,12 +34,21 @@ public sealed partial record ModelSettings(
             throw new ArgumentException("Choose codex or openrouter as the model provider.", nameof(Provider));
         var chat = NormalizeModel(ChatModel, nameof(ChatModel));
         var fast = NormalizeModel(FastModel, nameof(FastModel));
-        var reasoning = NormalizeModel(ReasoningModel, nameof(ReasoningModel));
+        var reasoning = NormalizeReasoningEffort(ReasoningEffort);
         var embedding = NormalizeModel(EmbeddingModel, nameof(EmbeddingModel));
         if (provider == OpenRouter && chat is null)
             throw new ArgumentException("Choose an OpenRouter chat model, such as anthropic/claude-sonnet-4.5.",
                 nameof(ChatModel));
         return new ModelSettings(provider, chat, fast, reasoning, embedding);
+    }
+
+    private static string? NormalizeReasoningEffort(string? value)
+    {
+        var trimmed = value?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(trimmed)) return null;
+        if (trimmed is not ("none" or "minimal" or "low" or "medium" or "high" or "xhigh" or "max" or "ultra"))
+            throw new ArgumentException("Choose a supported reasoning effort for the selected model.", nameof(ReasoningEffort));
+        return trimmed;
     }
 
     private static string? NormalizeModel(string? value, string field)

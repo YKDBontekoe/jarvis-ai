@@ -125,22 +125,24 @@ public sealed class ModelProviderTests
     }
 
     [Fact]
-    public async Task Resolver_applies_owner_codex_reasoning_model()
+    public async Task Resolver_applies_owner_codex_reasoning_effort_to_the_selected_model()
     {
         var codex = new NamedClient("codex");
         var settings = new InMemorySettingsStore();
         await settings.SaveAsync(Owner, SettingsSections.Models,
-            new ModelSettings(ModelSettings.Codex, ChatModel: "gpt-5.4", ReasoningModel: "gpt-5.4-pro"),
+            new ModelSettings(ModelSettings.Codex, ChatModel: "gpt-5.4", ReasoningEffort: "high"),
             CancellationToken.None);
 
         var resolver = CreateResolver(codex, settings, new InMemoryCredentialStore());
         var reasoning = await resolver.GetChatClientAsync(Owner, ModelPurpose.Reasoning, CancellationToken.None);
         _ = await reasoning.GetResponseAsync([new ChatMessage(ChatRole.User, "think")]);
-        Assert.Equal("gpt-5.4-pro", codex.LastOptions?.ModelId);
+        Assert.Equal("gpt-5.4", codex.LastOptions?.ModelId);
+        Assert.Equal("high", codex.LastOptions?.AdditionalProperties?["reasoning_effort"]);
 
         var chat = await resolver.GetChatClientAsync(Owner, ModelPurpose.Chat, CancellationToken.None);
         _ = await chat.GetResponseAsync([new ChatMessage(ChatRole.User, "hi")]);
         Assert.Equal("gpt-5.4", codex.LastOptions?.ModelId);
+        Assert.Equal("high", codex.LastOptions?.AdditionalProperties?["reasoning_effort"]);
     }
 
     [Fact]

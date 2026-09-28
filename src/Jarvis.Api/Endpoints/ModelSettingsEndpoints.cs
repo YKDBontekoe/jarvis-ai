@@ -8,12 +8,13 @@ using Jarvis.Application.Settings;
 
 namespace Jarvis.Api.Endpoints;
 
-public sealed record ModelSettingsDto(string Provider, string? ChatModel, string? FastModel, string? ReasoningModel,
+public sealed record ModelSettingsDto(string Provider, string? ChatModel, string? FastModel, string? ReasoningEffort,
     string? EmbeddingModel, bool OpenRouterKeyConfigured, IReadOnlyList<string> Providers);
 public sealed record SaveModelSettingsRequest(string? Provider, string? ChatModel, string? FastModel,
-    string? ReasoningModel, string? EmbeddingModel);
+    string? ReasoningEffort, string? EmbeddingModel);
 public sealed record CodexModelDto(string Id, string Model, string DisplayName, string? Description, bool IsDefault,
-    bool Hidden, bool SupportsImages, IReadOnlyList<string> InputModalities);
+    bool Hidden, bool SupportsImages, IReadOnlyList<string> InputModalities,
+    IReadOnlyList<ReasoningEffortOption> SupportedReasoningEfforts, string? DefaultReasoningEffort);
 public sealed record CodexInstallationDto(string? InstalledVersion, string? LatestVersion, bool UpdateAvailable,
     bool CanUpdate, bool UsingManagedInstall, string? UpdateBlockedReason, string? Error,
     IReadOnlyList<CodexModelDto> Models);
@@ -37,7 +38,7 @@ internal static class ModelSettingsEndpoints
             try
             {
                 normalized = new ModelSettings(request.Provider ?? ModelSettings.Codex, request.ChatModel,
-                    request.FastModel, request.ReasoningModel, request.EmbeddingModel).Normalize();
+                    request.FastModel, request.ReasoningEffort, request.EmbeddingModel).Normalize();
             }
             catch (ArgumentException exception)
             {
@@ -51,9 +52,15 @@ internal static class ModelSettingsEndpoints
                     if (normalized.ChatModel is not null && !catalog.SupportsModel(normalized.ChatModel))
                         return EndpointHelpers.Invalid("chatModel",
                             $"The installed Codex CLI does not support '{normalized.ChatModel}'. Choose a listed model or update Codex.");
-                    if (normalized.ReasoningModel is not null && !catalog.SupportsModel(normalized.ReasoningModel))
-                        return EndpointHelpers.Invalid("reasoningModel",
-                            $"The installed Codex CLI does not support '{normalized.ReasoningModel}'. Choose a listed model or update Codex.");
+                    var selectedModel = normalized.ChatModel is null
+                        ? catalog.Models.FirstOrDefault(model => model.IsDefault)
+                        : catalog.Models.FirstOrDefault(model => model.Model == normalized.ChatModel ||
+                            model.Id == normalized.ChatModel);
+                    if (normalized.ReasoningEffort is not null && selectedModel is not null &&
+                        selectedModel.SupportedReasoningEfforts.All(effort =>
+                            !effort.ReasoningEffort.Equals(normalized.ReasoningEffort, StringComparison.OrdinalIgnoreCase)))
+                        return EndpointHelpers.Invalid("reasoningEffort",
+                            $"The selected Codex model does not support '{normalized.ReasoningEffort}' reasoning effort.");
                 }
             }
             if (normalized.UsesOpenRouter && !await HasOpenRouterKeyAsync(currentUser.OwnerId, credentials, ct))
@@ -93,7 +100,7 @@ internal static class ModelSettingsEndpoints
                         Provider = ModelSettings.Codex,
                         ChatModel = null,
                         FastModel = null,
-                        ReasoningModel = null
+                        ReasoningEffort = null
                     }
                     : current;
                 if (updated.UsesOpenRouterEmbeddings)
@@ -155,7 +162,7 @@ internal static class ModelSettingsEndpoints
         IIntegrationCredentialStore credentials, CancellationToken ct)
     {
         var current = await settings.GetAsync<ModelSettings>(ownerId, SettingsSections.Models, ct) ?? ModelSettings.Default;
-        return new ModelSettingsDto(current.Provider, current.ChatModel, current.FastModel, current.ReasoningModel,
+        return new ModelSettingsDto(current.Provider, current.ChatModel, current.FastModel, current.ReasoningEffort,
             current.EmbeddingModel,
             await HasOpenRouterKeyAsync(ownerId, credentials, ct), ModelSettings.Providers);
     }
@@ -164,7 +171,8 @@ internal static class ModelSettingsEndpoints
         new(status.InstalledVersion, status.LatestVersion, status.UpdateAvailable, status.CanUpdate,
             status.UsingManagedInstall, status.UpdateBlockedReason, status.Error,
             status.Models.Select(model => new CodexModelDto(model.Id, model.Model, model.DisplayName, model.Description,
-                model.IsDefault, model.Hidden, model.SupportsImages, model.InputModalities)).ToArray());
+                model.IsDefault, model.Hidden, model.SupportsImages, model.InputModalities,
+                model.SupportedReasoningEfforts, model.DefaultReasoningEffort)).ToArray());
 
     private static async Task<bool> HasOpenRouterKeyAsync(Guid ownerId, IIntegrationCredentialStore credentials,
         CancellationToken ct) =>

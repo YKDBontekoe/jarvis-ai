@@ -13,7 +13,7 @@ Map<String, Object?> _settings({
   'provider': provider,
   'chatModel': chatModel,
   'fastModel': null,
-  'reasoningModel': null,
+  'reasoningEffort': null,
   'embeddingModel': embeddingModel,
   'openRouterKeyConfigured': keyConfigured,
   'providers': ['codex', 'openrouter'],
