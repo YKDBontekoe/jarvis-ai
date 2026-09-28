@@ -15,7 +15,6 @@ COMPOSE_FILE = REPO_ROOT / "infra" / "compose" / "docker-compose.production.yml"
 IMAGE_DEFAULTS = {
     "JARVIS_API_IMAGE": "ghcr.io/ykdbontekoe/jarvis-ai/api:latest",
     "JARVIS_WORKER_IMAGE": "ghcr.io/ykdbontekoe/jarvis-ai/worker:latest",
-    "JARVIS_VOICE_WORKER_IMAGE": "ghcr.io/ykdbontekoe/jarvis-ai/voice-worker:latest",
 }
 
 REQUIRED_ENV = {
@@ -52,13 +51,13 @@ class ProductionComposeImageTests(unittest.TestCase):
         found = dict(_IMAGE_LINE.findall(text))
         self.assertEqual(found, IMAGE_DEFAULTS)
         self.assertIn("dockerfile: infra/compose/Dockerfile", text)
-        self.assertIn("dockerfile: workers/voice/Dockerfile", text)
+        self.assertNotIn("dockerfile: workers/voice/Dockerfile", text)
+        self.assertNotIn("jarvis-voice-worker", text)
 
     def test_image_vars_override_defaults(self) -> None:
         env = {
             "JARVIS_API_IMAGE": "ghcr.io/example/jarvis-ai/api:deadbeef",
             "JARVIS_WORKER_IMAGE": "ghcr.io/example/jarvis-ai/worker:deadbeef",
-            "JARVIS_VOICE_WORKER_IMAGE": "ghcr.io/example/jarvis-ai/voice-worker:deadbeef",
         }
         rendered = _IMAGE_LINE.sub(
             lambda match: f"    image: {env.get(match.group(1), match.group(2))}",
@@ -66,7 +65,7 @@ class ProductionComposeImageTests(unittest.TestCase):
         )
         self.assertIn("image: ghcr.io/example/jarvis-ai/api:deadbeef", rendered)
         self.assertIn("image: ghcr.io/example/jarvis-ai/worker:deadbeef", rendered)
-        self.assertIn("image: ghcr.io/example/jarvis-ai/voice-worker:deadbeef", rendered)
+        self.assertNotIn("voice-worker", rendered)
 
     @unittest.skipUnless(shutil.which("docker"), "docker is not installed")
     def test_docker_compose_config_interpolates_images(self) -> None:
@@ -77,7 +76,6 @@ class ProductionComposeImageTests(unittest.TestCase):
                 [
                     "JARVIS_API_IMAGE=ghcr.io/example/jarvis-ai/api:deadbeef",
                     "JARVIS_WORKER_IMAGE=ghcr.io/example/jarvis-ai/worker:deadbeef",
-                    "JARVIS_VOICE_WORKER_IMAGE=ghcr.io/example/jarvis-ai/voice-worker:deadbeef",
                 ]
             )
             env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -100,9 +98,7 @@ class ProductionComposeImageTests(unittest.TestCase):
             rendered = completed.stdout
             self.assertIn("ghcr.io/example/jarvis-ai/api:deadbeef", rendered)
             self.assertIn("ghcr.io/example/jarvis-ai/worker:deadbeef", rendered)
-            self.assertIn(
-                "ghcr.io/example/jarvis-ai/voice-worker:deadbeef", rendered
-            )
+            self.assertNotIn("voice-worker", rendered)
 
 
 if __name__ == "__main__":

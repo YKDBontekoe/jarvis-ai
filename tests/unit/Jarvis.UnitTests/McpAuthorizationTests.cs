@@ -3,6 +3,7 @@ using System.Text.Json;
 using Jarvis.Agents;
 using Jarvis.Api.Realtime;
 using Jarvis.Application.Integrations;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Xunit;
 
@@ -116,15 +117,35 @@ public sealed class CodexWebSearchTests
     }
 }
 
-public sealed class VoiceConversationCoordinatorTests
+public sealed class VoiceToolsTests
 {
     [Fact]
-    public void Spoken_voice_replies_use_the_completed_agent_message()
+    public void Voice_approval_ids_are_distinct_from_chat_approvals()
     {
-        var message = new Jarvis.Domain.Conversations.Message(Guid.NewGuid(), "assistant", "Reminder set for 7am.");
-        Assert.Equal("Reminder set for 7am.",
-            VoiceConversationCoordinator.ToSpokenResponse(new Jarvis.Api.Conversations.ConversationTurnResult.Completed(message)));
-        Assert.Equal(VoiceConversationCoordinator.ApprovalNeeded,
-            VoiceConversationCoordinator.ToSpokenResponse(new Jarvis.Api.Conversations.ConversationTurnResult.AwaitingApproval([])));
+        var id = VoiceTools.NewApprovalRequestId();
+        Assert.True(VoiceTools.IsVoiceApproval(id));
+        Assert.False(VoiceTools.IsVoiceApproval("chat-approval"));
+        Assert.Equal(VoiceTools.ApprovalNeeded,
+            "I need your approval before I can continue. Check the Jarvis app.");
+    }
+
+    [Fact]
+    public void Approval_required_functions_are_detected_and_unwrapped()
+    {
+        var inner = AIFunctionFactory.Create(() => "ran", "fixture_action");
+        var gated = new ApprovalRequiredAIFunction(inner);
+        Assert.True(VoiceTools.RequiresApproval(gated));
+        Assert.False(VoiceTools.RequiresApproval(inner));
+        Assert.Same(inner, VoiceTools.UnwrapApprovals(gated));
+        Assert.Equal("fixture_action", VoiceTools.Describe(gated).Name);
+        Assert.True(VoiceTools.Describe(gated).RequiresApproval);
+    }
+
+    [Fact]
+    public void Voice_realtime_instructions_keep_tools_on_the_fast_path()
+    {
+        Assert.Contains("Call them yourself during this voice session", VoiceTools.VoiceRealtimeAppendix);
+        Assert.Contains("do not wait for a separate chat conversion", VoiceTools.VoiceRealtimeAppendix);
+        Assert.DoesNotContain("Speak only the Jarvis answer", VoiceTools.VoiceRealtimeAppendix);
     }
 }

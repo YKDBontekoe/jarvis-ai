@@ -35,18 +35,7 @@ public sealed class JarvisAgentFactory(
     {
         var modelClass = configuration["Jarvis:ModelClass"];
         if (string.IsNullOrWhiteSpace(modelClass)) modelClass = null;
-        var tools = Browser.BrowserToolWrapping.Wrap(mcpTools,
-            services.GetRequiredService<Jarvis.Application.Browser.IBrowserSessionStore>(),
-            context.ConversationId,
-            services.GetRequiredService<Jarvis.Application.Realtime.IRealtimePublisher>(),
-            services.GetRequiredService<ICurrentUser>()).ToList();
-        var toolNames = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
-        foreach (var tool in toolContributors.SelectMany(contributor => contributor.GetTools(context)))
-        {
-            if (!toolNames.Add(tool.Name))
-                throw new InvalidOperationException($"Two Jarvis features registered the same tool name '{tool.Name}'.");
-            tools.Add(tool);
-        }
+        var tools = CollectTools(mcpTools, context);
 
         List<AIContextProvider> contextProviders = [.. contextContributors
             .OrderBy(contributor => contributor.Order)
@@ -67,6 +56,28 @@ public sealed class JarvisAgentFactory(
             },
             AIContextProviders = contextProviders
         }, loggerFactory, services);
+    }
+
+    /// <summary>The same Jarvis + MCP functions used in chat, collected for the voice MCP host.</summary>
+    public IReadOnlyList<AIFunction> CollectFunctions(IEnumerable<AITool> mcpTools, AgentBuildContext context) =>
+        CollectTools(mcpTools, context).OfType<AIFunction>().ToArray();
+
+    private List<AITool> CollectTools(IEnumerable<AITool> mcpTools, AgentBuildContext context)
+    {
+        var tools = Browser.BrowserToolWrapping.Wrap(mcpTools,
+            services.GetRequiredService<Jarvis.Application.Browser.IBrowserSessionStore>(),
+            context.ConversationId,
+            services.GetRequiredService<Jarvis.Application.Realtime.IRealtimePublisher>(),
+            services.GetRequiredService<ICurrentUser>()).ToList();
+        var toolNames = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
+        foreach (var tool in toolContributors.SelectMany(contributor => contributor.GetTools(context)))
+        {
+            if (!toolNames.Add(tool.Name))
+                throw new InvalidOperationException($"Two Jarvis features registered the same tool name '{tool.Name}'.");
+            tools.Add(tool);
+        }
+
+        return tools;
     }
 
     internal static string BuildInstructions(string? configuredPersona, bool executingTask)

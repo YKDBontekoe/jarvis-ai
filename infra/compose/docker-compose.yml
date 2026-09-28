@@ -133,35 +133,6 @@ services:
         condition: service_healthy
     networks: [application, data]
 
-  jarvis-voice-worker:
-    profiles: [development]
-    build:
-      context: ../..
-      dockerfile: workers/voice/Dockerfile
-    restart: unless-stopped
-    mem_limit: 1g
-    cpus: 1.5
-    pids_limit: 128
-    environment:
-      LIVEKIT_URL: ws://livekit:7880
-      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
-      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-jarvis-local-livekit-development-secret}
-      JARVIS_INTERNAL_API_URL: http://jarvis-api:5082
-      VOICE_WORKER_SECRET: ${VOICE_WORKER_SECRET:?Set VOICE_WORKER_SECRET in .env}
-      CODEX_EXECUTABLE_PATH: /usr/local/bin/codex
-      CODEX_MODEL: ${CODEX_MODEL_REALTIME:-}
-      CODEX_HOME: /codex
-      LOG_LEVEL: INFO
-    volumes:
-      - ${CODEX_AUTH_FILE}:/codex/auth.json:rw
-      - codex-cli:/codex/cli
-    depends_on:
-      jarvis-api:
-        condition: service_started
-      livekit:
-        condition: service_started
-    networks: [application]
-
   jarvis-worker:
     profiles: [development]
     build:

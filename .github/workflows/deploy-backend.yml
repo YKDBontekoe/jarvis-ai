@@ -67,9 +67,6 @@ jobs:
           - name: worker
             dockerfile: infra/compose/Dockerfile
             build-args: PROJECT_PATH=workers/Jarvis.Worker/Jarvis.Worker.csproj
-          - name: voice-worker
-            dockerfile: workers/voice/Dockerfile
-            build-args: ""
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -136,7 +133,6 @@ jobs:
           SOURCE_BUNDLE: ${{ runner.temp }}/jarvis-source.bundle
           JARVIS_API_IMAGE: ${{ needs.prepare.outputs.prefix }}/api:${{ github.sha }}
           JARVIS_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/worker:${{ github.sha }}
-          JARVIS_VOICE_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/voice-worker:${{ github.sha }}
           DEPLOY_COMPOSE_FILES: ${{ vars.DEPLOY_COMPOSE_FILES }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |

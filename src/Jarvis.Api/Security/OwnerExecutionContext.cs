@@ -1,7 +1,7 @@
 namespace Jarvis.Api.Security;
 
 /// <summary>
-/// Scoped owner identity for trusted server-side entry points (voice worker, messaging channels, A2A,
+/// Scoped owner identity for trusted server-side entry points (voice runtime, messaging channels, A2A,
 /// background learning) that run agent turns without an authenticated HTTP user.
 /// </summary>
 public sealed class OwnerExecutionContext

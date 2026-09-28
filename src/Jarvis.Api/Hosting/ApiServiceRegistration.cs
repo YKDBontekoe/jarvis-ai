@@ -108,8 +108,9 @@ internal static class ApiServiceRegistration
         services.AddScoped<ApprovalDecisionService>();
         services.AddSingleton<RemoteQueryHost>();
         services.AddSingleton<RemoteQueryExecutor>();
-        services.AddSingleton<VoiceConversationCoordinator>();
-        services.AddHttpClient<LiveKitAgentDispatchClient>();
+        services.AddSingleton<VoiceBackendSession>();
+        services.AddSingleton<VoiceRuntime>();
+        services.AddHostedService(provider => provider.GetRequiredService<VoiceRuntime>());
         services.AddHttpClient("npm-registry", client =>
         {
             client.Timeout = TimeSpan.FromSeconds(20);
