@@ -184,4 +184,83 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Could not load briefing settings.'), findsOneWidget);
   });
+
+  testWidgets('task create validates empty fields and posts a valid task', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/tasks', <Object>[]);
+    http.on('POST', '/api/v1/tasks', {
+      'id': 't2',
+      'title': 'Buy milk',
+      'status': 'queued',
+      'createdAt': '2026-09-28T12:00:00Z',
+    });
+    await show(tester, TasksScreen(http: http.client()));
+
+    await tester.tap(find.text('New task'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start task'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enter a task name.'), findsOneWidget);
+    expect(find.text('Describe the task.'), findsOneWidget);
+    expect(http.sent('POST', '/api/v1/tasks'), isEmpty);
+
+    await tester.enterText(find.byType(TextFormField).at(0), 'Buy milk');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Get 2% milk');
+    await tester.tap(find.text('Start task'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    final body =
+        http.sent('POST', '/api/v1/tasks').single.body as Map<String, dynamic>;
+    expect(body['title'], 'Buy milk');
+    expect(body['prompt'], 'Get 2% milk');
+  });
+
+  testWidgets('watch create rejects non-https URLs and posts a valid watch', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/watches', <Object>[]);
+    http.on('POST', '/api/v1/watches', {
+      'id': 'w2',
+      'title': 'BTC price',
+      'status': 'active',
+      'url': 'https://example.com/price',
+    });
+    await show(tester, ConditionWatchesScreen(http: http.client()));
+
+    await tester.tap(find.text('New watch'));
+    await tester.pumpAndSettle();
+
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), 'BTC price');
+    await tester.enterText(fields.at(1), 'javascript:alert(1)');
+    await tester.enterText(fields.at(2), 'data.price');
+    await tester.enterText(fields.at(3), '100');
+    await tester.tap(find.text('Start watching'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enter a public HTTPS URL.'), findsOneWidget);
+    expect(http.sent('POST', '/api/v1/watches'), isEmpty);
+
+    await tester.enterText(fields.at(1), 'https://user:pass@example.com/price');
+    await tester.tap(find.text('Start watching'));
+    await tester.pumpAndSettle();
+    expect(http.sent('POST', '/api/v1/watches'), isEmpty);
+
+    await tester.enterText(fields.at(1), 'https://example.com/price');
+    await tester.tap(find.text('Start watching'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    final body =
+        http.sent('POST', '/api/v1/watches').single.body
+            as Map<String, dynamic>;
+    expect(body['title'], 'BTC price');
+    expect(body['url'], 'https://example.com/price');
+    expect(body['jsonPath'], 'data.price');
+    expect(body['threshold'], 100);
+    expect(body['intervalMinutes'], 15);
+  });
 }
