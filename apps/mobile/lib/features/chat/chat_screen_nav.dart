@@ -26,7 +26,8 @@ mixin _ChatScreenNav on _ChatScreenController {
     if (destination == 'tasks' ||
         destination == 'approvals' ||
         destination == 'watches' ||
-        destination == 'reminders') {
+        destination == 'reminders' ||
+        destination == 'usage') {
       setState(() => _homeRevision++);
     }
   }

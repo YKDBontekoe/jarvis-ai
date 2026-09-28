@@ -56,6 +56,7 @@ void main() {
     bool ready = true,
     VoidCallback? onTalk,
     VoidCallback? onOpenTasks,
+    VoidCallback? onOpenUsage,
   }) async {
     tester.view.physicalSize = const Size(800, 1000);
     tester.view.devicePixelRatio = 1;
@@ -71,6 +72,7 @@ void main() {
             voiceStarting: false,
             onTalk: onTalk,
             onOpenTasks: onOpenTasks ?? () {},
+            onOpenUsage: onOpenUsage,
             refreshRevision: 0,
           ),
         ),
@@ -180,6 +182,30 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Valid running task'), findsOneWidget);
     expect(find.text('Numeric id'), findsNothing);
+  });
+
+  testWidgets('home usage card summarizes the week and opens usage', (
+    tester,
+  ) async {
+    adapter.responses['/api/v1/tasks'] = [];
+    adapter.responses['/api/v1/usage'] = {
+      'personalization': {
+        'score': 58,
+        'band': 'Familiar',
+        'activeMemories': 12,
+      },
+      'codex': {'totalTokens': 15400},
+      'openRouter': {'totalTokens': 1000, 'estimatedCostUsd': 6.03},
+    };
+    var opened = false;
+    await showHome(tester, onOpenUsage: () => opened = true);
+    expect(find.byKey(const Key('home-usage')), findsOneWidget);
+    expect(find.text('Familiar · 58'), findsOneWidget);
+    expect(find.textContaining('12 memories'), findsOneWidget);
+    expect(find.textContaining('16k tokens this week'), findsOneWidget);
+    expect(find.textContaining('\$6.03'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('home-usage')));
+    expect(opened, isTrue);
   });
 
   testWidgets('task details show only approvals belonging to that task', (

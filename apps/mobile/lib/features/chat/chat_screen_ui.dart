@@ -355,6 +355,7 @@ mixin _ChatScreenUi on _ChatScreenController {
         ? null
         : () => _selectDestination(2),
     onOpenTasks: () => _openUtility('tasks'),
+    onOpenUsage: () => _openUtility('usage'),
     refreshRevision: _homeRevision,
     onContinueConversation: _hasMessages
         ? () => setState(() => _showHome = false)

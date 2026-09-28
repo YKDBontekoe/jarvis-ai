@@ -18,6 +18,12 @@ class VoicePlaybackGate:
     def begin_turn(self) -> None:
         self.suppress_speak = False
 
+    def allow_realtime_output(self) -> bool:
+        if self.suppress_speak:
+            return False
+        self.output_allowed = True
+        return True
+
     def try_start_speak(self) -> bool:
         if self.suppress_speak:
             return False

@@ -10,6 +10,7 @@ import '../../task_details_screen.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../chat/chat_widgets.dart';
+import '../usage/usage_screen.dart';
 
 part 'home_overview_widgets.dart';
 
@@ -24,6 +25,7 @@ class HomeOverview extends StatefulWidget {
     required this.refreshRevision,
     this.onContinueConversation,
     this.onSuggestion,
+    this.onOpenUsage,
     super.key,
   });
 
@@ -39,6 +41,9 @@ class HomeOverview extends StatefulWidget {
   /// Sends a suggested prompt; hidden when null.
   final ValueChanged<String>? onSuggestion;
 
+  /// Opens the usage dashboard. The summary is hidden when this is null.
+  final VoidCallback? onOpenUsage;
+
   @override
   State<HomeOverview> createState() => _HomeOverviewState();
 }
@@ -46,6 +51,7 @@ class HomeOverview extends StatefulWidget {
 class _HomeOverviewState extends State<HomeOverview>
     with WidgetsBindingObserver {
   List<_ActiveTask> _tasks = [];
+  Map<String, dynamic>? _usage;
   bool _loading = false;
   String? _error;
   int _requestRevision = 0;
@@ -55,7 +61,10 @@ class _HomeOverviewState extends State<HomeOverview>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.ready) unawaited(_load());
+    if (widget.ready) {
+      unawaited(_load());
+      unawaited(_loadUsage());
+    }
   }
 
   @override
@@ -65,11 +74,15 @@ class _HomeOverviewState extends State<HomeOverview>
       _requestRevision++;
       _request?.cancel();
       _tasks = [];
+      _usage = null;
       _loading = false;
       _error = null;
     } else if (!oldWidget.ready ||
         oldWidget.refreshRevision != widget.refreshRevision) {
       unawaited(_load());
+      unawaited(_loadUsage());
+    } else if (oldWidget.onOpenUsage == null && widget.onOpenUsage != null) {
+      unawaited(_loadUsage());
     }
   }
 
@@ -77,6 +90,27 @@ class _HomeOverviewState extends State<HomeOverview>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && widget.ready) {
       unawaited(_load());
+      unawaited(_loadUsage());
+    }
+  }
+
+  Future<void> _refresh() async {
+    await Future.wait([_load(), _loadUsage()]);
+  }
+
+  Future<void> _loadUsage() async {
+    if (!widget.ready || widget.onOpenUsage == null || !mounted) return;
+    try {
+      final response = await widget.http.get<dynamic>(
+        '/api/v1/usage',
+        queryParameters: const {'period': '7d'},
+      );
+      if (!mounted || !widget.ready || widget.onOpenUsage == null) return;
+      setState(() => _usage = jsonObject(response.data));
+    } on DioException {
+      if (mounted) setState(() => _usage = null);
+    } catch (_) {
+      if (mounted) setState(() => _usage = null);
     }
   }
 
@@ -134,6 +168,55 @@ class _HomeOverviewState extends State<HomeOverview>
     if (mounted) await _load();
   }
 
+  Widget _usageCard() {
+    final usage = _usage;
+    if (usage == null) return const SizedBox.shrink();
+    final personalization = jsonObject(usage['personalization']) ?? const {};
+    final codex = jsonObject(usage['codex']) ?? const {};
+    final openRouter = jsonObject(usage['openRouter']) ?? const {};
+    final tokens =
+        asJsonInt(codex['totalTokens']) + asJsonInt(openRouter['totalTokens']);
+    final band = asJsonString(personalization['band']) ?? 'New';
+    final score = asJsonInt(personalization['score']);
+    final memories = asJsonInt(personalization['activeMemories']);
+    final cost = openRouter['estimatedCostUsd'];
+    return SurfaceCard(
+      key: const Key('home-usage'),
+      onTap: widget.onOpenUsage,
+      child: Row(
+        children: [
+          const IconBadge(icon: PhosphorIconsRegular.chartBar, size: 40),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$band · $score',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$memories ${memories == 1 ? 'memory' : 'memories'} · ${formatTokenCount(tokens)} tokens this week'
+                  '${cost is num ? ' · ${formatUsd(cost)}' : ''}',
+                  style: const TextStyle(
+                    color: JarvisColors.inkSoft,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            PhosphorIconsRegular.caretRight,
+            size: 16,
+            color: JarvisColors.muted,
+          ),
+        ],
+      ),
+    );
+  }
+
   String get _greeting => switch (DateTime.now().hour) {
     < 12 => 'Good morning.',
     < 18 => 'Good afternoon.',
@@ -180,7 +263,7 @@ class _HomeOverviewState extends State<HomeOverview>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _refresh,
       child: LayoutBuilder(
         builder: (context, constraints) => ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -267,6 +350,10 @@ class _HomeOverviewState extends State<HomeOverview>
                         ],
                       ),
                       const SizedBox(height: 36),
+                      if (_usage != null && widget.onOpenUsage != null) ...[
+                        _usageCard(),
+                        const SizedBox(height: 28),
+                      ],
                       if (widget.onSuggestion != null) ...[
                         Padding(
                           padding: const EdgeInsets.only(left: 4, bottom: 10),
@@ -295,7 +382,7 @@ class _HomeOverviewState extends State<HomeOverview>
                             IconButton(
                               tooltip: 'Refresh active tasks',
                               onPressed: widget.ready && !_loading
-                                  ? _load
+                                  ? () => unawaited(_refresh())
                                   : null,
                               icon: const Icon(
                                 PhosphorIconsRegular.arrowsClockwise,

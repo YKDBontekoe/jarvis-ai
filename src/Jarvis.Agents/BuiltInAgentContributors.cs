@@ -56,6 +56,7 @@ internal sealed class CoreAgentTools(
         yield return AIFunctionFactory.Create(watchTools.CreateConditionWatchAsync);
         yield return AIFunctionFactory.Create(watchTools.ListConditionWatchesAsync);
         yield return AIFunctionFactory.Create(watchTools.CancelConditionWatchAsync);
+        yield return AIFunctionFactory.Create(memoryTools.ListMemoriesAsync);
         yield return AIFunctionFactory.Create(memoryTools.SearchMemoryAsync);
         yield return AIFunctionFactory.Create(memoryTools.RememberAsync);
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(memoryTools.ForgetMemoryAsync));

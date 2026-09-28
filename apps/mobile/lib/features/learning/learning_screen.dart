@@ -211,6 +211,9 @@ class _LearningScreenState extends _LearningController with _LearningCards {
                           margin: const EdgeInsets.only(top: 16),
                         ),
                       const SizedBox(height: 20),
+                      const SectionHeader('About you'),
+                      _portrait(),
+                      const SizedBox(height: 20),
                       const SectionHeader('What Jarvis may learn'),
                       GroupedSection(
                         children: [

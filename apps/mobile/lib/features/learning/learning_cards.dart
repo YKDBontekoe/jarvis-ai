@@ -196,6 +196,34 @@ mixin _LearningCards on _LearningController {
     );
   }
 
+  Widget _portrait() {
+    final summary = asJsonString(_dreaming['userSummary']);
+    final updated = _when(asJsonString(_dreaming['userSummaryUpdatedAt']));
+    if (summary == null || summary.trim().isEmpty) {
+      return const SurfaceCard(
+        child: Text(
+          'After a dream, Jarvis writes a short portrait from your memories and adds it to every chat. The next dream revises it. The portrait is background — not a memory of its own.',
+          style: TextStyle(color: JarvisColors.inkSoft),
+        ),
+      );
+    }
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(summary),
+          if (updated.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Updated $updated. Included in chat as background.',
+              style: const TextStyle(fontSize: 12.5, color: JarvisColors.muted),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _diary() {
     final entries = jsonMaps(_dreaming['diary']);
     if (entries.isEmpty) {

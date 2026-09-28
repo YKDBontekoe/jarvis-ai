@@ -35,6 +35,9 @@ public static class DependencyInjection
                 configure: telemetry => telemetry.EnableSensitiveData = false)
             .Build());
         services.AddSingleton<OpenAiCompatibleClientFactory>();
+        services.AddHttpClient<OpenRouterCatalog>(client => client.Timeout = TimeSpan.FromSeconds(20));
+        services.AddTransient<Jarvis.Application.Usage.IModelPriceLookup>(provider =>
+            provider.GetRequiredService<OpenRouterCatalog>());
         services.AddScoped<IChatClientResolver, ChatClientResolver>();
         services.AddScoped<IConversationMemoryExtractor, ConversationMemoryExtractor>();
         services.AddScoped<MemoryReranker>();
@@ -44,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentContextContributor, Skills.SkillContextContributor>();
         services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();
         services.AddScoped<IAgentContextContributor, Persona.PersonaContextContributor>();
+        services.AddScoped<IAgentContextContributor, Learning.UserSummaryContextContributor>();
         services.AddScoped<IMemoryEmbedder, Memory.ResolverMemoryEmbedder>();
         services.AddScoped<Memory.KnowledgeGraphExtractor>();
         services.AddScoped<Memory.MemoryIndexer>();

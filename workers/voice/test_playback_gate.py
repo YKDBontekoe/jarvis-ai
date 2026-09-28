@@ -6,6 +6,23 @@ from playback_gate import VoicePlaybackGate
 
 
 class VoicePlaybackGateTests(unittest.TestCase):
+    def test_realtime_audio_opens_for_the_live_session(self) -> None:
+        gate = VoicePlaybackGate()
+        self.assertIsNone(gate.accept_frame())
+        self.assertTrue(gate.allow_realtime_output())
+        self.assertEqual(gate.accept_frame(), 0)
+
+    def test_realtime_audio_stays_suppressed_after_barge_in_until_next_turn(self) -> None:
+        gate = VoicePlaybackGate()
+        gate.allow_realtime_output()
+        gate.duck(suppress_inflight=True)
+        self.assertFalse(gate.allow_realtime_output())
+        self.assertIsNone(gate.accept_frame())
+
+        gate.begin_turn()
+        self.assertTrue(gate.allow_realtime_output())
+        self.assertEqual(gate.accept_frame(), 1)
+
     def test_barge_in_drops_late_frames_until_next_speak(self) -> None:
         gate = VoicePlaybackGate()
         self.assertTrue(gate.try_start_speak())

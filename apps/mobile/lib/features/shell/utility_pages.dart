@@ -19,6 +19,7 @@ import '../persona/persona_screen.dart';
 import '../settings/model_settings_screen.dart';
 import '../settings/voice_settings_screen.dart';
 import '../skills/skills_screen.dart';
+import '../usage/usage_screen.dart';
 
 Widget? utilityPageFor(String destination, Dio http) => switch (destination) {
   'tasks' => TasksScreen(http: http),
@@ -39,5 +40,6 @@ Widget? utilityPageFor(String destination, Dio http) => switch (destination) {
   'agents' => AgentsScreen(http: http),
   'devices' => DevicesScreen(http: http),
   'voice-settings' => VoiceSettingsScreen(http: http),
+  'usage' => UsageScreen(http: http),
   _ => null,
 };

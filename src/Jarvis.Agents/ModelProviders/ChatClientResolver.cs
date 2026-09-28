@@ -1,5 +1,6 @@
 using Jarvis.Application.Integrations;
 using Jarvis.Application.Settings;
+using Jarvis.Application.Usage;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -31,6 +32,8 @@ internal sealed class ChatClientResolver(
     IOwnerSettingsStore settingsStore,
     IIntegrationCredentialStore credentials,
     OpenAiCompatibleClientFactory clientFactory,
+    IModelUsageRecorder usage,
+    IModelPriceLookup prices,
     ILogger<ChatClientResolver> logger) : IChatClientResolver
 {
     private readonly Dictionary<(Guid, ModelPurpose), IChatClient> _chatClients = [];
@@ -42,10 +45,15 @@ internal sealed class ChatClientResolver(
         if (_chatClients.TryGetValue((ownerId, purpose), out var cached)) return cached;
         var settings = await GetSettingsAsync(ownerId, cancellationToken);
         IChatClient client = codexClient;
+        var provider = UsageProviders.Codex;
         if (settings.UsesOpenRouter && await GetOpenRouterKeyAsync(ownerId, cancellationToken) is { } apiKey)
         {
             var model = purpose == ModelPurpose.Background ? settings.FastModel ?? settings.ChatModel : settings.ChatModel;
-            if (model is not null) client = clientFactory.CreateOpenRouterChatClient(apiKey, model);
+            if (model is not null)
+            {
+                client = clientFactory.CreateOpenRouterChatClient(apiKey, model);
+                provider = UsageProviders.OpenRouter;
+            }
         }
         else if (settings.UsesOpenRouter)
         {
@@ -53,6 +61,7 @@ internal sealed class ChatClientResolver(
         }
         else if (ResolveCodexModelOverride(settings, purpose) is { } codexModel)
             client = new SelectedModelChatClient(codexClient, codexModel);
+        client = new UsageRecordingChatClient(client, usage, prices, ownerId, provider, PurposeName(purpose), logger);
         _chatClients[(ownerId, purpose)] = client;
         return client;
     }
@@ -65,8 +74,11 @@ internal sealed class ChatClientResolver(
         if (settings.EmbeddingModel is { } embeddingModel &&
             await GetOpenRouterKeyAsync(ownerId, cancellationToken) is { } apiKey)
             model = new EmbeddingModel("openrouter:" + embeddingModel,
-                clientFactory.CreateOpenRouterEmbeddingGenerator(apiKey, embeddingModel));
-        model ??= clientFactory.CreateServerEmbeddingModel();
+                RecordEmbeddings(clientFactory.CreateOpenRouterEmbeddingGenerator(apiKey, embeddingModel), ownerId,
+                    embeddingModel, UsageProviders.OpenRouter));
+        else if (clientFactory.CreateServerEmbeddingModel() is { } server)
+            model = new EmbeddingModel(server.Name,
+                RecordEmbeddings(server.Generator, ownerId, ServerModelId(server.Name), UsageProviders.Server));
         _embeddingModels[ownerId] = model;
         return model;
     }
@@ -74,6 +86,21 @@ internal sealed class ChatClientResolver(
     private async Task<ModelSettings> GetSettingsAsync(Guid ownerId, CancellationToken cancellationToken) =>
         await settingsStore.GetAsync<ModelSettings>(ownerId, SettingsSections.Models, cancellationToken)
         ?? ModelSettings.Default;
+
+    private UsageRecordingEmbeddingGenerator RecordEmbeddings(
+        IEmbeddingGenerator<string, Embedding<float>> generator, Guid ownerId, string model, string provider) =>
+        new(generator, usage, prices, ownerId, model, provider, logger);
+
+    private static string ServerModelId(string name) =>
+        name.StartsWith("server:", StringComparison.Ordinal) ? name["server:".Length..] : name;
+
+    private static string PurposeName(ModelPurpose purpose) => purpose switch
+    {
+        ModelPurpose.Chat => UsagePurposes.Chat,
+        ModelPurpose.Background => UsagePurposes.Background,
+        ModelPurpose.Vision => UsagePurposes.Vision,
+        _ => UsagePurposes.Background
+    };
 
     private static string? ResolveCodexModelOverride(ModelSettings settings, ModelPurpose purpose) =>
         purpose switch

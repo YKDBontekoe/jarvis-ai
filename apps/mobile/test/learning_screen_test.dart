@@ -101,7 +101,12 @@ void main() {
     http.on('GET', '/api/v1/learning/status', {
       'settings': _settings(heartbeat: true),
       'state': {'lastSummary': 'Nothing new to learn.'},
-      'dreaming': {'lastSummary': 'No dream has run yet.', 'diary': <Object>[]},
+      'dreaming': {
+        'lastSummary': 'No dream has run yet.',
+        'diary': <Object>[],
+        'userSummary': 'The user lives in Amsterdam and builds Jarvis.',
+        'userSummaryUpdatedAt': DateTime.now().toIso8601String(),
+      },
       'activity': <Object>[],
     });
     http.on('POST', '/api/v1/learning/dream', {
@@ -117,6 +122,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('1 merged memory'), findsOneWidget);
+    expect(
+      find.textContaining('The user lives in Amsterdam and builds Jarvis.'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Included in chat as background'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('malformed learning status does not crash the screen', (

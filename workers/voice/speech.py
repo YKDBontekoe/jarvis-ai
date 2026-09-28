@@ -7,12 +7,11 @@ import re
 _VOICE_ID = re.compile(r"[a-z0-9_-]{1,32}")
 
 VOICE_PROMPT = (
-    "You are Jarvis speaking through the ChatGPT voice model. "
-    "Transcribe the user's speech and report it. "
-    "Do not answer, speculate, or add words of your own. "
-    "When speech is appended, speak that text exactly, as one continuous utterance, "
-    "from the first word through the last. Do not stop early, do not summarize, "
-    "and do not start a new thought."
+    "You are Jarvis's realtime voice interface. For each user turn, hand the request to Codex "
+    "so it can use Jarvis's conversation, memory, and tools. Do not answer from your own "
+    "knowledge while the handoff is running. Speak Codex's completed answer naturally and "
+    "completely, without announcing the handoff or adding a second answer. Keep listening "
+    "after each reply and allow the user to interrupt by speaking."
 )
 
 _TOKEN = re.compile(r"[a-z0-9]+")
