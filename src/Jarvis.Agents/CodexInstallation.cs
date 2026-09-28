@@ -16,6 +16,16 @@ public sealed record CodexSupportedModel(
     bool SupportsImages,
     IReadOnlyList<string> InputModalities);
 
+public sealed record CodexRealtimeVoice(string Id, string Name, bool IsDefault);
+
+public sealed record CodexRealtimeVoices(IReadOnlyList<CodexRealtimeVoice> Voices, string? DefaultVoice)
+{
+    public static CodexRealtimeVoices Empty { get; } = new([], null);
+
+    public bool Supports(string voice) =>
+        Voices.Any(item => item.Id.Equals(voice.Trim(), StringComparison.OrdinalIgnoreCase));
+}
+
 public sealed record CodexInstallationStatus(
     string? InstalledVersion,
     string? LatestVersion,
@@ -24,7 +34,9 @@ public sealed record CodexInstallationStatus(
     string? UpdateBlockedReason,
     bool UsingManagedInstall,
     string? Error,
-    IReadOnlyList<CodexSupportedModel> Models)
+    IReadOnlyList<CodexSupportedModel> Models,
+    CodexRealtimeVoices Voices,
+    string? VoiceError)
 {
     public bool SupportsModel(string modelId) =>
         Models.Any(model => model.Model == modelId || model.Id == modelId);
@@ -149,6 +161,36 @@ public sealed partial class CodexInstallation(
             .ToArray();
     }
 
+    internal static CodexRealtimeVoices ParseVoices(JsonElement result)
+    {
+        if (result.ValueKind != JsonValueKind.Object ||
+            !result.TryGetProperty("voices", out var voices) || voices.ValueKind != JsonValueKind.Object)
+            return CodexRealtimeVoices.Empty;
+        var defaultVoice = NormalizeVoiceId(ReadString(voices, "defaultV1"));
+        var parsed = new List<CodexRealtimeVoice>();
+        if (voices.TryGetProperty("v1", out var items) && items.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in items.EnumerateArray())
+            {
+                var id = NormalizeVoiceId(item.ValueKind == JsonValueKind.String ? item.GetString() : null);
+                if (id is null || parsed.Any(voice => voice.Id == id)) continue;
+                parsed.Add(new CodexRealtimeVoice(id, DisplayVoice(id), id == defaultVoice));
+            }
+        }
+        if (defaultVoice is not null && parsed.All(voice => voice.Id != defaultVoice))
+            parsed.Insert(0, new CodexRealtimeVoice(defaultVoice, DisplayVoice(defaultVoice), true));
+        return new CodexRealtimeVoices(parsed, defaultVoice);
+    }
+
+    private static string? NormalizeVoiceId(string? voice)
+    {
+        var id = voice?.Trim().ToLowerInvariant();
+        return string.IsNullOrEmpty(id) ? null : id;
+    }
+
+    private static string DisplayVoice(string id) =>
+        id.Length == 0 ? id : char.ToUpperInvariant(id[0]) + id[1..];
+
     private CodexInstallationStatus Cache(CodexInstallationStatus status)
     {
         _cached = status;
@@ -162,6 +204,8 @@ public sealed partial class CodexInstallation(
         string? installed = null;
         string? error = null;
         IReadOnlyList<CodexSupportedModel> models = [];
+        var voices = CodexRealtimeVoices.Empty;
+        string? voiceError = null;
         await processLimiter.WaitAsync(cancellationToken);
         try
         {
@@ -176,7 +220,10 @@ public sealed partial class CodexInstallation(
 
             try
             {
-                models = await ListModelsAsync(resolved, cancellationToken);
+                var catalog = await ListCatalogAsync(resolved, cancellationToken);
+                models = catalog.Models;
+                voices = catalog.Voices;
+                voiceError = catalog.VoiceError;
             }
             catch (Exception exception) when (IsProbeFailure(exception, cancellationToken))
             {
@@ -193,7 +240,7 @@ public sealed partial class CodexInstallation(
         var blocked = UpdateBlockedReason();
         return new CodexInstallationStatus(installed, latest,
             blocked is null && IsNewerRelease(latest, installed),
-            blocked is null, blocked, executable.IsManagedInstallActive, error, models);
+            blocked is null, blocked, executable.IsManagedInstallActive, error, models, voices, voiceError);
     }
 
     private string? UpdateBlockedReason()
@@ -312,7 +359,9 @@ public sealed partial class CodexInstallation(
         }
     }
 
-    private static async Task<IReadOnlyList<CodexSupportedModel>> ListModelsAsync(string executablePath,
+    private sealed record CatalogProbe(IReadOnlyList<CodexSupportedModel> Models, CodexRealtimeVoices Voices, string? VoiceError);
+
+    private static async Task<CatalogProbe> ListCatalogAsync(string executablePath,
         CancellationToken cancellationToken)
     {
         var scratch = Directory.CreateTempSubdirectory("jarvis-codex-models-").FullName;
@@ -328,7 +377,16 @@ public sealed partial class CodexInstallation(
             using var reader = process.StandardOutput;
             var connection = new CatalogConnection(writer, reader);
             await connection.InitializeAsync(timeout.Token);
-            return await connection.ListModelsAsync(timeout.Token);
+            var models = await connection.ListModelsAsync(timeout.Token);
+            try
+            {
+                return new CatalogProbe(models, await connection.ListVoicesAsync(timeout.Token), null);
+            }
+            catch (Exception exception) when (IsProbeFailure(exception, cancellationToken) || exception is JsonException)
+            {
+                return new CatalogProbe(models, CodexRealtimeVoices.Empty,
+                    "Could not load the voices supported by the installed Codex CLI.");
+            }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -449,6 +507,13 @@ public sealed partial class CodexInstallation(
                 .ToArray();
         }
 
+        public async Task<CodexRealtimeVoices> ListVoicesAsync(CancellationToken cancellationToken)
+        {
+            var requestId = await WriteAsync("thread/realtime/listVoices", new { }, cancellationToken);
+            using var response = await ReadResponseAsync(requestId, cancellationToken);
+            return ParseVoices(response.RootElement.GetProperty("result"));
+        }
+
         private async Task<int> WriteAsync(string method, object parameters, CancellationToken cancellationToken)
         {
             var id = ++_requestId;
@@ -462,7 +527,7 @@ public sealed partial class CodexInstallation(
             while (true)
             {
                 var line = await reader.ReadLineAsync(cancellationToken);
-                if (line is null) throw new InvalidOperationException("Codex CLI app-server exited before listing models.");
+                if (line is null) throw new InvalidOperationException("Codex CLI app-server exited before answering.");
                 var message = JsonDocument.Parse(line);
                 if (!message.RootElement.TryGetProperty("id", out var id) || !id.TryGetInt32(out var responseId) || responseId != requestId)
                 {

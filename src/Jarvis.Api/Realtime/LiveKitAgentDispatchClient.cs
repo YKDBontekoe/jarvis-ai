@@ -11,7 +11,7 @@ public sealed class LiveKitAgentDispatchClient(HttpClient httpClient, IConfigura
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public async Task DispatchAsync(string room, Guid conversationId, Guid ownerId,
+    public async Task DispatchAsync(string room, Guid conversationId, Guid ownerId, string voice,
         CancellationToken cancellationToken)
     {
         var apiKey = configuration["LiveKit:ApiKey"];
@@ -45,7 +45,7 @@ public sealed class LiveKitAgentDispatchClient(HttpClient httpClient, IConfigura
         {
             agentName = "jarvis-voice",
             room,
-            metadata = JsonSerializer.Serialize(new { conversationId, ownerId }, JsonOptions)
+            metadata = JsonSerializer.Serialize(new { conversationId, ownerId, voice }, JsonOptions)
         }, JsonOptions), Encoding.UTF8, "application/json");
 
         using var response = await httpClient.SendAsync(request, cancellationToken);

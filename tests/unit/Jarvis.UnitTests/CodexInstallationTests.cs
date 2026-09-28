@@ -25,6 +25,21 @@ public sealed class CodexInstallationTests : IDisposable
     }
 
     [Fact]
+    public void ParseVoices_reads_the_cli_voice_mode_catalog_and_its_default()
+    {
+        using var document = JsonDocument.Parse("""
+            {"voices":{"v1":["juniper","cove","spruce"],"v2":["marin"],"defaultV1":"cove","defaultV2":"marin"}}
+            """);
+
+        var voices = CodexInstallation.ParseVoices(document.RootElement);
+
+        Assert.Equal(["juniper", "cove", "spruce"], voices.Voices.Select(voice => voice.Id));
+        Assert.Equal("Cove", voices.Voices.Single(voice => voice.IsDefault).Name);
+        Assert.Equal("cove", voices.DefaultVoice);
+        Assert.DoesNotContain(voices.Voices, voice => voice.Id == "marin");
+    }
+
+    [Fact]
     public void ParseModels_reads_the_app_server_catalog()
     {
         using var document = JsonDocument.Parse("""
@@ -77,6 +92,10 @@ public sealed class CodexInstallationTests : IDisposable
         Assert.True(first.UpdateAvailable);
         Assert.True(first.CanUpdate);
         Assert.Equal(["gpt-5.4", "gpt-5.4-mini", "hidden-model"], first.Models.Select(model => model.Model));
+        Assert.Equal(["juniper", "cove", "spruce"], first.Voices.Voices.Select(voice => voice.Id));
+        Assert.Equal("cove", first.Voices.DefaultVoice);
+        Assert.True(first.Voices.Voices.Single(voice => voice.Id == "cove").IsDefault);
+        Assert.Null(first.VoiceError);
         Assert.Equal(1, CountCalls(installation.CliDirectory, "app-server"));
         Assert.Equal(first.InstalledVersion, second.InstalledVersion);
         Assert.Equal(1, CountCalls(installation.CliDirectory, "app-server"));
@@ -227,6 +246,11 @@ public sealed class CodexInstallationTests : IDisposable
                         {"id": "gpt-5.4", "model": "gpt-5.4", "displayName": "GPT-5.4", "description": "Default", "hidden": False, "isDefault": True, "inputModalities": ["text", "image"]},
                         {"id": "hidden-model", "model": "hidden-model", "displayName": "Hidden", "hidden": True, "isDefault": False, "inputModalities": ["text"]}
                     ], "nextCursor": None}}), flush=True)
+                elif method == "thread/realtime/listVoices":
+                    print(json.dumps({"id": request_id, "result": {"voices": {
+                        "v1": ["juniper", "cove", "spruce"], "v2": ["marin"],
+                        "defaultV1": "cove", "defaultV2": "marin"
+                    }}}), flush=True)
         """;
 
     private const string NpmScript = """
@@ -259,6 +283,10 @@ public sealed class CodexInstallationTests : IDisposable
                     print(json.dumps({"id": request_id, "result": {"data": [
                         {"id": "gpt-5.6-sol", "model": "gpt-5.6-sol", "displayName": "GPT-5.6 Sol", "hidden": False, "isDefault": True, "inputModalities": ["text", "image"]}
                     ], "nextCursor": None}}), flush=True)
+                elif method == "thread/realtime/listVoices":
+                    print(json.dumps({"id": request_id, "result": {"voices": {
+                        "v1": ["cove"], "v2": [], "defaultV1": "cove", "defaultV2": "marin"
+                    }}}), flush=True)
         '''.replace("VERSION", version), encoding="utf-8")
         binary.chmod(0o755)
         """;

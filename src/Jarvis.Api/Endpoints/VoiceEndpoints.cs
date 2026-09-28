@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
+using Jarvis.Agents;
 using Jarvis.Api.Realtime;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Security;
@@ -19,7 +20,8 @@ internal static class VoiceEndpoints
     {
         api.MapPost("/voice/session", async (VoiceSessionRequest request, IConversationStore conversations,
             IJarvisTaskRepository tasks, ICurrentUser currentUser, IConfiguration configuration,
-            IOwnerSettingsStore settings, LiveKitAgentDispatchClient dispatchClient, CancellationToken ct) =>
+            IOwnerSettingsStore settings, LiveKitAgentDispatchClient dispatchClient, CodexInstallation codex,
+            CancellationToken ct) =>
         {
             if (await conversations.GetAsync(request.ConversationId, currentUser.OwnerId, ct) is null)
                 return Results.NotFound();
@@ -37,9 +39,11 @@ internal static class VoiceEndpoints
                 return Results.Problem("LiveKit is not configured.", statusCode: StatusCodes.Status503ServiceUnavailable);
 
             var room = $"jarvis-{request.ConversationId:N}-{Guid.CreateVersion7():N}";
+            var voice = await ResolveVoiceAsync(settings, codex, currentUser.OwnerId, ct);
             try
             {
-                await dispatchClient.DispatchAsync(room, request.ConversationId, currentUser.OwnerId, ct);
+                await dispatchClient.DispatchAsync(room, request.ConversationId, currentUser.OwnerId,
+                    voice.Voice ?? "", ct);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -52,23 +56,30 @@ internal static class VoiceEndpoints
             var identity = Guid.CreateVersion7().ToString("N");
             var expiresAt = DateTimeOffset.UtcNow.AddMinutes(10);
             var token = CreateRoomToken(apiKey, apiSecret, room, identity, expiresAt);
-            var voice = await settings.GetAsync<VoiceSettings>(currentUser.OwnerId, SettingsSections.Voice, ct)
-                        ?? VoiceSettings.Default;
             return Results.Ok(new VoiceSessionDto(serverUrl!, room, identity, token, expiresAt, voice.HandsFree,
-                voice.Captions));
+                voice.Captions, voice.Voice));
         }).WithName("CreateVoiceSession");
 
         api.MapGet("/settings/voice", async (IOwnerSettingsStore settings, ICurrentUser currentUser,
-                CancellationToken ct) =>
-                Results.Ok(await settings.GetAsync<VoiceSettings>(currentUser.OwnerId, SettingsSections.Voice, ct)
-                           ?? VoiceSettings.Default))
+                CodexInstallation codex, CancellationToken ct) =>
+                Results.Ok(await ToDtoAsync(settings, codex, currentUser.OwnerId, ct)))
             .WithName("GetVoiceSettings");
 
         api.MapPut("/settings/voice", async (VoiceSettings request, IOwnerSettingsStore settings,
-            ICurrentUser currentUser, CancellationToken ct) =>
+            ICurrentUser currentUser, CodexInstallation codex, CancellationToken ct) =>
         {
-            await settings.SaveAsync(currentUser.OwnerId, SettingsSections.Voice, request, ct);
-            return Results.Ok(request);
+            var current = await settings.GetAsync<VoiceSettings>(currentUser.OwnerId, SettingsSections.Voice, ct)
+                          ?? VoiceSettings.Default;
+            var status = await codex.GetStatusAsync(ct);
+            var requested = string.IsNullOrWhiteSpace(request.Voice) ? current.Voice : request.Voice;
+            if (status.Voices.Voices.Count > 0 && requested is not null &&
+                !status.Voices.Supports(requested))
+                return EndpointHelpers.Invalid("voice", "The installed Codex CLI does not support that voice.");
+            var selected = VoiceSelection.Resolve(requested, status.Voices.Voices.Select(voice => voice.Id),
+                status.Voices.DefaultVoice);
+            await settings.SaveAsync(currentUser.OwnerId, SettingsSections.Voice,
+                new VoiceSettings(request.HandsFree, request.Captions, selected), ct);
+            return Results.Ok(await ToDtoAsync(settings, codex, currentUser.OwnerId, ct));
         }).WithName("SaveVoiceSettings");
 
         api.MapPost("/voice/internal/{conversationId:guid}/caption", async (Guid conversationId,
@@ -139,6 +150,23 @@ internal static class VoiceEndpoints
         }).WithName("ProcessVoiceTranscript").AllowAnonymous();
 
         return api;
+    }
+
+    private static Task<VoiceSettingsDto> ResolveVoiceAsync(IOwnerSettingsStore settings, CodexInstallation codex,
+        Guid ownerId, CancellationToken cancellationToken) =>
+        ToDtoAsync(settings, codex, ownerId, cancellationToken);
+
+    private static async Task<VoiceSettingsDto> ToDtoAsync(IOwnerSettingsStore settings, CodexInstallation codex,
+        Guid ownerId, CancellationToken cancellationToken)
+    {
+        var stored = await settings.GetAsync<VoiceSettings>(ownerId, SettingsSections.Voice, cancellationToken)
+                     ?? VoiceSettings.Default;
+        var status = await codex.GetStatusAsync(cancellationToken);
+        var selected = VoiceSelection.Resolve(stored.Voice, status.Voices.Voices.Select(voice => voice.Id),
+            status.Voices.DefaultVoice);
+        return new VoiceSettingsDto(stored.HandsFree, stored.Captions, selected, status.Voices.DefaultVoice,
+            status.Voices.Voices.Select(voice => new CodexVoiceDto(voice.Id, voice.Name, voice.IsDefault)).ToArray(),
+            status.VoiceError);
     }
 
     private static string CreateRoomToken(string apiKey, string apiSecret, string room, string identity,

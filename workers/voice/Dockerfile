@@ -9,6 +9,6 @@ COPY --from=codex-cli /usr/local /usr/local
 COPY workers/voice/pyproject.toml workers/voice/uv.lock workers/voice/.python-version ./
 RUN pip install --no-cache-dir uv==0.11.22 \
     && uv sync --locked --no-dev --no-install-project
-COPY workers/voice/voice_worker.py workers/voice/playback_gate.py workers/voice/codex_executable.py ./
+COPY workers/voice/voice_worker.py workers/voice/playback_gate.py workers/voice/speech.py workers/voice/codex_executable.py ./
 ENTRYPOINT ["/app/.venv/bin/python", "/app/voice_worker.py"]
 CMD ["start"]
