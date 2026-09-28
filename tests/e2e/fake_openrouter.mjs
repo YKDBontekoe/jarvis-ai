@@ -117,6 +117,8 @@ function plan(body) {
 
   if (/Reply with the single word OK/.test(request)) return { text: 'OK' };
   if (/Extract at most three useful long-term memories/.test(system + all)) return { text: '[]' };
+  if (/You write a short morning briefing intro for Jarvis/.test(system))
+    return { text: 'Here is a calm look at today.' };
   if (/Reorder saved-memory candidates/.test(system + all)) return { text: '[]' };
   if (/You maintain a temporal knowledge graph/.test(system)) return { text: JSON.stringify(extractGraph(request)) };
   if (/You are Jarvis reflecting on recent work with your user/.test(system))
@@ -128,8 +130,10 @@ function plan(body) {
     return { text: `Done. ${result.slice(0, 280)}` };
   }
   if (/\bremind me\b/.test(lower) && tools.has('CreateReminder')) {
+    const weekday = /\bevery weekday\b/.test(lower);
     const dueAt = new Date(Date.now() + 10 * 60_000).toISOString();
-    return { toolCall: { name: 'CreateReminder', args: { title: request.replace(/.*remind me (to )?/i, '').replace(/ in .*$/, ''), dueAt } } };
+    const title = request.replace(/.*remind me (to )?/i, '').replace(/ in .*$/, '').replace(/\s*every weekday\s*/i, ' ').trim();
+    return { toolCall: { name: 'CreateReminder', args: { title, dueAt, ...(weekday ? { recurrence: 'weekdays' } : {}) } } };
   }
   if (/\bwhat model\b|\bwhich model\b/.test(lower)) return { text: `I'm running on **${body.model}** through OpenRouter.` };
   return { text: `**${body.model}** via OpenRouter: ${request.slice(0, 400)}` };

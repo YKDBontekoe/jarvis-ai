@@ -167,14 +167,43 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
 public sealed class ReminderService(IReminderRepository reminders, TemporalReminderScheduler scheduler,
     ILogger<ReminderService> logger) : IReminderService
 {
-    public async Task<ReminderRecord> CreateAsync(Guid ownerId, string title, DateTimeOffset dueAt, CancellationToken cancellationToken)
+    public async Task<ReminderRecord> CreateAsync(Guid ownerId, CreateReminderRequest request, CancellationToken cancellationToken)
     {
-        title = title.Trim();
-        if (title.Length is < 1 or > 300) throw new ArgumentException("Reminder title must contain 1 to 300 characters.", nameof(title));
-        if (dueAt <= DateTimeOffset.UtcNow) throw new ArgumentOutOfRangeException(nameof(dueAt), "Reminder time must be in the future.");
-        if (dueAt > DateTimeOffset.UtcNow.AddYears(2)) throw new ArgumentOutOfRangeException(nameof(dueAt), "Reminder time must be within the next two years.");
+        var title = request.Title?.Trim() ?? string.Empty;
+        if (title.Length is < 1 or > 300) throw new ArgumentException("Reminder title must contain 1 to 300 characters.", nameof(request));
 
-        var reminder = await reminders.CreateAsync(ownerId, title, dueAt, cancellationToken);
+        var zoneId = string.IsNullOrWhiteSpace(request.TimeZoneId) ? "UTC" : request.TimeZoneId.Trim();
+        if (!LocalClock.TryFind(zoneId, out var zone))
+            throw new ArgumentException("Time zone identifier is not recognized by this server.", nameof(request));
+
+        var local = TimeZoneInfo.ConvertTime(request.DueAt, zone);
+        var localTime = request.LocalTime ?? TimeOnly.FromTimeSpan(local.TimeOfDay);
+        ReminderRule rule;
+        try
+        {
+            rule = ReminderSchedule.Normalize(request.Recurrence, request.Weekdays, zone.Id, localTime, request.Until);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new ArgumentException(exception.Message, nameof(request), exception);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset dueAt;
+        try
+        {
+            dueAt = ReminderSchedule.ResolveFirst(request.DueAt, rule, now);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            throw;
+        }
+
+        if (dueAt > now.AddYears(2))
+            throw new ArgumentOutOfRangeException(nameof(request), "Reminder time must be within the next two years.");
+
+        var reminder = await reminders.CreateAsync(ownerId, new CreateReminderRequest(title, dueAt, rule.Recurrence,
+            rule.Weekdays, rule.TimeZoneId, rule.Until, rule.LocalTime), cancellationToken);
         try
         {
             await scheduler.ScheduleAsync(new ReminderWorkflowInput(reminder.Id, ownerId, reminder.Title, reminder.DueAt),

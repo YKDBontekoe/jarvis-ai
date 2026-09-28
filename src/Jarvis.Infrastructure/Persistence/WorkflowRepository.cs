@@ -226,9 +226,10 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         await ApprovalInboxCleanup.RemoveAsync(db, approvals.Select(x => x.Id).ToArray(), cancellationToken);
     }
 
-    public async Task<ReminderRecord> CreateAsync(Guid ownerId, string title, DateTimeOffset dueAt, CancellationToken cancellationToken)
+    public async Task<ReminderRecord> CreateAsync(Guid ownerId, CreateReminderRequest request, CancellationToken cancellationToken)
     {
-        var reminder = new Reminder(ownerId, title, dueAt);
+        var reminder = new Reminder(ownerId, request.Title, request.DueAt, request.Recurrence ?? Reminder.RecurrenceNone,
+            request.Weekdays, request.TimeZoneId ?? "UTC", request.LocalTime, request.Until);
         db.Reminders.Add(reminder);
         AddAuditEvent(ownerId, "reminders", "reminder.created", "low", true, reminder.Id);
         await db.SaveChangesAsync(cancellationToken);
@@ -292,24 +293,35 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public async Task CompleteAndNotifyAsync(ReminderWorkflowInput input, CancellationToken cancellationToken)
+    public async Task<ReminderDeliveryResult> CompleteAndNotifyAsync(ReminderWorkflowInput input, CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var reminder = await GetLockedReminderAsync(input.ReminderId, cancellationToken);
-        if (reminder is null || reminder.OwnerId != input.OwnerId || reminder.Status != "pending") return;
+        if (reminder is null || reminder.OwnerId != input.OwnerId)
+            return new ReminderDeliveryResult(false, input.DueAt, input.Title);
+        if (reminder.Status != "pending")
+            return new ReminderDeliveryResult(false, reminder.DueAt, reminder.Title);
+        if (reminder.DueAt > input.DueAt.AddMinutes(1))
+            return new ReminderDeliveryResult(reminder.IsRecurring, reminder.DueAt, reminder.Title);
 
-        if (!await db.Notifications.AnyAsync(x => x.Id == input.ReminderId, cancellationToken))
+        var notification = new Notification(Guid.CreateVersion7(), input.OwnerId,
+            "reminder.due", "Reminder", input.Title, input.ReminderId);
+        db.Notifications.Add(notification);
+        await PushDeliveryQueue.QueueAsync(db, notification, cancellationToken);
+
+        DateTimeOffset? nextDueAt = null;
+        if (reminder.IsRecurring)
         {
-            var notification = new Notification(input.ReminderId, input.OwnerId,
-                "reminder.due", "Reminder", input.Title, input.ReminderId);
-            db.Notifications.Add(notification);
-            await PushDeliveryQueue.QueueAsync(db, notification, cancellationToken);
+            var rule = ReminderSchedule.FromRecord(reminder.ToRecord());
+            nextDueAt = ReminderSchedule.NextAfter(input.DueAt, rule);
         }
 
-        reminder.Complete();
+        reminder.CompleteOccurrence(DateTimeOffset.UtcNow, nextDueAt);
         AddAuditEvent(input.OwnerId, "temporal", "reminder.due", "low", true, input.ReminderId);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        return new ReminderDeliveryResult(reminder.Status == "pending" && nextDueAt is not null,
+            nextDueAt ?? reminder.DueAt, reminder.Title);
     }
 
     public async Task<IReadOnlyList<NotificationRecord>> ListNotificationsAsync(Guid ownerId, CancellationToken cancellationToken) =>

@@ -6,7 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Jarvis.Infrastructure.Persistence;
 
-public sealed class DailyBriefingRepository(JarvisDbContext db) : IDailyBriefingRepository
+public sealed class DailyBriefingRepository(JarvisDbContext db, IDailyBriefingNarrator? narrator = null)
+    : IDailyBriefingRepository
 {
     public async Task<DailyBriefingPreferenceRecord?> GetAsync(Guid ownerId, CancellationToken cancellationToken) =>
         (await db.DailyBriefings.AsNoTracking().SingleOrDefaultAsync(x => x.OwnerId == ownerId, cancellationToken))?.ToRecord();
@@ -73,7 +74,7 @@ public sealed class DailyBriefingRepository(JarvisDbContext db) : IDailyBriefing
         if (preference is null || preference.WorkflowId != input.WorkflowId || !preference.Enabled) return false;
         if (!preference.MarkDelivered(input.LocalDate)) return true;
 
-        var reminders = await db.Reminders.AsNoTracking()
+        var reminderEntities = await db.Reminders.AsNoTracking()
             .Where(x => x.OwnerId == input.OwnerId && x.Status == "pending" &&
                 x.DueAt >= input.LocalDayStart && x.DueAt < input.NextLocalDayStart)
             .OrderBy(x => x.DueAt).Take(8).ToListAsync(cancellationToken);
@@ -82,24 +83,31 @@ public sealed class DailyBriefingRepository(JarvisDbContext db) : IDailyBriefing
                 (x.Status == "queued" || x.Status == "running" || x.Status == "needs_approval"))
             .OrderBy(x => x.CreatedAt).Take(5).ToListAsync(cancellationToken);
 
-        var lines = new List<string>();
-        if (reminders.Count == 0) lines.Add("No reminders are due today.");
-        else
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(input.TimeZoneId);
+        var facts = new DailyBriefingFacts(
+            input.LocalDate,
+            input.TimeZoneId,
+            reminderEntities.Select(item => DailyBriefingComposer.ReminderItem(item.ToRecord(), timeZone)).ToArray(),
+            activeTasks.Select(item => DailyBriefingComposer.TaskItem(item.ToRecord())).ToArray());
+        var factsBody = DailyBriefingComposer.Compose(facts);
+        string? narration = null;
+        if (narrator is not null)
         {
-            lines.Add("Today's reminders:");
-            var timeZone = TimeZoneInfo.FindSystemTimeZoneById(input.TimeZoneId);
-            lines.AddRange(reminders.Select(x =>
-                $"• {TimeZoneInfo.ConvertTime(x.DueAt, timeZone):HH:mm} — {x.Title}"));
+            try
+            {
+                narration = await narrator.NarrateAsync(input.OwnerId, facts, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                narration = null;
+            }
         }
-        if (activeTasks.Count > 0)
-        {
-            lines.Add(string.Empty);
-            lines.Add("Active tasks:");
-            lines.AddRange(activeTasks.Select(x => $"• {x.Title} ({x.Status.Replace('_', ' ')})"));
-        }
-        var body = string.Join('\n', lines);
-        if (body.Length > 2_000) body = body[..1_997] + "…";
 
+        var body = DailyBriefingComposer.Combine(narration, factsBody);
         var notification = new Notification(Guid.CreateVersion7(), input.OwnerId,
             "briefing.daily", "Your morning briefing", body, null);
         db.Notifications.Add(notification);

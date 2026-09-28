@@ -15,7 +15,8 @@ internal static class ApiMappers
         approval.ResumeStatus, approval.CreatedAt);
 
     public static ReminderDto ToDto(this ReminderRecord reminder) => new(reminder.Id, reminder.Title,
-        reminder.DueAt, reminder.Status, reminder.CreatedAt, reminder.CompletedAt);
+        reminder.DueAt, reminder.Status, reminder.CreatedAt, reminder.CompletedAt, reminder.Recurrence,
+        reminder.Weekdays, reminder.TimeZoneId, reminder.LocalTime, reminder.Until, reminder.LastDeliveredAt);
 
     public static ConditionWatchDto ToDto(this ConditionWatchRecord watch) => new(watch.Id, watch.Title,
         watch.Url, watch.JsonPath, watch.Comparison, watch.Threshold, watch.IntervalMinutes, watch.Status,

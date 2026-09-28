@@ -10,6 +10,9 @@ public abstract class ReminderActivityContract
     [Activity("DeliverReminder")]
     public abstract Task DeliverReminderAsync(ReminderWorkflowInput reminder);
 
+    [Activity("DeliverReminderOccurrence")]
+    public abstract Task<ReminderDeliveryResult> DeliverReminderOccurrenceAsync(ReminderWorkflowInput reminder);
+
     [Activity("FailReminder")]
     public abstract Task FailReminderAsync(ReminderWorkflowInput reminder);
 }
@@ -25,13 +28,30 @@ public sealed class ReminderWorkflow
             var delay = reminder.DueAt - Workflow.UtcNow;
             if (delay > TimeSpan.Zero) await Workflow.DelayAsync(delay);
 
+            var options = new ActivityOptions
+            {
+                StartToCloseTimeout = TimeSpan.FromMinutes(1),
+                RetryPolicy = new Temporalio.Common.RetryPolicy { MaximumAttempts = 8 }
+            };
+
+            if (Workflow.Patched("reminder-recurrence"))
+            {
+                var result = await Workflow.ExecuteActivityAsync(
+                    (ReminderActivityContract activities) => activities.DeliverReminderOccurrenceAsync(reminder),
+                    options);
+                if (!result.Continue) return;
+                throw Workflow.CreateContinueAsNewException(
+                    (ReminderWorkflow workflow) => workflow.RunAsync(
+                        new ReminderWorkflowInput(reminder.ReminderId, reminder.OwnerId, result.Title, result.NextDueAt)));
+            }
+
             await Workflow.ExecuteActivityAsync(
                 (ReminderActivityContract activities) => activities.DeliverReminderAsync(reminder),
-                new ActivityOptions
-                {
-                    StartToCloseTimeout = TimeSpan.FromMinutes(1),
-                    RetryPolicy = new Temporalio.Common.RetryPolicy { MaximumAttempts = 8 }
-                });
+                options);
+        }
+        catch (ContinueAsNewException)
+        {
+            throw;
         }
         catch (CanceledFailureException)
         {

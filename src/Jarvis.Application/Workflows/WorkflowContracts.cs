@@ -3,7 +3,12 @@ using Jarvis.Domain.Workflows;
 namespace Jarvis.Application.Workflows;
 
 public sealed record ReminderRecord(Guid Id, Guid OwnerId, string Title, DateTimeOffset DueAt,
-    string WorkflowId, string Status, DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt);
+    string WorkflowId, string Status, DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt,
+    string Recurrence = "none", int Weekdays = 0, string TimeZoneId = "UTC", TimeOnly? LocalTime = null,
+    DateOnly? Until = null, DateTimeOffset? LastDeliveredAt = null);
+
+public sealed record CreateReminderRequest(string Title, DateTimeOffset DueAt, string? Recurrence = null,
+    int Weekdays = 0, string? TimeZoneId = null, DateOnly? Until = null, TimeOnly? LocalTime = null);
 
 public sealed record NotificationRecord(Guid Id, string Type, string Title, string Body,
     Guid? SourceId, DateTimeOffset CreatedAt, DateTimeOffset? ReadAt);
@@ -17,6 +22,8 @@ public sealed record JarvisTaskApprovalInput(Guid TaskId, string Summary);
 public sealed record CreateJarvisTaskRequest(string Title, string Prompt);
 
 public sealed record ReminderWorkflowInput(Guid ReminderId, Guid OwnerId, string Title, DateTimeOffset DueAt);
+
+public sealed record ReminderDeliveryResult(bool Continue, DateTimeOffset NextDueAt, string Title);
 
 public sealed record ConditionWatchRecord(Guid Id, Guid OwnerId, string Title, string Url, string JsonPath,
     string Comparison, double Threshold, int IntervalMinutes, string WorkflowId, string Status,
@@ -93,7 +100,7 @@ public interface IConditionWatchScheduler
 
 public interface IReminderRepository
 {
-    Task<ReminderRecord> CreateAsync(Guid ownerId, string title, DateTimeOffset dueAt, CancellationToken cancellationToken);
+    Task<ReminderRecord> CreateAsync(Guid ownerId, CreateReminderRequest request, CancellationToken cancellationToken);
     Task<ReminderRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ReminderRecord>> ListRemindersAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ReminderRecord>> ListPendingForSchedulingAsync(CancellationToken cancellationToken);
@@ -101,7 +108,7 @@ public interface IReminderRepository
     Task MarkReminderScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken);
     Task<ReminderRecord?> CancelAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task MarkScheduleFailedAsync(Guid id, CancellationToken cancellationToken);
-    Task CompleteAndNotifyAsync(ReminderWorkflowInput reminder, CancellationToken cancellationToken);
+    Task<ReminderDeliveryResult> CompleteAndNotifyAsync(ReminderWorkflowInput reminder, CancellationToken cancellationToken);
 }
 
 public interface INotificationRepository
@@ -155,7 +162,7 @@ public interface IJarvisTaskService
 
 public interface IReminderService
 {
-    Task<ReminderRecord> CreateAsync(Guid ownerId, string title, DateTimeOffset dueAt, CancellationToken cancellationToken);
+    Task<ReminderRecord> CreateAsync(Guid ownerId, CreateReminderRequest request, CancellationToken cancellationToken);
     Task<ReminderRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ReminderRecord>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<ReminderRecord?> CancelAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
@@ -169,7 +176,9 @@ public static class WorkflowRecordMapping
         task.CompletedAt, task.Summary);
 
     public static ReminderRecord ToRecord(this Reminder reminder) => new(reminder.Id, reminder.OwnerId,
-        reminder.Title, reminder.DueAt, reminder.WorkflowId, reminder.Status, reminder.CreatedAt, reminder.CompletedAt);
+        reminder.Title, reminder.DueAt, reminder.WorkflowId, reminder.Status, reminder.CreatedAt, reminder.CompletedAt,
+        reminder.Recurrence, reminder.Weekdays, reminder.TimeZoneId, reminder.LocalTime, reminder.Until,
+        reminder.LastDeliveredAt);
 
     public static NotificationRecord ToRecord(this Notification notification) => new(notification.Id,
         notification.Type, notification.Title, notification.Body, notification.SourceId,

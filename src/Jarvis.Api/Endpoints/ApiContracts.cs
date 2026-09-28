@@ -16,9 +16,11 @@ public sealed record MessageDto(Guid Id, string Role, string Content, DateTimeOf
 public sealed record ApprovalDecisionRequest(bool Approved);
 public sealed record ToolApprovalDto(Guid Id, Guid ConversationId, string ToolName, string ArgumentsJson,
     string Status, bool? Approved, string ResumeStatus, DateTimeOffset CreatedAt);
-public sealed record ReminderRequest(string? Title, DateTimeOffset DueAt);
+public sealed record ReminderRequest(string? Title, DateTimeOffset DueAt, string? Recurrence = null,
+    int Weekdays = 0, string? TimeZoneId = null, DateOnly? Until = null);
 public sealed record ReminderDto(Guid Id, string Title, DateTimeOffset DueAt, string Status, DateTimeOffset CreatedAt,
-    DateTimeOffset? CompletedAt);
+    DateTimeOffset? CompletedAt, string Recurrence, int Weekdays, string TimeZoneId, TimeOnly? LocalTime,
+    DateOnly? Until, DateTimeOffset? LastDeliveredAt);
 public sealed record ConditionWatchDto(Guid Id, string Title, string Url, string JsonPath, string Comparison,
     double Threshold, int IntervalMinutes, string Status, DateTimeOffset CreatedAt,
     DateTimeOffset? LastCheckedAt, double? LastValue);

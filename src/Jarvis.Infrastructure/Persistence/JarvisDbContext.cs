@@ -186,6 +186,14 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.Property(x => x.ScheduleDispatchedAt).HasColumnName("schedule_dispatched_at");
             entity.Property(x => x.CompletedAt).HasColumnName("completed_at");
+            entity.Property(x => x.Recurrence).HasColumnName("recurrence").HasMaxLength(20).HasDefaultValue("none")
+                .IsRequired();
+            entity.Property(x => x.Weekdays).HasColumnName("weekdays");
+            entity.Property(x => x.TimeZoneId).HasColumnName("time_zone_id").HasMaxLength(100).HasDefaultValue("UTC")
+                .IsRequired();
+            entity.Property(x => x.LocalTime).HasColumnName("local_time").HasColumnType("time without time zone");
+            entity.Property(x => x.Until).HasColumnName("until").HasColumnType("date");
+            entity.Property(x => x.LastDeliveredAt).HasColumnName("last_delivered_at");
             entity.HasIndex(x => x.WorkflowId).IsUnique();
             entity.HasIndex(x => new { x.OwnerId, x.DueAt });
             entity.HasIndex(x => new { x.Status, x.ScheduleDispatchedAt });

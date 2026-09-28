@@ -19,6 +19,7 @@ internal sealed class CoreAgentTools(
     MemoryReranker reranker,
     IConditionWatchService watchService,
     IReminderService reminderService,
+    IDailyBriefingRepository briefings,
     IFileSearchService fileSearch,
     IFileRepository fileRepository,
     IUserMcpServerRegistry mcpServers,
@@ -39,7 +40,7 @@ internal sealed class CoreAgentTools(
         var memoryTools = new MemoryAgentTools(memoryService, reranker, auditEvents, currentUser,
             loggerFactory.CreateLogger<MemoryAgentTools>(), recalls);
         var watchTools = new ConditionWatchAgentTools(watchService, currentUser);
-        var reminderTools = new ReminderAgentTools(reminderService, currentUser);
+        var reminderTools = new ReminderAgentTools(reminderService, currentUser, briefings);
         var fileTools = new FileAgentTools(fileSearch, fileRepository, currentUser);
         var clockTools = new ClockAgentTools(timeProvider ?? TimeProvider.System);
         var mcpServerTools = new McpServerAgentTools(mcpServers, mcpPolicy, configuration, currentUser, mcpToolHost);
