@@ -81,7 +81,7 @@ class _LearningScreenState extends State<LearningScreen> {
       _error = null;
     });
     try {
-      final response = await widget.http.put<Map<String, dynamic>>(
+      final response = await widget.http.put<dynamic>(
         '/api/v1/settings/learning',
         data: next,
       );
@@ -96,6 +96,10 @@ class _LearningScreenState extends State<LearningScreen> {
             'Jarvis could not save that setting.',
       );
       await _load();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Jarvis could not save that setting.');
+      await _load();
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -108,11 +112,11 @@ class _LearningScreenState extends State<LearningScreen> {
       _error = null;
     });
     try {
-      final response = await widget.http.post<Map<String, dynamic>>(
-        '/api/v1/learning/run',
-      );
+      final response = await widget.http.post<dynamic>('/api/v1/learning/run');
       if (!mounted) return;
-      setState(() => _result = asJsonString(response.data?['summary']));
+      setState(
+        () => _result = asJsonString(jsonObject(response.data)?['summary']),
+      );
       await _load();
     } on DioException catch (error) {
       if (mounted) {
@@ -134,11 +138,13 @@ class _LearningScreenState extends State<LearningScreen> {
       _error = null;
     });
     try {
-      final response = await widget.http.post<Map<String, dynamic>>(
+      final response = await widget.http.post<dynamic>(
         '/api/v1/learning/dream',
       );
       if (!mounted) return;
-      setState(() => _result = asJsonString(response.data?['summary']));
+      setState(
+        () => _result = asJsonString(jsonObject(response.data)?['summary']),
+      );
       await _load();
     } on DioException catch (error) {
       if (mounted) {

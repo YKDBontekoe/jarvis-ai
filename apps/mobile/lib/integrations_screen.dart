@@ -49,6 +49,9 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       } on DioException {
         credentialsFailed = true;
         error = 'Could not load integration credentials.';
+      } catch (_) {
+        credentialsFailed = true;
+        error = 'Could not load integration credentials.';
       }
       try {
         final connectionResponse = await widget.http.get<dynamic>(
@@ -59,6 +62,9 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       } on DioException {
         connectionsFailed = true;
         error ??= 'Could not load integration connections.';
+      } catch (_) {
+        connectionsFailed = true;
+        error ??= 'Could not load integration connections.';
       }
       try {
         final serversResponse = await widget.http.get<dynamic>(
@@ -67,6 +73,9 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         if (!mounted || revision != _requestRevision) return;
         setState(() => _managedServers = jsonMaps(serversResponse.data));
       } on DioException {
+        serversFailed = true;
+        error ??= 'Could not load MCP servers.';
+      } catch (_) {
         serversFailed = true;
         error ??= 'Could not load MCP servers.';
       }

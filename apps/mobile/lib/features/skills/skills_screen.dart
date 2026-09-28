@@ -304,11 +304,12 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
 
   Future<void> _export() async {
     try {
-      final response = await widget.http.get<String>(
+      final response = await widget.http.get<dynamic>(
         '$_path/export',
         options: Options(responseType: ResponseType.plain),
       );
-      await Clipboard.setData(ClipboardData(text: response.data ?? ''));
+      final text = asJsonString(response.data) ?? '';
+      await Clipboard.setData(ClipboardData(text: text));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('SKILL.md copied to the clipboard.')),

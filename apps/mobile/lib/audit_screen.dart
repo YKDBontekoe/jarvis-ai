@@ -48,6 +48,10 @@ class _AuditScreenState extends State<AuditScreen> {
       if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load the audit log.');
       }
+    } catch (_) {
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load the audit log.');
+      }
     } finally {
       if (mounted && revision == _requestRevision) {
         setState(() => _loading = false);

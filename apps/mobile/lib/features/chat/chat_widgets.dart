@@ -1,9 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../ui/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import '../../http_urls.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import 'chat_entries.dart';
@@ -337,10 +339,9 @@ class JarvisMarkdown extends StatelessWidget {
       selectable: true,
       styleSheet: sheet,
       onTapLink: (text, href, title) {
-        final uri = href == null ? null : Uri.tryParse(href);
-        if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
-          launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
+        final uri = parseHttpUrl(href);
+        if (uri == null) return;
+        unawaited(launchHttpUrl(uri));
       },
     );
   }

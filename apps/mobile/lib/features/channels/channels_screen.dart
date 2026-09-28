@@ -295,23 +295,28 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
             firstProblemMessage(error.response?.data) ??
             'Could not load this channel.';
       });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load this channel.';
+      });
     }
   }
 
   Future<void> _test() async {
     setState(() => _busy = true);
     try {
-      final response = await widget.http.post<Map<String, dynamic>>(
-        '$_path/test',
-      );
+      final response = await widget.http.post<dynamic>('$_path/test');
       if (!mounted) return;
-      final sent = asJsonBool(response.data?['sent']);
+      final body = jsonObject(response.data);
+      final sent = asJsonBool(body?['sent']);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             sent
                 ? 'Test message sent.'
-                : asJsonString(response.data?['error']) ??
+                : asJsonString(body?['error']) ??
                       'Could not send a test message.',
           ),
         ),
@@ -555,7 +560,7 @@ class _ChannelEditorSheetState extends State<ChannelEditorSheet> {
       _error = null;
     });
     try {
-      await widget.http.post<Map<String, dynamic>>(
+      await widget.http.post<dynamic>(
         '/api/v1/channels',
         data: {
           'kind': widget.kind,

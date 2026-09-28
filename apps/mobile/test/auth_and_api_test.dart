@@ -4,8 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/api/api_errors.dart';
 import 'package:jarvis_mobile/auth/auth_session.dart';
 import 'package:jarvis_mobile/auth/auth_validation.dart';
+import 'package:jarvis_mobile/features/chat/chat_widgets.dart';
 import 'package:jarvis_mobile/features/devices/device_invoke.dart';
 import 'package:jarvis_mobile/features/shell/utility_pages.dart';
+import 'package:jarvis_mobile/theme.dart';
 
 DioException _httpError({int? status, Object? data}) {
   final options = RequestOptions(path: '/api/v1/example');
@@ -148,5 +150,58 @@ void main() {
       context: context,
     );
     expect(missing.error, 'No URL was provided.');
+  });
+
+  testWidgets('device invoke reports a declined http URL as a result', (
+    tester,
+  ) async {
+    ({String? result, String? error})? outcome;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () async {
+              outcome = await performDeviceCapability(
+                capability: 'open_url',
+                event: {
+                  'arguments': {'url': 'https://example.com/docs'},
+                },
+                mounted: true,
+                context: context,
+              );
+            },
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.text('Open this link?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(outcome?.error, isNull);
+    expect(
+      outcome?.result,
+      'The owner declined to open https://example.com/docs.',
+    );
+  });
+
+  testWidgets('markdown ignores non-http link taps', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildJarvisTheme(),
+        home: const Scaffold(
+          body: JarvisMarkdown(
+            data: '[secret](file:///tmp/secret) [script](javascript:alert(1))',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('secret'));
+    await tester.pump();
+    await tester.tap(find.text('script'));
+    await tester.pump();
   });
 }

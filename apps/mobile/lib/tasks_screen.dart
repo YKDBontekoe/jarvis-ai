@@ -48,6 +48,10 @@ class _TasksScreenState extends State<TasksScreen> {
       if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load tasks.');
       }
+    } catch (_) {
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load tasks.');
+      }
     } finally {
       if (mounted && revision == _requestRevision) {
         setState(() => _loading = false);

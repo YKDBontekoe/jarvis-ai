@@ -67,6 +67,8 @@ class _RemindersScreenState extends State<RemindersScreen>
         }
       } on DioException {
         remindersFailed = true;
+      } catch (_) {
+        remindersFailed = true;
       }
       try {
         final notifications = await widget.http.get<dynamic>(
@@ -76,6 +78,8 @@ class _RemindersScreenState extends State<RemindersScreen>
           setState(() => _notifications = jsonMaps(notifications.data));
         }
       } on DioException {
+        notificationsFailed = true;
+      } catch (_) {
         notificationsFailed = true;
       }
       if (mounted && revision == _requestRevision) {
@@ -106,6 +110,8 @@ class _RemindersScreenState extends State<RemindersScreen>
           asJsonString(jsonObject(briefing.data)?['timeZoneId']) ?? 'UTC';
     } on DioException {
       // Keep UTC when briefing settings are unavailable.
+    } catch (_) {
+      // Keep UTC when briefing settings are malformed.
     }
     if (!mounted) return;
     final created = await showDialog<_NewReminder>(

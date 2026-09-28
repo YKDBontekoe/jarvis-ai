@@ -57,6 +57,10 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
       if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load pending approvals.');
       }
+    } catch (_) {
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load pending approvals.');
+      }
     } finally {
       if (mounted && revision == _requestRevision) {
         setState(() => _loading = false);

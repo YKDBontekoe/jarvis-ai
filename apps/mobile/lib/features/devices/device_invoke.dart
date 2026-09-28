@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../json_maps.dart';
+import '../../http_urls.dart';
+import '../../ui/jarvis_ui.dart';
 
 Future<({String? result, String? error})> performDeviceCapability({
   required String capability,
@@ -25,12 +26,26 @@ Future<({String? result, String? error})> performDeviceCapability({
         if (url == null) {
           return (result: null, error: 'No URL was provided.');
         }
-        final parsed = Uri.tryParse(url);
-        if (parsed == null ||
-            !(parsed.isScheme('http') || parsed.isScheme('https'))) {
+        final parsed = parseHttpUrl(url);
+        if (parsed == null) {
           return (result: null, error: 'That URL cannot be opened.');
         }
-        await launchUrl(parsed, mode: LaunchMode.externalApplication);
+        if (!mounted) {
+          return (result: null, error: 'Could not open that URL.');
+        }
+        final allowed = await showJarvisConfirm(
+          context,
+          title: 'Open this link?',
+          message: url,
+          confirmLabel: 'Open',
+        );
+        if (!allowed) {
+          return (result: 'The owner declined to open $url.', error: null);
+        }
+        final opened = await launchHttpUrl(parsed);
+        if (!opened) {
+          return (result: null, error: 'That URL cannot be opened.');
+        }
         return (result: 'Opened $url', error: null);
       case 'notify':
         final args = event?['arguments'];

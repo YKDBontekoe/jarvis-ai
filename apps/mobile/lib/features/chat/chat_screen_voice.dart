@@ -40,12 +40,12 @@ mixin _ChatScreenVoice on _ChatScreenController {
         _conversationId == conversationId &&
         _realtimeGeneration == generation;
     try {
-      final sessionResponse = await _http.post<Map<String, dynamic>>(
+      final sessionResponse = await _http.post<dynamic>(
         '/api/v1/voice/session',
         data: {'conversationId': conversationId},
       );
       if (!isCurrent()) return;
-      final session = sessionResponse.data;
+      final session = jsonObject(sessionResponse.data);
       if (session == null) {
         throw StateError('Jarvis returned no voice session.');
       }

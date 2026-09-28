@@ -46,6 +46,10 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
       if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load watches.');
       }
+    } catch (_) {
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load watches.');
+      }
     } finally {
       if (mounted && revision == _requestRevision) {
         setState(() => _loading = false);

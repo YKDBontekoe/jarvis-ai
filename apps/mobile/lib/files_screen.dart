@@ -67,6 +67,10 @@ class _FilesScreenState extends State<FilesScreen> {
       if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load your files.');
       }
+    } catch (_) {
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load your files.');
+      }
     } finally {
       if (mounted && revision == _requestRevision) {
         setState(() => _loading = false);

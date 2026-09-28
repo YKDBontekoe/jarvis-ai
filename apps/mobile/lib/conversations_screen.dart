@@ -58,6 +58,10 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load conversations.');
       }
+    } catch (_) {
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load conversations.');
+      }
     } finally {
       if (mounted && revision == _requestRevision) {
         setState(() => _loading = false);
@@ -68,12 +72,12 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   Future<void> _createConversation() async {
     setState(() => _creating = true);
     try {
-      final response = await widget.http.post<Map<String, dynamic>>(
+      final response = await widget.http.post<dynamic>(
         '/api/v1/conversations',
         data: const {'title': 'New conversation'},
       );
-      final id = response.data?['id'];
-      if (id is! String || id.isEmpty) {
+      final id = asJsonString(jsonObject(response.data)?['id']);
+      if (id == null || id.isEmpty) {
         throw const FormatException('Missing conversation ID.');
       }
       if (mounted) {

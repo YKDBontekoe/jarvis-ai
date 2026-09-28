@@ -150,7 +150,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
       _notice = null;
     });
     try {
-      final response = await widget.http.post<Map<String, dynamic>>(
+      final response = await widget.http.post<dynamic>(
         '/api/v1/settings/models/codex/update',
       );
       if (!mounted) return;
@@ -196,7 +196,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
   }
 
   Future<void> _run(
-    Future<Response<Map<String, dynamic>>> Function() request,
+    Future<Response<dynamic>> Function() request,
     String success, {
     bool keyOnly = false,
   }) async {
@@ -228,7 +228,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     final value = _key.text.trim();
     if (value.isEmpty) return;
     await _run(
-      () => widget.http.put<Map<String, dynamic>>(
+      () => widget.http.put<dynamic>(
         '/api/v1/settings/models/openrouter-key',
         data: {'value': value},
       ),
@@ -252,15 +252,14 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     );
     if (!confirmed) return;
     await _run(
-      () => widget.http.delete<Map<String, dynamic>>(
-        '/api/v1/settings/models/openrouter-key',
-      ),
+      () =>
+          widget.http.delete<dynamic>('/api/v1/settings/models/openrouter-key'),
       'OpenRouter key removed.',
     );
   }
 
   Future<void> _save() => _run(
-    () => widget.http.put<Map<String, dynamic>>(
+    () => widget.http.put<dynamic>(
       '/api/v1/settings/models',
       data: {
         'provider': _provider,
@@ -278,10 +277,10 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
       _test = null;
     });
     try {
-      final response = await widget.http.post<Map<String, dynamic>>(
+      final response = await widget.http.post<dynamic>(
         '/api/v1/settings/models/test',
       );
-      if (mounted) setState(() => _test = response.data);
+      if (mounted) setState(() => _test = jsonObject(response.data));
     } on DioException catch (error) {
       if (mounted) {
         setState(
@@ -727,6 +726,12 @@ class _OpenRouterModelPickerState extends State<OpenRouterModelPicker> {
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not load OpenRouter models.';
+      });
+    } catch (_) {
+      if (!mounted || revision != _revision) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load OpenRouter models.';
       });
     }
   }

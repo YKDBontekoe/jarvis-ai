@@ -28,12 +28,11 @@ mixin _ChatScreenSession on _ChatScreenController {
       if (items.isNotEmpty && items.first['id'] is String) {
         conversationId = items.first['id'] as String;
       } else {
-        final created = await _http.post<Map<String, dynamic>>(
+        final created = await _http.post<dynamic>(
           '/api/v1/conversations',
           data: const {'title': 'New conversation'},
         );
-        final id = created.data?['id'];
-        conversationId = id is String ? id : null;
+        conversationId = asJsonString(jsonObject(created.data)?['id']);
       }
       if (conversationId == null || conversationId.isEmpty) {
         throw const FormatException('Missing conversation ID.');
@@ -258,12 +257,12 @@ mixin _ChatScreenSession on _ChatScreenController {
 
   Future<void> _createAndOpenConversation() async {
     try {
-      final response = await _http.post<Map<String, dynamic>>(
+      final response = await _http.post<dynamic>(
         '/api/v1/conversations',
         data: const {'title': 'New conversation'},
       );
-      final id = response.data?['id'];
-      if (id is! String || id.isEmpty) {
+      final id = asJsonString(jsonObject(response.data)?['id']);
+      if (id == null || id.isEmpty) {
         throw const FormatException('Missing conversation ID.');
       }
       await _openConversation(id);
