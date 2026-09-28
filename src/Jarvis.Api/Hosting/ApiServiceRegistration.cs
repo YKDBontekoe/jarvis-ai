@@ -106,6 +106,8 @@ internal static class ApiServiceRegistration
         services.AddScoped<AgentRunCoordinator>();
         services.AddScoped<ConversationTurnService>();
         services.AddScoped<ApprovalDecisionService>();
+        services.AddSingleton<RemoteQueryHost>();
+        services.AddSingleton<RemoteQueryExecutor>();
         services.AddSingleton<VoiceConversationCoordinator>();
         services.AddHttpClient<LiveKitAgentDispatchClient>();
         services.AddHttpClient<Jarvis.Agents.ModelProviders.OpenRouterCatalog>(client => client.Timeout = TimeSpan.FromSeconds(20));

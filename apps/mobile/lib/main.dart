@@ -29,6 +29,7 @@ import 'daily_briefing_screen.dart';
 import 'integrations_screen.dart';
 import 'features/chat/chat_entries.dart';
 import 'features/chat/chat_widgets.dart';
+import 'features/chat/remote_query.dart';
 import 'features/chat/generative_ui.dart';
 import 'features/home/home_overview.dart';
 import 'features/learning/learning_screen.dart';
@@ -280,7 +281,7 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   static const _wideLayoutWidth = 840.0;
 
   late final _auth = _AuthSession(enabled: !widget.skipAuthentication);
@@ -318,6 +319,11 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _voiceCaptionRole;
   int _voiceGeneration = 0;
   CancelToken? _runCancel;
+  Timer? _catchUpTimer;
+  int _catchUpGeneration = 0;
+  bool _remoteQuery = false;
+  bool _stopRequested = false;
+  String? _pendingQueryText;
   int _selectedDestination = 0;
   int _homeRevision = 0;
   bool _showHome = true;
@@ -355,6 +361,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.skipAuthentication) _restoringSession = false;
     _attachPushListeners();
     _http.interceptors.add(
@@ -514,11 +521,15 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     if (!isLatestOpen()) return;
     final records = jsonMaps(details.data?['messages']);
+    final responding = asJsonBool(details.data?['responding']);
     final approvals = await _loadConversationApprovals(conversationId);
     if (!isLatestOpen()) return;
     final knownApprovals = approvals ?? const <ApprovalEntry>[];
 
     _runCancel?.cancel();
+    _catchUpTimer?.cancel();
+    _catchUpGeneration++;
+    _pendingQueryText = null;
     final generation = ++_realtimeGeneration;
     bool isCurrent() =>
         mounted &&
@@ -534,7 +545,8 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _conversationId = conversationId;
       _connected = false;
-      _sending = false;
+      _sending = responding;
+      _remoteQuery = responding;
       _selectedDestination = 0;
       _showHome = showHome &&
           !knownApprovals.any(
@@ -559,8 +571,10 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
         )
         ..addAll(knownApprovals);
+      if (responding) _ensurePlaceholder();
       _error = null;
     });
+    if (responding) unawaited(_catchUpRemoteQuery(conversationId));
     _scrollToBottom(jump: true);
     unawaited(_loadRecent());
     if (!isCurrent() || !isLatestOpen() || _conversationId != conversationId) {
@@ -640,6 +654,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _clearCurrentConversation() async {
+    _finishRemoteQuery();
     _runCancel?.cancel();
     _openGeneration++;
     _realtimeGeneration++;
@@ -969,6 +984,7 @@ class _ChatScreenState extends State<ChatScreen> {
           if (content.trim().isNotEmpty) {
             _settleSubmittingApprovals();
           }
+          _finishRemoteQuery();
         },
       );
       _scrollToBottom();
@@ -1004,6 +1020,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _showHome = false;
         _addApprovals([approval]);
+        _finishRemoteQuery();
       });
       _scrollToBottom();
     });
@@ -1056,6 +1073,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _removePlaceholder();
         _settleToolRuns();
         _settleSubmittingApprovals(fallback: ApprovalStatus.failed);
+        _finishRemoteQuery();
         _error =
             asJsonString(event?['message']) ??
             'Jarvis could not complete this response.';
@@ -1168,8 +1186,10 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _connected = false;
         _selectedDestination = _selectedDestination == 2 ? 0 : _selectedDestination;
-        _removePlaceholder();
-        _settleToolRuns();
+        if (!_remoteQuery) {
+          _removePlaceholder();
+          _settleToolRuns();
+        }
       });
     });
     hub.onreconnected(({connectionId}) {
@@ -1183,9 +1203,11 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           _connected = false;
           _selectedDestination = _selectedDestination == 2 ? 0 : _selectedDestination;
-          _removePlaceholder();
-          _settleToolRuns();
-          _error ??= 'Realtime updates disconnected. Retry the connection.';
+          if (!_remoteQuery) {
+            _removePlaceholder();
+            _settleToolRuns();
+            _error ??= 'Realtime updates disconnected. Retry the connection.';
+          }
         });
       }
     });
@@ -1248,7 +1270,11 @@ class _ChatScreenState extends State<ChatScreen> {
           _connected = true;
           _homeRevision++;
         });
-        await _reloadConversationEntries(conversationId, generation);
+        if (_remoteQuery) {
+          unawaited(_catchUpRemoteQuery(conversationId));
+        } else {
+          await _reloadConversationEntries(conversationId, generation);
+        }
       }
     } catch (_) {
       if (mounted &&
@@ -1280,26 +1306,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _signingOut) {
         return;
       }
-      final knownApprovals = approvals ?? _entries.whereType<ApprovalEntry>().toList();
-      setState(() {
-        _entries
-          ..clear()
-          ..addAll(
-            jsonMaps(details.data?['messages'])
-                .where(
-                  (message) =>
-                      message['role'] is String && message['content'] is String,
-                )
-                .map(
-                  (message) => MessageEntry(
-                    role: message['role'] as String,
-                    content: message['content'] as String,
-                    id: asJsonString(message['id']),
-                  ),
-                ),
-          );
-        _addApprovals(knownApprovals);
-      });
+      setState(() => _replaceTranscript(details.data, approvals));
       if (approvals == null) {
         unawaited(_syncConversationApprovals());
       }
@@ -1394,7 +1401,13 @@ class _ChatScreenState extends State<ChatScreen> {
     _signedOut = true;
     _initGeneration++;
     _realtimeGeneration++;
+    final runningConversation = _conversationId;
+    _stopRequested = true;
+    _finishRemoteQuery();
     _runCancel?.cancel();
+    if (runningConversation != null) {
+      unawaited(_cancelServerRun(runningConversation));
+    }
     if (mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -1613,6 +1626,8 @@ class _ChatScreenState extends State<ChatScreen> {
       return false;
     }
     if (text == null) _input.clear();
+    _stopRequested = false;
+    _pendingQueryText = content;
     final userMessage = MessageEntry(role: 'user', content: content);
     setState(() {
       _sending = true;
@@ -1638,6 +1653,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _realtimeGeneration != generation) {
         return true;
       }
+      _finishRemoteQuery();
       setState(() => _applyRunResult(response));
       unawaited(_loadRecent());
       return true;
@@ -1645,22 +1661,35 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted &&
           _conversationId == conversationId &&
           _realtimeGeneration == generation) {
-        setState(() {
-          _removePlaceholder();
-          _settleToolRuns();
-          final index = _entries.lastIndexOf(userMessage);
-          if (index >= 0) _entries[index] = userMessage.copyWith(failed: true);
-          _error = error.type == DioExceptionType.cancel
-              ? null
-              : _describeError(error);
-        });
+        if (queryContinuesRemotely(error, stopRequested: _stopRequested)) {
+          setState(() {
+            _remoteQuery = true;
+            _sending = true;
+            _error = null;
+            _ensurePlaceholder();
+          });
+          unawaited(_catchUpRemoteQuery(conversationId));
+        } else {
+          setState(() {
+            _removePlaceholder();
+            _settleToolRuns();
+            final index = _entries.lastIndexOf(userMessage);
+            if (index >= 0) {
+              _entries[index] = userMessage.copyWith(failed: true);
+            }
+            _error = error.type == DioExceptionType.cancel
+                ? null
+                : _describeError(error);
+          });
+        }
       }
       return true;
     } finally {
       if (identical(_runCancel, run)) _runCancel = null;
       if (mounted &&
           _conversationId == conversationId &&
-          _realtimeGeneration == generation) {
+          _realtimeGeneration == generation &&
+          !_remoteQuery) {
         setState(() => _sending = false);
       }
       _scrollToBottom();
@@ -1754,6 +1783,7 @@ class _ChatScreenState extends State<ChatScreen> {
     String action,
     Map<String, String> values,
   ) async {
+    _pendingQueryText = null;
     if (mounted && _surfaceErrorFor == surface.id) {
       setState(() {
         _surfaceError = null;
@@ -1775,6 +1805,20 @@ class _ChatScreenState extends State<ChatScreen> {
       _scrollToBottom();
     } on DioException catch (error) {
       if (!mounted) return;
+      final conversationId = _conversationId;
+      if (conversationId != null &&
+          queryContinuesRemotely(error, stopRequested: _stopRequested)) {
+        setState(() {
+          _remoteQuery = true;
+          _sending = true;
+          _error = null;
+          _surfaceError = null;
+          _upsertSurface(surface.copyWith(status: 'completed'));
+          _ensurePlaceholder();
+        });
+        unawaited(_catchUpRemoteQuery(conversationId));
+        return;
+      }
       final used = error.response?.statusCode == 409;
       final message = used
           ? 'This card was already used.'
@@ -1966,6 +2010,8 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
     final generation = _realtimeGeneration;
+    _stopRequested = false;
+    _pendingQueryText = null;
     void replace(ApprovalEntry Function(ApprovalEntry current) update) {
       final index = _entries.indexWhere(
         (entry) => entry is ApprovalEntry && entry.id == approval.id,
@@ -2002,6 +2048,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _realtimeGeneration != generation) {
         return;
       }
+      _finishRemoteQuery();
       setState(() {
         replace(
           (current) => current.copyWith(
@@ -2015,6 +2062,16 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted ||
           _conversationId != conversationId ||
           _realtimeGeneration != generation) {
+        return;
+      }
+      if (queryContinuesRemotely(error, stopRequested: _stopRequested)) {
+        setState(() {
+          _remoteQuery = true;
+          _sending = true;
+          _error = null;
+          _ensurePlaceholder();
+        });
+        unawaited(_catchUpRemoteQuery(conversationId));
         return;
       }
       if (error.type == DioExceptionType.cancel) {
@@ -2305,7 +2362,224 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final backgrounded =
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached;
+    if (backgrounded) {
+      if (_sending || _busy) _remoteQuery = true;
+      return;
+    }
+    if (state == AppLifecycleState.resumed &&
+        _remoteQuery &&
+        _conversationId != null) {
+      unawaited(_catchUpRemoteQuery(_conversationId!));
+    }
+  }
+
+  void _finishRemoteQuery() {
+    _remoteQuery = false;
+    _pendingQueryText = null;
+    _catchUpGeneration++;
+    _catchUpTimer?.cancel();
+    _catchUpTimer = null;
+    _sending = false;
+  }
+
+  void _ensurePlaceholder() {
+    final pending = _entries.any(
+      (entry) => entry is MessageEntry && !entry.isUser && entry.pending,
+    );
+    if (!pending) {
+      _entries.add(
+        const MessageEntry(role: 'assistant', content: '', pending: true),
+      );
+    }
+  }
+
+  void _scheduleCatchUp(String conversationId, int generation, int realtime) {
+    _catchUpTimer?.cancel();
+    _catchUpTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted ||
+          !_remoteQuery ||
+          generation != _catchUpGeneration ||
+          realtime != _realtimeGeneration ||
+          _conversationId != conversationId ||
+          _signedOut ||
+          _signingOut) {
+        return;
+      }
+      unawaited(_catchUpRemoteQuery(conversationId));
+    });
+  }
+
+  Future<void> _catchUpRemoteQuery(String conversationId) async {
+    final generation = ++_catchUpGeneration;
+    final realtime = _realtimeGeneration;
+    bool current() =>
+        mounted &&
+        _remoteQuery &&
+        generation == _catchUpGeneration &&
+        realtime == _realtimeGeneration &&
+        _conversationId == conversationId &&
+        !_signedOut &&
+        !_signingOut;
+    try {
+      final details = await _http.get<Map<String, dynamic>>(
+        '/api/v1/conversations/$conversationId',
+      );
+      if (!current()) return;
+      var payload = details.data;
+      var stored = jsonMaps(payload?['messages']);
+      if (asJsonBool(payload?['responding']) ||
+          !serverStoredReply(stored, _pendingQueryText)) {
+        if (asJsonBool(payload?['responding'])) {
+          setState(() {
+            _sending = true;
+            _error = null;
+            _ensurePlaceholder();
+          });
+          _scheduleCatchUp(conversationId, generation, realtime);
+          return;
+        }
+        // The running flag drops after the reply is stored. Read once more so a
+        // completion between those two reads is not shown as a failure.
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        if (!current()) return;
+        final confirmed = await _http.get<Map<String, dynamic>>(
+          '/api/v1/conversations/$conversationId',
+        );
+        if (!current()) return;
+        payload = confirmed.data;
+        stored = jsonMaps(payload?['messages']);
+        if (asJsonBool(payload?['responding'])) {
+          setState(() {
+            _sending = true;
+            _error = null;
+            _ensurePlaceholder();
+          });
+          _scheduleCatchUp(conversationId, generation, realtime);
+          return;
+        }
+      }
+      final sent = _pendingQueryText;
+      stored = jsonMaps(payload?['messages']);
+      final accepted =
+          sent == null ||
+          stored.any(
+            (message) =>
+                message['role'] == 'user' && message['content'] == sent,
+          );
+      if (!accepted) {
+        setState(() {
+          _removePlaceholder();
+          _settleToolRuns();
+          final index = _entries.lastIndexWhere(
+            (entry) =>
+                entry is MessageEntry &&
+                entry.isUser &&
+                entry.content == sent,
+          );
+          if (index >= 0) {
+            _entries[index] = (_entries[index] as MessageEntry).copyWith(
+              failed: true,
+            );
+          }
+          _error = 'Could not reach Jarvis. The message was not sent.';
+          _finishRemoteQuery();
+        });
+        return;
+      }
+      final approvals = await _loadConversationApprovals(conversationId);
+      if (!current()) return;
+      setState(() {
+        _replaceTranscript(payload, approvals);
+        _remoteQuery = false;
+        _sending = false;
+        _pendingQueryText = null;
+        _catchUpTimer?.cancel();
+        if (!_hasPendingApproval) {
+          final index = _entries.lastIndexWhere(
+            (entry) => entry is MessageEntry,
+          );
+          if (index >= 0 && (_entries[index] as MessageEntry).isUser) {
+            _entries[index] = (_entries[index] as MessageEntry).copyWith(
+              failed: true,
+            );
+            _error = 'Jarvis could not complete this response.';
+          }
+        }
+      });
+      if (approvals == null) unawaited(_syncConversationApprovals());
+      unawaited(_loadConversationSurfaces(conversationId));
+      unawaited(_loadRecent());
+    } on DioException {
+      if (!current()) return;
+      _scheduleCatchUp(conversationId, generation, realtime);
+    }
+  }
+
+  void _replaceTranscript(
+    Map<String, dynamic>? details,
+    List<ApprovalEntry>? approvals,
+  ) {
+    final knownApprovals =
+        approvals ?? _entries.whereType<ApprovalEntry>().toList();
+    _entries
+      ..clear()
+      ..addAll(
+        jsonMaps(details?['messages'])
+            .where(
+              (message) =>
+                  message['role'] is String && message['content'] is String,
+            )
+            .map(
+              (message) => MessageEntry(
+                role: message['role'] as String,
+                content: message['content'] as String,
+                id: asJsonString(message['id']),
+              ),
+            ),
+      );
+    _addApprovals(knownApprovals);
+  }
+
+  Future<void> _cancelServerRun(String conversationId) async {
+    try {
+      await _http.post<void>('/api/v1/conversations/$conversationId/cancel');
+    } on DioException {
+      // Stopping locally still applies when the server is unreachable.
+    }
+  }
+
+  Future<void> _cancelActiveRun() async {
+    final conversationId = _conversationId;
+    _stopRequested = true;
+    _finishRemoteQuery();
+    _runCancel?.cancel();
+    if (mounted) {
+      setState(() {
+        _removePlaceholder();
+        _settleToolRuns();
+        final index = _entries.lastIndexWhere(
+          (entry) => entry is MessageEntry && entry.isUser,
+        );
+        if (index >= 0) {
+          _entries[index] = (_entries[index] as MessageEntry).copyWith(
+            failed: true,
+          );
+        }
+      });
+    }
+    if (conversationId != null) await _cancelServerRun(conversationId);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _catchUpTimer?.cancel();
     _realtimeGeneration++;
     unawaited(_stopVoice());
     final hub = _hub;
@@ -2831,7 +3105,7 @@ class _ChatScreenState extends State<ChatScreen> {
               child: ChatComposer(
                 controller: _input,
                 onSend: () => unawaited(_send()),
-                onCancel: _busy ? () => _runCancel?.cancel() : null,
+                onCancel: _busy ? () => unawaited(_cancelActiveRun()) : null,
                 onVoice: _conversationId == null ||
                         (_busy && !_voiceActive && !_voiceStarting)
                     ? null

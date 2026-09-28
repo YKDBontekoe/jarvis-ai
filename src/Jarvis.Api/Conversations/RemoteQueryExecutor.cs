@@ -1,0 +1,35 @@
+using Jarvis.Api.Security;
+
+namespace Jarvis.Api.Conversations;
+
+/// <summary>
+/// Runs a conversation turn in its own owner scope so a closed phone cannot cancel it.
+/// The HTTP request may still wait for the result while the client is connected.
+/// </summary>
+public sealed class RemoteQueryExecutor(
+    IServiceScopeFactory scopes,
+    IHostApplicationLifetime lifetime,
+    RemoteQueryHost queries)
+{
+    public async Task<ConversationTurnResult> SendAsync(Guid ownerId, Guid conversationId, string content,
+        Func<string, CancellationToken, Task>? onTextDelta = null,
+        Func<CancellationToken, Task>? beforeRun = null)
+    {
+        using var query = queries.Begin(ownerId, conversationId, lifetime.ApplicationStopping);
+        await using var scope = scopes.CreateOwnerScope(ownerId);
+        var turns = scope.ServiceProvider.GetRequiredService<ConversationTurnService>();
+        return await turns.SendAsync(ownerId, conversationId, content, query.Token, onTextDelta, beforeRun);
+    }
+
+    public async Task<ConversationTurnResult> DecideAsync(Guid ownerId, Guid approvalId, bool approved)
+    {
+        await using var scope = scopes.CreateOwnerScope(ownerId);
+        var approvals = scope.ServiceProvider.GetRequiredService<Jarvis.Application.Approvals.IToolApprovalStore>();
+        var pending = await approvals.GetActionableAsync(approvalId, ownerId, CancellationToken.None);
+        if (pending is null) return new ConversationTurnResult.NotFound();
+
+        using var query = queries.Begin(ownerId, pending.ConversationId, lifetime.ApplicationStopping);
+        var decisions = scope.ServiceProvider.GetRequiredService<ApprovalDecisionService>();
+        return await decisions.DecideAsync(ownerId, approvalId, approved, query.Token);
+    }
+}

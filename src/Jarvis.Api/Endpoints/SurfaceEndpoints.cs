@@ -25,7 +25,7 @@ internal static class SurfaceEndpoints
         }).WithName("ListConversationSurfaces");
 
         api.MapPost("/ui-surfaces/{id:guid}/actions", async (Guid id, UiSurfaceActionRequest request,
-            IUiSurfaceRepository surfaces, ConversationTurnService turns, ICurrentUser currentUser,
+            IUiSurfaceRepository surfaces, RemoteQueryExecutor remote, ICurrentUser currentUser,
             IRealtimePublisher realtime, CancellationToken ct) =>
         {
             var surface = await surfaces.GetAsync(currentUser.OwnerId, id, ct);
@@ -41,9 +41,17 @@ internal static class SurfaceEndpoints
             if (values.Any(pair => pair.Key.Length > 40 || pair.Value.Length > 500))
                 return EndpointHelpers.Invalid("values", "Field values must be short.");
             var valuesJson = JsonSerializer.Serialize(values);
-            await surfaces.CompleteAsync(currentUser.OwnerId, id, actionId, valuesJson, ct);
+            await surfaces.CompleteAsync(currentUser.OwnerId, id, actionId, valuesJson, CancellationToken.None);
             var content = DescribeAnswer(surface, actionId, values);
-            var result = await turns.SendAsync(currentUser.OwnerId, surface.ConversationId, content, ct);
+            ConversationTurnResult result;
+            try
+            {
+                result = await remote.SendAsync(currentUser.OwnerId, surface.ConversationId, content);
+            }
+            catch (OperationCanceledException)
+            {
+                return Results.StatusCode(StatusCodes.Status499ClientClosedRequest);
+            }
             if (result is ConversationTurnResult.Failed)
             {
                 foreach (var changed in await surfaces.ReopenAsync(currentUser.OwnerId, id, CancellationToken.None))
