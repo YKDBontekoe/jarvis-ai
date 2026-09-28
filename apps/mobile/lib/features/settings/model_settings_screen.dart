@@ -8,6 +8,9 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 
+part 'openrouter_model_picker.dart';
+part 'codex_model_picker.dart';
+
 /// Chooses between the host's ChatGPT (Codex) session and the owner's own OpenRouter key.
 class ModelSettingsScreen extends StatefulWidget {
   const ModelSettingsScreen({required this.http, super.key});
@@ -40,6 +43,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
   String? _error;
   String? _notice;
   Map<String, dynamic>? _test;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -66,19 +70,20 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
   }
 
   Future<void> _load() async {
+    final revision = ++_requestRevision;
     try {
       final response = await widget.http.get<dynamic>(
         '/api/v1/settings/models',
       );
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _apply(jsonObject(response.data) ?? const {});
         _loading = false;
         _error = null;
       });
-      await _loadCodex();
+      await _loadCodex(revision);
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _codexLoading = false;
@@ -87,7 +92,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
             'Could not load model settings.';
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _codexLoading = false;
@@ -106,12 +111,13 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     _codexModels = jsonMaps(data['models']);
   }
 
-  Future<void> _loadCodex() async {
+  Future<void> _loadCodex([int? revision]) async {
+    final expected = revision ?? _requestRevision;
     try {
       final response = await widget.http.get<dynamic>(
         '/api/v1/settings/models/codex',
       );
-      if (!mounted) return;
+      if (!mounted || expected != _requestRevision) return;
       final data = jsonObject(response.data);
       if (data == null) {
         setState(() {
@@ -126,7 +132,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
         _codexLoading = false;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || expected != _requestRevision) return;
       setState(() {
         _codexLoading = false;
         _codexError =
@@ -134,7 +140,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
             'Could not load the models supported by the installed Codex CLI.';
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || expected != _requestRevision) return;
       setState(() {
         _codexLoading = false;
         _codexError =
@@ -167,6 +173,9 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
             firstProblemMessage(error.response?.data) ??
             'Jarvis could not update Codex.',
       );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Jarvis could not update Codex.');
     } finally {
       if (mounted) setState(() => _updating = false);
     }
@@ -293,6 +302,12 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
                 firstProblemMessage(error.response?.data) ??
                 'The test request failed.',
           },
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _test = {'ok': false, 'error': 'The test request failed.'},
         );
       }
     } finally {
@@ -666,291 +681,6 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
       message: ok
           ? 'Connected${model == null ? '' : ' to $model'} in $latency ms.'
           : asJsonString(_test!['error']) ?? 'The model did not answer.',
-    );
-  }
-}
-
-/// Searchable OpenRouter catalog with context size, price, and tool support.
-class OpenRouterModelPicker extends StatefulWidget {
-  const OpenRouterModelPicker({
-    required this.http,
-    required this.title,
-    super.key,
-  });
-
-  final Dio http;
-  final String title;
-
-  @override
-  State<OpenRouterModelPicker> createState() => _OpenRouterModelPickerState();
-}
-
-class _OpenRouterModelPickerState extends State<OpenRouterModelPicker> {
-  final _search = TextEditingController();
-  List<Map<String, dynamic>> _models = const [];
-  bool _loading = true;
-  String? _error;
-  Timer? _debounce;
-  int _revision = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_load());
-  }
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _search.dispose();
-    super.dispose();
-  }
-
-  Future<void> _load() async {
-    final revision = ++_revision;
-    setState(() => _loading = true);
-    try {
-      final response = await widget.http.get<dynamic>(
-        '/api/v1/settings/models/openrouter/catalog',
-        queryParameters: {
-          if (_search.text.trim().isNotEmpty) 'search': _search.text.trim(),
-        },
-      );
-      if (!mounted || revision != _revision) return;
-      setState(() {
-        _models = jsonMaps(response.data);
-        _loading = false;
-        _error = null;
-      });
-    } on DioException catch (error) {
-      if (!mounted || revision != _revision) return;
-      setState(() {
-        _loading = false;
-        _error =
-            firstProblemMessage(error.response?.data) ??
-            'Could not load OpenRouter models.';
-      });
-    } catch (_) {
-      if (!mounted || revision != _revision) return;
-      setState(() {
-        _loading = false;
-        _error = 'Could not load OpenRouter models.';
-      });
-    }
-  }
-
-  String _price(dynamic value) {
-    if (value is! num) return '—';
-    return value == 0 ? 'free' : '\$${value.toStringAsFixed(2)}';
-  }
-
-  @override
-  Widget build(BuildContext context) => SafeArea(
-    child: SizedBox(
-      height: MediaQuery.of(context).size.height * .8,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Close',
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(PhosphorIconsRegular.x),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: TextField(
-              controller: _search,
-              autofocus: true,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass),
-                hintText: 'Search models, e.g. claude, gemini, llama',
-              ),
-              onChanged: (_) {
-                _debounce?.cancel();
-                _debounce = Timer(
-                  const Duration(milliseconds: 300),
-                  () => unawaited(_load()),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: _loading && _models.isEmpty
-                ? const LoadingState()
-                : _error != null && _models.isEmpty
-                ? ErrorState(
-                    message: _error!,
-                    onRetry: () => unawaited(_load()),
-                  )
-                : ListView.separated(
-                    itemCount: _models.length,
-                    separatorBuilder: (_, _) => const Divider(indent: 20),
-                    itemBuilder: (context, index) {
-                      final model = _models[index];
-                      final id = asJsonString(model['id']) ?? '';
-                      final contextLength = asJsonInt(model['contextLength']);
-                      return ListTile(
-                        title: Text(asJsonString(model['name']) ?? id),
-                        subtitle: Text(
-                          '$id · ${contextLength == 0 ? '?' : '${(contextLength / 1000).round()}k'} ctx · '
-                          '${_price(model['promptPricePerMillion'])} in / '
-                          '${_price(model['completionPricePerMillion'])} out per 1M',
-                        ),
-                        trailing: asJsonBool(model['supportsTools'])
-                            ? const Tooltip(
-                                message: 'Supports tools',
-                                child: Icon(
-                                  PhosphorIconsRegular.puzzlePiece,
-                                  size: 18,
-                                  color: JarvisColors.success,
-                                ),
-                              )
-                            : null,
-                        onTap: () => Navigator.pop(context, id),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-/// Models reported by the installed Codex CLI, including the account default.
-class CodexModelPicker extends StatefulWidget {
-  const CodexModelPicker({
-    required this.models,
-    required this.selected,
-    super.key,
-  });
-
-  final List<Map<String, dynamic>> models;
-  final String selected;
-
-  @override
-  State<CodexModelPicker> createState() => _CodexModelPickerState();
-}
-
-class _CodexModelPickerState extends State<CodexModelPicker> {
-  final _search = TextEditingController();
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final query = _search.text.trim().toLowerCase();
-    final models = widget.models.where((model) {
-      if (query.isEmpty) return true;
-      final id =
-          (asJsonString(model['model']) ?? asJsonString(model['id']) ?? '')
-              .toLowerCase();
-      final name = (asJsonString(model['displayName']) ?? '').toLowerCase();
-      return id.contains(query) || name.contains(query);
-    }).toList();
-    return SafeArea(
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * .8,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Codex models',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(PhosphorIconsRegular.x),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: TextField(
-                controller: _search,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass),
-                  hintText: 'Search installed Codex models',
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView.separated(
-                itemCount: models.length + (query.isEmpty ? 1 : 0),
-                separatorBuilder: (_, _) => const Divider(indent: 20),
-                itemBuilder: (context, index) {
-                  if (query.isEmpty && index == 0) {
-                    return ListTile(
-                      title: const Text('Account default'),
-                      subtitle: const Text(
-                        'Use the default model from the signed-in ChatGPT account.',
-                      ),
-                      trailing: widget.selected.isEmpty
-                          ? const Icon(
-                              PhosphorIconsRegular.check,
-                              size: 18,
-                              color: JarvisColors.success,
-                            )
-                          : null,
-                      onTap: () => Navigator.pop(context, ''),
-                    );
-                  }
-                  final model = models[query.isEmpty ? index - 1 : index];
-                  final id =
-                      asJsonString(model['model']) ??
-                      asJsonString(model['id']) ??
-                      '';
-                  final description = asJsonString(model['description']);
-                  return ListTile(
-                    title: Text(asJsonString(model['displayName']) ?? id),
-                    subtitle: Text(
-                      description == null ? id : '$id · $description',
-                    ),
-                    trailing: asJsonBool(model['supportsImages'])
-                        ? const Tooltip(
-                            message: 'Accepts images',
-                            child: Icon(
-                              PhosphorIconsRegular.image,
-                              size: 18,
-                              color: JarvisColors.inkSoft,
-                            ),
-                          )
-                        : null,
-                    onTap: () => Navigator.pop(context, id),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
