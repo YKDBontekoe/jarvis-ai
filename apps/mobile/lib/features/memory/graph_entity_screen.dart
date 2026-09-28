@@ -18,6 +18,7 @@ class GraphEntityScreen extends StatefulWidget {
 class _GraphEntityScreenState extends State<GraphEntityScreen> {
   Map<String, dynamic>? _details;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -26,26 +27,26 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
   }
 
   Future<void> _load() async {
+    final revision = ++_requestRevision;
     try {
       final response = await widget.http.get<dynamic>(
         '/api/v1/graph/entities/${widget.entityId}',
       );
-      if (mounted) {
-        setState(() {
-          _details = jsonObject(response.data);
-          _error = _details == null ? 'Could not load this entity.' : null;
-        });
-      }
+      if (!mounted || revision != _requestRevision) return;
+      setState(() {
+        _details = jsonObject(response.data);
+        _error = _details == null ? 'Could not load this entity.' : null;
+      });
     } on DioException catch (error) {
-      if (mounted) {
-        setState(
-          () => _error =
-              firstProblemMessage(error.response?.data) ??
-              'Could not load this entity.',
-        );
-      }
+      if (!mounted || revision != _requestRevision) return;
+      setState(
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not load this entity.',
+      );
     } catch (_) {
-      if (mounted) setState(() => _error = 'Could not load this entity.');
+      if (!mounted || revision != _requestRevision) return;
+      setState(() => _error = 'Could not load this entity.');
     }
   }
 

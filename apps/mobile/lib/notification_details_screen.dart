@@ -29,6 +29,7 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
   Map<String, dynamic>? _item;
   bool _loading = true;
   String? _error;
+  int _requestRevision = 0;
 
   bool get _isReminder =>
       widget.notificationType == 'reminder.due' ||
@@ -45,6 +46,7 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
   }
 
   Future<void> _load() async {
+    final revision = ++_requestRevision;
     try {
       final path = switch (widget.notificationType) {
         'reminder.due' ||
@@ -59,8 +61,8 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
         return;
       }
       final response = await widget.http.get<dynamic>(path);
+      if (!mounted || revision != _requestRevision) return;
       final data = response.data;
-      if (!mounted) return;
       if (data == null) {
         setState(() => _error = 'Jarvis returned an invalid item.');
         return;
@@ -71,17 +73,19 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
         _error = item == null ? 'Jarvis returned an invalid item.' : null;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(
         () => _error = error.response?.statusCode == 404
             ? 'This item is no longer available.'
             : 'Jarvis could not load this item.',
       );
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() => _error = 'Jarvis could not load this item.');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 

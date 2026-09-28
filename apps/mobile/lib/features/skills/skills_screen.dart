@@ -241,6 +241,7 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
   List<Map<String, dynamic>> _revisions = const [];
   String? _error;
   bool _busy = false;
+  int _requestRevision = 0;
 
   String get _path => '/api/v1/skills/${widget.skillId}';
 
@@ -251,27 +252,26 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
   }
 
   Future<void> _load() async {
+    final revision = ++_requestRevision;
     try {
       final response = await widget.http.get<dynamic>(_path);
       final data = jsonObject(response.data) ?? const {};
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _skill = jsonObject(data['skill']);
         _revisions = jsonMaps(data['revisions']);
         _error = _skill == null ? 'Jarvis returned an invalid skill.' : null;
       });
     } on DioException catch (error) {
-      if (mounted) {
-        setState(
-          () => _error =
-              firstProblemMessage(error.response?.data) ??
-              'Could not load this skill.',
-        );
-      }
+      if (!mounted || revision != _requestRevision) return;
+      setState(
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not load this skill.',
+      );
     } catch (_) {
-      if (mounted) {
-        setState(() => _error = 'Could not load this skill.');
-      }
+      if (!mounted || revision != _requestRevision) return;
+      setState(() => _error = 'Could not load this skill.');
     }
   }
 

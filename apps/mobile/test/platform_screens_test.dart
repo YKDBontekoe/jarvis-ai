@@ -296,6 +296,46 @@ void main() {
     expect(find.byType(TextField), findsNothing);
   });
 
+  testWidgets('choice field menus skip malformed option lists', (tester) async {
+    Map<String, String>? values;
+    await show(
+      tester,
+      Scaffold(
+        body: UiSurfaceCard(
+          surface: const UiSurfaceEntry(
+            id: 'surf-options',
+            title: 'Pick a color',
+            status: 'open',
+            schema: {
+              'kind': 'form',
+              'title': 'Pick a color',
+              'fields': [
+                {
+                  'id': 'color',
+                  'label': 'Color',
+                  'type': 'choice',
+                  'options': 'red',
+                },
+              ],
+              'actions': [
+                {'id': 'share', 'label': 'Share', 'style': 'primary'},
+              ],
+            },
+          ),
+          onAction: (_, submitted) async {
+            values = submitted;
+          },
+        ),
+      ),
+    );
+
+    expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Share'));
+    await tester.pump();
+    expect(values, isNull);
+    expect(find.text('Choose an option in each menu.'), findsOneWidget);
+  });
+
   testWidgets('device settings save location and clipboard toggles', (
     tester,
   ) async {

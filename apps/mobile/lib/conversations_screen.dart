@@ -127,6 +127,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
             ? 'Task conversations are managed from the Tasks section.'
             : 'Jarvis could not delete this conversation.',
       );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Jarvis could not delete this conversation.');
     }
   }
 

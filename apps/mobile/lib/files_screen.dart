@@ -114,6 +114,8 @@ class _FilesScreenState extends State<FilesScreen> {
           ? 'That file type is not supported.'
           : 'Jarvis could not upload this file.';
       if (mounted) _showError(message);
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not upload this file.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -147,6 +149,8 @@ class _FilesScreenState extends State<FilesScreen> {
       await _load();
     } on DioException {
       if (mounted) _showError('Jarvis could not retry indexing this file.');
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not retry indexing this file.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -171,6 +175,8 @@ class _FilesScreenState extends State<FilesScreen> {
       await widget.http.delete('/api/v1/files/$id');
       await _load();
     } on DioException {
+      if (mounted) _showError('Jarvis could not delete this file.');
+    } catch (_) {
       if (mounted) _showError('Jarvis could not delete this file.');
     } finally {
       if (mounted) setState(() => _busy = false);

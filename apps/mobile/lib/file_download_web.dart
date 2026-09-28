@@ -5,14 +5,18 @@ import 'package:dio/dio.dart';
 import 'package:web/web.dart' as web;
 
 Future<void> downloadAndOpen(Dio http, String id, String fileName) async {
-  final response = await http.get<List<int>>(
+  final response = await http.get<dynamic>(
     '/api/v1/files/$id/content',
     options: Options(
       responseType: ResponseType.bytes,
       receiveTimeout: const Duration(minutes: 2),
     ),
   );
-  final bytes = Uint8List.fromList(response.data ?? const <int>[]);
+  final raw = response.data;
+  if (raw is! List<int>) {
+    throw StateError('Jarvis returned an invalid file.');
+  }
+  final bytes = Uint8List.fromList(raw);
   final blob = web.Blob([bytes.toJS].toJS);
   final url = web.URL.createObjectURL(blob);
   final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
