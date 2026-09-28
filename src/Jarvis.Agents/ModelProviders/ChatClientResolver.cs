@@ -10,8 +10,10 @@ public enum ModelPurpose
 {
     /// <summary>Interactive and background-task agent turns.</summary>
     Chat,
-    /// <summary>Memory extraction, reranking, reflection, and other short structured jobs.</summary>
+    /// <summary>Memory extraction, reranking, and other short structured jobs.</summary>
     Background,
+    /// <summary>Reflection, dreaming, durable background tasks, and other deeper reasoning jobs.</summary>
+    Reasoning,
     /// <summary>Image understanding such as OCR during file indexing.</summary>
     Vision
 }
@@ -48,7 +50,12 @@ internal sealed class ChatClientResolver(
         var provider = UsageProviders.Codex;
         if (settings.UsesOpenRouter && await GetOpenRouterKeyAsync(ownerId, cancellationToken) is { } apiKey)
         {
-            var model = purpose == ModelPurpose.Background ? settings.FastModel ?? settings.ChatModel : settings.ChatModel;
+            var model = purpose switch
+            {
+                ModelPurpose.Background => settings.FastModel ?? settings.ChatModel,
+                ModelPurpose.Reasoning => settings.ReasoningModel ?? settings.ChatModel,
+                _ => settings.ChatModel
+            };
             if (model is not null)
             {
                 client = clientFactory.CreateOpenRouterChatClient(apiKey, model);
@@ -98,6 +105,7 @@ internal sealed class ChatClientResolver(
     {
         ModelPurpose.Chat => UsagePurposes.Chat,
         ModelPurpose.Background => UsagePurposes.Background,
+        ModelPurpose.Reasoning => UsagePurposes.Reasoning,
         ModelPurpose.Vision => UsagePurposes.Vision,
         _ => UsagePurposes.Background
     };
@@ -107,6 +115,7 @@ internal sealed class ChatClientResolver(
         {
             ModelPurpose.Chat => settings.ChatModel,
             ModelPurpose.Background => settings.FastModel ?? settings.ChatModel,
+            ModelPurpose.Reasoning => settings.ReasoningModel ?? settings.ChatModel,
             _ => null
         };
 

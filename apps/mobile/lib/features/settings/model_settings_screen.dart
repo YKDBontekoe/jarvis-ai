@@ -22,6 +22,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
   final _key = TextEditingController();
   final _chat = TextEditingController();
   final _fast = TextEditingController();
+  final _reasoning = TextEditingController();
   final _embedding = TextEditingController();
   String _provider = 'codex';
   bool _keyConfigured = false;
@@ -52,6 +53,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     _key.dispose();
     _chat.dispose();
     _fast.dispose();
+    _reasoning.dispose();
     _embedding.dispose();
     super.dispose();
   }
@@ -62,6 +64,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     _provider = asJsonString(data['provider']) ?? 'codex';
     _chat.text = asJsonString(data['chatModel']) ?? '';
     _fast.text = asJsonString(data['fastModel']) ?? '';
+    _reasoning.text = asJsonString(data['reasoningModel']) ?? '';
     _embedding.text = asJsonString(data['embeddingModel']) ?? '';
   }
 
@@ -160,16 +163,16 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     ];
   }
 
-  Future<void> _pickCodex() async {
+  Future<void> _pickCodex(TextEditingController controller) async {
     final picked = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       builder: (_) => CodexModelPicker(
         models: _visibleCodexModels,
-        selected: _chat.text.trim(),
+        selected: controller.text.trim(),
       ),
     );
-    if (picked != null && mounted) setState(() => _chat.text = picked);
+    if (picked != null && mounted) setState(() => controller.text = picked);
   }
 
   Future<void> _run(
@@ -243,6 +246,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
         'provider': _provider,
         'chatModel': _chat.text.trim(),
         'fastModel': _fast.text.trim(),
+        'reasoningModel': _reasoning.text.trim(),
         'embeddingModel': _embedding.text.trim(),
       },
     ),
@@ -559,6 +563,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
       String helper, {
       Key? key,
       bool codexModels = false,
+      String? browseCodexKey,
     }) => Padding(
       padding: const EdgeInsets.only(top: 12),
       child: TextField(
@@ -575,10 +580,10 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
           helperMaxLines: 3,
           suffixIcon: codexModels
               ? IconButton(
-                  key: const Key('browse-codex-models'),
+                  key: Key(browseCodexKey ?? 'browse-codex-models'),
                   tooltip: 'Browse Codex models',
                   icon: const Icon(PhosphorIconsRegular.magnifyingGlass),
-                  onPressed: () => unawaited(_pickCodex()),
+                  onPressed: () => unawaited(_pickCodex(controller)),
                 )
               : openRouter || controller == _embedding
               ? IconButton(
@@ -590,17 +595,26 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
         ),
       ),
     );
-    final selected = _chat.text.trim();
-    final known = _codexModels.any(
-      (model) =>
-          (asJsonString(model['model']) ?? asJsonString(model['id'])) ==
-          selected,
-    );
-    final codexHelper = _codexModels.isEmpty
-        ? 'Leave empty to use the ChatGPT account default.'
-        : 'Models supported by Codex ${_installedVersion ?? 'the installed CLI'}. '
-              'Leave empty for the account default.'
-              '${selected.isNotEmpty && !known ? ' This model is not in the installed catalog.' : ''}';
+    String codexFieldHelper(String selected) {
+      final known = _codexModels.any(
+        (model) =>
+            (asJsonString(model['model']) ?? asJsonString(model['id'])) ==
+            selected,
+      );
+      if (_codexModels.isEmpty) {
+        return 'Leave empty to use the ChatGPT account default.';
+      }
+      return 'Models supported by Codex ${_installedVersion ?? 'the installed CLI'}. '
+          'Leave empty for the account default.'
+          '${selected.isNotEmpty && !known ? ' This model is not in the installed catalog.' : ''}';
+    }
+
+    final chatSelected = _chat.text.trim();
+    final reasoningSelected = _reasoning.text.trim();
+    final codexChatHelper = codexFieldHelper(chatSelected);
+    final codexReasoningHelper =
+        'Used for reflection, dreaming, and durable background tasks. '
+        '${codexFieldHelper(reasoningSelected)}';
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -611,7 +625,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
             'Chat model',
             openRouter
                 ? 'Used for conversations and background tasks. Pick one that supports tools.'
-                : codexHelper,
+                : codexChatHelper,
             key: const Key('chat-model'),
             codexModels: codexPicker,
           ),
@@ -619,8 +633,18 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
             field(
               _fast,
               'Fast model (optional)',
-              'Used for learning, memory extraction, and reranking. Defaults to the chat model.',
+              'Used for memory extraction and reranking. Defaults to the chat model.',
             ),
+          field(
+            _reasoning,
+            'Reasoning model (optional)',
+            openRouter
+                ? 'Used for reflection, dreaming, and durable background tasks. Defaults to the chat model.'
+                : codexReasoningHelper,
+            key: const Key('reasoning-model'),
+            codexModels: codexPicker,
+            browseCodexKey: 'browse-codex-reasoning-models',
+          ),
           field(
             _embedding,
             'Embedding model (optional)',

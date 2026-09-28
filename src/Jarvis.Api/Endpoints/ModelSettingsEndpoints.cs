@@ -8,10 +8,10 @@ using Jarvis.Application.Settings;
 
 namespace Jarvis.Api.Endpoints;
 
-public sealed record ModelSettingsDto(string Provider, string? ChatModel, string? FastModel, string? EmbeddingModel,
-    bool OpenRouterKeyConfigured, IReadOnlyList<string> Providers);
+public sealed record ModelSettingsDto(string Provider, string? ChatModel, string? FastModel, string? ReasoningModel,
+    string? EmbeddingModel, bool OpenRouterKeyConfigured, IReadOnlyList<string> Providers);
 public sealed record SaveModelSettingsRequest(string? Provider, string? ChatModel, string? FastModel,
-    string? EmbeddingModel);
+    string? ReasoningModel, string? EmbeddingModel);
 public sealed record CodexModelDto(string Id, string Model, string DisplayName, string? Description, bool IsDefault,
     bool Hidden, bool SupportsImages, IReadOnlyList<string> InputModalities);
 public sealed record CodexInstallationDto(string? InstalledVersion, string? LatestVersion, bool UpdateAvailable,
@@ -37,18 +37,24 @@ internal static class ModelSettingsEndpoints
             try
             {
                 normalized = new ModelSettings(request.Provider ?? ModelSettings.Codex, request.ChatModel,
-                    request.FastModel, request.EmbeddingModel).Normalize();
+                    request.FastModel, request.ReasoningModel, request.EmbeddingModel).Normalize();
             }
             catch (ArgumentException exception)
             {
                 return EndpointHelpers.Invalid("provider", exception.Message);
             }
-            if (normalized.Provider == ModelSettings.Codex && normalized.ChatModel is not null)
+            if (normalized.Provider == ModelSettings.Codex)
             {
                 var catalog = await codex.GetStatusAsync(ct);
-                if (catalog.Error is null && !catalog.SupportsModel(normalized.ChatModel))
-                    return EndpointHelpers.Invalid("chatModel",
-                        $"The installed Codex CLI does not support '{normalized.ChatModel}'. Choose a listed model or update Codex.");
+                if (catalog.Error is null)
+                {
+                    if (normalized.ChatModel is not null && !catalog.SupportsModel(normalized.ChatModel))
+                        return EndpointHelpers.Invalid("chatModel",
+                            $"The installed Codex CLI does not support '{normalized.ChatModel}'. Choose a listed model or update Codex.");
+                    if (normalized.ReasoningModel is not null && !catalog.SupportsModel(normalized.ReasoningModel))
+                        return EndpointHelpers.Invalid("reasoningModel",
+                            $"The installed Codex CLI does not support '{normalized.ReasoningModel}'. Choose a listed model or update Codex.");
+                }
             }
             if (normalized.UsesOpenRouter && !await HasOpenRouterKeyAsync(currentUser.OwnerId, credentials, ct))
                 return EndpointHelpers.Invalid("provider", "Save an OpenRouter API key before selecting OpenRouter.");
@@ -86,7 +92,8 @@ internal static class ModelSettingsEndpoints
                     {
                         Provider = ModelSettings.Codex,
                         ChatModel = null,
-                        FastModel = null
+                        FastModel = null,
+                        ReasoningModel = null
                     }
                     : current;
                 if (updated.UsesOpenRouterEmbeddings)
@@ -148,7 +155,8 @@ internal static class ModelSettingsEndpoints
         IIntegrationCredentialStore credentials, CancellationToken ct)
     {
         var current = await settings.GetAsync<ModelSettings>(ownerId, SettingsSections.Models, ct) ?? ModelSettings.Default;
-        return new ModelSettingsDto(current.Provider, current.ChatModel, current.FastModel, current.EmbeddingModel,
+        return new ModelSettingsDto(current.Provider, current.ChatModel, current.FastModel, current.ReasoningModel,
+            current.EmbeddingModel,
             await HasOpenRouterKeyAsync(ownerId, credentials, ct), ModelSettings.Providers);
     }
 
