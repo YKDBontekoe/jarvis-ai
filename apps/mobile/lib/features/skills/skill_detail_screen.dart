@@ -318,7 +318,7 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
   );
 
   String? _date(String? iso) {
-    final parsed = DateTime.tryParse(iso ?? '')?.toLocal();
+    final parsed = jsonDate(iso, local: true);
     if (parsed == null) return null;
     String two(int value) => value.toString().padLeft(2, '0');
     return '${parsed.year}-${two(parsed.month)}-${two(parsed.day)} ${two(parsed.hour)}:${two(parsed.minute)}';

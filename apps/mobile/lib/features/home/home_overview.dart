@@ -456,17 +456,15 @@ class _ActiveTask {
   final DateTime createdAt;
 
   static _ActiveTask? fromJson(dynamic value) {
-    if (value is! Map) return null;
-    final map = Map<String, dynamic>.from(value);
-    final id = map['id'];
-    final title = map['title'];
-    final status = map['status'];
-    final createdAt = map['createdAt'];
-    if (id is! String ||
+    final map = jsonObject(value);
+    if (map == null) return null;
+    final id = asJsonString(map['id']);
+    final title = asJsonString(map['title']);
+    final status = asJsonString(map['status']);
+    if (id == null ||
         id.isEmpty ||
-        title is! String ||
-        status is! String ||
-        createdAt is! String ||
+        title == null ||
+        status == null ||
         !const {
           'queued',
           'running',
@@ -475,7 +473,7 @@ class _ActiveTask {
         }.contains(status)) {
       return null;
     }
-    final date = DateTime.tryParse(createdAt);
+    final date = jsonDate(map['createdAt']);
     if (date == null) return null;
     return _ActiveTask(id: id, title: title, status: status, createdAt: date);
   }

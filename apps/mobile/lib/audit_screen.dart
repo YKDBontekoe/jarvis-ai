@@ -40,9 +40,7 @@ class _AuditScreenState extends State<AuditScreen> {
         queryParameters: const {'limit': 150},
       );
       if (mounted && revision == _requestRevision) {
-        setState(
-          () => _events = jsonMaps(response.data),
-        );
+        setState(() => _events = jsonMaps(response.data));
       }
     } on DioException {
       if (mounted && revision == _requestRevision) {
@@ -84,19 +82,19 @@ class _AuditScreenState extends State<AuditScreen> {
             'Approvals, tasks, reminders, files, and memory changes are recorded here.',
       ),
       child: RefreshIndicator(
-            onRefresh: _load,
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-              itemCount: _events.length,
-              itemBuilder: (context, index) => ContentWidth(
-                child: _AuditRow(
-                  event: _events[index],
-                  first: index == 0,
-                  last: index == _events.length - 1,
-                ),
-              ),
+        onRefresh: _load,
+        child: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+          itemCount: _events.length,
+          itemBuilder: (context, index) => ContentWidth(
+            child: _AuditRow(
+              event: _events[index],
+              first: index == 0,
+              last: index == _events.length - 1,
             ),
           ),
+        ),
+      ),
     ),
   );
 }
@@ -115,9 +113,7 @@ class _AuditRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final success = asJsonBool(event['success']);
-    final timestamp = DateTime.tryParse(
-      asJsonString(event['timestamp']) ?? '',
-    )?.toLocal();
+    final timestamp = jsonDate(event['timestamp'], local: true);
     final metadata = asJsonString(event['metadataJson']);
     final risk = asJsonString(event['riskClass']) ?? 'unknown risk';
     final color = success ? JarvisColors.success : JarvisColors.danger;
@@ -173,10 +169,8 @@ class _AuditRow extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          (asJsonString(event['action']) ?? 'action').replaceAll(
-                            '.',
-                            ' ',
-                          ),
+                          (asJsonString(event['action']) ?? 'action')
+                              .replaceAll('.', ' '),
                           style: Theme.of(context).textTheme.titleSmall,
                         ),
                       ),

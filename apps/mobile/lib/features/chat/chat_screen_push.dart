@@ -40,41 +40,49 @@ mixin _ChatScreenPush on _ChatScreenController {
       }
     } on DioException {
       // The API may be offline while Firebase initialization and chat recovery continue.
+    } catch (_) {
+      // Push stays optional; chat continues if token registration fails unexpectedly.
     }
   }
 
   Future<void> _registerPushToken(String token) async {
     if (_signedOut || _signingOut) return;
-    final platform = defaultTargetPlatform == TargetPlatform.iOS
-        ? 'ios'
-        : 'android';
-    final previous = _pushToken;
-    await _http.put<void>(
-      '/api/v1/push-devices',
-      data: {'token': token, 'platform': platform},
-    );
-    if (_signedOut || _signingOut) {
-      try {
-        await _http.delete<void>(
-          '/api/v1/push-devices',
-          data: {'token': token},
-        );
-      } on DioException {
-        // Sign-out already dropped local state; stale server rows expire at Firebase.
+    try {
+      final platform = defaultTargetPlatform == TargetPlatform.iOS
+          ? 'ios'
+          : 'android';
+      final previous = _pushToken;
+      await _http.put<void>(
+        '/api/v1/push-devices',
+        data: {'token': token, 'platform': platform},
+      );
+      if (_signedOut || _signingOut) {
+        try {
+          await _http.delete<void>(
+            '/api/v1/push-devices',
+            data: {'token': token},
+          );
+        } catch (_) {
+          // Sign-out already dropped local state; stale server rows expire at Firebase.
+        }
+        return;
       }
-      return;
-    }
-    if (previous != null && previous != token) {
-      try {
-        await _http.delete<void>(
-          '/api/v1/push-devices',
-          data: {'token': previous},
-        );
-      } on DioException {
-        // The new token is registered; Firebase expires the previous one.
+      if (previous != null && previous != token) {
+        try {
+          await _http.delete<void>(
+            '/api/v1/push-devices',
+            data: {'token': previous},
+          );
+        } catch (_) {
+          // The new token is registered; Firebase expires the previous one.
+        }
       }
+      _pushToken = token;
+    } on DioException {
+      // Token registration is best-effort; chat continues without push.
+    } catch (_) {
+      // Same if Firebase or decoding throws unexpectedly.
     }
-    _pushToken = token;
   }
 
   void _onForegroundPush(RemoteMessage message) {
@@ -140,7 +148,7 @@ mixin _ChatScreenPush on _ChatScreenController {
     if (notificationId == null || notificationId.isEmpty) return;
     try {
       await _http.post('/api/v1/notifications/$notificationId/read');
-    } on DioException {
+    } catch (_) {
       // The unread badge refreshes the next time Reminders is opened.
     }
   }

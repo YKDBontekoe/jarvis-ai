@@ -39,6 +39,17 @@ void main() {
     expect(jsonString({'name': 'x'}, 'id'), isNull);
   });
 
+  test('jsonDate parses ISO strings and rejects the wrong JSON types', () {
+    expect(jsonDate('2026-09-28T12:00:00.000Z'), DateTime.utc(2026, 9, 28, 12));
+    expect(jsonDate(null), isNull);
+    expect(jsonDate(1), isNull);
+    expect(jsonDate(''), isNull);
+    expect(jsonDate('nope'), isNull);
+    final local = jsonDate('2026-09-28T12:00:00.000Z', local: true)!;
+    expect(local.isUtc, isFalse);
+    expect(local.toUtc(), DateTime.utc(2026, 9, 28, 12));
+  });
+
   test('jsonId rejects missing, blank, and non-string ids', () {
     expect(jsonId({'id': 'abc'}), 'abc');
     expect(jsonId({'id': ''}), isNull);

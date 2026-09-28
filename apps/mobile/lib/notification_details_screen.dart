@@ -90,8 +90,7 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
   }
 
   String _date(dynamic raw) {
-    if (raw is! String) return '';
-    final date = DateTime.tryParse(raw)?.toLocal();
+    final date = jsonDate(raw, local: true);
     if (date == null) return '';
     final dateText = MaterialLocalizations.of(context).formatMediumDate(date);
     final timeText = MaterialLocalizations.of(

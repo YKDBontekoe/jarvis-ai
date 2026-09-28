@@ -85,9 +85,7 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
     final current = jsonMaps(details?['current']);
     final history = jsonMaps(details?['history']);
     final summary = asJsonString(entity['summary']);
-    final updated = DateTime.tryParse(
-      asJsonString(entity['updatedAt']) ?? '',
-    )?.toLocal();
+    final updated = jsonDate(entity['updatedAt'], local: true);
     return Scaffold(
       appBar: AppBar(
         title: Text(asJsonString(entity['name']) ?? 'Entity'),

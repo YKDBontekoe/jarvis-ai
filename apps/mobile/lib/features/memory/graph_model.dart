@@ -32,7 +32,7 @@ String formatGraphDay(DateTime time) =>
 /// Formats a fact's validity interval the same way on the map and the timeline.
 String formatFactRange(String? fromIso, String? toIso) {
   String day(String? iso) {
-    final time = DateTime.tryParse(iso ?? '')?.toLocal();
+    final time = jsonDate(iso, local: true);
     if (time == null) return 'now';
     return formatGraphDay(time);
   }

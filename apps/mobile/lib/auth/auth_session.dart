@@ -129,7 +129,7 @@ class AuthSession {
     final body = jsonObject(data);
     final accessToken = asJsonString(body?['accessToken']);
     final refreshToken = asJsonString(body?['refreshToken']);
-    final expiresAt = DateTime.tryParse(asJsonString(body?['expiresAt']) ?? '');
+    final expiresAt = jsonDate(body?['expiresAt']);
     if (accessToken == null ||
         accessToken.isEmpty ||
         refreshToken == null ||

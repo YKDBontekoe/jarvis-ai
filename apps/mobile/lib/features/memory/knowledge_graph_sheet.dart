@@ -81,7 +81,7 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
   Widget _inspector(GraphNode node) {
     final facts = factsFor(node.id, _snapshot);
     final extra = node.relationCount - facts.length;
-    final updated = DateTime.tryParse(node.updatedAt ?? '')?.toLocal();
+    final updated = jsonDate(node.updatedAt, local: true);
     return Column(
       key: const Key('graph-inspector'),
       crossAxisAlignment: CrossAxisAlignment.stretch,

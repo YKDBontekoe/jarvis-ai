@@ -74,6 +74,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       } on DioException {
         if (!mounted || revision != _requestRevision) return;
         setState(() => _error = 'Jarvis could not load the task activity.');
+      } catch (_) {
+        if (!mounted || revision != _requestRevision) return;
+        setState(() => _error = 'Jarvis could not load the task activity.');
       }
     } catch (_) {
       if (!mounted || revision != _requestRevision) return;
@@ -86,8 +89,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   }
 
   String _date(dynamic value) {
-    if (value is! String) return '';
-    final date = DateTime.tryParse(value)?.toLocal();
+    final date = jsonDate(value, local: true);
     if (date == null) return '';
     final dateText = MaterialLocalizations.of(context).formatMediumDate(date);
     final timeText = MaterialLocalizations.of(

@@ -40,9 +40,7 @@ class _TasksScreenState extends State<TasksScreen> {
     try {
       final response = await widget.http.get<dynamic>('/api/v1/tasks');
       if (mounted && revision == _requestRevision) {
-        setState(
-          () => _tasks = jsonMaps(response.data),
-        );
+        setState(() => _tasks = jsonMaps(response.data));
       }
     } on DioException {
       if (mounted && revision == _requestRevision) {
@@ -199,8 +197,7 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   String _date(dynamic value) {
-    if (value is! String) return '';
-    final date = DateTime.tryParse(value)?.toLocal();
+    final date = jsonDate(value, local: true);
     if (date == null) return '';
     return MaterialLocalizations.of(context).formatMediumDate(date);
   }
@@ -255,28 +252,28 @@ class _TasksScreenState extends State<TasksScreen> {
         message: 'No tasks yet. Give Jarvis something to work on.',
       ),
       child: RefreshIndicator(
-            onRefresh: _load,
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                4,
-                16,
-                32 + MediaQuery.paddingOf(context).bottom,
-              ),
-              children: [
-                ContentWidth(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _summary(),
-                      const SizedBox(height: 18),
-                      for (final task in _tasks) _taskCard(task),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+        onRefresh: _load,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            4,
+            16,
+            32 + MediaQuery.paddingOf(context).bottom,
           ),
+          children: [
+            ContentWidth(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _summary(),
+                  const SizedBox(height: 18),
+                  for (final task in _tasks) _taskCard(task),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     ),
   );
 

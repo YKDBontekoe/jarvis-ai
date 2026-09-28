@@ -38,6 +38,15 @@ String? jsonId(Map<dynamic, dynamic>? map) =>
 
 String? asJsonString(dynamic value) => value is String ? value : null;
 
+/// Parses an ISO-8601 JSON string. Wrong types and unparseable values are null.
+DateTime? jsonDate(dynamic value, {bool local = false}) {
+  final raw = asJsonString(value);
+  if (raw == null || raw.isEmpty) return null;
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return null;
+  return local ? parsed.toLocal() : parsed;
+}
+
 int asJsonInt(dynamic value, [int fallback = 0]) => switch (value) {
   int number => number,
   num number => number.toInt(),
@@ -50,7 +59,7 @@ bool asJsonBool(dynamic value, [bool fallback = false]) =>
 /// Keeps a future TTL on pin/edit; expired or missing validity is sent as null.
 String? activeValidUntil(Map<String, dynamic> memory, [DateTime? now]) {
   final raw = asJsonString(memory['validUntil']);
-  final parsed = DateTime.tryParse(raw ?? '');
+  final parsed = jsonDate(raw);
   if (parsed == null || !parsed.isAfter(now ?? DateTime.now())) return null;
   return raw;
 }

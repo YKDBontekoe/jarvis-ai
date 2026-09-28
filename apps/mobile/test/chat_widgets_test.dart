@@ -118,6 +118,25 @@ void main() {
       expect(ApprovalEntry.fromJson({'toolName': 'x'}), isNull);
       expect(ApprovalEntry.fromJson('nope'), isNull);
     });
+
+    test('non-object argument JSON does not throw', () {
+      expect(
+        ApprovalEntry.fromJson({
+          'id': 'a4',
+          'toolName': 'x',
+          'argumentsJson': '[1,2]',
+        })!.arguments,
+        isEmpty,
+      );
+      expect(
+        ApprovalEntry.fromJson({
+          'id': 'a5',
+          'toolName': 'x',
+          'argumentsJson': 'null',
+        })!.arguments,
+        isEmpty,
+      );
+    });
   });
 
   test('tool catalog describes known and unknown tools', () {
@@ -246,38 +265,39 @@ void main() {
     expect(reset.status, ApprovalStatus.pending);
   });
 
-  test('resolveSubmittingApproval maps a recorded decision to a terminal state', () {
-    const submitting = ApprovalEntry(
-      id: 'a1',
-      toolName: 'ForgetMemory',
-      argumentsJson: '{}',
-      status: ApprovalStatus.submitting,
-      decision: true,
-    );
-    expect(
-      resolveSubmittingApproval(submitting).status,
-      ApprovalStatus.approved,
-    );
-    expect(
-      resolveSubmittingApproval(
-        submitting.copyWith(decision: false),
-      ).status,
-      ApprovalStatus.denied,
-    );
-    expect(
-      resolveSubmittingApproval(
-        submitting.copyWith(clearDecision: true),
-      ).status,
-      ApprovalStatus.pending,
-    );
-    expect(
-      resolveSubmittingApproval(
-        submitting,
-        fallback: ApprovalStatus.failed,
-      ).status,
-      ApprovalStatus.failed,
-    );
-  });
+  test(
+    'resolveSubmittingApproval maps a recorded decision to a terminal state',
+    () {
+      const submitting = ApprovalEntry(
+        id: 'a1',
+        toolName: 'ForgetMemory',
+        argumentsJson: '{}',
+        status: ApprovalStatus.submitting,
+        decision: true,
+      );
+      expect(
+        resolveSubmittingApproval(submitting).status,
+        ApprovalStatus.approved,
+      );
+      expect(
+        resolveSubmittingApproval(submitting.copyWith(decision: false)).status,
+        ApprovalStatus.denied,
+      );
+      expect(
+        resolveSubmittingApproval(
+          submitting.copyWith(clearDecision: true),
+        ).status,
+        ApprovalStatus.pending,
+      );
+      expect(
+        resolveSubmittingApproval(
+          submitting,
+          fallback: ApprovalStatus.failed,
+        ).status,
+        ApprovalStatus.failed,
+      );
+    },
+  );
 
   testWidgets('pending Approve ignores a leftover decline decision', (
     tester,
@@ -324,32 +344,33 @@ void main() {
     expect(decisions, [false]);
   });
 
-  testWidgets('failed approval cards retry the leftover decision and hide Decline', (
-    tester,
-  ) async {
-    final decisions = <bool>[];
-    await tester.pumpWidget(
-      _host(
-        ApprovalCard(
-          approval: const ApprovalEntry(
-            id: 'a4',
-            toolName: 'ForgetMemory',
-            argumentsJson: '{}',
-            status: ApprovalStatus.failed,
-            decision: false,
-            error: 'Jarvis could not finish this step. You can retry.',
+  testWidgets(
+    'failed approval cards retry the leftover decision and hide Decline',
+    (tester) async {
+      final decisions = <bool>[];
+      await tester.pumpWidget(
+        _host(
+          ApprovalCard(
+            approval: const ApprovalEntry(
+              id: 'a4',
+              toolName: 'ForgetMemory',
+              argumentsJson: '{}',
+              status: ApprovalStatus.failed,
+              decision: false,
+              error: 'Jarvis could not finish this step. You can retry.',
+            ),
+            onDecide: decisions.add,
           ),
-          onDecide: decisions.add,
         ),
-      ),
-    );
+      );
 
-    expect(find.text('Declined, but not finished'), findsOneWidget);
-    expect(find.text('Retry'), findsOneWidget);
-    expect(find.text('Decline'), findsNothing);
-    await tester.tap(find.text('Retry'));
-    expect(decisions, [false]);
-  });
+      expect(find.text('Declined, but not finished'), findsOneWidget);
+      expect(find.text('Retry'), findsOneWidget);
+      expect(find.text('Decline'), findsNothing);
+      await tester.tap(find.text('Retry'));
+      expect(decisions, [false]);
+    },
+  );
 
   testWidgets('decided and retryable approval cards change their actions', (
     tester,
@@ -423,7 +444,9 @@ void main() {
     expect(sent, 1);
   });
 
-  testWidgets('composer stop stays enabled while voice is starting', (tester) async {
+  testWidgets('composer stop stays enabled while voice is starting', (
+    tester,
+  ) async {
     var stopped = 0;
     await tester.pumpWidget(
       _host(
