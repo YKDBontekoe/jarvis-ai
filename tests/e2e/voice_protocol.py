@@ -2,6 +2,7 @@
 import asyncio
 import base64
 import json
+import time
 from array import array
 from voice_worker import CodexRealtimeSession
 
@@ -10,8 +11,13 @@ async def check():
     session = None
     try:
         session = await CodexRealtimeSession.start()
-        print('Realtime transport started', flush=True)
-        await session.speak('Voice protocol verification complete.')
+        print('Direct Codex realtime transport started', flush=True)
+        started_at = time.monotonic()
+        await session.call('thread/realtime/appendText', {
+            'threadId': session.thread_id,
+            'role': 'user',
+            'text': 'Reply with one short greeting.',
+        })
         async with asyncio.timeout(45):
             while True:
                 event = await session.notifications.get()
@@ -24,7 +30,9 @@ async def check():
                     peak = max((abs(sample) for sample in samples), default=0)
                     if peak < 1000:  # Ignore the continuous silent media frames.
                         continue
-                    print(json.dumps({'audioOutput': True, 'transport': 'Codex CLI WebRTC + ChatGPT OAuth',
+                    print(json.dumps({'directAudioResponse': True,
+                                      'transport': 'Codex CLI WebRTC + ChatGPT OAuth',
+                                      'secondsToFirstAudio': round(time.monotonic() - started_at, 2),
                                       'encodedAudioCharacters': len(encoded), 'peakPcmAmplitude': peak}), flush=True)
                     return
     finally:
