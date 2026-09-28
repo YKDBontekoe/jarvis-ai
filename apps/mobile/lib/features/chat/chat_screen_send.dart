@@ -750,7 +750,7 @@ mixin _ChatScreenSend on _ChatScreenController {
           args: [invokeId, result ?? '', error ?? ''],
         );
       } catch (_) {}
-    }
+    } catch (_) {}
   }
 
   int get _placeholderIndex {

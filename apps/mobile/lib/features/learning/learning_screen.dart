@@ -126,6 +126,10 @@ class _LearningScreenState extends State<LearningScreen> {
               'The heartbeat could not run.',
         );
       }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'The heartbeat could not run.');
+      }
     } finally {
       if (mounted) setState(() => _running = false);
     }
@@ -153,6 +157,10 @@ class _LearningScreenState extends State<LearningScreen> {
               firstProblemMessage(error.response?.data) ??
               'Dreaming could not run.',
         );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Dreaming could not run.');
       }
     } finally {
       if (mounted) setState(() => _dreamingNow = false);

@@ -259,6 +259,7 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
   bool _loading = true;
   bool _busy = false;
   String? _error;
+  int _requestRevision = 0;
 
   String get _path => '/api/v1/channels/${widget.channelId}';
 
@@ -269,10 +270,11 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
   }
 
   Future<void> _load() async {
+    final revision = ++_requestRevision;
     try {
       final list = await widget.http.get<dynamic>('/api/v1/channels');
       final messages = await widget.http.get<dynamic>('$_path/messages');
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       final channel = jsonMaps(list.data)
           .cast<Map<String, dynamic>?>()
           .firstWhere(
@@ -288,7 +290,7 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
             : null;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error =
@@ -296,7 +298,7 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
             'Could not load this channel.';
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error = 'Could not load this channel.';
@@ -329,6 +331,9 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
             firstProblemMessage(error.response?.data) ??
             'Could not send a test message.',
       );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not send a test message.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -355,6 +360,12 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not disconnect this channel.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = 'Could not disconnect this channel.';
       });
     }
   }
@@ -588,6 +599,12 @@ class _ChannelEditorSheetState extends State<ChannelEditorSheet> {
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not connect this channel.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = 'Could not connect this channel.';
       });
     }
   }
