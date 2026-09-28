@@ -134,7 +134,9 @@ jobs:
 
   publish-source:
     needs: release-ipa
+    if: ${{ github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: [self-hosted, linux, x64, jarvis-deploy]
+    environment: production
     steps:
       - name: Checkout
         uses: actions/checkout@v4
