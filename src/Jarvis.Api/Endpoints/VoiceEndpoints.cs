@@ -110,19 +110,24 @@ internal static class VoiceEndpoints
             if (request.OwnerId == Guid.Empty || string.IsNullOrWhiteSpace(request.Transcript) ||
                 request.Transcript.Length > 32_000)
                 return EndpointHelpers.Invalid("transcript", "Transcript must contain 1 to 32,000 characters.");
-            if (await conversations.GetAsync(conversationId, request.OwnerId, ct) is null)
+            if (await conversations.GetAsync(conversationId, request.OwnerId, CancellationToken.None) is null)
                 return Results.NotFound();
-            if (await tasks.GetTaskByConversationIdAsync(conversationId, request.OwnerId, ct) is not null)
+            if (await tasks.GetTaskByConversationIdAsync(conversationId, request.OwnerId, CancellationToken.None) is not null)
                 return Results.Conflict(new { message = "Task conversations cannot use realtime voice." });
 
-            var deltas = Channel.CreateBounded<string>(new BoundedChannelOptions(32)
+            var deltas = Channel.CreateBounded<string>(new BoundedChannelOptions(64)
             {
                 SingleReader = true,
-                SingleWriter = true,
-                FullMode = BoundedChannelFullMode.Wait
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.DropOldest
             });
-            var agentRun = coordinator.HandleTranscriptAsync(request.OwnerId, conversationId,
-                request.Transcript, ct, (delta, token) => deltas.Writer.WriteAsync(delta, token).AsTask());
+            // Deltas are best-effort for the open voice socket. A full or closed socket must not stall the query.
+            var agentRun = coordinator.HandleTranscriptAsync(request.OwnerId, conversationId, request.Transcript,
+                (delta, _) =>
+                {
+                    deltas.Writer.TryWrite(delta);
+                    return Task.CompletedTask;
+                });
 
             async Task<string?> CompleteAgentRunAsync()
             {
@@ -140,12 +145,21 @@ internal static class VoiceEndpoints
             }
 
             var completion = CompleteAgentRunAsync();
+            _ = completion.ContinueWith(task => _ = task.Exception,
+                CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
             return Results.Stream(async stream =>
             {
-                await foreach (var delta in deltas.Reader.ReadAllAsync(ct))
-                    await WriteStreamEventAsync(stream, new { type = "delta", text = delta }, ct);
-                var responseText = await completion;
-                await WriteStreamEventAsync(stream, new { type = "done", responseText }, ct);
+                try
+                {
+                    await foreach (var delta in deltas.Reader.ReadAllAsync(ct))
+                        await WriteStreamEventAsync(stream, new { type = "delta", text = delta }, ct);
+                    var responseText = await completion;
+                    await WriteStreamEventAsync(stream, new { type = "done", responseText }, ct);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    // The phone closed. CompleteAgentRunAsync keeps the query running and stores the reply.
+                }
             }, contentType: "application/x-ndjson");
         }).WithName("ProcessVoiceTranscript").AllowAnonymous();
 

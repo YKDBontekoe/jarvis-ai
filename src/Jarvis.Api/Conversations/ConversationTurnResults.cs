@@ -2,6 +2,21 @@ using Jarvis.Api.Endpoints;
 
 namespace Jarvis.Api.Conversations;
 
+internal static class RemoteQueryResults
+{
+    public static async Task<IResult> ExecuteAsync(Func<Task<ConversationTurnResult>> run)
+    {
+        try
+        {
+            return (await run()).ToHttpResult();
+        }
+        catch (OperationCanceledException)
+        {
+            return Results.StatusCode(StatusCodes.Status499ClientClosedRequest);
+        }
+    }
+}
+
 internal static class ConversationTurnResults
 {
     public static IResult ToHttpResult(this ConversationTurnResult result) => result switch

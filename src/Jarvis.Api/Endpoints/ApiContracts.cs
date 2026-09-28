@@ -14,7 +14,7 @@ public sealed record VoiceCaptionRequest(Guid OwnerId, string? Role, string? Tex
 public sealed record SendMessageRequest([Required, StringLength(32_000, MinimumLength = 1)] string? Content);
 public sealed record ConversationDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 public sealed record ConversationDetailsDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
-    IReadOnlyList<MessageDto> Messages);
+    IReadOnlyList<MessageDto> Messages, bool Responding);
 public sealed record MessageDto(Guid Id, string Role, string Content, DateTimeOffset CreatedAt);
 public sealed record ApprovalDecisionRequest(bool Approved);
 public sealed record ToolApprovalDto(Guid Id, Guid ConversationId, string ToolName, string ArgumentsJson,

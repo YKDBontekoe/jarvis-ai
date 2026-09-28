@@ -25,7 +25,7 @@ internal static class ConversationEndpoints
             .WithName("ListConversations");
 
         api.MapGet("/conversations/{conversationId:guid}", async (Guid conversationId, IConversationStore store,
-            IJarvisTaskRepository tasks, ICurrentUser currentUser, CancellationToken ct) =>
+            IJarvisTaskRepository tasks, ICurrentUser currentUser, RemoteQueryHost queries, CancellationToken ct) =>
         {
             var conversation = await store.GetAsync(conversationId, currentUser.OwnerId, ct);
             if (conversation is null) return Results.NotFound();
@@ -33,7 +33,8 @@ internal static class ConversationEndpoints
                 return Results.NotFound();
             var messages = await store.GetMessagesAsync(conversationId, ct);
             return Results.Ok(new ConversationDetailsDto(conversation.Id, conversation.Title, conversation.CreatedAt,
-                conversation.UpdatedAt, messages.Select(message => message.ToDto()).ToArray()));
+                conversation.UpdatedAt, messages.Select(message => message.ToDto()).ToArray(),
+                queries.IsResponding(conversationId)));
         }).WithName("GetConversation");
 
         api.MapDelete("/conversations/{conversationId:guid}", async (Guid conversationId,
@@ -48,14 +49,25 @@ internal static class ConversationEndpoints
         }).WithName("DeleteConversation");
 
         api.MapPost("/conversations/{conversationId:guid}/messages", async (Guid conversationId,
-            SendMessageRequest request, ConversationTurnService turns, ICurrentUser currentUser,
-            CancellationToken ct) =>
+            SendMessageRequest request, RemoteQueryExecutor remote, ICurrentUser currentUser) =>
         {
             var content = request.Content?.Trim();
             if (string.IsNullOrWhiteSpace(content) || content.Length > 32_000)
                 return EndpointHelpers.Invalid("content", "Message content must contain 1 to 32,000 characters.");
-            return (await turns.SendAsync(currentUser.OwnerId, conversationId, content, ct)).ToHttpResult();
+            // The request abort token is intentionally unused. Closing the phone drops this connection,
+            // and the query still runs until it is stored.
+            return await RemoteQueryResults.ExecuteAsync(() =>
+                remote.SendAsync(currentUser.OwnerId, conversationId, content));
         }).WithName("SendMessage");
+
+        api.MapPost("/conversations/{conversationId:guid}/cancel", async (Guid conversationId,
+            IConversationStore store, ICurrentUser currentUser, RemoteQueryHost queries, CancellationToken ct) =>
+        {
+            if (await store.GetAsync(conversationId, currentUser.OwnerId, ct) is null)
+                return Results.NotFound();
+            queries.TryCancel(currentUser.OwnerId, conversationId);
+            return Results.NoContent();
+        }).WithName("CancelConversationRun");
 
         return api;
     }
@@ -67,8 +79,9 @@ internal static class ConversationEndpoints
             .WithName("ListPendingApprovals");
 
         api.MapPost("/approvals/{approvalId:guid}/decision", async (Guid approvalId, ApprovalDecisionRequest request,
-                ApprovalDecisionService decisions, ICurrentUser currentUser, CancellationToken ct) =>
-            (await decisions.DecideAsync(currentUser.OwnerId, approvalId, request.Approved, ct)).ToHttpResult())
+                RemoteQueryExecutor remote, ICurrentUser currentUser) =>
+            await RemoteQueryResults.ExecuteAsync(() =>
+                remote.DecideAsync(currentUser.OwnerId, approvalId, request.Approved)))
             .WithName("DecideToolApproval");
 
         return api;
