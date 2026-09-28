@@ -41,6 +41,17 @@ var clamav = builder.AddContainer("clamav", "clamav/clamav", "stable")
     .WithVolume("jarvis-clamav-signatures", "/var/lib/clamav")
     .WithEndpoint(targetPort: 3310, port: 3310, name: "clamd");
 
+var signalCliUrl = builder.Configuration["Channels:Signal:BaseUrl"]
+                   ?? builder.Configuration["SIGNAL_CLI_REST_URL"];
+IResourceBuilder<ContainerResource>? signalCli = null;
+if (string.IsNullOrWhiteSpace(signalCliUrl))
+{
+    signalCli = builder.AddContainer("signal-cli", "bbernhard/signal-cli-rest-api", "latest")
+        .WithEnvironment("MODE", "json-rpc")
+        .WithVolume("jarvis-signal-cli-data", "/home/.local/share/signal-cli")
+        .WithHttpEndpoint(port: 8080, targetPort: 8080);
+}
+
 var api = builder.AddProject<Projects.Jarvis_Api>("jarvis-api")
     .WithReference(database)
     .WithEnvironment("Coding__Repositories__0__Name", "jarvis")
@@ -66,6 +77,10 @@ var api = builder.AddProject<Projects.Jarvis_Api>("jarvis-api")
     .WaitFor(objectStorage)
     .WaitFor(clamav)
     .WaitFor(livekit);
+if (signalCli is not null)
+    api.WithEnvironment("Channels__Signal__BaseUrl", signalCli.GetEndpoint("http")).WaitFor(signalCli);
+else
+    api.WithEnvironment("Channels__Signal__BaseUrl", signalCliUrl!);
 if (!string.IsNullOrWhiteSpace(builder.Configuration["Jarvis:ModelClass"]))
     api.WithEnvironment("Jarvis__ModelClass", builder.Configuration["Jarvis:ModelClass"]!);
 foreach (var modelClass in builder.Configuration.GetSection("Codex:ModelClasses").GetChildren())

@@ -74,6 +74,18 @@ services:
       start_period: 5m
     networks: [application]
 
+  signal-cli:
+    profiles: [development]
+    image: bbernhard/signal-cli-rest-api:latest
+    restart: unless-stopped
+    environment:
+      MODE: json-rpc
+    ports:
+      - "${SIGNAL_CLI_BIND_ADDRESS:-127.0.0.1}:8080:8080"
+    volumes:
+      - signal-cli-data:/home/.local/share/signal-cli
+    networks: [application]
+
   jarvis-api:
     profiles: [development]
     build:
@@ -113,6 +125,7 @@ services:
       Voice__WorkerSecret: ${VOICE_WORKER_SECRET:?Set VOICE_WORKER_SECRET in .env}
       Push__FirebaseProjectId: ${FIREBASE_PROJECT_ID:-}
       Push__GoogleServiceAccountFile: /run/secrets/firebase-service-account.json
+      Channels__Signal__BaseUrl: ${SIGNAL_CLI_REST_URL:-http://signal-cli:8080}
     ports:
       - "${JARVIS_BIND_ADDRESS:-127.0.0.1}:5082:5082"
     volumes:
@@ -131,6 +144,8 @@ services:
         condition: service_started
       clamav:
         condition: service_healthy
+      signal-cli:
+        condition: service_started
     networks: [application, data]
 
   jarvis-worker:
@@ -190,3 +205,4 @@ volumes:
   clamav-signatures:
   data-protection-keys:
   codex-cli:
+  signal-cli-data:
