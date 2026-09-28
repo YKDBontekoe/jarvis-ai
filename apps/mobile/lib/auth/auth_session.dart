@@ -116,7 +116,7 @@ class AuthSession {
             '/api/v1/auth/logout',
             data: {'refreshToken': refreshToken},
           );
-        } on DioException {
+        } catch (_) {
           // Local sign-out still clears the session when the API is unreachable.
         }
       }

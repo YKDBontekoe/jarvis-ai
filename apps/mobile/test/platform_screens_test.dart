@@ -100,6 +100,29 @@ void main() {
     expect(surfaceAwaitsReply(entries[2]), isFalse);
   });
 
+  test(
+    'UiSurfaceEntry.fromJson keeps string schema keys and skips junk items',
+    () {
+      final surface = UiSurfaceEntry.fromJson(<dynamic, dynamic>{
+        'id': 's1',
+        'title': 'Hi',
+        'status': 'open',
+        'schema': <dynamic, dynamic>{
+          1: 'ignored',
+          'kind': 'choice',
+          'items': [
+            {'id': 'a', 'title': 'A'},
+            'nope',
+            3,
+          ],
+        },
+      })!;
+    expect(surface.schema['kind'], 'choice');
+    expect(surface.schema.length, 2);
+    expect(surfaceAwaitsReply(surface), isTrue);
+    },
+  );
+
   testWidgets('a choice card requires a pick before sharing', (tester) async {
     String? action;
     Map<String, String>? values;

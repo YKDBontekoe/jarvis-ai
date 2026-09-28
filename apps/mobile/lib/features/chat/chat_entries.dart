@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../../json_maps.dart';
+
 /// One row in the chat transcript.
 sealed class ChatEntry {
   const ChatEntry();
@@ -223,9 +225,7 @@ class UiSurfaceEntry extends ChatEntry {
       id: id,
       title: value['title'] is String ? value['title'] as String : '',
       status: value['status'] is String ? value['status'] as String : 'open',
-      schema: schema is Map
-          ? Map<String, dynamic>.from(schema)
-          : const <String, dynamic>{},
+      schema: jsonObject(schema) ?? const <String, dynamic>{},
     );
   }
 

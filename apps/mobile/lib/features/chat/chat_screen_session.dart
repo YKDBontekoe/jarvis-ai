@@ -451,7 +451,7 @@ mixin _ChatScreenSession on _ChatScreenController {
             '/api/v1/push-devices',
             data: {'token': pushToken},
           );
-        } on DioException {
+        } catch (_) {
           // The token is owner-scoped on the server; stale registrations expire at Firebase.
         }
         _pushToken = null;

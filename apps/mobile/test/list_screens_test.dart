@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jarvis_mobile/approvals_screen.dart';
+import 'package:jarvis_mobile/audit_screen.dart';
+import 'package:jarvis_mobile/condition_watches_screen.dart';
 import 'package:jarvis_mobile/conversations_screen.dart';
+import 'package:jarvis_mobile/daily_briefing_screen.dart';
 import 'package:jarvis_mobile/files_screen.dart';
 import 'package:jarvis_mobile/memory_screen.dart';
+import 'package:jarvis_mobile/tasks_screen.dart';
 
 import 'support/fixture_http.dart';
 
@@ -84,5 +89,92 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('No memories yet'), findsOneWidget);
+  });
+
+  testWidgets('tasks skip invalid list rows instead of crashing', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/tasks', [
+      'nope',
+      {
+        'id': 't1',
+        'title': 'Buy milk',
+        'status': 'queued',
+        'createdAt': '2026-09-28T12:00:00Z',
+      },
+      3,
+    ]);
+    await show(tester, TasksScreen(http: http.client()));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Buy milk'), findsOneWidget);
+  });
+
+  testWidgets('approvals skip invalid list rows instead of crashing', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/approvals', [
+      {'toolName': 'Missing id'},
+      {
+        'id': 'a1',
+        'toolName': 'ForgetMemory',
+        'status': 'pending',
+        'argumentsJson': '[1,2]',
+      },
+      'nope',
+    ]);
+    await show(tester, ApprovalsScreen(http: http.client()));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('ForgetMemory'), findsOneWidget);
+    expect(find.text('Missing id'), findsOneWidget);
+  });
+
+  testWidgets('audit skips invalid list rows instead of crashing', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/audit', [
+      'nope',
+      {
+        'id': 'e1',
+        'action': 'memory.created',
+        'success': true,
+        'timestamp': '2026-09-28T12:00:00Z',
+        'riskClass': 'low',
+      },
+    ]);
+    await show(tester, AuditScreen(http: http.client()));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('memory created'), findsOneWidget);
+  });
+
+  testWidgets('watches skip invalid list rows instead of crashing', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/watches', [
+      1,
+      {
+        'id': 'w1',
+        'title': 'BTC price',
+        'status': 'active',
+        'url': 'https://example.com/price',
+      },
+      'nope',
+    ]);
+    await show(tester, ConditionWatchesScreen(http: http.client()));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('BTC price'), findsOneWidget);
+  });
+
+  testWidgets('briefing shows an error for a non-object payload', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/briefings/daily', 'nope');
+    await show(tester, DailyBriefingScreen(http: http.client()));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Could not load briefing settings.'), findsOneWidget);
   });
 }

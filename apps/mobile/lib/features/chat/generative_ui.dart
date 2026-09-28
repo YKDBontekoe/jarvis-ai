@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
@@ -22,11 +23,11 @@ UiSurfaceEntry? liveSurface(Iterable<ChatEntry> entries) {
 /// True when the card is waiting for a tap or a typed answer.
 bool surfaceAwaitsReply(UiSurfaceEntry surface) {
   if (surface.status != 'open') return false;
-  final fields = asMaps(surface.schema['fields']);
-  final actions = asMaps(surface.schema['actions']);
+  final fields = jsonMaps(surface.schema['fields']);
+  final actions = jsonMaps(surface.schema['actions']);
   if (fields.isNotEmpty || actions.isNotEmpty) return true;
   final kind = asString(surface.schema['kind']) ?? '';
-  return kind == 'choice' && asMaps(surface.schema['items']).isNotEmpty;
+  return kind == 'choice' && jsonMaps(surface.schema['items']).isNotEmpty;
 }
 
 /// Native renderer for A2UI-style surfaces Jarvis emits with RenderUi.
@@ -60,9 +61,9 @@ abstract class _UiSurfaceCardController extends State<UiSurfaceCard> {
 
   Map<String, dynamic> get _schema => widget.surface.schema;
   String get _kind => asString(_schema['kind']) ?? 'card';
-  List<Map<String, dynamic>> get _items => asMaps(_schema['items']);
-  List<Map<String, dynamic>> get _fields => asMaps(_schema['fields']);
-  List<Map<String, dynamic>> get _actions => asMaps(_schema['actions']);
+  List<Map<String, dynamic>> get _items => jsonMaps(_schema['items']);
+  List<Map<String, dynamic>> get _fields => jsonMaps(_schema['fields']);
+  List<Map<String, dynamic>> get _actions => jsonMaps(_schema['actions']);
 
   Map<String, Map<String, dynamic>> get _itemById => {
     for (final item in _items) ?asString(item['id']): item,
@@ -189,11 +190,3 @@ class _UiSurfaceCardState extends _UiSurfaceCardController
 
 String? asString(dynamic value) =>
     value is String && value.isNotEmpty ? value : null;
-
-List<Map<String, dynamic>> asMaps(dynamic value) {
-  if (value is! List) return const [];
-  return [
-    for (final item in value)
-      if (item is Map) Map<String, dynamic>.from(item),
-  ];
-}

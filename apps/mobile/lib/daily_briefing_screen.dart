@@ -128,6 +128,8 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
         final detail = firstProblemMessage(error.response?.data);
         setState(() => _error = detail ?? 'Could not save briefing settings.');
       }
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not save briefing settings.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }

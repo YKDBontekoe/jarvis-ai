@@ -163,6 +163,25 @@ void main() {
     );
   });
 
+  testWidgets('home skips invalid task rows instead of crashing', (
+    tester,
+  ) async {
+    adapter.responses['/api/v1/tasks'] = [
+      'nope',
+      {
+        'id': 1,
+        'title': 'Numeric id',
+        'status': 'running',
+        'createdAt': '2026-09-28T12:00:00Z',
+      },
+      _task('running', 'Valid running task', 'running'),
+    ];
+    await showHome(tester);
+    expect(tester.takeException(), isNull);
+    expect(find.text('Valid running task'), findsOneWidget);
+    expect(find.text('Numeric id'), findsNothing);
+  });
+
   testWidgets('task details show only approvals belonging to that task', (
     tester,
   ) async {
