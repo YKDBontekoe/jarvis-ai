@@ -89,7 +89,7 @@ class _HomeOverviewState extends State<HomeOverview>
       _error = null;
     });
     try {
-      final response = await widget.http.get<List<dynamic>>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/tasks',
         cancelToken: request,
       );
