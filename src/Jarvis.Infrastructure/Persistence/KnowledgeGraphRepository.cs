@@ -168,6 +168,69 @@ public sealed class KnowledgeGraphRepository(JarvisDbContext db) : IKnowledgeGra
         return changed;
     }
 
+    public async Task<GraphEntityRecord?> UpdateEntityAsync(Guid ownerId, Guid entityId, string? name, string? type,
+        string? summary, CancellationToken cancellationToken)
+    {
+        var entity = await db.GraphEntities.SingleOrDefaultAsync(x => x.OwnerId == ownerId && x.Id == entityId,
+            cancellationToken);
+        if (entity is null) return null;
+        if (!string.IsNullOrWhiteSpace(name) && name.Trim().Length <= 120 && entity.Key != GraphNames.UserKey)
+        {
+            var trimmed = name.Trim();
+            if (!string.Equals(entity.Name, trimmed, StringComparison.Ordinal))
+            {
+                var aliases = ParseAliases(entity.AliasesJson);
+                if (!aliases.Contains(entity.Name, StringComparer.OrdinalIgnoreCase) && aliases.Count < 10)
+                    aliases.Add(entity.Name);
+                entity.AliasesJson = JsonSerializer.Serialize(aliases);
+                entity.Name = trimmed;
+            }
+        }
+        if (!string.IsNullOrWhiteSpace(type)) entity.Type = GraphEntityTypes.Normalize(type);
+        if (summary is not null) entity.Summary = summary.Trim() is { Length: > 0 } text
+            ? text[..Math.Min(text.Length, 500)]
+            : null;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return (await ToRecordsAsync(ownerId, [entity], cancellationToken))[0];
+    }
+
+    public async Task<bool> CloseRelationAsync(Guid ownerId, Guid relationId, CancellationToken cancellationToken)
+    {
+        var relation = await db.GraphRelations.SingleOrDefaultAsync(x => x.OwnerId == ownerId && x.Id == relationId,
+            cancellationToken);
+        if (relation is null || relation.ValidTo is not null) return false;
+        relation.ValidTo = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> MergeEntitiesAsync(Guid ownerId, Guid keepId, Guid absorbId,
+        CancellationToken cancellationToken)
+    {
+        if (keepId == absorbId) throw new ArgumentException("Choose two different entities to merge.");
+        var keep = await db.GraphEntities.SingleOrDefaultAsync(x => x.OwnerId == ownerId && x.Id == keepId,
+            cancellationToken);
+        var absorb = await db.GraphEntities.SingleOrDefaultAsync(x => x.OwnerId == ownerId && x.Id == absorbId,
+            cancellationToken);
+        if (keep is null || absorb is null) return false;
+        var now = DateTimeOffset.UtcNow;
+        var aliases = ParseAliases(keep.AliasesJson);
+        if (!aliases.Contains(absorb.Name, StringComparer.OrdinalIgnoreCase) && aliases.Count < 10)
+            aliases.Add(absorb.Name);
+        keep.AliasesJson = JsonSerializer.Serialize(aliases);
+        keep.UpdatedAt = now;
+        if (string.IsNullOrWhiteSpace(keep.Summary) && !string.IsNullOrWhiteSpace(absorb.Summary))
+            keep.Summary = absorb.Summary;
+        await db.GraphRelations.Where(x => x.OwnerId == ownerId && x.SubjectId == absorbId)
+            .ExecuteUpdateAsync(set => set.SetProperty(x => x.SubjectId, keepId), cancellationToken);
+        await db.GraphRelations.Where(x => x.OwnerId == ownerId && x.ObjectId == absorbId)
+            .ExecuteUpdateAsync(set => set.SetProperty(x => x.ObjectId, keepId), cancellationToken);
+        db.GraphEntities.Remove(absorb);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<bool> DeleteEntityAsync(Guid ownerId, Guid entityId, CancellationToken cancellationToken) =>
         await db.GraphEntities.Where(x => x.OwnerId == ownerId && x.Id == entityId)
             .ExecuteDeleteAsync(cancellationToken) > 0;

@@ -3,28 +3,35 @@ using System.Globalization;
 using System.Text;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Workflows;
+using Jarvis.Domain.Workflows;
 
 namespace Jarvis.Agents;
 
 internal sealed class ConditionWatchAgentTools(IConditionWatchService watches, ICurrentUser currentUser)
 {
-    [Description("Create a durable watch for a public JSON API endpoint. The endpoint must be HTTPS, credential-free, and return an object with a numeric value at the requested dot-separated property path. Jarvis checks it on a timer and sends a notification when the value reaches the threshold. Never use private, local, authenticated, or secret-bearing URLs.")]
+    [Description("Create a durable watch. kind is public_json (default), authenticated_json, device_battery, device_location, or calendar. JSON watches poll a public HTTPS JSON URL. authenticated_json uses a stored integration token as Authorization. device_battery uses the latest phone battery snapshot. device_location alerts from distance in meters to a lat/lng. calendar alerts when the next ICS event is within minutesBefore. Never use private or secret-bearing URLs.")]
     public async Task<string> CreateConditionWatchAsync(
         [Description("A short user-facing name for this watch.")] string title,
-        [Description("An unauthenticated public HTTPS JSON URL. Do not include private network addresses, user credentials, API keys, or other secrets.")] string url,
-        [Description("A dot-separated object property path to a numeric JSON value, such as data.price.")] string jsonPath,
-        [Description("Use below to alert when the value is at or below the threshold, or above to alert when it is at or above the threshold.")] string comparison,
-        [Description("The numeric trigger value.")] double threshold,
-        [Description("Minutes between deterministic checks, from 5 through 1,440.")] int intervalMinutes = 15,
+        [Description("public_json, authenticated_json, device_battery, device_location, or calendar.")] string? kind = null,
+        [Description("An HTTPS JSON URL for JSON watches. Omit for device and calendar watches.")] string? url = null,
+        [Description("Dot-separated numeric JSON path for JSON watches.")] string? jsonPath = null,
+        [Description("below or above.")] string comparison = "below",
+        [Description("Numeric trigger: JSON value, battery percent, or location radius meters when radiusMeters is omitted.")] double threshold = 0,
+        [Description("Minutes between checks, 5 through 1440.")] int intervalMinutes = 15,
+        [Description("Integration provider slug for authenticated_json, such as github.")] string? credentialProvider = null,
+        [Description("Latitude for a location watch.")] double? latitude = null,
+        [Description("Longitude for a location watch.")] double? longitude = null,
+        [Description("Geofence radius in meters for a location watch.")] double? radiusMeters = null,
+        [Description("Minutes before the next calendar event to alert.")] int? minutesBefore = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
             var watch = await watches.CreateAsync(currentUser.OwnerId,
-                new CreateConditionWatchRequest(title, url, jsonPath, comparison, threshold, intervalMinutes),
+                new CreateConditionWatchRequest(title, url ?? "", jsonPath ?? "", comparison, threshold,
+                    intervalMinutes, kind, credentialProvider, latitude, longitude, radiusMeters, minutesBefore),
                 cancellationToken);
-            var symbol = watch.Comparison == "below" ? "≤" : "≥";
-            return $"Condition watch created (id: {watch.Id:D}, status: {watch.Status}, alert when {watch.JsonPath} {symbol} {watch.Threshold} {watch.IntervalMinutes}-minute checks).";
+            return $"Condition watch created (id: {watch.Id:D}, kind: {watch.Kind}, status: {watch.Status}).";
         }
         catch (ArgumentException exception)
         {
@@ -32,7 +39,7 @@ internal sealed class ConditionWatchAgentTools(IConditionWatchService watches, I
         }
     }
 
-    [Description("List the user's condition watches with their thresholds, status, and the most recent observed value.")]
+    [Description("List the user's condition watches with their kind, thresholds, status, and the most recent observed value.")]
     public async Task<string> ListConditionWatchesAsync(CancellationToken cancellationToken = default)
     {
         var items = await watches.ListAsync(currentUser.OwnerId, cancellationToken);
@@ -42,14 +49,13 @@ internal sealed class ConditionWatchAgentTools(IConditionWatchService watches, I
         foreach (var watch in items.OrderByDescending(watch => watch.CreatedAt).Take(20))
         {
             var symbol = watch.Comparison == "below" ? "≤" : "≥";
-            result.Append("- [").Append(watch.Status).Append("] watch ID ").Append(watch.Id)
+            result.Append("- [").Append(watch.Status).Append("] ").Append(watch.Kind)
+                .Append(" watch ID ").Append(watch.Id)
                 .Append(": ").Append(AgentText.Limit(watch.Title, 200))
-                .Append(" — alert when ").Append(watch.JsonPath).Append(' ').Append(symbol).Append(' ')
-                .Append(watch.Threshold.ToString(CultureInfo.InvariantCulture))
-                .Append(", every ").Append(watch.IntervalMinutes).Append(" min");
+                .Append(" — alert when ").Append(symbol).Append(' ')
+                .Append(watch.Threshold.ToString(CultureInfo.InvariantCulture));
             if (watch.LastValue is { } lastValue)
-                result.Append(", last value ").Append(lastValue.ToString(CultureInfo.InvariantCulture))
-                    .Append(" at ").Append(AgentText.Time(watch.LastCheckedAt));
+                result.Append(", last value ").Append(lastValue.ToString(CultureInfo.InvariantCulture));
             result.AppendLine();
         }
         return result.ToString();

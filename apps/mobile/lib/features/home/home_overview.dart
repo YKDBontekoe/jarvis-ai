@@ -26,6 +26,10 @@ class HomeOverview extends StatefulWidget {
     this.onContinueConversation,
     this.onSuggestion,
     this.onOpenUsage,
+    this.onOpenApprovals,
+    this.onOpenReminders,
+    this.onOpenIntegrations,
+    this.onOpenCoding,
     super.key,
   });
 
@@ -44,6 +48,18 @@ class HomeOverview extends StatefulWidget {
   /// Opens the usage dashboard. The summary is hidden when this is null.
   final VoidCallback? onOpenUsage;
 
+  /// Opens pending approvals from the home briefing.
+  final VoidCallback? onOpenApprovals;
+
+  /// Opens reminders from the home briefing.
+  final VoidCallback? onOpenReminders;
+
+  /// Opens guided integration packs.
+  final VoidCallback? onOpenIntegrations;
+
+  /// Opens coding-run review.
+  final VoidCallback? onOpenCoding;
+
   @override
   State<HomeOverview> createState() => _HomeOverviewState();
 }
@@ -52,6 +68,7 @@ class _HomeOverviewState extends State<HomeOverview>
     with WidgetsBindingObserver {
   List<_ActiveTask> _tasks = [];
   Map<String, dynamic>? _usage;
+  Map<String, dynamic>? _briefing;
   bool _loading = false;
   String? _error;
   int _requestRevision = 0;
@@ -64,6 +81,7 @@ class _HomeOverviewState extends State<HomeOverview>
     if (widget.ready) {
       unawaited(_load());
       unawaited(_loadUsage());
+      unawaited(_loadBriefing());
     }
   }
 
@@ -75,12 +93,14 @@ class _HomeOverviewState extends State<HomeOverview>
       _request?.cancel();
       _tasks = [];
       _usage = null;
+      _briefing = null;
       _loading = false;
       _error = null;
     } else if (!oldWidget.ready ||
         oldWidget.refreshRevision != widget.refreshRevision) {
       unawaited(_load());
       unawaited(_loadUsage());
+      unawaited(_loadBriefing());
     } else if (oldWidget.onOpenUsage == null && widget.onOpenUsage != null) {
       unawaited(_loadUsage());
     }
@@ -91,11 +111,25 @@ class _HomeOverviewState extends State<HomeOverview>
     if (state == AppLifecycleState.resumed && widget.ready) {
       unawaited(_load());
       unawaited(_loadUsage());
+      unawaited(_loadBriefing());
     }
   }
 
   Future<void> _refresh() async {
-    await Future.wait([_load(), _loadUsage()]);
+    await Future.wait([_load(), _loadUsage(), _loadBriefing()]);
+  }
+
+  Future<void> _loadBriefing() async {
+    if (!widget.ready || !mounted) return;
+    try {
+      final response = await widget.http.get<dynamic>('/api/v1/home');
+      if (!mounted || !widget.ready) return;
+      setState(() => _briefing = jsonObject(response.data));
+    } on DioException {
+      if (mounted) setState(() => _briefing = null);
+    } catch (_) {
+      if (mounted) setState(() => _briefing = null);
+    }
   }
 
   Future<void> _loadUsage() async {
@@ -166,6 +200,145 @@ class _HomeOverviewState extends State<HomeOverview>
       ),
     );
     if (mounted) await _load();
+  }
+
+  Widget _briefingSections() {
+    final briefing = _briefing;
+    if (briefing == null) return const SizedBox.shrink();
+    final portrait = asJsonString(briefing['portrait']);
+    final reminders = jsonMaps(briefing['reminders']);
+    final approvals = jsonMaps(briefing['approvals']);
+    final calendar = jsonObject(briefing['calendar']) ?? const {};
+    final events = jsonMaps(calendar['events']);
+    final device = jsonObject(briefing['device']);
+    final packs = jsonMaps(briefing['packs']);
+    final missingPacks = packs
+        .where((pack) => asJsonBool(pack['installed']) == false)
+        .toList();
+    return Column(
+      key: const Key('home-briefing'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (portrait != null && portrait.isNotEmpty) ...[
+          SurfaceCard(
+            child: Text(
+              portrait,
+              style: const TextStyle(color: JarvisColors.inkSoft, height: 1.45),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (approvals.isNotEmpty)
+          _BriefingListCard(
+            key: const Key('home-approvals'),
+            icon: PhosphorIconsRegular.shieldWarning,
+            title:
+                '${approvals.length} ${approvals.length == 1 ? 'approval' : 'approvals'} waiting',
+            subtitle: approvals
+                .take(3)
+                .map((item) => asJsonString(item['toolName']) ?? 'Tool')
+                .join(' · '),
+            onTap: widget.onOpenApprovals,
+          ),
+        if (reminders.isNotEmpty) ...[
+          if (approvals.isNotEmpty) const SizedBox(height: 12),
+          _BriefingListCard(
+            key: const Key('home-reminders'),
+            icon: PhosphorIconsRegular.bell,
+            title: reminders.length == 1
+                ? (asJsonString(reminders.first['title']) ?? 'Reminder')
+                : '${reminders.length} upcoming reminders',
+            subtitle: reminders
+                .take(3)
+                .map((item) {
+                  final due = jsonDate(item['dueAt'], local: true);
+                  final when = due == null ? null : _shortWhen(due);
+                  if (reminders.length == 1) return when ?? '';
+                  final title = asJsonString(item['title']) ?? 'Reminder';
+                  return when == null ? title : '$title · $when';
+                })
+                .join('\n'),
+            onTap: widget.onOpenReminders,
+          ),
+        ],
+        if (events.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _BriefingListCard(
+            key: const Key('home-calendar'),
+            icon: PhosphorIconsRegular.calendarBlank,
+            title: asJsonBool(calendar['connected'])
+                ? 'Today’s calendar'
+                : 'Upcoming events',
+            subtitle: events
+                .take(3)
+                .map((item) {
+                  final start = jsonDate(item['startAt'], local: true);
+                  final title = asJsonString(item['title']) ?? 'Event';
+                  return start == null
+                      ? title
+                      : '$title · ${_shortWhen(start)}';
+                })
+                .join('\n'),
+            onTap: widget.onOpenIntegrations,
+          ),
+        ] else if (asJsonBool(calendar['connected']) == false &&
+            widget.onOpenIntegrations != null) ...[
+          const SizedBox(height: 12),
+          _BriefingListCard(
+            icon: PhosphorIconsRegular.calendarBlank,
+            title: 'Connect a calendar',
+            subtitle:
+                'Subscribe to an ICS feed in Integrations so today’s events appear here.',
+            onTap: widget.onOpenIntegrations,
+          ),
+        ],
+        if (device != null) ...[
+          const SizedBox(height: 12),
+          _BriefingListCard(
+            icon: PhosphorIconsRegular.deviceMobile,
+            title: device['batteryPercent'] is num
+                ? 'This device · ${asJsonInt(device['batteryPercent'])}%'
+                : 'This device',
+            subtitle: [
+              if (asJsonBool(device['charging'])) 'Charging',
+              if (asJsonBool(device['hasLocation'])) 'Location available',
+            ].join(' · '),
+          ),
+        ],
+        if (missingPacks.isNotEmpty && widget.onOpenIntegrations != null) ...[
+          const SizedBox(height: 12),
+          _BriefingListCard(
+            icon: PhosphorIconsRegular.plugsConnected,
+            title: 'Suggested connections',
+            subtitle: missingPacks
+                .map((pack) => asJsonString(pack['name']) ?? 'Pack')
+                .join(' · '),
+            onTap: widget.onOpenIntegrations,
+          ),
+        ],
+        if (widget.onOpenCoding != null) ...[
+          const SizedBox(height: 12),
+          _BriefingListCard(
+            icon: PhosphorIconsRegular.code,
+            title: 'Coding runs',
+            subtitle: 'Review isolated worktrees and diffs from coding tasks.',
+            onTap: widget.onOpenCoding,
+          ),
+        ],
+      ],
+    );
+  }
+
+  String _shortWhen(DateTime time) {
+    final local = time.toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(local.year, local.month, local.day);
+    final hour =
+        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    if (day == today) return hour;
+    if (day == today.add(const Duration(days: 1))) return 'tomorrow $hour';
+    return '${local.month}/${local.day} $hour';
   }
 
   Widget _usageCard() {
@@ -350,6 +523,10 @@ class _HomeOverviewState extends State<HomeOverview>
                         ],
                       ),
                       const SizedBox(height: 36),
+                      if (_briefing != null) ...[
+                        _briefingSections(),
+                        const SizedBox(height: 28),
+                      ],
                       if (_usage != null && widget.onOpenUsage != null) ...[
                         _usageCard(),
                         const SizedBox(height: 28),

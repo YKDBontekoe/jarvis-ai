@@ -32,7 +32,8 @@ public sealed record ReminderDto(Guid Id, string Title, DateTimeOffset DueAt, st
     DateOnly? Until, DateTimeOffset? LastDeliveredAt);
 public sealed record ConditionWatchDto(Guid Id, string Title, string Url, string JsonPath, string Comparison,
     double Threshold, int IntervalMinutes, string Status, DateTimeOffset CreatedAt,
-    DateTimeOffset? LastCheckedAt, double? LastValue);
+    DateTimeOffset? LastCheckedAt, double? LastValue, string Kind = "public_json", string? CredentialProvider = null,
+    double? Latitude = null, double? Longitude = null, double? RadiusMeters = null, int? MinutesBefore = null);
 public sealed record JarvisTaskDto(Guid Id, string Title, string Prompt, string Status, Guid ConversationId,
     DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt, string? Summary);
 public sealed record NotificationDto(Guid Id, string Type, string Title, string Body, Guid? SourceId,

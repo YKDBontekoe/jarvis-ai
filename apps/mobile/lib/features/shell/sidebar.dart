@@ -179,6 +179,11 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     label: 'Usage',
                     onTap: () => _leaveSearch(() => widget.onUtility('usage')),
                   ),
+                  _NavRow(
+                    icon: PhosphorIconsRegular.code,
+                    label: 'Coding',
+                    onTap: () => _leaveSearch(() => widget.onUtility('coding')),
+                  ),
                   const SizedBox(height: 18),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 0, 0, 2),

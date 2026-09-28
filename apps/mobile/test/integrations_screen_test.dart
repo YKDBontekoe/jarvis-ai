@@ -65,4 +65,50 @@ void main() {
       'enabled': false,
     });
   });
+
+  testWidgets('guided calendar pack posts an ICS URL without MCP', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/integrations/credentials', <Object>[]);
+    http.on('GET', '/api/v1/integrations/connections', <Object>[]);
+    http.on('GET', '/api/v1/mcp-servers', <Object>[]);
+    http.on('GET', '/api/v1/integrations/packs', [
+      {
+        'pack': {
+          'id': 'calendar',
+          'name': 'Calendar',
+          'category': 'calendar',
+          'description': 'Subscribe to an ICS feed.',
+          'authKind': 'ics',
+          'supportsIcs': true,
+        },
+        'installed': false,
+        'hasToken': false,
+        'hasIcs': false,
+      },
+    ]);
+    http.on('POST', '/api/v1/integrations/packs/calendar', {
+      'installed': true,
+    });
+    tester.view.physicalSize = const Size(900, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(home: IntegrationsScreen(http: http.client())),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Set up'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextFormField).first,
+      'https://calendar.example.com/basic.ics',
+    );
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(
+      http.sent('POST', '/api/v1/integrations/packs/calendar').single.body,
+      {'icsUrl': 'https://calendar.example.com/basic.ics'},
+    );
+  });
 }

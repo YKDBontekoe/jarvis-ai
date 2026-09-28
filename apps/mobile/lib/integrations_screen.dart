@@ -4,10 +4,12 @@ import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
 import 'json_maps.dart';
+import 'http_urls.dart';
 import 'ui/jarvis_ui.dart';
 
 part 'integrations_credentials.dart';
 part 'integrations_mcp.dart';
+part 'integrations_packs.dart';
 
 class IntegrationsScreen extends StatefulWidget {
   const IntegrationsScreen({required this.http, super.key});
@@ -23,6 +25,7 @@ abstract class _IntegrationsController extends State<IntegrationsScreen> {
   List<Map<String, dynamic>> _providers = [];
   List<Map<String, dynamic>> _connections = [];
   List<Map<String, dynamic>> _managedServers = [];
+  List<Map<String, dynamic>> _packs = [];
   bool _loading = true;
   bool _credentialsFailed = false;
   bool _connectionsFailed = false;
@@ -32,10 +35,11 @@ abstract class _IntegrationsController extends State<IntegrationsScreen> {
 
   Future<void> _load();
   Future<void> _editSecret({String? provider, String? secretName});
+  Future<void> _connectOAuth({String? server, String? endpoint});
 }
 
 class _IntegrationsScreenState extends _IntegrationsController
-    with _IntegrationsCredentials, _IntegrationsMcp {
+    with _IntegrationsCredentials, _IntegrationsMcp, _IntegrationsPacks {
   @override
   void initState() {
     super.initState();
@@ -89,6 +93,16 @@ class _IntegrationsScreenState extends _IntegrationsController
       } catch (_) {
         serversFailed = true;
         error ??= 'Could not load MCP servers.';
+      }
+      try {
+        final packsResponse = await widget.http.get<dynamic>(
+          '/api/v1/integrations/packs',
+        );
+        if (!mounted || revision != _requestRevision) return;
+        setState(() => _packs = jsonMaps(packsResponse.data));
+      } catch (_) {
+        if (!mounted || revision != _requestRevision) return;
+        setState(() => _packs = []);
       }
       if (!mounted || revision != _requestRevision) return;
       setState(() {
@@ -158,6 +172,16 @@ class _IntegrationsScreenState extends _IntegrationsController
           margin: const EdgeInsets.only(top: 12),
         ),
       const SizedBox(height: 24),
+      const SectionHeader('Guided packs'),
+      if (_packs.isEmpty)
+        const _MutedLine(
+          icon: PhosphorIconsRegular.plugsConnected,
+          text:
+              'Calendar, mail, and contacts packs appear here when the server supports them.',
+        )
+      else
+        for (final pack in _packs) _packCard(pack),
+      const SizedBox(height: 28),
       const SectionHeader('Featured'),
       _featuredCard(
         title: 'Home Assistant',

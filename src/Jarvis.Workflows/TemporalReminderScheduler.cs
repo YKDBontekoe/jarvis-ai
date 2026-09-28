@@ -1,5 +1,6 @@
 using Jarvis.Application.Workflows;
 using Jarvis.Application.Files;
+using Jarvis.Domain.Workflows;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Temporalio.Api.Enums.V1;
@@ -357,28 +358,77 @@ public sealed class ConditionWatchService(IConditionWatchRepository watches, ICo
         CancellationToken cancellationToken)
     {
         var title = request.Title?.Trim();
-        var jsonPath = request.JsonPath?.Trim();
+        var kind = WatchKinds.Normalize(request.Kind);
         var comparison = request.Comparison?.Trim().ToLowerInvariant();
-        var url = NormalizeUrl(request.Url);
         if (string.IsNullOrWhiteSpace(title) || title.Length > 200)
             throw new ArgumentException("Watch title must contain 1 to 200 characters.", nameof(request));
-        if (string.IsNullOrWhiteSpace(jsonPath) || jsonPath.Length > 512 ||
-            jsonPath.Split('.').Any(segment => segment.Length is < 1 or > 64 ||
-                segment.Any(character => !(char.IsAsciiLetterOrDigit(character) || character is '_' or '-'))))
-            throw new ArgumentException("JSON path must contain simple object-property names separated by dots.", nameof(request));
         if (comparison is not ("below" or "above"))
             throw new ArgumentException("Comparison must be 'below' or 'above'.", nameof(request));
-        if (!double.IsFinite(request.Threshold))
+        if (!double.IsFinite(request.Threshold) && kind is not WatchKinds.DeviceLocation and not WatchKinds.Calendar)
             throw new ArgumentOutOfRangeException(nameof(request), "Threshold must be a finite number.");
         if (request.IntervalMinutes is < 5 or > 1440)
             throw new ArgumentOutOfRangeException(nameof(request), "Check interval must be between 5 minutes and 24 hours.");
 
+        var url = "";
+        var jsonPath = "";
+        string? credentialProvider = null;
+        double? latitude = null, longitude = null, radius = null;
+        int? minutesBefore = null;
+        var threshold = request.Threshold;
+
+        if (WatchKinds.RequiresUrl(kind))
+        {
+            url = NormalizeUrl(request.Url);
+            jsonPath = request.JsonPath?.Trim() ?? "";
+            if (string.IsNullOrWhiteSpace(jsonPath) || jsonPath.Length > 512 ||
+                jsonPath.Split('.').Any(segment => segment.Length is < 1 or > 64 ||
+                    segment.Any(character => !(char.IsAsciiLetterOrDigit(character) || character is '_' or '-'))))
+                throw new ArgumentException("JSON path must contain simple object-property names separated by dots.", nameof(request));
+            if (kind == WatchKinds.AuthenticatedJson)
+            {
+                credentialProvider = request.CredentialProvider?.Trim().ToLowerInvariant();
+                if (string.IsNullOrWhiteSpace(credentialProvider) || credentialProvider.Length > 80)
+                    throw new ArgumentException("Authenticated watches need a stored integration provider slug.", nameof(request));
+            }
+        }
+        else if (kind == WatchKinds.DeviceBattery)
+        {
+            if (!double.IsFinite(threshold) || threshold is < 0 or > 100)
+                throw new ArgumentOutOfRangeException(nameof(request), "Battery threshold must be between 0 and 100 percent.");
+        }
+        else if (kind == WatchKinds.DeviceLocation)
+        {
+            latitude = request.Latitude;
+            longitude = request.Longitude;
+            radius = request.RadiusMeters ?? request.Threshold;
+            if (latitude is null or < -90 or > 90 || longitude is null or < -180 or > 180)
+                throw new ArgumentException("Location watches need a latitude and longitude.", nameof(request));
+            if (radius is null or < 25 or > 50_000)
+                throw new ArgumentException("Location watches need a radius between 25 and 50,000 meters.", nameof(request));
+            threshold = radius.Value;
+        }
+        else if (kind == WatchKinds.Calendar)
+        {
+            minutesBefore = request.MinutesBefore is > 0 and <= 24 * 60
+                ? request.MinutesBefore
+                : (int)Math.Clamp(request.Threshold, 5, 24 * 60);
+            threshold = minutesBefore.Value;
+            comparison = "below";
+        }
+
         var watch = await watches.CreateAsync(ownerId, request with
         {
             Title = title,
+            Kind = kind,
             Url = url,
             JsonPath = jsonPath,
-            Comparison = comparison
+            Comparison = comparison,
+            Threshold = threshold,
+            CredentialProvider = credentialProvider,
+            Latitude = latitude,
+            Longitude = longitude,
+            RadiusMeters = radius,
+            MinutesBefore = minutesBefore
         }, cancellationToken);
         try
         {

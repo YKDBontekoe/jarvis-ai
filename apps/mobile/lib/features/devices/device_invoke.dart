@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../json_maps.dart';
 import '../../http_urls.dart';
 import '../../ui/jarvis_ui.dart';
+import 'device_sensors.dart';
 
 Future<({String? result, String? error})> performDeviceCapability({
   required String capability,
@@ -60,16 +61,9 @@ Future<({String? result, String? error})> performDeviceCapability({
         }
         return (result: 'Shown on this device.', error: null);
       case 'battery':
-        return (
-          result: 'Battery level is not available in this client yet.',
-          error: null,
-        );
+        return readDeviceBattery();
       case 'location':
-        return (
-          result:
-              'Location is turned off or not available on this device build.',
-          error: null,
-        );
+        return readDeviceLocation();
       default:
         return (
           result: null,

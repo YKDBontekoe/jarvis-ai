@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Workflows;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -12,7 +13,7 @@ namespace Jarvis.Agents;
 /// <summary>Runs a coding task in an isolated snapshot using the Codex CLI harness.</summary>
 public sealed class CodexCodingTools(IConfiguration configuration, ILogger<CodexCodingTools> logger,
     IAuditEventStore audit, ICurrentUser currentUser, CodexProcessLimiter processLimiter,
-    CodexExecutable codexExecutable)
+    CodexExecutable codexExecutable, ICodingRunStore? codingRuns = null)
 {
     private const int MaxTaskLength = 16_000;
     private const int MaxResultLength = 24_000;
@@ -52,6 +53,7 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
             throw new InvalidOperationException("Coding workspaces must be separate from the repository and kept beside it.");
 
         var taskId = Guid.CreateVersion7().ToString("N");
+        var runId = Guid.Parse(taskId);
         var repositoryWorktreeRoot = Path.Combine(worktreeRoot, repository.Name);
         var worktreePath = Path.Combine(repositoryWorktreeRoot, taskId);
         Directory.CreateDirectory(repositoryWorktreeRoot);
@@ -78,6 +80,9 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
         var standardError = string.Empty;
         try
         {
+            if (codingRuns is not null)
+                await codingRuns.UpsertAsync(new SaveCodingRunRequest(runId, currentUser.OwnerId, repository.Name,
+                    task, "running", worktreePath, null, null, null, null, null), cancellationToken);
             await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.started", "high",
                 true, null, metadata, cancellationToken);
             using var process = new Process { StartInfo = start };
@@ -110,6 +115,10 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
                 logger.LogWarning("Codex coding task timed out for repository {RepositoryName}.", repository.Name);
                 await audit.AppendAsync(currentUser.OwnerId, "codex", "coding_task.failed", "high",
                     false, null, metadata, CancellationToken.None);
+                if (codingRuns is not null)
+                    await codingRuns.UpsertAsync(new SaveCodingRunRequest(runId, currentUser.OwnerId, repository.Name,
+                        task, "failed", worktreePath, null, null, null, "Codex reached the coding-task time limit.",
+                        null), CancellationToken.None);
                 try { await Task.WhenAll(stderrTask, stdoutTask).WaitAsync(TimeSpan.FromSeconds(2)); }
                 catch (TimeoutException) { }
                 catch (OperationCanceledException) { }
@@ -140,14 +149,21 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
         await audit.AppendAsync(currentUser.OwnerId, "codex",
             exitCode == 0 ? "coding_task.completed" : "coding_task.failed",
             "high", exitCode == 0, null, metadata, cancellationToken);
+        if (codingRuns is not null)
+            await codingRuns.UpsertAsync(new SaveCodingRunRequest(runId, currentUser.OwnerId, repository.Name, task,
+                exitCode == 0 ? "completed" : "failed", worktreePath, Limit(diff.StandardOutput.Trim(), 4_000),
+                status.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+                Limit(summary.Trim(), MaxResultLength),
+                exitCode == 0 ? null : Limit(standardError.Trim(), 2_000), exitCode), cancellationToken);
         logger.LogInformation("Codex coding task finished for repository {RepositoryName} with exit code {ExitCode}.",
             repository.Name, exitCode);
 
         return JsonSerializer.Serialize(new
-        {
-            completed = exitCode == 0,
-            exitCode,
-            repository = repository.Name,
+            {
+                completed = exitCode == 0,
+                exitCode,
+                id = runId,
+                repository = repository.Name,
             sourceMode,
             worktreePath,
             changedFiles = Limit(status.StandardOutput.Trim(), 4_000),

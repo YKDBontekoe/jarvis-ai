@@ -5,16 +5,24 @@ public sealed class ConditionWatch
     private ConditionWatch() { }
 
     public ConditionWatch(Guid ownerId, string title, string url, string jsonPath, string comparison,
-        double threshold, int intervalMinutes)
+        double threshold, int intervalMinutes, string kind = WatchKinds.PublicJson,
+        string? credentialProvider = null, double? latitude = null, double? longitude = null,
+        double? radiusMeters = null, int? minutesBefore = null)
     {
         Id = Guid.CreateVersion7();
         OwnerId = ownerId;
         Title = title;
+        Kind = WatchKinds.Normalize(kind);
         Url = url;
         JsonPath = jsonPath;
         Comparison = comparison;
         Threshold = threshold;
         IntervalMinutes = intervalMinutes;
+        CredentialProvider = credentialProvider;
+        Latitude = latitude;
+        Longitude = longitude;
+        RadiusMeters = radiusMeters;
+        MinutesBefore = minutesBefore;
         WorkflowId = $"jarvis-watch-{Id:N}";
         Status = "active";
         CreatedAt = DateTimeOffset.UtcNow;
@@ -23,11 +31,17 @@ public sealed class ConditionWatch
     public Guid Id { get; private set; }
     public Guid OwnerId { get; private set; }
     public string Title { get; private set; } = string.Empty;
+    public string Kind { get; private set; } = WatchKinds.PublicJson;
     public string Url { get; private set; } = string.Empty;
     public string JsonPath { get; private set; } = string.Empty;
     public string Comparison { get; private set; } = string.Empty;
     public double Threshold { get; private set; }
     public int IntervalMinutes { get; private set; }
+    public string? CredentialProvider { get; private set; }
+    public double? Latitude { get; private set; }
+    public double? Longitude { get; private set; }
+    public double? RadiusMeters { get; private set; }
+    public int? MinutesBefore { get; private set; }
     public string WorkflowId { get; private set; } = string.Empty;
     public string Status { get; private set; } = "active";
     public DateTimeOffset CreatedAt { get; private set; }

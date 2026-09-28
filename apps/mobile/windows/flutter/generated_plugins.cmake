@@ -3,10 +3,12 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  battery_plus
   connectivity_plus
   firebase_core
   flutter_secure_storage_windows
   flutter_webrtc
+  geolocator_windows
   livekit_client
   url_launcher_windows
 )

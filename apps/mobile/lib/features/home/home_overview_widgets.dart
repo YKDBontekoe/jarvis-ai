@@ -151,3 +151,54 @@ class _ActiveTask {
 
   Color get color => statusStyle(status).color;
 }
+
+class _BriefingListCard extends StatelessWidget {
+  const _BriefingListCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => SurfaceCard(
+    onTap: onTap,
+    child: Row(
+      children: [
+        IconBadge(icon: icon, size: 40),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              if (subtitle.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: JarvisColors.inkSoft,
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (onTap != null)
+          const Icon(
+            PhosphorIconsRegular.caretRight,
+            size: 16,
+            color: JarvisColors.muted,
+          ),
+      ],
+    ),
+  );
+}

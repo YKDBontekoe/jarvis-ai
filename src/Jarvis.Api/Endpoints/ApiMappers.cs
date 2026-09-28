@@ -20,7 +20,8 @@ internal static class ApiMappers
 
     public static ConditionWatchDto ToDto(this ConditionWatchRecord watch) => new(watch.Id, watch.Title,
         watch.Url, watch.JsonPath, watch.Comparison, watch.Threshold, watch.IntervalMinutes, watch.Status,
-        watch.CreatedAt, watch.LastCheckedAt, watch.LastValue);
+        watch.CreatedAt, watch.LastCheckedAt, watch.LastValue, watch.Kind, watch.CredentialProvider,
+        watch.Latitude, watch.Longitude, watch.RadiusMeters, watch.MinutesBefore);
 
     public static JarvisTaskDto ToDto(this JarvisTaskRecord task) => new(task.Id, task.Title, task.Prompt,
         task.Status, task.ConversationId, task.CreatedAt, task.StartedAt, task.CompletedAt, task.Summary);

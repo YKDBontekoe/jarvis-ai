@@ -42,6 +42,19 @@ public sealed record DevicePresence(string ConnectionId, string Name, IReadOnlyL
 
 public sealed record DeviceInvokeRequest(Guid InvokeId, string Capability, JsonElement? Arguments, TimeSpan Timeout);
 
+public sealed record DeviceTelemetryRecord(Guid OwnerId, double? Latitude, double? Longitude, double? AccuracyMeters,
+    int? BatteryPercent, bool? Charging, DateTimeOffset ReportedAt);
+
+public sealed record SaveDeviceTelemetryRequest(double? Latitude, double? Longitude, double? AccuracyMeters,
+    int? BatteryPercent, bool? Charging);
+
+public interface IDeviceTelemetryStore
+{
+    Task<DeviceTelemetryRecord> SaveAsync(Guid ownerId, SaveDeviceTelemetryRequest request,
+        CancellationToken cancellationToken);
+    Task<DeviceTelemetryRecord?> GetAsync(Guid ownerId, CancellationToken cancellationToken);
+}
+
 public interface IDeviceInvoker
 {
     IReadOnlyList<DevicePresence> List(Guid ownerId);

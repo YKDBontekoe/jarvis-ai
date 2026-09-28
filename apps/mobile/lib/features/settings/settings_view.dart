@@ -66,9 +66,15 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
       ),
       (
         title: 'Integrations',
-        subtitle: 'Manage MCP servers and credentials',
+        subtitle: 'Packs, MCP servers, OAuth, and credentials',
         icon: PhosphorIconsRegular.plugsConnected,
         destination: 'integrations',
+      ),
+      (
+        title: 'Coding runs',
+        subtitle: 'Review isolated worktrees and diffs',
+        icon: PhosphorIconsRegular.code,
+        destination: 'coding',
       ),
       (
         title: 'Approvals',

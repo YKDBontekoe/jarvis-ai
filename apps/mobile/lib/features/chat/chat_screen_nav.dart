@@ -27,7 +27,11 @@ mixin _ChatScreenNav on _ChatScreenController {
         destination == 'approvals' ||
         destination == 'watches' ||
         destination == 'reminders' ||
-        destination == 'usage') {
+        destination == 'usage' ||
+        destination == 'integrations' ||
+        destination == 'coding' ||
+        destination == 'graph' ||
+        destination == 'channels') {
       setState(() => _homeRevision++);
     }
   }
