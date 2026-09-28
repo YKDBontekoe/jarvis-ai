@@ -39,6 +39,8 @@ part 'chat_screen_session.dart';
 part 'chat_screen_realtime.dart';
 part 'chat_screen_push.dart';
 part 'chat_screen_send.dart';
+part 'chat_screen_catchup.dart';
+part 'chat_screen_transcript.dart';
 part 'chat_screen_voice.dart';
 part 'chat_screen_ui.dart';
 
@@ -63,6 +65,8 @@ class _ChatScreenState extends _ChatScreenController
         _ChatScreenRealtime,
         _ChatScreenPush,
         _ChatScreenSend,
+        _ChatScreenCatchUp,
+        _ChatScreenTranscript,
         _ChatScreenVoice,
         _ChatScreenUi {
   static const _wideLayoutWidth = 840.0;
