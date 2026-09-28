@@ -479,7 +479,11 @@ public sealed partial class CodexInstallation(
 
         public async Task InitializeAsync(CancellationToken cancellationToken)
         {
-            var requestId = await WriteAsync("initialize", new { clientInfo = new { name = "jarvis", version = "1.0.0" } }, cancellationToken);
+            var requestId = await WriteAsync("initialize", new
+            {
+                clientInfo = new { name = "jarvis", version = "1.0.0" },
+                capabilities = new { experimentalApi = true }
+            }, cancellationToken);
             using var response = await ReadResponseAsync(requestId, cancellationToken);
             await writer.WriteLineAsync(JsonSerializer.Serialize(new { method = "initialized", @params = new { } }).AsMemory(), cancellationToken);
             await writer.FlushAsync(cancellationToken);
