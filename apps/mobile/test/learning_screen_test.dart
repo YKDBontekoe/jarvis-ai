@@ -101,6 +101,8 @@ void main() {
       'dreaming': {
         'lastSummary': 'No dream has run yet.',
         'diary': <Object>[],
+        'userSummary': 'The user lives in Amsterdam and builds Jarvis.',
+        'userSummaryUpdatedAt': DateTime.now().toIso8601String(),
       },
       'activity': <Object>[],
     });
@@ -117,5 +119,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('1 merged memory'), findsOneWidget);
+    expect(
+      find.textContaining('The user lives in Amsterdam and builds Jarvis.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Included in chat as background'), findsOneWidget);
   });
 }
