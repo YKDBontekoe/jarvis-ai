@@ -18,8 +18,8 @@ public static class DailyBriefingClock
         var now = utcNow.ToUniversalTime();
         var fireAt = GetNextOccurrence(now, localTime, timeZone, lastDeliveredDate, catchUpMissedDay);
         var localDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(fireAt.UtcDateTime, timeZone).Date);
-        var dayStart = ResolveLocalTime(localDate.ToDateTime(TimeOnly.MinValue), timeZone);
-        var nextDayStart = ResolveLocalTime(localDate.AddDays(1).ToDateTime(TimeOnly.MinValue), timeZone);
+        var dayStart = LocalClock.Resolve(localDate.ToDateTime(TimeOnly.MinValue), timeZone);
+        var nextDayStart = LocalClock.Resolve(localDate.AddDays(1).ToDateTime(TimeOnly.MinValue), timeZone);
         return new DailyBriefingSchedule(fireAt, localDate, dayStart, nextDayStart);
     }
 
@@ -52,25 +52,11 @@ public static class DailyBriefingClock
         var localNow = TimeZoneInfo.ConvertTime(now, timeZone);
         var localDate = DateOnly.FromDateTime(localNow.DateTime);
         if (catchUpMissedDay && lastDeliveredDate >= localDate)
-            return ResolveLocalTime(localDate.AddDays(1).ToDateTime(localTime), timeZone);
+            return LocalClock.Resolve(localDate.AddDays(1).ToDateTime(localTime), timeZone);
 
-        var candidate = ResolveLocalTime(localDate.ToDateTime(localTime), timeZone);
+        var candidate = LocalClock.Resolve(localDate.ToDateTime(localTime), timeZone);
         if (candidate > now) return candidate;
         if (catchUpMissedDay) return now;
-        return ResolveLocalTime(localDate.AddDays(1).ToDateTime(localTime), timeZone);
-    }
-
-    private static DateTimeOffset ResolveLocalTime(DateTime local, TimeZoneInfo timeZone)
-    {
-        local = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
-        for (var minutes = 0; timeZone.IsInvalidTime(local) && minutes < 180; minutes++)
-            local = local.AddMinutes(1);
-        if (timeZone.IsInvalidTime(local))
-            throw new InvalidOperationException("Could not resolve the local briefing time in the configured time zone.");
-
-        var offset = timeZone.IsAmbiguousTime(local)
-            ? timeZone.GetAmbiguousTimeOffsets(local).Max()
-            : timeZone.GetUtcOffset(local);
-        return new DateTimeOffset(local, offset).ToUniversalTime();
+        return LocalClock.Resolve(localDate.AddDays(1).ToDateTime(localTime), timeZone);
     }
 }

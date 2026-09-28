@@ -1,3 +1,4 @@
+using Jarvis.Application.Workflows;
 using Jarvis.Domain.Workflows;
 using Xunit;
 
@@ -25,5 +26,21 @@ public sealed class ReminderTests
         Assert.True(reminder.IsOverdueDispatchStale(now));
         reminder.Complete();
         Assert.False(reminder.IsOverdueDispatchStale(now));
+    }
+
+    [Fact]
+    public void Overdue_dispatched_recurring_reminders_stay_pending_for_the_next_fire()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var reminder = new Reminder(Guid.CreateVersion7(), "Trash", now.AddMinutes(-5),
+            Reminder.RecurrenceWeekdays, ReminderWeekdays.Weekdays, "UTC", new TimeOnly(7, 30), null);
+        reminder.MarkScheduleDispatched();
+        Assert.True(reminder.IsOverdueDispatchStale(now));
+        Assert.Equal("pending", reminder.Status);
+
+        reminder.CompleteOccurrence(now, now.AddDays(1));
+        Assert.Equal("pending", reminder.Status);
+        Assert.False(reminder.IsOverdueDispatchStale(now));
+        Assert.NotNull(reminder.LastDeliveredAt);
     }
 }

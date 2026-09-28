@@ -77,6 +77,8 @@ function plan(prompt) {
   if (prompt.includes('Extract at most three useful long-term memories')) return text('[]');
   if (prompt.includes('Reorder saved-memory candidates')) return text('[]');
 
+  if (prompt.includes('You write a short morning briefing intro for Jarvis'))
+    return text('Here is a calm look at today.');
   if (prompt.includes('You maintain a temporal knowledge graph'))
     return text(JSON.stringify(extractGraph(parseConversation(prompt).request)));
   if (prompt.includes('You are Jarvis reflecting on recent work with your user'))
@@ -95,10 +97,10 @@ function plan(prompt) {
 
   if (/\bremind me\b/.test(lower) && has('CreateReminder')) {
     if (results.length === 0) {
-      const { title, dueAt } = parseReminder(request);
-      return call('CreateReminder', { title, dueAt });
+      const reminder = parseReminder(request);
+      return call('CreateReminder', reminder);
     }
-    const due = last.match(/ for (\S+): /)?.[1];
+    const due = last.match(/next (\S+)\)/)?.[1] ?? last.match(/ for (\S+): /)?.[1];
     return text(`Done! I'll remind you to **${parseReminder(request).title}**` +
       (due ? ` at \`${new Date(due).toUTCString()}\`.` : '.') +
       '\n\nYou can see or cancel it any time under *Settings → Reminders*.');
@@ -277,13 +279,36 @@ function decodeResult(value) {
 }
 
 function parseReminder(request) {
+  const lower = request.toLowerCase();
+  const weekday = /\bevery weekday\b/.test(lower);
+  const daily = /\bevery day\b/.test(lower);
+  const timeMatch = lower.match(/\bat (\d{1,2})(?::(\d{2}))?\b/);
   const amount = request.match(/in (\d+|an?|one) (minute|min|hour|day)s?/i);
+  const title = request.replace(/.*remind me (to )?/i, '')
+    .replace(/\s*in (\d+|an?|one) \w+$/i, '')
+    .replace(/\s*every weekday\s*/i, ' ')
+    .replace(/\s*every day\s*/i, ' ')
+    .replace(/\s*at \d{1,2}(?::\d{2})?\s*/i, ' ')
+    .replace(/[.?!]$/, '').replace(/\s+/g, ' ').trim() || 'your reminder';
+  if (weekday || daily) {
+    const hour = timeMatch ? Number(timeMatch[1]) : 7;
+    const minute = timeMatch?.[2] ? Number(timeMatch[2]) : 30;
+    const now = new Date();
+    const due = new Date(now);
+    due.setHours(hour, minute, 0, 0);
+    const skipWeekend = weekday;
+    while (due <= now || (skipWeekend && (due.getDay() === 0 || due.getDay() === 6)))
+      due.setDate(due.getDate() + 1);
+    return {
+      title,
+      dueAt: due.toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      recurrence: weekday ? 'weekdays' : 'daily',
+    };
+  }
   const count = amount ? (/^\d+$/.test(amount[1]) ? Number(amount[1]) : 1) : 30;
   const unit = amount?.[2].toLowerCase().startsWith('h') ? 3_600_000 :
     amount?.[2].toLowerCase().startsWith('d') ? 86_400_000 : 60_000;
   const dueAt = new Date(Date.now() + count * unit).toISOString().replace(/\.\d{3}Z$/, 'Z');
-  const title = request.replace(/.*remind me (to )?/i, '').replace(/\s*in (\d+|an?|one) \w+$/i, '')
-    .replace(/[.?!]$/, '').trim() || 'your reminder';
   return { title, dueAt };
 }
 

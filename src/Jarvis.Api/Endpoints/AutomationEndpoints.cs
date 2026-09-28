@@ -34,12 +34,18 @@ internal static class AutomationEndpoints
                 return EndpointHelpers.Invalid("title", "Title must contain 1 to 300 characters.");
             try
             {
-                var reminder = await reminders.CreateAsync(currentUser.OwnerId, request.Title, request.DueAt, ct);
+                var reminder = await reminders.CreateAsync(currentUser.OwnerId, new CreateReminderRequest(
+                    request.Title ?? string.Empty, request.DueAt, request.Recurrence, request.Weekdays,
+                    request.TimeZoneId, request.Until, request.LocalTime), ct);
                 return Results.Created($"/api/v1/reminders/{reminder.Id}", reminder.ToDto());
             }
             catch (ArgumentOutOfRangeException exception)
             {
                 return EndpointHelpers.Invalid("dueAt", exception.Message);
+            }
+            catch (ArgumentException exception)
+            {
+                return EndpointHelpers.Invalid("recurrence", exception.Message);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {

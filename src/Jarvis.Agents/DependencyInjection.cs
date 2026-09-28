@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Memory;
+using Jarvis.Application.Workflows;
 using Jarvis.Agents.ModelProviders;
 
 namespace Jarvis.Agents;
@@ -62,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<Learning.ReflectionService>();
         services.AddScoped<Learning.HeartbeatService>();
         services.AddScoped<Learning.DreamingService>();
+        services.AddScoped<IDailyBriefingNarrator, DailyBriefingNarrator>();
         services.AddScoped<JarvisAgentFactory>();
         services.AddScoped<IJarvisAgent, JarvisAgent>();
         return services;

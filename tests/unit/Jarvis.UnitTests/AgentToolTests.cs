@@ -39,12 +39,30 @@ public sealed class AgentToolTests
     public async Task Create_reminder_without_offset_never_reaches_the_scheduler()
     {
         var reminders = new FakeReminderService();
-        var tools = new ReminderAgentTools(reminders, new FixedUser());
+        var tools = new ReminderAgentTools(reminders, new FixedUser(), new FakeBriefingRepository(null));
 
-        var result = await tools.CreateReminderAsync("Call mom", "2030-01-02T09:30:00", CancellationToken.None);
+        var result = await tools.CreateReminderAsync("Call mom", "2030-01-02T09:30:00",
+            cancellationToken: CancellationToken.None);
 
         Assert.Contains("timezone offset", result);
         Assert.Empty(reminders.Items);
+    }
+
+    [Fact]
+    public async Task Create_weekday_reminder_passes_recurrence_to_the_scheduler()
+    {
+        var reminders = new FakeReminderService();
+        var tools = new ReminderAgentTools(reminders, new FixedUser(), new FakeBriefingRepository(
+            new DailyBriefingPreferenceRecord(OwnerId, true, new TimeOnly(8, 0), "Europe/Amsterdam", "wf", null, null)));
+
+        var result = await tools.CreateReminderAsync("Take out the trash", "2030-01-16T07:30:00+01:00",
+            "weekdays", 0, null, null, CancellationToken.None);
+
+        var created = Assert.Single(reminders.Items);
+        Assert.Equal("weekdays", created.Recurrence);
+        Assert.Equal("Europe/Amsterdam", created.TimeZoneId);
+        Assert.Contains("every weekday", result);
+        Assert.Contains(created.Id.ToString(), result);
     }
 
     [Fact]
@@ -54,7 +72,7 @@ public sealed class AgentToolTests
         var later = reminders.Add("Later", DateTimeOffset.UtcNow.AddDays(2));
         var sooner = reminders.Add("Sooner", DateTimeOffset.UtcNow.AddHours(1));
         reminders.Add("Delivered", DateTimeOffset.UtcNow.AddDays(-1), "completed");
-        var tools = new ReminderAgentTools(reminders, new FixedUser());
+        var tools = new ReminderAgentTools(reminders, new FixedUser(), new FakeBriefingRepository(null));
 
         var result = await tools.ListRemindersAsync();
 
@@ -69,7 +87,7 @@ public sealed class AgentToolTests
     {
         var reminders = new FakeReminderService();
         var existing = reminders.Add("Stretch", DateTimeOffset.UtcNow.AddHours(3));
-        var tools = new ReminderAgentTools(reminders, new FixedUser());
+        var tools = new ReminderAgentTools(reminders, new FixedUser(), new FakeBriefingRepository(null));
 
         Assert.Contains("invalid", await tools.CancelReminderAsync("not-a-guid", CancellationToken.None));
         Assert.Contains("not found", await tools.CancelReminderAsync(Guid.NewGuid().ToString(), CancellationToken.None));
@@ -202,7 +220,7 @@ public sealed class AgentToolTests
     {
         var reminders = new FakeReminderService();
         var target = reminders.Add("Dentist", DateTimeOffset.UtcNow.AddDays(1));
-        var tools = new ReminderAgentTools(reminders, new FixedUser());
+        var tools = new ReminderAgentTools(reminders, new FixedUser(), new FakeBriefingRepository(null));
         var client = new ScriptedToolClient(target.Id);
         var agent = new ChatClientAgent(client, new ChatClientAgentOptions
         {
@@ -239,15 +257,18 @@ public sealed class AgentToolTests
     {
         public List<ReminderRecord> Items { get; } = [];
 
-        public ReminderRecord Add(string title, DateTimeOffset dueAt, string status = "pending")
+        public ReminderRecord Add(string title, DateTimeOffset dueAt, string status = "pending",
+            string recurrence = "none", string timeZoneId = "UTC")
         {
-            var record = new ReminderRecord(Guid.NewGuid(), OwnerId, title, dueAt, "wf", status, DateTimeOffset.UtcNow, null);
+            var record = new ReminderRecord(Guid.NewGuid(), OwnerId, title, dueAt, "wf", status, DateTimeOffset.UtcNow, null,
+                recurrence, 0, timeZoneId, TimeOnly.FromDateTime(dueAt.UtcDateTime), null, null);
             Items.Add(record);
             return record;
         }
 
-        public Task<ReminderRecord> CreateAsync(Guid ownerId, string title, DateTimeOffset dueAt, CancellationToken cancellationToken) =>
-            Task.FromResult(Add(title, dueAt));
+        public Task<ReminderRecord> CreateAsync(Guid ownerId, CreateReminderRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult(Add(request.Title, request.DueAt, "pending", request.Recurrence ?? "none",
+                request.TimeZoneId ?? "UTC"));
 
         public Task<ReminderRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
             Task.FromResult(Items.FirstOrDefault(item => item.Id == id && item.OwnerId == ownerId));
