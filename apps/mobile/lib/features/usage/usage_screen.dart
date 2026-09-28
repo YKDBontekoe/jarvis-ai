@@ -65,13 +65,17 @@ class _UsageScreenState extends State<UsageScreen> {
 
   Future<void> _load() async {
     try {
-      final response = await widget.http.get<Map<String, dynamic>>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/usage',
         queryParameters: {'period': _period},
       );
       if (!mounted) return;
+      final data = jsonObject(response.data);
+      if (data == null) {
+        throw const FormatException('Missing usage payload.');
+      }
       setState(() {
-        _usage = response.data;
+        _usage = data;
         _loading = false;
         _error = null;
       });
@@ -88,6 +92,12 @@ class _UsageScreenState extends State<UsageScreen> {
       setState(() {
         _loading = false;
         _error = 'Jarvis returned an unreadable usage summary.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load usage.';
       });
     }
   }
@@ -227,9 +237,7 @@ class _UsageScreenState extends State<UsageScreen> {
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    _chip(
-                      '${asJsonInt(persona['activeMemories'])} memories',
-                    ),
+                    _chip('${asJsonInt(persona['activeMemories'])} memories'),
                     if (asJsonInt(persona['pinnedMemories']) > 0)
                       _chip('${asJsonInt(persona['pinnedMemories'])} pinned'),
                     _chip('${asJsonInt(persona['memoryKinds'])} kinds'),
@@ -302,7 +310,11 @@ class _UsageScreenState extends State<UsageScreen> {
           _dreamCaption(activity),
           key: const Key('usage-dreams'),
         ),
-        _stat('Skills', _amount(activity['skills']), _caption(activity['skills'])),
+        _stat(
+          'Skills',
+          _amount(activity['skills']),
+          _caption(activity['skills']),
+        ),
         _stat('Files', _amount(activity['files']), _caption(activity['files'])),
         _stat(
           'Graph facts',
@@ -332,7 +344,10 @@ class _UsageScreenState extends State<UsageScreen> {
                 const SizedBox(height: 2),
                 Text(
                   caption,
-                  style: const TextStyle(color: JarvisColors.inkSoft, fontSize: 12),
+                  style: const TextStyle(
+                    color: JarvisColors.inkSoft,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ],
@@ -364,13 +379,18 @@ class _UsageScreenState extends State<UsageScreen> {
                     Text(title, style: Theme.of(context).textTheme.titleMedium),
                     Text(
                       subtitle,
-                      style: const TextStyle(color: JarvisColors.inkSoft, fontSize: 13),
+                      style: const TextStyle(
+                        color: JarvisColors.inkSoft,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
               ),
               Text(
-                showCost ? _money(provider) : formatTokenCount(asJsonInt(provider['totalTokens'])),
+                showCost
+                    ? _money(provider)
+                    : formatTokenCount(asJsonInt(provider['totalTokens'])),
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ],
@@ -381,22 +401,40 @@ class _UsageScreenState extends State<UsageScreen> {
             runSpacing: 8,
             children: [
               _metric('Calls', '$calls'),
-              _metric('Input', formatTokenCount(asJsonInt(provider['inputTokens']))),
-              _metric('Output', formatTokenCount(asJsonInt(provider['outputTokens']))),
-              _metric('Cached', formatTokenCount(asJsonInt(provider['cachedInputTokens']))),
+              _metric(
+                'Input',
+                formatTokenCount(asJsonInt(provider['inputTokens'])),
+              ),
+              _metric(
+                'Output',
+                formatTokenCount(asJsonInt(provider['outputTokens'])),
+              ),
+              _metric(
+                'Cached',
+                formatTokenCount(asJsonInt(provider['cachedInputTokens'])),
+              ),
               _metric(
                 'Reasoning',
                 formatTokenCount(asJsonInt(provider['reasoningOutputTokens'])),
               ),
               if (asJsonInt(provider['webSearchActions']) > 0)
-                _metric('Searches', '${asJsonInt(provider['webSearchActions'])}'),
-              _metric('Latency', _latency(asJsonInt(provider['averageDurationMs']))),
+                _metric(
+                  'Searches',
+                  '${asJsonInt(provider['webSearchActions'])}',
+                ),
+              _metric(
+                'Latency',
+                _latency(asJsonInt(provider['averageDurationMs'])),
+              ),
               if (failed > 0) _metric('Failed', '$failed'),
             ],
           ),
           if (_purposeLine(provider) case final line?) ...[
             const SizedBox(height: 10),
-            Text(line, style: const TextStyle(color: JarvisColors.inkSoft, fontSize: 13)),
+            Text(
+              line,
+              style: const TextStyle(color: JarvisColors.inkSoft, fontSize: 13),
+            ),
           ],
           if (_period != 'all') ...[
             const SizedBox(height: 6),
@@ -408,7 +446,14 @@ class _UsageScreenState extends State<UsageScreen> {
           ],
           if (asJsonString(provider['costNote']) case final note?) ...[
             const SizedBox(height: 8),
-            Text(note, style: const TextStyle(color: JarvisColors.muted, fontSize: 12, height: 1.35)),
+            Text(
+              note,
+              style: const TextStyle(
+                color: JarvisColors.muted,
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
           ],
         ],
       ),
@@ -418,7 +463,10 @@ class _UsageScreenState extends State<UsageScreen> {
   Widget _metric(String label, String value) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(label, style: const TextStyle(color: JarvisColors.muted, fontSize: 11)),
+      Text(
+        label,
+        style: const TextStyle(color: JarvisColors.muted, fontSize: 11),
+      ),
       Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
     ],
   );
@@ -429,7 +477,8 @@ class _UsageScreenState extends State<UsageScreen> {
     final zone = asJsonString(_usage?['timeZoneId']) ?? 'UTC';
     final hasTokens = days.any(
       (day) =>
-          asJsonInt(day['codexTokens']) > 0 || asJsonInt(day['openRouterTokens']) > 0,
+          asJsonInt(day['codexTokens']) > 0 ||
+          asJsonInt(day['openRouterTokens']) > 0,
     );
     return SurfaceCard(
       child: Column(
@@ -490,7 +539,8 @@ class _UsageScreenState extends State<UsageScreen> {
                 '${_label(asJsonString(model['purpose']))} · ${asJsonString(model['provider']) ?? ''} · ${asJsonInt(model['calls'])} calls',
               ),
               trailing: Text(
-                model['provider'] == 'openrouter' && model['estimatedCostUsd'] != null
+                model['provider'] == 'openrouter' &&
+                        model['estimatedCostUsd'] != null
                     ? '${formatTokenCount(asJsonInt(model['totalTokens']))} · ${formatUsd(asJsonNum(model['estimatedCostUsd']))}'
                     : formatTokenCount(asJsonInt(model['totalTokens'])),
               ),
@@ -544,9 +594,13 @@ class _UsageScreenState extends State<UsageScreen> {
     return '${_total(window)} $noun';
   }
 
-  String? _lifetimeTokens(Map<String, dynamic> codex, Map<String, dynamic> openRouter) {
+  String? _lifetimeTokens(
+    Map<String, dynamic> codex,
+    Map<String, dynamic> openRouter,
+  ) {
     if (_period == 'all') return null;
-    final total = asJsonInt(codex['lifetimeTotalTokens']) +
+    final total =
+        asJsonInt(codex['lifetimeTotalTokens']) +
         asJsonInt(openRouter['lifetimeTotalTokens']);
     return '${formatTokenCount(total)} all time';
   }
@@ -555,7 +609,9 @@ class _UsageScreenState extends State<UsageScreen> {
     final superseded = asJsonInt(persona['supersededMemories']);
     final created = _inPeriod(stored);
     if (_period == 'all') {
-      return superseded == 0 ? '${_total(stored)} stored' : '$superseded superseded';
+      return superseded == 0
+          ? '${_total(stored)} stored'
+          : '$superseded superseded';
     }
     final added = created == 1 ? '1 added' : '$created added';
     return superseded == 0 ? added : '$added · $superseded superseded';
@@ -569,16 +625,30 @@ class _UsageScreenState extends State<UsageScreen> {
     final parsed = DateTime.tryParse(last)?.toLocal();
     if (parsed == null) return diaryText;
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '$diaryText · last ${months[parsed.month - 1]} ${parsed.day}';
   }
 
   String _money(Map<String, dynamic> provider, {bool lifetime = false}) {
-    final calls = asJsonInt(lifetime ? provider['lifetimeCalls'] : provider['calls']);
+    final calls = asJsonInt(
+      lifetime ? provider['lifetimeCalls'] : provider['calls'],
+    );
     final cost = asJsonNum(
-      lifetime ? provider['lifetimeEstimatedCostUsd'] : provider['estimatedCostUsd'],
+      lifetime
+          ? provider['lifetimeEstimatedCostUsd']
+          : provider['estimatedCostUsd'],
     );
     if (cost == null) return calls == 0 ? '\$0.00' : 'Unpriced';
     return formatUsd(cost);
@@ -611,8 +681,7 @@ class _UsageScreenState extends State<UsageScreen> {
   int _inPeriod(dynamic value) => asJsonInt(_map(value)['inPeriod']);
   int _total(dynamic value) => asJsonInt(_map(value)['total']);
 
-  Map<String, dynamic> _map(dynamic value) =>
-      value is Map ? Map<String, dynamic>.from(value) : const {};
+  Map<String, dynamic> _map(dynamic value) => jsonObject(value) ?? const {};
 }
 
 num? asJsonNum(dynamic value) => value is num ? value : null;
@@ -631,10 +700,7 @@ class _ScoreRing extends StatelessWidget {
       child: CustomPaint(
         painter: _RingPainter(score.clamp(0, 100) / 100),
         child: Center(
-          child: Text(
-            '$score',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          child: Text('$score', style: Theme.of(context).textTheme.titleLarge),
         ),
       ),
     ),
@@ -670,7 +736,8 @@ class _RingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_RingPainter oldDelegate) => oldDelegate.progress != progress;
+  bool shouldRepaint(_RingPainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
 
 class _Legend extends StatelessWidget {
@@ -689,7 +756,10 @@ class _Legend extends StatelessWidget {
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
       const SizedBox(width: 6),
-      Text(label, style: const TextStyle(fontSize: 12, color: JarvisColors.inkSoft)),
+      Text(
+        label,
+        style: const TextStyle(fontSize: 12, color: JarvisColors.inkSoft),
+      ),
     ],
   );
 }
@@ -704,7 +774,8 @@ class _UsageChartPainter extends CustomPainter {
     if (days.isEmpty) return;
     var maxTokens = 1;
     for (final day in days) {
-      final total = asJsonInt(day['codexTokens']) + asJsonInt(day['openRouterTokens']);
+      final total =
+          asJsonInt(day['codexTokens']) + asJsonInt(day['openRouterTokens']);
       if (total > maxTokens) maxTokens = total;
     }
     final slot = size.width / days.length;
@@ -712,8 +783,10 @@ class _UsageChartPainter extends CustomPainter {
     final codexPaint = Paint()..color = JarvisColors.accent;
     final openRouterPaint = Paint()..color = JarvisColors.violet;
     for (final (index, day) in days.indexed) {
-      final codex = asJsonInt(day['codexTokens']) / maxTokens * (size.height - 4);
-      final openRouter = asJsonInt(day['openRouterTokens']) / maxTokens * (size.height - 4);
+      final codex =
+          asJsonInt(day['codexTokens']) / maxTokens * (size.height - 4);
+      final openRouter =
+          asJsonInt(day['openRouterTokens']) / maxTokens * (size.height - 4);
       final x = slot * index + (slot - barWidth) / 2;
       if (codex > 0) {
         canvas.drawRRect(
@@ -727,7 +800,12 @@ class _UsageChartPainter extends CustomPainter {
       if (openRouter > 0) {
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(x, size.height - codex - openRouter, barWidth, openRouter),
+            Rect.fromLTWH(
+              x,
+              size.height - codex - openRouter,
+              barWidth,
+              openRouter,
+            ),
             const Radius.circular(3),
           ),
           openRouterPaint,
@@ -737,5 +815,6 @@ class _UsageChartPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_UsageChartPainter oldDelegate) => oldDelegate.days != days;
+  bool shouldRepaint(_UsageChartPainter oldDelegate) =>
+      oldDelegate.days != days;
 }

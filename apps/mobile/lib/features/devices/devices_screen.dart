@@ -23,6 +23,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
   List<Map<String, dynamic>> _online = const [];
   bool _loading = true;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -31,33 +32,45 @@ class _DevicesScreenState extends State<DevicesScreen> {
   }
 
   Future<void> _load() async {
+    final revision = ++_requestRevision;
     try {
-      final response = await widget.http.get<Map<String, dynamic>>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/settings/devices',
       );
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
+      final data = jsonObject(response.data) ?? const {};
       setState(() {
-        _settings = response.data ?? const {};
-        _online = jsonMaps(response.data?['online']);
+        _settings = data;
+        _online = jsonMaps(data['online']);
         _loading = false;
         _error = null;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not load device settings.';
       });
+    } catch (_) {
+      if (!mounted || revision != _requestRevision) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load device settings.';
+      });
     }
   }
 
   Future<void> _set(String key, bool value) async {
+    final previous = _settings;
     final next = {..._settings, key: value};
-    setState(() => _settings = next);
+    setState(() {
+      _settings = next;
+      _error = null;
+    });
     try {
-      final response = await widget.http.put<Map<String, dynamic>>(
+      final response = await widget.http.put<dynamic>(
         '/api/v1/settings/devices',
         data: {
           'location': asJsonBool(next['location']),
@@ -67,19 +80,26 @@ class _DevicesScreenState extends State<DevicesScreen> {
           'notify': asJsonBool(next['notify'], true),
         },
       );
-      if (mounted) {
-        setState(() {
-          _settings = response.data ?? next;
-          _online = jsonMaps(response.data?['online']);
-        });
-      }
+      if (!mounted) return;
+      final data = jsonObject(response.data) ?? next;
+      setState(() {
+        _settings = data;
+        _online = jsonMaps(data['online']);
+      });
     } on DioException catch (error) {
       if (!mounted) return;
-      setState(
-        () => _error =
+      setState(() {
+        _settings = previous;
+        _error =
             firstProblemMessage(error.response?.data) ??
-            'Could not save device settings.',
-      );
+            'Could not save device settings.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _settings = previous;
+        _error = 'Could not save device settings.';
+      });
     }
   }
 
@@ -156,7 +176,9 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     else
                       for (final device in _online)
                         ListTile(
-                          leading: const Icon(PhosphorIconsRegular.deviceMobile),
+                          leading: const Icon(
+                            PhosphorIconsRegular.deviceMobile,
+                          ),
                           title: Text(asJsonString(device['name']) ?? 'Device'),
                           subtitle: Text(
                             jsonStrings(device['capabilities']).join(', '),
@@ -174,7 +196,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
         secondary: Icon(icon),
         title: Text(title),
         subtitle: Text(subtitle),
-        value: asJsonBool(_settings[key], key != 'location' && key != 'clipboard'),
+        value: asJsonBool(
+          _settings[key],
+          key != 'location' && key != 'clipboard',
+        ),
         onChanged: (value) => unawaited(_set(key, value)),
       );
 }

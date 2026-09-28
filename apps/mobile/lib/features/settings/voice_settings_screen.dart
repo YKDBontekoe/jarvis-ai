@@ -23,6 +23,7 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
   Map<String, dynamic> _settings = const {};
   bool _loading = true;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -31,23 +32,28 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
   }
 
   Future<void> _load() async {
+    final revision = ++_requestRevision;
     try {
-      final response = await widget.http.get<Map<String, dynamic>>(
-        '/api/v1/settings/voice',
-      );
-      if (!mounted) return;
+      final response = await widget.http.get<dynamic>('/api/v1/settings/voice');
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
-        _settings = response.data ?? const {};
+        _settings = jsonObject(response.data) ?? const {};
         _loading = false;
         _error = null;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not load voice settings.';
+      });
+    } catch (_) {
+      if (!mounted || revision != _requestRevision) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load voice settings.';
       });
     }
   }
@@ -57,24 +63,38 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
   List<Map<String, dynamic>> get _voices => jsonMaps(_settings['voices']);
 
   Future<void> _save(Map<String, dynamic> next) async {
-    setState(() => _settings = next);
+    final previous = _settings;
+    setState(() {
+      _settings = next;
+      _error = null;
+    });
     try {
-      final response = await widget.http.put<Map<String, dynamic>>(
+      final response = await widget.http.put<dynamic>(
         '/api/v1/settings/voice',
         data: {
           'handsFree': asJsonBool(next['handsFree'], true),
           'captions': asJsonBool(next['captions'], true),
-          'voice': asJsonString(next['voice']) ?? asJsonString(next['defaultVoice']),
+          'voice':
+              asJsonString(next['voice']) ?? asJsonString(next['defaultVoice']),
         },
       );
-      if (mounted) setState(() => _settings = response.data ?? next);
+      if (mounted) {
+        setState(() => _settings = jsonObject(response.data) ?? next);
+      }
     } on DioException catch (error) {
       if (!mounted) return;
-      setState(
-        () => _error =
+      setState(() {
+        _settings = previous;
+        _error =
             firstProblemMessage(error.response?.data) ??
-            'Could not save voice settings.',
-      );
+            'Could not save voice settings.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _settings = previous;
+        _error = 'Could not save voice settings.';
+      });
     }
   }
 

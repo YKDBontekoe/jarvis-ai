@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import 'ui/phosphor_icons.dart';
 
 import 'features/chat/chat_widgets.dart';
@@ -28,6 +29,7 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
   Map<String, dynamic>? _item;
   bool _loading = true;
   String? _error;
+  int _requestRevision = 0;
 
   bool get _isReminder =>
       widget.notificationType == 'reminder.due' ||
@@ -44,12 +46,12 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
   }
 
   Future<void> _load() async {
+    final revision = ++_requestRevision;
     try {
       final path = switch (widget.notificationType) {
         'reminder.due' ||
         'reminder.failed' => '/api/v1/reminders/${widget.sourceId}',
-        'task.completed' ||
-        'task.failed' => '/api/v1/tasks/${widget.sourceId}',
+        'task.completed' || 'task.failed' => '/api/v1/tasks/${widget.sourceId}',
         'watch.triggered' ||
         'watch.failed' => '/api/v1/watches/${widget.sourceId}',
         _ => null,
@@ -58,29 +60,37 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
         setState(() => _error = 'This notification has no linked item.');
         return;
       }
-      final response = await widget.http.get<Map<String, dynamic>>(path);
+      final response = await widget.http.get<dynamic>(path);
+      if (!mounted || revision != _requestRevision) return;
       final data = response.data;
-      if (!mounted) return;
       if (data == null) {
         setState(() => _error = 'Jarvis returned an invalid item.');
         return;
       }
-      setState(() => _item = Map<String, dynamic>.from(data));
+      final item = jsonObject(data);
+      setState(() {
+        _item = item;
+        _error = item == null ? 'Jarvis returned an invalid item.' : null;
+      });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(
         () => _error = error.response?.statusCode == 404
             ? 'This item is no longer available.'
             : 'Jarvis could not load this item.',
       );
+    } catch (_) {
+      if (!mounted || revision != _requestRevision) return;
+      setState(() => _error = 'Jarvis could not load this item.');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && revision == _requestRevision) {
+        setState(() => _loading = false);
+      }
     }
   }
 
   String _date(dynamic raw) {
-    if (raw is! String) return '';
-    final date = DateTime.tryParse(raw)?.toLocal();
+    final date = jsonDate(raw, local: true);
     if (date == null) return '';
     final dateText = MaterialLocalizations.of(context).formatMediumDate(date);
     final timeText = MaterialLocalizations.of(

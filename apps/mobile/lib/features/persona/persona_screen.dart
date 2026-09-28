@@ -8,6 +8,8 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 
+part 'persona_trait_dialog.dart';
+
 const personaCategories = {
   'tone': ('Tone', PhosphorIconsRegular.chatCenteredText),
   'format': ('Format', PhosphorIconsRegular.listChecks),
@@ -38,6 +40,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
   bool _saving = false;
   String? _error;
   String? _notice;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -63,23 +66,28 @@ class _PersonaScreenState extends State<PersonaScreen> {
   }
 
   Future<void> _load({bool traitsOnly = false}) async {
+    final revision = ++_requestRevision;
     try {
-      final response = await widget.http.get<Map<String, dynamic>>(
-        '/api/v1/persona',
-      );
-      if (!mounted) return;
+      final response = await widget.http.get<dynamic>('/api/v1/persona');
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
-        _apply(response.data ?? const {}, traitsOnly: traitsOnly);
+        _apply(jsonObject(response.data) ?? const {}, traitsOnly: traitsOnly);
         _loading = false;
         _error = null;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not load your persona.';
+      });
+    } catch (_) {
+      if (!mounted || revision != _requestRevision) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load your persona.';
       });
     }
   }
@@ -101,6 +109,10 @@ class _PersonaScreenState extends State<PersonaScreen> {
               firstProblemMessage(error.response?.data) ??
               'Jarvis could not save that change.',
         );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Jarvis could not save that change.');
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -143,25 +155,35 @@ class _PersonaScreenState extends State<PersonaScreen> {
       ),
     );
     if (result == null) return;
+    final id = jsonId(trait);
+    if (id == null) return;
     await _mutate(
       () => widget.http.patch<void>(
-        '/api/v1/persona/traits/${trait['id']}',
+        '/api/v1/persona/traits/$id',
         data: {'statement': result.$2},
       ),
     );
   }
 
-  Future<void> _togglePin(Map<String, dynamic> trait) => _mutate(
-    () => widget.http.patch<void>(
-      '/api/v1/persona/traits/${trait['id']}',
-      data: {'pinned': !asJsonBool(trait['pinned'])},
-    ),
-  );
+  Future<void> _togglePin(Map<String, dynamic> trait) async {
+    final id = jsonId(trait);
+    if (id == null) return;
+    await _mutate(
+      () => widget.http.patch<void>(
+        '/api/v1/persona/traits/$id',
+        data: {'pinned': !asJsonBool(trait['pinned'])},
+      ),
+    );
+  }
 
-  Future<void> _remove(Map<String, dynamic> trait) => _mutate(
-    () => widget.http.delete<void>('/api/v1/persona/traits/${trait['id']}'),
-    'Jarvis forgot that preference.',
-  );
+  Future<void> _remove(Map<String, dynamic> trait) async {
+    final id = jsonId(trait);
+    if (id == null) return;
+    await _mutate(
+      () => widget.http.delete<void>('/api/v1/persona/traits/$id'),
+      'Jarvis forgot that preference.',
+    );
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -388,7 +410,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
   }
 
   String _relative(String iso) {
-    final time = DateTime.tryParse(iso);
+    final time = jsonDate(iso);
     if (time == null) return 'recently';
     final minutes = DateTime.now().difference(time).inMinutes;
     if (minutes < 1) return 'just now';
@@ -396,68 +418,4 @@ class _PersonaScreenState extends State<PersonaScreen> {
     if (minutes < 1440) return '${minutes ~/ 60} h ago';
     return '${minutes ~/ 1440} days ago';
   }
-}
-
-class _TraitDialog extends StatefulWidget {
-  const _TraitDialog({this.category, this.statement});
-
-  final String? category;
-  final String? statement;
-
-  @override
-  State<_TraitDialog> createState() => _TraitDialogState();
-}
-
-class _TraitDialogState extends State<_TraitDialog> {
-  late String _category = widget.category ?? 'format';
-  late final _statement = TextEditingController(text: widget.statement ?? '');
-
-  @override
-  void dispose() {
-    _statement.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.statement == null ? 'Teach Jarvis' : 'Edit rule'),
-    content: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (widget.statement == null)
-          DropdownButtonFormField<String>(
-            initialValue: _category,
-            decoration: const InputDecoration(labelText: 'About'),
-            items: [
-              for (final entry in personaCategories.entries)
-                DropdownMenuItem(value: entry.key, child: Text(entry.value.$1)),
-            ],
-            onChanged: (value) => setState(() => _category = value ?? 'other'),
-          ),
-        const SizedBox(height: 12),
-        TextField(
-          key: const Key('trait-statement'),
-          controller: _statement,
-          autofocus: true,
-          maxLines: 3,
-          maxLength: 280,
-          decoration: const InputDecoration(
-            hintText: 'e.g. Keep answers under five sentences.',
-          ),
-        ),
-      ],
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
-      ),
-      FilledButton(
-        key: const Key('save-trait'),
-        onPressed: () =>
-            Navigator.pop(context, (_category, _statement.text.trim())),
-        child: const Text('Save'),
-      ),
-    ],
-  );
 }

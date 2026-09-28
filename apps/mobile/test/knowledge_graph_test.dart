@@ -231,6 +231,21 @@ void main() {
     expect(find.byKey(const Key('node-You')), findsOneWidget);
   });
 
+  testWidgets('invalid entity payload shows an error instead of crashing', (
+    tester,
+  ) async {
+    final http = FixtureHttp();
+    http.on('GET', '/api/v1/graph/entities/u', 'nope');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GraphEntityScreen(http: http.client(), entityId: 'u'),
+      ),
+    );
+    await settle(tester);
+    expect(tester.takeException(), isNull);
+    expect(find.text('Could not load this entity.'), findsOneWidget);
+  });
+
   test('overview parsing keeps links, literals, and neighborhood facts', () {
     final snapshot = parseGraphOverview({
       'entities': [

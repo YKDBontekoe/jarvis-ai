@@ -4,7 +4,10 @@ import 'package:jarvis_mobile/features/learning/learning_screen.dart';
 
 import 'support/fixture_http.dart';
 
-Map<String, Object?> _settings({bool heartbeat = false, bool dreaming = true}) => {
+Map<String, Object?> _settings({
+  bool heartbeat = false,
+  bool dreaming = true,
+}) => {
   'heartbeatEnabled': heartbeat,
   'heartbeatMinutes': 60,
   'learnPersona': true,
@@ -123,6 +126,28 @@ void main() {
       find.textContaining('The user lives in Amsterdam and builds Jarvis.'),
       findsOneWidget,
     );
-    expect(find.textContaining('Included in chat as background'), findsOneWidget);
+    expect(
+      find.textContaining('Included in chat as background'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('malformed learning status does not crash the screen', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/learning/status', {
+      'settings': 'nope',
+      'state': <Object>[],
+      'dreaming': 3,
+      'activity': 'x',
+    });
+    await show(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('heartbeat-switch')), findsOneWidget);
+    expect(
+      find.textContaining('Could not load learning settings.'),
+      findsNothing,
+    );
   });
 }

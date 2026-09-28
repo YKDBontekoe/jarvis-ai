@@ -57,13 +57,17 @@ class _FilesScreenState extends State<FilesScreen> {
       _error = null;
     });
     try {
-      final response = await widget.http.get<List<dynamic>>('/api/v1/files');
+      final response = await widget.http.get<dynamic>('/api/v1/files');
       if (mounted && revision == _requestRevision) {
         setState(
           () => _files = jsonMaps(response.data),
         );
       }
     } on DioException {
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load your files.');
+      }
+    } catch (_) {
       if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load your files.');
       }
@@ -96,13 +100,22 @@ class _FilesScreenState extends State<FilesScreen> {
           contentType: DioMediaType.parse(_contentTypeFor(file.name)),
         ),
       });
-      await widget.http.post('/api/v1/files', data: form);
+      await widget.http.post(
+        '/api/v1/files',
+        data: form,
+        options: Options(
+          sendTimeout: const Duration(minutes: 2),
+          receiveTimeout: const Duration(minutes: 2),
+        ),
+      );
       await _load();
     } on DioException catch (error) {
       final message = error.response?.statusCode == 400
           ? 'That file type is not supported.'
           : 'Jarvis could not upload this file.';
       if (mounted) _showError(message);
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not upload this file.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -136,6 +149,8 @@ class _FilesScreenState extends State<FilesScreen> {
       await _load();
     } on DioException {
       if (mounted) _showError('Jarvis could not retry indexing this file.');
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not retry indexing this file.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -160,6 +175,8 @@ class _FilesScreenState extends State<FilesScreen> {
       await widget.http.delete('/api/v1/files/$id');
       await _load();
     } on DioException {
+      if (mounted) _showError('Jarvis could not delete this file.');
+    } catch (_) {
       if (mounted) _showError('Jarvis could not delete this file.');
     } finally {
       if (mounted) setState(() => _busy = false);

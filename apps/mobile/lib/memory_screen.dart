@@ -7,6 +7,8 @@ import 'json_maps.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
 
+part 'memory_editor.dart';
+
 const _memoryKinds = [
   'preference',
   'fact',
@@ -53,29 +55,25 @@ class _MemoryScreenState extends State<MemoryScreen> {
     });
     try {
       final response = query == null || query.isEmpty
-          ? await widget.http.get<List<dynamic>>(
+          ? await widget.http.get<dynamic>(
               '/api/v1/memory',
               queryParameters: {
                 if (_selectedKind != null) 'kind': _selectedKind,
               },
             )
-          : await widget.http.get<List<dynamic>>(
+          : await widget.http.get<dynamic>(
               '/api/v1/memory/search',
               queryParameters: {
                 'query': query,
                 if (_selectedKind != null) 'kind': _selectedKind,
               },
             );
-      final records = response.data ?? [];
+      final records = jsonMaps(response.data);
       final entries = <Map<String, dynamic>>[];
-      for (final item in records) {
-        if (item is! Map) continue;
-        final record = Map<String, dynamic>.from(item);
+      for (final record in records) {
         if (_searching) {
-          final memory = record['memory'];
-          if (memory is Map) {
-            entries.add(Map<String, dynamic>.from(memory));
-          }
+          final memory = jsonObject(record['memory']);
+          if (memory != null) entries.add(memory);
         } else {
           entries.add(record);
         }
@@ -106,97 +104,28 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   Future<void> _createMemory() async {
-    final formKey = GlobalKey<FormState>();
-    final content = TextEditingController();
-    var kind = 'fact';
-    var pinned = false;
-    final created = await showDialog<bool>(
+    final draft = await showDialog<_MemoryDraft>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Add a memory'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: kind,
-                  decoration: const InputDecoration(labelText: 'Type'),
-                  items: _memoryKinds
-                      .map(
-                        (value) =>
-                            DropdownMenuItem(value: value, child: Text(value)),
-                      )
-                      .toList(),
-                  onChanged: (value) =>
-                      setDialogState(() => kind = value ?? 'fact'),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: content,
-                  autofocus: true,
-                  minLines: 2,
-                  maxLines: 5,
-                  maxLength: 8000,
-                  decoration: const InputDecoration(
-                    labelText: 'What should Jarvis remember?',
-                    alignLabelWithHint: true,
-                  ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Enter something to remember.'
-                      : null,
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Pin this memory'),
-                  value: pinned,
-                  onChanged: (value) => setDialogState(() => pinned = value),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (formKey.currentState?.validate() ?? false) {
-                  Navigator.pop(dialogContext, true);
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
+      builder: (_) =>
+          const _MemoryEditorDialog(title: 'Add a memory', saveLabel: 'Save'),
     );
-    if (created != true) {
-      content.dispose();
-      return;
-    }
-    if (!mounted) {
-      content.dispose();
-      return;
-    }
+    if (draft == null || !mounted) return;
     try {
       await widget.http.post(
         '/api/v1/memory',
         data: {
-          'kind': kind,
-          'content': content.text.trim(),
-          'importance': pinned ? 0.9 : 0.5,
+          'kind': draft.kind,
+          'content': draft.content,
+          'importance': draft.pinned ? 0.9 : 0.5,
           'confidence': 1.0,
-          'isPinned': pinned,
+          'isPinned': draft.pinned,
         },
       );
       if (mounted) await _load(query: _searching ? _query.text.trim() : null);
     } on DioException {
       if (mounted) _showError('Jarvis could not save this memory.');
-    } finally {
-      content.dispose();
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not save this memory.');
     }
   }
 
@@ -212,119 +141,60 @@ class _MemoryScreenState extends State<MemoryScreen> {
     );
     if (!delete) return;
     if (!mounted) return;
+    final id = jsonId(memory);
+    if (id == null) return;
     try {
-      await widget.http.delete('/api/v1/memory/${memory['id']}');
+      await widget.http.delete('/api/v1/memory/$id');
       if (mounted) await _load(query: _searching ? _query.text.trim() : null);
     } on DioException {
+      if (mounted) _showError('Jarvis could not delete this memory.');
+    } catch (_) {
       if (mounted) _showError('Jarvis could not delete this memory.');
     }
   }
 
   Future<void> _editMemory(Map<String, dynamic> memory) async {
-    final formKey = GlobalKey<FormState>();
-    final content = TextEditingController(
-      text: asJsonString(memory['content']) ?? '',
-    );
-    var kind = _memoryKinds.contains(memory['kind'])
-        ? asJsonString(memory['kind']) ?? 'other'
-        : 'other';
-    var pinned = asJsonBool(memory['isPinned']);
-    final saved = await showDialog<bool>(
+    final draft = await showDialog<_MemoryDraft>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Correct this memory'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: kind,
-                  decoration: const InputDecoration(labelText: 'Type'),
-                  items: _memoryKinds
-                      .map(
-                        (value) =>
-                            DropdownMenuItem(value: value, child: Text(value)),
-                      )
-                      .toList(),
-                  onChanged: (value) =>
-                      setDialogState(() => kind = value ?? 'other'),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: content,
-                  autofocus: true,
-                  minLines: 2,
-                  maxLines: 5,
-                  maxLength: 8000,
-                  decoration: const InputDecoration(
-                    labelText: 'What should Jarvis remember?',
-                    alignLabelWithHint: true,
-                  ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Enter something to remember.'
-                      : null,
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Pin this memory'),
-                  value: pinned,
-                  onChanged: (value) => setDialogState(() => pinned = value),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (formKey.currentState?.validate() ?? false) {
-                  Navigator.pop(dialogContext, true);
-                }
-              },
-              child: const Text('Save correction'),
-            ),
-          ],
-        ),
+      builder: (_) => _MemoryEditorDialog(
+        title: 'Correct this memory',
+        saveLabel: 'Save correction',
+        kind: asJsonString(memory['kind']),
+        content: asJsonString(memory['content']) ?? '',
+        pinned: asJsonBool(memory['isPinned']),
+        kindFallback: 'other',
       ),
     );
-    if (saved != true) {
-      content.dispose();
-      return;
-    }
-    if (!mounted) {
-      content.dispose();
-      return;
-    }
+    if (draft == null || !mounted) return;
+    final id = jsonId(memory);
+    if (id == null) return;
     try {
       await widget.http.put(
-        '/api/v1/memory/${memory['id']}',
+        '/api/v1/memory/$id',
         data: {
-          'kind': kind,
-          'content': content.text.trim(),
+          'kind': draft.kind,
+          'content': draft.content,
           'importance': memory['importance'] ?? 0.5,
           'confidence': memory['confidence'] ?? 0.8,
           'validUntil': activeValidUntil(memory),
-          'isPinned': pinned,
+          'isPinned': draft.pinned,
         },
       );
       if (mounted) await _load(query: _searching ? _query.text.trim() : null);
     } on DioException {
       if (mounted) _showError('Jarvis could not correct this memory.');
-    } finally {
-      content.dispose();
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not correct this memory.');
     }
   }
 
   Future<void> _togglePinned(Map<String, dynamic> memory) async {
+    final id = jsonId(memory);
+    if (id == null) return;
     final pinned = !asJsonBool(memory['isPinned']);
     try {
       await widget.http.put(
-        '/api/v1/memory/${memory['id']}',
+        '/api/v1/memory/$id',
         data: {
           'kind': memory['kind'],
           'content': memory['content'],
@@ -336,6 +206,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
       );
       if (mounted) await _load(query: _searching ? _query.text.trim() : null);
     } on DioException {
+      if (mounted) _showError('Jarvis could not update this memory.');
+    } catch (_) {
       if (mounted) _showError('Jarvis could not update this memory.');
     }
   }
@@ -481,7 +353,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
 
   Widget _memoryCard(Map<String, dynamic> memory) {
     final isPinned = asJsonBool(memory['isPinned']);
-    final validUntil = DateTime.tryParse(asJsonString(memory['validUntil']) ?? '');
+    final validUntil = jsonDate(memory['validUntil']);
     final isSuperseded =
         validUntil != null && !validUntil.isAfter(DateTime.now());
     final kind = asJsonString(memory['kind']) ?? 'fact';

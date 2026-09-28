@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import '../../ui/phosphor_icons.dart';
 
 import '../../json_maps.dart';
@@ -10,6 +11,8 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../chat/chat_widgets.dart';
 import '../usage/usage_screen.dart';
+
+part 'home_overview_widgets.dart';
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({
@@ -98,16 +101,15 @@ class _HomeOverviewState extends State<HomeOverview>
   Future<void> _loadUsage() async {
     if (!widget.ready || widget.onOpenUsage == null || !mounted) return;
     try {
-      final response = await widget.http.get<Map<String, dynamic>>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/usage',
         queryParameters: const {'period': '7d'},
       );
       if (!mounted || !widget.ready || widget.onOpenUsage == null) return;
-      final data = response.data;
-      setState(
-        () => _usage = data == null ? null : Map<String, dynamic>.of(data),
-      );
+      setState(() => _usage = jsonObject(response.data));
     } on DioException {
+      if (mounted) setState(() => _usage = null);
+    } catch (_) {
       if (mounted) setState(() => _usage = null);
     }
   }
@@ -123,15 +125,14 @@ class _HomeOverviewState extends State<HomeOverview>
       _error = null;
     });
     try {
-      final response = await widget.http.get<List<dynamic>>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/tasks',
         cancelToken: request,
       );
       final tasks =
-          (response.data ?? [])
-              .map(_ActiveTask.fromJson)
-              .whereType<_ActiveTask>()
-              .toList()
+          jsonMaps(
+              response.data,
+            ).map(_ActiveTask.fromJson).whereType<_ActiveTask>().toList()
             ..sort((a, b) {
               final priority = a.priority.compareTo(b.priority);
               return priority != 0
@@ -145,6 +146,10 @@ class _HomeOverviewState extends State<HomeOverview>
       if (!CancelToken.isCancel(error) &&
           mounted &&
           revision == _requestRevision) {
+        setState(() => _error = 'Could not load active tasks.');
+      }
+    } catch (_) {
+      if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Could not load active tasks.');
       }
     } finally {
@@ -166,16 +171,9 @@ class _HomeOverviewState extends State<HomeOverview>
   Widget _usageCard() {
     final usage = _usage;
     if (usage == null) return const SizedBox.shrink();
-    final persona = usage['personalization'];
-    final personalization = persona is Map
-        ? Map<String, dynamic>.from(persona)
-        : const <String, dynamic>{};
-    final codex = usage['codex'] is Map
-        ? Map<String, dynamic>.from(usage['codex'] as Map)
-        : const <String, dynamic>{};
-    final openRouter = usage['openRouter'] is Map
-        ? Map<String, dynamic>.from(usage['openRouter'] as Map)
-        : const <String, dynamic>{};
+    final personalization = jsonObject(usage['personalization']) ?? const {};
+    final codex = jsonObject(usage['codex']) ?? const {};
+    final openRouter = jsonObject(usage['openRouter']) ?? const {};
     final tokens =
         asJsonInt(codex['totalTokens']) + asJsonInt(openRouter['totalTokens']);
     final band = asJsonString(personalization['band']) ?? 'New';
@@ -201,7 +199,10 @@ class _HomeOverviewState extends State<HomeOverview>
                 Text(
                   '$memories ${memories == 1 ? 'memory' : 'memories'} · ${formatTokenCount(tokens)} tokens this week'
                   '${cost is num ? ' · ${formatUsd(cost)}' : ''}',
-                  style: const TextStyle(color: JarvisColors.inkSoft, fontSize: 13),
+                  style: const TextStyle(
+                    color: JarvisColors.inkSoft,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -436,158 +437,4 @@ class _HomeOverviewState extends State<HomeOverview>
       ),
     );
   }
-}
-
-/// Fades and lifts the home content in once when it first appears.
-class _Entrance extends StatelessWidget {
-  const _Entrance({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
-    tween: Tween(begin: 0, end: 1),
-    duration: const Duration(milliseconds: 450),
-    curve: Curves.easeOutCubic,
-    builder: (context, value, child) => Opacity(
-      opacity: value,
-      child: Transform.translate(
-        offset: Offset(0, 12 * (1 - value)),
-        child: child,
-      ),
-    ),
-    child: child,
-  );
-}
-
-class _TasksPlaceholder extends StatelessWidget {
-  const _TasksPlaceholder({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(JarvisRadii.lg),
-      border: Border.all(color: JarvisColors.outline),
-      color: JarvisColors.surface,
-    ),
-    child: Row(
-      children: [
-        Icon(icon, size: 20, color: JarvisColors.muted),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(color: JarvisColors.inkSoft),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _TaskRow extends StatelessWidget {
-  const _TaskRow({required this.task, required this.onTap});
-
-  final _ActiveTask task;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-      child: Row(
-        children: [
-          IconBadge(icon: task.icon),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 5),
-                StatusPill(label: task.statusLabel, color: task.color),
-              ],
-            ),
-          ),
-          const Icon(
-            PhosphorIconsRegular.caretRight,
-            size: 16,
-            color: JarvisColors.muted,
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _ActiveTask {
-  const _ActiveTask({
-    required this.id,
-    required this.title,
-    required this.status,
-    required this.createdAt,
-  });
-
-  final String id;
-  final String title;
-  final String status;
-  final DateTime createdAt;
-
-  static _ActiveTask? fromJson(dynamic value) {
-    if (value is! Map) return null;
-    final map = Map<String, dynamic>.from(value);
-    final id = map['id'];
-    final title = map['title'];
-    final status = map['status'];
-    final createdAt = map['createdAt'];
-    if (id is! String ||
-        id.isEmpty ||
-        title is! String ||
-        status is! String ||
-        createdAt is! String ||
-        !const {
-          'queued',
-          'running',
-          'waiting',
-          'needs_approval',
-        }.contains(status)) {
-      return null;
-    }
-    final date = DateTime.tryParse(createdAt);
-    if (date == null) return null;
-    return _ActiveTask(id: id, title: title, status: status, createdAt: date);
-  }
-
-  int get priority => switch (status) {
-    'needs_approval' => 0,
-    'running' => 1,
-    'waiting' => 2,
-    _ => 3,
-  };
-
-  String get statusLabel => switch (status) {
-    'needs_approval' => 'Needs your approval',
-    'running' => 'In progress',
-    'waiting' => 'Waiting',
-    _ => 'Queued',
-  };
-
-  IconData get icon => switch (status) {
-    'needs_approval' => PhosphorIconsRegular.shieldWarning,
-    'running' => PhosphorIconsRegular.hourglassMedium,
-    'waiting' => PhosphorIconsRegular.pauseCircle,
-    _ => PhosphorIconsRegular.clock,
-  };
-
-  Color get color => statusStyle(status).color;
 }

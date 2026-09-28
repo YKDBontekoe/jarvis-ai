@@ -2,9 +2,12 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
+import 'http_urls.dart';
 import 'theme.dart';
 import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
+
+part 'watch_editor.dart';
 
 class ConditionWatchesScreen extends StatefulWidget {
   const ConditionWatchesScreen({required this.http, super.key});
@@ -36,13 +39,15 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
       _error = null;
     });
     try {
-      final response = await widget.http.get<List<dynamic>>('/api/v1/watches');
+      final response = await widget.http.get<dynamic>('/api/v1/watches');
       if (mounted && revision == _requestRevision) {
-        setState(
-          () => _watches = jsonMaps(response.data),
-        );
+        setState(() => _watches = jsonMaps(response.data));
       }
     } on DioException {
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load watches.');
+      }
+    } catch (_) {
       if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load watches.');
       }
@@ -54,163 +59,23 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
   }
 
   Future<void> _createWatch() async {
-    final title = TextEditingController();
-    final url = TextEditingController();
-    final jsonPath = TextEditingController();
-    final threshold = TextEditingController();
-    final interval = TextEditingController(text: '15');
-    final formKey = GlobalKey<FormState>();
-    var comparison = 'below';
-    final create = await showDialog<bool>(
+    final created = await showDialog<_NewWatch>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Create a condition watch'),
-          content: SizedBox(
-            width: 520,
-            child: SingleChildScrollView(
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: title,
-                      autofocus: true,
-                      maxLength: 200,
-                      decoration: const InputDecoration(
-                        labelText: 'What are we watching?',
-                      ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                          ? 'Enter a short name.'
-                          : null,
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: url,
-                      maxLength: 2048,
-                      keyboardType: TextInputType.url,
-                      decoration: const InputDecoration(
-                        labelText: 'Public JSON HTTPS URL',
-                        hintText: 'https://example.com/api/price',
-                      ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                          ? 'Enter a public HTTPS URL.'
-                          : null,
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: jsonPath,
-                      decoration: const InputDecoration(
-                        labelText: 'Numeric JSON property path',
-                        hintText: 'data.price',
-                      ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                          ? 'Enter a property path.'
-                          : null,
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: comparison,
-                      decoration: const InputDecoration(
-                        labelText: 'Alert when value is',
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'below',
-                          child: Text('at or below threshold'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'above',
-                          child: Text('at or above threshold'),
-                        ),
-                      ],
-                      onChanged: (value) =>
-                          setDialogState(() => comparison = value ?? 'below'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: threshold,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                        signed: true,
-                      ),
-                      decoration: const InputDecoration(labelText: 'Threshold'),
-                      validator: (value) {
-                        final number = double.tryParse(value ?? '');
-                        return number == null || !number.isFinite
-                            ? 'Enter a finite number.'
-                            : null;
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: interval,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Check interval (minutes, 5–1440)',
-                      ),
-                      validator: (value) {
-                        final minutes = int.tryParse(value ?? '');
-                        return minutes == null || minutes < 5 || minutes > 1440
-                            ? 'Choose between 5 and 1,440 minutes.'
-                            : null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Jarvis checks the public endpoint on a timer and stops after the threshold is reached. URLs requiring sign-in or containing credentials are not supported.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (formKey.currentState?.validate() ?? false) {
-                  Navigator.pop(dialogContext, true);
-                }
-              },
-              child: const Text('Start watching'),
-            ),
-          ],
-        ),
-      ),
+      builder: (_) => const _NewWatchDialog(),
     );
-    if (create != true) {
-      for (final controller in [title, url, jsonPath, threshold, interval]) {
-        controller.dispose();
-      }
-      return;
-    }
-    if (!mounted) {
-      for (final controller in [title, url, jsonPath, threshold, interval]) {
-        controller.dispose();
-      }
-      return;
-    }
+    if (created == null || !mounted) return;
 
     setState(() => _creating = true);
     try {
       await widget.http.post<void>(
         '/api/v1/watches',
         data: {
-          'title': title.text.trim(),
-          'url': url.text.trim(),
-          'jsonPath': jsonPath.text.trim(),
-          'comparison': comparison,
-          'threshold': double.parse(threshold.text),
-          'intervalMinutes': int.parse(interval.text),
+          'title': created.title,
+          'url': created.url,
+          'jsonPath': created.jsonPath,
+          'comparison': created.comparison,
+          'threshold': created.threshold,
+          'intervalMinutes': created.intervalMinutes,
         },
       );
       await _load();
@@ -221,10 +86,11 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
             : 'Jarvis could not start that watch. Check that the URL is public HTTPS and returns JSON.';
         _showError(message);
       }
-    } finally {
-      for (final controller in [title, url, jsonPath, threshold, interval]) {
-        controller.dispose();
+    } catch (_) {
+      if (mounted) {
+        _showError('Jarvis could not start that watch.');
       }
+    } finally {
       if (mounted) setState(() => _creating = false);
     }
   }
@@ -242,10 +108,14 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
     );
     if (!confirmed) return;
     if (!mounted) return;
+    final id = jsonId(watch);
+    if (id == null) return;
     try {
-      await widget.http.delete<void>('/api/v1/watches/${watch['id']}');
+      await widget.http.delete<void>('/api/v1/watches/$id');
       if (mounted) await _load();
     } on DioException {
+      if (mounted) _showError('Jarvis could not stop that watch.');
+    } catch (_) {
       if (mounted) _showError('Jarvis could not stop that watch.');
     }
   }
@@ -291,14 +161,14 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
             'No watches yet. Set a threshold and Jarvis will keep an eye on it.',
       ),
       child: RefreshIndicator(
-            onRefresh: _load,
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-              itemCount: _watches.length,
-              itemBuilder: (context, index) =>
-                  ContentWidth(child: _watchCard(_watches[index])),
-            ),
-          ),
+        onRefresh: _load,
+        child: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+          itemCount: _watches.length,
+          itemBuilder: (context, index) =>
+              ContentWidth(child: _watchCard(_watches[index])),
+        ),
+      ),
     ),
   );
 

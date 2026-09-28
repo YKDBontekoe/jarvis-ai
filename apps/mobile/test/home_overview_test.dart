@@ -152,6 +152,38 @@ void main() {
     );
   });
 
+  testWidgets('a non-list tasks payload does not crash the home screen', (
+    tester,
+  ) async {
+    adapter.responses['/api/v1/tasks'] = {'items': <Object>[]};
+    await showHome(tester);
+    expect(tester.takeException(), isNull);
+    expect(find.text('Active tasks'), findsOneWidget);
+    expect(
+      find.text('Could not load active tasks. Pull down to retry.'),
+      findsNothing,
+    );
+  });
+
+  testWidgets('home skips invalid task rows instead of crashing', (
+    tester,
+  ) async {
+    adapter.responses['/api/v1/tasks'] = [
+      'nope',
+      {
+        'id': 1,
+        'title': 'Numeric id',
+        'status': 'running',
+        'createdAt': '2026-09-28T12:00:00Z',
+      },
+      _task('running', 'Valid running task', 'running'),
+    ];
+    await showHome(tester);
+    expect(tester.takeException(), isNull);
+    expect(find.text('Valid running task'), findsOneWidget);
+    expect(find.text('Numeric id'), findsNothing);
+  });
+
   testWidgets('home usage card summarizes the week and opens usage', (
     tester,
   ) async {

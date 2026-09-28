@@ -66,9 +66,7 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
       if (jsonString(conversation, 'id') == null) continue;
       final title = (asJsonString(conversation['title']) ?? '').toLowerCase();
       if (query.isNotEmpty && !title.contains(query)) continue;
-      final updated = DateTime.tryParse(
-        asJsonString(conversation['updatedAt']) ?? '',
-      )?.toLocal();
+      final updated = jsonDate(conversation['updatedAt'], local: true);
       final day = updated == null
           ? null
           : DateTime(updated.year, updated.month, updated.day);

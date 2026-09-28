@@ -8,6 +8,8 @@ import 'theme.dart';
 import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
+part 'task_editor.dart';
+
 class TasksScreen extends StatefulWidget {
   const TasksScreen({required this.http, super.key});
 
@@ -38,13 +40,15 @@ class _TasksScreenState extends State<TasksScreen> {
       _error = null;
     });
     try {
-      final response = await widget.http.get<List<dynamic>>('/api/v1/tasks');
+      final response = await widget.http.get<dynamic>('/api/v1/tasks');
       if (mounted && revision == _requestRevision) {
-        setState(
-          () => _tasks = jsonMaps(response.data),
-        );
+        setState(() => _tasks = jsonMaps(response.data));
       }
     } on DioException {
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load tasks.');
+      }
+    } catch (_) {
       if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load tasks.');
       }
@@ -56,76 +60,17 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Future<void> _createTask() async {
-    final title = TextEditingController();
-    final prompt = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final create = await showDialog<bool>(
+    final created = await showDialog<_NewTask>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Give Jarvis a task'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: title,
-                autofocus: true,
-                maxLength: 200,
-                decoration: const InputDecoration(labelText: 'Task name'),
-                validator: (value) => value == null || value.trim().isEmpty
-                    ? 'Enter a task name.'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: prompt,
-                minLines: 2,
-                maxLines: 5,
-                maxLength: 32000,
-                decoration: const InputDecoration(
-                  labelText: 'What should Jarvis do?',
-                  alignLabelWithHint: true,
-                ),
-                validator: (value) => value == null || value.trim().isEmpty
-                    ? 'Describe the task.'
-                    : null,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() ?? false) {
-                Navigator.pop(dialogContext, true);
-              }
-            },
-            child: const Text('Start task'),
-          ),
-        ],
-      ),
+      builder: (_) => const _NewTaskDialog(),
     );
-    if (create != true) {
-      title.dispose();
-      prompt.dispose();
-      return;
-    }
-    if (!mounted) {
-      title.dispose();
-      prompt.dispose();
-      return;
-    }
+    if (created == null || !mounted) return;
 
     setState(() => _creating = true);
     try {
       await widget.http.post(
         '/api/v1/tasks',
-        data: {'title': title.text.trim(), 'prompt': prompt.text.trim()},
+        data: {'title': created.title, 'prompt': created.prompt},
       );
       await _load();
     } on DioException catch (error) {
@@ -135,9 +80,9 @@ class _TasksScreenState extends State<TasksScreen> {
             : 'Jarvis could not start that task.';
         _showError(message);
       }
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not start that task.');
     } finally {
-      title.dispose();
-      prompt.dispose();
       if (mounted) setState(() => _creating = false);
     }
   }
@@ -154,10 +99,14 @@ class _TasksScreenState extends State<TasksScreen> {
     );
     if (!confirmed) return;
     if (!mounted) return;
+    final id = jsonId(task);
+    if (id == null) return;
     try {
-      await widget.http.delete('/api/v1/tasks/${task['id']}');
+      await widget.http.delete('/api/v1/tasks/$id');
       if (mounted) await _load();
     } on DioException {
+      if (mounted) _showError('Jarvis could not cancel that task.');
+    } catch (_) {
       if (mounted) _showError('Jarvis could not cancel that task.');
     }
   }
@@ -189,8 +138,7 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   String _date(dynamic value) {
-    if (value is! String) return '';
-    final date = DateTime.tryParse(value)?.toLocal();
+    final date = jsonDate(value, local: true);
     if (date == null) return '';
     return MaterialLocalizations.of(context).formatMediumDate(date);
   }
@@ -245,28 +193,28 @@ class _TasksScreenState extends State<TasksScreen> {
         message: 'No tasks yet. Give Jarvis something to work on.',
       ),
       child: RefreshIndicator(
-            onRefresh: _load,
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                4,
-                16,
-                32 + MediaQuery.paddingOf(context).bottom,
-              ),
-              children: [
-                ContentWidth(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _summary(),
-                      const SizedBox(height: 18),
-                      for (final task in _tasks) _taskCard(task),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+        onRefresh: _load,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            4,
+            16,
+            32 + MediaQuery.paddingOf(context).bottom,
           ),
+          children: [
+            ContentWidth(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _summary(),
+                  const SizedBox(height: 18),
+                  for (final task in _tasks) _taskCard(task),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     ),
   );
 

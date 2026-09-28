@@ -111,4 +111,39 @@ void main() {
       'markdown': markdown,
     });
   });
+
+  testWidgets('invalid skill payload shows an error instead of crashing', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/skills/1', {'skill': 'nope', 'revisions': 'x'});
+    await show(tester, SkillDetailScreen(http: http.client(), skillId: '1'));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Jarvis returned an invalid skill.'), findsOneWidget);
+  });
+
+  testWidgets('editing a skill without an id does not call the API', (
+    tester,
+  ) async {
+    await show(
+      tester,
+      Scaffold(
+        body: SkillEditorSheet(
+          http: http.client(),
+          existing: {
+            'name': 'trip-planning',
+            'description': 'Use for trips.',
+            'instructions': '1. Pack.',
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('save-skill')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('The skill could not be saved.'), findsOneWidget);
+    expect(http.requests, isEmpty);
+  });
 }

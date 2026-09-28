@@ -46,15 +46,15 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       _error = null;
     });
     try {
-      final response = await widget.http.get<List<dynamic>>(
-        '/api/v1/conversations',
-      );
+      final response = await widget.http.get<dynamic>('/api/v1/conversations');
       if (mounted && revision == _requestRevision) {
-        setState(
-          () => _conversations = jsonMaps(response.data),
-        );
+        setState(() => _conversations = jsonMaps(response.data));
       }
     } on DioException {
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load conversations.');
+      }
+    } catch (_) {
       if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load conversations.');
       }
@@ -68,12 +68,12 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   Future<void> _createConversation() async {
     setState(() => _creating = true);
     try {
-      final response = await widget.http.post<Map<String, dynamic>>(
+      final response = await widget.http.post<dynamic>(
         '/api/v1/conversations',
         data: const {'title': 'New conversation'},
       );
-      final id = response.data?['id'];
-      if (id is! String || id.isEmpty) {
+      final id = asJsonString(jsonObject(response.data)?['id']);
+      if (id == null || id.isEmpty) {
         throw const FormatException('Missing conversation ID.');
       }
       if (mounted) {
@@ -86,6 +86,10 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     } on FormatException {
       if (mounted) {
         setState(() => _error = 'Jarvis returned an invalid conversation.');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Jarvis could not create a conversation.');
       }
     } finally {
       if (mounted) setState(() => _creating = false);
@@ -123,6 +127,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
             ? 'Task conversations are managed from the Tasks section.'
             : 'Jarvis could not delete this conversation.',
       );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Jarvis could not delete this conversation.');
     }
   }
 
@@ -155,77 +162,77 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         message: 'Start a new conversation and it will appear here.',
       ),
       child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-            itemCount: _conversations.length,
-            itemBuilder: (context, index) {
-              final conversation = _conversations[index];
-              final id = jsonString(conversation, 'id');
-              if (id == null) return const SizedBox.shrink();
-              final selected = id == widget.selectedConversationId;
-              return ContentWidth(
-                child: SurfaceCard(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
-                  borderColor: selected
-                      ? JarvisColors.outlineStrong
-                      : JarvisColors.outline,
-                  onTap: () => Navigator.of(
-                    context,
-                  ).pop((conversationId: id, deletedCurrent: false)),
-                  child: Row(
-                    children: [
-                      IconBadge(
-                        icon: selected
-                            ? PhosphorIconsFill.chatCircle
-                            : PhosphorIconsRegular.chatCircle,
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              asJsonString(conversation['title']) ??
-                                  'New conversation',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(
-                                context,
-                              ).textTheme.titleSmall?.copyWith(fontSize: 15),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              _formatDate(conversation['updatedAt']),
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (selected)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4),
-                          child: Icon(
-                            PhosphorIconsFill.checkCircle,
-                            size: 20,
-                            color: JarvisColors.ink,
-                          ),
-                        ),
-                      IconButton(
-                        tooltip: 'Delete conversation',
-                        onPressed: () => _deleteConversation(conversation),
-                        icon: const Icon(PhosphorIconsRegular.trash, size: 20),
-                      ),
-                    ],
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+        itemCount: _conversations.length,
+        itemBuilder: (context, index) {
+          final conversation = _conversations[index];
+          final id = jsonString(conversation, 'id');
+          if (id == null) return const SizedBox.shrink();
+          final selected = id == widget.selectedConversationId;
+          return ContentWidth(
+            child: SurfaceCard(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+              borderColor: selected
+                  ? JarvisColors.outlineStrong
+                  : JarvisColors.outline,
+              onTap: () => Navigator.of(
+                context,
+              ).pop((conversationId: id, deletedCurrent: false)),
+              child: Row(
+                children: [
+                  IconBadge(
+                    icon: selected
+                        ? PhosphorIconsFill.chatCircle
+                        : PhosphorIconsRegular.chatCircle,
                   ),
-                ),
-              );
-            },
-          ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          asJsonString(conversation['title']) ??
+                              'New conversation',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleSmall?.copyWith(fontSize: 15),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _formatDate(conversation['updatedAt']),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (selected)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4),
+                      child: Icon(
+                        PhosphorIconsFill.checkCircle,
+                        size: 20,
+                        color: JarvisColors.ink,
+                      ),
+                    ),
+                  IconButton(
+                    tooltip: 'Delete conversation',
+                    onPressed: () => _deleteConversation(conversation),
+                    icon: const Icon(PhosphorIconsRegular.trash, size: 20),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     ),
   );
 
   String _formatDate(Object? value) {
-    final date = value is String ? DateTime.tryParse(value)?.toLocal() : null;
+    final date = jsonDate(value, local: true);
     if (date == null) return '';
     final now = DateTime.now();
     final sameDay =

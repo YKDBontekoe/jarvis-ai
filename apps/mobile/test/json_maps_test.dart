@@ -19,6 +19,14 @@ void main() {
     expect(jsonMaps('x'), isEmpty);
   });
 
+  test('jsonObject copies maps and rejects the wrong JSON types', () {
+    expect(jsonObject({'id': '1'}), {'id': '1'});
+    expect(jsonObject(<dynamic, dynamic>{'id': '1', 2: true}), {'id': '1'});
+    expect(jsonObject(null), isNull);
+    expect(jsonObject('x'), isNull);
+    expect(jsonObject(['nope']), isNull);
+  });
+
   test('jsonStrings keeps string entries', () {
     expect(jsonStrings(['a', 1, 'b', null]), ['a', 'b']);
     expect(jsonStrings(null), isEmpty);
@@ -29,6 +37,25 @@ void main() {
     expect(jsonString({'id': ''}, 'id'), isNull);
     expect(jsonString({'id': 1}, 'id'), isNull);
     expect(jsonString({'name': 'x'}, 'id'), isNull);
+  });
+
+  test('jsonDate parses ISO strings and rejects the wrong JSON types', () {
+    expect(jsonDate('2026-09-28T12:00:00.000Z'), DateTime.utc(2026, 9, 28, 12));
+    expect(jsonDate(null), isNull);
+    expect(jsonDate(1), isNull);
+    expect(jsonDate(''), isNull);
+    expect(jsonDate('nope'), isNull);
+    final local = jsonDate('2026-09-28T12:00:00.000Z', local: true)!;
+    expect(local.isUtc, isFalse);
+    expect(local.toUtc(), DateTime.utc(2026, 9, 28, 12));
+  });
+
+  test('jsonId rejects missing, blank, and non-string ids', () {
+    expect(jsonId({'id': 'abc'}), 'abc');
+    expect(jsonId({'id': ''}), isNull);
+    expect(jsonId({'id': 1}), isNull);
+    expect(jsonId({'name': 'x'}), isNull);
+    expect(jsonId(null), isNull);
   });
 
   test('firstProblemMessage reads ASP.NET detail and error lists', () {
@@ -52,18 +79,25 @@ void main() {
     );
     expect(firstProblemMessage('nope'), isNull);
     expect(firstProblemMessage(null), isNull);
+    expect(
+      firstProblemMessage(<dynamic, dynamic>{2: 'ignored', 'detail': 'Kept.'}),
+      'Kept.',
+    );
   });
 
-  test('asJsonString, asJsonInt, and asJsonBool ignore the wrong JSON types', () {
-    expect(asJsonString('ok'), 'ok');
-    expect(asJsonString(''), '');
-    expect(asJsonString(1), isNull);
-    expect(asJsonInt(3), 3);
-    expect(asJsonInt(3.2), 3);
-    expect(asJsonInt('3'), 0);
-    expect(asJsonBool(true), isTrue);
-    expect(asJsonBool('true'), isFalse);
-  });
+  test(
+    'asJsonString, asJsonInt, and asJsonBool ignore the wrong JSON types',
+    () {
+      expect(asJsonString('ok'), 'ok');
+      expect(asJsonString(''), '');
+      expect(asJsonString(1), isNull);
+      expect(asJsonInt(3), 3);
+      expect(asJsonInt(3.2), 3);
+      expect(asJsonInt('3'), 0);
+      expect(asJsonBool(true), isTrue);
+      expect(asJsonBool('true'), isFalse);
+    },
+  );
 
   test('activeValidUntil keeps a future TTL and clears expired ones', () {
     final now = DateTime.utc(2026, 9, 27, 12);

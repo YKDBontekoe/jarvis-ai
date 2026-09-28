@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../../json_maps.dart';
+
 /// One row in the chat transcript.
 sealed class ChatEntry {
   const ChatEntry();
@@ -172,9 +174,13 @@ class ApprovalEntry extends ChatEntry {
   Map<String, Object?> get arguments {
     try {
       final decoded = jsonDecode(argumentsJson);
-      if (decoded is Map) return Map<String, Object?>.from(decoded);
-    } on FormatException {
-      // Fall through to an empty argument list for malformed payloads.
+      if (decoded is! Map) return const {};
+      return {
+        for (final entry in decoded.entries)
+          if (entry.key is String) entry.key as String: entry.value,
+      };
+    } catch (_) {
+      // Malformed payloads render as no arguments instead of crashing the card.
     }
     return const {};
   }
@@ -219,9 +225,7 @@ class UiSurfaceEntry extends ChatEntry {
       id: id,
       title: value['title'] is String ? value['title'] as String : '',
       status: value['status'] is String ? value['status'] as String : 'open',
-      schema: schema is Map
-          ? Map<String, dynamic>.from(schema)
-          : const <String, dynamic>{},
+      schema: jsonObject(schema) ?? const <String, dynamic>{},
     );
   }
 
@@ -257,9 +261,6 @@ class BrowserSessionEntry extends ChatEntry {
   final String goal;
   final List<BrowserStepItem> steps;
 
-  BrowserSessionEntry withStep(BrowserStepItem step) => BrowserSessionEntry(
-    id: id,
-    goal: goal,
-    steps: [...steps, step],
-  );
+  BrowserSessionEntry withStep(BrowserStepItem step) =>
+      BrowserSessionEntry(id: id, goal: goal, steps: [...steps, step]);
 }
