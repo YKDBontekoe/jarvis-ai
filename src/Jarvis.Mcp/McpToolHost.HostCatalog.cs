@@ -35,7 +35,13 @@ public sealed partial class McpToolHost
                 enabled,
                 operatorAllowlist = configuredTools,
                 ownerAllowlist = ownerTools,
-                registerWith = "Use SetMcpServerEnabled and SetMcpServerTools with this name. Do not use AddMcpServer for host servers."
+                registerWith = "Use SetMcpServerEnabled and SetMcpServerTools with this name. Do not use AddMcpServer for host servers.",
+                authorizationRequired = secrets is null,
+                askUser = secrets is null,
+                mustAsk = secrets is null,
+                nextStep = secrets is null
+                    ? $"Ask the user to authorize '{server.Name}' in Settings → Integrations under provider '{provider}' and credential name 'token' before using it."
+                    : null
             });
         }
         return JsonSerializer.Serialize(entries, HostCatalogJsonOptions);

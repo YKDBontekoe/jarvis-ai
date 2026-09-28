@@ -6,7 +6,6 @@ import json
 import logging
 import os
 import shutil
-import sys
 import tempfile
 from fractions import Fraction
 from pathlib import Path
@@ -20,6 +19,7 @@ from livekit import agents, rtc
 from codex_executable import resolve_codex_executable
 from playback_gate import VoicePlaybackGate
 from speech import VOICE_PROMPT, BargeIn, is_echo, resolve_voice
+import jarvis_voice_mcp
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger("jarvis.voice")
@@ -130,16 +130,7 @@ class CodexRealtimeSession:
                 "JARVIS_VOICE_OWNER_ID": str(owner_id),
             })
         args = [codex_path, "app-server", "--stdio", "--enable", "realtime_conversation"]
-        if jarvis_bridge:
-            mcp_config = (
-                "mcp_servers={jarvis_voice={"
-                f"command={json.dumps(sys.executable)},"
-                f"args={json.dumps([str(Path(__file__).with_name('jarvis_voice_mcp.py'))])}"
-                "}}"
-            )
-        else:
-            mcp_config = "mcp_servers={}"
-        args.extend(("-c", mcp_config))
+        args.extend(("-c", "mcp_servers={}"))
         for feature in (
             "shell_tool", "shell_snapshot", "code_mode_host", "computer_use", "browser_use",
             "browser_use_external", "in_app_browser", "apps", "plugins", "skill_search",
@@ -171,12 +162,10 @@ class CodexRealtimeSession:
             }
             if jarvis_bridge:
                 thread_params["developerInstructions"] = (
-                    "You are handling voice turns for the Jarvis app. For every user request, "
-                    "call the jarvis_voice_turn tool with the user's exact request as transcript. "
-                    "Do not answer from your own knowledge or use other tools. After the tool "
-                    "returns, give its response verbatim as your final answer, without mentioning "
-                    "the tool or adding commentary. Jarvis applies its usual conversation memory, "
-                    "tool, and approval rules inside that call."
+                    "You are handling voice playback for the Jarvis app. Do not answer from "
+                    "your own knowledge and do not call tools. Speak only the Jarvis answer "
+                    "that is appended to this session, verbatim, without mentioning Jarvis "
+                    "tools or adding commentary."
                 )
             result = await session.call("thread/start", thread_params)
             session.thread_id = result["thread"]["id"]
@@ -447,6 +436,14 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
     audio_ends_at: float | None = None
     assistant_response_done_at: float | None = None
     playback.allow_realtime_output()
+    jarvis_turns: set[asyncio.Task[None]] = set()
+    turn_lock = asyncio.Lock()
+    voice_environ = {
+        "JARVIS_INTERNAL_API_URL": api_url,
+        "VOICE_WORKER_SECRET": worker_secret,
+        "JARVIS_VOICE_CONVERSATION_ID": str(conversation_id),
+        "JARVIS_VOICE_OWNER_ID": str(owner_id),
+    }
 
     async def set_phase(value: str) -> None:
         nonlocal phase
@@ -545,14 +542,41 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
             await publish_caption("user", transcript, True)
             if phase == "speaking" and is_echo(transcript, assistant_transcript):
                 return
-            playback.begin_turn()
-            playback.allow_realtime_output()
+            duck_output(suppress_inflight=True)
             assistant_transcript = ""
             assistant_response_done_at = None
             last_audio_frame_at = None
             audio_ends_at = None
             barge.reset()
             await set_phase("thinking")
+
+            async def run_jarvis_turn(spoken_request: str) -> None:
+                nonlocal assistant_transcript
+                async with turn_lock:
+                    try:
+                        answer = await jarvis_voice_mcp.handle_final_user_transcript(
+                            spoken_request,
+                            spoken=assistant_transcript,
+                            phase="thinking",
+                            environ=voice_environ,
+                            speak=codex.speak,
+                            set_phase=set_phase,
+                            duck=duck_output,
+                            begin_turn=playback.begin_turn,
+                            allow_output=playback.allow_realtime_output,
+                        )
+                        if isinstance(answer, str) and answer.strip():
+                            assistant_transcript = answer
+                            await publish_caption("assistant", answer, True)
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception:
+                        logger.exception("Jarvis voice turn failed.")
+                        await speak_error_turn()
+
+            task = asyncio.create_task(run_jarvis_turn(transcript))
+            jarvis_turns.add(task)
+            task.add_done_callback(jarvis_turns.discard)
         elif method == "thread/realtime/outputAudio/delta":
             generation = playback.accept_frame()
             if generation is None:
@@ -638,6 +662,10 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
         duck_output()
         playback_phase_task.cancel()
         await asyncio.gather(playback_phase_task, return_exceptions=True)
+        for task in jarvis_turns:
+            task.cancel()
+        if jarvis_turns:
+            await asyncio.gather(*jarvis_turns, return_exceptions=True)
         for task in audio_tasks:
             task.cancel()
         if audio_tasks:

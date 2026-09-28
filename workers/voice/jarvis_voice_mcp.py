@@ -1,4 +1,4 @@
-"""Small, owner-scoped MCP bridge from Codex voice handoffs to Jarvis turns."""
+"""Owner-scoped voice turns: send transcripts through Jarvis, then speak the answer."""
 
 from __future__ import annotations
 
@@ -6,10 +6,12 @@ import asyncio
 import json
 import os
 import sys
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
 import httpx
+
+from speech import is_echo
 
 TOOL_NAME = "jarvis_voice_turn"
 MAX_TRANSCRIPT_LENGTH = 32_000
@@ -60,6 +62,36 @@ async def request_jarvis_turn(
     answer = final_text if final_text and final_text.strip() else "".join(chunks).strip()
     if not answer:
         raise RuntimeError("Jarvis returned no answer for the spoken request.")
+    return answer
+
+
+async def handle_final_user_transcript(
+    transcript: str,
+    *,
+    spoken: str,
+    phase: str,
+    environ: Mapping[str, str],
+    speak: Callable[[str], Awaitable[None]],
+    set_phase: Callable[[str], Awaitable[None]],
+    duck: Callable[..., None],
+    begin_turn: Callable[[], None],
+    allow_output: Callable[[], object],
+    request_turn: Callable[..., Awaitable[str]] | None = None,
+) -> str | None:
+    """Run one spoken user turn through Jarvis tools/memory, then speak the answer."""
+    text = transcript.strip()
+    if not text:
+        return None
+    if phase == "speaking" and is_echo(text, spoken):
+        return None
+    duck(suppress_inflight=True)
+    await set_phase("thinking")
+    turn = request_turn or request_jarvis_turn
+    answer = await turn(text, environ=environ)
+    begin_turn()
+    allow_output()
+    await set_phase("speaking")
+    await speak(answer)
     return answer
 
 

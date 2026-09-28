@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import unittest
 
-from speech import BargeIn, SpeechSequencer, is_echo, resolve_voice
+from speech import VOICE_PROMPT, BargeIn, SpeechSequencer, is_echo, resolve_voice
 
 
 class VoiceSelectionTests(unittest.TestCase):
+    def test_voice_prompt_does_not_answer_from_the_realtime_model(self) -> None:
+        self.assertIn("Do not answer from your own knowledge", VOICE_PROMPT)
+        self.assertIn("conversation, memory, tools", VOICE_PROMPT)
+
     def test_blank_voice_lets_the_installed_cli_choose(self) -> None:
         self.assertIsNone(resolve_voice(None, None))
         self.assertIsNone(resolve_voice("  ", "not a voice"))

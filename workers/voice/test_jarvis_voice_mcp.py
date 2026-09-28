@@ -83,6 +83,70 @@ class JarvisVoiceMcpTests(unittest.IsolatedAsyncioTestCase):
             "jarvis_voice_turn",
         ])
 
+    async def test_final_user_transcript_runs_jarvis_then_speaks_the_answer(self) -> None:
+        spoken: list[str] = []
+        phases: list[str] = []
+        ducked: list[bool] = []
+        began: list[bool] = []
+        allowed: list[bool] = []
+
+        async def speak(text: str) -> None:
+            spoken.append(text)
+
+        async def set_phase(value: str) -> None:
+            phases.append(value)
+
+        async def request_turn(transcript: str, **_kwargs: object) -> str:
+            self.assertEqual(transcript, "What is on my calendar?")
+            self.assertEqual(phases, ["thinking"])
+            return "You have lunch at noon."
+
+        answer = await jarvis_voice_mcp.handle_final_user_transcript(
+            "  What is on my calendar?  ",
+            spoken="",
+            phase="listening",
+            environ={"JARVIS_INTERNAL_API_URL": "http://jarvis-api:5082"},
+            speak=speak,
+            set_phase=set_phase,
+            duck=lambda **kwargs: ducked.append(kwargs.get("suppress_inflight", False)),
+            begin_turn=lambda: began.append(True),
+            allow_output=lambda: allowed.append(True),
+            request_turn=request_turn,
+        )
+
+        self.assertEqual(answer, "You have lunch at noon.")
+        self.assertEqual(spoken, ["You have lunch at noon."])
+        self.assertEqual(phases, ["thinking", "speaking"])
+        self.assertEqual(ducked, [True])
+        self.assertEqual(began, [True])
+        self.assertEqual(allowed, [True])
+
+    async def test_echo_of_assistant_speech_does_not_start_a_jarvis_turn(self) -> None:
+        called: list[str] = []
+
+        async def request_turn(transcript: str, **_kwargs: object) -> str:
+            called.append(transcript)
+            return "should not run"
+
+        async def unused(_value: str) -> None:
+            return None
+
+        answer = await jarvis_voice_mcp.handle_final_user_transcript(
+            "finished the calendar check for tomorrow",
+            spoken="I finished the calendar check for tomorrow morning.",
+            phase="speaking",
+            environ={},
+            speak=unused,
+            set_phase=unused,
+            duck=lambda **_kwargs: None,
+            begin_turn=lambda: None,
+            allow_output=lambda: None,
+            request_turn=request_turn,
+        )
+
+        self.assertIsNone(answer)
+        self.assertEqual(called, [])
+
     async def test_empty_transcript_is_rejected_before_network_call(self) -> None:
         with self.assertRaises(ValueError):
             await jarvis_voice_mcp.request_jarvis_turn(
