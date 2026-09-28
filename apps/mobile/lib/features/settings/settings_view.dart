@@ -105,6 +105,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
     'Data',
     [
       (
+        title: 'Usage',
+        subtitle: 'Tokens, Codex, OpenRouter costs, memories, and dreams',
+        icon: PhosphorIconsRegular.chartBar,
+        destination: 'usage',
+      ),
+      (
         title: 'Knowledge graph',
         subtitle: 'Pan, search, and inspect people, places, and projects',
         icon: PhosphorIconsRegular.graph,

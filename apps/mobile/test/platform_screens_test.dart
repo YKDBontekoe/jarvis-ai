@@ -356,6 +356,7 @@ void main() {
     tester,
   ) async {
     await show(tester, SettingsView(connected: true, onOpen: (_) {}));
+    expect(find.byKey(const Key('settings-usage')), findsOneWidget);
     expect(find.byKey(const Key('settings-agents')), findsOneWidget);
     expect(find.byKey(const Key('settings-devices')), findsOneWidget);
     expect(find.byKey(const Key('settings-voice-settings')), findsOneWidget);

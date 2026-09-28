@@ -45,6 +45,7 @@ import 'features/settings/voice_settings_screen.dart';
 import 'features/voice/chat_gpt_voices.dart';
 import 'features/voice/voice_stage.dart';
 import 'features/skills/skills_screen.dart';
+import 'features/usage/usage_screen.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
 
@@ -726,6 +727,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       'agents' => AgentsScreen(http: _http),
       'devices' => DevicesScreen(http: _http),
       'voice-settings' => VoiceSettingsScreen(http: _http),
+      'usage' => UsageScreen(http: _http),
       _ => null,
     };
     if (destination == 'sign_out') {
@@ -3264,6 +3266,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     onSuggestion: _conversationId == null || _busy || _hasPendingApproval
         ? null
         : (text) => unawaited(_send(text)),
+    onOpenUsage: () => _openUtility('usage'),
   );
 }
 

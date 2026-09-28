@@ -176,6 +176,11 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     label: 'Files',
                     onTap: () => _leaveSearch(() => widget.onUtility('files')),
                   ),
+                  _NavRow(
+                    icon: PhosphorIconsRegular.chartBar,
+                    label: 'Usage',
+                    onTap: () => _leaveSearch(() => widget.onUtility('usage')),
+                  ),
                   const SizedBox(height: 18),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 0, 0, 2),
