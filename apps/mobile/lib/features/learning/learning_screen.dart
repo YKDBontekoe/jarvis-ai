@@ -176,6 +176,9 @@ class _LearningScreenState extends State<LearningScreen> {
                           margin: const EdgeInsets.only(top: 16),
                         ),
                       const SizedBox(height: 20),
+                      const SectionHeader('About you'),
+                      _portrait(),
+                      const SizedBox(height: 20),
                       const SectionHeader('What Jarvis may learn'),
                       GroupedSection(
                         children: [
@@ -356,7 +359,7 @@ class _LearningScreenState extends State<LearningScreen> {
                     const SizedBox(height: 2),
                     Text(
                       enabled
-                          ? 'Consolidates memories, facts, and tone around ${_clockHour(hour)}.'
+                          ? 'Consolidates memories, facts, and tone around ${_clockHour(hour)}, and keeps a portrait of you in chat.'
                           : 'Off — Jarvis will not improve stored memories overnight.',
                       style: const TextStyle(color: JarvisColors.inkSoft),
                     ),
@@ -414,6 +417,34 @@ class _LearningScreenState extends State<LearningScreen> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _portrait() {
+    final summary = asJsonString(_dreaming['userSummary']);
+    final updated = _when(asJsonString(_dreaming['userSummaryUpdatedAt']));
+    if (summary == null || summary.trim().isEmpty) {
+      return const SurfaceCard(
+        child: Text(
+          'After a dream, Jarvis writes a short portrait from your memories and adds it to every chat. The next dream revises it. The portrait is background — not a memory of its own.',
+          style: TextStyle(color: JarvisColors.inkSoft),
+        ),
+      );
+    }
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(summary),
+          if (updated.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Updated $updated. Included in chat as background.',
+              style: const TextStyle(fontSize: 12.5, color: JarvisColors.muted),
+            ),
+          ],
         ],
       ),
     );

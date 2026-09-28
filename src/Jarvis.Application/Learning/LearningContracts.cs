@@ -50,13 +50,18 @@ public sealed record DreamingWorkflowInput(Guid OwnerId);
 
 public sealed record DreamingRunResult(bool Continue, int NextRunMinutes);
 
-/// <summary>Durable dreaming bookkeeping: recall traces, last sweep, and the human-readable diary.</summary>
+/// <summary>
+/// Durable dreaming bookkeeping: recall traces, last sweep, the human-readable diary, and the user portrait
+/// that chat appends to the system prompt.
+/// </summary>
 public sealed record DreamingState(
     DateTimeOffset? LastRunAt = null,
     string? LastPhase = null,
     string? LastSummary = null,
     IReadOnlyList<DreamDiaryEntry>? Diary = null,
-    IReadOnlyList<MemoryRecallRecord>? Recalls = null)
+    IReadOnlyList<MemoryRecallRecord>? Recalls = null,
+    string? UserSummary = null,
+    DateTimeOffset? UserSummaryUpdatedAt = null)
 {
     public const int MaxDiaryEntries = 20;
     public const int MaxRecallRecords = 200;
@@ -80,12 +85,13 @@ public sealed record DreamingOutcome(
     int FactsMerged,
     bool Skipped,
     string Summary,
-    IReadOnlyList<DreamDiaryEntry> Diary)
+    IReadOnlyList<DreamDiaryEntry> Diary,
+    bool UserSummaryUpdated = false)
 {
     public static DreamingOutcome Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, true, "Nothing to dream about yet.", []);
 
     public bool ImprovedAnything =>
-        Promoted + Merged + Superseded + Deduplicated + PersonaUpdated + FactsMerged > 0;
+        Promoted + Merged + Superseded + Deduplicated + PersonaUpdated + FactsMerged > 0 || UserSummaryUpdated;
 }
 
 public interface IDreamingScheduler

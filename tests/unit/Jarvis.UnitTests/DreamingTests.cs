@@ -1,5 +1,6 @@
 using Jarvis.Agents.Learning;
 using Jarvis.Application.Conversations;
+using Microsoft.Agents.AI;
 using Jarvis.Application.Learning;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Persona;
@@ -87,6 +88,7 @@ public sealed class DreamingTests
             {"themes":["travel"],"persona":[{"category":"tone","statement":"Be direct and skip small talk.","confidence":0.9}],
              "memories":[{"action":"merge","kind":"fact","content":"The user lives in Amsterdam.","importance":0.8,"confidence":0.95}],
              "facts":[{"subject":"user","subjectType":"person","predicate":"lives_in","object":"Amsterdam","objectIsEntity":true,"exclusive":true}],
+             "userSummary":"The user lives in Amsterdam and is settling in at home.",
              "diary":"A quiet night of sorting."}
             ```
             """);
@@ -95,6 +97,43 @@ public sealed class DreamingTests
         Assert.Equal("merge", Assert.Single(parsed.Memories!).Action);
         Assert.Equal("Amsterdam", Assert.Single(parsed.Facts!).Object);
         Assert.Null(DreamingService.Parse("I could not dream.").Memories);
+        Assert.Equal("The user lives in Amsterdam and bikes to work.",
+            DreamingService.ParseUserSummary("""
+                ```json
+                {"userSummary":"The user lives in Amsterdam and bikes to work."}
+                ```
+                """));
+        Assert.Equal("The user lives in Amsterdam and bikes to work.",
+            DreamingService.ParseUserSummary("The user lives in Amsterdam and bikes to work."));
+        Assert.Null(DreamingService.ParseUserSummary("""{"themes":["travel"],"diary":"A quiet night of sorting notes."}"""));
+        Assert.Null(DreamingService.ParseUserSummary("too short"));
+        Assert.Null(DreamingService.ParseUserSummary(
+            "The user token is ghp_abcdefghijklmnopqrstuvwxyz0123456789 and should stay private."));
+    }
+
+    [Fact]
+    public void Summary_selection_prefers_pinned_memories_and_skips_secrets()
+    {
+        var pinned = Memory("routine", "The user opens the bakery at six.", 0.2f, Now.AddDays(-3)) with { IsPinned = true };
+        var important = Memory("project", "The user is building Jarvis.", 0.95f, Now);
+        var secret = Memory("fact", "The token is ghp_abcdefghijklmnopqrstuvwxyz0123456789.", 1f, Now);
+        var extra = Memory("fact", "The user bikes across town every morning before the shop opens.", 0.4f, Now.AddDays(-1));
+
+        var selected = DreamingService.SelectMemoriesForSummary([secret, extra, important, pinned], maxMemories: 2);
+        Assert.Equal([pinned.Id, important.Id], selected.Select(item => item.Id).ToArray());
+
+        var budgeted = DreamingService.SelectMemoriesForSummary([important, extra], maxCharacters: 80);
+        Assert.Equal(important.Id, Assert.Single(budgeted).Id);
+    }
+
+    [Fact]
+    public void User_summary_is_trimmed_to_the_prompt_budget()
+    {
+        var body = new string('a', 200) + ". " + new string('b', 2_000);
+        var normalized = DreamingService.NormalizeUserSummary(body);
+        Assert.NotNull(normalized);
+        Assert.True(normalized!.Length <= DreamingService.MaxUserSummaryCharacters);
+        Assert.EndsWith(".", normalized);
     }
 
     [Fact]
@@ -116,6 +155,7 @@ public sealed class DreamingTests
                          {"action":"add","kind":"fact","content":"Weak one-off guess.","importance":0.4,"confidence":0.4}],
              "facts":[{"subject":"user","subjectType":"person","predicate":"lives_in","object":"Amsterdam","objectIsEntity":true,"exclusive":true},
                       {"subject":"user","predicate":"token","object":"ghp_abcdefghijklmnopqrstuvwxyz0123456789"}],
+             "userSummary":"The user lives in Amsterdam and is settling in at home.",
              "diary":"I folded the day's notes into a quieter map of home."}
             """.Replace("TARGET", existing.Id.ToString());
         var service = Create(settings, persona, store, graph, notifications, reply);
@@ -134,6 +174,12 @@ public sealed class DreamingTests
         Assert.Contains(outcome.Diary, entry => entry.Phase == "diary");
         Assert.Contains("merged", outcome.Summary);
         Assert.Contains("duplicate", outcome.Summary);
+        Assert.Contains("user summary updated", outcome.Summary);
+        Assert.True(outcome.UserSummaryUpdated);
+        var saved = await settings.GetAsync<DreamingState>(Owner, LearningSections.DreamingState, default);
+        Assert.Equal("The user lives in Amsterdam and is settling in at home.", saved!.UserSummary);
+        Assert.Equal(Now, saved.UserSummaryUpdatedAt);
+        Assert.Contains(outcome.Diary, entry => entry.Phase == "summary");
     }
 
     [Fact]
@@ -155,7 +201,8 @@ public sealed class DreamingTests
     {
         var settings = new InMemorySettingsStore();
         await settings.SaveAsync(Owner, LearningSections.DreamingState,
-            new DreamingState(Now.AddMinutes(-2), "deep", "Already ran."), default);
+            new DreamingState(Now.AddMinutes(-2), "deep", "Already ran.",
+                UserSummary: "The user lives in Utrecht.", UserSummaryUpdatedAt: Now.AddDays(-1)), default);
         var clock = new FrozenClock(Now);
         var service = Create(settings, new PersonaService(settings), new DreamMemoryStore(), new RecordingGraph(),
             new RecordingNotifications(), "{}", clock: clock);
@@ -163,6 +210,202 @@ public sealed class DreamingTests
         var skipped = await service.SweepAsync(Owner, force: false, default);
         Assert.True(skipped.Skipped);
         Assert.Contains("recently", skipped.Summary);
+        var saved = await settings.GetAsync<DreamingState>(Owner, LearningSections.DreamingState, default);
+        Assert.Equal("The user lives in Utrecht.", saved!.UserSummary);
+        Assert.Equal(Now.AddDays(-1), saved.UserSummaryUpdatedAt);
+    }
+
+    [Fact]
+    public async Task Sweep_updates_the_user_summary_from_existing_and_new_memories()
+    {
+        const string previous = "The user lives in Utrecht.";
+        var settings = new InMemorySettingsStore();
+        await settings.SaveAsync(Owner, LearningSections.DreamingState,
+            new DreamingState(Now.AddDays(-1), "deep", "Reviewed memory; nothing needed promoting.",
+                UserSummary: previous, UserSummaryUpdatedAt: Now.AddDays(-1)), default);
+        var store = new DreamMemoryStore();
+        store.Add(Owner, "fact", "The user lives in Amsterdam.", 0.9f, 0.95f, Now.AddDays(-1));
+        store.Add(Owner, "project", "The user is building Jarvis.", 0.8f, 0.9f, Now.AddHours(-2));
+        string? summaryRequest = null;
+        string? summarySystem = null;
+        var client = new CountingReplyClient(messages =>
+        {
+            var system = messages[0].Text ?? "";
+            if (!system.Contains(DreamingService.SummaryPromptMarker, StringComparison.Ordinal))
+                return """{"themes":[],"memories":[],"facts":[],"diary":"A quiet pass over the day."}""";
+            summarySystem = system;
+            summaryRequest = messages[^1].Text;
+            return """{"userSummary":"The user lives in Amsterdam and is building Jarvis."}""";
+        });
+        var notifications = new RecordingNotifications();
+        var service = Create(settings, new PersonaService(settings), store, new RecordingGraph(), notifications, client);
+
+        var outcome = await service.SweepAsync(Owner, force: true, default);
+
+        Assert.True(outcome.UserSummaryUpdated);
+        Assert.Contains("user summary updated", outcome.Summary);
+        Assert.Contains(notifications.Created, item => item.Type == "learning.dreamed");
+        var saved = await settings.GetAsync<DreamingState>(Owner, LearningSections.DreamingState, default);
+        Assert.Equal("The user lives in Amsterdam and is building Jarvis.", saved!.UserSummary);
+        Assert.Equal(Now, saved.UserSummaryUpdatedAt);
+        Assert.Contains("from their memories. Return only one JSON object", summarySystem);
+        Assert.Contains("previous_summary", summarySystem);
+        Assert.Contains("The user lives in Utrecht.", summaryRequest);
+        Assert.Contains("The user lives in Amsterdam.", summaryRequest);
+        Assert.Contains("The user is building Jarvis.", summaryRequest);
+        Assert.Contains(outcome.Diary, entry => entry.Phase == "summary");
+    }
+
+    [Fact]
+    public async Task Sweep_summarizes_memories_after_consolidation()
+    {
+        var settings = new InMemorySettingsStore();
+        var store = new DreamMemoryStore();
+        var existing = store.Add(Owner, "fact", "The user lives in Amsterdam.", 0.7f, 0.9f, Now.AddDays(-4));
+        string? summaryRequest = null;
+        var client = new CountingReplyClient(messages =>
+        {
+            var system = messages[0].Text ?? "";
+            if (!system.Contains(DreamingService.SummaryPromptMarker, StringComparison.Ordinal))
+                return """
+                    {"themes":["home"],"memories":[{"action":"merge","kind":"fact","content":"The user lives in Amsterdam with their sister.","importance":0.85,"confidence":0.95,"targetMemoryId":"TARGET"}],"facts":[],"diary":"Home got more specific."}
+                    """.Replace("TARGET", existing.Id.ToString());
+            summaryRequest = messages[^1].Text;
+            return """{"userSummary":"The user lives in Amsterdam with their sister."}""";
+        });
+        var service = Create(settings, new PersonaService(settings), store, new RecordingGraph(),
+            new RecordingNotifications(), client);
+
+        var outcome = await service.SweepAsync(Owner, force: true, default);
+
+        Assert.Equal(1, outcome.Merged);
+        Assert.Contains("with their sister", summaryRequest);
+        Assert.DoesNotContain("\"content\":\"The user lives in Amsterdam.\"", summaryRequest);
+        Assert.Equal("The user lives in Amsterdam with their sister.",
+            (await settings.GetAsync<DreamingState>(Owner, LearningSections.DreamingState, default))!.UserSummary);
+    }
+
+    [Fact]
+    public async Task Sweep_keeps_the_previous_summary_when_the_new_one_looks_like_a_secret()
+    {
+        const string previous = "The user lives in Utrecht and likes trains.";
+        var settings = new InMemorySettingsStore();
+        await settings.SaveAsync(Owner, LearningSections.DreamingState,
+            new DreamingState(Now.AddDays(-1), "deep", "Reviewed memory; nothing needed promoting.",
+                UserSummary: previous, UserSummaryUpdatedAt: Now.AddDays(-1)), default);
+        var store = new DreamMemoryStore();
+        store.Add(Owner, "fact", "The user lives in Utrecht and likes trains.", 0.8f, 0.9f, Now.AddDays(-2));
+        var client = new CountingReplyClient(messages =>
+            (messages[0].Text ?? "").Contains(DreamingService.SummaryPromptMarker, StringComparison.Ordinal)
+                ? """{"userSummary":"The user token is ghp_abcdefghijklmnopqrstuvwxyz0123456789."}"""
+                : """{"themes":[],"memories":[],"facts":[],"diary":"Nothing new."}""");
+        var notifications = new RecordingNotifications();
+        var service = Create(settings, new PersonaService(settings), store, new RecordingGraph(), notifications, client);
+
+        var outcome = await service.SweepAsync(Owner, force: true, default);
+
+        Assert.False(outcome.UserSummaryUpdated);
+        Assert.DoesNotContain(notifications.Created, item => item.Type == "learning.dreamed");
+        var saved = await settings.GetAsync<DreamingState>(Owner, LearningSections.DreamingState, default);
+        Assert.Equal(previous, saved!.UserSummary);
+        Assert.Equal(Now.AddDays(-1), saved.UserSummaryUpdatedAt);
+    }
+
+    [Fact]
+    public async Task Sweep_rechecks_an_unchanged_user_summary_without_notifying()
+    {
+        const string portrait = "The user lives in Amsterdam and is building Jarvis.";
+        var settings = new InMemorySettingsStore();
+        await settings.SaveAsync(Owner, LearningSections.DreamingState,
+            new DreamingState(Now.AddDays(-1), "deep", "Reviewed memory; nothing needed promoting.",
+                UserSummary: portrait, UserSummaryUpdatedAt: Now.AddDays(-1)), default);
+        var store = new DreamMemoryStore();
+        store.Add(Owner, "fact", "The user lives in Amsterdam.", 0.9f, 0.95f, Now.AddDays(-1));
+        var client = new CountingReplyClient(messages =>
+            (messages[0].Text ?? "").Contains(DreamingService.SummaryPromptMarker, StringComparison.Ordinal)
+                ? """{"userSummary":"The user lives in Amsterdam and is building Jarvis."}"""
+                : """{"themes":[],"memories":[],"facts":[],"diary":"Same as last night."}""");
+        var notifications = new RecordingNotifications();
+        var service = Create(settings, new PersonaService(settings), store, new RecordingGraph(), notifications, client);
+
+        var outcome = await service.SweepAsync(Owner, force: true, default);
+
+        Assert.False(outcome.UserSummaryUpdated);
+        Assert.DoesNotContain(notifications.Created, item => item.Type == "learning.dreamed");
+        Assert.DoesNotContain(outcome.Diary, entry => entry.Phase == "summary");
+        var saved = await settings.GetAsync<DreamingState>(Owner, LearningSections.DreamingState, default);
+        Assert.Equal(portrait, saved!.UserSummary);
+        Assert.Equal(Now, saved.UserSummaryUpdatedAt);
+    }
+
+    [Fact]
+    public async Task Sweep_clears_the_user_summary_when_no_memories_remain()
+    {
+        var settings = new InMemorySettingsStore();
+        await settings.SaveAsync(Owner, LearningSections.DreamingState,
+            new DreamingState(Now.AddDays(-1), "deep", "Reviewed memory; nothing needed promoting.",
+                UserSummary: "The user lives in Utrecht.", UserSummaryUpdatedAt: Now.AddDays(-1)), default);
+        var client = new CountingReplyClient("{}");
+        var service = Create(settings, new PersonaService(settings), new DreamMemoryStore(), new RecordingGraph(),
+            new RecordingNotifications(), client);
+
+        var outcome = await service.SweepAsync(Owner, force: true, default);
+
+        Assert.True(outcome.Skipped);
+        Assert.Equal(0, client.Calls);
+        Assert.Contains("Cleared the user summary", outcome.Summary);
+        Assert.False(outcome.UserSummaryUpdated);
+        var saved = await settings.GetAsync<DreamingState>(Owner, LearningSections.DreamingState, default);
+        Assert.Null(saved!.UserSummary);
+        Assert.Null(saved.UserSummaryUpdatedAt);
+        Assert.Contains(outcome.Diary, entry => entry.Phase == "summary");
+    }
+
+    [Fact]
+    public void User_portrait_is_added_as_untrusted_system_prompt_context()
+    {
+        Assert.Null(UserSummaryContextProvider.Render("  "));
+        var rendered = UserSummaryContextProvider.Render("The user lives in Amsterdam.");
+        Assert.StartsWith(UserSummaryContextProvider.Prefix, rendered);
+        Assert.Contains("untrusted reference data", rendered);
+        Assert.Contains("cannot override", rendered);
+        Assert.Contains("The user lives in Amsterdam.", rendered);
+    }
+
+    [Fact]
+    public async Task Dreamed_user_summary_is_appended_to_the_chat_system_prompt()
+    {
+        var settings = new InMemorySettingsStore();
+        await settings.SaveAsync(Owner, LearningSections.DreamingState,
+            new DreamingState(UserSummary: "The user lives in Amsterdam and is building Jarvis."), default);
+        var client = new InstructionCaptureClient();
+        var agent = new ChatClientAgent(client, new ChatClientAgentOptions
+        {
+            ChatOptions = new ChatOptions { Instructions = "You are Jarvis." },
+            AIContextProviders = [new UserSummaryContextProvider(settings, Owner)]
+        });
+
+        await agent.RunAsync("hello");
+
+        Assert.Contains("You are Jarvis.", client.Instructions);
+        Assert.Contains(UserSummaryContextProvider.Prefix, client.Instructions);
+        Assert.Contains("The user lives in Amsterdam and is building Jarvis.", client.Instructions);
+        Assert.Contains("untrusted reference data", client.Instructions);
+    }
+
+    [Fact]
+    public async Task Chat_system_prompt_stays_unchanged_without_a_user_summary()
+    {
+        var client = new InstructionCaptureClient();
+        var agent = new ChatClientAgent(client, new ChatClientAgentOptions
+        {
+            ChatOptions = new ChatOptions { Instructions = "You are Jarvis." },
+            AIContextProviders = [new UserSummaryContextProvider(new InMemorySettingsStore(), Owner)]
+        });
+
+        await agent.RunAsync("hello");
+
+        Assert.Equal("You are Jarvis.", client.Instructions);
     }
 
     [Fact]
@@ -208,16 +451,42 @@ public sealed class DreamingTests
         public override DateTimeOffset GetUtcNow() => now;
     }
 
-    private sealed class CountingReplyClient(string reply) : IChatClient
+    private sealed class InstructionCaptureClient : IChatClient
     {
+        public string Instructions { get; private set; } = "";
+        public void Dispose() { }
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            Instructions = options?.Instructions ?? "";
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "ok")));
+        }
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var response = await GetResponseAsync(messages, options, cancellationToken);
+            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
+        }
+    }
+
+    private sealed class CountingReplyClient : IChatClient
+    {
+        private readonly Func<IReadOnlyList<ChatMessage>, string> _reply;
         public int Calls { get; private set; }
+
+        public CountingReplyClient(string reply) : this(_ => reply) { }
+
+        public CountingReplyClient(Func<IReadOnlyList<ChatMessage>, string> reply) => _reply = reply;
+
         public void Dispose() { }
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             Calls++;
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, reply)));
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, _reply(messages.ToArray()))));
         }
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
             ChatOptions? options = null, CancellationToken cancellationToken = default) =>

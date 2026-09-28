@@ -47,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentContextContributor, Skills.SkillContextContributor>();
         services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();
         services.AddScoped<IAgentContextContributor, Persona.PersonaContextContributor>();
+        services.AddScoped<IAgentContextContributor, Learning.UserSummaryContextContributor>();
         services.AddScoped<IMemoryEmbedder, Memory.ResolverMemoryEmbedder>();
         services.AddScoped<Memory.KnowledgeGraphExtractor>();
         services.AddScoped<Memory.MemoryIndexer>();
