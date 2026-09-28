@@ -107,6 +107,8 @@ services:
     volumes:
       - ../livekit/production.yaml:/etc/livekit.yaml:ro
     ports:
+      # The host Caddy stack proxies public LiveKit signaling through this loopback port.
+      - "127.0.0.1:7880:7880/tcp"
       - "${LIVEKIT_BIND_ADDRESS:-0.0.0.0}:7881:7881/tcp"
       - "${LIVEKIT_BIND_ADDRESS:-0.0.0.0}:50000-50100:50000-50100/udp"
     networks: [application]
