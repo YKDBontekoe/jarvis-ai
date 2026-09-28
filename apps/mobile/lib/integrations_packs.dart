@@ -23,7 +23,10 @@ mixin _IntegrationsPacks on _IntegrationsController {
               IconBadge(icon: icon),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(name, style: Theme.of(context).textTheme.titleMedium),
+                child: Text(
+                  name,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
               StatusPill(
                 label: installed ? 'Connected' : 'Not connected',
@@ -69,82 +72,18 @@ mixin _IntegrationsPacks on _IntegrationsController {
     final id = asJsonString(pack['id']);
     if (id == null) return;
     final supportsIcs = asJsonBool(pack['supportsIcs']);
-    final ics = TextEditingController();
-    final token = TextEditingController();
-    final endpoint = TextEditingController(
-      text: asJsonString(pack['suggestedEndpoint']) ?? '',
-    );
-    final saved = await showDialog<bool>(
+    final saved = await showDialog<_PackSetupValues>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Set up ${asJsonString(pack['name']) ?? 'pack'}'),
-        content: SizedBox(
-          width: 480,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (supportsIcs) ...[
-                  TextFormField(
-                    controller: ics,
-                    keyboardType: TextInputType.url,
-                    decoration: const InputDecoration(
-                      labelText: 'ICS/iCal HTTPS URL',
-                      hintText: 'https://calendar.google.com/.../basic.ics',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: token,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Optional feed token',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                TextFormField(
-                  controller: endpoint,
-                  keyboardType: TextInputType.url,
-                  decoration: InputDecoration(
-                    labelText: supportsIcs
-                        ? 'Optional MCP HTTPS endpoint'
-                        : 'MCP HTTPS endpoint (or leave empty for stdio)',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  supportsIcs
-                      ? 'An ICS URL is enough for today’s events on Home. Add an MCP endpoint only if Jarvis should create events too.'
-                      : 'Jarvis can start the suggested stdio MCP server, or you can paste a public HTTPS MCP endpoint. Authorize with OAuth next — never paste tokens in chat.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Save'),
-          ),
-        ],
+      builder: (_) => _PackSetupDialog(
+        name: asJsonString(pack['name']) ?? 'pack',
+        supportsIcs: supportsIcs,
+        suggestedEndpoint: asJsonString(pack['suggestedEndpoint']) ?? '',
       ),
     );
-    final icsUrl = ics.text.trim();
-    final icsToken = token.text.trim();
-    final mcpEndpoint = endpoint.text.trim();
-    ics.dispose();
-    token.dispose();
-    endpoint.dispose();
-    if (saved != true || !mounted) return;
+    if (saved == null || !mounted) return;
     if (supportsIcs &&
-        icsUrl.isNotEmpty &&
-        parsePublicHttpsUrl(icsUrl) == null) {
+        saved.icsUrl.isNotEmpty &&
+        parsePublicHttpsUrl(saved.icsUrl) == null) {
       setState(() => _error = 'Calendar feeds need a public HTTPS ICS URL.');
       return;
     }
@@ -152,9 +91,9 @@ mixin _IntegrationsPacks on _IntegrationsController {
       await widget.http.post<void>(
         '/api/v1/integrations/packs/$id',
         data: {
-          if (icsUrl.isNotEmpty) 'icsUrl': icsUrl,
-          if (icsToken.isNotEmpty) 'icsToken': icsToken,
-          if (mcpEndpoint.isNotEmpty) 'endpoint': mcpEndpoint,
+          if (saved.icsUrl.isNotEmpty) 'icsUrl': saved.icsUrl,
+          if (saved.icsToken.isNotEmpty) 'icsToken': saved.icsToken,
+          if (saved.mcpEndpoint.isNotEmpty) 'endpoint': saved.mcpEndpoint,
         },
       );
       if (mounted) await _load();
@@ -176,8 +115,7 @@ mixin _IntegrationsPacks on _IntegrationsController {
     final url = (endpoint ?? '').trim();
     if (target.isEmpty && url.isEmpty) {
       setState(
-        () => _error =
-            'OAuth needs an MCP server or a public HTTPS endpoint.',
+        () => _error = 'OAuth needs an MCP server or a public HTTPS endpoint.',
       );
       return;
     }
@@ -212,7 +150,9 @@ mixin _IntegrationsPacks on _IntegrationsController {
         return;
       }
       final id = asJsonString(body['id']);
-      if (id == null || id.isEmpty || id == '00000000-0000-0000-0000-000000000000') {
+      if (id == null ||
+          id.isEmpty ||
+          id == '00000000-0000-0000-0000-000000000000') {
         if (mounted) await _load();
         return;
       }
@@ -258,4 +198,112 @@ mixin _IntegrationsPacks on _IntegrationsController {
       if (mounted) setState(() => _error = 'Could not start authorization.');
     }
   }
+}
+
+class _PackSetupValues {
+  const _PackSetupValues({
+    required this.icsUrl,
+    required this.icsToken,
+    required this.mcpEndpoint,
+  });
+
+  final String icsUrl;
+  final String icsToken;
+  final String mcpEndpoint;
+}
+
+class _PackSetupDialog extends StatefulWidget {
+  const _PackSetupDialog({
+    required this.name,
+    required this.supportsIcs,
+    required this.suggestedEndpoint,
+  });
+
+  final String name;
+  final bool supportsIcs;
+  final String suggestedEndpoint;
+
+  @override
+  State<_PackSetupDialog> createState() => _PackSetupDialogState();
+}
+
+class _PackSetupDialogState extends State<_PackSetupDialog> {
+  final _ics = TextEditingController();
+  final _token = TextEditingController();
+  late final _endpoint = TextEditingController(text: widget.suggestedEndpoint);
+
+  @override
+  void dispose() {
+    _ics.dispose();
+    _token.dispose();
+    _endpoint.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text('Set up ${widget.name}'),
+    content: SizedBox(
+      width: 480,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.supportsIcs) ...[
+              TextFormField(
+                controller: _ics,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  labelText: 'ICS/iCal HTTPS URL',
+                  hintText: 'https://calendar.google.com/.../basic.ics',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _token,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Optional feed token',
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            TextFormField(
+              controller: _endpoint,
+              keyboardType: TextInputType.url,
+              decoration: InputDecoration(
+                labelText: widget.supportsIcs
+                    ? 'Optional MCP HTTPS endpoint'
+                    : 'MCP HTTPS endpoint (or leave empty for stdio)',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              widget.supportsIcs
+                  ? 'An ICS URL is enough for today’s events on Home. Add an MCP endpoint only if Jarvis should create events too.'
+                  : 'Jarvis can start the suggested stdio MCP server, or you can paste a public HTTPS MCP endpoint. Authorize with OAuth next — never paste tokens in chat.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(
+          context,
+          _PackSetupValues(
+            icsUrl: _ics.text.trim(),
+            icsToken: _token.text.trim(),
+            mcpEndpoint: _endpoint.text.trim(),
+          ),
+        ),
+        child: const Text('Save'),
+      ),
+    ],
+  );
 }

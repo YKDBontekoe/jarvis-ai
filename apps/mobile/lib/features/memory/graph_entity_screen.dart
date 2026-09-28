@@ -80,69 +80,22 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
 
   Future<void> _editEntity() async {
     final entity = jsonObject(_details?['entity']) ?? const {};
-    final name = TextEditingController(text: asJsonString(entity['name']) ?? '');
-    final summary = TextEditingController(
-      text: asJsonString(entity['summary']) ?? '',
-    );
-    var type = asJsonString(entity['type']) ?? 'thing';
-    final saved = await showDialog<bool>(
+    final saved = await showDialog<_EntityEditValues>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialog) => AlertDialog(
-          title: const Text('Edit entity'),
-          content: SizedBox(
-            width: 420,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: name,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: graphTypeOrder.contains(type) ? type : 'thing',
-                  decoration: const InputDecoration(labelText: 'Type'),
-                  items: [
-                    for (final item in graphTypeOrder)
-                      DropdownMenuItem(value: item, child: Text(item)),
-                  ],
-                  onChanged: (value) => setDialog(() => type = value ?? type),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: summary,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Summary'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+      builder: (_) => _EntityEditDialog(
+        name: asJsonString(entity['name']) ?? '',
+        type: asJsonString(entity['type']) ?? 'thing',
+        summary: asJsonString(entity['summary']) ?? '',
       ),
     );
-    final nextName = name.text.trim();
-    final nextSummary = summary.text.trim();
-    name.dispose();
-    summary.dispose();
-    if (saved != true || !mounted) return;
+    if (saved == null || !mounted) return;
     try {
       await widget.http.put<void>(
         '/api/v1/graph/entities/${widget.entityId}',
         data: {
-          'name': nextName,
-          'type': type,
-          'summary': nextSummary.isEmpty ? null : nextSummary,
+          'name': saved.name,
+          'type': saved.type,
+          'summary': saved.summary.isEmpty ? null : saved.summary,
         },
       );
       if (mounted) await _load();
@@ -161,62 +114,12 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
   Future<void> _addFact() async {
     final entity = jsonObject(_details?['entity']) ?? const {};
     final subject = asJsonString(entity['name']) ?? '';
-    final predicate = TextEditingController();
-    final object = TextEditingController();
-    var objectIsEntity = false;
-    final saved = await showDialog<bool>(
+    final saved = await showDialog<_FactValues>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialog) => AlertDialog(
-          title: const Text('Add a fact'),
-          content: SizedBox(
-            width: 420,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: predicate,
-                  decoration: const InputDecoration(
-                    labelText: 'Predicate',
-                    hintText: 'lives_in',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: object,
-                  decoration: const InputDecoration(
-                    labelText: 'Object or value',
-                    hintText: 'Amsterdam',
-                  ),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Object is another entity'),
-                  value: objectIsEntity,
-                  onChanged: (value) => setDialog(() => objectIsEntity = value),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
+      builder: (_) => const _AddFactDialog(),
     );
-    final nextPredicate = predicate.text.trim();
-    final nextObject = object.text.trim();
-    predicate.dispose();
-    object.dispose();
-    if (saved != true || !mounted) return;
-    if (nextPredicate.isEmpty || nextObject.isEmpty) {
+    if (saved == null || !mounted) return;
+    if (saved.predicate.isEmpty || saved.object.isEmpty) {
       setState(() => _error = 'A fact needs a predicate and an object.');
       return;
     }
@@ -226,9 +129,9 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
         data: {
           'subject': subject,
           'subjectType': asJsonString(entity['type']),
-          'predicate': nextPredicate,
-          'object': nextObject,
-          'objectIsEntity': objectIsEntity,
+          'predicate': saved.predicate,
+          'object': saved.object,
+          'objectIsEntity': saved.objectIsEntity,
           'exclusive': true,
         },
       );
@@ -274,11 +177,13 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
     try {
       final response = await widget.http.get<dynamic>('/api/v1/graph/entities');
       if (!mounted) return;
-      final others = jsonMaps(response.data)
-          .where((item) => asJsonString(item['id']) != widget.entityId)
-          .toList();
+      final others = jsonMaps(
+        response.data,
+      ).where((item) => asJsonString(item['id']) != widget.entityId).toList();
       if (others.isEmpty) {
-        setState(() => _error = 'There is no other entity to merge into this one.');
+        setState(
+          () => _error = 'There is no other entity to merge into this one.',
+        );
         return;
       }
       String? absorbId = asJsonString(others.first['id']);
@@ -457,7 +362,10 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
                 ? IconButton(
                     tooltip: 'Close fact',
                     onPressed: () => unawaited(_closeFact(fact)),
-                    icon: const Icon(PhosphorIconsRegular.minusCircle, size: 20),
+                    icon: const Icon(
+                      PhosphorIconsRegular.minusCircle,
+                      size: 20,
+                    ),
                   )
                 : null,
           ),
@@ -473,4 +381,179 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
     final confidence = confidenceLabel(graphJsonDouble(fact['confidence']));
     return confidence == null ? range : '$range · $confidence';
   }
+}
+
+class _EntityEditValues {
+  const _EntityEditValues({
+    required this.name,
+    required this.type,
+    required this.summary,
+  });
+
+  final String name;
+  final String type;
+  final String summary;
+}
+
+class _EntityEditDialog extends StatefulWidget {
+  const _EntityEditDialog({
+    required this.name,
+    required this.type,
+    required this.summary,
+  });
+
+  final String name;
+  final String type;
+  final String summary;
+
+  @override
+  State<_EntityEditDialog> createState() => _EntityEditDialogState();
+}
+
+class _EntityEditDialogState extends State<_EntityEditDialog> {
+  late final _name = TextEditingController(text: widget.name);
+  late final _summary = TextEditingController(text: widget.summary);
+  late String _type = graphTypeOrder.contains(widget.type)
+      ? widget.type
+      : 'thing';
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _summary.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Edit entity'),
+    content: SizedBox(
+      width: 420,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _name,
+            decoration: const InputDecoration(labelText: 'Name'),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            initialValue: _type,
+            decoration: const InputDecoration(labelText: 'Type'),
+            items: [
+              for (final item in graphTypeOrder)
+                DropdownMenuItem(value: item, child: Text(item)),
+            ],
+            onChanged: (value) => setState(() => _type = value ?? _type),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _summary,
+            maxLines: 3,
+            decoration: const InputDecoration(labelText: 'Summary'),
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(
+          context,
+          _EntityEditValues(
+            name: _name.text.trim(),
+            type: _type,
+            summary: _summary.text.trim(),
+          ),
+        ),
+        child: const Text('Save'),
+      ),
+    ],
+  );
+}
+
+class _FactValues {
+  const _FactValues({
+    required this.predicate,
+    required this.object,
+    required this.objectIsEntity,
+  });
+
+  final String predicate;
+  final String object;
+  final bool objectIsEntity;
+}
+
+class _AddFactDialog extends StatefulWidget {
+  const _AddFactDialog();
+
+  @override
+  State<_AddFactDialog> createState() => _AddFactDialogState();
+}
+
+class _AddFactDialogState extends State<_AddFactDialog> {
+  final _predicate = TextEditingController();
+  final _object = TextEditingController();
+  var _objectIsEntity = false;
+
+  @override
+  void dispose() {
+    _predicate.dispose();
+    _object.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Add a fact'),
+    content: SizedBox(
+      width: 420,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _predicate,
+            decoration: const InputDecoration(
+              labelText: 'Predicate',
+              hintText: 'lives_in',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _object,
+            decoration: const InputDecoration(
+              labelText: 'Object or value',
+              hintText: 'Amsterdam',
+            ),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Object is another entity'),
+            value: _objectIsEntity,
+            onChanged: (value) => setState(() => _objectIsEntity = value),
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(
+          context,
+          _FactValues(
+            predicate: _predicate.text.trim(),
+            object: _object.text.trim(),
+            objectIsEntity: _objectIsEntity,
+          ),
+        ),
+        child: const Text('Save'),
+      ),
+    ],
+  );
 }

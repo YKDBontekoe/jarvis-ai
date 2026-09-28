@@ -234,10 +234,7 @@ void main() {
         'connected': true,
         'source': 'ics',
         'events': [
-          {
-            'title': 'Standup',
-            'startAt': '2026-09-28T09:00:00Z',
-          },
+          {'title': 'Standup', 'startAt': '2026-09-28T09:00:00Z'},
         ],
       },
       'device': {
@@ -276,7 +273,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Robin likes quiet mornings.'), findsOneWidget);
     expect(find.textContaining('approval'), findsOneWidget);
-    expect(find.textContaining('Call the dentist'), findsOneWidget);
+    expect(find.text('Call the dentist'), findsOneWidget);
     expect(find.textContaining('Standup'), findsOneWidget);
     expect(find.textContaining('64%'), findsOneWidget);
     await tester.tap(find.byKey(const Key('home-approvals')));

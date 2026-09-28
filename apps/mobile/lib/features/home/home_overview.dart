@@ -252,9 +252,10 @@ class _HomeOverviewState extends State<HomeOverview>
                 .take(3)
                 .map((item) {
                   final due = jsonDate(item['dueAt'], local: true);
+                  final when = due == null ? null : _shortWhen(due);
+                  if (reminders.length == 1) return when ?? '';
                   final title = asJsonString(item['title']) ?? 'Reminder';
-                  if (due == null) return title;
-                  return '$title · ${_shortWhen(due)}';
+                  return when == null ? title : '$title · $when';
                 })
                 .join('\n'),
             onTap: widget.onOpenReminders,
@@ -273,7 +274,9 @@ class _HomeOverviewState extends State<HomeOverview>
                 .map((item) {
                   final start = jsonDate(item['startAt'], local: true);
                   final title = asJsonString(item['title']) ?? 'Event';
-                  return start == null ? title : '$title · ${_shortWhen(start)}';
+                  return start == null
+                      ? title
+                      : '$title · ${_shortWhen(start)}';
                 })
                 .join('\n'),
             onTap: widget.onOpenIntegrations,
