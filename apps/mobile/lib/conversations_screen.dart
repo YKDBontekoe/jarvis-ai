@@ -91,6 +91,10 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       if (mounted) {
         setState(() => _error = 'Jarvis returned an invalid conversation.');
       }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Jarvis could not create a conversation.');
+      }
     } finally {
       if (mounted) setState(() => _creating = false);
     }

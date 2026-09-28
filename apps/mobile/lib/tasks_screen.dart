@@ -139,6 +139,8 @@ class _TasksScreenState extends State<TasksScreen> {
             : 'Jarvis could not start that task.';
         _showError(message);
       }
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not start that task.');
     } finally {
       title.dispose();
       prompt.dispose();

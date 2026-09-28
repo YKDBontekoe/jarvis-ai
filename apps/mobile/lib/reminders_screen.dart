@@ -154,6 +154,8 @@ class _RemindersScreenState extends State<RemindersScreen>
                   'Jarvis could not create that reminder.';
         _showError(message);
       }
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not create that reminder.');
     }
   }
 

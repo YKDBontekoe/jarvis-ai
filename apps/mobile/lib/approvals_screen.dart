@@ -148,6 +148,15 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         ).showSnackBar(SnackBar(content: Text(message)));
         await _load();
       }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Jarvis could not process this decision.'),
+          ),
+        );
+        await _load();
+      }
     } finally {
       if (mounted) setState(() => _processingId = null);
     }

@@ -196,6 +196,8 @@ mixin _ChatScreenSession on _ChatScreenController {
           .toList();
     } on DioException {
       return null;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -353,6 +355,8 @@ mixin _ChatScreenSession on _ChatScreenController {
       unawaited(_loadConversationSurfaces(conversationId));
     } on DioException {
       // Keep the current transcript if history cannot be refreshed.
+    } catch (_) {
+      // Keep the current transcript if history is malformed.
     }
   }
 
@@ -527,6 +531,8 @@ mixin _ChatScreenSession on _ChatScreenController {
       );
     } on DioException {
       // The sidebar keeps its last known list while the API is unreachable.
+    } catch (_) {
+      // The sidebar keeps its last known list when the payload is malformed.
     }
   }
 
