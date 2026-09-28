@@ -35,6 +35,9 @@ public static class DependencyInjection
                 configure: telemetry => telemetry.EnableSensitiveData = false)
             .Build());
         services.AddSingleton<OpenAiCompatibleClientFactory>();
+        services.AddHttpClient<OpenRouterCatalog>(client => client.Timeout = TimeSpan.FromSeconds(20));
+        services.AddTransient<Jarvis.Application.Usage.IModelPriceLookup>(provider =>
+            provider.GetRequiredService<OpenRouterCatalog>());
         services.AddScoped<IChatClientResolver, ChatClientResolver>();
         services.AddScoped<IConversationMemoryExtractor, ConversationMemoryExtractor>();
         services.AddScoped<MemoryReranker>();

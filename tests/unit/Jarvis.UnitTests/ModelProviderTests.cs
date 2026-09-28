@@ -2,6 +2,7 @@ using System.Text.Json;
 using Jarvis.Agents.ModelProviders;
 using Jarvis.Application.Integrations;
 using Jarvis.Application.Settings;
+using Jarvis.Application.Usage;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -43,8 +44,12 @@ public sealed class ModelProviderTests
             new ModelSettings(ModelSettings.OpenRouter, "anthropic/claude-sonnet-4.5", "google/gemini-2.5-flash"),
             CancellationToken.None);
 
-        var withoutKey = CreateResolver(codex, settings, credentials);
-        Assert.Same(codex, await withoutKey.GetChatClientAsync(Owner, ModelPurpose.Chat, CancellationToken.None));
+        var recorder = new RecordingUsageRecorder();
+        var withoutKey = CreateResolver(codex, settings, credentials, recorder);
+        var fallback = await withoutKey.GetChatClientAsync(Owner, ModelPurpose.Chat, CancellationToken.None);
+        var fallbackResponse = await fallback.GetResponseAsync([new ChatMessage(ChatRole.User, "hi")]);
+        Assert.Equal("codex", fallbackResponse.Text);
+        Assert.Equal(UsageProviders.Codex, recorder.Drafts.Single().Provider);
 
         await credentials.SaveSecretAsync(Owner, IntegrationCredentialProviders.OpenRouter,
             ModelSettings.OpenRouterKeySecret, "sk-or-test", CancellationToken.None);
@@ -153,10 +158,28 @@ public sealed class ModelProviderTests
     }
 
     private static ChatClientResolver CreateResolver(IChatClient codex, IOwnerSettingsStore settings,
-        IIntegrationCredentialStore credentials) =>
+        IIntegrationCredentialStore credentials, RecordingUsageRecorder? recorder = null) =>
         new(codex, settings, credentials,
             new OpenAiCompatibleClientFactory(new ConfigurationBuilder().Build(), NullLoggerFactory.Instance),
+            recorder ?? new RecordingUsageRecorder(), new NoPrices(),
             NullLogger<ChatClientResolver>.Instance);
+
+    private sealed class RecordingUsageRecorder : IModelUsageRecorder
+    {
+        public List<ModelUsageDraft> Drafts { get; } = [];
+
+        public Task RecordAsync(ModelUsageDraft draft, CancellationToken cancellationToken)
+        {
+            Drafts.Add(draft);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class NoPrices : IModelPriceLookup
+    {
+        public Task<TokenPrice?> GetOpenRouterPriceAsync(string modelId, CancellationToken cancellationToken) =>
+            Task.FromResult<TokenPrice?>(null);
+    }
 
     private sealed class NamedClient(string name) : IChatClient
     {

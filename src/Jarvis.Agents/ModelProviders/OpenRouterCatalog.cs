@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
+using Jarvis.Application.Usage;
 using Microsoft.Extensions.AI;
 
 namespace Jarvis.Agents.ModelProviders;
@@ -11,7 +12,7 @@ public sealed record OpenRouterModel(string Id, string Name, int? ContextLength,
 public sealed record ModelConnectionTest(bool Ok, string Provider, string? Model, long LatencyMs, string? Error);
 
 /// <summary>Reads OpenRouter's public model list for the settings picker and verifies owner model settings.</summary>
-public sealed class OpenRouterCatalog(HttpClient http, OpenAiCompatibleClientFactory factory)
+public sealed class OpenRouterCatalog(HttpClient http, OpenAiCompatibleClientFactory factory) : IModelPriceLookup
 {
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(10);
     private readonly SemaphoreSlim _refresh = new(1, 1);
@@ -27,6 +28,23 @@ public sealed class OpenRouterCatalog(HttpClient http, OpenAiCompatibleClientFac
                 model.Id.Contains(term, StringComparison.OrdinalIgnoreCase) ||
                 model.Name.Contains(term, StringComparison.OrdinalIgnoreCase)))
             .Take(100).ToArray();
+    }
+
+    public async Task<TokenPrice?> GetOpenRouterPriceAsync(string modelId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(modelId)) return null;
+        try
+        {
+            var match = (await GetModelsAsync(cancellationToken)).FirstOrDefault(model =>
+                model.Id.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+            return match is null || (match.PromptPricePerMillion is null && match.CompletionPricePerMillion is null)
+                ? null
+                : new TokenPrice(match.PromptPricePerMillion, match.CompletionPricePerMillion);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return null;
+        }
     }
 
     public static async Task<ModelConnectionTest> TestAsync(IChatClient client, string provider, string? model,

@@ -47,6 +47,7 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<A2ATokenEntity> A2ATokens => Set<A2ATokenEntity>();
     public DbSet<BrowserSessionEntity> BrowserSessions => Set<BrowserSessionEntity>();
     public DbSet<BrowserStepEntity> BrowserSteps => Set<BrowserStepEntity>();
+    public DbSet<ModelUsageEventEntity> ModelUsageEvents => Set<ModelUsageEventEntity>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -607,6 +608,27 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.Property(x => x.Success).HasColumnName("success");
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
             entity.HasIndex(x => new { x.SessionId, x.Ordinal }).IsUnique();
+        });
+
+        modelBuilder.Entity<ModelUsageEventEntity>(entity =>
+        {
+            entity.ToTable("model_usage_events");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Provider).HasColumnName("provider").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Purpose).HasColumnName("purpose").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Model).HasColumnName("model").HasMaxLength(200);
+            entity.Property(x => x.InputTokens).HasColumnName("input_tokens");
+            entity.Property(x => x.OutputTokens).HasColumnName("output_tokens");
+            entity.Property(x => x.CachedInputTokens).HasColumnName("cached_input_tokens");
+            entity.Property(x => x.ReasoningOutputTokens).HasColumnName("reasoning_output_tokens");
+            entity.Property(x => x.EstimatedCostUsd).HasColumnName("estimated_cost_usd").HasColumnType("numeric(18,8)");
+            entity.Property(x => x.DurationMs).HasColumnName("duration_ms");
+            entity.Property(x => x.Outcome).HasColumnName("outcome").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.WebSearchActions).HasColumnName("web_search_actions");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => new { x.OwnerId, x.CreatedAt });
         });
 
         modelBuilder.Entity<Message>(entity =>
