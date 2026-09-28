@@ -10,6 +10,18 @@ Uri? parseHttpUrl(String? raw) {
   return uri;
 }
 
+/// HTTPS URL with a host and no embedded credentials, for server-side polling.
+Uri? parsePublicHttpsUrl(String? raw) {
+  final uri = parseHttpUrl(raw?.trim());
+  if (uri == null ||
+      !uri.isScheme('https') ||
+      uri.host.isEmpty ||
+      uri.userInfo.isNotEmpty) {
+    return null;
+  }
+  return uri;
+}
+
 Future<bool> launchHttpUrl(Uri uri) async {
   try {
     return await launchUrl(uri, mode: LaunchMode.externalApplication);

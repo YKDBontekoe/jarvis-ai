@@ -55,11 +55,13 @@ class _NewWatchDialogState extends State<_NewWatchDialog> {
         parsedInterval > 1440) {
       return;
     }
+    final url = parsePublicHttpsUrl(_url.text);
+    if (url == null) return;
     Navigator.pop(
       context,
       _NewWatch(
         title: _title.text.trim(),
-        url: _url.text.trim(),
+        url: url.toString(),
         jsonPath: _jsonPath.text.trim(),
         comparison: _comparison,
         threshold: parsedThreshold,
@@ -99,7 +101,7 @@ class _NewWatchDialogState extends State<_NewWatchDialog> {
                   labelText: 'Public JSON HTTPS URL',
                   hintText: 'https://example.com/api/price',
                 ),
-                validator: (value) => value == null || value.trim().isEmpty
+                validator: (value) => parsePublicHttpsUrl(value) == null
                     ? 'Enter a public HTTPS URL.'
                     : null,
               ),

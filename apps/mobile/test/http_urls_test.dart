@@ -20,6 +20,17 @@ void main() {
     expect(parseHttpUrl('data:text/html,hi'), isNull);
   });
 
+  test('parsePublicHttpsUrl requires https without credentials', () {
+    expect(parsePublicHttpsUrl('https://example.com/api')?.host, 'example.com');
+    expect(parsePublicHttpsUrl(' https://example.com/price '), isNotNull);
+    expect(parsePublicHttpsUrl('http://example.com'), isNull);
+    expect(parsePublicHttpsUrl('https://user:pass@example.com/secret'), isNull);
+    expect(parsePublicHttpsUrl('javascript:alert(1)'), isNull);
+    expect(parsePublicHttpsUrl('file:///tmp/secret'), isNull);
+    expect(parsePublicHttpsUrl(''), isNull);
+    expect(parsePublicHttpsUrl('example.com'), isNull);
+  });
+
   test('isHttpUrl is scheme-only', () {
     expect(isHttpUrl(Uri.parse('https://example.com')), isTrue);
     expect(isHttpUrl(Uri.parse('http://localhost:8080')), isTrue);
