@@ -51,8 +51,20 @@ public interface IKnowledgeGraphRepository
     Task<int> MergeAsync(Guid ownerId, IReadOnlyList<GraphFact> facts, Guid? sourceMemoryId,
         CancellationToken cancellationToken);
 
+    Task<GraphEntityRecord?> UpdateEntityAsync(Guid ownerId, Guid entityId, string? name, string? type,
+        string? summary, CancellationToken cancellationToken);
+
+    Task<bool> CloseRelationAsync(Guid ownerId, Guid relationId, CancellationToken cancellationToken);
+
+    Task<bool> MergeEntitiesAsync(Guid ownerId, Guid keepId, Guid absorbId, CancellationToken cancellationToken);
+
     Task<bool> DeleteEntityAsync(Guid ownerId, Guid entityId, CancellationToken cancellationToken);
 }
+
+public sealed record UpdateGraphEntityRequest(string? Name, string? Type, string? Summary);
+public sealed record ProposeGraphFactRequest(string Subject, string? SubjectType, string Predicate, string Object,
+    string? ObjectType, bool ObjectIsEntity = false, bool Exclusive = true);
+public sealed record MergeGraphEntitiesRequest(Guid KeepId, Guid AbsorbId);
 
 public static class GraphNames
 {

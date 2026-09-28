@@ -12,6 +12,7 @@ import '../../reminders_screen.dart';
 import '../../tasks_screen.dart';
 import '../agents/agents_screen.dart';
 import '../channels/channels_screen.dart';
+import '../coding/coding_runs_screen.dart';
 import '../devices/devices_screen.dart';
 import '../learning/learning_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
@@ -37,6 +38,7 @@ Widget? utilityPageFor(String destination, Dio http) => switch (destination) {
   'learning' => LearningScreen(http: http),
   'graph' => KnowledgeGraphScreen(http: http),
   'channels' => ChannelsScreen(http: http),
+  'coding' => CodingRunsScreen(http: http),
   'agents' => AgentsScreen(http: http),
   'devices' => DevicesScreen(http: http),
   'voice-settings' => VoiceSettingsScreen(http: http),

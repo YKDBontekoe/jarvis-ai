@@ -11,6 +11,7 @@ import '../../ui/phosphor_icons.dart';
 
 part 'channel_detail_screen.dart';
 part 'channel_editor_sheet.dart';
+part 'channel_thread_screen.dart';
 
 ({String label, IconData icon, Color color}) channelKind(String kind) =>
     switch (kind) {

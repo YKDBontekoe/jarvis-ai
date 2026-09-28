@@ -1,6 +1,7 @@
 using System.Text;
 using System.Diagnostics;
 using Jarvis.Application.Workflows;
+using Jarvis.Application.Integrations;
 using Jarvis.Infrastructure;
 using Jarvis.Infrastructure.Persistence;
 using Jarvis.Application.Files;
@@ -41,6 +42,8 @@ builder.Services.AddHostedService<MemoryIndexingWorker>();
 builder.Services.AddScoped<IReminderService, ReminderService>();
 builder.Services.AddScoped<IConditionWatchService, ConditionWatchService>();
 builder.Services.AddSingleton<PublicJsonMetricReader>();
+builder.Services.AddScoped<ICalendarFeed, CalendarFeed>();
+builder.Services.AddScoped<WatchMetricReader>();
 builder.Services.AddJarvisMemory();
 builder.Services.AddScoped<McpToolHost>();
 builder.Services.AddJarvisAgent(builder.Configuration);
@@ -54,8 +57,7 @@ var fileActivities = new FileProcessingActivities(host.Services.GetRequiredServi
 var taskActivities = new JarvisTaskActivities(host.Services.GetRequiredService<IServiceScopeFactory>(),
     host.Services.GetRequiredService<ILogger<JarvisTaskActivities>>());
 var conditionWatchActivities = new ConditionWatchActivities(
-    host.Services.GetRequiredService<IServiceScopeFactory>(),
-    host.Services.GetRequiredService<PublicJsonMetricReader>());
+    host.Services.GetRequiredService<IServiceScopeFactory>());
 var briefingActivities = new DailyBriefingActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
 var heartbeatActivities = new AssistantHeartbeatActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
 var dreamingActivities = new AssistantDreamingActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
@@ -130,7 +132,7 @@ internal sealed class ReminderActivities(IServiceScopeFactory scopeFactory) : Re
     }
 }
 
-internal sealed class ConditionWatchActivities(IServiceScopeFactory scopeFactory, PublicJsonMetricReader reader)
+internal sealed class ConditionWatchActivities(IServiceScopeFactory scopeFactory)
     : ConditionWatchActivityContract
 {
     [Temporalio.Activities.Activity("CheckConditionWatch")]
@@ -143,7 +145,8 @@ internal sealed class ConditionWatchActivities(IServiceScopeFactory scopeFactory
         var watches = scope.ServiceProvider.GetRequiredService<IConditionWatchRepository>();
         var watch = await watches.GetForExecutionAsync(input.WatchId, activity.CancellationToken);
         if (watch is null || watch.Status != "active") return new ConditionWatchCheckResult(false, 15);
-        var value = await reader.ReadAsync(watch.Url, watch.JsonPath, activity.CancellationToken);
+        var metrics = scope.ServiceProvider.GetRequiredService<WatchMetricReader>();
+        var value = await metrics.ReadAsync(watch, activity.CancellationToken);
         return await watches.RecordCheckAsync(input.WatchId, value, DateTimeOffset.UtcNow,
             activity.CancellationToken);
     }

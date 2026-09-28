@@ -578,6 +578,14 @@ public sealed class DreamingTests
             Task.FromResult<IReadOnlyList<GraphEntityRecord>>([]);
         public Task<GraphOverview> GetOverviewAsync(Guid ownerId, int limit, CancellationToken cancellationToken) =>
             Task.FromResult(new GraphOverview([], [], []));
+        public Task<GraphEntityRecord?> UpdateEntityAsync(Guid ownerId, Guid entityId, string? name, string? type,
+            string? summary, CancellationToken cancellationToken) =>
+            Task.FromResult<GraphEntityRecord?>(null);
+        public Task<bool> CloseRelationAsync(Guid ownerId, Guid relationId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+        public Task<bool> MergeEntitiesAsync(Guid ownerId, Guid keepId, Guid absorbId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(false);
         public Task<bool> DeleteEntityAsync(Guid ownerId, Guid entityId, CancellationToken cancellationToken) =>
             Task.FromResult(false);
     }

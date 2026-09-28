@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using Jarvis.Api.Channels;
 using Jarvis.Application.Audit;
@@ -100,6 +101,17 @@ internal static class ChannelEndpoints
                 ICurrentUser currentUser, CancellationToken ct) =>
                 Results.Ok(await repository.ListMessagesAsync(currentUser.OwnerId, id, 50, ct)))
             .WithName("ListChannelMessages");
+
+        channels.MapGet("/{id:guid}/threads", async (Guid id, IChannelRepository repository,
+                ICurrentUser currentUser, CancellationToken ct) =>
+                Results.Ok(await repository.ListThreadsAsync(currentUser.OwnerId, id, ct)))
+            .WithName("ListChannelThreads");
+
+        channels.MapGet("/{id:guid}/threads/{peer}/messages", async (Guid id, string peer,
+                IChannelRepository repository, ICurrentUser currentUser, CancellationToken ct) =>
+                Results.Ok(await repository.ListThreadMessagesAsync(currentUser.OwnerId, id,
+                    WebUtility.UrlDecode(peer), 100, ct)))
+            .WithName("ListChannelThreadMessages");
 
         channels.MapGet("/signal/status", async (ChannelOptions options, IHttpClientFactory httpClients,
             CancellationToken ct) =>

@@ -17,6 +17,7 @@ class ChannelDetailScreen extends StatefulWidget {
 class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
   Map<String, dynamic>? _channel;
   List<Map<String, dynamic>> _messages = const [];
+  List<Map<String, dynamic>> _threads = const [];
   bool _loading = true;
   bool _busy = false;
   String? _error;
@@ -35,6 +36,15 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
     try {
       final list = await widget.http.get<dynamic>('/api/v1/channels');
       final messages = await widget.http.get<dynamic>('$_path/messages');
+      var threads = <Map<String, dynamic>>[];
+      try {
+        final threadResponse = await widget.http.get<dynamic>(
+          '$_path/threads',
+        );
+        threads = jsonMaps(threadResponse.data);
+      } catch (_) {
+        threads = const [];
+      }
       if (!mounted || revision != _requestRevision) return;
       final channel = jsonMaps(list.data)
           .cast<Map<String, dynamic>?>()
@@ -45,6 +55,7 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
       setState(() {
         _channel = channel;
         _messages = jsonMaps(messages.data);
+        _threads = threads;
         _loading = false;
         _error = channel == null
             ? 'This channel is no longer connected.'
@@ -65,6 +76,21 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
         _error = 'Could not load this channel.';
       });
     }
+  }
+
+  Future<void> _openThread(Map<String, dynamic> thread) async {
+    final peer = asJsonString(thread['peer']);
+    if (peer == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ChannelThreadScreen(
+          http: widget.http,
+          channelId: widget.channelId,
+          peer: peer,
+        ),
+      ),
+    );
+    if (mounted) unawaited(_load());
   }
 
   Future<void> _test() async {
@@ -244,6 +270,66 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 18),
+                  if (_threads.isNotEmpty) ...[
+                    Text(
+                      'THREADS',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: JarvisColors.muted,
+                        letterSpacing: .8,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    for (final thread in _threads)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: SurfaceCard(
+                          key: Key('channel-thread-${asJsonString(thread['peer'])}'),
+                          onTap: () => unawaited(_openThread(thread)),
+                          padding: const EdgeInsets.all(14),
+                          child: Row(
+                            children: [
+                              const IconBadge(
+                                icon: PhosphorIconsRegular.chatCircle,
+                                size: 32,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      asJsonString(thread['peer']) ?? 'Unknown',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleSmall,
+                                    ),
+                                    Text(
+                                      asJsonString(
+                                            jsonObject(
+                                              thread['lastMessage'],
+                                            )?['text'],
+                                          ) ??
+                                          '${asJsonInt(thread['messageCount'])} messages',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(
+                                PhosphorIconsRegular.caretRight,
+                                size: 16,
+                                color: JarvisColors.muted,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                  ],
                   Text(
                     'RECENT MESSAGES',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(

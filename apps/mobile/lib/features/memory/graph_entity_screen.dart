@@ -78,6 +78,257 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
     }
   }
 
+  Future<void> _editEntity() async {
+    final entity = jsonObject(_details?['entity']) ?? const {};
+    final name = TextEditingController(text: asJsonString(entity['name']) ?? '');
+    final summary = TextEditingController(
+      text: asJsonString(entity['summary']) ?? '',
+    );
+    var type = asJsonString(entity['type']) ?? 'thing';
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialog) => AlertDialog(
+          title: const Text('Edit entity'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: name,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: graphTypeOrder.contains(type) ? type : 'thing',
+                  decoration: const InputDecoration(labelText: 'Type'),
+                  items: [
+                    for (final item in graphTypeOrder)
+                      DropdownMenuItem(value: item, child: Text(item)),
+                  ],
+                  onChanged: (value) => setDialog(() => type = value ?? type),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: summary,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Summary'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final nextName = name.text.trim();
+    final nextSummary = summary.text.trim();
+    name.dispose();
+    summary.dispose();
+    if (saved != true || !mounted) return;
+    try {
+      await widget.http.put<void>(
+        '/api/v1/graph/entities/${widget.entityId}',
+        data: {
+          'name': nextName,
+          'type': type,
+          'summary': nextSummary.isEmpty ? null : nextSummary,
+        },
+      );
+      if (mounted) await _load();
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not update this entity.',
+      );
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not update this entity.');
+    }
+  }
+
+  Future<void> _addFact() async {
+    final entity = jsonObject(_details?['entity']) ?? const {};
+    final subject = asJsonString(entity['name']) ?? '';
+    final predicate = TextEditingController();
+    final object = TextEditingController();
+    var objectIsEntity = false;
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialog) => AlertDialog(
+          title: const Text('Add a fact'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: predicate,
+                  decoration: const InputDecoration(
+                    labelText: 'Predicate',
+                    hintText: 'lives_in',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: object,
+                  decoration: const InputDecoration(
+                    labelText: 'Object or value',
+                    hintText: 'Amsterdam',
+                  ),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Object is another entity'),
+                  value: objectIsEntity,
+                  onChanged: (value) => setDialog(() => objectIsEntity = value),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final nextPredicate = predicate.text.trim();
+    final nextObject = object.text.trim();
+    predicate.dispose();
+    object.dispose();
+    if (saved != true || !mounted) return;
+    if (nextPredicate.isEmpty || nextObject.isEmpty) {
+      setState(() => _error = 'A fact needs a predicate and an object.');
+      return;
+    }
+    try {
+      await widget.http.post<void>(
+        '/api/v1/graph/facts',
+        data: {
+          'subject': subject,
+          'subjectType': asJsonString(entity['type']),
+          'predicate': nextPredicate,
+          'object': nextObject,
+          'objectIsEntity': objectIsEntity,
+          'exclusive': true,
+        },
+      );
+      if (mounted) await _load();
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not save that fact.',
+      );
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not save that fact.');
+    }
+  }
+
+  Future<void> _closeFact(Map<String, dynamic> fact) async {
+    final id = jsonId(fact);
+    if (id == null) return;
+    final confirmed = await showJarvisConfirm(
+      context,
+      title: 'Close this fact?',
+      message: 'Jarvis marks it as no longer current. History stays.',
+      confirmLabel: 'Close fact',
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      await widget.http.delete<void>('/api/v1/graph/relations/$id');
+      if (mounted) await _load();
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not close that fact.',
+      );
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not close that fact.');
+    }
+  }
+
+  Future<void> _mergeEntity() async {
+    try {
+      final response = await widget.http.get<dynamic>('/api/v1/graph/entities');
+      if (!mounted) return;
+      final others = jsonMaps(response.data)
+          .where((item) => asJsonString(item['id']) != widget.entityId)
+          .toList();
+      if (others.isEmpty) {
+        setState(() => _error = 'There is no other entity to merge into this one.');
+        return;
+      }
+      String? absorbId = asJsonString(others.first['id']);
+      final saved = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialog) => AlertDialog(
+            title: const Text('Merge another entity into this one'),
+            content: DropdownButtonFormField<String>(
+              initialValue: absorbId,
+              items: [
+                for (final item in others)
+                  DropdownMenuItem(
+                    value: asJsonString(item['id']),
+                    child: Text(asJsonString(item['name']) ?? 'Entity'),
+                  ),
+              ],
+              onChanged: (value) => setDialog(() => absorbId = value),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Merge'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (saved != true || absorbId == null || !mounted) return;
+      await widget.http.post<void>(
+        '/api/v1/graph/entities/merge',
+        data: {'keepId': widget.entityId, 'absorbId': absorbId},
+      );
+      if (mounted) await _load();
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not merge those entities.',
+      );
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not merge those entities.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final details = _details;
@@ -91,10 +342,25 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
         title: Text(asJsonString(entity['name']) ?? 'Entity'),
         actions: [
           if (details != null)
-            IconButton(
-              tooltip: 'Forget',
-              onPressed: () => unawaited(_delete()),
-              icon: const Icon(PhosphorIconsRegular.trash),
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                switch (value) {
+                  case 'edit':
+                    unawaited(_editEntity());
+                  case 'fact':
+                    unawaited(_addFact());
+                  case 'merge':
+                    unawaited(_mergeEntity());
+                  case 'forget':
+                    unawaited(_delete());
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'edit', child: Text('Edit')),
+                PopupMenuItem(value: 'fact', child: Text('Add fact')),
+                PopupMenuItem(value: 'merge', child: Text('Merge into this')),
+                PopupMenuItem(value: 'forget', child: Text('Forget')),
+              ],
             ),
         ],
       ),
@@ -187,6 +453,13 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
                     ),
             ),
             subtitle: Text(_factMeta(fact)),
+            trailing: currentFacts
+                ? IconButton(
+                    tooltip: 'Close fact',
+                    onPressed: () => unawaited(_closeFact(fact)),
+                    icon: const Icon(PhosphorIconsRegular.minusCircle, size: 20),
+                  )
+                : null,
           ),
       ],
     );

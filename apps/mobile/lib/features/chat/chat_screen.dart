@@ -23,6 +23,7 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../devices/device_invoke.dart';
+import '../devices/device_telemetry.dart';
 import '../home/home_overview.dart';
 import '../settings/settings_view.dart';
 import '../shell/sidebar.dart';

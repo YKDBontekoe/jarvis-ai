@@ -1,6 +1,7 @@
 using Jarvis.Domain.Conversations;
 using Jarvis.Domain.Approvals;
 using Jarvis.Domain.Audit;
+using Jarvis.Domain.Devices;
 using Jarvis.Domain.Workflows;
 using Jarvis.Domain.Integrations;
 using Jarvis.Infrastructure.Identity;
@@ -48,6 +49,9 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<BrowserSessionEntity> BrowserSessions => Set<BrowserSessionEntity>();
     public DbSet<BrowserStepEntity> BrowserSteps => Set<BrowserStepEntity>();
     public DbSet<ModelUsageEventEntity> ModelUsageEvents => Set<ModelUsageEventEntity>();
+    public DbSet<DeviceTelemetry> DeviceTelemetry => Set<DeviceTelemetry>();
+    public DbSet<McpOAuthSession> McpOAuthSessions => Set<McpOAuthSession>();
+    public DbSet<CodingRun> CodingRuns => Set<CodingRun>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -254,11 +258,18 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.Property(x => x.Id).ValueGeneratedNever();
             entity.Property(x => x.OwnerId).HasColumnName("owner_id");
             entity.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Kind).HasColumnName("kind").HasMaxLength(40).HasDefaultValue(WatchKinds.PublicJson)
+                .IsRequired();
             entity.Property(x => x.Url).HasMaxLength(2048).IsRequired();
             entity.Property(x => x.JsonPath).HasMaxLength(512).IsRequired();
             entity.Property(x => x.Comparison).HasMaxLength(16).IsRequired();
             entity.Property(x => x.Threshold).HasColumnName("threshold");
             entity.Property(x => x.IntervalMinutes).HasColumnName("interval_minutes");
+            entity.Property(x => x.CredentialProvider).HasColumnName("credential_provider").HasMaxLength(80);
+            entity.Property(x => x.Latitude).HasColumnName("latitude");
+            entity.Property(x => x.Longitude).HasColumnName("longitude");
+            entity.Property(x => x.RadiusMeters).HasColumnName("radius_meters");
+            entity.Property(x => x.MinutesBefore).HasColumnName("minutes_before");
             entity.Property(x => x.WorkflowId).HasColumnName("workflow_id").HasMaxLength(300).IsRequired();
             entity.Property(x => x.Status).HasMaxLength(20).IsRequired();
             entity.Property(x => x.CreatedAt).HasColumnName("created_at");
@@ -649,6 +660,64 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.HasOne<Conversation>().WithOne()
                 .HasForeignKey<AgentSessionState>(x => x.ConversationId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DeviceTelemetry>(entity =>
+        {
+            entity.ToTable("device_telemetry");
+            entity.HasKey(x => x.OwnerId);
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id").ValueGeneratedNever();
+            entity.Property(x => x.Latitude).HasColumnName("latitude");
+            entity.Property(x => x.Longitude).HasColumnName("longitude");
+            entity.Property(x => x.AccuracyMeters).HasColumnName("accuracy_meters");
+            entity.Property(x => x.BatteryPercent).HasColumnName("battery_percent");
+            entity.Property(x => x.Charging).HasColumnName("charging");
+            entity.Property(x => x.ReportedAt).HasColumnName("reported_at");
+        });
+
+        modelBuilder.Entity<McpOAuthSession>(entity =>
+        {
+            entity.ToTable("mcp_oauth_sessions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.State).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Provider).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.ServerKey).HasColumnName("server_key").HasMaxLength(200);
+            entity.Property(x => x.CodeVerifier).HasColumnName("code_verifier").HasMaxLength(128).IsRequired();
+            entity.Property(x => x.RedirectUri).HasColumnName("redirect_uri").HasMaxLength(500).IsRequired();
+            entity.Property(x => x.AuthorizationEndpoint).HasColumnName("authorization_endpoint").HasMaxLength(500);
+            entity.Property(x => x.TokenEndpoint).HasColumnName("token_endpoint").HasMaxLength(500);
+            entity.Property(x => x.RegistrationEndpoint).HasColumnName("registration_endpoint").HasMaxLength(500);
+            entity.Property(x => x.ClientId).HasColumnName("client_id").HasMaxLength(200);
+            entity.Property(x => x.Resource).HasMaxLength(500);
+            entity.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Error).HasMaxLength(200);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.ExpiresAt).HasColumnName("expires_at");
+            entity.Property(x => x.CompletedAt).HasColumnName("completed_at");
+            entity.HasIndex(x => x.State).IsUnique();
+            entity.HasIndex(x => new { x.OwnerId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<CodingRun>(entity =>
+        {
+            entity.ToTable("coding_runs");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Repository).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Task).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.WorktreePath).HasColumnName("worktree_path").HasMaxLength(1024).IsRequired();
+            entity.Property(x => x.DiffSummary).HasColumnName("diff_summary");
+            entity.Property(x => x.ChangedFiles).HasColumnName("changed_files");
+            entity.Property(x => x.Summary);
+            entity.Property(x => x.Error).HasMaxLength(2000);
+            entity.Property(x => x.ExitCode).HasColumnName("exit_code");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.CompletedAt).HasColumnName("completed_at");
+            entity.HasIndex(x => new { x.OwnerId, x.CreatedAt });
         });
     }
 }

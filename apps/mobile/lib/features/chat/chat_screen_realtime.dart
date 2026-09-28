@@ -340,6 +340,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
             ['battery', 'open_url', 'notify', 'clipboard', 'location'],
           ],
         );
+        unawaited(postDeviceTelemetry(_http));
       } catch (_) {
         // Older servers without device nodes still stream chat.
       }
@@ -368,6 +369,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
             ['battery', 'open_url', 'notify', 'clipboard', 'location'],
           ],
         );
+        unawaited(postDeviceTelemetry(_http));
       } catch (_) {
         // Older servers without device nodes still stream chat.
       }

@@ -48,6 +48,9 @@ public sealed record SaveChannelRequest(
 public sealed record ChannelMessageRecord(Guid Id, Guid ConnectionId, string Direction, string Peer, string Text,
     string Status, DateTimeOffset CreatedAt, DateTimeOffset? ProcessedAt, string? Error);
 
+public sealed record ChannelThreadRecord(string Peer, Guid? ConversationId, int MessageCount,
+    ChannelMessageRecord? LastMessage);
+
 public sealed record InboundChannelMessage(Guid Id, ChannelConnectionRecord Connection, string Sender, string Text);
 
 public interface IChannelRepository
@@ -70,6 +73,10 @@ public interface IChannelRepository
         CancellationToken cancellationToken);
     Task<IReadOnlyList<ChannelMessageRecord>> ListMessagesAsync(Guid ownerId, Guid connectionId, int limit,
         CancellationToken cancellationToken);
+    Task<IReadOnlyList<ChannelThreadRecord>> ListThreadsAsync(Guid ownerId, Guid connectionId,
+        CancellationToken cancellationToken);
+    Task<IReadOnlyList<ChannelMessageRecord>> ListThreadMessagesAsync(Guid ownerId, Guid connectionId, string peer,
+        int limit, CancellationToken cancellationToken);
     Task<Guid?> GetThreadConversationAsync(Guid connectionId, string sender, CancellationToken cancellationToken);
     Task SetThreadConversationAsync(Guid connectionId, string sender, Guid conversationId,
         CancellationToken cancellationToken);

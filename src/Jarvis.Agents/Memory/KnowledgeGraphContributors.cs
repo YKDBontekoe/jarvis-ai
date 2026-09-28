@@ -49,8 +49,15 @@ internal sealed class KnowledgeGraphTools(IKnowledgeGraphRepository graph, ICurr
 internal sealed class KnowledgeGraphToolContributor(IKnowledgeGraphRepository graph, ICurrentUser currentUser)
     : IAgentToolContributor
 {
-    public IEnumerable<AITool> GetTools(AgentBuildContext context) =>
-        [AIFunctionFactory.Create(new KnowledgeGraphTools(graph, currentUser).QueryKnowledgeGraphAsync)];
+    public IEnumerable<AITool> GetTools(AgentBuildContext context)
+    {
+        yield return AIFunctionFactory.Create(new KnowledgeGraphTools(graph, currentUser).QueryKnowledgeGraphAsync);
+        var writes = new KnowledgeGraphWriteTools(graph, currentUser);
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(writes.ProposeGraphFactAsync));
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(writes.CorrectGraphFactAsync));
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(writes.MergeGraphEntitiesAsync));
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(writes.ForgetGraphEntityAsync));
+    }
 }
 
 internal sealed class KnowledgeGraphContextContributor(IKnowledgeGraphRepository graph) : IAgentContextContributor
@@ -90,5 +97,63 @@ internal sealed class KnowledgeGraphContextProvider(IKnowledgeGraphRepository gr
                     .AppendLine(latestChange.ValidTo!.Value.ToString("yyyy-MM-dd"));
         }
         return [new ChatMessage(ChatRole.User, builder.ToString())];
+    }
+}
+
+internal sealed class KnowledgeGraphWriteTools(IKnowledgeGraphRepository graph, ICurrentUser currentUser)
+{
+    [Description("Add or update a fact in the knowledge graph after the user confirms it. Exclusive facts replace the current value of that predicate.")]
+    public async Task<string> ProposeGraphFactAsync(
+        [Description("Subject name, or user.")] string subject,
+        [Description("person, place, organization, project, thing, event, pet, or topic.")] string? subjectType,
+        [Description("Short predicate such as lives_in or works_at.")] string predicate,
+        [Description("Object name or literal value.")] string @object,
+        [Description("Type when the object is an entity.")] string? objectType = null,
+        [Description("True when the object is another entity rather than a literal.")] bool objectIsEntity = false,
+        [Description("True to close other current values for this predicate.")] bool exclusive = true,
+        CancellationToken cancellationToken = default)
+    {
+        var count = await graph.MergeAsync(currentUser.OwnerId,
+        [
+            new GraphFact(subject, subjectType ?? "thing", predicate, @object, objectType, objectIsEntity, exclusive,
+                DateTimeOffset.UtcNow, 1f)
+        ], null, cancellationToken);
+        return count == 0 ? "That fact could not be stored." : "Saved that fact in the knowledge graph.";
+    }
+
+    [Description("Replace a current fact with a correction the user stated. Closes the previous value.")]
+    public Task<string> CorrectGraphFactAsync(
+        [Description("Subject name, or user.")] string subject,
+        [Description("Predicate to correct.")] string predicate,
+        [Description("New object name or literal.")] string @object,
+        [Description("True when the object is an entity.")] bool objectIsEntity = false,
+        [Description("Object type when it is an entity.")] string? objectType = null,
+        CancellationToken cancellationToken = default) =>
+        ProposeGraphFactAsync(subject, "thing", predicate, @object, objectType, objectIsEntity, true, cancellationToken);
+
+    [Description("Merge two knowledge-graph entities that are the same person, place, or thing. keepName remains; absorbName is folded into it.")]
+    public async Task<string> MergeGraphEntitiesAsync(
+        [Description("Name to keep.")] string keepName,
+        [Description("Name to absorb.")] string absorbName,
+        CancellationToken cancellationToken)
+    {
+        var keep = await graph.FindEntityAsync(currentUser.OwnerId, keepName, null, cancellationToken);
+        var absorb = await graph.FindEntityAsync(currentUser.OwnerId, absorbName, null, cancellationToken);
+        if (keep is null || absorb is null) return "I could not find both entities to merge.";
+        var merged = await graph.MergeEntitiesAsync(currentUser.OwnerId, keep.Entity.Id, absorb.Entity.Id,
+            cancellationToken);
+        return merged ? $"Merged {absorb.Entity.Name} into {keep.Entity.Name}." : "Those entities could not be merged.";
+    }
+
+    [Description("Remove an entity and its facts from the knowledge graph after the user asks to forget it.")]
+    public async Task<string> ForgetGraphEntityAsync(
+        [Description("Entity name.")] string name,
+        CancellationToken cancellationToken)
+    {
+        var details = await graph.FindEntityAsync(currentUser.OwnerId, name, null, cancellationToken);
+        if (details is null) return "The knowledge graph has nothing by that name.";
+        return await graph.DeleteEntityAsync(currentUser.OwnerId, details.Entity.Id, cancellationToken)
+            ? $"Forgot {details.Entity.Name} and its graph facts. Memories were not deleted."
+            : "That entity could not be removed.";
     }
 }

@@ -47,6 +47,8 @@ dependencies:
   web: ^1.1.1
   flutter_markdown_plus: ^1.0.12
   url_launcher: ^6.3.2
+  geolocator: ^13.0.4
+  battery_plus: ^6.2.3
 
 dev_dependencies:
   flutter_test:

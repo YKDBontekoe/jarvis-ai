@@ -103,12 +103,24 @@ mixin _IntegrationsMcp on _IntegrationsController {
           ),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => _editSecret(provider: id, secretName: 'token'),
-              icon: const Icon(PhosphorIconsRegular.key, size: 18),
-              label: Text(
-                hasToken ? 'Rotate bearer token' : 'Add bearer token',
-              ),
+            child: Wrap(
+              spacing: 4,
+              children: [
+                TextButton.icon(
+                  onPressed: () =>
+                      _editSecret(provider: id, secretName: 'token'),
+                  icon: const Icon(PhosphorIconsRegular.key, size: 18),
+                  label: Text(
+                    hasToken ? 'Rotate bearer token' : 'Add bearer token',
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () =>
+                      _connectOAuth(server: id, endpoint: endpoint),
+                  icon: const Icon(PhosphorIconsRegular.lockSimple, size: 18),
+                  label: const Text('Connect with OAuth'),
+                ),
+              ],
             ),
           ),
         ],

@@ -178,10 +178,45 @@ public sealed class ChannelRepository(JarvisDbContext db) : IChannelRepository
             return [];
         return (await db.ChannelMessages.AsNoTracking().Where(x => x.ConnectionId == connectionId)
                 .OrderByDescending(x => x.CreatedAt).Take(Math.Clamp(limit, 1, 200)).ToListAsync(cancellationToken))
-            .Select(x => new ChannelMessageRecord(x.Id, x.ConnectionId, x.Direction, x.Peer, x.Text, x.Status,
-                x.CreatedAt, x.ProcessedAt, x.Error))
+            .Select(ToMessage).ToArray();
+    }
+
+    public async Task<IReadOnlyList<ChannelThreadRecord>> ListThreadsAsync(Guid ownerId, Guid connectionId,
+        CancellationToken cancellationToken)
+    {
+        if (!await db.ChannelConnections.AnyAsync(x => x.Id == connectionId && x.OwnerId == ownerId, cancellationToken))
+            return [];
+        var messages = await db.ChannelMessages.AsNoTracking().Where(x => x.ConnectionId == connectionId)
+            .OrderByDescending(x => x.CreatedAt).Take(500).ToListAsync(cancellationToken);
+        var conversations = await db.ChannelThreads.AsNoTracking().Where(x => x.ConnectionId == connectionId)
+            .ToDictionaryAsync(x => x.Peer, x => x.ConversationId, cancellationToken);
+        return messages.GroupBy(x => x.Peer)
+            .Select(group =>
+            {
+                var last = group.First();
+                return new ChannelThreadRecord(group.Key,
+                    conversations.GetValueOrDefault(group.Key),
+                    group.Count(),
+                    ToMessage(last));
+            })
+            .OrderByDescending(thread => thread.LastMessage?.CreatedAt)
             .ToArray();
     }
+
+    public async Task<IReadOnlyList<ChannelMessageRecord>> ListThreadMessagesAsync(Guid ownerId, Guid connectionId,
+        string peer, int limit, CancellationToken cancellationToken)
+    {
+        if (!await db.ChannelConnections.AnyAsync(x => x.Id == connectionId && x.OwnerId == ownerId, cancellationToken))
+            return [];
+        var normalized = ChannelAddresses.Normalize(peer);
+        return (await db.ChannelMessages.AsNoTracking()
+                .Where(x => x.ConnectionId == connectionId && (x.Peer == peer || x.Peer == normalized))
+                .OrderByDescending(x => x.CreatedAt).Take(Math.Clamp(limit, 1, 200)).ToListAsync(cancellationToken))
+            .Select(ToMessage).ToArray();
+    }
+
+    private static ChannelMessageRecord ToMessage(ChannelMessageEntity x) =>
+        new(x.Id, x.ConnectionId, x.Direction, x.Peer, x.Text, x.Status, x.CreatedAt, x.ProcessedAt, x.Error);
 
     public async Task<Guid?> GetThreadConversationAsync(Guid connectionId, string sender,
         CancellationToken cancellationToken) =>

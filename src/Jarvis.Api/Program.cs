@@ -60,6 +60,7 @@ api.MapSurfaceEndpoints();
 api.MapA2AManagementEndpoints();
 api.MapDeviceEndpoints();
 api.MapBrowserEndpoints();
+api.MapPersonalAssistantEndpoints();
 
 app.MapA2AProtocol();
 

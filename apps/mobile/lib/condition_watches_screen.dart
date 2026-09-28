@@ -71,11 +71,20 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
         '/api/v1/watches',
         data: {
           'title': created.title,
+          'kind': created.kind,
           'url': created.url,
           'jsonPath': created.jsonPath,
           'comparison': created.comparison,
           'threshold': created.threshold,
           'intervalMinutes': created.intervalMinutes,
+          if (created.credentialProvider != null)
+            'credentialProvider': created.credentialProvider,
+          if (created.latitude != null) 'latitude': created.latitude,
+          if (created.longitude != null) 'longitude': created.longitude,
+          if (created.radiusMeters != null)
+            'radiusMeters': created.radiusMeters,
+          if (created.minutesBefore != null)
+            'minutesBefore': created.minutesBefore,
         },
       );
       await _load();
@@ -83,7 +92,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
       if (mounted) {
         final message = error.response?.statusCode == 503
             ? 'The durable watch service is unavailable. Try again shortly.'
-            : 'Jarvis could not start that watch. Check that the URL is public HTTPS and returns JSON.';
+            : 'Jarvis could not start that watch. Check the watch type, URL, and threshold.';
         _showError(message);
       }
     } catch (_) {
@@ -127,8 +136,18 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
   }
 
   String _condition(Map<String, dynamic> watch) {
+    final kind = asJsonString(watch['kind']) ?? 'public_json';
     final comparison = watch['comparison'] == 'below' ? '≤' : '≥';
-    return '${watch['jsonPath']} $comparison ${watch['threshold']}';
+    return switch (kind) {
+      'device_battery' => 'battery $comparison ${watch['threshold']}%',
+      'device_location' =>
+        'distance $comparison ${watch['radiusMeters'] ?? watch['threshold']} m',
+      'calendar' =>
+        'next event in ≤ ${watch['minutesBefore'] ?? watch['threshold']} min',
+      'authenticated_json' =>
+        '${watch['jsonPath']} $comparison ${watch['threshold']} (auth)',
+      _ => '${watch['jsonPath']} $comparison ${watch['threshold']}',
+    };
   }
 
   @override

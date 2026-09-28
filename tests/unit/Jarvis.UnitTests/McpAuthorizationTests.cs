@@ -12,6 +12,17 @@ namespace Jarvis.UnitTests;
 public sealed class McpAuthorizationTests
 {
     [Fact]
+    public void FormatAsk_can_point_at_an_in_app_connect_link()
+    {
+        var json = McpAuthorization.FormatAsk("Calendar", "jarvis-pack-calendar",
+            startUrl: "https://mcp.example.net/authorize");
+        using var document = JsonDocument.Parse(json);
+        Assert.Equal("https://mcp.example.net/authorize", document.RootElement.GetProperty("startUrl").GetString());
+        Assert.Contains("Jarvis connect link", document.RootElement.GetProperty("message").GetString());
+        Assert.DoesNotContain("store a token under provider", document.RootElement.GetProperty("message").GetString());
+    }
+
+    [Fact]
     public void FormatAsk_requires_the_user_to_authorize_and_never_collects_tokens()
     {
         var json = McpAuthorization.FormatAsk("GitHub", "github", "https://github.com/login/oauth/authorize");

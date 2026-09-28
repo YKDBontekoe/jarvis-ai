@@ -83,7 +83,7 @@ public sealed partial class McpToolHost
                 string.IsNullOrWhiteSpace(resolved.Server.CredentialProvider)
                     ? resolved.Server.Name.ToLowerInvariant()
                     : resolved.Server.CredentialProvider,
-                url, extra: "Ask the user now and wait until they finish authorization.");
+                url, extra: "Ask the user now and wait until they finish authorization. They can tap Connect on Settings → Integrations to finish OAuth in Jarvis.");
         }
         if (string.IsNullOrWhiteSpace(endpoint))
             return "Name the MCP server or pass its public HTTPS endpoint so Jarvis can request authorization.";

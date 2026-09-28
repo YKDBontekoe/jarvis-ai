@@ -262,5 +262,6 @@ void main() {
     expect(body['jsonPath'], 'data.price');
     expect(body['threshold'], 100);
     expect(body['intervalMinutes'], 15);
+    expect(body['kind'], 'public_json');
   });
 }

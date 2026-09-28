@@ -126,6 +126,73 @@ void main() {
     },
   );
 
+  testWidgets('entity screen can add a fact', (tester) async {
+    tester.view.physicalSize = const Size(900, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final http = FixtureHttp();
+    http.on('GET', '/api/v1/graph/overview', {
+      'entities': [
+        {
+          'id': '11111111-1111-1111-1111-111111111111',
+          'name': 'You',
+          'type': 'person',
+          'aliases': [],
+          'relationCount': 0,
+        },
+      ],
+      'edges': <Object>[],
+    });
+    http.on('GET', '/api/v1/memory/index-status', {
+      'active': 1,
+      'embedded': 1,
+      'graphIndexed': 1,
+    });
+    http.on(
+      'GET',
+      '/api/v1/graph/entities/11111111-1111-1111-1111-111111111111',
+      {
+        'entity': {
+          'id': '11111111-1111-1111-1111-111111111111',
+          'name': 'You',
+          'type': 'person',
+          'aliases': [],
+        },
+        'current': <Object>[],
+        'history': <Object>[],
+      },
+    );
+    http.on('POST', '/api/v1/graph/facts', {'merged': 1});
+
+    await tester.pumpWidget(
+      MaterialApp(home: KnowledgeGraphScreen(http: http.client())),
+    );
+    await settle(tester);
+    await tester.tap(find.byKey(const Key('entity-You')));
+    await settle(tester);
+    await tester.tap(find.byKey(const Key('open-timeline')));
+    await settle(tester);
+
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await settle(tester);
+    await tester.tap(find.text('Add fact'));
+    await settle(tester);
+    await tester.enterText(find.byType(TextField).at(0), 'lives_in');
+    await tester.enterText(find.byType(TextField).at(1), 'Amsterdam');
+    await tester.tap(find.text('Save'));
+    await settle(tester);
+
+    expect(http.sent('POST', '/api/v1/graph/facts').single.body, {
+      'subject': 'You',
+      'subjectType': 'person',
+      'predicate': 'lives_in',
+      'object': 'Amsterdam',
+      'objectIsEntity': false,
+      'exclusive': true,
+    });
+  });
+
   testWidgets('map selects a node, shows literal facts, and filters the list', (
     tester,
   ) async {

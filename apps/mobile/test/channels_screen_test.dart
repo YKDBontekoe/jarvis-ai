@@ -136,4 +136,54 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Home WhatsApp'), findsOneWidget);
   });
+
+  testWidgets('channel detail lists threads and opens a peer conversation', (
+    tester,
+  ) async {
+    const id = '11111111-1111-1111-1111-111111111111';
+    http.on('GET', '/api/v1/channels', [_channel()]);
+    http.on('GET', '/api/v1/channels/signal/status', {
+      'configured': false,
+      'accounts': <String>[],
+    });
+    http.on('GET', '/api/v1/channels/$id/messages', [
+      {
+        'id': 'm1',
+        'direction': 'in',
+        'peer': '+31612345678',
+        'text': 'Hello from WhatsApp',
+        'status': 'received',
+      },
+    ]);
+    http.on('GET', '/api/v1/channels/$id/threads', [
+      {
+        'peer': '+31612345678',
+        'messageCount': 1,
+        'lastMessage': {
+          'text': 'Hello from WhatsApp',
+          'direction': 'in',
+        },
+      },
+    ]);
+    http.on(
+      'GET',
+      '/api/v1/channels/$id/threads/${Uri.encodeComponent('+31612345678')}/messages',
+      [
+        {
+          'id': 'm1',
+          'direction': 'in',
+          'peer': '+31612345678',
+          'text': 'Hello from WhatsApp',
+          'status': 'received',
+        },
+      ],
+    );
+    await show(tester, ChannelsScreen(http: http.client()));
+    await tester.tap(find.text('Home WhatsApp'));
+    await tester.pumpAndSettle();
+    expect(find.text('+31612345678'), findsWidgets);
+    await tester.tap(find.byKey(const Key('channel-thread-+31612345678')));
+    await tester.pumpAndSettle();
+    expect(find.text('Hello from WhatsApp'), findsWidgets);
+  });
 }

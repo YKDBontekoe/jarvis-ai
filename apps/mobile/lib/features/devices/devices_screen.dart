@@ -7,6 +7,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import 'device_telemetry.dart';
 
 /// Toggles which capabilities this phone or computer will honor as a device node.
 class DevicesScreen extends StatefulWidget {
@@ -86,6 +87,9 @@ class _DevicesScreenState extends State<DevicesScreen> {
         _settings = data;
         _online = jsonMaps(data['online']);
       });
+      if (asJsonBool(data['location']) || asJsonBool(data['battery'], true)) {
+        unawaited(postDeviceTelemetry(widget.http));
+      }
     } on DioException catch (error) {
       if (!mounted) return;
       setState(() {

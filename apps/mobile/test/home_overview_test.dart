@@ -208,6 +208,81 @@ void main() {
     expect(opened, isTrue);
   });
 
+  testWidgets('home briefing shows reminders, approvals, and calendar', (
+    tester,
+  ) async {
+    adapter.responses['/api/v1/tasks'] = [];
+    adapter.responses['/api/v1/home'] = {
+      'portrait': 'Robin likes quiet mornings.',
+      'reminders': [
+        {
+          'id': 'r1',
+          'title': 'Call the dentist',
+          'dueAt': '2026-09-28T18:00:00Z',
+          'status': 'pending',
+          'recurrence': 'none',
+        },
+      ],
+      'approvals': [
+        {
+          'id': 'a1',
+          'toolName': 'RunCodingTask',
+          'createdAt': '2026-09-28T12:00:00Z',
+        },
+      ],
+      'calendar': {
+        'connected': true,
+        'source': 'ics',
+        'events': [
+          {
+            'title': 'Standup',
+            'startAt': '2026-09-28T09:00:00Z',
+          },
+        ],
+      },
+      'device': {
+        'batteryPercent': 64,
+        'charging': true,
+        'hasLocation': true,
+        'reportedAt': '2026-09-28T12:00:00Z',
+      },
+      'packs': [
+        {'id': 'mail', 'name': 'Mail', 'category': 'mail', 'installed': false},
+      ],
+    };
+    var openedApprovals = false;
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HomeOverview(
+            http: http,
+            mark: const Icon(Icons.blur_on),
+            ready: true,
+            voiceStarting: false,
+            onTalk: () {},
+            onOpenTasks: () {},
+            onOpenApprovals: () => openedApprovals = true,
+            onOpenReminders: () {},
+            onOpenIntegrations: () {},
+            refreshRevision: 0,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Robin likes quiet mornings.'), findsOneWidget);
+    expect(find.textContaining('approval'), findsOneWidget);
+    expect(find.textContaining('Call the dentist'), findsOneWidget);
+    expect(find.textContaining('Standup'), findsOneWidget);
+    expect(find.textContaining('64%'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('home-approvals')));
+    expect(openedApprovals, isTrue);
+  });
+
   testWidgets('task details show only approvals belonging to that task', (
     tester,
   ) async {

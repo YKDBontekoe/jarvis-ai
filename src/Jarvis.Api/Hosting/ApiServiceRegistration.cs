@@ -6,6 +6,7 @@ using Jarvis.Api.Realtime;
 using Jarvis.Api.Security;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
+using Jarvis.Application.Integrations;
 using Jarvis.Application.Workflows;
 using Jarvis.Infrastructure;
 using Jarvis.Infrastructure.Identity;
@@ -97,6 +98,10 @@ internal static class ApiServiceRegistration
         services.AddScoped<IDailyBriefingService, DailyBriefingService>();
         services.AddScoped<IJarvisTaskRepository, WorkflowRepository>();
         services.AddScoped<IJarvisTaskService, JarvisTaskService>();
+        services.AddSingleton<PublicJsonMetricReader>();
+        services.AddScoped<ICalendarFeed, CalendarFeed>();
+        services.AddScoped<WatchMetricReader>();
+        services.AddScoped<Jarvis.Application.Integrations.IMcpOAuthService, Jarvis.Mcp.McpOAuthService>();
         services.AddSingleton<ITaskRunAbort, TaskRunAbort>();
         services.AddJarvisAgent(configuration);
         services.AddSingleton<Jarvis.Application.Realtime.IRealtimePublisher, Devices.SignalRRealtimePublisher>();

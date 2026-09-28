@@ -27,12 +27,16 @@ public sealed record ReminderDeliveryResult(bool Continue, DateTimeOffset NextDu
 
 public sealed record ConditionWatchRecord(Guid Id, Guid OwnerId, string Title, string Url, string JsonPath,
     string Comparison, double Threshold, int IntervalMinutes, string WorkflowId, string Status,
-    DateTimeOffset CreatedAt, DateTimeOffset? LastCheckedAt, double? LastValue);
+    DateTimeOffset CreatedAt, DateTimeOffset? LastCheckedAt, double? LastValue,
+    string Kind = WatchKinds.PublicJson, string? CredentialProvider = null, double? Latitude = null,
+    double? Longitude = null, double? RadiusMeters = null, int? MinutesBefore = null);
 
 public sealed record ConditionWatchWorkflowInput(Guid WatchId);
 public sealed record ConditionWatchCheckResult(bool Continue, int IntervalMinutes);
 public sealed record CreateConditionWatchRequest(string Title, string Url, string JsonPath,
-    string Comparison, double Threshold, int IntervalMinutes = 15);
+    string Comparison, double Threshold, int IntervalMinutes = 15, string? Kind = null,
+    string? CredentialProvider = null, double? Latitude = null, double? Longitude = null,
+    double? RadiusMeters = null, int? MinutesBefore = null);
 
 public sealed record DailyBriefingPreferenceRecord(Guid OwnerId, bool Enabled, TimeOnly LocalTime,
     string TimeZoneId, string WorkflowId, DateTimeOffset? ScheduleDispatchedAt, DateOnly? LastDeliveredDate);
