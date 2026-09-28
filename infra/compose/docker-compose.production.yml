@@ -113,6 +113,17 @@ services:
       - "${LIVEKIT_BIND_ADDRESS:-0.0.0.0}:50000-50100:50000-50100/udp"
     networks: [application]
 
+  signal-cli:
+    image: bbernhard/signal-cli-rest-api:latest
+    restart: unless-stopped
+    environment:
+      MODE: json-rpc
+    volumes:
+      - signal-cli-data:/home/.local/share/signal-cli
+    mem_limit: 2g
+    cpus: 1.0
+    networks: [application]
+
   jarvis-api:
     image: ${JARVIS_API_IMAGE:-ghcr.io/ykdbontekoe/jarvis-ai/api:latest}
     build:
@@ -164,7 +175,7 @@ services:
       Voice__WorkerSecret: ${VOICE_WORKER_SECRET:?Set VOICE_WORKER_SECRET}
       Jarvis__PublicBaseUrl: ${JARVIS_WEB_ORIGIN:?Set JARVIS_WEB_ORIGIN}
       Channels__PublicBaseUrl: ${JARVIS_WEB_ORIGIN:?Set JARVIS_WEB_ORIGIN}
-      Channels__Signal__BaseUrl: ${SIGNAL_CLI_REST_URL:-}
+      Channels__Signal__BaseUrl: ${SIGNAL_CLI_REST_URL:-http://signal-cli:8080}
       Push__FirebaseProjectId: ${FIREBASE_PROJECT_ID:-}
       Push__GoogleServiceAccountFile: /run/secrets/firebase-service-account.json
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
@@ -182,6 +193,8 @@ services:
       clamav:
         condition: service_healthy
       livekit:
+        condition: service_started
+      signal-cli:
         condition: service_started
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5082/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -277,3 +290,4 @@ volumes:
   clamav-signatures:
   caddy-data:
   caddy-config:
+  signal-cli-data:

@@ -6,6 +6,7 @@ using Jarvis.Api.Conversations;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Channels;
 using Jarvis.Domain.Conversations;
+using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace Jarvis.UnitTests;
@@ -133,5 +134,18 @@ public sealed class ChannelTests
         Assert.True(ChannelNotificationForwarder.CanMessage(connection with { Kind = ChannelKinds.Signal, LastInboundAt = null }, now));
         Assert.False(ChannelNotificationForwarder.ShouldForward("approval.required"));
         Assert.True(ChannelNotificationForwarder.ShouldForward("reminder.due"));
+    }
+
+    [Fact]
+    public void Channel_options_read_the_signal_cli_base_url()
+    {
+        var configured = ChannelOptions.From(new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?> { ["Channels:Signal:BaseUrl"] = " http://signal-cli:8080/ " }).Build());
+        var missing = ChannelOptions.From(new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?> { ["Channels:Signal:BaseUrl"] = "  " }).Build());
+
+        Assert.Equal("http://signal-cli:8080/", configured.SignalBaseUrl);
+        Assert.Null(missing.SignalBaseUrl);
+        Assert.Null(ChannelOptions.From(new ConfigurationBuilder().Build()).SignalBaseUrl);
     }
 }

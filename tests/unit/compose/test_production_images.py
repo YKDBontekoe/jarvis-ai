@@ -76,6 +76,7 @@ class ProductionComposeImageTests(unittest.TestCase):
                 [
                     "JARVIS_API_IMAGE=ghcr.io/example/jarvis-ai/api:deadbeef",
                     "JARVIS_WORKER_IMAGE=ghcr.io/example/jarvis-ai/worker:deadbeef",
+                    "SIGNAL_CLI_REST_URL=",
                 ]
             )
             env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -99,6 +100,32 @@ class ProductionComposeImageTests(unittest.TestCase):
             self.assertIn("ghcr.io/example/jarvis-ai/api:deadbeef", rendered)
             self.assertIn("ghcr.io/example/jarvis-ai/worker:deadbeef", rendered)
             self.assertNotIn("voice-worker", rendered)
+            self.assertIn("bbernhard/signal-cli-rest-api:latest", rendered)
+            self.assertIn("http://signal-cli:8080", rendered)
+            self.assertNotIn("8080:8080", rendered)
+
+
+class SignalCliComposeTests(unittest.TestCase):
+    def test_production_defaults_signal_base_url_to_internal_service(self) -> None:
+        text = COMPOSE_FILE.read_text(encoding="utf-8")
+        self.assertIn("bbernhard/signal-cli-rest-api:latest", text)
+        self.assertIn(
+            "Channels__Signal__BaseUrl: ${SIGNAL_CLI_REST_URL:-http://signal-cli:8080}",
+            text,
+        )
+        self.assertIn("signal-cli-data:/home/.local/share/signal-cli", text)
+        self.assertNotRegex(text, r"ports:\n(?:\s+-[^\n]+\n)*\s+- [^\n]*8080:8080")
+
+    def test_development_compose_wires_signal_cli(self) -> None:
+        text = (REPO_ROOT / "infra" / "compose" / "docker-compose.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("bbernhard/signal-cli-rest-api:latest", text)
+        self.assertIn(
+            "Channels__Signal__BaseUrl: ${SIGNAL_CLI_REST_URL:-http://signal-cli:8080}",
+            text,
+        )
+        self.assertIn("${SIGNAL_CLI_BIND_ADDRESS:-127.0.0.1}:8080:8080", text)
 
 
 if __name__ == "__main__":
