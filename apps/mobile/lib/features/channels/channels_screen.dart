@@ -44,6 +44,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
   Map<String, dynamic> _signal = const {};
   bool _loading = true;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -52,19 +53,20 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
   }
 
   Future<void> _load() async {
+    final revision = ++_requestRevision;
     setState(() => _loading = true);
     try {
       final channels = await widget.http.get<dynamic>('/api/v1/channels');
       Map<String, dynamic> signal = const {};
       try {
-        final status = await widget.http.get<Map<String, dynamic>>(
+        final status = await widget.http.get<dynamic>(
           '/api/v1/channels/signal/status',
         );
         signal = jsonObject(status.data) ?? const {};
       } on DioException {
         // Signal is optional; the list of WhatsApp connections still loads.
       }
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _channels = jsonMaps(channels.data);
         _signal = signal;
@@ -72,7 +74,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
         _error = null;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error =
@@ -80,7 +82,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
             'Could not load messaging channels.';
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error = 'Could not load messaging channels.';

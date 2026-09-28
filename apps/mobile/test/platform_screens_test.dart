@@ -330,6 +330,30 @@ void main() {
     expect(saved['location'], isTrue);
   });
 
+  testWidgets('a failed device save restores the previous toggle', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/settings/devices', {
+      'location': false,
+      'battery': true,
+      'clipboard': false,
+      'openUrl': true,
+      'notify': true,
+      'online': <Object>[],
+    });
+    http.on('PUT', '/api/v1/settings/devices', {
+      'message': 'Not saved.',
+    }, status: 503);
+    await show(tester, DevicesScreen(http: http.client()));
+    final toggle = tester.widget<Switch>(find.byType(Switch).first);
+    expect(toggle.value, isFalse);
+    await tester.tap(find.byType(Switch).first);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(tester.widget<Switch>(find.byType(Switch).first).value, isFalse);
+    expect(find.text('Not saved.'), findsOneWidget);
+  });
+
   testWidgets('agents screen lists peers and inbound tokens', (tester) async {
     http.on('GET', '/api/v1/agents', [
       {
@@ -351,6 +375,51 @@ void main() {
     await show(tester, AgentsScreen(http: http.client()));
     expect(find.text('Travel'), findsOneWidget);
     expect(find.text('Home'), findsOneWidget);
+  });
+
+  testWidgets('failed agent delete shows an error instead of crashing', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/agents', [
+      {
+        'id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        'name': 'Travel',
+        'url': 'https://travel.example/a2a',
+      },
+    ]);
+    http.on('GET', '/api/v1/a2a/tokens', <Object>[]);
+    http.on('DELETE', '/api/v1/agents/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', {
+      'message': 'Still in use.',
+    }, status: 409);
+    await show(tester, AgentsScreen(http: http.client()));
+    await tester.tap(find.byTooltip('Remove'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Still in use.'), findsOneWidget);
+    expect(find.text('Travel'), findsOneWidget);
+  });
+
+  testWidgets('copying a new inbound token clears it from the screen', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/agents', <Object>[]);
+    http.on('GET', '/api/v1/a2a/tokens', <Object>[]);
+    http.on('POST', '/api/v1/a2a/tokens', {
+      'id': 'tok-1',
+      'name': 'App 2026-09-28',
+      'token': 'secret-a2a-token',
+    });
+    await show(tester, AgentsScreen(http: http.client()));
+    await tester.tap(find.text('Create token'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('secret-a2a-token'), findsOneWidget);
+    await tester.tap(find.text('Copy'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('secret-a2a-token'), findsNothing);
+    expect(
+      find.text('Token copied. It will not be shown again.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('cancelling add-agent disposes the dialog without leaking', (

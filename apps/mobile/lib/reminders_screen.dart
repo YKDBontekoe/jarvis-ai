@@ -61,9 +61,7 @@ class _RemindersScreenState extends State<RemindersScreen>
       var remindersFailed = false;
       var notificationsFailed = false;
       try {
-        final reminders = await widget.http.get<dynamic>(
-          '/api/v1/reminders',
-        );
+        final reminders = await widget.http.get<dynamic>('/api/v1/reminders');
         if (mounted && revision == _requestRevision) {
           setState(() => _reminders = jsonMaps(reminders.data));
         }
@@ -101,10 +99,11 @@ class _RemindersScreenState extends State<RemindersScreen>
   Future<void> _createReminder() async {
     var timeZoneId = 'UTC';
     try {
-      final briefing = await widget.http.get<Map<String, dynamic>>(
+      final briefing = await widget.http.get<dynamic>(
         '/api/v1/briefings/daily',
       );
-      timeZoneId = asJsonString(briefing.data?['timeZoneId']) ?? 'UTC';
+      timeZoneId =
+          asJsonString(jsonObject(briefing.data)?['timeZoneId']) ?? 'UTC';
     } on DioException {
       // Keep UTC when briefing settings are unavailable.
     }

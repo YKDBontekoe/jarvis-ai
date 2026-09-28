@@ -29,6 +29,7 @@ class _LearningScreenState extends State<LearningScreen> {
   bool _dreamingNow = false;
   String? _error;
   String? _result;
+  int _requestRevision = 0;
 
   static const _intervals = [15, 30, 60, 120, 240, 720, 1440];
   static const _dreamHours = [0, 3, 5, 22, 23];
@@ -40,12 +41,13 @@ class _LearningScreenState extends State<LearningScreen> {
   }
 
   Future<void> _load() async {
+    final revision = ++_requestRevision;
     try {
-      final response = await widget.http.get<Map<String, dynamic>>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/learning/status',
       );
       final data = jsonObject(response.data) ?? const {};
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _settings = jsonObject(data['settings']) ?? const {};
         _state = jsonObject(data['state']) ?? const {};
@@ -55,7 +57,7 @@ class _LearningScreenState extends State<LearningScreen> {
         _error = null;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error =
@@ -63,7 +65,7 @@ class _LearningScreenState extends State<LearningScreen> {
             'Could not load learning settings.';
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error = 'Could not load learning settings.';

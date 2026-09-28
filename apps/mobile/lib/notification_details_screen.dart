@@ -58,7 +58,7 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
         setState(() => _error = 'This notification has no linked item.');
         return;
       }
-      final response = await widget.http.get<Map<String, dynamic>>(path);
+      final response = await widget.http.get<dynamic>(path);
       final data = response.data;
       if (!mounted) return;
       if (data == null) {

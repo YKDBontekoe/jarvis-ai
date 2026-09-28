@@ -67,7 +67,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
 
   Future<void> _load() async {
     try {
-      final response = await widget.http.get<Map<String, dynamic>>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/settings/models',
       );
       if (!mounted) return;
@@ -108,12 +108,21 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
 
   Future<void> _loadCodex() async {
     try {
-      final response = await widget.http.get<Map<String, dynamic>>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/settings/models/codex',
       );
       if (!mounted) return;
+      final data = jsonObject(response.data);
+      if (data == null) {
+        setState(() {
+          _codexLoading = false;
+          _codexError =
+              'Could not load the models supported by the installed Codex CLI.';
+        });
+        return;
+      }
       setState(() {
-        _applyCodex(response.data ?? const {});
+        _applyCodex(data);
         _codexLoading = false;
       });
     } on DioException catch (error) {
@@ -122,6 +131,13 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
         _codexLoading = false;
         _codexError =
             firstProblemMessage(error.response?.data) ??
+            'Could not load the models supported by the installed Codex CLI.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _codexLoading = false;
+        _codexError =
             'Could not load the models supported by the installed Codex CLI.';
       });
     }
@@ -138,7 +154,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
         '/api/v1/settings/models/codex/update',
       );
       if (!mounted) return;
-      final data = response.data ?? const {};
+      final data = jsonObject(response.data) ?? const {};
       setState(() {
         _applyCodex(data);
         _notice =
@@ -193,7 +209,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
       final response = await request();
       if (!mounted) return;
       setState(() {
-        _apply(response.data ?? const {}, keyOnly: keyOnly);
+        _apply(jsonObject(response.data) ?? const {}, keyOnly: keyOnly);
         _notice = success;
       });
     } on DioException catch (error) {

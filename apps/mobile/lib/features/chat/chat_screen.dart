@@ -172,6 +172,8 @@ class _ChatScreenState extends _ChatScreenController
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _catchUpTimer?.cancel();
+    _runCancel?.cancel();
+    _catchUpGeneration++;
     _realtimeGeneration++;
     unawaited(_stopVoice());
     final hub = _hub;

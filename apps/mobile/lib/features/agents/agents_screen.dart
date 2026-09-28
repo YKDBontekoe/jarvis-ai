@@ -25,6 +25,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
   bool _loading = true;
   String? _error;
   String? _newToken;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -33,10 +34,11 @@ class _AgentsScreenState extends State<AgentsScreen> {
   }
 
   Future<void> _load() async {
+    final revision = ++_requestRevision;
     try {
       final agents = await widget.http.get<dynamic>('/api/v1/agents');
       final tokens = await widget.http.get<dynamic>('/api/v1/a2a/tokens');
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _agents = jsonMaps(agents.data);
         _tokens = jsonMaps(tokens.data);
@@ -44,7 +46,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
         _error = null;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error =
@@ -52,7 +54,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
             'Could not load Agent2Agent settings.';
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error = 'Could not load Agent2Agent settings.';
@@ -133,14 +135,16 @@ class _AgentsScreenState extends State<AgentsScreen> {
 
   Future<void> _createToken() async {
     try {
-      final response = await widget.http.post<Map<String, dynamic>>(
+      final response = await widget.http.post<dynamic>(
         '/api/v1/a2a/tokens',
         data: {
           'name': 'App ${DateTime.now().toIso8601String().substring(0, 10)}',
         },
       );
       if (!mounted) return;
-      setState(() => _newToken = asJsonString(response.data?['token']));
+      setState(
+        () => _newToken = asJsonString(jsonObject(response.data)?['token']),
+      );
       unawaited(_load());
     } on DioException catch (error) {
       if (!mounted) return;
@@ -149,6 +153,58 @@ class _AgentsScreenState extends State<AgentsScreen> {
             firstProblemMessage(error.response?.data) ??
             'Could not create a token.',
       );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not create a token.');
+    }
+  }
+
+  Future<void> _copyNewToken() async {
+    final token = _newToken;
+    if (token == null) return;
+    await Clipboard.setData(ClipboardData(text: token));
+    if (!mounted) return;
+    setState(() => _newToken = null);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Token copied. It will not be shown again.'),
+      ),
+    );
+  }
+
+  Future<void> _removeAgent(String? id) async {
+    if (id == null || id.isEmpty) return;
+    try {
+      await widget.http.delete('/api/v1/agents/$id');
+      unawaited(_load());
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not remove that agent.',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not remove that agent.');
+    }
+  }
+
+  Future<void> _removeToken(String? id) async {
+    if (id == null || id.isEmpty) return;
+    try {
+      await widget.http.delete('/api/v1/a2a/tokens/$id');
+      unawaited(_load());
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not remove that token.',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not remove that token.');
     }
   }
 
@@ -200,12 +256,9 @@ class _AgentsScreenState extends State<AgentsScreen> {
                         subtitle: Text(asJsonString(agent['url']) ?? ''),
                         trailing: IconButton(
                           tooltip: 'Remove',
-                          onPressed: () async {
-                            await widget.http.delete(
-                              '/api/v1/agents/${agent['id']}',
-                            );
-                            unawaited(_load());
-                          },
+                          onPressed: () => unawaited(
+                            _removeAgent(asJsonString(agent['id'])),
+                          ),
                           icon: const Icon(PhosphorIconsRegular.trash),
                         ),
                       ),
@@ -235,8 +288,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
                     margin: const EdgeInsets.only(top: 12),
                     actions: [
                       TextButton(
-                        onPressed: () =>
-                            Clipboard.setData(ClipboardData(text: _newToken!)),
+                        onPressed: () => unawaited(_copyNewToken()),
                         child: const Text('Copy'),
                       ),
                     ],
@@ -248,12 +300,9 @@ class _AgentsScreenState extends State<AgentsScreen> {
                     title: Text(asJsonString(token['name']) ?? 'Token'),
                     subtitle: Text(asJsonString(token['createdAt']) ?? ''),
                     trailing: IconButton(
-                      onPressed: () async {
-                        await widget.http.delete(
-                          '/api/v1/a2a/tokens/${token['id']}',
-                        );
-                        unawaited(_load());
-                      },
+                      tooltip: 'Remove token',
+                      onPressed: () =>
+                          unawaited(_removeToken(asJsonString(token['id']))),
                       icon: const Icon(PhosphorIconsRegular.trash),
                     ),
                   ),

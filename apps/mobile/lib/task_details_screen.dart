@@ -44,11 +44,10 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     try {
       Map<String, dynamic>? task;
       try {
-        final taskResponse = await widget.http.get<Map<String, dynamic>>(
+        final taskResponse = await widget.http.get<dynamic>(
           '/api/v1/tasks/${widget.taskId}',
         );
-        final data = taskResponse.data;
-        task = data == null ? null : Map<String, dynamic>.from(data);
+        task = jsonObject(taskResponse.data);
       } on DioException catch (error) {
         if (!mounted || revision != _requestRevision) return;
         setState(() {

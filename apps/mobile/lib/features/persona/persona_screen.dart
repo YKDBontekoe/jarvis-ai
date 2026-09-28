@@ -38,6 +38,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
   bool _saving = false;
   String? _error;
   String? _notice;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -63,18 +64,17 @@ class _PersonaScreenState extends State<PersonaScreen> {
   }
 
   Future<void> _load({bool traitsOnly = false}) async {
+    final revision = ++_requestRevision;
     try {
-      final response = await widget.http.get<Map<String, dynamic>>(
-        '/api/v1/persona',
-      );
-      if (!mounted) return;
+      final response = await widget.http.get<dynamic>('/api/v1/persona');
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _apply(jsonObject(response.data) ?? const {}, traitsOnly: traitsOnly);
         _loading = false;
         _error = null;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error =
@@ -82,7 +82,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
             'Could not load your persona.';
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error = 'Could not load your persona.';

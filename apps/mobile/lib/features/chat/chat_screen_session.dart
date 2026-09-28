@@ -93,12 +93,13 @@ mixin _ChatScreenSession on _ChatScreenController {
         openGeneration == _openGeneration &&
         !_signedOut &&
         !_signingOut;
-    final details = await _http.get<Map<String, dynamic>>(
+    final details = await _http.get<dynamic>(
       '/api/v1/conversations/$conversationId',
     );
     if (!isLatestOpen()) return;
-    final records = jsonMaps(details.data?['messages']);
-    final responding = asJsonBool(details.data?['responding']);
+    final body = jsonObject(details.data);
+    final records = jsonMaps(body?['messages']);
+    final responding = asJsonBool(body?['responding']);
     final approvals = await _loadConversationApprovals(conversationId);
     if (!isLatestOpen()) return;
     final knownApprovals = approvals ?? const <ApprovalEntry>[];
@@ -335,7 +336,7 @@ mixin _ChatScreenSession on _ChatScreenController {
   ]) async {
     final expectedGeneration = generation ?? _realtimeGeneration;
     try {
-      final details = await _http.get<Map<String, dynamic>>(
+      final details = await _http.get<dynamic>(
         '/api/v1/conversations/$conversationId',
       );
       final approvals = await _loadConversationApprovals(conversationId);
@@ -346,7 +347,7 @@ mixin _ChatScreenSession on _ChatScreenController {
           _signingOut) {
         return;
       }
-      setState(() => _replaceTranscript(details.data, approvals));
+      setState(() => _replaceTranscript(jsonObject(details.data), approvals));
       if (approvals == null) {
         unawaited(_syncConversationApprovals());
       }

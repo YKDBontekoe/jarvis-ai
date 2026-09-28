@@ -43,6 +43,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
   List<Map<String, dynamic>> _skills = const [];
   bool _loading = true;
   String? _error;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -51,17 +52,18 @@ class _SkillsScreenState extends State<SkillsScreen> {
   }
 
   Future<void> _load() async {
+    final revision = ++_requestRevision;
     setState(() => _loading = true);
     try {
       final response = await widget.http.get<dynamic>('/api/v1/skills');
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _skills = jsonMaps(response.data);
         _loading = false;
         _error = null;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error =
@@ -69,7 +71,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
             'Could not load skills.';
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error = 'Could not load skills.';
@@ -251,7 +253,7 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
 
   Future<void> _load() async {
     try {
-      final response = await widget.http.get<Map<String, dynamic>>(_path);
+      final response = await widget.http.get<dynamic>(_path);
       final data = jsonObject(response.data) ?? const {};
       if (!mounted) return;
       setState(() {

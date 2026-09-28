@@ -43,14 +43,14 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
     if (!mounted) return;
     final revision = ++_requestRevision;
     try {
-      final response = await widget.http.get<Map<String, dynamic>>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/briefings/daily',
       );
-      final data = response.data;
+      final data = jsonObject(response.data);
       if (data == null) {
         throw const FormatException('Missing briefing settings.');
       }
-      final map = Map<String, dynamic>.from(data);
+      final map = data;
       final time = (asJsonString(map['localTime']) ?? '08:00:00').split(':');
       if (mounted && revision == _requestRevision) {
         setState(() {

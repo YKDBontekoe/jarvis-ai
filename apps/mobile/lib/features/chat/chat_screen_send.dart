@@ -556,11 +556,11 @@ mixin _ChatScreenSend on _ChatScreenController {
         !_signedOut &&
         !_signingOut;
     try {
-      final details = await _http.get<Map<String, dynamic>>(
+      final details = await _http.get<dynamic>(
         '/api/v1/conversations/$conversationId',
       );
       if (!current()) return;
-      var payload = details.data;
+      var payload = jsonObject(details.data);
       var stored = jsonMaps(payload?['messages']);
       if (asJsonBool(payload?['responding']) ||
           !serverStoredReply(stored, _pendingQueryText)) {
@@ -577,11 +577,11 @@ mixin _ChatScreenSend on _ChatScreenController {
         // completion between those two reads is not shown as a failure.
         await Future<void>.delayed(const Duration(milliseconds: 300));
         if (!current()) return;
-        final confirmed = await _http.get<Map<String, dynamic>>(
+        final confirmed = await _http.get<dynamic>(
           '/api/v1/conversations/$conversationId',
         );
         if (!current()) return;
-        payload = confirmed.data;
+        payload = jsonObject(confirmed.data);
         stored = jsonMaps(payload?['messages']);
         if (asJsonBool(payload?['responding'])) {
           setState(() {

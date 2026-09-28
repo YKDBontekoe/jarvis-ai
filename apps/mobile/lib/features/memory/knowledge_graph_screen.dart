@@ -60,6 +60,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen>
   double _world = 1200;
   int _reveal = 0;
   int _revealed = 0;
+  int _requestRevision = 0;
 
   @override
   void initState() {
@@ -81,20 +82,23 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen>
   }
 
   Future<void> _load() async {
+    final revision = ++_requestRevision;
     try {
       final responses = await Future.wait([
-        widget.http.get<Map<String, dynamic>>(
+        widget.http.get<dynamic>(
           '/api/v1/graph/overview',
           queryParameters: const {'limit': 120},
         ),
-        widget.http.get<Map<String, dynamic>>('/api/v1/memory/index-status'),
+        widget.http.get<dynamic>('/api/v1/memory/index-status'),
       ]);
-      final snapshot = parseGraphOverview(responses[0].data ?? const {});
+      final snapshot = parseGraphOverview(
+        jsonObject(responses[0].data) ?? const {},
+      );
       final you = snapshot.nodes
           .where((node) => node.isYou)
           .map((node) => node.id)
           .firstOrNull;
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _snapshot = snapshot;
         _layout = layoutGraph(
@@ -112,7 +116,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen>
         if (selected != null && !_passesType(selected)) _selectedId = null;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error =
@@ -120,7 +124,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen>
             'Could not load the knowledge graph.';
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error = 'Could not load the knowledge graph.';
@@ -1168,7 +1172,7 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
 
   Future<void> _load() async {
     try {
-      final response = await widget.http.get<Map<String, dynamic>>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/graph/entities/${widget.entityId}',
       );
       if (mounted) {
