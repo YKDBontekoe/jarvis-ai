@@ -233,7 +233,7 @@ Server bootstrap:
 
 1. Clone this repository to a persistent path such as `/opt/jarvis`.
 2. Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, mode `0600`, and fill in real secrets. Set `GARAGE_CONFIG_FILE` to the private Garage config file path. The deploy job supplies the API and worker image names and commit tag.
-3. Install Docker with the Compose plugin. The checkout must be able to `git fetch` this repository; the workflow uses its short-lived `GITHUB_TOKEN` for the fetch and GHCR pull.
+3. Install Docker with the Compose plugin. The deploy workflow transfers the checked-out source to the self-hosted runner as a short-lived Git bundle, so the server does not need GitHub repository access. GHCR pulls use the workflow's short-lived `GITHUB_TOKEN`.
 4. Add repository secret `DEPLOY_PATH` for the production checkout path on the server.
 5. Register a persistent Linux x64 self-hosted runner on the production server with the `jarvis-deploy` label. Run it as the account that owns the checkout and production env file, with Docker and Compose access. The build jobs stay on GitHub-hosted runners; only the deploy job runs on the server.
 6. Set repository variable `DEPLOY_COMPOSE_FILES` to `infra/compose/docker-compose.production.tunnel.yml` when using a host-level reverse proxy or Cloudflare Tunnel instead of the bundled public Caddy edge. Optional overlays can be space-separated after it, for example `infra/compose/docker-compose.github.yml infra/compose/docker-compose.home-assistant.yml`.
