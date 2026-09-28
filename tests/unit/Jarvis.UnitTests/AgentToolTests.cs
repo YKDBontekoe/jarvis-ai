@@ -155,6 +155,65 @@ public sealed class AgentToolTests
     }
 
     [Fact]
+    public async Task Search_memory_lists_all_active_owner_memories_for_overview_questions()
+    {
+        var memories = new FakeMemoryService();
+        memories.Items.Add(new MemoryRecord(Guid.NewGuid(), OwnerId, "preference",
+            "The user prefers short answers.", 0.7f, 0.95f, "user", null,
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, false));
+        memories.Items.Add(new MemoryRecord(Guid.NewGuid(), OwnerId, "project",
+            "The user is building Jarvis.", 0.7f, 0.95f, "user", null,
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, false));
+        memories.Items.Add(new MemoryRecord(Guid.NewGuid(), OwnerId, "fact",
+            "Expired fact.", 0.7f, 0.95f, "user", null,
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(-1), false));
+        memories.Items.Add(new MemoryRecord(Guid.NewGuid(), Guid.NewGuid(), "fact",
+            "Another user's private fact.", 0.7f, 0.95f, "user", null,
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, false));
+        var tools = CreateMemoryTools(memories, new FakeAuditStore());
+
+        var result = await tools.SearchMemoryAsync("What do you remember about me?", CancellationToken.None);
+
+        Assert.Contains("The user prefers short answers.", result);
+        Assert.Contains("The user is building Jarvis.", result);
+        Assert.DoesNotContain("Expired fact", result);
+        Assert.DoesNotContain("Another user's private fact", result);
+        Assert.Empty(memories.SearchQueries);
+    }
+
+    [Theory]
+    [InlineData("What do you remember about me?")]
+    [InlineData("wat weet je over mij?")]
+    [InlineData("Laat mijn herinneringen zien")]
+    public void Memory_overview_questions_are_recognized(string query) =>
+        Assert.True(MemoryAgentTools.IsMemoryOverviewQuery(query));
+
+    [Fact]
+    public async Task Memory_context_includes_all_active_memories_for_overview_questions()
+    {
+        var memories = new FakeMemoryService();
+        memories.Items.Add(new MemoryRecord(Guid.NewGuid(), OwnerId, "fact",
+            "The user likes hiking.", 0.7f, 0.95f, "user", null,
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, false));
+        memories.Items.Add(new MemoryRecord(Guid.NewGuid(), OwnerId, "project",
+            "The user is building Jarvis.", 0.7f, 0.95f, "user", null,
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, false));
+        var provider = new PersonalMemoryContextProvider(memories,
+            new MemoryReranker(new FixedChatClientResolver(new EchoContextClient()),
+                NullLogger<MemoryReranker>.Instance), OwnerId);
+        var agent = new ChatClientAgent(new EchoContextClient(), new ChatClientAgentOptions
+        {
+            AIContextProviders = [provider]
+        });
+
+        var response = await agent.RunAsync("What do you remember about me?");
+
+        Assert.Contains("The user likes hiking.", response.Text);
+        Assert.Contains("The user is building Jarvis.", response.Text);
+        Assert.Empty(memories.SearchQueries);
+    }
+
+    [Fact]
     public async Task Forget_memory_deletes_owned_record_and_audits()
     {
         var memories = new FakeMemoryService();
@@ -299,12 +358,17 @@ public sealed class AgentToolTests
             return Task.FromResult(record);
         }
 
+        public List<string> SearchQueries { get; } = [];
+
         public Task<IReadOnlyList<MemorySearchHit>> SearchAsync(Guid ownerId, string query,
-            CancellationToken cancellationToken, string? kind = null) =>
-            Task.FromResult<IReadOnlyList<MemorySearchHit>>(Items
+            CancellationToken cancellationToken, string? kind = null)
+        {
+            SearchQueries.Add(query);
+            return Task.FromResult<IReadOnlyList<MemorySearchHit>>(Items
                 .Where(item => item.OwnerId == ownerId &&
                                item.Content.Contains(query.Split(' ')[^1].TrimEnd('.'), StringComparison.OrdinalIgnoreCase))
                 .Select(item => new MemorySearchHit(item, 1)).ToArray());
+        }
 
         public Task<MemoryRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
             Task.FromResult(Items.FirstOrDefault(item => item.Id == id && item.OwnerId == ownerId));
@@ -319,7 +383,8 @@ public sealed class AgentToolTests
             float confidence, CancellationToken cancellationToken, string sourceType = "conversation", Guid? sourceId = null) =>
             throw new NotSupportedException();
         public Task<IReadOnlyList<MemoryRecord>> ListAsync(Guid ownerId, string? kind, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<MemoryRecord>>(Items.ToArray());
+            Task.FromResult<IReadOnlyList<MemoryRecord>>(Items.Where(item => item.OwnerId == ownerId &&
+                (kind is null || item.Kind == kind)).ToArray());
         public Task<IReadOnlyList<MemoryRecord>> ListPinnedAsync(Guid ownerId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<MemoryRecord>>(Items.Where(item => item.IsPinned).ToArray());
         public Task<MemoryRecord?> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance,
