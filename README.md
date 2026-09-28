@@ -11,6 +11,7 @@ Jarvis is a self-hosted personal assistant built as a modular .NET monolith with
 - Connected device nodes over SignalR: the signed-in app can honor location, battery, clipboard, open-URL, and local notification requests, with per-capability toggles under Settings → This device
 - WhatsApp Cloud API and Signal (signal-cli REST) messaging channels, configured in the app with an allowlist, webhook copy, test send, and approval-gated replies
 - Per-owner model routing in Settings → Models: ChatGPT Codex by default, or OpenRouter with an encrypted API key, catalog picker, and connection test
+- Usage dashboard at Settings → Usage, the sidebar, and a home summary: Codex CLI and OpenRouter calls with input, output, cached, and reasoning tokens, web searches, estimated OpenRouter cost, messages sent, dreams, memories, and a personalization level based on active memory, pins, variety, and persona
 - Owner-scoped skills (`SKILL.md` import/export) that the agent can load, save, and auto-create when continuous learning is on; Skills screen lists them
 - A learned persona (traits plus custom instructions) from what the user says and how they rate replies, shown under Settings → Persona
 - Durable heartbeat/reflection Temporal workflow that writes memories, persona updates, and skills on an interval, with proactive check-in notifications
@@ -19,7 +20,7 @@ Jarvis is a self-hosted personal assistant built as a modular .NET monolith with
 - Agent tools for reminders (create, list, cancel, including daily/weekday/weekly recurrence), background tasks (create, list, cancel), condition watches (create, list, stop), memory (search, remember, and approval-gated forget), files (search, list), MCP server management, and an IANA time-zone clock; each turn also receives the current time in the owner's configured briefing time zone
 - Personal home screen with a time-based greeting, voice action, active task previews, and a shortcut to continue the current conversation; task details open from the preview, and the list refreshes on resume, task notifications, or pull to refresh
 - Approval review is available from Tasks and contextually from a task waiting for approval; task-specific review shows only that task's conversation approvals
-- Persistent primary navigation for Chat, Tasks, Voice, Memory, and Settings; reminders, approvals, files, watches, briefings, models, skills, persona, learning, channels, agents, this device, voice options, integrations, and audit log are grouped under Settings
+- Persistent primary navigation for Chat, Tasks, Voice, Memory, and Settings; reminders, approvals, files, watches, briefings, models, skills, persona, learning, channels, agents, this device, voice options, integrations, usage, and audit log are grouped under Settings
 - ASP.NET Core API with persistent conversations and Agent Framework sessions
 - SignalR events for streamed assistant text and run status through Codex CLI app-server delta notifications
 - User-visible tool activity through SignalR (`tool.started`, `tool.completed`, and `tool.failed`); only tool names and run status are sent, never arguments or results

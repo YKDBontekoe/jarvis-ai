@@ -173,10 +173,11 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                 modelActivity?.SetTag("gen_ai.request.input_images", prompt.Images.Count);
                 var modelCallStarted = Stopwatch.GetTimestamp();
                 var modelOutcome = "failed";
-                CodexTokenUsage? usage;
+                CodexTokenUsage? usage = null;
+                var webSearches = 0;
                 try
                 {
-                    usage = await rpc.RunTurnAsync(threadId, prompt, resolvedModel, delta =>
+                    var turn = await rpc.RunTurnAsync(threadId, prompt, resolvedModel, delta =>
                     {
                         if (rawResponse.Length + delta.Length > MaxOutputLength)
                             throw new InvalidOperationException("Codex CLI response exceeded the output size limit.");
@@ -192,6 +193,8 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                             });
                         }
                     }, runToken);
+                    usage = turn.Usage;
+                    webSearches += turn.WebSearchActions;
                     modelOutcome = "completed";
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -253,7 +256,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                     var retryOutcome = "failed";
                     try
                     {
-                        usage = await rpc.RunTurnAsync(threadId, retryPrompt, resolvedModel, delta =>
+                        var retry = await rpc.RunTurnAsync(threadId, retryPrompt, resolvedModel, delta =>
                         {
                             if (rawResponse.Length + delta.Length > MaxOutputLength)
                                 throw new InvalidOperationException("Codex CLI response exceeded the output size limit.");
@@ -267,6 +270,16 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                                     ModelId = resolvedModel
                                 });
                         }, runToken);
+                        usage = AddUsage(usage, retry.Usage);
+                        webSearches += retry.WebSearchActions;
+                        if (retry.Usage is { } retryUsage)
+                        {
+                            var retryTags = new TagList { { "model", resolvedModel } };
+                            InputTokens.Add(retryUsage.InputTokens, retryTags);
+                            OutputTokens.Add(retryUsage.OutputTokens, retryTags);
+                            CachedInputTokens.Add(retryUsage.CachedInputTokens, retryTags);
+                            ReasoningOutputTokens.Add(retryUsage.ReasoningOutputTokens, retryTags);
+                        }
                         retryOutcome = "completed";
                     }
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -311,11 +324,19 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                         });
                 }
 
+                var reportedUsage = ToUsageDetails(usage, webSearches);
+                if (reportedUsage is not null)
+                    updates?.TryWrite(new ChatResponseUpdate
+                    {
+                        Role = ChatRole.Assistant,
+                        ModelId = resolvedModel,
+                        Contents = [new UsageContent(reportedUsage)]
+                    });
                 writer.Close();
                 using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(2));
                 try { await process.WaitForExitAsync(shutdown.Token); }
                 catch (OperationCanceledException) { process.Kill(entireProcessTree: true); }
-                return new ChatResponse(assistant) { ModelId = resolvedModel };
+                return new ChatResponse(assistant) { ModelId = resolvedModel, Usage = reportedUsage };
             }
             finally
             {
@@ -548,6 +569,37 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
     private readonly record struct CodexTokenUsage(long InputTokens, long OutputTokens,
         long CachedInputTokens, long ReasoningOutputTokens);
 
+    private readonly record struct CodexTurnMetrics(CodexTokenUsage? Usage, int WebSearchActions);
+
+    private static CodexTokenUsage? AddUsage(CodexTokenUsage? left, CodexTokenUsage? right)
+    {
+        if (left is null) return right;
+        if (right is null) return left;
+        return new CodexTokenUsage(left.Value.InputTokens + right.Value.InputTokens,
+            left.Value.OutputTokens + right.Value.OutputTokens,
+            left.Value.CachedInputTokens + right.Value.CachedInputTokens,
+            left.Value.ReasoningOutputTokens + right.Value.ReasoningOutputTokens);
+    }
+
+    private static UsageDetails? ToUsageDetails(CodexTokenUsage? usage, int webSearches)
+    {
+        if (usage is null && webSearches <= 0) return null;
+        var details = new UsageDetails
+        {
+            InputTokenCount = usage?.InputTokens ?? 0,
+            OutputTokenCount = usage?.OutputTokens ?? 0,
+            TotalTokenCount = (usage?.InputTokens ?? 0) + (usage?.OutputTokens ?? 0),
+            CachedInputTokenCount = usage?.CachedInputTokens ?? 0,
+            ReasoningTokenCount = usage?.ReasoningOutputTokens ?? 0
+        };
+        if (webSearches > 0)
+        {
+            details.AdditionalCounts ??= new AdditionalPropertiesDictionary<long>();
+            details.AdditionalCounts["webSearchActions"] = webSearches;
+        }
+        return details;
+    }
+
     private sealed record AvailableModel(string Model, string? Id, IReadOnlySet<string> InputModalities, bool IsDefault);
 
     private sealed class AppServerConnection(StreamWriter writer, StreamReader reader, Task<string> stderrTask)
@@ -609,9 +661,11 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                 ?? throw new InvalidOperationException("Codex CLI app-server returned no thread identifier.");
         }
 
-        public async Task<CodexTokenUsage?> RunTurnAsync(string threadId, PromptPayload prompt, string modelId,
+        public async Task<CodexTurnMetrics> RunTurnAsync(string threadId, PromptPayload prompt, string modelId,
             Action<string> onDelta, CancellationToken cancellationToken)
         {
+            _latestUsage = null;
+            var webSearches = 0;
             // Tool validation is performed by the outer client after parsing the structured response.
             // The prompt itself contains the exact allowlisted function definitions.
             var requestId = ++_requestId;
@@ -657,6 +711,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                     item.TryGetProperty("type", out var itemType) && itemType.GetString() == "webSearch")
                 {
                     WebSearchActions.Add(1);
+                    webSearches++;
                 }
                 else if (methodName == "turn/completed")
                 {
@@ -671,7 +726,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                         throw new InvalidOperationException("Codex CLI model turn " + (status ?? "failed") +
                             (string.IsNullOrWhiteSpace(error) ? "." : ": " + Limit(error, 2_000)));
                     }
-                    return _latestUsage;
+                    return new CodexTurnMetrics(_latestUsage, webSearches);
                 }
             }
         }

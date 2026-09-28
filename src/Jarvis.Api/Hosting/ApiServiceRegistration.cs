@@ -110,7 +110,6 @@ internal static class ApiServiceRegistration
         services.AddSingleton<RemoteQueryExecutor>();
         services.AddSingleton<VoiceConversationCoordinator>();
         services.AddHttpClient<LiveKitAgentDispatchClient>();
-        services.AddHttpClient<Jarvis.Agents.ModelProviders.OpenRouterCatalog>(client => client.Timeout = TimeSpan.FromSeconds(20));
         services.AddHttpClient("npm-registry", client =>
         {
             client.Timeout = TimeSpan.FromSeconds(20);
