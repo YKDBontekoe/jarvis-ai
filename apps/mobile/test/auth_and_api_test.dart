@@ -143,6 +143,16 @@ void main() {
     expect(blocked.error, 'That URL cannot be opened.');
     expect(blocked.result, isNull);
 
+    final script = await performDeviceCapability(
+      capability: 'open_url',
+      event: {
+        'arguments': {'url': 'javascript:alert(1)'},
+      },
+      mounted: true,
+      context: context,
+    );
+    expect(script.error, 'That URL cannot be opened.');
+
     final missing = await performDeviceCapability(
       capability: 'open_url',
       event: const {},
@@ -187,21 +197,24 @@ void main() {
     );
   });
 
-  testWidgets('markdown ignores non-http link taps', (tester) async {
+  testWidgets('markdown renders blocked schemes without throwing', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildJarvisTheme(),
         home: const Scaffold(
           body: JarvisMarkdown(
-            data: '[secret](file:///tmp/secret) [script](javascript:alert(1))',
+            data:
+                '[secret](file:///tmp/secret) and [script](javascript:alert(1))',
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('secret'));
-    await tester.pump();
-    await tester.tap(find.text('script'));
+    expect(find.byType(JarvisMarkdown), findsOneWidget);
+    expect(find.textContaining('secret', findRichText: true), findsWidgets);
+    await tester.tap(find.byType(JarvisMarkdown));
     await tester.pump();
   });
 }
