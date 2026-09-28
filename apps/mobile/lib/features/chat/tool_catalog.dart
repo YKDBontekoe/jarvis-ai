@@ -109,6 +109,11 @@ const _catalog = <String, ToolDescription>{
     'Discovered integration tools',
     PhosphorIconsRegular.globeSimple,
   ),
+  'RequestMcpAuthorization': ToolDescription(
+    'Asking you to authorize an integration',
+    'Asked you to authorize an integration',
+    PhosphorIconsRegular.key,
+  ),
   'AddMcpServer': ToolDescription(
     'Adding an integration',
     'Added an integration',

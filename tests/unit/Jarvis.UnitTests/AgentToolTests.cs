@@ -234,6 +234,9 @@ public sealed class AgentToolTests
         Assert.StartsWith("You are Jarvis, a capable, proactive personal assistant", defaults);
         Assert.Contains("Markdown", defaults);
         Assert.Contains("ListMemories for a general overview", defaults);
+        Assert.Contains("live Codex web search", defaults);
+        Assert.Contains("RequestMcpAuthorization", defaults);
+        Assert.Contains("ask the user to authorize", defaults);
         Assert.Contains("untrusted data", defaults);
         Assert.DoesNotContain("background task. Carry out", defaults);
 

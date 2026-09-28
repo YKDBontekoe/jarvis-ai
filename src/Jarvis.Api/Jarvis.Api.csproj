@@ -11,6 +11,8 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="Microsoft.OpenApi" />
     <PackageReference Include="Google.Apis.Auth" />
+    <PackageReference Include="Livekit.Rtc.Dotnet" />
+    <PackageReference Include="SIPSorcery" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Jarvis.UnitTests" />

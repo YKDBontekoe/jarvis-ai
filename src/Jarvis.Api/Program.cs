@@ -6,6 +6,12 @@ using Jarvis.Infrastructure.Identity;
 using Jarvis.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
+if (args is ["voice-mcp"])
+{
+    await Jarvis.Api.Realtime.VoiceMcpStdio.RunAsync();
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 builder.ValidateProductionConfiguration();
 

@@ -1,3 +1,4 @@
+using Jarvis.Agents;
 using Jarvis.Api.Endpoints;
 using Jarvis.Api.Realtime;
 using Jarvis.Application.Approvals;
@@ -22,7 +23,8 @@ public sealed class ApprovalDecisionService(
     IJarvisTaskRepository taskRepository,
     ITaskRunAbort taskRunAbort,
     IServiceScopeFactory scopes,
-    IHubContext<JarvisEventsHub> hub)
+    IHubContext<JarvisEventsHub> hub,
+    VoiceBackendSession voice)
 {
     private const string CancelledMessage = "This task was cancelled.";
 
@@ -77,6 +79,16 @@ public sealed class ApprovalDecisionService(
             if (pending.Status != "pending" &&
                 await TryCompleteAlreadyResumedAsync(ownerId, approvalId, decided, runCt) is { } alreadyResumed)
                 return alreadyResumed;
+
+            if (VoiceTools.IsVoiceApproval(decided.RequestId))
+            {
+                var voiceResult = await voice.CompleteApprovalAsync(decided, runCt);
+                await approvals.MarkResumeCompletedAsync(approvalId, ownerId, CancellationToken.None);
+                return voiceResult.IsError
+                    ? new ConversationTurnResult.Failed(voiceResult.Result)
+                    : new ConversationTurnResult.Completed(new Jarvis.Domain.Conversations.Message(
+                        decided.ConversationId, "assistant", voiceResult.Result));
+            }
 
             var outcome = await coordinator.RunAsync(ownerId, decided.ConversationId,
                 agent.ResumeReplyAsync(decided.ConversationId, decided.ToReply(), runCt), null, runCt,

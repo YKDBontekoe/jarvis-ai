@@ -35,10 +35,21 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             ConnectionTimeoutSeconds = 20,
             CredentialProvider = "jarvis-mcp-discovery"
         };
-        await using var client = await McpClient.CreateAsync(
-            CreateTransport(server, loggerFactory), cancellationToken: cancellationToken);
-        var availableTools = await client.ListToolsAsync(cancellationToken: cancellationToken);
-        return availableTools.Select(tool => tool.Name).Order(StringComparer.Ordinal).ToArray();
+        try
+        {
+            await using var client = await McpClient.CreateAsync(
+                CreateTransport(server, loggerFactory), cancellationToken: cancellationToken);
+            var availableTools = await client.ListToolsAsync(cancellationToken: cancellationToken);
+            return availableTools.Select(tool => tool.Name).Order(StringComparer.Ordinal).ToArray();
+        }
+        catch (Exception exception) when (CancellationExceptions.Unwrap(exception) is { } canceled)
+        {
+            throw canceled;
+        }
+        catch (Exception exception) when (McpAuthorization.IsAuthorizationFailure(exception))
+        {
+            throw new McpAuthorizationRequiredException(validatedEndpoint, exception);
+        }
     }
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
@@ -394,6 +405,12 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
         foreach (var client in _clients)
             await client.DisposeAsync();
     }
+}
+
+public sealed class McpAuthorizationRequiredException(string endpoint, Exception inner)
+    : InvalidOperationException("This MCP server requires authorization before Jarvis can use it.", inner)
+{
+    public string Endpoint { get; } = endpoint;
 }
 
 public sealed record McpServerConnectionStatus(string Name, string State, int ToolCount, string? Issue,

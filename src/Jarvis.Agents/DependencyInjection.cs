@@ -69,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<Learning.DreamingService>();
         services.AddScoped<IDailyBriefingNarrator, DailyBriefingNarrator>();
         services.AddScoped<JarvisAgentFactory>();
+        services.AddScoped<VoiceSessionContext>();
         services.AddScoped<IJarvisAgent, JarvisAgent>();
         return services;
     }

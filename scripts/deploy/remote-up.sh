@@ -22,7 +22,6 @@ fi
 required_images=(
   "${JARVIS_API_IMAGE:?Set JARVIS_API_IMAGE to the GHCR api image}"
   "${JARVIS_WORKER_IMAGE:?Set JARVIS_WORKER_IMAGE to the GHCR worker image}"
-  "${JARVIS_VOICE_WORKER_IMAGE:?Set JARVIS_VOICE_WORKER_IMAGE to the GHCR voice-worker image}"
 )
 
 # Tag the currently deployed image IDs before pulling. This preserves the complete
@@ -30,8 +29,8 @@ required_images=(
 # "latest"). The prior rollback tags are removed after the next healthy deployment.
 image_prefix="${required_images[0]%/api:*}"
 previous_images=()
-services=(jarvis-api jarvis-worker jarvis-voice-worker)
-service_images=(api worker voice-worker)
+services=(jarvis-api jarvis-worker)
+service_images=(api worker)
 for index in "${!services[@]}"; do
   service="${services[$index]}"
   image_name="${service_images[$index]}"
@@ -55,13 +54,13 @@ echo "Pulling Jarvis images:"
 printf '  %s\n' "${required_images[@]}"
 
 docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" pull \
-  jarvis-api jarvis-worker jarvis-voice-worker garage
+  jarvis-api jarvis-worker garage
 
 docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" up \
   -d --no-build --remove-orphans
 
-# Do not discard rollback images until the new API is healthy and both workers
-# are running. A failed deployment leaves the previous images available.
+# Do not discard rollback images until the new API is healthy and the Temporal
+# worker is running. A failed deployment leaves the previous images available.
 api_container=""
 api_healthy=false
 for attempt in $(seq 1 48); do
@@ -87,7 +86,7 @@ if [[ "${api_healthy}" != true ]]; then
   exit 1
 fi
 
-for service in jarvis-worker jarvis-voice-worker; do
+for service in jarvis-worker; do
   container_id="$(docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" ps -q "${service}" | head -n1)"
   state=""
   if [[ -n "${container_id}" ]]; then

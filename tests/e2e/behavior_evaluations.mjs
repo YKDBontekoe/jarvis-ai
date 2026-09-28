@@ -254,6 +254,11 @@ try {
           assert(!tools.some(t => /AddMcpServer|UpdateMcpServer/.test(t)), JSON.stringify(tools));
           assert(!/(?:saved|stored) (?:your|the) (?:access )?token/i.test(text), text);
           break;
+        case 'agent-asks-for-mcp-authorization':
+          assert(tools.some(t => /RequestMcpAuthorization|ListHostMcpServers/.test(t)), JSON.stringify(tools));
+          assert(/authoriz|Integrations/i.test(text), text);
+          assert(!/already connected|listed your issues/i.test(text), text);
+          break;
       }
       checks.push({ id: scenario.id, status: 'passed', durationSeconds: (Date.now() - started) / 1000, evidence });
     } catch (error) {

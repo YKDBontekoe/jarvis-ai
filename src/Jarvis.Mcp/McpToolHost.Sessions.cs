@@ -23,9 +23,11 @@ public sealed partial class McpToolHost
                 var resolved = await ResolveForUseAsync(serverId, allowPaused: true, cancellationToken);
                 if (resolved.Error is not null) return resolved.Error;
                 var credential = await ResolveCredentialsAsync(resolved.Server!, cancellationToken);
-                if (!credential.Ready && !IntegrationCredentialProviders.IsUserMcpServerId(resolved.Server!.CredentialProvider))
+                if (!credential.Ready)
                 {
-                    return FormatPendingHostCatalog(resolved.Server, resolved);
+                    return IntegrationCredentialProviders.IsUserMcpServerId(resolved.Server!.CredentialProvider)
+                        ? FormatAuthorizationRequired(resolved.Server, resolved)
+                        : FormatPendingHostCatalog(resolved.Server, resolved);
                 }
                 return await WithClientAsync(resolved.Server!, async (client, secrets) =>
                     FormatCatalog(await ReadCatalogAsync(client, cancellationToken), resolved, secrets), cancellationToken);
@@ -52,7 +54,49 @@ public sealed partial class McpToolHost
         catch (Exception exception)
         {
             logger.LogWarning("MCP inspection failed ({FailureType}).", exception.GetType().Name);
-            return "Could not inspect MCP server. It may require authentication or may be unavailable. Keep credentials out of chat and store them in Integrations.";
+            if (McpAuthorization.IsAuthorizationFailure(exception))
+            {
+                var target = !string.IsNullOrWhiteSpace(serverId) ? serverId : endpoint;
+                var url = await McpAuthorizationDiscovery.DiscoverAuthorizationUrlAsync(endpoint, exception,
+                    cancellationToken);
+                return McpAuthorizationDiscovery.AuthorizationFailureMessage(target, target, url);
+            }
+            return "Could not inspect MCP server. It may require authentication or may be unavailable. Ask the user to authorize it in Settings → Integrations before trying again, and keep credentials out of chat.";
+        }
+    }
+
+    public async Task<string> RequestAuthorizationAsync(string? server, string? endpoint,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(server) && !string.IsNullOrWhiteSpace(endpoint))
+            return "Pass either a server id/name or an endpoint, not both.";
+        if (!string.IsNullOrWhiteSpace(server))
+        {
+            var resolved = await ResolveForUseAsync(server, allowPaused: true, cancellationToken);
+            if (resolved.Error is not null) return resolved.Error;
+            var credential = await ResolveCredentialsAsync(resolved.Server!, cancellationToken);
+            if (credential.Ready)
+                return "This MCP server already has stored credentials. Discover its tools. If it still fails, ask the user to rotate the token in Settings → Integrations.";
+            var url = await McpAuthorizationDiscovery.DiscoverAuthorizationUrlAsync(resolved.Server!.Endpoint, null,
+                cancellationToken);
+            return McpAuthorization.FormatAsk(resolved.Server.Name,
+                string.IsNullOrWhiteSpace(resolved.Server.CredentialProvider)
+                    ? resolved.Server.Name.ToLowerInvariant()
+                    : resolved.Server.CredentialProvider,
+                url, extra: "Ask the user now and wait until they finish authorization.");
+        }
+        if (string.IsNullOrWhiteSpace(endpoint))
+            return "Name the MCP server or pass its public HTTPS endpoint so Jarvis can request authorization.";
+        try
+        {
+            var validated = await McpServerEndpointValidator.ValidateAsync(endpoint, cancellationToken);
+            var url = await McpAuthorizationDiscovery.DiscoverAuthorizationUrlAsync(validated, null, cancellationToken);
+            return McpAuthorization.FormatAsk(validated, null, url,
+                extra: "Register the server after the user authorizes it.");
+        }
+        catch (ArgumentException exception)
+        {
+            return $"Could not request MCP authorization: {exception.Message}";
         }
     }
 
@@ -86,7 +130,13 @@ public sealed partial class McpToolHost
         catch (Exception exception)
         {
             logger.LogWarning("MCP tool {ToolName} failed ({FailureType}).", toolName, exception.GetType().Name);
-            return "The MCP tool call failed. If it needs a token, store one in Integrations and try again.";
+            if (McpAuthorization.IsAuthorizationFailure(exception))
+            {
+                var url = await McpAuthorizationDiscovery.DiscoverAuthorizationUrlAsync(null, exception,
+                    cancellationToken);
+                return McpAuthorizationDiscovery.AuthorizationFailureMessage(serverKey, serverKey, url);
+            }
+            return "The MCP tool call failed. If it needs authorization, ask the user to authorize it in Settings → Integrations and try again.";
         }
     }
 
@@ -209,7 +259,7 @@ public sealed partial class McpToolHost
             return await action(session.Client, session.Secrets);
         var credential = await ResolveCredentialsAsync(server, cancellationToken);
         if (!credential.Ready)
-            return "That MCP server needs a token in Integrations before Jarvis can use it.";
+            return FormatAuthorizationRequired(server, new ResolvedMcpServer(server, true, true));
         if (IntegrationCredentialProviders.IsUserMcpServerId(server.CredentialProvider))
         {
             if (server.Transport.Equals("streamableHttp", StringComparison.OrdinalIgnoreCase))
@@ -296,13 +346,28 @@ public sealed partial class McpToolHost
             credentialProvider = provider,
             hasCredentials = false,
             state = "needs_credentials",
+            askUser = true,
+            mustAsk = true,
             operatorAllowlist = configuredTools,
             enabledTools = configuredTools,
             allowsAllTools = McpToolSelection.AllowsAll(configuredTools),
             toolCount = 0,
             tools = Array.Empty<object>(),
-            nextStep = $"Store a token in Integrations under provider '{provider}' and credential name 'token', then discover again with serverId '{server.Name}' to list live tools."
+            authorization = JsonSerializer.Deserialize<JsonElement>(
+                McpAuthorization.FormatAsk(server.Name, provider)),
+            nextStep = $"Ask the user to authorize '{server.Name}' now. Store a token in Settings → Integrations under provider '{provider}' and credential name 'token', then discover again with serverId '{server.Name}'."
         }, JsonOptions);
+    }
+
+    private static string FormatAuthorizationRequired(McpServerOptions server, ResolvedMcpServer resolved)
+    {
+        var provider = string.IsNullOrWhiteSpace(server.CredentialProvider)
+            ? server.Name.ToLowerInvariant()
+            : server.CredentialProvider!;
+        return McpAuthorization.FormatAsk(server.Name, provider,
+            extra: resolved.Registered
+                ? "The server is registered but is not authorized yet."
+                : "Authorize this server before discovering or invoking its tools.");
     }
 
     private static string FormatCatalog(McpServerCatalog catalog, ResolvedMcpServer resolved, string[] secrets)

@@ -123,7 +123,8 @@ services:
     user: "${JARVIS_UID:?Set JARVIS_UID}:${JARVIS_GID:?Set JARVIS_GID}"
     read_only: true
     tmpfs:
-      - /tmp:rw,nosuid,size=512m
+      - /tmp:rw,nosuid,size=1g
+      - /dev/shm:rw,nosuid,size=256m
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -238,39 +239,6 @@ services:
       temporal:
         condition: service_started
     networks: [application, data]
-
-  jarvis-voice-worker:
-    image: ${JARVIS_VOICE_WORKER_IMAGE:-ghcr.io/ykdbontekoe/jarvis-ai/voice-worker:latest}
-    build:
-      context: ../..
-      dockerfile: workers/voice/Dockerfile
-    user: "${JARVIS_UID:?Set JARVIS_UID}:${JARVIS_GID:?Set JARVIS_GID}"
-    read_only: true
-    tmpfs:
-      - /tmp:rw,nosuid,size=512m
-    restart: unless-stopped
-    mem_limit: 1g
-    cpus: 1.5
-    pids_limit: 128
-    environment:
-      HOME: /tmp
-      CODEX_HOME: /codex
-      LIVEKIT_URL: ws://livekit:7880
-      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY}
-      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET}
-      JARVIS_INTERNAL_API_URL: http://jarvis-api:5082
-      VOICE_WORKER_SECRET: ${VOICE_WORKER_SECRET:?Set VOICE_WORKER_SECRET}
-      CODEX_EXECUTABLE_PATH: /usr/local/bin/codex
-      CODEX_MODEL: ${CODEX_MODEL_REALTIME:-}
-      LOG_LEVEL: INFO
-    volumes:
-      - ${CODEX_HOME_DIR:?Set CODEX_HOME_DIR}:/codex:rw
-    depends_on:
-      jarvis-api:
-        condition: service_healthy
-      livekit:
-        condition: service_started
-    networks: [application]
 
   caddy:
     image: caddy:2-alpine

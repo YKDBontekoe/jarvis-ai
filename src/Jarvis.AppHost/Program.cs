@@ -72,19 +72,6 @@ foreach (var modelClass in builder.Configuration.GetSection("Codex:ModelClasses"
     if (!string.IsNullOrWhiteSpace(modelClass.Value))
         api.WithEnvironment($"Codex__ModelClasses__{modelClass.Key}", modelClass.Value);
 
-var voiceWorker = builder.AddExecutable("jarvis-voice-worker", "uv", Path.Combine(workspaceRoot, "workers", "voice"),
-        "run", "--locked", "--no-dev", "python", "voice_worker.py", "start")
-    .WithEnvironment("LIVEKIT_URL", "ws://localhost:7880")
-    .WithEnvironment("LIVEKIT_API_KEY", livekitApiKey)
-    .WithEnvironment("LIVEKIT_API_SECRET", livekitApiSecret)
-    .WithEnvironment("JARVIS_INTERNAL_API_URL", api.GetEndpoint("http"))
-    .WithEnvironment("VOICE_WORKER_SECRET", voiceWorkerSecret)
-    .WithEnvironment("CODEX_EXECUTABLE_PATH", "codex")
-    .WaitFor(api)
-    .WaitFor(livekit);
-if (!string.IsNullOrWhiteSpace(builder.Configuration["Codex:ModelClasses:Realtime"]))
-    voiceWorker.WithEnvironment("CODEX_MODEL", builder.Configuration["Codex:ModelClasses:Realtime"]);
-
 var worker = builder.AddProject<Projects.Jarvis_Worker>("jarvis-worker")
     .WithReference(database)
     .WithEnvironment("Coding__Repositories__0__Name", "jarvis")

@@ -18,8 +18,9 @@ public abstract record ConversationTurnResult
 }
 
 /// <summary>
-/// Runs one user turn through the shared conversation, approval, and recovery rules. HTTP chat, voice,
-/// messaging channels, and A2A all enter the agent through this service so their behavior cannot drift.
+/// Runs one user turn through the shared conversation, approval, and recovery rules. HTTP chat,
+/// messaging channels, and A2A enter the agent through this service so their behavior cannot drift.
+/// Realtime voice calls the same tools on the backend over MCP instead of converting each utterance.
 /// </summary>
 public sealed class ConversationTurnService(
     IConversationStore store,

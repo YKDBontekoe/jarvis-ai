@@ -141,6 +141,8 @@ void main() {
 
   test('tool catalog describes known and unknown tools', () {
     expect(describeTool('CreateReminder').done, 'Scheduled a reminder');
+    expect(describeTool('RequestMcpAuthorization').active,
+        'Asking you to authorize an integration');
     expect(describeTool('SearchMemoryAsync').active, 'Searching memory');
     expect(
       describeTool('github_create_issue').active,
