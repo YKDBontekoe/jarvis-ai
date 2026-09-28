@@ -20,6 +20,18 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       _conversationId == conversationId &&
       _realtimeGeneration == generation;
 
+  void _onHub(
+    HubConnection hub,
+    String event,
+    void Function(List<Object?>? arguments) handler,
+  ) {
+    hub.on(event, (arguments) {
+      try {
+        handler(arguments);
+      } catch (_) {}
+    });
+  }
+
   Future<void> _connectRealtime([int? generation]) async {
     final expectedGeneration = generation ?? _realtimeGeneration;
     final conversationId = _conversationId;
@@ -39,7 +51,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
         )
         .withAutomaticReconnect()
         .build();
-    hub.on('message.delta', (arguments) {
+    _onHub(hub, 'message.delta', (arguments) {
       final event = _payload(arguments);
       final delta = asJsonString(event?['delta']) ?? '';
       if (delta.isEmpty ||
@@ -52,7 +64,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       });
       _scrollToBottom();
     });
-    hub.on('message.completed', (arguments) {
+    _onHub(hub, 'message.completed', (arguments) {
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
       final payload = _payload(arguments);
       final content = asJsonString(payload?['content']) ?? '';
@@ -65,7 +77,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       });
       _scrollToBottom();
     });
-    hub.on('tool.started', (arguments) {
+    _onHub(hub, 'tool.started', (arguments) {
       final tool = asJsonString(_payload(arguments)?['tool']);
       if (tool == null ||
           !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
@@ -74,7 +86,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       setState(() => _toolEvent(tool));
       _scrollToBottom();
     });
-    hub.on('tool.completed', (arguments) {
+    _onHub(hub, 'tool.completed', (arguments) {
       final tool = asJsonString(_payload(arguments)?['tool']);
       if (tool == null ||
           !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
@@ -82,7 +94,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       }
       setState(() => _toolEvent(tool, success: true));
     });
-    hub.on('tool.failed', (arguments) {
+    _onHub(hub, 'tool.failed', (arguments) {
       final tool = asJsonString(_payload(arguments)?['tool']);
       if (tool == null ||
           !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
@@ -90,7 +102,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       }
       setState(() => _toolEvent(tool, success: false));
     });
-    hub.on('tool.approval_required', (arguments) {
+    _onHub(hub, 'tool.approval_required', (arguments) {
       final approval = ApprovalEntry.fromJson(_payload(arguments));
       if (approval == null ||
           !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
@@ -103,7 +115,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       });
       _scrollToBottom();
     });
-    hub.on('notification.created', (arguments) {
+    _onHub(hub, 'notification.created', (arguments) {
       final event = _payload(arguments);
       if (event == null ||
           !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
@@ -137,7 +149,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
         ),
       );
     });
-    hub.on('agent.completed', (_) {
+    _onHub(hub, 'agent.completed', (_) {
       if (_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         setState(() {
           _settleToolRuns();
@@ -145,7 +157,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
         });
       }
     });
-    hub.on('agent.failed', (arguments) {
+    _onHub(hub, 'agent.failed', (arguments) {
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
       final event = _payload(arguments);
       setState(() {
@@ -158,7 +170,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
             'Jarvis could not complete this response.';
       });
     });
-    hub.on('voice.transcript', (arguments) {
+    _onHub(hub, 'voice.transcript', (arguments) {
       final transcript = asJsonString(_payload(arguments)?['text']) ?? '';
       if (transcript.isEmpty ||
           !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
@@ -175,7 +187,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       });
       _scrollToBottom();
     });
-    hub.on('voice.failed', (arguments) {
+    _onHub(hub, 'voice.failed', (arguments) {
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
       final event = _payload(arguments);
       setState(
@@ -184,7 +196,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       );
       unawaited(_stopVoice());
     });
-    hub.on('ui.surface', (arguments) {
+    _onHub(hub, 'ui.surface', (arguments) {
       final surface = UiSurfaceEntry.fromJson(_payload(arguments));
       if (surface == null ||
           !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
@@ -196,7 +208,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       });
       _scrollToBottom();
     });
-    hub.on('browser.session', (arguments) {
+    _onHub(hub, 'browser.session', (arguments) {
       final event = _payload(arguments);
       final id = asJsonString(event?['id']);
       final goal = asJsonString(event?['goal']);
@@ -213,7 +225,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       });
       _scrollToBottom();
     });
-    hub.on('browser.step', (arguments) {
+    _onHub(hub, 'browser.step', (arguments) {
       final event = _payload(arguments);
       final sessionId = asJsonString(event?['sessionId']);
       final summary = asJsonString(event?['summary']);
@@ -234,7 +246,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       });
       _scrollToBottom();
     });
-    hub.on('device.invoke', (arguments) {
+    _onHub(hub, 'device.invoke', (arguments) {
       final event = _payload(arguments);
       final invokeId = asJsonString(event?['invokeId']);
       final capability = asJsonString(event?['capability']);
@@ -247,7 +259,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       }
       unawaited(_handleDeviceInvoke(invokeId, capability, event));
     });
-    hub.on('voice.caption', (arguments) {
+    _onHub(hub, 'voice.caption', (arguments) {
       final event = _payload(arguments);
       final text = asJsonString(event?['text']) ?? '';
       if (!_voiceCaptions ||
