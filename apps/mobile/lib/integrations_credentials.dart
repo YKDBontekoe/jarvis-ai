@@ -1,5 +1,7 @@
 part of 'integrations_screen.dart';
 
+// ignore_for_file: annotate_overrides
+
 mixin _IntegrationsCredentials on _IntegrationsController {
   Future<void> _editSecret({String? provider, String? secretName}) async {
     final replacing =

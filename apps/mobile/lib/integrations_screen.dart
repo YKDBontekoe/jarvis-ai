@@ -29,6 +29,9 @@ abstract class _IntegrationsController extends State<IntegrationsScreen> {
   bool _serversFailed = false;
   String? _error;
   int _requestRevision = 0;
+
+  Future<void> _load();
+  Future<void> _editSecret({String? provider, String? secretName});
 }
 
 class _IntegrationsScreenState extends _IntegrationsController
@@ -39,6 +42,7 @@ class _IntegrationsScreenState extends _IntegrationsController
     _load();
   }
 
+  @override
   Future<void> _load() async {
     if (!mounted) return;
     final revision = ++_requestRevision;

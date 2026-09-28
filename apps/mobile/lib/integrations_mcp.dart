@@ -1,5 +1,7 @@
 part of 'integrations_screen.dart';
 
+// ignore_for_file: annotate_overrides
+
 mixin _IntegrationsMcp on _IntegrationsController {
   Widget _managedServerCard(Map<String, dynamic> server) {
     final id = asJsonString(server['id']) ?? '';

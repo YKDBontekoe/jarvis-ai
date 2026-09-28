@@ -331,8 +331,9 @@ mixin _ChatScreenSend on _ChatScreenController {
     } on DioException catch (error) {
       if (mounted) setState(() => _error = describeApiError(error));
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() => _error = 'Jarvis could not save that rating.');
+      }
     }
   }
 
