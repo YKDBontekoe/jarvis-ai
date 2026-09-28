@@ -43,6 +43,7 @@ part 'chat_screen_catchup.dart';
 part 'chat_screen_transcript.dart';
 part 'chat_screen_voice.dart';
 part 'chat_screen_ui.dart';
+part 'chat_screen_auth.dart';
 
 const _voiceCapture = AudioCaptureOptions(
   echoCancellation: true,
@@ -68,7 +69,8 @@ class _ChatScreenState extends _ChatScreenController
         _ChatScreenCatchUp,
         _ChatScreenTranscript,
         _ChatScreenVoice,
-        _ChatScreenUi {
+        _ChatScreenUi,
+        _ChatScreenAuth {
   static const _wideLayoutWidth = 840.0;
 
   /// Outgoing content fades out before incoming content fades in, so the two

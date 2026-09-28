@@ -8,6 +8,8 @@ import 'theme.dart';
 import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
+part 'task_editor.dart';
+
 class TasksScreen extends StatefulWidget {
   const TasksScreen({required this.http, super.key});
 
@@ -58,76 +60,17 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Future<void> _createTask() async {
-    final title = TextEditingController();
-    final prompt = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final create = await showDialog<bool>(
+    final created = await showDialog<_NewTask>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Give Jarvis a task'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: title,
-                autofocus: true,
-                maxLength: 200,
-                decoration: const InputDecoration(labelText: 'Task name'),
-                validator: (value) => value == null || value.trim().isEmpty
-                    ? 'Enter a task name.'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: prompt,
-                minLines: 2,
-                maxLines: 5,
-                maxLength: 32000,
-                decoration: const InputDecoration(
-                  labelText: 'What should Jarvis do?',
-                  alignLabelWithHint: true,
-                ),
-                validator: (value) => value == null || value.trim().isEmpty
-                    ? 'Describe the task.'
-                    : null,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() ?? false) {
-                Navigator.pop(dialogContext, true);
-              }
-            },
-            child: const Text('Start task'),
-          ),
-        ],
-      ),
+      builder: (_) => const _NewTaskDialog(),
     );
-    if (create != true) {
-      title.dispose();
-      prompt.dispose();
-      return;
-    }
-    if (!mounted) {
-      title.dispose();
-      prompt.dispose();
-      return;
-    }
+    if (created == null || !mounted) return;
 
     setState(() => _creating = true);
     try {
       await widget.http.post(
         '/api/v1/tasks',
-        data: {'title': title.text.trim(), 'prompt': prompt.text.trim()},
+        data: {'title': created.title, 'prompt': created.prompt},
       );
       await _load();
     } on DioException catch (error) {
@@ -140,8 +83,6 @@ class _TasksScreenState extends State<TasksScreen> {
     } catch (_) {
       if (mounted) _showError('Jarvis could not start that task.');
     } finally {
-      title.dispose();
-      prompt.dispose();
       if (mounted) setState(() => _creating = false);
     }
   }
