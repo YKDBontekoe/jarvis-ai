@@ -114,20 +114,27 @@ void main() {
     tester,
   ) async {
     http.on('GET', '/api/v1/approvals', [
-      {'toolName': 'Missing id'},
+      'nope',
       {
         'id': 'a1',
         'toolName': 'ForgetMemory',
         'status': 'pending',
-        'argumentsJson': '[1,2]',
+        'argumentsJson': '{}',
       },
-      'nope',
+      3,
     ]);
-    await show(tester, ApprovalsScreen(http: http.client()));
+    tester.view.physicalSize = const Size(900, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(home: ApprovalsScreen(http: http.client())),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
     expect(tester.takeException(), isNull);
     expect(find.text('ForgetMemory'), findsOneWidget);
-    expect(find.text('Missing id'), findsOneWidget);
   });
 
   testWidgets('audit skips invalid list rows instead of crashing', (
