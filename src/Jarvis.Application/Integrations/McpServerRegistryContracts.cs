@@ -3,9 +3,13 @@ using System.Net;
 namespace Jarvis.Application.Integrations;
 
 public sealed record UserMcpServer(string Id, string Name, string Endpoint,
-    IReadOnlyList<string> AllowedTools, DateTimeOffset UpdatedAt, bool HasToken, bool Enabled = true);
+    IReadOnlyList<string> AllowedTools, DateTimeOffset UpdatedAt, bool HasToken, bool Enabled = true,
+    string Transport = "streamableHttp", string? Command = null, IReadOnlyList<string>? Arguments = null);
 
 public sealed record AddUserMcpServerRequest(string Name, string Endpoint, IReadOnlyList<string> AllowedTools);
+
+public sealed record AddUserMcpStdioServerRequest(string Name, string Command, IReadOnlyList<string> Arguments,
+    IReadOnlyList<string> AllowedTools);
 
 public sealed record McpServerStateRequest(bool? Enabled, string? ToolMode, IReadOnlyList<string>? AllowedTools);
 
@@ -22,6 +26,8 @@ public interface IUserMcpServerRegistry
 {
     Task<IReadOnlyList<UserMcpServer>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<UserMcpServer> AddAsync(Guid ownerId, AddUserMcpServerRequest request,
+        CancellationToken cancellationToken);
+    Task<UserMcpServer> AddStdioAsync(Guid ownerId, AddUserMcpStdioServerRequest request,
         CancellationToken cancellationToken);
     Task<UserMcpServer?> UpdateAsync(Guid ownerId, string id, AddUserMcpServerRequest request,
         CancellationToken cancellationToken);
