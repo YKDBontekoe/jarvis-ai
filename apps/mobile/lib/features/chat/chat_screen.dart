@@ -36,6 +36,7 @@ import 'remote_query.dart';
 
 part 'chat_screen_controller.dart';
 part 'chat_screen_session.dart';
+part 'chat_screen_nav.dart';
 part 'chat_screen_realtime.dart';
 part 'chat_screen_push.dart';
 part 'chat_screen_send.dart';
@@ -63,6 +64,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends _ChatScreenController
     with
         _ChatScreenSession,
+        _ChatScreenNav,
         _ChatScreenRealtime,
         _ChatScreenPush,
         _ChatScreenSend,

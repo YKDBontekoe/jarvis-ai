@@ -76,11 +76,13 @@ abstract class _ChatScreenController extends State<ChatScreen>
             entry is ApprovalEntry && entry.status == ApprovalStatus.submitting,
       );
 
-  Future<void> _openConversation(String conversationId);
+  Future<void> _initialize();
+  Future<void> _openConversation(String conversationId, {bool showHome = false});
   Future<List<ApprovalEntry>?> _loadConversationApprovals(
     String conversationId,
   );
   Future<void> _chooseConversation();
+  Future<void> _createAndOpenConversation();
   void _openUtility(String destination);
   void _selectDestination(int index);
   Future<void> _reloadConversationEntries(
