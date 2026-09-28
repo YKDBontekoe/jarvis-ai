@@ -38,7 +38,7 @@ class _TasksScreenState extends State<TasksScreen> {
       _error = null;
     });
     try {
-      final response = await widget.http.get<List<dynamic>>('/api/v1/tasks');
+      final response = await widget.http.get<dynamic>('/api/v1/tasks');
       if (mounted && revision == _requestRevision) {
         setState(
           () => _tasks = jsonMaps(response.data),

@@ -692,7 +692,7 @@ class _OpenRouterModelPickerState extends State<OpenRouterModelPicker> {
     final revision = ++_revision;
     setState(() => _loading = true);
     try {
-      final response = await widget.http.get<List<dynamic>>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/settings/models/openrouter/catalog',
         queryParameters: {
           if (_search.text.trim().isNotEmpty) 'search': _search.text.trim(),

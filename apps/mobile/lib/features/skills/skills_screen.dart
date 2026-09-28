@@ -53,7 +53,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final response = await widget.http.get<List<dynamic>>('/api/v1/skills');
+      final response = await widget.http.get<dynamic>('/api/v1/skills');
       if (!mounted) return;
       setState(() {
         _skills = jsonMaps(response.data);

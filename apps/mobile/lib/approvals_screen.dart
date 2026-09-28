@@ -39,7 +39,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
       _error = null;
     });
     try {
-      final response = await widget.http.get<List<dynamic>>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/approvals',
       );
       if (mounted && revision == _requestRevision) {

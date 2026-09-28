@@ -21,7 +21,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       if (stale()) return;
       await _enablePush();
       if (stale()) return;
-      final list = await _http.get<List<dynamic>>('/api/v1/conversations');
+      final list = await _http.get<dynamic>('/api/v1/conversations');
       if (stale()) return;
       final items = jsonMaps(list.data);
       String? conversationId;
@@ -60,8 +60,9 @@ mixin _ChatScreenSession on _ChatScreenController {
         setState(() {
           _error = describeApiError(error);
           _restoringSession = false;
-          if (isAuthExpired(error, authEnabled: _auth.enabled))
+          if (isAuthExpired(error, authEnabled: _auth.enabled)) {
             _signedOut = true;
+          }
         });
       }
     } on FormatException {
@@ -187,7 +188,7 @@ mixin _ChatScreenSession on _ChatScreenController {
     String conversationId,
   ) async {
     try {
-      final response = await _http.get<List<dynamic>>('/api/v1/approvals');
+      final response = await _http.get<dynamic>('/api/v1/approvals');
       return jsonMaps(response.data)
           .where((item) => item['conversationId'] == conversationId)
           .map(ApprovalEntry.fromJson)
@@ -490,8 +491,9 @@ mixin _ChatScreenSession on _ChatScreenController {
             _conversationId == conversationId) {
           setState(() {
             _error = describeApiError(error);
-            if (isAuthExpired(error, authEnabled: _auth.enabled))
+            if (isAuthExpired(error, authEnabled: _auth.enabled)) {
               _signedOut = true;
+            }
           });
         }
       } catch (error) {
@@ -511,7 +513,7 @@ mixin _ChatScreenSession on _ChatScreenController {
     if (_signedOut || _signingOut) return;
     final revision = ++_recentRevision;
     try {
-      final response = await _http.get<List<dynamic>>('/api/v1/conversations');
+      final response = await _http.get<dynamic>('/api/v1/conversations');
       if (!mounted ||
           _signedOut ||
           _signingOut ||

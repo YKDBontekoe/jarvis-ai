@@ -53,29 +53,25 @@ class _MemoryScreenState extends State<MemoryScreen> {
     });
     try {
       final response = query == null || query.isEmpty
-          ? await widget.http.get<List<dynamic>>(
+          ? await widget.http.get<dynamic>(
               '/api/v1/memory',
               queryParameters: {
                 if (_selectedKind != null) 'kind': _selectedKind,
               },
             )
-          : await widget.http.get<List<dynamic>>(
+          : await widget.http.get<dynamic>(
               '/api/v1/memory/search',
               queryParameters: {
                 'query': query,
                 if (_selectedKind != null) 'kind': _selectedKind,
               },
             );
-      final records = response.data ?? [];
+      final records = jsonMaps(response.data);
       final entries = <Map<String, dynamic>>[];
-      for (final item in records) {
-        if (item is! Map) continue;
-        final record = Map<String, dynamic>.from(item);
+      for (final record in records) {
         if (_searching) {
-          final memory = record['memory'];
-          if (memory is Map) {
-            entries.add(Map<String, dynamic>.from(memory));
-          }
+          final memory = jsonObject(record['memory']);
+          if (memory != null) entries.add(memory);
         } else {
           entries.add(record);
         }

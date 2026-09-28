@@ -61,7 +61,7 @@ class _RemindersScreenState extends State<RemindersScreen>
       var remindersFailed = false;
       var notificationsFailed = false;
       try {
-        final reminders = await widget.http.get<List<dynamic>>(
+        final reminders = await widget.http.get<dynamic>(
           '/api/v1/reminders',
         );
         if (mounted && revision == _requestRevision) {
@@ -71,7 +71,7 @@ class _RemindersScreenState extends State<RemindersScreen>
         remindersFailed = true;
       }
       try {
-        final notifications = await widget.http.get<List<dynamic>>(
+        final notifications = await widget.http.get<dynamic>(
           '/api/v1/notifications',
         );
         if (mounted && revision == _requestRevision) {

@@ -41,7 +41,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       var serversFailed = false;
       String? error;
       try {
-        final response = await widget.http.get<List<dynamic>>(
+        final response = await widget.http.get<dynamic>(
           '/api/v1/integrations/credentials',
         );
         if (!mounted || revision != _requestRevision) return;
@@ -51,7 +51,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         error = 'Could not load integration credentials.';
       }
       try {
-        final connectionResponse = await widget.http.get<List<dynamic>>(
+        final connectionResponse = await widget.http.get<dynamic>(
           '/api/v1/integrations/connections',
         );
         if (!mounted || revision != _requestRevision) return;
@@ -61,7 +61,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
         error ??= 'Could not load integration connections.';
       }
       try {
-        final serversResponse = await widget.http.get<List<dynamic>>(
+        final serversResponse = await widget.http.get<dynamic>(
           '/api/v1/mcp-servers',
         );
         if (!mounted || revision != _requestRevision) return;

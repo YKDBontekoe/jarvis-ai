@@ -89,8 +89,9 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
 
   Future<void> _chooseTime() async {
     final selected = await showTimePicker(context: context, initialTime: _time);
-    if (selected != null && mounted)
+    if (selected != null && mounted) {
       _discardSavedNotice(() => _time = selected);
+    }
   }
 
   void _discardSavedNotice([VoidCallback? apply]) {

@@ -54,7 +54,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final channels = await widget.http.get<List<dynamic>>('/api/v1/channels');
+      final channels = await widget.http.get<dynamic>('/api/v1/channels');
       Map<String, dynamic> signal = const {};
       try {
         final status = await widget.http.get<Map<String, dynamic>>(
@@ -268,8 +268,8 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
 
   Future<void> _load() async {
     try {
-      final list = await widget.http.get<List<dynamic>>('/api/v1/channels');
-      final messages = await widget.http.get<List<dynamic>>('$_path/messages');
+      final list = await widget.http.get<dynamic>('/api/v1/channels');
+      final messages = await widget.http.get<dynamic>('$_path/messages');
       if (!mounted) return;
       final channel = jsonMaps(list.data)
           .cast<Map<String, dynamic>?>()

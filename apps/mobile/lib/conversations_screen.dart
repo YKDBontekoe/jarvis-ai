@@ -46,7 +46,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       _error = null;
     });
     try {
-      final response = await widget.http.get<List<dynamic>>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/conversations',
       );
       if (mounted && revision == _requestRevision) {

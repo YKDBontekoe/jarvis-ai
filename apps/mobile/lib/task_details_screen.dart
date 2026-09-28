@@ -67,7 +67,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       });
       if (task == null) return;
       try {
-        final messagesResponse = await widget.http.get<List<dynamic>>(
+        final messagesResponse = await widget.http.get<dynamic>(
           '/api/v1/tasks/${widget.taskId}/messages',
         );
         if (!mounted || revision != _requestRevision) return;

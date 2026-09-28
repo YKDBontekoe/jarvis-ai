@@ -252,10 +252,10 @@ mixin _ChatScreenSend on _ChatScreenController {
 
   Future<void> _loadConversationSurfaces(String conversationId) async {
     try {
-      final response = await _http.get<List<dynamic>>(
+      final response = await _http.get<dynamic>(
         '/api/v1/conversations/$conversationId/surfaces',
       );
-      final sessions = await _http.get<List<dynamic>>(
+      final sessions = await _http.get<dynamic>(
         '/api/v1/conversations/$conversationId/browser-sessions',
       );
       if (!mounted || _conversationId != conversationId) return;

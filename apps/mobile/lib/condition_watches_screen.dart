@@ -36,7 +36,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
       _error = null;
     });
     try {
-      final response = await widget.http.get<List<dynamic>>('/api/v1/watches');
+      final response = await widget.http.get<dynamic>('/api/v1/watches');
       if (mounted && revision == _requestRevision) {
         setState(
           () => _watches = jsonMaps(response.data),

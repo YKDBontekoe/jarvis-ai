@@ -35,7 +35,7 @@ class _AuditScreenState extends State<AuditScreen> {
       _error = null;
     });
     try {
-      final response = await widget.http.get<List<dynamic>>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/audit',
         queryParameters: const {'limit': 150},
       );

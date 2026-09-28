@@ -57,7 +57,7 @@ class _FilesScreenState extends State<FilesScreen> {
       _error = null;
     });
     try {
-      final response = await widget.http.get<List<dynamic>>('/api/v1/files');
+      final response = await widget.http.get<dynamic>('/api/v1/files');
       if (mounted && revision == _requestRevision) {
         setState(
           () => _files = jsonMaps(response.data),

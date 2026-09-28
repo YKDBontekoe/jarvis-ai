@@ -34,8 +34,8 @@ class _AgentsScreenState extends State<AgentsScreen> {
 
   Future<void> _load() async {
     try {
-      final agents = await widget.http.get<List<dynamic>>('/api/v1/agents');
-      final tokens = await widget.http.get<List<dynamic>>('/api/v1/a2a/tokens');
+      final agents = await widget.http.get<dynamic>('/api/v1/agents');
+      final tokens = await widget.http.get<dynamic>('/api/v1/a2a/tokens');
       if (!mounted) return;
       setState(() {
         _agents = jsonMaps(agents.data);
