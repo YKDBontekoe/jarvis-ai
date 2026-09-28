@@ -89,7 +89,7 @@ const _options = <_AppearanceOption>[
     preference: AppearancePreference.light,
     title: 'Light',
     subtitle: 'Warm paper surfaces and dark ink',
-    icon: PhosphorIconsRegular.sun,
+    icon: PhosphorIconsRegular.lightbulb,
   ),
   _AppearanceOption(
     preference: AppearancePreference.dark,
