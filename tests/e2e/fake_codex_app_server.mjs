@@ -100,7 +100,7 @@ function plan(prompt) {
       const reminder = parseReminder(request);
       return call('CreateReminder', reminder);
     }
-    const due = last.match(/ for (\S+): /)?.[1];
+    const due = last.match(/next (\S+)\)/)?.[1] ?? last.match(/ for (\S+): /)?.[1];
     return text(`Done! I'll remind you to **${parseReminder(request).title}**` +
       (due ? ` at \`${new Date(due).toUTCString()}\`.` : '.') +
       '\n\nYou can see or cancel it any time under *Settings → Reminders*.');

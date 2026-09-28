@@ -59,6 +59,7 @@ void main() {
     expect(body['title'], 'Take out the trash');
     expect(body['recurrence'], 'weekdays');
     expect(body['timeZoneId'], 'Europe/Amsterdam');
+    expect(body['localTime'], '09:00:00');
   });
 
   testWidgets('list shows the recurrence rule beside the next fire', (

@@ -96,11 +96,6 @@ class _RemindersScreenState extends State<RemindersScreen>
   }
 
   Future<void> _createReminder() async {
-    final titleController = TextEditingController();
-    DateTime selectedDate = DateTime.now().add(const Duration(days: 1));
-    TimeOfDay selectedTime = const TimeOfDay(hour: 9, minute: 0);
-    var recurrence = 'once';
-    var weekdays = 0;
     var timeZoneId = 'UTC';
     try {
       final briefing = await widget.http.get<Map<String, dynamic>>(
@@ -110,176 +105,36 @@ class _RemindersScreenState extends State<RemindersScreen>
     } on DioException {
       // Keep UTC when briefing settings are unavailable.
     }
-    if (!mounted) {
-      titleController.dispose();
-      return;
-    }
-    final formKey = GlobalKey<FormState>();
-    final created = await showDialog<bool>(
+    if (!mounted) return;
+    final created = await showDialog<_NewReminder>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Create a reminder'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextFormField(
-                    controller: titleController,
-                    autofocus: true,
-                    maxLength: 300,
-                    decoration: const InputDecoration(
-                      labelText: 'Remind me about',
-                    ),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Enter a reminder.'
-                        : null,
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final option in const [
-                        ('once', 'Once'),
-                        ('daily', 'Daily'),
-                        ('weekdays', 'Weekdays'),
-                        ('weekly', 'Weekly'),
-                      ])
-                        ChoiceChip(
-                          key: Key('recurrence-${option.$1}'),
-                          label: Text(option.$2),
-                          selected: recurrence == option.$1,
-                          onSelected: (_) =>
-                              setDialogState(() => recurrence = option.$1),
-                        ),
-                    ],
-                  ),
-                  if (recurrence == 'weekly') ...[
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final day in _weekdayChoices)
-                          FilterChip(
-                            key: Key('weekday-${day.$1}'),
-                            label: Text(day.$2),
-                            selected: weekdays & day.$1 != 0,
-                            onSelected: (selected) => setDialogState(() {
-                              weekdays = selected
-                                  ? weekdays | day.$1
-                                  : weekdays & ~day.$1;
-                            }),
-                          ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  ListTile(
-                    tileColor: JarvisColors.surfaceMuted,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(JarvisRadii.md),
-                    ),
-                    leading: const Icon(PhosphorIconsRegular.calendarBlank),
-                    trailing: const Icon(PhosphorIconsRegular.caretDown),
-                    title: Text(
-                      MaterialLocalizations.of(
-                        context,
-                      ).formatFullDate(selectedDate),
-                    ),
-                    onTap: () async {
-                      final value = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate,
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 730)),
-                      );
-                      if (value != null) {
-                        setDialogState(() => selectedDate = value);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  ListTile(
-                    tileColor: JarvisColors.surfaceMuted,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(JarvisRadii.md),
-                    ),
-                    leading: const Icon(PhosphorIconsRegular.clock),
-                    trailing: const Icon(PhosphorIconsRegular.caretDown),
-                    title: Text(selectedTime.format(context)),
-                    onTap: () async {
-                      final value = await showTimePicker(
-                        context: context,
-                        initialTime: selectedTime,
-                      );
-                      if (value != null) {
-                        setDialogState(() => selectedTime = value);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (!(formKey.currentState?.validate() ?? false)) return;
-                if (recurrence == 'weekly' && weekdays == 0) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(
-                      content: Text('Choose at least one weekday.'),
-                    ),
-                  );
-                  return;
-                }
-                Navigator.pop(dialogContext, true);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
+      builder: (_) => const _NewReminderDialog(),
     );
-    if (created != true) {
-      titleController.dispose();
-      return;
-    }
-    if (!mounted) {
-      titleController.dispose();
-      return;
-    }
+    if (created == null || !mounted) return;
 
     final localDueAt = DateTime(
-      selectedDate.year,
-      selectedDate.month,
-      selectedDate.day,
-      selectedTime.hour,
-      selectedTime.minute,
+      created.date.year,
+      created.date.month,
+      created.date.day,
+      created.time.hour,
+      created.time.minute,
     );
-    if (!localDueAt.isAfter(DateTime.now()) && recurrence == 'once') {
-      titleController.dispose();
-      if (mounted) _showError('Choose a time in the future.');
+    if (!localDueAt.isAfter(DateTime.now()) && created.recurrence == 'once') {
+      _showError('Choose a time in the future.');
       return;
     }
+    final localTime =
+        '${created.time.hour.toString().padLeft(2, '0')}:${created.time.minute.toString().padLeft(2, '0')}:00';
     try {
       await widget.http.post(
         '/api/v1/reminders',
         data: {
-          'title': titleController.text.trim(),
+          'title': created.title,
           'dueAt': localDueAt.toUtc().toIso8601String(),
-          if (recurrence != 'once') 'recurrence': recurrence,
-          if (recurrence == 'weekly') 'weekdays': weekdays,
+          if (created.recurrence != 'once') 'recurrence': created.recurrence,
+          if (created.recurrence == 'weekly') 'weekdays': created.weekdays,
           'timeZoneId': timeZoneId,
+          'localTime': localTime,
         },
       );
       await _load();
@@ -291,8 +146,6 @@ class _RemindersScreenState extends State<RemindersScreen>
                   'Jarvis could not create that reminder.';
         _showError(message);
       }
-    } finally {
-      titleController.dispose();
     }
   }
 
@@ -468,16 +321,12 @@ class _RemindersScreenState extends State<RemindersScreen>
     ),
     body: ListScreenBody(
       loading: _loading,
-      error: (_reminders.isNotEmpty || _notifications.isNotEmpty) ? _error : null,
-      isEmpty: _reminders.isEmpty &&
-          _notifications.isEmpty &&
-          !_remindersFailed &&
-          !_notificationsFailed,
+      error: (_reminders.isNotEmpty || _notifications.isNotEmpty)
+          ? _error
+          : null,
+      isEmpty: false,
       onRetry: _load,
-      empty: TabBarView(
-        controller: _tabs,
-        children: [_buildReminders(), _buildNotifications()],
-      ),
+      empty: const SizedBox.shrink(),
       child: TabBarView(
         controller: _tabs,
         children: [_buildReminders(), _buildNotifications()],
@@ -651,3 +500,170 @@ class _RemindersScreenState extends State<RemindersScreen>
           },
         );
 }
+
+class _NewReminder {
+  const _NewReminder({
+    required this.title,
+    required this.date,
+    required this.time,
+    required this.recurrence,
+    required this.weekdays,
+  });
+
+  final String title;
+  final DateTime date;
+  final TimeOfDay time;
+  final String recurrence;
+  final int weekdays;
+}
+
+class _NewReminderDialog extends StatefulWidget {
+  const _NewReminderDialog();
+
+  @override
+  State<_NewReminderDialog> createState() => _NewReminderDialogState();
+}
+
+class _NewReminderDialogState extends State<_NewReminderDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _title = TextEditingController();
+  DateTime _date = DateTime.now().add(const Duration(days: 1));
+  TimeOfDay _time = const TimeOfDay(hour: 9, minute: 0);
+  String _recurrence = 'once';
+  int _weekdays = 0;
+
+  @override
+  void dispose() {
+    _title.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_recurrence == 'weekly' && _weekdays == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose at least one weekday.')),
+      );
+      return;
+    }
+    Navigator.pop(
+      context,
+      _NewReminder(
+        title: _title.text.trim(),
+        date: _date,
+        time: _time,
+        recurrence: _recurrence,
+        weekdays: _weekdays,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Create a reminder'),
+    content: Form(
+      key: _formKey,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextFormField(
+              controller: _title,
+              autofocus: true,
+              maxLength: 300,
+              decoration: const InputDecoration(labelText: 'Remind me about'),
+              validator: (value) =>
+                  value == null || value.trim().isEmpty ? 'Enter a reminder.' : null,
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final option in const [
+                  ('once', 'Once'),
+                  ('daily', 'Daily'),
+                  ('weekdays', 'Weekdays'),
+                  ('weekly', 'Weekly'),
+                ])
+                  ChoiceChip(
+                    key: Key('recurrence-${option.$1}'),
+                    label: Text(option.$2),
+                    selected: _recurrence == option.$1,
+                    onSelected: (_) => setState(() => _recurrence = option.$1),
+                  ),
+              ],
+            ),
+            if (_recurrence == 'weekly') ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final day in _weekdayChoices)
+                    FilterChip(
+                      key: Key('weekday-${day.$1}'),
+                      label: Text(day.$2),
+                      selected: _weekdays & day.$1 != 0,
+                      onSelected: (selected) => setState(() {
+                        _weekdays = selected
+                            ? _weekdays | day.$1
+                            : _weekdays & ~day.$1;
+                      }),
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 10),
+            ListTile(
+              tileColor: JarvisColors.surfaceMuted,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(JarvisRadii.md),
+              ),
+              leading: const Icon(PhosphorIconsRegular.calendarBlank),
+              trailing: const Icon(PhosphorIconsRegular.caretDown),
+              title: Text(
+                MaterialLocalizations.of(context).formatFullDate(_date),
+              ),
+              onTap: () async {
+                final value = await showDatePicker(
+                  context: context,
+                  initialDate: _date,
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 730)),
+                );
+                if (value != null) setState(() => _date = value);
+              },
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              tileColor: JarvisColors.surfaceMuted,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(JarvisRadii.md),
+              ),
+              leading: const Icon(PhosphorIconsRegular.clock),
+              trailing: const Icon(PhosphorIconsRegular.caretDown),
+              title: Text(_time.format(context)),
+              onTap: () async {
+                final value = await showTimePicker(
+                  context: context,
+                  initialTime: _time,
+                );
+                if (value != null) setState(() => _time = value);
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(onPressed: _save, child: const Text('Save')),
+    ],
+  );
+}
+

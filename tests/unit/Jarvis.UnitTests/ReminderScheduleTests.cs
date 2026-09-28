@@ -69,6 +69,21 @@ public sealed class ReminderScheduleTests
         Assert.Throws<ArgumentException>(() =>
             ReminderSchedule.Normalize("weekly", 0, "UTC", new TimeOnly(8, 0), null));
     }
+
+    [Fact]
+    public void Recurring_first_fire_uses_the_rule_local_time_in_the_zone()
+    {
+        var rule = ReminderSchedule.Normalize("weekdays", 0, "Europe/Amsterdam", new TimeOnly(7, 30), null);
+        var requested = new DateTimeOffset(2030, 1, 16, 12, 0, 0, TimeSpan.Zero);
+        var now = new DateTimeOffset(2030, 1, 15, 12, 0, 0, TimeSpan.Zero);
+
+        var first = ReminderSchedule.ResolveFirst(requested, rule, now);
+        var local = TimeZoneInfo.ConvertTime(first, TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam"));
+
+        Assert.Equal(new TimeOnly(7, 30), TimeOnly.FromTimeSpan(local.TimeOfDay));
+        Assert.NotEqual(DayOfWeek.Saturday, local.DayOfWeek);
+        Assert.NotEqual(DayOfWeek.Sunday, local.DayOfWeek);
+    }
 }
 
 public sealed class DailyBriefingComposerTests

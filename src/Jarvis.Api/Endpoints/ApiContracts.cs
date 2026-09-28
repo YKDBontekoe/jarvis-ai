@@ -17,7 +17,7 @@ public sealed record ApprovalDecisionRequest(bool Approved);
 public sealed record ToolApprovalDto(Guid Id, Guid ConversationId, string ToolName, string ArgumentsJson,
     string Status, bool? Approved, string ResumeStatus, DateTimeOffset CreatedAt);
 public sealed record ReminderRequest(string? Title, DateTimeOffset DueAt, string? Recurrence = null,
-    int Weekdays = 0, string? TimeZoneId = null, DateOnly? Until = null);
+    int Weekdays = 0, string? TimeZoneId = null, DateOnly? Until = null, TimeOnly? LocalTime = null);
 public sealed record ReminderDto(Guid Id, string Title, DateTimeOffset DueAt, string Status, DateTimeOffset CreatedAt,
     DateTimeOffset? CompletedAt, string Recurrence, int Weekdays, string TimeZoneId, TimeOnly? LocalTime,
     DateOnly? Until, DateTimeOffset? LastDeliveredAt);

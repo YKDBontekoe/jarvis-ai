@@ -36,7 +36,7 @@ internal static class AutomationEndpoints
             {
                 var reminder = await reminders.CreateAsync(currentUser.OwnerId, new CreateReminderRequest(
                     request.Title ?? string.Empty, request.DueAt, request.Recurrence, request.Weekdays,
-                    request.TimeZoneId, request.Until), ct);
+                    request.TimeZoneId, request.Until, request.LocalTime), ct);
                 return Results.Created($"/api/v1/reminders/{reminder.Id}", reminder.ToDto());
             }
             catch (ArgumentOutOfRangeException exception)
