@@ -22,6 +22,11 @@ public sealed partial class McpToolHost
             {
                 var resolved = await ResolveForUseAsync(serverId, allowPaused: true, cancellationToken);
                 if (resolved.Error is not null) return resolved.Error;
+                var credential = await ResolveCredentialsAsync(resolved.Server!, cancellationToken);
+                if (!credential.Ready && !IntegrationCredentialProviders.IsUserMcpServerId(resolved.Server!.CredentialProvider))
+                {
+                    return FormatPendingHostCatalog(resolved.Server, resolved);
+                }
                 return await WithClientAsync(resolved.Server!, async (client, secrets) =>
                     FormatCatalog(await ReadCatalogAsync(client, cancellationToken), resolved, secrets), cancellationToken);
             }
@@ -206,7 +211,10 @@ public sealed partial class McpToolHost
         if (!credential.Ready)
             return "That MCP server needs a token in Integrations before Jarvis can use it.";
         if (IntegrationCredentialProviders.IsUserMcpServerId(server.CredentialProvider))
-            await McpServerEndpointValidator.ValidateAsync(server.Endpoint, cancellationToken);
+        {
+            if (server.Transport.Equals("streamableHttp", StringComparison.OrdinalIgnoreCase))
+                await McpServerEndpointValidator.ValidateAsync(server.Endpoint, cancellationToken);
+        }
         var client = await McpClient.CreateAsync(CreateTransport(server, loggerFactory), cancellationToken: cancellationToken);
         var secrets = SecretValues(credential.Secrets, server);
         var live = new LiveSession(client, secrets);
@@ -269,6 +277,32 @@ public sealed partial class McpToolHost
         {
             return ([], false);
         }
+    }
+
+    private static string FormatPendingHostCatalog(McpServerOptions server, ResolvedMcpServer resolved)
+    {
+        var provider = string.IsNullOrWhiteSpace(server.CredentialProvider)
+            ? server.Name.ToLowerInvariant()
+            : server.CredentialProvider!;
+        var configuredTools = McpToolSelection.AllowsAll(server.AllowedTools)
+            ? new[] { McpToolSelection.All }
+            : server.AllowedTools;
+        return JsonSerializer.Serialize(new
+        {
+            registered = resolved.Registered,
+            enabled = resolved.Registered && resolved.Enabled,
+            hostManaged = true,
+            transport = server.Transport,
+            credentialProvider = provider,
+            hasCredentials = false,
+            state = "needs_credentials",
+            operatorAllowlist = configuredTools,
+            enabledTools = configuredTools,
+            allowsAllTools = McpToolSelection.AllowsAll(configuredTools),
+            toolCount = 0,
+            tools = Array.Empty<object>(),
+            nextStep = $"Store a token in Integrations under provider '{provider}' and credential name 'token', then discover again with serverId '{server.Name}' to list live tools."
+        }, JsonOptions);
     }
 
     private static string FormatCatalog(McpServerCatalog catalog, ResolvedMcpServer resolved, string[] secrets)

@@ -36,7 +36,17 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         CancellationToken cancellationToken)
     {
         var id = ProviderPrefix + Guid.NewGuid().ToString("N");
-        var stored = await BuildStoredAsync(request, cancellationToken);
+        var stored = await BuildHttpStoredAsync(request, cancellationToken);
+        await credentials.SaveSecretAsync(ownerId, id, ConfigSecret,
+            JsonSerializer.Serialize(stored, JsonOptions), cancellationToken);
+        return ToPublic(id, stored, DateTimeOffset.UtcNow, false);
+    }
+
+    public async Task<UserMcpServer> AddStdioAsync(Guid ownerId, AddUserMcpStdioServerRequest request,
+        CancellationToken cancellationToken)
+    {
+        var id = ProviderPrefix + Guid.NewGuid().ToString("N");
+        var stored = BuildStdioStored(request);
         await credentials.SaveSecretAsync(ownerId, id, ConfigSecret,
             JsonSerializer.Serialize(stored, JsonOptions), cancellationToken);
         return ToPublic(id, stored, DateTimeOffset.UtcNow, false);
@@ -60,7 +70,7 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         StoredServer? current = null;
         try { current = JsonSerializer.Deserialize<StoredServer>(existing[ConfigSecret], JsonOptions); }
         catch (JsonException) { }
-        var replacement = await BuildStoredAsync(request, cancellationToken);
+        var replacement = await BuildHttpStoredAsync(request, cancellationToken);
         replacement = replacement with { Enabled = current?.Enabled ?? true };
         await credentials.SaveSecretAsync(ownerId, id, ConfigSecret,
             JsonSerializer.Serialize(replacement, JsonOptions), cancellationToken);
@@ -86,7 +96,9 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         var stored = await ReadStoredAsync(ownerId, id, cancellationToken);
         if (stored is null) return null;
         var tools = McpToolSelection.Apply(stored.Value.Server.AllowedTools, mode, allowedTools);
-        var endpoint = await McpServerEndpointValidator.ValidateAsync(stored.Value.Server.Endpoint, cancellationToken);
+        var endpoint = stored.Value.Server.Transport is "stdio"
+            ? stored.Value.Server.Endpoint
+            : await McpServerEndpointValidator.ValidateAsync(stored.Value.Server.Endpoint, cancellationToken);
         var updated = stored.Value.Server with { AllowedTools = tools, Endpoint = endpoint };
         await credentials.SaveSecretAsync(ownerId, id, ConfigSecret, JsonSerializer.Serialize(updated, JsonOptions),
             cancellationToken);
@@ -103,23 +115,40 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         return stored is null ? null : (stored, secrets.ContainsKey(IntegrationCredentialProviders.UserMcpTokenSecret));
     }
 
-    private static async Task<StoredServer> BuildStoredAsync(AddUserMcpServerRequest request,
+    private static async Task<StoredServer> BuildHttpStoredAsync(AddUserMcpServerRequest request,
         CancellationToken cancellationToken)
     {
-        var name = request.Name?.Trim() ?? string.Empty;
-        if (name.Length is < 1 or > 80 || !NamePattern().IsMatch(name))
-            throw new ArgumentException("Use a server name of 1 to 80 letters, numbers, spaces, underscores, or hyphens.");
+        var name = ValidateName(request.Name);
         var allowedTools = McpToolSelection.Normalize(request.AllowedTools);
         return new StoredServer(name, await McpServerEndpointValidator.ValidateAsync(request.Endpoint, cancellationToken),
-            allowedTools, true);
+            allowedTools, true, "streamableHttp", null, [], null);
+    }
+
+    private static StoredServer BuildStdioStored(AddUserMcpStdioServerRequest request)
+    {
+        var name = ValidateName(request.Name);
+        var allowedTools = McpToolSelection.Normalize(request.AllowedTools);
+        var (command, arguments) = McpStdioCommandValidator.Normalize(request.Command, request.Arguments);
+        return new StoredServer(name, string.Empty, allowedTools, true, "stdio", command, arguments, null);
+    }
+
+    private static string ValidateName(string? name)
+    {
+        var trimmed = name?.Trim() ?? string.Empty;
+        if (trimmed.Length is < 1 or > 80 || !NamePattern().IsMatch(trimmed))
+            throw new ArgumentException("Use a server name of 1 to 80 letters, numbers, spaces, underscores, or hyphens.");
+        return trimmed;
     }
 
     public static bool IsId(string? id) => IntegrationCredentialProviders.IsUserMcpServerId(id);
 
     private static UserMcpServer ToPublic(string id, StoredServer stored, DateTimeOffset updatedAt, bool hasToken) =>
-        new(id, stored.Name, stored.Endpoint, stored.AllowedTools, updatedAt, hasToken, stored.Enabled ?? true);
+        new(id, stored.Name, stored.Endpoint, stored.AllowedTools, updatedAt, hasToken, stored.Enabled ?? true,
+            stored.Transport ?? "streamableHttp", stored.Command, stored.Arguments);
 
     [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9 _-]{0,79}$", RegexOptions.CultureInvariant)]
     private static partial Regex NamePattern();
-    private sealed record StoredServer(string Name, string Endpoint, string[] AllowedTools, bool? Enabled);
+    private sealed record StoredServer(string Name, string Endpoint, string[] AllowedTools, bool? Enabled,
+        string? Transport = null, string? Command = null, string[]? Arguments = null,
+        Dictionary<string, string>? CredentialEnvironmentVariables = null);
 }
