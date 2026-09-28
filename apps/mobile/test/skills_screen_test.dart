@@ -121,4 +121,29 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Jarvis returned an invalid skill.'), findsOneWidget);
   });
+
+  testWidgets('editing a skill without an id does not call the API', (
+    tester,
+  ) async {
+    await show(
+      tester,
+      Scaffold(
+        body: SkillEditorSheet(
+          http: http.client(),
+          existing: {
+            'name': 'trip-planning',
+            'description': 'Use for trips.',
+            'instructions': '1. Pack.',
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('save-skill')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('The skill could not be saved.'), findsOneWidget);
+    expect(http.requests, isEmpty);
+  });
 }
