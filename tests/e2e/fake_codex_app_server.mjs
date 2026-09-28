@@ -45,6 +45,10 @@ async function handle(request) {
       return send({ id: request.id, result: { data: [
         { id: MODEL, model: MODEL, inputModalities: ['text', 'image'], isDefault: true },
       ], nextCursor: null } });
+    case 'thread/realtime/listVoices':
+      return send({ id: request.id, result: { voices: {
+        v1: ['juniper', 'cove', 'spruce'], v2: ['marin'], defaultV1: 'cove', defaultV2: 'marin',
+      } } });
     case 'thread/start':
       return send({ id: request.id, result: { thread: { id: 'thread-fixture' } } });
     case 'turn/start':

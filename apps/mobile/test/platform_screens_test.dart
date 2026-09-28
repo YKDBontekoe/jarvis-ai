@@ -367,16 +367,30 @@ void main() {
     http.on('GET', '/api/v1/settings/voice', {
       'handsFree': true,
       'captions': true,
+      'voice': 'cove',
+      'defaultVoice': 'cove',
+      'voices': [
+        {'id': 'juniper', 'name': 'Juniper', 'isDefault': false},
+        {'id': 'cove', 'name': 'Cove', 'isDefault': true},
+      ],
     });
     http.on('PUT', '/api/v1/settings/voice', {
       'handsFree': true,
       'captions': false,
+      'voice': 'cove',
+      'defaultVoice': 'cove',
+      'voices': [
+        {'id': 'juniper', 'name': 'Juniper', 'isDefault': false},
+        {'id': 'cove', 'name': 'Cove', 'isDefault': true},
+      ],
     });
     await show(tester, VoiceSettingsScreen(http: http.client()));
-    expect(find.text('Hands-free'), findsOneWidget);
+    expect(find.text('Cove'), findsOneWidget);
+    expect(find.text('Codex default'), findsOneWidget);
     await tester.tap(find.byType(Switch).last);
     await tester.pumpAndSettle();
     final saved = http.sent('PUT', '/api/v1/settings/voice').single.body as Map;
     expect(saved['captions'], isFalse);
+    expect(saved['voice'], 'cove');
   });
 }

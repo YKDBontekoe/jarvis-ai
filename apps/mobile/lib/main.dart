@@ -41,6 +41,8 @@ import 'features/agents/agents_screen.dart';
 import 'features/channels/channels_screen.dart';
 import 'features/devices/devices_screen.dart';
 import 'features/settings/voice_settings_screen.dart';
+import 'features/voice/chat_gpt_voices.dart';
+import 'features/voice/voice_stage.dart';
 import 'features/skills/skills_screen.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
@@ -316,6 +318,15 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _voiceCaptions = true;
   String? _voiceCaption;
   String? _voiceCaptionRole;
+  String _voicePhase = 'idle';
+  static const _voiceCapture = AudioCaptureOptions(
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+  );
+  String _voiceName = '';
+  bool _voiceMuted = false;
+  bool _voiceUserStop = false;
   int _voiceGeneration = 0;
   CancelToken? _runCancel;
   int _selectedDestination = 0;
@@ -1157,9 +1168,19 @@ class _ChatScreenState extends State<ChatScreen> {
           !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
+      final role = asJsonString(event?['role']) ?? 'user';
+      final captionFinal = asJsonBool(event?['final']);
       setState(() {
         _voiceCaption = text;
-        _voiceCaptionRole = asJsonString(event?['role']) ?? 'user';
+        _voiceCaptionRole = role;
+        if (!_voiceActive && !_voiceStarting) return;
+        if (role == 'assistant') {
+          _voicePhase = 'speaking';
+        } else if (captionFinal) {
+          _voicePhase = 'thinking';
+        } else if (_voicePhase != 'speaking') {
+          _voicePhase = 'listening';
+        }
       });
     });
     hub.onreconnecting(({error}) {
@@ -2100,8 +2121,12 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     final voiceGeneration = ++_voiceGeneration;
+    _voiceUserStop = false;
     setState(() {
       _voiceStarting = true;
+      _voicePhase = 'connecting';
+      _voiceCaption = null;
+      _voiceCaptionRole = null;
       _selectedDestination = 2;
       _error = null;
     });
@@ -2131,6 +2156,8 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       _voiceHandsFree = session['handsFree'] != false;
       _voiceCaptions = session['captions'] != false;
+      _voiceName = asJsonString(session['voice']) ?? '';
+      _voiceMuted = !_voiceHandsFree;
       if (!_voiceCaptions) {
         _voiceCaption = null;
         _voiceCaptionRole = null;
@@ -2146,13 +2173,17 @@ class _ChatScreenState extends State<ChatScreen> {
         await _abandonVoiceRoom(room);
         return;
       }
-      await room.localParticipant?.setMicrophoneEnabled(true);
+      await room.localParticipant?.setMicrophoneEnabled(
+        _voiceHandsFree,
+        audioCaptureOptions: _voiceCapture,
+      );
       if (!isCurrent() || _voiceRoom != room) {
         await _abandonVoiceRoom(room);
         return;
       }
       setState(() {
         _voiceActive = true;
+        _voicePhase = 'listening';
         _selectedDestination = 2;
       });
     } on DioException catch (error) {
@@ -2196,19 +2227,46 @@ class _ChatScreenState extends State<ChatScreen> {
     _voiceEvents?.dispose();
     final listener = room.createListener();
     _voiceEvents = listener;
-    listener.on<RoomDisconnectedEvent>((event) {
-      if (!identical(_voiceRoom, room)) return;
-      unawaited(_stopVoice());
-      if (mounted) {
-        setState(() {
-          if (_selectedDestination == 2) _selectedDestination = 0;
-          _error ??= 'The voice session ended.';
-        });
-      }
-    });
+    listener
+      ..on<RoomDisconnectedEvent>((event) {
+        if (!identical(_voiceRoom, room)) return;
+        final userStop = _voiceUserStop;
+        unawaited(_stopVoice(leave: userStop));
+        if (mounted && !userStop) {
+          setState(() => _error ??= 'The voice session ended. Start it again to continue.');
+        }
+      })
+      ..on<ParticipantAttributesChanged>((event) {
+        if (!identical(_voiceRoom, room) || !mounted) return;
+        final next = event.participant.attributes['jarvis.voice.phase'];
+        if (next == null || next.isEmpty) return;
+        setState(() => _voicePhase = next);
+      })
+      ..on<ActiveSpeakersChangedEvent>((event) {
+        if (!identical(_voiceRoom, room) || !mounted) return;
+        final localSid = room.localParticipant?.sid;
+        final remoteSpeaking = event.speakers.any((speaker) => speaker.sid != localSid);
+        if (remoteSpeaking) setState(() => _voicePhase = 'speaking');
+      });
   }
 
-  Future<void> _stopVoice() async {
+  Future<void> _toggleVoiceMute() async {
+    final room = _voiceRoom;
+    if (room == null || !_voiceActive) return;
+    final muted = !_voiceMuted;
+    try {
+      await room.localParticipant?.setMicrophoneEnabled(
+        !muted,
+        audioCaptureOptions: _voiceCapture,
+      );
+      if (mounted && identical(_voiceRoom, room)) {
+        setState(() => _voiceMuted = muted);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _stopVoice({bool leave = true}) async {
+    _voiceUserStop = true;
     _voiceGeneration++;
     _voiceEvents?.dispose();
     _voiceEvents = null;
@@ -2226,7 +2284,11 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _voiceActive = false;
         _voiceStarting = false;
-        if (_selectedDestination == 2) _selectedDestination = 0;
+        _voicePhase = 'idle';
+        _voiceMuted = false;
+        _voiceCaption = null;
+        _voiceCaptionRole = null;
+        if (leave && _selectedDestination == 2) _selectedDestination = 0;
       });
     }
   }
@@ -2883,140 +2945,25 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _voiceBody() {
-    final theme = Theme.of(context);
-    return Stack(
-      children: [
-        const Positioned.fill(child: _AmbientBackdrop()),
-        SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox.square(
-                      dimension: 240,
-                      child: Center(
-                        child: JarvisOrb(
-                          size: 128,
-                          animate: _voiceStarting,
-                          listening: _voiceActive,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 240),
-                      switchInCurve: _fadeThrough,
-                      switchOutCurve: _fadeThrough,
-                      child: Text(
-                        _voiceStarting
-                            ? 'Connecting to Jarvis…'
-                            : _voiceActive
-                            ? 'Listening'
-                            : 'Talk to Jarvis',
-                        key: ValueKey('$_voiceStarting$_voiceActive'),
-                        style: JarvisType.serif.copyWith(fontSize: 40),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      _voiceActive
-                          ? (_voiceHandsFree
-                              ? 'Speak naturally. Stay on this screen and interrupt at any time.'
-                              : 'Speak naturally. You can interrupt at any time.')
-                          : 'Voice continues this conversation and its memory.',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: JarvisColors.inkSoft,
-                      ),
-                    ),
-                    if (_voiceCaptions && _voiceCaption != null) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        _voiceCaptionRole == 'assistant' ? 'Jarvis' : 'You',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: JarvisColors.muted,
-                        ),
-                      ),
-                      Text(
-                        _voiceCaption!,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyLarge,
-                      ),
-                    ],
-                    if (_error != null)
-                      InlineNotice(
-                        message: _error!,
-                        tone: NoticeTone.danger,
-                        margin: const EdgeInsets.only(top: 20),
-                      ),
-                    const SizedBox(height: 32),
-                    FilledButton.icon(
-                      onPressed: _voiceActive || _voiceStarting
-                          ? _toggleVoice
-                          : (_busy || _hasPendingApproval ? null : _toggleVoice),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _voiceActive || _voiceStarting
-                            ? JarvisColors.danger
-                            : JarvisColors.ink,
-                        minimumSize: const Size(220, 56),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(40),
-                        ),
-                      ),
-                      icon: _voiceStarting
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(
-                              _voiceActive
-                                  ? PhosphorIconsRegular.stop
-                                  : PhosphorIconsRegular.microphone,
-                            ),
-                      label: Text(
-                        _voiceActive || _voiceStarting
-                            ? 'End voice chat'
-                            : 'Start voice chat',
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _VoiceHint(
-                          icon: PhosphorIconsRegular.waveform,
-                          label: 'Interrupt anytime',
-                        ),
-                        _VoiceHint(
-                          icon: PhosphorIconsRegular.ear,
-                          label: 'Hands-free',
-                        ),
-                        _VoiceHint(
-                          icon: PhosphorIconsRegular.brain,
-                          label: 'Uses your memory',
-                        ),
-                        _VoiceHint(
-                          icon: PhosphorIconsRegular.shieldCheck,
-                          label: 'Asks before acting',
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
+  String get _shownVoicePhase {
+    if (_voiceStarting) return 'connecting';
+    if (!_voiceActive) return 'idle';
+    return _voicePhase;
   }
+
+  Widget _voiceBody() => VoiceStage(
+    phase: _shownVoicePhase,
+    voiceName: voiceLabel(_voiceName),
+    handsFree: _voiceHandsFree,
+    captions: _voiceCaptions,
+    caption: _voiceCaption,
+    captionRole: _voiceCaptionRole,
+    muted: _voiceMuted,
+    error: _error,
+    canStart: !_busy && !_hasPendingApproval && _conversationId != null,
+    onPrimary: () => unawaited(_toggleVoice()),
+    onToggleMute: _voiceActive ? () => unawaited(_toggleVoiceMute()) : null,
+  );
 
   Widget _settingsBody() => SettingsView(
     connected: _connected,
@@ -3066,42 +3013,7 @@ class _ConnectionDot extends StatelessWidget {
   );
 }
 
-/// Floating frosted capsule for the main sections, with a detached voice
-/// button; the voice destination starts a session rather than just
-/// switching screens, so it is kept visually separate.
-class _VoiceHint extends StatelessWidget {
-  const _VoiceHint({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    decoration: BoxDecoration(
-      color: JarvisColors.surface.withValues(alpha: .8),
-      borderRadius: BorderRadius.circular(40),
-      border: Border.all(color: JarvisColors.outline),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 15, color: JarvisColors.inkSoft),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w500,
-            color: JarvisColors.inkSoft,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-/// Soft, blurred colour fields behind full-screen moments (sign-in, voice).
+/// Soft, blurred colour fields behind full-screen moments (sign-in).
 class _AmbientBackdrop extends StatelessWidget {
   const _AmbientBackdrop();
 

@@ -7,8 +7,9 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../voice/chat_gpt_voices.dart';
 
-/// Hands-free listening and live captions for realtime voice sessions.
+/// ChatGPT voice, hands-free listening, and live captions.
 class VoiceSettingsScreen extends StatefulWidget {
   const VoiceSettingsScreen({required this.http, super.key});
 
@@ -51,8 +52,11 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
     }
   }
 
-  Future<void> _set(String key, bool value) async {
-    final next = {..._settings, key: value};
+  String? get _voice => asJsonString(_settings['voice']);
+
+  List<Map<String, dynamic>> get _voices => jsonMaps(_settings['voices']);
+
+  Future<void> _save(Map<String, dynamic> next) async {
     setState(() => _settings = next);
     try {
       final response = await widget.http.put<Map<String, dynamic>>(
@@ -60,6 +64,7 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
         data: {
           'handsFree': asJsonBool(next['handsFree'], true),
           'captions': asJsonBool(next['captions'], true),
+          'voice': asJsonString(next['voice']) ?? asJsonString(next['defaultVoice']),
         },
       );
       if (mounted) setState(() => _settings = response.data ?? next);
@@ -72,6 +77,11 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
       );
     }
   }
+
+  Future<void> _set(String key, bool value) =>
+      _save({..._settings, key: value});
+
+  Future<void> _setVoice(String voice) => _save({..._settings, 'voice': voice});
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -91,9 +101,55 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'Realtime voice stays in the LiveKit room. These options control how that session feels in the app: keep listening after you pause, and show live captions while you talk.',
+                    Text(
+                      _voices.isEmpty
+                          ? 'Voice uses the ChatGPT voice model in the installed Codex CLI. Its voice list will appear here once that CLI can be reached.'
+                          : 'These are the voice-mode voices from the installed Codex CLI. A new session uses the CLI default until you pick another.',
                     ),
+                    const SizedBox(height: 12),
+                    if (asJsonString(_settings['catalogError']) != null)
+                      InlineNotice(
+                        message: asJsonString(_settings['catalogError'])!,
+                        tone: NoticeTone.warning,
+                        margin: const EdgeInsets.only(bottom: 12),
+                      ),
+                    if (_voices.isNotEmpty)
+                      SurfaceCard(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(
+                          children: [
+                            for (final voice in _voices)
+                              ListTile(
+                                key: Key('voice-${asJsonString(voice['id'])}'),
+                                leading: Icon(
+                                  _voice == asJsonString(voice['id'])
+                                      ? PhosphorIconsRegular.waveform
+                                      : PhosphorIconsRegular.microphone,
+                                  color: _voice == asJsonString(voice['id'])
+                                      ? JarvisColors.ink
+                                      : JarvisColors.muted,
+                                ),
+                                title: Text(
+                                  asJsonString(voice['name']) ??
+                                      voiceLabel(asJsonString(voice['id'])),
+                                ),
+                                subtitle: Text(
+                                  asJsonBool(voice['isDefault'])
+                                      ? 'Codex default'
+                                      : 'Installed CLI',
+                                ),
+                                trailing: _voice == asJsonString(voice['id'])
+                                    ? const Icon(PhosphorIconsRegular.check)
+                                    : null,
+                                onTap: asJsonString(voice['id']) == null
+                                    ? null
+                                    : () => unawaited(
+                                        _setVoice(asJsonString(voice['id'])!),
+                                      ),
+                              ),
+                          ],
+                        ),
+                      ),
                     const SizedBox(height: 12),
                     SurfaceCard(
                       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -105,7 +161,7 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
                             ),
                             title: const Text('Hands-free'),
                             subtitle: const Text(
-                              'Stay listening on this screen and interrupt at any time',
+                              'Keep the microphone open and interrupt by speaking',
                             ),
                             value: asJsonBool(_settings['handsFree'], true),
                             onChanged: (value) =>

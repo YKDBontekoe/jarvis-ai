@@ -60,7 +60,7 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
       ),
       (
         title: 'Voice',
-        subtitle: 'Hands-free listening and live captions',
+        subtitle: 'ChatGPT voice, hands-free listening, and captions',
         icon: PhosphorIconsRegular.microphone,
         destination: 'voice-settings',
       ),

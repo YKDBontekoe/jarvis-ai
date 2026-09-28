@@ -18,6 +18,7 @@ from livekit import agents, rtc
 
 from codex_executable import resolve_codex_executable
 from playback_gate import VoicePlaybackGate
+from speech import VOICE_PROMPT, BargeIn, SpeechSequencer, is_echo, resolve_voice
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger("jarvis.voice")
@@ -36,9 +37,9 @@ class CodexInputTrack(MediaStreamTrack):
         if frame.sample_rate != 24000 or frame.num_channels != 1:
             raise ValueError("Codex microphone audio must be mono PCM at 24 kHz.")
         self.buffer.extend(frame.data.cast("B").tobytes())
-        # Keep at most one second of microphone audio when a transport stalls.
-        if len(self.buffer) > 48000:
-            del self.buffer[:-48000]
+        # Keep several seconds so a brief transport stall does not clip the user's words.
+        if len(self.buffer) > 24000 * 2 * 8:
+            del self.buffer[: -24000 * 2 * 8]
 
     async def recv(self) -> AudioFrame:
         loop = asyncio.get_running_loop()
@@ -108,7 +109,7 @@ class CodexRealtimeSession:
                 logger.exception("Codex WebRTC audio receiver failed.")
 
     @classmethod
-    async def start(cls) -> CodexRealtimeSession:
+    async def start(cls, voice: str | None = None) -> CodexRealtimeSession:
         scratch = tempfile.mkdtemp(prefix="jarvis-codex-voice-")
         codex_path = resolve_codex_executable()
         home = os.getenv("HOME", str(Path.home()))
@@ -152,23 +153,21 @@ class CodexRealtimeSession:
             )
             session.thread_id = result["thread"]["id"]
             await session.peer.setLocalDescription(await session.peer.createOffer())
-            await session.call(
-                "thread/realtime/start",
-                {
-                    "threadId": session.thread_id,
-                    "transport": {"type": "webrtc", "sdp": session.peer.localDescription.sdp},
-                    "outputModality": "audio",
-                    "voice": os.getenv("CODEX_VOICE", "juniper"),
-                    "version": "v3",
-                    "clientManagedHandoffs": True,
-                    "codexResponsesAsItems": True,
-                    "prompt": (
-                        "You are the speech interface for Jarvis. Transcribe the user's speech and report it. "
-                        "Do not answer the user or speak on your own. Jarvis will reason and use its approved tools. "
-                        "Speak only text explicitly appended by Jarvis."
-                    ),
-                },
-            )
+            start_params: dict[str, Any] = {
+                "threadId": session.thread_id,
+                "transport": {"type": "webrtc", "sdp": session.peer.localDescription.sdp},
+                "outputModality": "audio",
+                "version": "v3",
+                "clientManagedHandoffs": True,
+                "codexResponsesAsItems": True,
+                "includeStartupContext": False,
+                "delegationAckFiller": False,
+                "prompt": VOICE_PROMPT,
+            }
+            # Omit voice when unset so the installed Codex CLI applies its own voice-mode default.
+            if selected := resolve_voice(voice, os.getenv("CODEX_VOICE")):
+                start_params["voice"] = selected
+            await session.call("thread/realtime/start", start_params)
             # The start RPC only acknowledges the request; protocol/transport failures arrive later.
             async with asyncio.timeout(30):
                 while True:
@@ -324,10 +323,54 @@ class CodexRealtimeSession:
         shutil.rmtree(self.scratch, ignore_errors=True)
 
 
+class OrderedAudioOutput:
+    """Play voice frames in arrival order. Concurrent capture calls scramble and clip audio."""
+
+    def __init__(self, source: rtc.AudioSource) -> None:
+        self.source = source
+        self.queue: asyncio.Queue[rtc.AudioFrame | None] = asyncio.Queue()
+        self.task = asyncio.create_task(self._play())
+
+    async def _play(self) -> None:
+        while True:
+            frame = await self.queue.get()
+            if frame is None:
+                return
+            try:
+                await self.source.capture_frame(frame)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Could not play a Codex voice audio frame.")
+
+    def enqueue(self, frame: rtc.AudioFrame) -> None:
+        self.queue.put_nowait(frame)
+
+    def clear(self) -> None:
+        while True:
+            try:
+                self.queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+        self.source.clear_queue()
+
+    async def close(self) -> None:
+        self.clear()
+        if self.task.done():
+            return
+        self.queue.put_nowait(None)
+        try:
+            await asyncio.wait_for(self.task, timeout=2)
+        except TimeoutError:
+            self.task.cancel()
+            await asyncio.gather(self.task, return_exceptions=True)
+
+
 async def _voice_entrypoint(ctx: agents.JobContext) -> None:
     metadata = json.loads(ctx.job.metadata or "{}")
     conversation_id = metadata.get("conversationId")
     owner_id = metadata.get("ownerId")
+    voice = resolve_voice(metadata.get("voice") if isinstance(metadata.get("voice"), str) else None, os.getenv("CODEX_VOICE"))
     if not isinstance(conversation_id, str) or not isinstance(owner_id, str):
         raise RuntimeError("Voice dispatch is missing its conversation and owner identifiers.")
 
@@ -340,7 +383,7 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
     await ctx.room.local_participant.set_attributes({"jarvis.voice.status": "starting"})
     http = httpx.AsyncClient(timeout=httpx.Timeout(1200, connect=5))
     try:
-        codex = await CodexRealtimeSession.start()
+        codex = await CodexRealtimeSession.start(voice)
     except BaseException:
         await ctx.room.local_participant.set_attributes({"jarvis.voice.status": "unavailable"})
         await asyncio.sleep(2)
@@ -357,21 +400,37 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
         raise
     logger.info("Voice worker joined room %s for conversation %s.", ctx.room.name, conversation_id)
 
-    output_source = rtc.AudioSource(sample_rate=24000, num_channels=1, queue_size_ms=1200)
+    output_source = rtc.AudioSource(sample_rate=24000, num_channels=1, queue_size_ms=20000)
     output_track = rtc.LocalAudioTrack.create_audio_track("jarvis-voice", output_source)
     await ctx.room.local_participant.publish_track(output_track)
+    audio_out = OrderedAudioOutput(output_source)
     audio_tasks: set[asyncio.Task[None]] = set()
     turn_tasks: set[asyncio.Task[None]] = set()
-    playback_tasks: set[asyncio.Task[None]] = set()
     playback = VoicePlaybackGate()
+    sequencer = SpeechSequencer()
+    barge = BargeIn()
     turn_lock = asyncio.Lock()
     current_turn: asyncio.Task[None] | None = None
+    phase = ""
 
-    def duck_output(*, suppress_inflight: bool = False) -> None:
+    async def set_phase(value: str) -> None:
+        nonlocal phase
+        if phase == value:
+            return
+        phase = value
+        try:
+            await ctx.room.local_participant.set_attributes({"jarvis.voice.phase": value})
+        except Exception:
+            logger.debug("Could not publish the voice phase.", exc_info=True)
+
+    await set_phase("listening")
+
+    def duck_output(*, suppress_inflight: bool = False, reset_speech: bool = True) -> None:
         playback.duck(suppress_inflight=suppress_inflight)
-        output_source.clear_queue()
-        for task in list(playback_tasks):
-            task.cancel()
+        audio_out.clear()
+        if reset_speech:
+            sequencer.cancel()
+        barge.reset()
 
     async def publish_caption(role: str, text: str, final: bool) -> None:
         if not text.strip():
@@ -385,27 +444,45 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
         except Exception:
             logger.debug("Could not publish a voice caption.", exc_info=True)
 
-    async def speak_text(text: str) -> None:
+    async def speak_text(text: str) -> bool:
         if not text.strip() or not playback.try_start_speak():
-            return
+            sequencer.abandon_current()
+            return False
         try:
             await codex.speak(text)
+            await set_phase("speaking")
+            return True
+        except Exception:
+            sequencer.abandon_current()
+            raise
         finally:
             playback.finish_speak()
 
-    async def play_output_frame(frame: rtc.AudioFrame, generation: int) -> None:
-        if generation != playback.generation:
-            return
-        try:
-            await output_source.capture_frame(frame)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("Could not play a Codex voice audio frame.")
+    async def maybe_speak() -> bool:
+        while True:
+            text = sequencer.poll(asyncio.get_running_loop().time())
+            if text is None:
+                return True
+            if not await speak_text(text):
+                return False
+
+    async def finish_speech() -> None:
+        sequencer.mark_final()
+        while True:
+            text = sequencer.poll(asyncio.get_running_loop().time())
+            if text:
+                if not await speak_text(text):
+                    return
+                continue
+            if sequencer.idle:
+                return
+            await asyncio.sleep(0.05)
 
     async def speak_failure() -> None:
         try:
-            await speak_text("I could not complete that. Check the Jarvis app.")
+            sequencer.begin()
+            sequencer.add("I could not complete that. Check the Jarvis app.")
+            await finish_speech()
         except Exception:
             logger.exception("Could not speak the voice error.")
 
@@ -418,8 +495,10 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
         try:
             async with turn_lock:
                 playback.begin_turn()
+                sequencer.begin()
+                barge.reset()
+                await set_phase("thinking")
                 streamed_text = ""
-                speech_buffer = ""
                 final_text: str | None = None
                 async with http.stream(
                     "POST",
@@ -437,29 +516,28 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
                             if not isinstance(delta, str) or not delta:
                                 continue
                             streamed_text += delta
-                            speech_buffer += delta
+                            sequencer.add(delta)
                             await publish_caption("assistant", streamed_text, False)
-                            if len(speech_buffer) >= 160 or (
-                                len(speech_buffer) >= 48 and speech_buffer.rstrip().endswith((".", "!", "?", "\n"))
-                            ):
-                                await speak_text(speech_buffer)
-                                speech_buffer = ""
+                            if not await maybe_speak():
+                                return
                         elif event.get("type") == "done":
                             final_text = event.get("responseText")
 
                 if isinstance(final_text, str) and final_text.strip():
-                    if not streamed_text or final_text.startswith(streamed_text):
-                        if not streamed_text:
-                            speech_buffer = final_text
-                        else:
-                            speech_buffer += final_text[len(streamed_text):]
+                    if not streamed_text:
+                        sequencer.add(final_text)
+                    elif final_text.startswith(streamed_text):
+                        sequencer.add(final_text[len(streamed_text):])
                     else:
                         duck_output()
-                        speech_buffer = final_text
-                if speech_buffer.strip():
-                    await speak_text(speech_buffer)
+                        playback.begin_turn()
+                        sequencer.begin()
+                        sequencer.add(final_text)
+                if sequencer.speaking or sequencer.buffer.strip():
+                    await finish_speech()
                 elif not streamed_text.strip():
                     await speak_failure()
+                await set_phase("listening")
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -476,15 +554,22 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
         method = message.get("method")
         params = message.get("params", {})
         if method == "thread/realtime/transcript/delta" and params.get("role") == "user":
-            duck_output(suppress_inflight=True)
             partial = params.get("text", "").strip()
             if partial:
                 await publish_caption("user", partial, False)
+            now = asyncio.get_running_loop().time()
+            if barge.consider(partial, sequencer.spoken, sequencer.assistant_busy, now):
+                duck_output(suppress_inflight=True)
+                if current_turn is not None and not current_turn.done():
+                    current_turn.cancel()
+                await set_phase("listening")
         elif method == "thread/realtime/transcript/done" and params.get("role") == "user":
             transcript = params.get("text", "").strip()
             if not transcript:
                 return
             await publish_caption("user", transcript, True)
+            if sequencer.assistant_busy and is_echo(transcript, sequencer.spoken):
+                return
             duck_output(suppress_inflight=True)
             if current_turn is not None and not current_turn.done():
                 current_turn.cancel()
@@ -500,14 +585,14 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
                 sample_rate = int(audio.get("sampleRate", 24000))
                 channels = int(audio.get("numChannels", 1))
                 data = base64.b64decode(audio["data"], validate=True)
-                samples = audio.get("samplesPerChannel") or len(data) // (2 * channels)
-                frame = rtc.AudioFrame(data, sample_rate, channels, int(samples))
+                samples = int(audio.get("samplesPerChannel") or len(data) // (2 * max(channels, 1)))
+                frame = rtc.AudioFrame(data, sample_rate, channels, samples)
                 if sample_rate != 24000 or channels != 1:
                     logger.warning("Codex voice audio format differs from the LiveKit output track.")
                     return
-                task = asyncio.create_task(play_output_frame(frame, generation))
-                playback_tasks.add(task)
-                task.add_done_callback(playback_tasks.discard)
+                sequencer.note_frame(samples, asyncio.get_running_loop().time(), sample_rate)
+                if generation == playback.generation:
+                    audio_out.enqueue(frame)
             except (KeyError, TypeError, ValueError):
                 logger.exception("Codex voice returned an invalid audio chunk.")
         elif method == "thread/realtime/error":
@@ -579,8 +664,7 @@ async def _voice_entrypoint(ctx: agents.JobContext) -> None:
             task.cancel()
         if audio_tasks:
             await asyncio.gather(*audio_tasks, return_exceptions=True)
-        if playback_tasks:
-            await asyncio.gather(*playback_tasks, return_exceptions=True)
+        await audio_out.close()
         await codex.close()
         await http.aclose()
         await output_source.aclose()
