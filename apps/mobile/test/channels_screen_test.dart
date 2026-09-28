@@ -125,4 +125,15 @@ void main() {
     expect(find.byKey(const Key('settings-channels')), findsOneWidget);
     expect(find.text('WhatsApp & Signal'), findsOneWidget);
   });
+
+  testWidgets('a malformed Signal status still lists WhatsApp channels', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/channels', [_channel()]);
+    http.on('GET', '/api/v1/channels/signal/status', 'nope');
+    await show(tester, ChannelsScreen(http: http.client()));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Home WhatsApp'), findsOneWidget);
+  });
 }
