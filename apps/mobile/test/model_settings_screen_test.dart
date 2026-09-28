@@ -129,48 +129,49 @@ void main() {
     );
   });
 
-  testWidgets('Codex with embeddings can save an OpenRouter key and embedding model', (
-    tester,
-  ) async {
-    http.on('GET', '/api/v1/settings/models', _settings());
-    http.on(
-      'PUT',
-      '/api/v1/settings/models/openrouter-key',
-      _settings(keyConfigured: true),
-    );
-    http.on(
-      'PUT',
-      '/api/v1/settings/models',
-      _settings(
-        provider: 'codex',
-        keyConfigured: true,
-        embeddingModel: 'openai/text-embedding-3-small',
-      ),
-    );
-    await show(tester);
+  testWidgets(
+    'Codex with embeddings can save an OpenRouter key and embedding model',
+    (tester) async {
+      http.on('GET', '/api/v1/settings/models', _settings());
+      http.on(
+        'PUT',
+        '/api/v1/settings/models/openrouter-key',
+        _settings(keyConfigured: true),
+      );
+      http.on(
+        'PUT',
+        '/api/v1/settings/models',
+        _settings(
+          provider: 'codex',
+          keyConfigured: true,
+          embeddingModel: 'openai/text-embedding-3-small',
+        ),
+      );
+      await show(tester);
 
-    await tester.enterText(
-      find.byKey(const Key('openrouter-key')),
-      'sk-or-secret',
-    );
-    await tester.tap(find.text('Save key'));
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('openrouter-key')),
+        'sk-or-secret',
+      );
+      await tester.tap(find.text('Save key'));
+      await tester.pumpAndSettle();
 
-    final embedding = find.widgetWithText(
-      TextField,
-      'Embedding model (optional)',
-    );
-    await tester.ensureVisible(embedding);
-    await tester.enterText(embedding, 'openai/text-embedding-3-small');
-    await tester.tap(find.byKey(const Key('save-models')));
-    await tester.pumpAndSettle();
+      final embedding = find.widgetWithText(
+        TextField,
+        'Embedding model (optional)',
+      );
+      await tester.ensureVisible(embedding);
+      await tester.enterText(embedding, 'openai/text-embedding-3-small');
+      await tester.tap(find.byKey(const Key('save-models')));
+      await tester.pumpAndSettle();
 
-    final saved =
-        http.sent('PUT', '/api/v1/settings/models').single.body
-            as Map<String, dynamic>;
-    expect(saved['provider'], 'codex');
-    expect(saved['embeddingModel'], 'openai/text-embedding-3-small');
-  });
+      final saved =
+          http.sent('PUT', '/api/v1/settings/models').single.body
+              as Map<String, dynamic>;
+      expect(saved['provider'], 'codex');
+      expect(saved['embeddingModel'], 'openai/text-embedding-3-small');
+    },
+  );
 
   testWidgets('connection test reports the answering model and latency', (
     tester,
@@ -272,5 +273,20 @@ void main() {
     );
     expect(find.textContaining('Codex 0.157.0 is installed'), findsOneWidget);
     expect(find.text('Up to date'), findsOneWidget);
+  });
+
+  testWidgets('a non-object Codex payload does not crash model settings', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/settings/models', _settings());
+    http.on('GET', '/api/v1/settings/models/codex', <Object>[]);
+    await show(tester);
+    expect(tester.takeException(), isNull);
+    expect(
+      find.text(
+        'Could not load the models supported by the installed Codex CLI.',
+      ),
+      findsOneWidget,
+    );
   });
 }

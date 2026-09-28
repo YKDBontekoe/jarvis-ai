@@ -75,8 +75,8 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             {
                 if (!hostPolicy.Enabled)
                 {
-                    statuses.Add(new McpServerConnectionStatus(server.Name, "paused", 0, "paused_by_owner",
-                        null, false, null));
+                    statuses.Add(await BuildStatusAsync(server, "paused", 0, "paused_by_owner", false, null,
+                        cancellationToken));
                     continue;
                 }
                 if (hostPolicy.AllowedTools is { Count: > 0 })
@@ -88,8 +88,9 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             if (server.AllowedTools.Length == 0)
             {
                 logger.LogWarning("Skipping MCP server {ServerName}: no tools are explicitly allowlisted.", server.Name);
-                statuses.Add(new McpServerConnectionStatus(server.Name, "disabled", 0,
-                    server.OwnerNarrowed ? "no_matching_tools" : "no_tools_allowlisted", UserServerId(server), true, []));
+                statuses.Add(await BuildStatusAsync(server, "disabled", 0,
+                    server.OwnerNarrowed ? "no_matching_tools" : "no_tools_allowlisted", true, [],
+                    cancellationToken));
                 continue;
             }
             servers.Add(server);
@@ -103,13 +104,16 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                 var credentialResolution = await ResolveCredentialsAsync(server, cancellationToken);
                 if (!credentialResolution.Ready)
                 {
-                    statuses.Add(new McpServerConnectionStatus(server.Name, "needs_credentials", 0, "credentials_required",
-                        UserServerId(server), true, null));
+                    statuses.Add(await BuildStatusAsync(server, "needs_credentials", 0, "credentials_required", true,
+                        null, cancellationToken));
                     continue;
                 }
                 var serverSecrets = credentialResolution.Secrets;
                 if (IntegrationCredentialProviders.IsUserMcpServerId(server.CredentialProvider))
-                    await McpServerEndpointValidator.ValidateAsync(server.Endpoint, cancellationToken);
+                {
+                    if (server.Transport.Equals("streamableHttp", StringComparison.OrdinalIgnoreCase))
+                        await McpServerEndpointValidator.ValidateAsync(server.Endpoint, cancellationToken);
+                }
 
                 var connectedClient = await McpClient.CreateAsync(CreateTransport(server, loggerFactory), cancellationToken: cancellationToken);
                 client = connectedClient;
@@ -120,8 +124,8 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                 {
                     await CloseQuietlyAsync(connectedClient);
                     client = null;
-                    statuses.Add(new McpServerConnectionStatus(server.Name, "unavailable", 0, "too_many_tools",
-                        UserServerId(server), true, null));
+                    statuses.Add(await BuildStatusAsync(server, "unavailable", 0, "too_many_tools", true, null,
+                        cancellationToken));
                     logger.LogWarning("Skipping MCP server {ServerName}: it exposes {ToolCount} tools, above the {MaxTools} tool limit.",
                         server.Name, availableNames.Count, McpToolSelection.MaxTools);
                     continue;
@@ -136,8 +140,8 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                     {
                         await CloseQuietlyAsync(connectedClient);
                         client = null;
-                        statuses.Add(new McpServerConnectionStatus(server.Name, "disabled", 0, "no_matching_tools",
-                            UserServerId(server), true, []));
+                        statuses.Add(await BuildStatusAsync(server, "disabled", 0, "no_matching_tools", true, [],
+                            cancellationToken));
                         continue;
                     }
                 }
@@ -173,8 +177,8 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                 _clients.Add(connectedClient);
                 Remember(server, new LiveSession(connectedClient, transportSecrets));
                 client = null;
-                statuses.Add(new McpServerConnectionStatus(server.Name, "connected", selected.Length, null,
-                    UserServerId(server), true, selected.Select(tool => tool.Name).ToArray()));
+                statuses.Add(await BuildStatusAsync(server, "connected", selected.Length, null, true,
+                    selected.Select(tool => tool.Name).ToArray(), cancellationToken));
                 logger.LogInformation("Connected MCP server {ServerName}; enabled {ToolCount} allowlisted tools.", server.Name, selected.Length);
             }
             catch (Exception exception) when (CancellationExceptions.Unwrap(exception) is { } canceled)
@@ -188,7 +192,7 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                 var issue = exception is ArgumentException or InvalidOperationException
                     ? "invalid_configuration"
                     : "server_unavailable";
-                statuses.Add(new McpServerConnectionStatus(server.Name, "unavailable", 0, issue, UserServerId(server)));
+                statuses.Add(await BuildStatusAsync(server, "unavailable", 0, issue, true, null, cancellationToken));
                 logger.LogWarning("Skipping MCP server {ServerName} after initialization failure ({FailureType}).",
                     server.Name, exception.GetType().Name);
             }
@@ -203,16 +207,20 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
         CancellationToken cancellationToken)
     {
         var secrets = await credentialStore.GetSecretsAsync(currentUser.OwnerId, userServer.Id, cancellationToken);
+        var transport = string.IsNullOrWhiteSpace(userServer.Transport) ? "streamableHttp" : userServer.Transport;
         var server = new McpServerOptions
         {
             Name = userServer.Name,
-            Transport = "streamableHttp",
+            Transport = transport,
             Endpoint = userServer.Endpoint,
+            Command = userServer.Command ?? string.Empty,
+            Arguments = userServer.Arguments?.ToArray() ?? [],
             AllowedTools = userServer.AllowedTools.ToArray(),
             CredentialProvider = userServer.Id,
             ConnectionTimeoutSeconds = 30
         };
-        if (secrets?.ContainsKey("token") == true)
+        if (transport.Equals("streamableHttp", StringComparison.OrdinalIgnoreCase) &&
+            secrets?.ContainsKey("token") == true)
         {
             server.CredentialHeaders["Authorization"] = "token";
             server.CredentialHeaderPrefixes["Authorization"] = "Bearer";
@@ -389,7 +397,9 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
 }
 
 public sealed record McpServerConnectionStatus(string Name, string State, int ToolCount, string? Issue,
-    string? Id = null, bool Enabled = true, IReadOnlyList<string>? Tools = null);
+    string? Id = null, bool Enabled = true, IReadOnlyList<string>? Tools = null, bool HostManaged = false,
+    string? Transport = null, string? CredentialProvider = null, IReadOnlyList<string>? ConfiguredTools = null,
+    bool? HasCredentials = null);
 
 public static class McpServerConfiguration
 {

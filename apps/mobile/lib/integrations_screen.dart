@@ -6,6 +6,9 @@ import 'theme.dart';
 import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
+part 'integrations_credentials.dart';
+part 'integrations_mcp.dart';
+
 class IntegrationsScreen extends StatefulWidget {
   const IntegrationsScreen({required this.http, super.key});
 
@@ -15,7 +18,8 @@ class IntegrationsScreen extends StatefulWidget {
   State<IntegrationsScreen> createState() => _IntegrationsScreenState();
 }
 
-class _IntegrationsScreenState extends State<IntegrationsScreen> {
+/// Holds integration fields so credential and MCP mixins can share state.
+abstract class _IntegrationsController extends State<IntegrationsScreen> {
   List<Map<String, dynamic>> _providers = [];
   List<Map<String, dynamic>> _connections = [];
   List<Map<String, dynamic>> _managedServers = [];
@@ -26,12 +30,19 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
   String? _error;
   int _requestRevision = 0;
 
+  Future<void> _load();
+  Future<void> _editSecret({String? provider, String? secretName});
+}
+
+class _IntegrationsScreenState extends _IntegrationsController
+    with _IntegrationsCredentials, _IntegrationsMcp {
   @override
   void initState() {
     super.initState();
     _load();
   }
 
+  @override
   Future<void> _load() async {
     if (!mounted) return;
     final revision = ++_requestRevision;
@@ -41,7 +52,7 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       var serversFailed = false;
       String? error;
       try {
-        final response = await widget.http.get<List<dynamic>>(
+        final response = await widget.http.get<dynamic>(
           '/api/v1/integrations/credentials',
         );
         if (!mounted || revision != _requestRevision) return;
@@ -49,9 +60,12 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       } on DioException {
         credentialsFailed = true;
         error = 'Could not load integration credentials.';
+      } catch (_) {
+        credentialsFailed = true;
+        error = 'Could not load integration credentials.';
       }
       try {
-        final connectionResponse = await widget.http.get<List<dynamic>>(
+        final connectionResponse = await widget.http.get<dynamic>(
           '/api/v1/integrations/connections',
         );
         if (!mounted || revision != _requestRevision) return;
@@ -59,14 +73,20 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       } on DioException {
         connectionsFailed = true;
         error ??= 'Could not load integration connections.';
+      } catch (_) {
+        connectionsFailed = true;
+        error ??= 'Could not load integration connections.';
       }
       try {
-        final serversResponse = await widget.http.get<List<dynamic>>(
+        final serversResponse = await widget.http.get<dynamic>(
           '/api/v1/mcp-servers',
         );
         if (!mounted || revision != _requestRevision) return;
         setState(() => _managedServers = jsonMaps(serversResponse.data));
       } on DioException {
+        serversFailed = true;
+        error ??= 'Could not load MCP servers.';
+      } catch (_) {
         serversFailed = true;
         error ??= 'Could not load MCP servers.';
       }
@@ -84,193 +104,6 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
           _loading = false;
           _error ??= 'Could not load integration credentials.';
         });
-      }
-    }
-  }
-
-  Future<void> _editSecret({String? provider, String? secretName}) async {
-    final replacing =
-        secretName != null &&
-        (_providers.any(
-              (item) =>
-                  item['provider'] == provider &&
-                  jsonStrings(item['secretNames']).contains(secretName),
-            ) ||
-            (secretName == 'token' &&
-                _managedServers.any(
-                  (server) =>
-                      server['id'] == provider && server['hasToken'] == true,
-                )));
-    final providerController = TextEditingController(text: provider ?? '');
-    final nameController = TextEditingController(text: secretName ?? '');
-    final valueController = TextEditingController();
-    var obscure = true;
-    var saving = false;
-    String? dialogError;
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(
-            replacing ? 'Replace credential' : 'Add integration credential',
-          ),
-          content: SizedBox(
-            width: 420,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (provider == null)
-                  TextField(
-                    controller: providerController,
-                    autocorrect: false,
-                    textCapitalization: TextCapitalization.none,
-                    decoration: const InputDecoration(
-                      labelText: 'Provider slug',
-                      hintText: 'home-assistant',
-                    ),
-                  ),
-                if (secretName == null)
-                  TextField(
-                    controller: nameController,
-                    autocorrect: false,
-                    textCapitalization: TextCapitalization.none,
-                    decoration: const InputDecoration(
-                      labelText: 'Credential name',
-                      hintText: 'token',
-                    ),
-                  ),
-                TextField(
-                  controller: valueController,
-                  obscureText: obscure,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  decoration: InputDecoration(
-                    labelText: 'Secret value',
-                    suffixIcon: IconButton(
-                      tooltip: obscure ? 'Show value' : 'Hide value',
-                      onPressed: () => setDialogState(() => obscure = !obscure),
-                      icon: Icon(
-                        obscure
-                            ? PhosphorIconsRegular.eye
-                            : PhosphorIconsRegular.eyeSlash,
-                      ),
-                    ),
-                  ),
-                ),
-                if (dialogError != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    dialogError!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: saving
-                  ? null
-                  : () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      final providerValue =
-                          (provider ?? providerController.text).trim();
-                      final nameValue = (secretName ?? nameController.text)
-                          .trim();
-                      final value = valueController.text;
-                      if (providerValue.isEmpty ||
-                          nameValue.isEmpty ||
-                          value.trim().isEmpty) {
-                        setDialogState(
-                          () => dialogError =
-                              'Enter a provider, credential name, and value.',
-                        );
-                        return;
-                      }
-                      setDialogState(() => saving = true);
-                      try {
-                        await widget.http.put<void>(
-                          '/api/v1/integrations/${Uri.encodeComponent(providerValue)}/credentials/${Uri.encodeComponent(nameValue)}',
-                          data: {'value': value},
-                        );
-                        if (dialogContext.mounted) {
-                          Navigator.pop(dialogContext, true);
-                        }
-                      } on DioException catch (error) {
-                        final message =
-                            firstProblemMessage(error.response?.data) ??
-                            'Could not save credential.';
-                        if (dialogContext.mounted) {
-                          setDialogState(() {
-                            dialogError = message;
-                            saving = false;
-                          });
-                        }
-                      } finally {
-                        if (dialogContext.mounted) {
-                          setDialogState(() => saving = false);
-                        }
-                      }
-                    },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
-    );
-    providerController.dispose();
-    nameController.dispose();
-    valueController.dispose();
-    if (saved == true && mounted) await _load();
-  }
-
-  Future<void> _deleteSecret(String provider, String secretName) async {
-    final confirmed = await showJarvisConfirm(
-      context,
-      title: 'Delete credential?',
-      message: 'Remove $secretName from $provider?',
-      confirmLabel: 'Delete',
-      destructive: true,
-      icon: PhosphorIconsRegular.key,
-    );
-    if (!confirmed) return;
-    if (!mounted) return;
-    try {
-      await widget.http.delete<void>(
-        '/api/v1/integrations/${Uri.encodeComponent(provider)}/credentials/${Uri.encodeComponent(secretName)}',
-      );
-      if (mounted) await _load();
-    } on DioException {
-      if (mounted) setState(() => _error = 'Could not delete credential.');
-    }
-  }
-
-  Future<void> _deleteProvider(String provider) async {
-    final confirmed = await showJarvisConfirm(
-      context,
-      title: 'Remove integration credentials?',
-      message: 'Delete all stored credentials for $provider?',
-      confirmLabel: 'Delete all',
-      destructive: true,
-      icon: PhosphorIconsRegular.trash,
-    );
-    if (!confirmed) return;
-    if (!mounted) return;
-    try {
-      await widget.http.delete<void>(
-        '/api/v1/integrations/${Uri.encodeComponent(provider)}/credentials',
-      );
-      if (mounted) await _load();
-    } on DioException {
-      if (mounted) {
-        setState(() => _error = 'Could not remove integration credentials.');
       }
     }
   }
@@ -372,401 +205,4 @@ class _IntegrationsScreenState extends State<IntegrationsScreen> {
       for (final item in providers) _providerCard(item),
     ];
   }
-
-  Widget _featuredCard({
-    required String title,
-    required IconData icon,
-    required String description,
-    required String provider,
-  }) {
-    final configured = !_credentialsFailed &&
-        _providers.any(
-          (item) =>
-              item['provider'] == provider &&
-              jsonStrings(item['secretNames']).contains(
-                'token',
-              ),
-        );
-    final statusLabel = _credentialsFailed
-        ? 'Couldn’t load'
-        : configured
-        ? 'Token stored'
-        : 'Not configured';
-    final statusColor = _credentialsFailed
-        ? JarvisColors.danger
-        : configured
-        ? JarvisColors.success
-        : JarvisColors.muted;
-    return SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              IconBadge(icon: icon, size: 44),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              StatusPill(
-                label: statusLabel,
-                color: statusColor,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            description,
-            style: const TextStyle(
-              height: 1.5,
-              fontSize: 13.5,
-              color: JarvisColors.inkSoft,
-            ),
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: () =>
-                _editSecret(provider: provider, secretName: 'token'),
-            icon: const Icon(PhosphorIconsRegular.key, size: 18),
-            label: const Text('Set or rotate token'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _managedServerCard(Map<String, dynamic> server) {
-    final id = asJsonString(server['id']) ?? '';
-    final name = asJsonString(server['name']) ?? 'MCP server';
-    final endpoint = asJsonString(server['endpoint']) ?? '';
-    final tools = jsonStrings(server['allowedTools']);
-    final allTools = tools.length == 1 && tools.first == '*';
-    final enabled = server['enabled'] != false;
-    final hasToken = server['hasToken'] == true;
-    return SurfaceCard(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const IconBadge(icon: PhosphorIconsRegular.plugsConnected),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  name,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              if (!enabled)
-                const Padding(
-                  padding: EdgeInsets.only(right: 4),
-                  child: StatusPill(label: 'Paused', color: JarvisColors.muted),
-                ),
-              Switch(
-                value: enabled,
-                onChanged: id.isEmpty
-                    ? null
-                    : (value) => _setManagedEnabled(id, value),
-              ),
-              IconButton(
-                tooltip: 'Remove MCP server',
-                onPressed: () => _removeManagedServer(id, name),
-                icon: const Icon(PhosphorIconsRegular.trash, size: 20),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          SelectableText(
-            endpoint,
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12.5,
-              color: JarvisColors.inkSoft,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              if (allTools)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: JarvisColors.surfaceMuted,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'Every exposed tool',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: JarvisColors.inkSoft,
-                    ),
-                  ),
-                ),
-              if (!allTools)
-                for (final tool in tools)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: JarvisColors.surfaceMuted,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    tool,
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                      color: JarvisColors.inkSoft,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Credential provider: $id',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => _editSecret(provider: id, secretName: 'token'),
-              icon: const Icon(PhosphorIconsRegular.key, size: 18),
-              label: Text(
-                hasToken ? 'Rotate bearer token' : 'Add bearer token',
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _setManagedEnabled(String id, bool enabled) async {
-    try {
-      await widget.http.put<void>(
-        '/api/v1/mcp-servers/${Uri.encodeComponent(id)}/state',
-        data: {'enabled': enabled},
-      );
-      if (mounted) await _load();
-    } on DioException {
-      if (mounted) setState(() => _error = 'Could not update the MCP server.');
-    }
-  }
-
-  Future<void> _setHostEnabled(String name, bool enabled) async {
-    try {
-      await widget.http.put<void>(
-        '/api/v1/mcp-controls/${Uri.encodeComponent(name)}',
-        data: {'enabled': enabled},
-      );
-      if (mounted) await _load();
-    } on DioException {
-      if (mounted) setState(() => _error = 'Could not update the MCP server.');
-    }
-  }
-
-  Future<void> _removeManagedServer(String id, String name) async {
-    final confirmed = await showJarvisConfirm(
-      context,
-      title: 'Remove MCP server?',
-      message: 'Remove $name and its stored credentials?',
-      confirmLabel: 'Remove',
-      destructive: true,
-      icon: PhosphorIconsRegular.plugsConnected,
-    );
-    if (!confirmed) return;
-    if (!mounted) return;
-    try {
-      await widget.http.delete<void>(
-        '/api/v1/mcp-servers/${Uri.encodeComponent(id)}',
-      );
-      if (mounted) await _load();
-    } on DioException {
-      if (mounted) setState(() => _error = 'Could not remove MCP server.');
-    }
-  }
-
-  Widget _providerCard(Map<String, dynamic> provider) {
-    final slug = asJsonString(provider['provider']) ?? '';
-    final names =
-        jsonStrings(provider['secretNames']);
-    return SurfaceCard(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const IconBadge(icon: PhosphorIconsRegular.lockSimple),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  slug,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              IconButton(
-                tooltip: 'Remove all credentials',
-                onPressed: () => _deleteProvider(slug),
-                icon: const Icon(PhosphorIconsRegular.trash, size: 20),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          for (final name in names)
-            ListTile(
-              dense: true,
-              contentPadding: const EdgeInsets.only(left: 4),
-              leading: const Icon(PhosphorIconsRegular.key, size: 19),
-              title: Text(name),
-              subtitle: const Text('Stored securely · value hidden'),
-              trailing: Wrap(
-                children: [
-                  IconButton(
-                    tooltip: 'Replace value',
-                    onPressed: () =>
-                        _editSecret(provider: slug, secretName: name),
-                    icon: const Icon(
-                      PhosphorIconsRegular.pencilSimple,
-                      size: 19,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Delete value',
-                    onPressed: () => _deleteSecret(slug, name),
-                    icon: const Icon(
-                      PhosphorIconsRegular.minusCircle,
-                      size: 19,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _connectionCard(Map<String, dynamic> connection) {
-    final name = asJsonString(connection['name']) ?? 'MCP server';
-    final id = asJsonString(connection['id']);
-    final state = asJsonString(connection['state']) ?? 'unavailable';
-    final toolCount = asJsonInt(connection['toolCount']);
-    final issue = asJsonString(connection['issue']);
-    final detail = switch (issue) {
-      'too_many_tools' => 'More than 80 tools. Narrow the allowlist.',
-      'no_matching_tools' => 'None of the selected tools are available',
-      'invalid_configuration' => 'Configuration needs attention',
-      _ => null,
-    };
-    final (icon, fallback, label, color) = switch (state) {
-      'connected' => (
-        PhosphorIconsRegular.checkCircle,
-        '$toolCount allowlisted tools available',
-        'Connected',
-        JarvisColors.success,
-      ),
-      'needs_credentials' => (
-        PhosphorIconsRegular.key,
-        'Owner credentials are required',
-        'Needs token',
-        JarvisColors.warning,
-      ),
-      'paused' => (
-        PhosphorIconsRegular.pauseCircle,
-        'Paused for this account',
-        'Paused',
-        JarvisColors.muted,
-      ),
-      'disabled' => (
-        PhosphorIconsRegular.prohibit,
-        'No tools are allowlisted',
-        'Disabled',
-        JarvisColors.muted,
-      ),
-      _ => (
-        PhosphorIconsRegular.warningCircle,
-        'Server could not be reached',
-        'Unavailable',
-        JarvisColors.danger,
-      ),
-    };
-    final hostControlled = id == null || id.isEmpty;
-    return SurfaceCard(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      child: Row(
-        children: [
-          IconBadge(icon: icon),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 2),
-                Text(
-                  detail ?? fallback,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                if (hostControlled && name != '(unnamed)')
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      onPressed: () =>
-                          _setHostEnabled(name, state == 'paused'),
-                      child: Text(state == 'paused' ? 'Resume' : 'Pause'),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          StatusPill(label: label, color: color),
-        ],
-      ),
-    );
-  }
-}
-
-class _MutedLine extends StatelessWidget {
-  const _MutedLine({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 10),
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(JarvisRadii.lg),
-      border: Border.all(color: JarvisColors.outlineStrong),
-    ),
-    child: Row(
-      children: [
-        Icon(icon, size: 20, color: JarvisColors.muted),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(color: JarvisColors.inkSoft),
-          ),
-        ),
-      ],
-    ),
-  );
 }

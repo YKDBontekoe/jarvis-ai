@@ -39,9 +39,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
       _error = null;
     });
     try {
-      final response = await widget.http.get<List<dynamic>>(
-        '/api/v1/approvals',
-      );
+      final response = await widget.http.get<dynamic>('/api/v1/approvals');
       if (mounted && revision == _requestRevision) {
         setState(
           () => _approvals = jsonMaps(response.data)
@@ -54,6 +52,10 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         );
       }
     } on DioException {
+      if (mounted && revision == _requestRevision) {
+        setState(() => _error = 'Jarvis could not load pending approvals.');
+      }
+    } catch (_) {
       if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load pending approvals.');
       }
@@ -144,6 +146,15 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         ).showSnackBar(SnackBar(content: Text(message)));
         await _load();
       }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Jarvis could not process this decision.'),
+          ),
+        );
+        await _load();
+      }
     } finally {
       if (mounted) setState(() => _processingId = null);
     }
@@ -153,7 +164,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
     if (raw == null || raw.isEmpty) return '{}';
     try {
       return const JsonEncoder.withIndent('  ').convert(jsonDecode(raw));
-    } on FormatException {
+    } catch (_) {
       return raw;
     }
   }
@@ -184,11 +195,11 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         message: 'No tool calls are waiting for approval.',
       ),
       child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-            itemCount: _approvals.length,
-            itemBuilder: (context, index) =>
-                ContentWidth(child: _approvalCard(_approvals[index])),
-          ),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+        itemCount: _approvals.length,
+        itemBuilder: (context, index) =>
+            ContentWidth(child: _approvalCard(_approvals[index])),
+      ),
     ),
   );
 

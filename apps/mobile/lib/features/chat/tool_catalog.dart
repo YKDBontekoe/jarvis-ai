@@ -99,6 +99,11 @@ const _catalog = <String, ToolDescription>{
     'Checked live integrations',
     PhosphorIconsRegular.plugsConnected,
   ),
+  'ListHostMcpServers': ToolDescription(
+    'Checking host integrations',
+    'Checked host integrations',
+    PhosphorIconsRegular.plugsConnected,
+  ),
   'DiscoverMcpServerTools': ToolDescription(
     'Discovering integration tools',
     'Discovered integration tools',
@@ -107,6 +112,11 @@ const _catalog = <String, ToolDescription>{
   'AddMcpServer': ToolDescription(
     'Adding an integration',
     'Added an integration',
+    PhosphorIconsRegular.linkSimple,
+  ),
+  'AddMcpStdioServer': ToolDescription(
+    'Installing a local integration',
+    'Installed a local integration',
     PhosphorIconsRegular.linkSimple,
   ),
   'UpdateMcpServer': ToolDescription(

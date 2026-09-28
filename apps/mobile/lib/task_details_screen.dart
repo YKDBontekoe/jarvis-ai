@@ -44,11 +44,10 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     try {
       Map<String, dynamic>? task;
       try {
-        final taskResponse = await widget.http.get<Map<String, dynamic>>(
+        final taskResponse = await widget.http.get<dynamic>(
           '/api/v1/tasks/${widget.taskId}',
         );
-        final data = taskResponse.data;
-        task = data == null ? null : Map<String, dynamic>.from(data);
+        task = jsonObject(taskResponse.data);
       } on DioException catch (error) {
         if (!mounted || revision != _requestRevision) return;
         setState(() {
@@ -67,12 +66,15 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       });
       if (task == null) return;
       try {
-        final messagesResponse = await widget.http.get<List<dynamic>>(
+        final messagesResponse = await widget.http.get<dynamic>(
           '/api/v1/tasks/${widget.taskId}/messages',
         );
         if (!mounted || revision != _requestRevision) return;
         setState(() => _messages = jsonMaps(messagesResponse.data));
       } on DioException {
+        if (!mounted || revision != _requestRevision) return;
+        setState(() => _error = 'Jarvis could not load the task activity.');
+      } catch (_) {
         if (!mounted || revision != _requestRevision) return;
         setState(() => _error = 'Jarvis could not load the task activity.');
       }
@@ -87,8 +89,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   }
 
   String _date(dynamic value) {
-    if (value is! String) return '';
-    final date = DateTime.tryParse(value)?.toLocal();
+    final date = jsonDate(value, local: true);
     if (date == null) return '';
     final dateText = MaterialLocalizations.of(context).formatMediumDate(date);
     final timeText = MaterialLocalizations.of(

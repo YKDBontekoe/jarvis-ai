@@ -13,6 +13,11 @@ import 'graph_model.dart';
 
 export 'graph_model.dart' show humanPredicate;
 
+part 'knowledge_graph_map.dart';
+part 'graph_entity_screen.dart';
+part 'knowledge_graph_viewport.dart';
+part 'knowledge_graph_sheet.dart';
+
 const _typeColors = {
   'person': JarvisColors.accent,
   'place': JarvisColors.success,
@@ -40,7 +45,8 @@ class KnowledgeGraphScreen extends StatefulWidget {
   State<KnowledgeGraphScreen> createState() => _KnowledgeGraphScreenState();
 }
 
-class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen>
+/// Holds graph fields so map and sheet mixins can share state.
+abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
     with TickerProviderStateMixin {
   GraphSnapshot _snapshot = GraphSnapshot.empty;
   Map<String, Offset> _layout = const {};
@@ -60,41 +66,26 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen>
   double _world = 1200;
   int _reveal = 0;
   int _revealed = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _motion = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 280),
-    );
-    unawaited(_load());
-  }
-
-  @override
-  void dispose() {
-    if (_motionTick != null) _motion.removeListener(_motionTick!);
-    _motion.dispose();
-    _transform.dispose();
-    _query.dispose();
-    super.dispose();
-  }
+  int _requestRevision = 0;
 
   Future<void> _load() async {
+    final revision = ++_requestRevision;
     try {
       final responses = await Future.wait([
-        widget.http.get<Map<String, dynamic>>(
+        widget.http.get<dynamic>(
           '/api/v1/graph/overview',
           queryParameters: const {'limit': 120},
         ),
-        widget.http.get<Map<String, dynamic>>('/api/v1/memory/index-status'),
+        widget.http.get<dynamic>('/api/v1/memory/index-status'),
       ]);
-      final snapshot = parseGraphOverview(responses[0].data ?? const {});
+      final snapshot = parseGraphOverview(
+        jsonObject(responses[0].data) ?? const {},
+      );
       final you = snapshot.nodes
           .where((node) => node.isYou)
           .map((node) => node.id)
           .firstOrNull;
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _snapshot = snapshot;
         _layout = layoutGraph(
@@ -102,7 +93,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen>
           [for (final link in snapshot.links) (link.fromId, link.toId)],
           pinned: you,
         );
-        _status = responses[1].data;
+        _status = jsonObject(responses[1].data);
         _world = _worldFor(snapshot.nodes.length);
         _loading = false;
         _error = null;
@@ -112,12 +103,18 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen>
         if (selected != null && !_passesType(selected)) _selectedId = null;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not load the knowledge graph.';
+      });
+    } catch (_) {
+      if (!mounted || revision != _requestRevision) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load the knowledge graph.';
       });
     }
   }
@@ -276,6 +273,29 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen>
       if (touches) return true;
     }
     return false;
+  }
+
+}
+
+class _KnowledgeGraphScreenState extends _KnowledgeGraphController
+    with _KnowledgeGraphViewport, _KnowledgeGraphSheet {
+  @override
+  void initState() {
+    super.initState();
+    _motion = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    unawaited(_load());
+  }
+
+  @override
+  void dispose() {
+    if (_motionTick != null) _motion.removeListener(_motionTick!);
+    _motion.dispose();
+    _transform.dispose();
+    _query.dispose();
+    super.dispose();
   }
 
   @override
@@ -459,861 +479,5 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen>
         ),
       ],
     );
-  }
-
-  Widget _map(double coveredBySheet) => LayoutBuilder(
-    builder: (context, constraints) {
-      final viewport = Size(constraints.maxWidth, constraints.maxHeight);
-      final overlap = math.min(viewport.height, coveredBySheet);
-      _scheduleFit(viewport, overlap);
-      return Semantics(
-        container: true,
-        explicitChildNodes: true,
-        label: 'Knowledge graph map',
-        child: Stack(
-          clipBehavior: Clip.hardEdge,
-          children: [
-            ColoredBox(
-              color: JarvisColors.canvas,
-              child: InteractiveViewer(
-                transformationController: _transform,
-                constrained: false,
-                minScale: _minScale,
-                maxScale: _maxScale,
-                boundaryMargin: const EdgeInsets.all(280),
-                clipBehavior: Clip.hardEdge,
-                child: SizedBox(
-                  width: _world,
-                  height: _world,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _clearSelection,
-                    child: CustomPaint(
-                      painter: _GraphPainter(_mapEdges()),
-                      size: Size(_world, _world),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            if (_fitted)
-              AnimatedBuilder(
-                animation: _transform,
-                builder: (context, _) => _nodeLayer(viewport),
-              ),
-            Positioned(
-              top: 12,
-              right: 12,
-              child: Column(
-                children: [
-                  CircleIconButton(
-                    icon: PhosphorIconsRegular.plus,
-                    tooltip: 'Zoom in',
-                    onPressed: () => _zoomBy(1.25),
-                  ),
-                  const SizedBox(height: 8),
-                  CircleIconButton(
-                    icon: PhosphorIconsRegular.minusCircle,
-                    tooltip: 'Zoom out',
-                    onPressed: () => _zoomBy(.8),
-                  ),
-                  const SizedBox(height: 8),
-                  CircleIconButton(
-                    icon: PhosphorIconsRegular.arrowsClockwise,
-                    tooltip: 'Reset view',
-                    onPressed: _resetView,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-
-  Widget _nodeLayer(Size viewport) {
-    final query = _query.text;
-    final matched = {
-      for (final node in _typedNodes)
-        if (nodeMatchesQuery(node, _snapshot, query)) node.id,
-    };
-    final ranked = [..._typedNodes]
-      ..sort((a, b) {
-        final rankA = _labelRank(a, matched, query);
-        final rankB = _labelRank(b, matched, query);
-        if (rankA != rankB) return rankA.compareTo(rankB);
-        return b.relationCount.compareTo(a.relationCount);
-      });
-    final anchors = <({String id, Offset anchor, bool force})>[];
-    final positions = <String, Offset>{};
-    for (final node in ranked) {
-      final screen = MatrixUtils.transformPoint(
-        _transform.value,
-        _worldPoint(node.id),
-      );
-      if (screen.dx < -140 ||
-          screen.dy < -140 ||
-          screen.dx > viewport.width + 140 ||
-          screen.dy > viewport.height + 140) {
-        continue;
-      }
-      positions[node.id] = screen;
-      final dimmed = _dimmed(node, matched, query);
-      if (dimmed && node.id != _selectedId) continue;
-      anchors.add((
-        id: node.id,
-        anchor: screen,
-        force: node.id == _selectedId || node.isYou,
-      ));
-    }
-    final labels = chooseLabelIds(anchors);
-    return Stack(
-      children: [
-        for (final node in _typedNodes)
-          if (positions[node.id] case final screen?)
-            Positioned(
-              left: screen.dx - 56,
-              top: screen.dy - _hitExtent(node) / 2,
-              width: 112,
-              child: _MapNode(
-                node: node,
-                selected: node.id == _selectedId,
-                dimmed: _dimmed(node, matched, query),
-                showLabel: labels.contains(node.id),
-                onTap: () => _select(node.id),
-              ),
-            ),
-      ],
-    );
-  }
-
-  int _labelRank(GraphNode node, Set<String> matched, String query) {
-    if (node.id == _selectedId) return 0;
-    if (node.isYou) return 1;
-    if (query.trim().isNotEmpty && matched.contains(node.id)) return 2;
-    return 3;
-  }
-
-  bool _dimmed(GraphNode node, Set<String> matched, String query) {
-    if (node.id == _selectedId) return false;
-    if (_selectedId != null && !_linkedToSelected(node.id)) return true;
-    return query.trim().isNotEmpty && !matched.contains(node.id);
-  }
-
-  double _hitExtent(GraphNode node) {
-    final selected = node.id == _selectedId;
-    final diameter = selected ? 26.0 : (node.isYou ? 20.0 : 16.0);
-    return diameter + (selected ? 10 : 6);
-  }
-
-  List<_MapEdge> _mapEdges() {
-    final shown = _typedNodes.map((node) => node.id).toSet();
-    final query = _query.text.trim();
-    final matched = {
-      for (final node in _typedNodes)
-        if (nodeMatchesQuery(node, _snapshot, query)) node.id,
-    };
-    final selected = _selectedId;
-    final prominent = <int>[];
-    for (var index = 0; index < _snapshot.links.length; index++) {
-      final link = _snapshot.links[index];
-      if (!shown.contains(link.fromId) || !shown.contains(link.toId)) continue;
-      if (selected != null &&
-          (link.fromId == selected || link.toId == selected)) {
-        prominent.add(index);
-      }
-    }
-    prominent.sort(
-      (a, b) => (_snapshot.links[b].confidence ?? 0).compareTo(
-        _snapshot.links[a].confidence ?? 0,
-      ),
-    );
-    final labeled = prominent.take(6).toSet();
-    final lanes = edgeLanes(_snapshot.links);
-    final edges = <_MapEdge>[];
-    for (var index = 0; index < _snapshot.links.length; index++) {
-      final link = _snapshot.links[index];
-      if (!shown.contains(link.fromId) || !shown.contains(link.toId)) continue;
-      final isProminent =
-          selected != null &&
-          (link.fromId == selected || link.toId == selected);
-      final faded =
-          !isProminent &&
-          (selected != null ||
-              (query.isNotEmpty &&
-                  (!matched.contains(link.fromId) ||
-                      !matched.contains(link.toId))));
-      final color = isProminent
-          ? graphTypeColor(_snapshot.node(link.fromId)?.type)
-          : JarvisColors.outlineStrong.withValues(alpha: faded ? .28 : .9);
-      edges.add(
-        _MapEdge(
-          from: _worldPoint(link.fromId),
-          to: _worldPoint(link.toId),
-          color: color,
-          prominent: isProminent,
-          lane: lanes[index].lane,
-          lanes: lanes[index].lanes,
-          label: labeled.contains(index)
-              ? humanPredicate(link.predicate)
-              : null,
-        ),
-      );
-    }
-    return edges;
-  }
-
-  Widget _sheet() {
-    final listed = _listedNodes;
-    final selected = _snapshot.node(_selectedId);
-    final total = _snapshot.nodes.length;
-    final title = listed.length == total
-        ? 'Entities'
-        : 'Entities · ${listed.length} of $total';
-    return DraggableScrollableSheet(
-      initialChildSize: _sheetPeek,
-      minChildSize: .16,
-      maxChildSize: .88,
-      snap: true,
-      snapSizes: const [_sheetPeek],
-      builder: (context, controller) {
-        if (_reveal != _revealed) {
-          final token = _reveal;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted || token != _reveal) return;
-            _revealed = token;
-            if (controller.hasClients) controller.jumpTo(0);
-          });
-        }
-        return Material(
-          color: JarvisColors.surface,
-          elevation: 18,
-          shadowColor: const Color(0x30111113),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-          clipBehavior: Clip.antiAlias,
-          child: RefreshIndicator(
-            onRefresh: _load,
-            child: ListView(
-              controller: controller,
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(
-                16,
-                0,
-                16,
-                28 + MediaQuery.paddingOf(context).bottom,
-              ),
-              children: [
-                const SizedBox(height: 8),
-                const Center(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: JarvisColors.outlineStrong,
-                      borderRadius: BorderRadius.all(Radius.circular(99)),
-                    ),
-                    child: SizedBox(width: 36, height: 4),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (selected != null) ...[
-                  _inspector(selected),
-                  const SizedBox(height: 18),
-                ],
-                SectionHeader(title),
-                if (listed.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(4, 4, 4, 12),
-                    child: Text(
-                      'Nothing matches this filter.',
-                      style: TextStyle(color: JarvisColors.inkSoft),
-                    ),
-                  )
-                else
-                  GroupedSection(
-                    dividerIndent: 60,
-                    children: [for (final node in listed) _entityTile(node)],
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _inspector(GraphNode node) {
-    final facts = factsFor(node.id, _snapshot);
-    final extra = node.relationCount - facts.length;
-    final updated = DateTime.tryParse(node.updatedAt ?? '')?.toLocal();
-    return Column(
-      key: const Key('graph-inspector'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            _avatar(node, radius: 18),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    node.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  Text(
-                    '${graphTypeLabel(node.type)} · ${node.relationCount} current ${node.relationCount == 1 ? 'fact' : 'facts'}',
-                    style: const TextStyle(
-                      color: JarvisColors.inkSoft,
-                      fontSize: 12.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              key: const Key('open-timeline'),
-              tooltip: 'Open timeline',
-              visualDensity: VisualDensity.compact,
-              onPressed: () => unawaited(_open(node.id)),
-              icon: const Icon(PhosphorIconsRegular.arrowSquareOut, size: 20),
-            ),
-            IconButton(
-              tooltip: 'Close',
-              visualDensity: VisualDensity.compact,
-              onPressed: _clearSelection,
-              icon: const Icon(PhosphorIconsRegular.x, size: 18),
-            ),
-          ],
-        ),
-        if (node.aliases.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Also known as ${node.aliases.join(', ')}',
-            style: const TextStyle(color: JarvisColors.inkSoft),
-          ),
-        ],
-        if (node.summary != null) ...[
-          const SizedBox(height: 6),
-          Text(node.summary!),
-        ],
-        if (updated != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            'Updated ${formatGraphDay(updated)}',
-            style: const TextStyle(fontSize: 12, color: JarvisColors.muted),
-          ),
-        ],
-        const SizedBox(height: 10),
-        if (facts.isEmpty)
-          const Text(
-            'No current facts in this view.',
-            style: TextStyle(color: JarvisColors.inkSoft),
-          )
-        else
-          for (final fact in facts) _factRow(fact),
-        if (extra > 0)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              '$extra more in the timeline',
-              style: const TextStyle(fontSize: 12.5, color: JarvisColors.muted),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _factRow(GraphFactView fact) {
-    final other = _snapshot.node(fact.otherId);
-    final color = fact.literal
-        ? JarvisColors.inkSoft
-        : graphTypeColor(other?.type);
-    final meta = [
-      if (fact.validFrom != null) formatFactRange(fact.validFrom, null),
-      ?confidenceLabel(fact.confidence),
-    ].join(' · ');
-    return InkWell(
-      onTap: fact.otherId == null
-          ? null
-          : () => _select(fact.otherId!, toggle: false),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 7),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 5),
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(fact.sentence),
-                  if (meta.isNotEmpty)
-                    Text(
-                      meta,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: JarvisColors.muted,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (fact.otherId != null)
-              const Icon(
-                PhosphorIconsRegular.caretRight,
-                size: 14,
-                color: JarvisColors.muted,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _entityTile(GraphNode node) {
-    final selected = node.id == _selectedId;
-    return ListTile(
-      key: Key('entity-${node.name}'),
-      selected: selected,
-      selectedTileColor: graphTypeColor(node.type).withValues(alpha: .08),
-      leading: _avatar(node, radius: 16),
-      title: Text(node.name),
-      subtitle: Text(
-        _entitySubtitle(node),
-        maxLines: 3,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: IconButton(
-        key: Key('timeline-${node.name}'),
-        tooltip: 'Open timeline',
-        visualDensity: VisualDensity.compact,
-        onPressed: () => unawaited(_open(node.id)),
-        icon: const Icon(
-          PhosphorIconsRegular.caretRight,
-          size: 16,
-          color: JarvisColors.muted,
-        ),
-      ),
-      onTap: () => _select(node.id),
-    );
-  }
-
-  String _entitySubtitle(GraphNode node) {
-    final count = node.relationCount;
-    final lines = <String>[
-      '${graphTypeLabel(node.type)} · $count current ${count == 1 ? 'fact' : 'facts'}',
-    ];
-    if (node.aliases.isNotEmpty) {
-      lines.add('aka ${node.aliases.take(3).join(', ')}');
-    }
-    if (node.summary != null) lines.add(node.summary!);
-    final preview = factPreview(factsFor(node.id, _snapshot));
-    if (preview.isNotEmpty) lines.add(preview);
-    return lines.join('\n');
-  }
-
-  Widget _avatar(GraphNode node, {required double radius}) {
-    final color = graphTypeColor(node.type);
-    final letter = node.name.trim().isEmpty
-        ? '?'
-        : node.name.trim().characters.first.toUpperCase();
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: color.withValues(alpha: .15),
-      child: Text(
-        letter,
-        style: TextStyle(color: color, fontWeight: FontWeight.w700),
-      ),
-    );
-  }
-}
-
-class _MapNode extends StatelessWidget {
-  const _MapNode({
-    required this.node,
-    required this.selected,
-    required this.dimmed,
-    required this.showLabel,
-    required this.onTap,
-  });
-
-  final GraphNode node;
-  final bool selected;
-  final bool dimmed;
-  final bool showLabel;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = graphTypeColor(node.type);
-    final diameter = selected ? 26.0 : (node.isYou ? 20.0 : 16.0);
-    return Opacity(
-      opacity: dimmed ? .32 : 1,
-      child: GestureDetector(
-        key: Key('node-${node.name}'),
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Semantics(
-              button: true,
-              label: '${node.name}, ${graphTypeLabel(node.type)}',
-              child: Container(
-                width: diameter + (selected ? 10 : 6),
-                height: diameter + (selected ? 10 : 6),
-                alignment: Alignment.center,
-                decoration: selected
-                    ? BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: color.withValues(alpha: .18),
-                      )
-                    : null,
-                child: Container(
-                  width: diameter,
-                  height: diameter,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: JarvisColors.surface,
-                      width: selected ? 3 : 2,
-                    ),
-                    boxShadow: JarvisShadows.soft,
-                  ),
-                ),
-              ),
-            ),
-            if (showLabel)
-              Container(
-                margin: const EdgeInsets.only(top: 2),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                constraints: const BoxConstraints(maxWidth: 108),
-                decoration: BoxDecoration(
-                  color: JarvisColors.surface.withValues(alpha: .94),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: selected ? color : JarvisColors.outline,
-                  ),
-                ),
-                child: Text(
-                  node.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: node.isYou || selected ? 12 : 11,
-                    fontWeight: FontWeight.w600,
-                    color: JarvisColors.ink,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MapEdge {
-  const _MapEdge({
-    required this.from,
-    required this.to,
-    required this.color,
-    required this.prominent,
-    required this.lane,
-    required this.lanes,
-    this.label,
-  });
-
-  final Offset from;
-  final Offset to;
-  final Color color;
-  final bool prominent;
-  final int lane;
-  final int lanes;
-  final String? label;
-}
-
-class _GraphPainter extends CustomPainter {
-  const _GraphPainter(this.edges);
-
-  final List<_MapEdge> edges;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final dot = Paint()..color = const Color(0xffe3dfd6);
-    for (var x = 22.0; x < size.width; x += 28) {
-      for (var y = 22.0; y < size.height; y += 28) {
-        canvas.drawCircle(Offset(x, y), 1.15, dot);
-      }
-    }
-    for (final edge in edges) {
-      final control = _control(edge);
-      final path = Path()
-        ..moveTo(edge.from.dx, edge.from.dy)
-        ..quadraticBezierTo(control.dx, control.dy, edge.to.dx, edge.to.dy);
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = edge.color
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = edge.prominent ? 2.2 : 1.25
-          ..strokeCap = StrokeCap.round,
-      );
-      if (!edge.prominent) continue;
-      _arrow(canvas, control, edge.to, edge.color);
-      final label = edge.label;
-      if (label == null || label.isEmpty) continue;
-      final painter = TextPainter(
-        text: TextSpan(
-          text: label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: JarvisColors.inkSoft,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout(maxWidth: 120);
-      final origin = control - Offset(painter.width / 2, painter.height / 2);
-      final rect = Rect.fromLTWH(
-        origin.dx - 5,
-        origin.dy - 2,
-        painter.width + 10,
-        painter.height + 4,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(6)),
-        Paint()..color = JarvisColors.surface.withValues(alpha: .94),
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(6)),
-        Paint()
-          ..color = JarvisColors.outline
-          ..style = PaintingStyle.stroke,
-      );
-      painter.paint(canvas, origin);
-    }
-  }
-
-  Offset _control(_MapEdge edge) {
-    final mid = Offset.lerp(edge.from, edge.to, .5)!;
-    if (edge.lanes <= 1) return mid;
-    final delta = edge.to - edge.from;
-    final length = math.max(delta.distance, 1).toDouble();
-    final normal = Offset(-delta.dy / length, delta.dx / length);
-    final shift = (edge.lane - (edge.lanes - 1) / 2) * 42;
-    return mid + normal * shift;
-  }
-
-  void _arrow(Canvas canvas, Offset control, Offset to, Color color) {
-    final direction = to - control;
-    final length = math.max(direction.distance, 1).toDouble();
-    final unit = direction / length;
-    final tip = to - unit * 16;
-    final normal = Offset(-unit.dy, unit.dx);
-    final base = tip - unit * 9;
-    final path = Path()
-      ..moveTo(tip.dx, tip.dy)
-      ..lineTo(base.dx + normal.dx * 4.5, base.dy + normal.dy * 4.5)
-      ..lineTo(base.dx - normal.dx * 4.5, base.dy - normal.dy * 4.5)
-      ..close();
-    canvas.drawPath(path, Paint()..color = color);
-  }
-
-  @override
-  bool shouldRepaint(_GraphPainter oldDelegate) => oldDelegate.edges != edges;
-}
-
-/// One entity's current facts and how they changed over time.
-class GraphEntityScreen extends StatefulWidget {
-  const GraphEntityScreen({
-    required this.http,
-    required this.entityId,
-    super.key,
-  });
-
-  final Dio http;
-  final String entityId;
-
-  @override
-  State<GraphEntityScreen> createState() => _GraphEntityScreenState();
-}
-
-class _GraphEntityScreenState extends State<GraphEntityScreen> {
-  Map<String, dynamic>? _details;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_load());
-  }
-
-  Future<void> _load() async {
-    try {
-      final response = await widget.http.get<Map<String, dynamic>>(
-        '/api/v1/graph/entities/${widget.entityId}',
-      );
-      if (mounted) setState(() => _details = response.data);
-    } on DioException catch (error) {
-      if (mounted) {
-        setState(
-          () => _error =
-              firstProblemMessage(error.response?.data) ??
-              'Could not load this entity.',
-        );
-      }
-    }
-  }
-
-  Future<void> _delete() async {
-    final confirmed = await showJarvisConfirm(
-      context,
-      title: 'Forget this entity?',
-      message:
-          'Jarvis removes it and every fact that links to it from the graph. Your memories stay.',
-      confirmLabel: 'Forget',
-      destructive: true,
-      icon: PhosphorIconsRegular.trash,
-    );
-    if (!confirmed) return;
-    await widget.http.delete<void>('/api/v1/graph/entities/${widget.entityId}');
-    if (mounted) Navigator.pop(context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final details = _details;
-    final entity = Map<String, dynamic>.from(details?['entity'] as Map? ?? {});
-    final current = jsonMaps(details?['current']);
-    final history = jsonMaps(details?['history']);
-    final summary = asJsonString(entity['summary']);
-    final updated = DateTime.tryParse(
-      asJsonString(entity['updatedAt']) ?? '',
-    )?.toLocal();
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(asJsonString(entity['name']) ?? 'Entity'),
-        actions: [
-          if (details != null)
-            IconButton(
-              tooltip: 'Forget',
-              onPressed: () => unawaited(_delete()),
-              icon: const Icon(PhosphorIconsRegular.trash),
-            ),
-        ],
-      ),
-      body: details == null
-          ? (_error == null
-                ? const LoadingState()
-                : ErrorState(
-                    message: _error!,
-                    onRetry: () => unawaited(_load()),
-                  ))
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-              children: [
-                ContentWidth(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          StatusPill(
-                            label: graphTypeLabel(asJsonString(entity['type'])),
-                            color: graphTypeColor(asJsonString(entity['type'])),
-                          ),
-                          for (final alias in jsonStrings(entity['aliases']))
-                            StatusPill(
-                              label: 'aka $alias',
-                              color: JarvisColors.muted,
-                            ),
-                          if (updated != null)
-                            StatusPill(
-                              label: 'Updated ${formatGraphDay(updated)}',
-                              color: JarvisColors.inkSoft,
-                            ),
-                        ],
-                      ),
-                      if (summary != null && summary.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Text(summary),
-                      ],
-                      const SizedBox(height: 16),
-                      const SectionHeader('Now'),
-                      _facts(current, currentFacts: true),
-                      if (history.isNotEmpty) ...[
-                        const SizedBox(height: 20),
-                        const SectionHeader('Timeline'),
-                        _facts(history, currentFacts: false),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
-
-  Widget _facts(
-    List<Map<String, dynamic>> facts, {
-    required bool currentFacts,
-  }) {
-    if (facts.isEmpty) {
-      return const SurfaceCard(
-        child: Text(
-          'Nothing recorded yet.',
-          style: TextStyle(color: JarvisColors.inkSoft),
-        ),
-      );
-    }
-    return GroupedSection(
-      dividerIndent: 56,
-      children: [
-        for (final fact in facts)
-          ListTile(
-            leading: IconBadge(
-              icon: currentFacts
-                  ? PhosphorIconsRegular.checkCircle
-                  : PhosphorIconsRegular.clockCounterClockwise,
-              color: currentFacts ? JarvisColors.success : JarvisColors.muted,
-              size: 32,
-            ),
-            title: Text(
-              '${asJsonString(fact['subjectName'])} ${humanPredicate(asJsonString(fact['predicate']) ?? '')} '
-              '${asJsonString(fact['objectName']) ?? asJsonString(fact['objectValue']) ?? ''}',
-              style: currentFacts
-                  ? null
-                  : const TextStyle(
-                      color: JarvisColors.inkSoft,
-                      decoration: TextDecoration.lineThrough,
-                    ),
-            ),
-            subtitle: Text(_factMeta(fact)),
-          ),
-      ],
-    );
-  }
-
-  String _factMeta(Map<String, dynamic> fact) {
-    final range = formatFactRange(
-      asJsonString(fact['validFrom']),
-      asJsonString(fact['validTo']),
-    );
-    final confidence = confidenceLabel(graphJsonDouble(fact['confidence']));
-    return confidence == null ? range : '$range · $confidence';
   }
 }

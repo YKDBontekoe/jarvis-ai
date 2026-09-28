@@ -63,9 +63,11 @@ internal sealed class CoreAgentTools(
         if (!context.IsBackgroundTask)
             yield return AIFunctionFactory.Create(taskTools.CreateTaskAsync);
         yield return AIFunctionFactory.Create(mcpServerTools.ListMcpServersAsync);
+        yield return AIFunctionFactory.Create(mcpServerTools.ListHostMcpServersAsync);
         yield return AIFunctionFactory.Create(mcpServerTools.ListMcpConnectionsAsync);
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.DiscoverMcpServerToolsAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.AddMcpServerAsync));
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.AddMcpStdioServerAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.UpdateMcpServerAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.SetMcpServerEnabledAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.SetMcpServerToolsAsync));
