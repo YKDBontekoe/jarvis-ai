@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/agents/agents_screen.dart';
 import 'package:jarvis_mobile/features/chat/chat_entries.dart';
@@ -402,6 +403,16 @@ void main() {
   testWidgets('copying a new inbound token clears it from the screen', (
     tester,
   ) async {
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async => null,
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
     http.on('GET', '/api/v1/agents', <Object>[]);
     http.on('GET', '/api/v1/a2a/tokens', <Object>[]);
     http.on('POST', '/api/v1/a2a/tokens', {

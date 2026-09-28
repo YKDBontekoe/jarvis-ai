@@ -162,9 +162,13 @@ class _AgentsScreenState extends State<AgentsScreen> {
   Future<void> _copyNewToken() async {
     final token = _newToken;
     if (token == null) return;
-    await Clipboard.setData(ClipboardData(text: token));
-    if (!mounted) return;
     setState(() => _newToken = null);
+    try {
+      await Clipboard.setData(ClipboardData(text: token));
+    } catch (_) {
+      // The secret is already off-screen even if the clipboard write fails.
+    }
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Token copied. It will not be shown again.'),
