@@ -70,7 +70,13 @@ class _UiSurfaceCardState extends State<UiSurfaceCard> {
   @override
   void didUpdateWidget(UiSurfaceCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.surface.id == widget.surface.id) return;
+    if (oldWidget.surface.id == widget.surface.id) {
+      if (_busyAction != null &&
+          (widget.surface.status != 'open' || widget.onAction == null)) {
+        _busyAction = null;
+      }
+      return;
+    }
     _values.clear();
     _selectedItem = null;
     _hint = null;

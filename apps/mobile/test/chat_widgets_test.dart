@@ -246,6 +246,39 @@ void main() {
     expect(reset.status, ApprovalStatus.pending);
   });
 
+  test('resolveSubmittingApproval maps a recorded decision to a terminal state', () {
+    const submitting = ApprovalEntry(
+      id: 'a1',
+      toolName: 'ForgetMemory',
+      argumentsJson: '{}',
+      status: ApprovalStatus.submitting,
+      decision: true,
+    );
+    expect(
+      resolveSubmittingApproval(submitting).status,
+      ApprovalStatus.approved,
+    );
+    expect(
+      resolveSubmittingApproval(
+        submitting.copyWith(decision: false),
+      ).status,
+      ApprovalStatus.denied,
+    );
+    expect(
+      resolveSubmittingApproval(
+        submitting.copyWith(clearDecision: true),
+      ).status,
+      ApprovalStatus.pending,
+    );
+    expect(
+      resolveSubmittingApproval(
+        submitting,
+        fallback: ApprovalStatus.failed,
+      ).status,
+      ApprovalStatus.failed,
+    );
+  });
+
   testWidgets('pending Approve ignores a leftover decline decision', (
     tester,
   ) async {

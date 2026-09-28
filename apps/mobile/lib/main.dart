@@ -848,6 +848,15 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _settleSubmittingApprovals({ApprovalStatus? fallback}) {
+    for (var i = 0; i < _entries.length; i++) {
+      final entry = _entries[i];
+      if (entry is! ApprovalEntry) continue;
+      final resolved = resolveSubmittingApproval(entry, fallback: fallback);
+      if (!identical(resolved, entry)) _entries[i] = resolved;
+    }
+  }
+
   void _addApprovals(Iterable<ApprovalEntry> approvals) {
     final placeholder = _placeholderIndex;
     if (placeholder >= 0) _entries.removeAt(placeholder);
@@ -858,7 +867,15 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       if (existing >= 0) {
         final current = _entries[existing] as ApprovalEntry;
-        if (current.status == ApprovalStatus.submitting) continue;
+        if (current.status == ApprovalStatus.submitting) {
+          if (approval.retry) {
+            _entries[existing] = current.copyWith(
+              status: ApprovalStatus.failed,
+              decision: approval.decision ?? current.decision,
+            );
+          }
+          continue;
+        }
         if (current.status != ApprovalStatus.pending &&
             approval.status == ApprovalStatus.pending &&
             !approval.retry) {
@@ -891,6 +908,15 @@ class _ChatScreenState extends State<ChatScreen> {
         }
         return !approvals.any((approval) => approval.id == entry.id);
       });
+      for (var i = 0; i < _entries.length; i++) {
+        final entry = _entries[i];
+        if (entry is! ApprovalEntry ||
+            entry.status != ApprovalStatus.submitting) {
+          continue;
+        }
+        if (approvals.any((approval) => approval.id == entry.id)) continue;
+        _entries[i] = resolveSubmittingApproval(entry);
+      }
       _addApprovals(approvals);
     });
   }
@@ -938,7 +964,12 @@ class _ChatScreenState extends State<ChatScreen> {
       final payload = _payload(arguments);
       final content = asJsonString(payload?['content']) ?? '';
       setState(
-        () => _completeAssistant(content, id: asJsonString(payload?['id'])),
+        () {
+          _completeAssistant(content, id: asJsonString(payload?['id']));
+          if (content.trim().isNotEmpty) {
+            _settleSubmittingApprovals();
+          }
+        },
       );
       _scrollToBottom();
     });
@@ -1012,7 +1043,10 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     hub.on('agent.completed', (_) {
       if (_hubIsCurrent(hub, conversationId, expectedGeneration)) {
-        setState(_settleToolRuns);
+        setState(() {
+          _settleToolRuns();
+          _settleSubmittingApprovals();
+        });
       }
     });
     hub.on('agent.failed', (arguments) {
@@ -1021,6 +1055,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _removePlaceholder();
         _settleToolRuns();
+        _settleSubmittingApprovals(fallback: ApprovalStatus.failed);
         _error =
             asJsonString(event?['message']) ??
             'Jarvis could not complete this response.';
@@ -1750,6 +1785,12 @@ class _ChatScreenState extends State<ChatScreen> {
         _surfaceErrorFor = surface.id;
         if (used) _error = message;
       });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _surfaceError = 'Jarvis could not use this card. Try again.';
+        _surfaceErrorFor = surface.id;
+      });
     }
   }
 
@@ -2032,6 +2073,11 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     } finally {
       if (identical(_runCancel, run)) _runCancel = null;
+      if (mounted &&
+          _conversationId == conversationId &&
+          _realtimeGeneration == generation) {
+        setState(_settleSubmittingApprovals);
+      }
       _scrollToBottom();
     }
   }

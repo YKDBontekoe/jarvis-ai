@@ -3,9 +3,20 @@ using System.Net;
 namespace Jarvis.Application.Integrations;
 
 public sealed record UserMcpServer(string Id, string Name, string Endpoint,
-    IReadOnlyList<string> AllowedTools, DateTimeOffset UpdatedAt, bool HasToken);
+    IReadOnlyList<string> AllowedTools, DateTimeOffset UpdatedAt, bool HasToken, bool Enabled = true);
 
 public sealed record AddUserMcpServerRequest(string Name, string Endpoint, IReadOnlyList<string> AllowedTools);
+
+public sealed record McpServerStateRequest(bool? Enabled, string? ToolMode, IReadOnlyList<string>? AllowedTools);
+
+public sealed record HostMcpOverride(bool Enabled, IReadOnlyList<string>? AllowedTools);
+
+public interface IOwnerMcpPolicyStore
+{
+    Task<IReadOnlyDictionary<string, HostMcpOverride>> GetAsync(Guid ownerId, CancellationToken cancellationToken);
+    Task<HostMcpOverride> SaveAsync(Guid ownerId, string serverName, HostMcpOverride value,
+        CancellationToken cancellationToken);
+}
 
 public interface IUserMcpServerRegistry
 {
@@ -13,6 +24,9 @@ public interface IUserMcpServerRegistry
     Task<UserMcpServer> AddAsync(Guid ownerId, AddUserMcpServerRequest request,
         CancellationToken cancellationToken);
     Task<UserMcpServer?> UpdateAsync(Guid ownerId, string id, AddUserMcpServerRequest request,
+        CancellationToken cancellationToken);
+    Task<UserMcpServer?> SetEnabledAsync(Guid ownerId, string id, bool enabled, CancellationToken cancellationToken);
+    Task<UserMcpServer?> SetToolsAsync(Guid ownerId, string id, string mode, IReadOnlyList<string> allowedTools,
         CancellationToken cancellationToken);
     Task<bool> RemoveAsync(Guid ownerId, string id, CancellationToken cancellationToken);
 }

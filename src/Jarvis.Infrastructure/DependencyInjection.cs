@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<IFileContentRepository, FileContentRepository>();
         services.AddScoped<IIntegrationCredentialStore, IntegrationCredentialStore>();
         services.AddScoped<IUserMcpServerRegistry, UserMcpServerRegistry>();
+        services.AddScoped<IOwnerMcpPolicyStore, OwnerMcpPolicyStore>();
         services.AddScoped<IDailyBriefingRepository, DailyBriefingRepository>();
         services.AddScoped<Jarvis.Application.Settings.IOwnerSettingsStore, OwnerSettingsStore>();
         services.AddScoped<Jarvis.Application.Skills.ISkillRepository, SkillRepository>();

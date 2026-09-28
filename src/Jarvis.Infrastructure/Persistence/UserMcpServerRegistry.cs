@@ -57,7 +57,11 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         if (!IsId(id)) return null;
         var existing = await credentials.GetSecretsAsync(ownerId, id, cancellationToken);
         if (existing is null || !existing.ContainsKey(ConfigSecret)) return null;
+        StoredServer? current = null;
+        try { current = JsonSerializer.Deserialize<StoredServer>(existing[ConfigSecret], JsonOptions); }
+        catch (JsonException) { }
         var replacement = await BuildStoredAsync(request, cancellationToken);
+        replacement = replacement with { Enabled = current?.Enabled ?? true };
         await credentials.SaveSecretAsync(ownerId, id, ConfigSecret,
             JsonSerializer.Serialize(replacement, JsonOptions), cancellationToken);
         var status = await credentials.GetStatusAsync(ownerId, id, cancellationToken);
@@ -65,28 +69,57 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
             status?.SecretNames.Contains(IntegrationCredentialProviders.UserMcpTokenSecret, StringComparer.Ordinal) == true);
     }
 
+    public async Task<UserMcpServer?> SetEnabledAsync(Guid ownerId, string id, bool enabled,
+        CancellationToken cancellationToken)
+    {
+        var stored = await ReadStoredAsync(ownerId, id, cancellationToken);
+        if (stored is null) return null;
+        var updated = stored.Value.Server with { Enabled = enabled };
+        await credentials.SaveSecretAsync(ownerId, id, ConfigSecret, JsonSerializer.Serialize(updated, JsonOptions),
+            cancellationToken);
+        return ToPublic(id, updated, DateTimeOffset.UtcNow, stored.Value.HasToken);
+    }
+
+    public async Task<UserMcpServer?> SetToolsAsync(Guid ownerId, string id, string mode, IReadOnlyList<string> allowedTools,
+        CancellationToken cancellationToken)
+    {
+        var stored = await ReadStoredAsync(ownerId, id, cancellationToken);
+        if (stored is null) return null;
+        var tools = McpToolSelection.Apply(stored.Value.Server.AllowedTools, mode, allowedTools);
+        var endpoint = await McpServerEndpointValidator.ValidateAsync(stored.Value.Server.Endpoint, cancellationToken);
+        var updated = stored.Value.Server with { AllowedTools = tools, Endpoint = endpoint };
+        await credentials.SaveSecretAsync(ownerId, id, ConfigSecret, JsonSerializer.Serialize(updated, JsonOptions),
+            cancellationToken);
+        return ToPublic(id, updated, DateTimeOffset.UtcNow, stored.Value.HasToken);
+    }
+
+    private async Task<(StoredServer Server, bool HasToken)?> ReadStoredAsync(Guid ownerId, string id,
+        CancellationToken cancellationToken)
+    {
+        if (!IsId(id)) return null;
+        var secrets = await credentials.GetSecretsAsync(ownerId, id, cancellationToken);
+        if (secrets is null || !secrets.TryGetValue(ConfigSecret, out var json)) return null;
+        var stored = JsonSerializer.Deserialize<StoredServer>(json, JsonOptions);
+        return stored is null ? null : (stored, secrets.ContainsKey(IntegrationCredentialProviders.UserMcpTokenSecret));
+    }
+
     private static async Task<StoredServer> BuildStoredAsync(AddUserMcpServerRequest request,
         CancellationToken cancellationToken)
     {
         var name = request.Name?.Trim() ?? string.Empty;
-        var allowedTools = request.AllowedTools?.Select(tool => tool?.Trim() ?? string.Empty)
-            .Where(tool => tool.Length > 0).Distinct(StringComparer.Ordinal).ToArray() ?? [];
         if (name.Length is < 1 or > 80 || !NamePattern().IsMatch(name))
             throw new ArgumentException("Use a server name of 1 to 80 letters, numbers, spaces, underscores, or hyphens.");
-        if (allowedTools.Length is < 1 or > 50 || allowedTools.Any(tool => tool.Length > 128 || !ToolPattern().IsMatch(tool)))
-            throw new ArgumentException("Add 1 to 50 exact tool names using letters, numbers, underscores, dots, or hyphens.");
-        return new StoredServer(name, await McpServerEndpointValidator.ValidateAsync(request.Endpoint, cancellationToken), allowedTools);
+        var allowedTools = McpToolSelection.Normalize(request.AllowedTools);
+        return new StoredServer(name, await McpServerEndpointValidator.ValidateAsync(request.Endpoint, cancellationToken),
+            allowedTools, true);
     }
 
-    public static bool IsId(string id) => id.StartsWith(ProviderPrefix, StringComparison.Ordinal) &&
-        Guid.TryParseExact(id[ProviderPrefix.Length..], "N", out _);
+    public static bool IsId(string? id) => IntegrationCredentialProviders.IsUserMcpServerId(id);
 
     private static UserMcpServer ToPublic(string id, StoredServer stored, DateTimeOffset updatedAt, bool hasToken) =>
-        new(id, stored.Name, stored.Endpoint, stored.AllowedTools, updatedAt, hasToken);
+        new(id, stored.Name, stored.Endpoint, stored.AllowedTools, updatedAt, hasToken, stored.Enabled ?? true);
 
     [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9 _-]{0,79}$", RegexOptions.CultureInvariant)]
     private static partial Regex NamePattern();
-    [GeneratedRegex("^[A-Za-z0-9_.-]{1,128}$", RegexOptions.CultureInvariant)]
-    private static partial Regex ToolPattern();
-    private sealed record StoredServer(string Name, string Endpoint, string[] AllowedTools);
+    private sealed record StoredServer(string Name, string Endpoint, string[] AllowedTools, bool? Enabled);
 }

@@ -1,6 +1,7 @@
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Integrations;
 using Jarvis.Mcp;
+using Microsoft.Extensions.Configuration;
 
 namespace Jarvis.Api.Endpoints;
 
@@ -51,6 +52,59 @@ internal static class IntegrationEndpoints
                 ICurrentUser currentUser, CancellationToken ct) =>
             await servers.RemoveAsync(currentUser.OwnerId, id, ct) ? Results.NoContent() : Results.NotFound())
             .WithName("RemoveUserMcpServer");
+
+        api.MapPut("/mcp-servers/{id}/state", async (string id, McpServerStateRequest request,
+            IUserMcpServerRegistry servers, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            try
+            {
+                var server = await ApplyUserStateAsync(id, request, servers, currentUser.OwnerId, ct);
+                return server is null ? Results.NotFound() : Results.Ok(server);
+            }
+            catch (ArgumentException exception)
+            {
+                return EndpointHelpers.Invalid("state", exception.Message);
+            }
+        }).WithName("SetUserMcpServerState");
+
+        api.MapPut("/mcp-controls/{name}", async (string name, McpServerStateRequest request,
+            IConfiguration configuration, IOwnerMcpPolicyStore policy, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var configured = McpServerConfiguration.Find(configuration, name);
+            if (configured is null) return Results.NotFound();
+            try
+            {
+                var current = (await policy.GetAsync(currentUser.OwnerId, ct))
+                    .TryGetValue(configured.Name, out var existing) ? existing : null;
+                var next = McpToolSelection.NextHostOverride(current, configured.AllowedTools, request.Enabled,
+                    request.ToolMode, request.AllowedTools);
+                await policy.SaveAsync(currentUser.OwnerId, configured.Name, next, ct);
+                return Results.Ok(new { name = configured.Name, enabled = next.Enabled, allowedTools = next.AllowedTools });
+            }
+            catch (ArgumentException exception)
+            {
+                return EndpointHelpers.Invalid("state", exception.Message);
+            }
+        }).WithName("SetHostMcpServerState");
+    }
+
+    private static async Task<UserMcpServer?> ApplyUserStateAsync(string id, McpServerStateRequest request,
+        IUserMcpServerRegistry servers, Guid ownerId, CancellationToken cancellationToken)
+    {
+        if (request.Enabled is null && string.IsNullOrWhiteSpace(request.ToolMode))
+            throw new ArgumentException("Set enabled, a tool mode, or both.");
+        UserMcpServer? server = null;
+        if (request.Enabled is { } enabled)
+        {
+            server = await servers.SetEnabledAsync(ownerId, id, enabled, cancellationToken);
+            if (server is null) return null;
+        }
+        if (!string.IsNullOrWhiteSpace(request.ToolMode))
+        {
+            server = await servers.SetToolsAsync(ownerId, id, request.ToolMode, request.AllowedTools ?? [],
+                cancellationToken);
+        }
+        return server;
     }
 
     private static void MapCredentials(RouteGroupBuilder api)

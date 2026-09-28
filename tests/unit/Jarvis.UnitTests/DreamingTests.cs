@@ -308,7 +308,7 @@ public sealed class DreamingTests
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<GraphEntityRecord>>([]);
         public Task<GraphOverview> GetOverviewAsync(Guid ownerId, int limit, CancellationToken cancellationToken) =>
-            Task.FromResult(new GraphOverview([], []));
+            Task.FromResult(new GraphOverview([], [], []));
         public Task<bool> DeleteEntityAsync(Guid ownerId, Guid entityId, CancellationToken cancellationToken) =>
             Task.FromResult(false);
     }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/agents/agents_screen.dart';
@@ -196,6 +198,71 @@ void main() {
     await tester.pump();
     expect(submitted, isTrue);
     expect(values?['day'], 'I walk the dog');
+  });
+
+  testWidgets('clears action spinners when the card is no longer interactive', (
+    tester,
+  ) async {
+    final pending = Completer<void>();
+    addTearDown(() {
+      if (!pending.isCompleted) pending.complete();
+    });
+    await show(
+      tester,
+      Scaffold(
+        body: UiSurfaceCard(
+          key: const ValueKey('surf-busy'),
+          surface: const UiSurfaceEntry(
+            id: 'surf-busy',
+            title: 'Pick a plan',
+            status: 'open',
+            schema: {
+              'kind': 'choice',
+              'title': 'Pick a plan',
+              'actions': [
+                {'id': 'train', 'label': 'Train', 'style': 'primary'},
+              ],
+              'items': [
+                {'id': 'train', 'title': 'Train'},
+              ],
+            },
+          ),
+          onAction: (_, __) => pending.future,
+        ),
+      ),
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Train'));
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: UiSurfaceCard(
+            key: const ValueKey('surf-busy'),
+            surface: const UiSurfaceEntry(
+              id: 'surf-busy',
+              title: 'Pick a plan',
+              status: 'completed',
+              schema: {
+                'kind': 'choice',
+                'title': 'Pick a plan',
+                'actions': [
+                  {'id': 'train', 'label': 'Train', 'style': 'primary'},
+                ],
+                'items': [
+                  {'id': 'train', 'title': 'Train'},
+                ],
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    pending.complete();
   });
 
   testWidgets('a used card collapses to one answered line', (tester) async {

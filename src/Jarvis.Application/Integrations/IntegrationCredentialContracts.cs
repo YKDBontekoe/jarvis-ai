@@ -17,6 +17,9 @@ public static class IntegrationCredentialProviders
         !string.IsNullOrEmpty(provider) &&
         provider.StartsWith(UserMcpPrefix, StringComparison.Ordinal);
 
+    public static bool IsUserMcpServerId(string? provider) =>
+        IsUserMcpManaged(provider) && Guid.TryParseExact(provider![UserMcpPrefix.Length..], "N", out _);
+
     /// <summary>Providers whose secrets belong to a Jarvis feature screen rather than the generic credential API.</summary>
     public static bool IsSystemManaged(string? provider) =>
         IsReserved(provider) && !IsUserMcpManaged(provider);

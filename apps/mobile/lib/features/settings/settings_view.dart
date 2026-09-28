@@ -106,7 +106,7 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
     [
       (
         title: 'Knowledge graph',
-        subtitle: 'People, places, and projects Jarvis connects over time',
+        subtitle: 'Pan, search, and inspect people, places, and projects',
         icon: PhosphorIconsRegular.graph,
         destination: 'graph',
       ),
