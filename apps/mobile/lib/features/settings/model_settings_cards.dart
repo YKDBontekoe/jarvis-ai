@@ -196,6 +196,7 @@ mixin _ModelSettingsCards on _ModelSettingsController {
       String helper, {
       Key? key,
       bool codexModels = false,
+      String? browseCodexKey,
     }) => Padding(
       padding: const EdgeInsets.only(top: 12),
       child: TextField(
@@ -212,10 +213,10 @@ mixin _ModelSettingsCards on _ModelSettingsController {
           helperMaxLines: 3,
           suffixIcon: codexModels
               ? IconButton(
-                  key: const Key('browse-codex-models'),
+                  key: Key(browseCodexKey ?? 'browse-codex-models'),
                   tooltip: 'Browse Codex models',
                   icon: const Icon(PhosphorIconsRegular.magnifyingGlass),
-                  onPressed: () => unawaited(_pickCodex()),
+                  onPressed: () => unawaited(_pickCodex(controller)),
                 )
               : openRouter || controller == _embedding
               ? IconButton(
@@ -227,17 +228,26 @@ mixin _ModelSettingsCards on _ModelSettingsController {
         ),
       ),
     );
-    final selected = _chat.text.trim();
-    final known = _codexModels.any(
-      (model) =>
-          (asJsonString(model['model']) ?? asJsonString(model['id'])) ==
-          selected,
-    );
-    final codexHelper = _codexModels.isEmpty
-        ? 'Leave empty to use the ChatGPT account default.'
-        : 'Models supported by Codex ${_installedVersion ?? 'the installed CLI'}. '
-              'Leave empty for the account default.'
-              '${selected.isNotEmpty && !known ? ' This model is not in the installed catalog.' : ''}';
+    String codexFieldHelper(String selected) {
+      final known = _codexModels.any(
+        (model) =>
+            (asJsonString(model['model']) ?? asJsonString(model['id'])) ==
+            selected,
+      );
+      if (_codexModels.isEmpty) {
+        return 'Leave empty to use the ChatGPT account default.';
+      }
+      return 'Models supported by Codex ${_installedVersion ?? 'the installed CLI'}. '
+          'Leave empty for the account default.'
+          '${selected.isNotEmpty && !known ? ' This model is not in the installed catalog.' : ''}';
+    }
+
+    final chatSelected = _chat.text.trim();
+    final reasoningSelected = _reasoning.text.trim();
+    final codexChatHelper = codexFieldHelper(chatSelected);
+    final codexReasoningHelper =
+        'Used for reflection, dreaming, and durable background tasks. '
+        '${codexFieldHelper(reasoningSelected)}';
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -248,7 +258,7 @@ mixin _ModelSettingsCards on _ModelSettingsController {
             'Chat model',
             openRouter
                 ? 'Used for conversations and background tasks. Pick one that supports tools.'
-                : codexHelper,
+                : codexChatHelper,
             key: const Key('chat-model'),
             codexModels: codexPicker,
           ),
@@ -256,8 +266,18 @@ mixin _ModelSettingsCards on _ModelSettingsController {
             field(
               _fast,
               'Fast model (optional)',
-              'Used for learning, memory extraction, and reranking. Defaults to the chat model.',
+              'Used for memory extraction and reranking. Defaults to the chat model.',
             ),
+          field(
+            _reasoning,
+            'Reasoning model (optional)',
+            openRouter
+                ? 'Used for reflection, dreaming, and durable background tasks. Defaults to the chat model.'
+                : codexReasoningHelper,
+            key: const Key('reasoning-model'),
+            codexModels: codexPicker,
+            browseCodexKey: 'browse-codex-reasoning-models',
+          ),
           field(
             _embedding,
             'Embedding model (optional)',

@@ -17,7 +17,7 @@ public sealed class ModelProviderTests
     [Fact]
     public void Normalize_defaults_to_codex_and_trims_models()
     {
-        var settings = new ModelSettings(" CODEX ", " gpt-5 ", null, "").Normalize();
+        var settings = new ModelSettings(" CODEX ", " gpt-5 ", null, null, "").Normalize();
 
         Assert.Equal(ModelSettings.Codex, settings.Provider);
         Assert.Equal("gpt-5", settings.ChatModel);
@@ -41,7 +41,8 @@ public sealed class ModelProviderTests
         var settings = new InMemorySettingsStore();
         var credentials = new InMemoryCredentialStore();
         await settings.SaveAsync(Owner, SettingsSections.Models,
-            new ModelSettings(ModelSettings.OpenRouter, "anthropic/claude-sonnet-4.5", "google/gemini-2.5-flash"),
+            new ModelSettings(ModelSettings.OpenRouter, "anthropic/claude-sonnet-4.5",
+                FastModel: "google/gemini-2.5-flash"),
             CancellationToken.None);
 
         var recorder = new RecordingUsageRecorder();
@@ -120,6 +121,25 @@ public sealed class ModelProviderTests
         var background = await resolver.GetChatClientAsync(Owner, ModelPurpose.Background, CancellationToken.None);
         Assert.NotSame(codex, background);
         _ = await background.GetResponseAsync([new ChatMessage(ChatRole.User, "bg")]);
+        Assert.Equal("gpt-5.4", codex.LastOptions?.ModelId);
+    }
+
+    [Fact]
+    public async Task Resolver_applies_owner_codex_reasoning_model()
+    {
+        var codex = new NamedClient("codex");
+        var settings = new InMemorySettingsStore();
+        await settings.SaveAsync(Owner, SettingsSections.Models,
+            new ModelSettings(ModelSettings.Codex, ChatModel: "gpt-5.4", ReasoningModel: "gpt-5.4-pro"),
+            CancellationToken.None);
+
+        var resolver = CreateResolver(codex, settings, new InMemoryCredentialStore());
+        var reasoning = await resolver.GetChatClientAsync(Owner, ModelPurpose.Reasoning, CancellationToken.None);
+        _ = await reasoning.GetResponseAsync([new ChatMessage(ChatRole.User, "think")]);
+        Assert.Equal("gpt-5.4-pro", codex.LastOptions?.ModelId);
+
+        var chat = await resolver.GetChatClientAsync(Owner, ModelPurpose.Chat, CancellationToken.None);
+        _ = await chat.GetResponseAsync([new ChatMessage(ChatRole.User, "hi")]);
         Assert.Equal("gpt-5.4", codex.LastOptions?.ModelId);
     }
 

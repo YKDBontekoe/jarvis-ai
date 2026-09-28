@@ -70,7 +70,8 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
         await mcpToolHost.InitializeAsync(cancellationToken);
         var ownerId = currentUser.OwnerId;
         var task = await tasks.GetTaskByConversationIdAsync(conversationId, ownerId, cancellationToken);
-        var chatClient = await chatClients.GetChatClientAsync(ownerId, ModelPurpose.Chat, cancellationToken);
+        var purpose = task is not null ? ModelPurpose.Reasoning : ModelPurpose.Chat;
+        var chatClient = await chatClients.GetChatClientAsync(ownerId, purpose, cancellationToken);
         return _agent = agentFactory.Create(chatClient, mcpToolHost.Tools,
             new AgentBuildContext(ownerId, task?.Id, conversationId));
     }

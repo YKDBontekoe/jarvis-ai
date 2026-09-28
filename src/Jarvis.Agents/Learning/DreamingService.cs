@@ -329,7 +329,7 @@ public sealed class DreamingService(
             })
         }, JsonOptions);
 
-        var client = await chatClients.GetChatClientAsync(ownerId, ModelPurpose.Background, cancellationToken);
+        var client = await chatClients.GetChatClientAsync(ownerId, ModelPurpose.Reasoning, cancellationToken);
         var response = await client.GetResponseAsync(
         [
             new ChatMessage(ChatRole.System, PromptMarker + """

@@ -27,6 +27,7 @@ abstract class _ModelSettingsController extends State<ModelSettingsScreen> {
   final _key = TextEditingController();
   final _chat = TextEditingController();
   final _fast = TextEditingController();
+  final _reasoning = TextEditingController();
   final _embedding = TextEditingController();
   String _provider = 'codex';
   bool _keyConfigured = false;
@@ -50,7 +51,7 @@ abstract class _ModelSettingsController extends State<ModelSettingsScreen> {
   Future<void> _updateCodex();
   Future<void> _saveKey();
   Future<void> _removeKey();
-  Future<void> _pickCodex();
+  Future<void> _pickCodex(TextEditingController controller);
   Future<void> _pick(TextEditingController controller, String title);
   List<Map<String, dynamic>> get _visibleCodexModels;
 }
@@ -68,6 +69,7 @@ class _ModelSettingsScreenState extends _ModelSettingsController
     _key.dispose();
     _chat.dispose();
     _fast.dispose();
+    _reasoning.dispose();
     _embedding.dispose();
     super.dispose();
   }
@@ -78,6 +80,7 @@ class _ModelSettingsScreenState extends _ModelSettingsController
     _provider = asJsonString(data['provider']) ?? 'codex';
     _chat.text = asJsonString(data['chatModel']) ?? '';
     _fast.text = asJsonString(data['fastModel']) ?? '';
+    _reasoning.text = asJsonString(data['reasoningModel']) ?? '';
     _embedding.text = asJsonString(data['embeddingModel']) ?? '';
   }
 
@@ -207,16 +210,24 @@ class _ModelSettingsScreenState extends _ModelSettingsController
   }
 
   @override
-  Future<void> _pickCodex() async {
+  Future<void> _pickCodex(TextEditingController controller) async {
+    final selected = controller.text.trim();
+    final models = [
+      for (final model in _codexModels)
+        if (!asJsonBool(model['hidden']) ||
+            (asJsonString(model['model']) ?? asJsonString(model['id'])) ==
+                selected)
+          model,
+    ];
     final picked = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       builder: (_) => CodexModelPicker(
-        models: _visibleCodexModels,
-        selected: _chat.text.trim(),
+        models: models,
+        selected: selected,
       ),
     );
-    if (picked != null && mounted) setState(() => _chat.text = picked);
+    if (picked != null && mounted) setState(() => controller.text = picked);
   }
 
   Future<void> _run(
@@ -294,6 +305,7 @@ class _ModelSettingsScreenState extends _ModelSettingsController
         'provider': _provider,
         'chatModel': _chat.text.trim(),
         'fastModel': _fast.text.trim(),
+        'reasoningModel': _reasoning.text.trim(),
         'embeddingModel': _embedding.text.trim(),
       },
     ),

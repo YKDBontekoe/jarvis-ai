@@ -11,6 +11,7 @@ public static class UsagePurposes
 {
     public const string Chat = "chat";
     public const string Background = "background";
+    public const string Reasoning = "reasoning";
     public const string Vision = "vision";
     public const string Embedding = "embedding";
 }
