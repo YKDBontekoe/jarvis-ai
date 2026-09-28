@@ -6,7 +6,7 @@ using Jarvis.Application.Settings;
 
 namespace Jarvis.Api.Endpoints;
 
-public sealed record LearningStatusDto(LearningSettings Settings, HeartbeatState State,
+public sealed record LearningStatusDto(LearningSettings Settings, HeartbeatState State, DreamingState Dreaming,
     IReadOnlyList<AuditEventDto> Activity);
 
 internal static class LearningEndpoints
@@ -22,7 +22,8 @@ internal static class LearningEndpoints
             .WithName("GetLearningSettings");
 
         api.MapPut("/settings/learning", async (LearningSettings request, IOwnerSettingsStore settings,
-            IHeartbeatScheduler scheduler, ICurrentUser currentUser, CancellationToken ct) =>
+            IHeartbeatScheduler scheduler, IDreamingScheduler dreaming, ICurrentUser currentUser,
+            CancellationToken ct) =>
         {
             LearningSettings normalized;
             try { normalized = request.Normalize(); }
@@ -34,11 +35,16 @@ internal static class LearningEndpoints
                     await scheduler.ScheduleHeartbeatAsync(currentUser.OwnerId, ct);
                 else
                     await scheduler.CancelHeartbeatAsync(currentUser.OwnerId, ct);
+                if (normalized.DreamingEnabled)
+                    await dreaming.ScheduleDreamingAsync(currentUser.OwnerId, ct);
+                else
+                    await dreaming.CancelDreamingAsync(currentUser.OwnerId, ct);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 logger.LogInformation(exception,
-                    "Heartbeat scheduling for {OwnerId} will be repaired by the worker reconciler.", currentUser.OwnerId);
+                    "Heartbeat or dreaming scheduling for {OwnerId} will be repaired by the worker reconciler.",
+                    currentUser.OwnerId);
             }
             return Results.Ok(normalized);
         }).WithName("SaveLearningSettings");
@@ -55,6 +61,7 @@ internal static class LearningEndpoints
             return Results.Ok(new LearningStatusDto(
                 await settings.GetAsync<LearningSettings>(ownerId, SettingsSections.Learning, ct) ?? LearningSettings.Default,
                 await settings.GetAsync<HeartbeatState>(ownerId, LearningSections.HeartbeatState, ct) ?? new HeartbeatState(),
+                await settings.GetAsync<DreamingState>(ownerId, LearningSections.DreamingState, ct) ?? new DreamingState(),
                 activity));
         }).WithName("GetLearningStatus");
 
@@ -64,6 +71,13 @@ internal static class LearningEndpoints
             var outcome = await heartbeat.RunAsync(currentUser.OwnerId, ct);
             return Results.Ok(outcome);
         }).WithName("RunHeartbeatNow");
+
+        api.MapPost("/learning/dream", async (DreamingService dreaming, ICurrentUser currentUser,
+            CancellationToken ct) =>
+        {
+            var outcome = await dreaming.SweepAsync(currentUser.OwnerId, force: true, ct);
+            return Results.Ok(outcome);
+        }).WithName("RunDreamingNow");
 
         return api;
     }

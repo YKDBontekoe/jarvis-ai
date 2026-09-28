@@ -4,7 +4,7 @@ import 'package:jarvis_mobile/features/learning/learning_screen.dart';
 
 import 'support/fixture_http.dart';
 
-Map<String, Object?> _settings({bool heartbeat = false}) => {
+Map<String, Object?> _settings({bool heartbeat = false, bool dreaming = true}) => {
   'heartbeatEnabled': heartbeat,
   'heartbeatMinutes': 60,
   'learnPersona': true,
@@ -13,6 +13,8 @@ Map<String, Object?> _settings({bool heartbeat = false}) => {
   'proactiveCheckIns': true,
   'quietHoursStart': 22,
   'quietHoursEnd': 7,
+  'dreamingEnabled': dreaming,
+  'dreamingHour': 3,
 };
 
 void main() {
@@ -21,7 +23,7 @@ void main() {
   setUp(() => http = FixtureHttp());
 
   Future<void> show(WidgetTester tester) async {
-    tester.view.physicalSize = const Size(900, 2200);
+    tester.view.physicalSize = const Size(900, 2800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -37,6 +39,7 @@ void main() {
     http.on('GET', '/api/v1/learning/status', {
       'settings': _settings(),
       'state': {'lastSummary': null},
+      'dreaming': {'lastSummary': null, 'diary': <Object>[]},
       'activity': [
         {
           'id': 'a1',
@@ -63,6 +66,7 @@ void main() {
         http.sent('PUT', '/api/v1/settings/learning').single.body
             as Map<String, dynamic>;
     expect(body['heartbeatEnabled'], true);
+    expect(body['dreamingEnabled'], true);
     expect(body['quietHoursStart'], 22);
     expect(
       find.textContaining('Reflects and checks in every 1 h'),
@@ -74,6 +78,7 @@ void main() {
     http.on('GET', '/api/v1/learning/status', {
       'settings': _settings(heartbeat: true),
       'state': {'lastSummary': 'Nothing new to learn.'},
+      'dreaming': {'lastSummary': 'No dream has run yet.', 'diary': <Object>[]},
       'activity': <Object>[],
     });
     http.on('POST', '/api/v1/learning/run', {
@@ -87,5 +92,30 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('1 new preference, 1 skill'), findsOneWidget);
+  });
+
+  testWidgets('dream now shows what consolidation changed', (tester) async {
+    http.on('GET', '/api/v1/learning/status', {
+      'settings': _settings(heartbeat: true),
+      'state': {'lastSummary': 'Nothing new to learn.'},
+      'dreaming': {
+        'lastSummary': 'No dream has run yet.',
+        'diary': <Object>[],
+      },
+      'activity': <Object>[],
+    });
+    http.on('POST', '/api/v1/learning/dream', {
+      'summary': '1 merged memory, 1 tone/preference.',
+      'promoted': 0,
+      'merged': 1,
+      'personaUpdated': 1,
+    });
+    await show(tester);
+
+    await tester.ensureVisible(find.byKey(const Key('run-dreaming')));
+    await tester.tap(find.byKey(const Key('run-dreaming')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('1 merged memory'), findsOneWidget);
   });
 }

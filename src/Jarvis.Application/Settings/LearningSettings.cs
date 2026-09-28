@@ -1,6 +1,6 @@
 namespace Jarvis.Application.Settings;
 
-/// <summary>Owner controls for continuous learning, self-authored skills, and the proactive heartbeat.</summary>
+/// <summary>Owner controls for continuous learning, self-authored skills, dreaming, and the proactive heartbeat.</summary>
 public sealed record LearningSettings(
     bool HeartbeatEnabled = false,
     int HeartbeatMinutes = 60,
@@ -9,7 +9,9 @@ public sealed record LearningSettings(
     bool AutoActivateSkills = true,
     bool ProactiveCheckIns = true,
     int QuietHoursStart = 22,
-    int QuietHoursEnd = 7)
+    int QuietHoursEnd = 7,
+    bool DreamingEnabled = true,
+    int DreamingHour = 3)
 {
     public static LearningSettings Default { get; } = new();
 
@@ -19,6 +21,8 @@ public sealed record LearningSettings(
             throw new ArgumentException("Choose a heartbeat interval between 15 minutes and 24 hours.", nameof(HeartbeatMinutes));
         if (QuietHoursStart is < 0 or > 23 || QuietHoursEnd is < 0 or > 23)
             throw new ArgumentException("Quiet hours must be whole hours from 0 to 23.", nameof(QuietHoursStart));
+        if (DreamingHour is < 0 or > 23)
+            throw new ArgumentException("Choose a dreaming hour from 0 to 23.", nameof(DreamingHour));
         return this;
     }
 

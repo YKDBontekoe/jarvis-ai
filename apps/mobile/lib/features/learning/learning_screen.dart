@@ -8,7 +8,7 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 
-/// Heartbeat and continuous-learning controls with a timeline of what Jarvis learned.
+/// Heartbeat, dreaming, and continuous-learning controls with a timeline of what Jarvis learned.
 class LearningScreen extends StatefulWidget {
   const LearningScreen({required this.http, super.key});
 
@@ -21,14 +21,17 @@ class LearningScreen extends StatefulWidget {
 class _LearningScreenState extends State<LearningScreen> {
   Map<String, dynamic> _settings = const {};
   Map<String, dynamic> _state = const {};
+  Map<String, dynamic> _dreaming = const {};
   List<Map<String, dynamic>> _activity = const [];
   bool _loading = true;
   bool _saving = false;
   bool _running = false;
+  bool _dreamingNow = false;
   String? _error;
   String? _result;
 
   static const _intervals = [15, 30, 60, 120, 240, 720, 1440];
+  static const _dreamHours = [0, 3, 5, 22, 23];
 
   @override
   void initState() {
@@ -46,6 +49,7 @@ class _LearningScreenState extends State<LearningScreen> {
       setState(() {
         _settings = Map<String, dynamic>.from(data['settings'] as Map? ?? {});
         _state = Map<String, dynamic>.from(data['state'] as Map? ?? {});
+        _dreaming = Map<String, dynamic>.from(data['dreaming'] as Map? ?? {});
         _activity = jsonMaps(data['activity']);
         _loading = false;
         _error = null;
@@ -113,6 +117,32 @@ class _LearningScreenState extends State<LearningScreen> {
     }
   }
 
+  Future<void> _dreamNow() async {
+    setState(() {
+      _dreamingNow = true;
+      _result = null;
+      _error = null;
+    });
+    try {
+      final response = await widget.http.post<Map<String, dynamic>>(
+        '/api/v1/learning/dream',
+      );
+      if (!mounted) return;
+      setState(() => _result = asJsonString(response.data?['summary']));
+      await _load();
+    } on DioException catch (error) {
+      if (mounted) {
+        setState(
+          () => _error =
+              firstProblemMessage(error.response?.data) ??
+              'Dreaming could not run.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _dreamingNow = false);
+    }
+  }
+
   bool _flag(String key, [bool fallback = false]) =>
       asJsonBool(_settings[key], fallback);
 
@@ -131,6 +161,8 @@ class _LearningScreenState extends State<LearningScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _heartbeatCard(),
+                      const SizedBox(height: 16),
+                      _dreamingCard(),
                       if (_error != null)
                         InlineNotice(
                           message: _error!,
@@ -181,6 +213,9 @@ class _LearningScreenState extends State<LearningScreen> {
                       const SizedBox(height: 20),
                       const SectionHeader('Quiet hours'),
                       _quietHours(),
+                      const SizedBox(height: 20),
+                      const SectionHeader('Dream diary'),
+                      _diary(),
                       const SizedBox(height: 20),
                       const SectionHeader('Recent learning'),
                       _timeline(),
@@ -288,6 +323,138 @@ class _LearningScreenState extends State<LearningScreen> {
     );
   }
 
+  Widget _dreamingCard() {
+    final enabled = _flag('dreamingEnabled', true);
+    final hour = asJsonInt(_settings['dreamingHour'], 3);
+    return SurfaceCard(
+      gradient: LinearGradient(
+        colors: enabled
+            ? const [JarvisColors.accentSoft, JarvisColors.surface]
+            : const [JarvisColors.surface, JarvisColors.surface],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              IconBadge(
+                icon: PhosphorIconsRegular.sparkle,
+                color: enabled ? JarvisColors.accent : JarvisColors.muted,
+                size: 44,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Dreaming',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      enabled
+                          ? 'Consolidates memories, facts, and tone around ${_clockHour(hour)}.'
+                          : 'Off — Jarvis will not improve stored memories overnight.',
+                      style: const TextStyle(color: JarvisColors.inkSoft),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                key: const Key('dreaming-switch'),
+                value: enabled,
+                onChanged: _saving
+                    ? null
+                    : (value) => unawaited(_update('dreamingEnabled', value)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final option in _dreamHours)
+                ChoiceChip(
+                  label: Text(_clockHour(option)),
+                  selected: hour == option,
+                  onSelected: _saving || !enabled
+                      ? null
+                      : (_) => unawaited(_update('dreamingHour', option)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  asJsonString(_dreaming['lastSummary']) ??
+                      'No dream has run yet.',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: JarvisColors.inkSoft,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                key: const Key('run-dreaming'),
+                onPressed: _dreamingNow ? null : () => unawaited(_dreamNow()),
+                icon: _dreamingNow
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(PhosphorIconsRegular.sparkle, size: 16),
+                label: const Text('Dream now'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _diary() {
+    final entries = jsonMaps(_dreaming['diary']);
+    if (entries.isEmpty) {
+      return const SurfaceCard(
+        child: Text(
+          'After a dream, Jarvis writes a short diary of what it staged, reflected on, and promoted. The diary is for you to review — it is never stored as a memory.',
+          style: TextStyle(color: JarvisColors.inkSoft),
+        ),
+      );
+    }
+    return GroupedSection(
+      dividerIndent: 60,
+      children: [
+        for (final item in entries.reversed)
+          ListTile(
+            leading: IconBadge(
+              icon: switch (asJsonString(item['phase'])) {
+                'light' => PhosphorIconsRegular.sunHorizon,
+                'deep' => PhosphorIconsRegular.brain,
+                _ => PhosphorIconsRegular.sparkle,
+              },
+              size: 32,
+            ),
+            title: Text(asJsonString(item['title']) ?? 'Dream'),
+            subtitle: Text(
+              [
+                asJsonString(item['body']) ?? '',
+                _when(asJsonString(item['at'])),
+              ].where((part) => part.isNotEmpty).join('\n'),
+            ),
+            isThreeLine: true,
+          ),
+      ],
+    );
+  }
+
   Widget _switch(
     String key,
     String title,
@@ -374,6 +541,7 @@ class _LearningScreenState extends State<LearningScreen> {
       switch (asJsonString(item['action'])) {
         'skill.learned' || 'skill.improved' => PhosphorIconsRegular.magicWand,
         'learning.reflected' => PhosphorIconsRegular.brain,
+        'learning.dreamed' => PhosphorIconsRegular.sparkle,
         _ => PhosphorIconsRegular.sparkle,
       };
 
@@ -389,9 +557,12 @@ class _LearningScreenState extends State<LearningScreen> {
       'skill.created' => 'You added the skill ${field('name') ?? ''}',
       'learning.reflected' =>
         'Reflected on ${field('messagesReviewed') ?? 'recent'} messages',
+      'learning.dreamed' => 'Dreamed and improved stored memory',
       _ => action.replaceAll('.', ' '),
     };
   }
+
+  String _clockHour(int hour) => '${hour.toString().padLeft(2, '0')}:00';
 
   String _interval(int minutes) => minutes < 60
       ? '$minutes min'

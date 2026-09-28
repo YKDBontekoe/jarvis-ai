@@ -160,14 +160,20 @@ internal sealed class TemporalWorkflowReconciler(
                 _nextHeartbeatReconcile = DateTimeOffset.UtcNow + HeartbeatInterval;
                 var settingsStore = services.GetRequiredService<Jarvis.Application.Settings.IOwnerSettingsStore>();
                 var heartbeatScheduler = services.GetRequiredService<Jarvis.Application.Learning.IHeartbeatScheduler>();
+                var dreamingScheduler = services.GetRequiredService<Jarvis.Application.Learning.IDreamingScheduler>();
                 foreach (var ownerId in await settingsStore.ListOwnersAsync(
                              Jarvis.Application.Settings.SettingsSections.Learning, cancellationToken))
                 {
                     var learning = await settingsStore.GetAsync<Jarvis.Application.Settings.LearningSettings>(ownerId,
-                        Jarvis.Application.Settings.SettingsSections.Learning, cancellationToken);
-                    if (learning is { HeartbeatEnabled: true })
+                        Jarvis.Application.Settings.SettingsSections.Learning, cancellationToken)
+                        ?? Jarvis.Application.Settings.LearningSettings.Default;
+                    if (learning.HeartbeatEnabled)
                         await TryScheduleAsync("heartbeat", ownerId,
                             () => heartbeatScheduler.ScheduleHeartbeatAsync(ownerId, cancellationToken),
+                            cancellationToken);
+                    if (learning.DreamingEnabled)
+                        await TryScheduleAsync("dreaming", ownerId,
+                            () => dreamingScheduler.ScheduleDreamingAsync(ownerId, cancellationToken),
                             cancellationToken);
                 }
             }
