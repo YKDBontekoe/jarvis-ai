@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import '../../ui/phosphor_icons.dart';
 
+import '../../json_maps.dart';
 import '../../task_details_screen.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
@@ -92,10 +94,9 @@ class _HomeOverviewState extends State<HomeOverview>
         cancelToken: request,
       );
       final tasks =
-          (response.data ?? [])
-              .map(_ActiveTask.fromJson)
-              .whereType<_ActiveTask>()
-              .toList()
+          jsonMaps(
+              response.data,
+            ).map(_ActiveTask.fromJson).whereType<_ActiveTask>().toList()
             ..sort((a, b) {
               final priority = a.priority.compareTo(b.priority);
               return priority != 0
@@ -109,6 +110,10 @@ class _HomeOverviewState extends State<HomeOverview>
       if (!CancelToken.isCancel(error) &&
           mounted &&
           revision == _requestRevision) {
+        setState(() => _error = 'Could not load active tasks.');
+      }
+    } catch (_) {
+      if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Could not load active tasks.');
       }
     } finally {

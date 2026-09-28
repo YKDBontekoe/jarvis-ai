@@ -7,7 +7,10 @@ import 'package:path_provider/path_provider.dart';
 Future<void> downloadAndOpen(Dio http, String id, String fileName) async {
   final response = await http.get<List<int>>(
     '/api/v1/files/$id/content',
-    options: Options(responseType: ResponseType.bytes),
+    options: Options(
+      responseType: ResponseType.bytes,
+      receiveTimeout: const Duration(minutes: 2),
+    ),
   );
   final directory = await getTemporaryDirectory();
   final safeName = fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');

@@ -68,6 +68,12 @@ class _SkillsScreenState extends State<SkillsScreen> {
             firstProblemMessage(error.response?.data) ??
             'Could not load skills.';
       });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load skills.';
+      });
     }
   }
 
@@ -246,12 +252,12 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
   Future<void> _load() async {
     try {
       final response = await widget.http.get<Map<String, dynamic>>(_path);
-      final data = response.data ?? const {};
+      final data = jsonObject(response.data) ?? const {};
       if (!mounted) return;
       setState(() {
-        _skill = Map<String, dynamic>.from(data['skill'] as Map? ?? const {});
+        _skill = jsonObject(data['skill']);
         _revisions = jsonMaps(data['revisions']);
-        _error = null;
+        _error = _skill == null ? 'Jarvis returned an invalid skill.' : null;
       });
     } on DioException catch (error) {
       if (mounted) {
@@ -260,6 +266,10 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
               firstProblemMessage(error.response?.data) ??
               'Could not load this skill.',
         );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Could not load this skill.');
       }
     }
   }
@@ -291,15 +301,26 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
   );
 
   Future<void> _export() async {
-    final response = await widget.http.get<String>(
-      '$_path/export',
-      options: Options(responseType: ResponseType.plain),
-    );
-    await Clipboard.setData(ClipboardData(text: response.data ?? ''));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('SKILL.md copied to the clipboard.')),
+    try {
+      final response = await widget.http.get<String>(
+        '$_path/export',
+        options: Options(responseType: ResponseType.plain),
       );
+      await Clipboard.setData(ClipboardData(text: response.data ?? ''));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('SKILL.md copied to the clipboard.')),
+        );
+      }
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not export this skill.',
+      );
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not export this skill.');
     }
   }
 
@@ -322,9 +343,20 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
       destructive: true,
       icon: PhosphorIconsRegular.trash,
     );
-    if (!confirmed) return;
-    await widget.http.delete<void>(_path);
-    if (mounted) Navigator.pop(context);
+    if (!confirmed || !mounted) return;
+    try {
+      await widget.http.delete<void>(_path);
+      if (mounted) Navigator.pop(context);
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not delete this skill.',
+      );
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not delete this skill.');
+    }
   }
 
   @override

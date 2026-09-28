@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import 'ui/phosphor_icons.dart';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -131,13 +134,14 @@ class _AuthSession {
     final existing = _accessTokenInFlight;
     if (existing != null && !forceRefresh) return existing;
     late final Future<String?> pending;
-    pending = _serialized(
-      () => _readOrRefreshAccessToken(forceRefresh: forceRefresh),
-    ).whenComplete(() {
-      if (identical(_accessTokenInFlight, pending)) {
-        _accessTokenInFlight = null;
-      }
-    });
+    pending =
+        _serialized(
+          () => _readOrRefreshAccessToken(forceRefresh: forceRefresh),
+        ).whenComplete(() {
+          if (identical(_accessTokenInFlight, pending)) {
+            _accessTokenInFlight = null;
+          }
+        });
     _accessTokenInFlight = pending;
     return pending;
   }
@@ -291,9 +295,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     BaseOptions(
       baseUrl: _apiBaseUrl,
       connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(minutes: 20),
+      receiveTimeout: const Duration(seconds: 20),
     ),
   );
+  static Options get _longRunning =>
+      Options(receiveTimeout: const Duration(minutes: 20));
   final _input = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
@@ -439,10 +445,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _initialize() async {
     final generation = ++_initGeneration;
     bool stale() =>
-        !mounted ||
-        generation != _initGeneration ||
-        _signedOut ||
-        _signingOut;
+        !mounted || generation != _initGeneration || _signedOut || _signingOut;
     try {
       if (stale()) return;
       if (_auth.enabled && await _auth.accessToken() == null) {
@@ -559,7 +562,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _sending = responding;
       _remoteQuery = responding;
       _selectedDestination = 0;
-      _showHome = showHome &&
+      _showHome =
+          showHome &&
           !knownApprovals.any(
             (entry) =>
                 entry.status == ApprovalStatus.pending ||
@@ -593,9 +597,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
     try {
       await _connectRealtime(generation);
-      if (isCurrent() &&
-          isLatestOpen() &&
-          _conversationId == conversationId) {
+      if (isCurrent() && isLatestOpen() && _conversationId == conversationId) {
         unawaited(_loadConversationSurfaces(conversationId));
       }
       if (approvals == null &&
@@ -605,7 +607,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         unawaited(_syncConversationApprovals());
       }
     } catch (error) {
-      if (!isCurrent() || !isLatestOpen() || _conversationId != conversationId) {
+      if (!isCurrent() ||
+          !isLatestOpen() ||
+          _conversationId != conversationId) {
         return;
       }
       setState(() {
@@ -660,6 +664,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         await _openConversation(selection.conversationId!);
       } on DioException catch (error) {
         if (mounted) setState(() => _error = _describeError(error));
+      } catch (_) {
+        if (mounted) {
+          setState(() => _error = 'Could not open that conversation.');
+        }
       }
     }
   }
@@ -700,6 +708,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     } on FormatException {
       if (mounted) {
         setState(() => _error = 'Jarvis returned an invalid conversation.');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Could not start a new conversation.');
       }
     }
   }
@@ -947,7 +959,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     });
   }
 
-  bool _hubIsCurrent(HubConnection hub, String conversationId, int generation) =>
+  bool _hubIsCurrent(
+    HubConnection hub,
+    String conversationId,
+    int generation,
+  ) =>
       mounted &&
       !_signedOut &&
       identical(_hub, hub) &&
@@ -976,7 +992,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     hub.on('message.delta', (arguments) {
       final event = _payload(arguments);
       final delta = asJsonString(event?['delta']) ?? '';
-      if (delta.isEmpty || !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+      if (delta.isEmpty ||
+          !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
       setState(() {
@@ -989,20 +1006,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
       final payload = _payload(arguments);
       final content = asJsonString(payload?['content']) ?? '';
-      setState(
-        () {
-          _completeAssistant(content, id: asJsonString(payload?['id']));
-          if (content.trim().isNotEmpty) {
-            _settleSubmittingApprovals();
-          }
-          _finishRemoteQuery();
-        },
-      );
+      setState(() {
+        _completeAssistant(content, id: asJsonString(payload?['id']));
+        if (content.trim().isNotEmpty) {
+          _settleSubmittingApprovals();
+        }
+        _finishRemoteQuery();
+      });
       _scrollToBottom();
     });
     hub.on('tool.started', (arguments) {
       final tool = asJsonString(_payload(arguments)?['tool']);
-      if (tool == null || !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+      if (tool == null ||
+          !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
       setState(() => _toolEvent(tool));
@@ -1010,14 +1026,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     });
     hub.on('tool.completed', (arguments) {
       final tool = asJsonString(_payload(arguments)?['tool']);
-      if (tool == null || !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+      if (tool == null ||
+          !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
       setState(() => _toolEvent(tool, success: true));
     });
     hub.on('tool.failed', (arguments) {
       final tool = asJsonString(_payload(arguments)?['tool']);
-      if (tool == null || !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+      if (tool == null ||
+          !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
       setState(() => _toolEvent(tool, success: false));
@@ -1111,7 +1129,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
       final event = _payload(arguments);
       setState(
-        () => _error = asJsonString(event?['message']) ?? 'Voice session failed.',
+        () =>
+            _error = asJsonString(event?['message']) ?? 'Voice session failed.',
       );
       unawaited(_stopVoice());
     });
@@ -1206,7 +1225,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       unawaited(_stopVoice());
       setState(() {
         _connected = false;
-        _selectedDestination = _selectedDestination == 2 ? 0 : _selectedDestination;
+        _selectedDestination = _selectedDestination == 2
+            ? 0
+            : _selectedDestination;
         if (!_remoteQuery) {
           _removePlaceholder();
           _settleToolRuns();
@@ -1223,7 +1244,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (mounted) {
         setState(() {
           _connected = false;
-          _selectedDestination = _selectedDestination == 2 ? 0 : _selectedDestination;
+          _selectedDestination = _selectedDestination == 2
+              ? 0
+              : _selectedDestination;
           if (!_remoteQuery) {
             _removePlaceholder();
             _settleToolRuns();
@@ -1250,7 +1273,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       try {
         await hub.invoke(
           'RegisterDevice',
-          args: ['Jarvis app', ['battery', 'open_url', 'notify', 'clipboard', 'location']],
+          args: [
+            'Jarvis app',
+            ['battery', 'open_url', 'notify', 'clipboard', 'location'],
+          ],
         );
       } catch (_) {
         // Older servers without device nodes still stream chat.
@@ -1445,36 +1471,36 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       });
     }
     try {
-    await _stopVoice();
-    final hub = _hub;
-    _hub = null;
-    final pushToken = _pushToken;
-    if (pushToken != null) {
-      try {
-        await _http.delete<void>(
-          '/api/v1/push-devices',
-          data: {'token': pushToken},
-        );
-      } on DioException {
-        // The token is owner-scoped on the server; stale registrations expire at Firebase.
+      await _stopVoice();
+      final hub = _hub;
+      _hub = null;
+      final pushToken = _pushToken;
+      if (pushToken != null) {
+        try {
+          await _http.delete<void>(
+            '/api/v1/push-devices',
+            data: {'token': pushToken},
+          );
+        } on DioException {
+          // The token is owner-scoped on the server; stale registrations expire at Firebase.
+        }
+        _pushToken = null;
       }
-      _pushToken = null;
-    }
-    await _pushTokenSubscription?.cancel();
-    _pushTokenSubscription = null;
-    await _pushOpenedSubscription?.cancel();
-    _pushOpenedSubscription = null;
-    await _pushForegroundSubscription?.cancel();
-    _pushForegroundSubscription = null;
-    if (Firebase.apps.isNotEmpty) {
-      try {
-        await FirebaseMessaging.instance.deleteToken();
-      } on FirebaseException {
-        // The server registration is also removed above when the API is reachable.
+      await _pushTokenSubscription?.cancel();
+      _pushTokenSubscription = null;
+      await _pushOpenedSubscription?.cancel();
+      _pushOpenedSubscription = null;
+      await _pushForegroundSubscription?.cancel();
+      _pushForegroundSubscription = null;
+      if (Firebase.apps.isNotEmpty) {
+        try {
+          await FirebaseMessaging.instance.deleteToken();
+        } on FirebaseException {
+          // The server registration is also removed above when the API is reachable.
+        }
       }
-    }
-    await _auth.signOut();
-    await hub?.stop();
+      await _auth.signOut();
+      await hub?.stop();
     } finally {
       _signingOut = false;
       if (mounted) setState(() {});
@@ -1594,9 +1620,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       return;
     }
     if (opensTaskDetails(type) && sourceId != null) {
-      unawaited(_openPushedDetail(
-        TaskDetailsScreen(http: _http, taskId: sourceId),
-      ));
+      unawaited(
+        _openPushedDetail(TaskDetailsScreen(http: _http, taskId: sourceId)),
+      );
       return;
     }
     if (sourceId == null || !opensNotificationDetails(type)) {
@@ -1624,9 +1650,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _openPushedDetail(Widget page) async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => page),
-    );
+    await Navigator.of(
+      context,
+    ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
     if (mounted && !_signedOut && !_signingOut) {
       setState(() => _homeRevision++);
     }
@@ -1668,6 +1694,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         '/api/v1/conversations/$conversationId/messages',
         data: {'content': content},
         cancelToken: run,
+        options: _longRunning,
       );
       if (!mounted ||
           _conversationId != conversationId ||
@@ -1705,6 +1732,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         }
       }
       return true;
+    } catch (_) {
+      if (mounted &&
+          _conversationId == conversationId &&
+          _realtimeGeneration == generation) {
+        setState(() {
+          _removePlaceholder();
+          _settleToolRuns();
+          final index = _entries.lastIndexOf(userMessage);
+          if (index >= 0) {
+            _entries[index] = userMessage.copyWith(failed: true);
+          }
+          _error = 'Jarvis could not send that message.';
+        });
+      }
+      return true;
     } finally {
       if (identical(_runCancel, run)) _runCancel = null;
       if (mounted &&
@@ -1726,7 +1768,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       return;
     }
     final content = data is Map ? asJsonString(data['content']) ?? '' : '';
-    _completeAssistant(content, id: data is Map ? asJsonString(data['id']) : null);
+    _completeAssistant(
+      content,
+      id: data is Map ? asJsonString(data['id']) : null,
+    );
   }
 
   void _upsertSurface(UiSurfaceEntry surface) {
@@ -1815,6 +1860,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final response = await _http.post<dynamic>(
         '/api/v1/ui-surfaces/${surface.id}/actions',
         data: {'actionId': action, 'values': values},
+        options: _longRunning,
       );
       if (!mounted) return;
       setState(() {
@@ -1977,7 +2023,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     try {
       await _http.post<void>(
         '/api/v1/conversations/$conversationId/messages/$messageId/feedback',
-        data: {'rating': rating, if (note != null && note.isNotEmpty) 'note': note},
+        data: {
+          'rating': rating,
+          if (note != null && note.isNotEmpty) 'note': note,
+        },
       );
       if (!mounted) return;
       setState(() {
@@ -2063,6 +2112,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         '/api/v1/approvals/${approval.id}/decision',
         data: {'approved': approved},
         cancelToken: run,
+        options: _longRunning,
       );
       if (!mounted ||
           _conversationId != conversationId ||
@@ -2290,7 +2340,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         final userStop = _voiceUserStop;
         unawaited(_stopVoice(leave: userStop));
         if (mounted && !userStop) {
-          setState(() => _error ??= 'The voice session ended. Start it again to continue.');
+          setState(
+            () => _error ??=
+                'The voice session ended. Start it again to continue.',
+          );
         }
       })
       ..on<ParticipantAttributesChanged>((event) {
@@ -2302,7 +2355,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ..on<ActiveSpeakersChangedEvent>((event) {
         if (!identical(_voiceRoom, room) || !mounted) return;
         final localSid = room.localParticipant?.sid;
-        final remoteSpeaking = event.speakers.any((speaker) => speaker.sid != localSid);
+        final remoteSpeaking = event.speakers.any(
+          (speaker) => speaker.sid != localSid,
+        );
         if (remoteSpeaking) setState(() => _voicePhase = 'speaking');
       });
   }
@@ -2337,7 +2392,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     try {
       await AudioManager.instance.setSpeakerOutputPreferred(false);
     } catch (_) {}
-    if (mounted && (_voiceActive || _voiceStarting || _selectedDestination == 2)) {
+    if (mounted &&
+        (_voiceActive || _voiceStarting || _selectedDestination == 2)) {
       setState(() {
         _voiceActive = false;
         _voiceStarting = false;
@@ -2461,9 +2517,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _scheduleCatchUp(String conversationId, int generation, int realtime) {
+  void _scheduleCatchUp(
+    String conversationId,
+    int generation,
+    int realtime, {
+    Duration delay = const Duration(seconds: 2),
+    int failedAttempts = 0,
+  }) {
     _catchUpTimer?.cancel();
-    _catchUpTimer = Timer(const Duration(seconds: 2), () {
+    _catchUpTimer = Timer(delay, () {
       if (!mounted ||
           !_remoteQuery ||
           generation != _catchUpGeneration ||
@@ -2473,11 +2535,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           _signingOut) {
         return;
       }
-      unawaited(_catchUpRemoteQuery(conversationId));
+      unawaited(
+        _catchUpRemoteQuery(conversationId, failedAttempts: failedAttempts),
+      );
     });
   }
 
-  Future<void> _catchUpRemoteQuery(String conversationId) async {
+  void _failCatchUp(String message) {
+    setState(() {
+      _removePlaceholder();
+      _settleToolRuns();
+      _error = message;
+      _finishRemoteQuery();
+    });
+  }
+
+  Future<void> _catchUpRemoteQuery(
+    String conversationId, {
+    int failedAttempts = 0,
+  }) async {
     final generation = ++_catchUpGeneration;
     final realtime = _realtimeGeneration;
     bool current() =>
@@ -2540,9 +2616,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           _settleToolRuns();
           final index = _entries.lastIndexWhere(
             (entry) =>
-                entry is MessageEntry &&
-                entry.isUser &&
-                entry.content == sent,
+                entry is MessageEntry && entry.isUser && entry.content == sent,
           );
           if (index >= 0) {
             _entries[index] = (_entries[index] as MessageEntry).copyWith(
@@ -2577,9 +2651,31 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (approvals == null) unawaited(_syncConversationApprovals());
       unawaited(_loadConversationSurfaces(conversationId));
       unawaited(_loadRecent());
-    } on DioException {
+    } on DioException catch (error) {
       if (!current()) return;
-      _scheduleCatchUp(conversationId, generation, realtime);
+      final delay = catchUpRetryDelay(
+        failedAttempts: failedAttempts + 1,
+        error: error,
+        stopRequested: _stopRequested,
+      );
+      if (delay == null) {
+        _failCatchUp(
+          queryContinuesRemotely(error, stopRequested: false)
+              ? 'Lost the connection while Jarvis was still working. Open this conversation again to catch up.'
+              : _describeError(error),
+        );
+        return;
+      }
+      _scheduleCatchUp(
+        conversationId,
+        generation,
+        realtime,
+        delay: delay,
+        failedAttempts: failedAttempts + 1,
+      );
+    } catch (_) {
+      if (!current()) return;
+      _failCatchUp('Jarvis returned an unexpected conversation.');
     }
   }
 
@@ -2752,6 +2848,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         await _openConversation(id);
       } on DioException catch (error) {
         if (mounted) setState(() => _error = _describeError(error));
+      } catch (_) {
+        if (mounted) {
+          setState(() => _error = 'Could not open that conversation.');
+        }
       }
     }),
     onSeeAll: () => _fromSidebar(() => unawaited(_chooseConversation())),
@@ -2780,9 +2880,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         return;
       }
       setState(
-        () => _recent = jsonMaps(response.data)
-            .where((item) => item['id'] is String)
-            .toList(),
+        () => _recent = jsonMaps(
+          response.data,
+        ).where((item) => item['id'] is String).toList(),
       );
     } on DioException {
       // The sidebar keeps its last known list while the API is unreachable.
@@ -2956,9 +3056,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           autofillHints: const [AutofillHints.email],
                           autocorrect: false,
                           enableSuggestions: false,
-                          decoration: const InputDecoration(
-                            labelText: 'Email',
-                          ),
+                          decoration: const InputDecoration(labelText: 'Email'),
                         ),
                         const SizedBox(height: 12),
                         TextField(
@@ -2971,7 +3069,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                 ? AutofillHints.newPassword
                                 : AutofillHints.password,
                           ],
-                          onSubmitted: busy ? null : (_) => unawaited(_signIn()),
+                          onSubmitted: busy
+                              ? null
+                              : (_) => unawaited(_signIn()),
                           decoration: InputDecoration(
                             labelText: 'Password',
                             suffixIcon: IconButton(
@@ -3168,7 +3268,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 controller: _input,
                 onSend: () => unawaited(_send()),
                 onCancel: _busy ? () => unawaited(_cancelActiveRun()) : null,
-                onVoice: _conversationId == null ||
+                onVoice:
+                    _conversationId == null ||
                         (_busy && !_voiceActive && !_voiceStarting)
                     ? null
                     : () => _selectDestination(2),
@@ -3250,10 +3351,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     mark: const JarvisOrb(size: 56),
     ready: _conversationId != null,
     voiceStarting: _voiceStarting,
-    onTalk: _conversationId == null ||
-            _busy ||
-            _hasPendingApproval ||
-            !_connected
+    onTalk:
+        _conversationId == null || _busy || _hasPendingApproval || !_connected
         ? null
         : () => _selectDestination(2),
     onOpenTasks: () => _openUtility('tasks'),

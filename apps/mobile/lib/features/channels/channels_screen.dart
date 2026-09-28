@@ -60,7 +60,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
         final status = await widget.http.get<Map<String, dynamic>>(
           '/api/v1/channels/signal/status',
         );
-        signal = status.data ?? const {};
+        signal = jsonObject(status.data) ?? const {};
       } on DioException {
         // Signal is optional; the list of WhatsApp connections still loads.
       }
@@ -78,6 +78,12 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not load messaging channels.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load messaging channels.';
       });
     }
   }
@@ -265,15 +271,19 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
       final list = await widget.http.get<List<dynamic>>('/api/v1/channels');
       final messages = await widget.http.get<List<dynamic>>('$_path/messages');
       if (!mounted) return;
-      final channel = jsonMaps(list.data).cast<Map<String, dynamic>?>().firstWhere(
-        (item) => asJsonString(item?['id']) == widget.channelId,
-        orElse: () => null,
-      );
+      final channel = jsonMaps(list.data)
+          .cast<Map<String, dynamic>?>()
+          .firstWhere(
+            (item) => asJsonString(item?['id']) == widget.channelId,
+            orElse: () => null,
+          );
       setState(() {
         _channel = channel;
         _messages = jsonMaps(messages.data);
         _loading = false;
-        _error = channel == null ? 'This channel is no longer connected.' : null;
+        _error = channel == null
+            ? 'This channel is no longer connected.'
+            : null;
       });
     } on DioException catch (error) {
       if (!mounted) return;
@@ -289,7 +299,9 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
   Future<void> _test() async {
     setState(() => _busy = true);
     try {
-      final response = await widget.http.post<Map<String, dynamic>>('$_path/test');
+      final response = await widget.http.post<Map<String, dynamic>>(
+        '$_path/test',
+      );
       if (!mounted) return;
       final sent = asJsonBool(response.data?['sent']);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -394,7 +406,9 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                             size: 40,
                           ),
                           title: Text(kind.label),
-                          subtitle: Text(asJsonString(channel['account']) ?? ''),
+                          subtitle: Text(
+                            asJsonString(channel['account']) ?? '',
+                          ),
                           trailing: Text(
                             asJsonBool(channel['enabled'], true)
                                 ? 'On'
@@ -432,7 +446,10 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                           ),
                           TextButton.icon(
                             onPressed: () => unawaited(_copyWebhook()),
-                            icon: const Icon(PhosphorIconsRegular.copy, size: 16),
+                            icon: const Icon(
+                              PhosphorIconsRegular.copy,
+                              size: 16,
+                            ),
                             label: const Text('Copy webhook URL'),
                           ),
                         ],
@@ -619,7 +636,8 @@ class _ChannelEditorSheetState extends State<ChannelEditorSheet> {
               decoration: const InputDecoration(
                 labelText: 'Allowed phone numbers',
                 hintText: '+31612345678',
-                helperText: 'One international number per line. Only these can talk to Jarvis.',
+                helperText:
+                    'One international number per line. Only these can talk to Jarvis.',
               ),
             ),
             const SizedBox(height: 10),

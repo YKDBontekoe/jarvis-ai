@@ -36,9 +36,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
         '/api/v1/settings/devices',
       );
       if (!mounted) return;
+      final data = jsonObject(response.data) ?? const {};
       setState(() {
-        _settings = response.data ?? const {};
-        _online = jsonMaps(response.data?['online']);
+        _settings = data;
+        _online = jsonMaps(data['online']);
         _loading = false;
         _error = null;
       });
@@ -49,6 +50,12 @@ class _DevicesScreenState extends State<DevicesScreen> {
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not load device settings.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load device settings.';
       });
     }
   }
@@ -68,9 +75,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
         },
       );
       if (mounted) {
+        final data = jsonObject(response.data) ?? next;
         setState(() {
-          _settings = response.data ?? next;
-          _online = jsonMaps(response.data?['online']);
+          _settings = data;
+          _online = jsonMaps(data['online']);
         });
       }
     } on DioException catch (error) {
@@ -156,7 +164,9 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     else
                       for (final device in _online)
                         ListTile(
-                          leading: const Icon(PhosphorIconsRegular.deviceMobile),
+                          leading: const Icon(
+                            PhosphorIconsRegular.deviceMobile,
+                          ),
                           title: Text(asJsonString(device['name']) ?? 'Device'),
                           subtitle: Text(
                             jsonStrings(device['capabilities']).join(', '),
@@ -174,7 +184,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
         secondary: Icon(icon),
         title: Text(title),
         subtitle: Text(subtitle),
-        value: asJsonBool(_settings[key], key != 'location' && key != 'clipboard'),
+        value: asJsonBool(
+          _settings[key],
+          key != 'location' && key != 'clipboard',
+        ),
         onChanged: (value) => unawaited(_set(key, value)),
       );
 }

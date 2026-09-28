@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import 'ui/phosphor_icons.dart';
 
 import 'approvals_screen.dart';
@@ -60,7 +61,9 @@ class _RemindersScreenState extends State<RemindersScreen>
       var remindersFailed = false;
       var notificationsFailed = false;
       try {
-        final reminders = await widget.http.get<List<dynamic>>('/api/v1/reminders');
+        final reminders = await widget.http.get<List<dynamic>>(
+          '/api/v1/reminders',
+        );
         if (mounted && revision == _requestRevision) {
           setState(() => _reminders = jsonMaps(reminders.data));
         }
@@ -338,10 +341,7 @@ class _RemindersScreenState extends State<RemindersScreen>
       _notifications.where((item) => item['readAt'] == null).length;
 
   Widget _buildReminders() => _remindersFailed && _reminders.isEmpty
-      ? ErrorState(
-          message: 'Jarvis could not load reminders.',
-          onRetry: _load,
-        )
+      ? ErrorState(message: 'Jarvis could not load reminders.', onRetry: _load)
       : _reminders.isEmpty
       ? const EmptyState(
           icon: PhosphorIconsRegular.alarm,
@@ -573,8 +573,9 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
               autofocus: true,
               maxLength: 300,
               decoration: const InputDecoration(labelText: 'Remind me about'),
-              validator: (value) =>
-                  value == null || value.trim().isEmpty ? 'Enter a reminder.' : null,
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Enter a reminder.'
+                  : null,
             ),
             const SizedBox(height: 10),
             Wrap(
@@ -633,7 +634,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
                   firstDate: DateTime.now(),
                   lastDate: DateTime.now().add(const Duration(days: 730)),
                 );
-                if (value != null) setState(() => _date = value);
+                if (value != null && mounted) setState(() => _date = value);
               },
             ),
             const SizedBox(height: 8),
@@ -650,7 +651,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
                   context: context,
                   initialTime: _time,
                 );
-                if (value != null) setState(() => _time = value);
+                if (value != null && mounted) setState(() => _time = value);
               },
             ),
           ],
@@ -666,4 +667,3 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
     ],
   );
 }
-

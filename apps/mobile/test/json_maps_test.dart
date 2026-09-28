@@ -19,6 +19,14 @@ void main() {
     expect(jsonMaps('x'), isEmpty);
   });
 
+  test('jsonObject copies maps and rejects the wrong JSON types', () {
+    expect(jsonObject({'id': '1'}), {'id': '1'});
+    expect(jsonObject(<dynamic, dynamic>{'id': '1', 2: true}), {'id': '1'});
+    expect(jsonObject(null), isNull);
+    expect(jsonObject('x'), isNull);
+    expect(jsonObject(['nope']), isNull);
+  });
+
   test('jsonStrings keeps string entries', () {
     expect(jsonStrings(['a', 1, 'b', null]), ['a', 'b']);
     expect(jsonStrings(null), isEmpty);
@@ -52,18 +60,25 @@ void main() {
     );
     expect(firstProblemMessage('nope'), isNull);
     expect(firstProblemMessage(null), isNull);
+    expect(
+      firstProblemMessage(<dynamic, dynamic>{2: 'ignored', 'detail': 'Kept.'}),
+      'Kept.',
+    );
   });
 
-  test('asJsonString, asJsonInt, and asJsonBool ignore the wrong JSON types', () {
-    expect(asJsonString('ok'), 'ok');
-    expect(asJsonString(''), '');
-    expect(asJsonString(1), isNull);
-    expect(asJsonInt(3), 3);
-    expect(asJsonInt(3.2), 3);
-    expect(asJsonInt('3'), 0);
-    expect(asJsonBool(true), isTrue);
-    expect(asJsonBool('true'), isFalse);
-  });
+  test(
+    'asJsonString, asJsonInt, and asJsonBool ignore the wrong JSON types',
+    () {
+      expect(asJsonString('ok'), 'ok');
+      expect(asJsonString(''), '');
+      expect(asJsonString(1), isNull);
+      expect(asJsonInt(3), 3);
+      expect(asJsonInt(3.2), 3);
+      expect(asJsonInt('3'), 0);
+      expect(asJsonBool(true), isTrue);
+      expect(asJsonBool('true'), isFalse);
+    },
+  );
 
   test('activeValidUntil keeps a future TTL and clears expired ones', () {
     final now = DateTime.utc(2026, 9, 27, 12);

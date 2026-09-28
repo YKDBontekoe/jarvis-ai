@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
@@ -66,12 +67,9 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
     } on DioException catch (error) {
       if (mounted && revision == _requestRevision) {
         setState(() {
-          _error = error.response?.data is Map
-              ? asJsonString(
-                      Map<String, dynamic>.from(error.response!.data as Map)['detail'],
-                    ) ??
-                    'Could not load briefing settings.'
-              : 'Could not load briefing settings.';
+          _error =
+              firstProblemMessage(error.response?.data) ??
+              'Could not load briefing settings.';
           _loaded = false;
         });
       }
@@ -91,7 +89,8 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
 
   Future<void> _chooseTime() async {
     final selected = await showTimePicker(context: context, initialTime: _time);
-    if (selected != null && mounted) _discardSavedNotice(() => _time = selected);
+    if (selected != null && mounted)
+      _discardSavedNotice(() => _time = selected);
   }
 
   void _discardSavedNotice([VoidCallback? apply]) {

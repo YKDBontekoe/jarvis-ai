@@ -4,7 +4,10 @@ import 'package:jarvis_mobile/features/learning/learning_screen.dart';
 
 import 'support/fixture_http.dart';
 
-Map<String, Object?> _settings({bool heartbeat = false, bool dreaming = true}) => {
+Map<String, Object?> _settings({
+  bool heartbeat = false,
+  bool dreaming = true,
+}) => {
   'heartbeatEnabled': heartbeat,
   'heartbeatMinutes': 60,
   'learnPersona': true,
@@ -98,10 +101,7 @@ void main() {
     http.on('GET', '/api/v1/learning/status', {
       'settings': _settings(heartbeat: true),
       'state': {'lastSummary': 'Nothing new to learn.'},
-      'dreaming': {
-        'lastSummary': 'No dream has run yet.',
-        'diary': <Object>[],
-      },
+      'dreaming': {'lastSummary': 'No dream has run yet.', 'diary': <Object>[]},
       'activity': <Object>[],
     });
     http.on('POST', '/api/v1/learning/dream', {
@@ -117,5 +117,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('1 merged memory'), findsOneWidget);
+  });
+
+  testWidgets('malformed learning status does not crash the screen', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/learning/status', {
+      'settings': 'nope',
+      'state': <Object>[],
+      'dreaming': 3,
+      'activity': 'x',
+    });
+    await show(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('heartbeat-switch')), findsOneWidget);
+    expect(
+      find.textContaining('Could not load learning settings.'),
+      findsNothing,
+    );
   });
 }

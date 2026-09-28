@@ -51,6 +51,12 @@ class _AgentsScreenState extends State<AgentsScreen> {
             firstProblemMessage(error.response?.data) ??
             'Could not load Agent2Agent settings.';
       });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load Agent2Agent settings.';
+      });
     }
   }
 
@@ -58,64 +64,70 @@ class _AgentsScreenState extends State<AgentsScreen> {
     final name = TextEditingController();
     final url = TextEditingController();
     final token = TextEditingController();
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add a remote agent'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: name,
-              decoration: const InputDecoration(labelText: 'Name'),
-            ),
-            TextField(
-              controller: url,
-              decoration: const InputDecoration(
-                labelText: 'Agent2Agent URL',
-                hintText: 'https://assistant.example/a2a',
+    try {
+      final saved = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Add a remote agent'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: name,
+                decoration: const InputDecoration(labelText: 'Name'),
               ),
-            ),
-            TextField(
-              controller: token,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Bearer token (optional)',
+              TextField(
+                controller: url,
+                decoration: const InputDecoration(
+                  labelText: 'Agent2Agent URL',
+                  hintText: 'https://assistant.example/a2a',
+                ),
               ),
+              TextField(
+                controller: token,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Bearer token (optional)',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Add'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-    if (saved != true || !mounted) return;
-    try {
-      await widget.http.post<void>(
-        '/api/v1/agents',
-        data: {
-          'name': name.text.trim(),
-          'url': url.text.trim(),
-          'enabled': true,
-          if (token.text.trim().isNotEmpty) 'token': token.text.trim(),
-        },
       );
-      unawaited(_load());
-    } on DioException catch (error) {
-      if (!mounted) return;
-      setState(
-        () => _error =
-            firstProblemMessage(error.response?.data) ??
-            'Could not add that agent.',
-      );
+      if (saved != true || !mounted) return;
+      try {
+        await widget.http.post<void>(
+          '/api/v1/agents',
+          data: {
+            'name': name.text.trim(),
+            'url': url.text.trim(),
+            'enabled': true,
+            if (token.text.trim().isNotEmpty) 'token': token.text.trim(),
+          },
+        );
+        unawaited(_load());
+      } on DioException catch (error) {
+        if (!mounted) return;
+        setState(
+          () => _error =
+              firstProblemMessage(error.response?.data) ??
+              'Could not add that agent.',
+        );
+      }
+    } finally {
+      name.dispose();
+      url.dispose();
+      token.dispose();
     }
   }
 
@@ -123,7 +135,9 @@ class _AgentsScreenState extends State<AgentsScreen> {
     try {
       final response = await widget.http.post<Map<String, dynamic>>(
         '/api/v1/a2a/tokens',
-        data: {'name': 'App ${DateTime.now().toIso8601String().substring(0, 10)}'},
+        data: {
+          'name': 'App ${DateTime.now().toIso8601String().substring(0, 10)}',
+        },
       );
       if (!mounted) return;
       setState(() => _newToken = asJsonString(response.data?['token']));
@@ -221,9 +235,8 @@ class _AgentsScreenState extends State<AgentsScreen> {
                     margin: const EdgeInsets.only(top: 12),
                     actions: [
                       TextButton(
-                        onPressed: () => Clipboard.setData(
-                          ClipboardData(text: _newToken!),
-                        ),
+                        onPressed: () =>
+                            Clipboard.setData(ClipboardData(text: _newToken!)),
                         child: const Text('Copy'),
                       ),
                     ],
@@ -233,9 +246,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
                   ListTile(
                     leading: const Icon(PhosphorIconsRegular.key),
                     title: Text(asJsonString(token['name']) ?? 'Token'),
-                    subtitle: Text(
-                      asJsonString(token['createdAt']) ?? '',
-                    ),
+                    subtitle: Text(asJsonString(token['createdAt']) ?? ''),
                     trailing: IconButton(
                       onPressed: () async {
                         await widget.http.delete(

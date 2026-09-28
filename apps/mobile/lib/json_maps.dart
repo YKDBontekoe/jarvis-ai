@@ -2,14 +2,29 @@ List<Map<String, dynamic>> jsonMaps(dynamic data) {
   if (data is! List) return const [];
   final maps = <Map<String, dynamic>>[];
   for (final item in data) {
-    if (item is Map) maps.add(Map<String, dynamic>.from(item));
+    final map = jsonObject(item);
+    if (map != null) maps.add(map);
   }
   return maps;
 }
 
+/// Copies a JSON object. Wrong types, including `null`, become `null`.
+Map<String, dynamic>? jsonObject(dynamic data) {
+  if (data is! Map) return null;
+  if (data is Map<String, dynamic>) return Map<String, dynamic>.from(data);
+  final map = <String, dynamic>{};
+  data.forEach((key, value) {
+    if (key is String) map[key] = value;
+  });
+  return map;
+}
+
 List<String> jsonStrings(dynamic data) {
   if (data is! List) return const [];
-  return [for (final item in data) if (item is String) item];
+  return [
+    for (final item in data)
+      if (item is String) item,
+  ];
 }
 
 String? jsonString(Map<dynamic, dynamic> map, String key) {
@@ -37,8 +52,8 @@ String? activeValidUntil(Map<String, dynamic> memory, [DateTime? now]) {
 }
 
 String? firstProblemMessage(dynamic data) {
-  if (data is! Map) return null;
-  final map = Map<String, dynamic>.from(data);
+  final map = jsonObject(data);
+  if (map == null) return null;
   final detail = asJsonString(map['detail']);
   if (detail != null && detail.isNotEmpty) return detail;
   final errors = map['errors'];

@@ -7,7 +7,10 @@ import 'package:web/web.dart' as web;
 Future<void> downloadAndOpen(Dio http, String id, String fileName) async {
   final response = await http.get<List<int>>(
     '/api/v1/files/$id/content',
-    options: Options(responseType: ResponseType.bytes),
+    options: Options(
+      responseType: ResponseType.bytes,
+      receiveTimeout: const Duration(minutes: 2),
+    ),
   );
   final bytes = Uint8List.fromList(response.data ?? const <int>[]);
   final blob = web.Blob([bytes.toJS].toJS);

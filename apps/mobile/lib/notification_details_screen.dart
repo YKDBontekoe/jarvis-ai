@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import 'ui/phosphor_icons.dart';
 
 import 'features/chat/chat_widgets.dart';
@@ -48,8 +49,7 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
       final path = switch (widget.notificationType) {
         'reminder.due' ||
         'reminder.failed' => '/api/v1/reminders/${widget.sourceId}',
-        'task.completed' ||
-        'task.failed' => '/api/v1/tasks/${widget.sourceId}',
+        'task.completed' || 'task.failed' => '/api/v1/tasks/${widget.sourceId}',
         'watch.triggered' ||
         'watch.failed' => '/api/v1/watches/${widget.sourceId}',
         _ => null,
@@ -65,7 +65,11 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
         setState(() => _error = 'Jarvis returned an invalid item.');
         return;
       }
-      setState(() => _item = Map<String, dynamic>.from(data));
+      final item = jsonObject(data);
+      setState(() {
+        _item = item;
+        _error = item == null ? 'Jarvis returned an invalid item.' : null;
+      });
     } on DioException catch (error) {
       if (!mounted) return;
       setState(
@@ -73,6 +77,9 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
             ? 'This item is no longer available.'
             : 'Jarvis could not load this item.',
       );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Jarvis could not load this item.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

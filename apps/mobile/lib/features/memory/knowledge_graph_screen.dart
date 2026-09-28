@@ -102,7 +102,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen>
           [for (final link in snapshot.links) (link.fromId, link.toId)],
           pinned: you,
         );
-        _status = responses[1].data;
+        _status = jsonObject(responses[1].data);
         _world = _worldFor(snapshot.nodes.length);
         _loading = false;
         _error = null;
@@ -118,6 +118,12 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen>
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not load the knowledge graph.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load the knowledge graph.';
       });
     }
   }
@@ -1165,7 +1171,12 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
       final response = await widget.http.get<Map<String, dynamic>>(
         '/api/v1/graph/entities/${widget.entityId}',
       );
-      if (mounted) setState(() => _details = response.data);
+      if (mounted) {
+        setState(() {
+          _details = jsonObject(response.data);
+          _error = _details == null ? 'Could not load this entity.' : null;
+        });
+      }
     } on DioException catch (error) {
       if (mounted) {
         setState(
@@ -1174,6 +1185,8 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
               'Could not load this entity.',
         );
       }
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not load this entity.');
     }
   }
 
@@ -1187,15 +1200,28 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
       destructive: true,
       icon: PhosphorIconsRegular.trash,
     );
-    if (!confirmed) return;
-    await widget.http.delete<void>('/api/v1/graph/entities/${widget.entityId}');
-    if (mounted) Navigator.pop(context);
+    if (!confirmed || !mounted) return;
+    try {
+      await widget.http.delete<void>(
+        '/api/v1/graph/entities/${widget.entityId}',
+      );
+      if (mounted) Navigator.pop(context);
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not forget this entity.',
+      );
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not forget this entity.');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final details = _details;
-    final entity = Map<String, dynamic>.from(details?['entity'] as Map? ?? {});
+    final entity = jsonObject(details?['entity']) ?? const {};
     final current = jsonMaps(details?['current']);
     final history = jsonMaps(details?['history']);
     final summary = asJsonString(entity['summary']);

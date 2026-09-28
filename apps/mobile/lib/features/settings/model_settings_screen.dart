@@ -72,7 +72,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _apply(response.data ?? const {});
+        _apply(jsonObject(response.data) ?? const {});
         _loading = false;
         _error = null;
       });
@@ -85,6 +85,13 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not load model settings.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _codexLoading = false;
+        _error = 'Could not load model settings.';
       });
     }
   }

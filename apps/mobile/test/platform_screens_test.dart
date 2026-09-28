@@ -325,7 +325,8 @@ void main() {
     expect(find.text('Jarvis app'), findsOneWidget);
     await tester.tap(find.byType(Switch).first);
     await tester.pumpAndSettle();
-    final saved = http.sent('PUT', '/api/v1/settings/devices').single.body as Map;
+    final saved =
+        http.sent('PUT', '/api/v1/settings/devices').single.body as Map;
     expect(saved['location'], isTrue);
   });
 
@@ -350,6 +351,21 @@ void main() {
     await show(tester, AgentsScreen(http: http.client()));
     expect(find.text('Travel'), findsOneWidget);
     expect(find.text('Home'), findsOneWidget);
+  });
+
+  testWidgets('cancelling add-agent disposes the dialog without leaking', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/agents', <Object>[]);
+    http.on('GET', '/api/v1/a2a/tokens', <Object>[]);
+    await show(tester, AgentsScreen(http: http.client()));
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add a remote agent'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add a remote agent'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('settings includes agents, this-device, and voice destinations', (

@@ -111,4 +111,14 @@ void main() {
       'markdown': markdown,
     });
   });
+
+  testWidgets('invalid skill payload shows an error instead of crashing', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/skills/1', {'skill': 'nope', 'revisions': 'x'});
+    await show(tester, SkillDetailScreen(http: http.client(), skillId: '1'));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Jarvis returned an invalid skill.'), findsOneWidget);
+  });
 }

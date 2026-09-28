@@ -44,12 +44,12 @@ class _LearningScreenState extends State<LearningScreen> {
       final response = await widget.http.get<Map<String, dynamic>>(
         '/api/v1/learning/status',
       );
-      final data = response.data ?? const {};
+      final data = jsonObject(response.data) ?? const {};
       if (!mounted) return;
       setState(() {
-        _settings = Map<String, dynamic>.from(data['settings'] as Map? ?? {});
-        _state = Map<String, dynamic>.from(data['state'] as Map? ?? {});
-        _dreaming = Map<String, dynamic>.from(data['dreaming'] as Map? ?? {});
+        _settings = jsonObject(data['settings']) ?? const {};
+        _state = jsonObject(data['state']) ?? const {};
+        _dreaming = jsonObject(data['dreaming']) ?? const {};
         _activity = jsonMaps(data['activity']);
         _loading = false;
         _error = null;
@@ -61,6 +61,12 @@ class _LearningScreenState extends State<LearningScreen> {
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not load learning settings.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load learning settings.';
       });
     }
   }
@@ -77,7 +83,9 @@ class _LearningScreenState extends State<LearningScreen> {
         '/api/v1/settings/learning',
         data: next,
       );
-      if (mounted) setState(() => _settings = response.data ?? next);
+      if (mounted) {
+        setState(() => _settings = jsonObject(response.data) ?? next);
+      }
     } on DioException catch (error) {
       if (!mounted) return;
       setState(

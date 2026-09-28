@@ -69,7 +69,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _apply(response.data ?? const {}, traitsOnly: traitsOnly);
+        _apply(jsonObject(response.data) ?? const {}, traitsOnly: traitsOnly);
         _loading = false;
         _error = null;
       });
@@ -80,6 +80,12 @@ class _PersonaScreenState extends State<PersonaScreen> {
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not load your persona.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load your persona.';
       });
     }
   }

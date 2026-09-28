@@ -96,7 +96,14 @@ class _FilesScreenState extends State<FilesScreen> {
           contentType: DioMediaType.parse(_contentTypeFor(file.name)),
         ),
       });
-      await widget.http.post('/api/v1/files', data: form);
+      await widget.http.post(
+        '/api/v1/files',
+        data: form,
+        options: Options(
+          sendTimeout: const Duration(minutes: 2),
+          receiveTimeout: const Duration(minutes: 2),
+        ),
+      );
       await _load();
     } on DioException catch (error) {
       final message = error.response?.statusCode == 400

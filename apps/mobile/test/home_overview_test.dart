@@ -150,6 +150,19 @@ void main() {
     );
   });
 
+  testWidgets('a non-list tasks payload does not crash the home screen', (
+    tester,
+  ) async {
+    adapter.responses['/api/v1/tasks'] = {'items': <Object>[]};
+    await showHome(tester);
+    expect(tester.takeException(), isNull);
+    expect(find.text('Active tasks'), findsOneWidget);
+    expect(
+      find.text('Could not load active tasks. Pull down to retry.'),
+      findsNothing,
+    );
+  });
+
   testWidgets('task details show only approvals belonging to that task', (
     tester,
   ) async {

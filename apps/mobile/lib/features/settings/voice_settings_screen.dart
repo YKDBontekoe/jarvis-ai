@@ -37,7 +37,7 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _settings = response.data ?? const {};
+        _settings = jsonObject(response.data) ?? const {};
         _loading = false;
         _error = null;
       });
@@ -48,6 +48,12 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
         _error =
             firstProblemMessage(error.response?.data) ??
             'Could not load voice settings.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load voice settings.';
       });
     }
   }
@@ -64,10 +70,13 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
         data: {
           'handsFree': asJsonBool(next['handsFree'], true),
           'captions': asJsonBool(next['captions'], true),
-          'voice': asJsonString(next['voice']) ?? asJsonString(next['defaultVoice']),
+          'voice':
+              asJsonString(next['voice']) ?? asJsonString(next['defaultVoice']),
         },
       );
-      if (mounted) setState(() => _settings = response.data ?? next);
+      if (mounted) {
+        setState(() => _settings = jsonObject(response.data) ?? next);
+      }
     } on DioException catch (error) {
       if (!mounted) return;
       setState(
