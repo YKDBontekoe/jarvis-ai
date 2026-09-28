@@ -35,6 +35,25 @@ jobs:
         id: meta
         run: echo "prefix=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "${GITHUB_OUTPUT}"
 
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create deployment source bundle
+        run: git bundle create "${RUNNER_TEMP}/jarvis-source.bundle" HEAD
+
+      - name: Upload deployment source bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-deployment-source
+          path: ${{ runner.temp }}/jarvis-source.bundle
+          if-no-files-found: error
+          retention-days: 1
+
   build:
     needs: prepare
     runs-on: ubuntu-latest
@@ -93,17 +112,22 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
   deploy:
-    needs: [prepare, build]
+    needs: [prepare, build, source]
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.skip_deploy != true }}
     runs-on: [self-hosted, linux, x64, jarvis-deploy]
     steps:
+      - name: Download deployment source bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: jarvis-deployment-source
+          path: ${{ runner.temp }}
+
       - name: Deploy on the server runner
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
           GIT_SHA: ${{ github.sha }}
-          GIT_REF: ${{ github.ref }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          SOURCE_BUNDLE: ${{ runner.temp }}/jarvis-source.bundle
           JARVIS_API_IMAGE: ${{ needs.prepare.outputs.prefix }}/api:${{ github.sha }}
           JARVIS_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/worker:${{ github.sha }}
           JARVIS_VOICE_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/voice-worker:${{ github.sha }}
@@ -114,13 +138,9 @@ jobs:
           cd "${DEPLOY_PATH}"
           if [[ ! -d .git ]]; then
             git init
-            git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           fi
-          git_auth="$(printf 'x-access-token:%s' "${GHCR_TOKEN}" | base64 -w0)"
-          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${git_auth}" fetch --prune origin
-          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${git_auth}" fetch --force origin "${GIT_SHA}" || \
-            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${git_auth}" fetch --force origin "${GIT_REF}"
-          git checkout --detach "${GIT_SHA}"
+          git fetch --force "${SOURCE_BUNDLE}" HEAD
+          git checkout --detach --force "${GIT_SHA}"
           echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
           chmod +x scripts/deploy/remote-up.sh
           scripts/deploy/remote-up.sh
