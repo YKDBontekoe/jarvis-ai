@@ -10,6 +10,7 @@ import '../../ui/phosphor_icons.dart';
 
 part 'openrouter_model_picker.dart';
 part 'codex_model_picker.dart';
+part 'model_settings_cards.dart';
 
 /// Chooses between the host's ChatGPT (Codex) session and the owner's own OpenRouter key.
 class ModelSettingsScreen extends StatefulWidget {
@@ -21,7 +22,8 @@ class ModelSettingsScreen extends StatefulWidget {
   State<ModelSettingsScreen> createState() => _ModelSettingsScreenState();
 }
 
-class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
+/// Holds model-settings fields so the cards mixin can share state.
+abstract class _ModelSettingsController extends State<ModelSettingsScreen> {
   final _key = TextEditingController();
   final _chat = TextEditingController();
   final _fast = TextEditingController();
@@ -45,6 +47,16 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
   Map<String, dynamic>? _test;
   int _requestRevision = 0;
 
+  Future<void> _updateCodex();
+  Future<void> _saveKey();
+  Future<void> _removeKey();
+  Future<void> _pickCodex();
+  Future<void> _pick(TextEditingController controller, String title);
+  List<Map<String, dynamic>> get _visibleCodexModels;
+}
+
+class _ModelSettingsScreenState extends _ModelSettingsController
+    with _ModelSettingsCards {
   @override
   void initState() {
     super.initState();
@@ -149,6 +161,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     }
   }
 
+  @override
   Future<void> _updateCodex() async {
     setState(() {
       _updating = true;
@@ -181,6 +194,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     }
   }
 
+  @override
   List<Map<String, dynamic>> get _visibleCodexModels {
     final selected = _chat.text.trim();
     return [
@@ -192,6 +206,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     ];
   }
 
+  @override
   Future<void> _pickCodex() async {
     final picked = await showModalBottomSheet<String>(
       context: context,
@@ -236,6 +251,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     }
   }
 
+  @override
   Future<void> _saveKey() async {
     final value = _key.text.trim();
     if (value.isEmpty) return;
@@ -250,6 +266,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     _key.clear();
   }
 
+  @override
   Future<void> _removeKey() async {
     final embeddingOnly = _provider == 'codex';
     final confirmed = await showJarvisConfirm(
@@ -315,6 +332,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     }
   }
 
+  @override
   Future<void> _pick(TextEditingController controller, String title) async {
     final picked = await showModalBottomSheet<String>(
       context: context,
@@ -403,284 +421,4 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
             ),
           ),
   );
-
-  Widget _providerCard() => SurfaceCard(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Provider', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 6),
-        const Text(
-          'ChatGPT uses the server’s signed-in Codex session for conversations. '
-          'OpenRouter uses your own key for chat—or only for the optional embedding model while chat stays on Codex.',
-          style: TextStyle(color: JarvisColors.inkSoft, height: 1.4),
-        ),
-        const SizedBox(height: 14),
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(
-              value: 'codex',
-              label: Text('ChatGPT (Codex)'),
-              icon: Icon(PhosphorIconsRegular.sparkle, size: 16),
-            ),
-            ButtonSegment(
-              value: 'openrouter',
-              label: Text('OpenRouter'),
-              icon: Icon(PhosphorIconsRegular.shareNetwork, size: 16),
-            ),
-          ],
-          selected: {_provider},
-          onSelectionChanged: (value) =>
-              setState(() => _provider = value.first),
-        ),
-      ],
-    ),
-  );
-
-  Widget _codexCard() {
-    final installed = _installedVersion ?? 'unknown';
-    final latest = _latestVersion;
-    return SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const IconBadge(icon: PhosphorIconsRegular.cpu, size: 34),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Codex CLI',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              if (!_codexLoading)
-                StatusPill(
-                  label: _updateAvailable
-                      ? 'Update available'
-                      : _canUpdate && latest != null
-                      ? 'Up to date'
-                      : 'Installed',
-                  color: _updateAvailable
-                      ? JarvisColors.warning
-                      : _canUpdate && latest != null
-                      ? JarvisColors.success
-                      : JarvisColors.muted,
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            latest == null
-                ? 'Installed $installed.'
-                : 'Installed $installed. Latest release is $latest.',
-            style: const TextStyle(color: JarvisColors.inkSoft, height: 1.4),
-          ),
-          if (_codexLoading)
-            const Padding(
-              padding: EdgeInsets.only(top: 12),
-              child: LinearProgressIndicator(),
-            ),
-          if (_updateAvailable)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton.tonalIcon(
-                  key: const Key('update-codex'),
-                  onPressed: _updating || _saving
-                      ? null
-                      : () => unawaited(_updateCodex()),
-                  icon: _updating
-                      ? const SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(
-                          PhosphorIconsRegular.arrowsClockwise,
-                          size: 18,
-                        ),
-                  label: Text('Update to $latest'),
-                ),
-              ),
-            ),
-          if (_updateBlocked != null && !_canUpdate)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                _updateBlocked!,
-                style: const TextStyle(
-                  color: JarvisColors.inkSoft,
-                  height: 1.4,
-                ),
-              ),
-            ),
-          if (_codexError != null)
-            InlineNotice(
-              message: _codexError!,
-              tone: NoticeTone.danger,
-              margin: const EdgeInsets.only(top: 12),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _keyCard({required bool embeddingOnly}) => SurfaceCard(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            const IconBadge(icon: PhosphorIconsRegular.key, size: 34),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                embeddingOnly
-                    ? 'OpenRouter API key (embeddings)'
-                    : 'OpenRouter API key',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-            StatusPill(
-              label: _keyConfigured ? 'Saved' : 'Not set',
-              color: _keyConfigured ? JarvisColors.success : JarvisColors.muted,
-            ),
-          ],
-        ),
-        if (embeddingOnly) ...[
-          const SizedBox(height: 6),
-          const Text(
-            'Required only when you pick an embedding model below. Chat stays on Codex.',
-            style: TextStyle(color: JarvisColors.inkSoft, height: 1.4),
-          ),
-        ],
-        const SizedBox(height: 12),
-        TextField(
-          key: const Key('openrouter-key'),
-          controller: _key,
-          obscureText: true,
-          autocorrect: false,
-          enableSuggestions: false,
-          decoration: InputDecoration(
-            labelText: _keyConfigured ? 'Replace key' : 'sk-or-…',
-            helperText:
-                'Stored encrypted on your Jarvis server; never shown again.',
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            FilledButton.tonal(
-              onPressed: _saving ? null : () => unawaited(_saveKey()),
-              child: const Text('Save key'),
-            ),
-            const Spacer(),
-            if (_keyConfigured)
-              TextButton(
-                onPressed: _saving ? null : () => unawaited(_removeKey()),
-                style: TextButton.styleFrom(
-                  foregroundColor: JarvisColors.danger,
-                ),
-                child: const Text('Remove'),
-              ),
-          ],
-        ),
-      ],
-    ),
-  );
-
-  Widget _modelsCard() {
-    final openRouter = _provider == 'openrouter';
-    final codexPicker = !openRouter && _visibleCodexModels.isNotEmpty;
-    Widget field(
-      TextEditingController controller,
-      String label,
-      String helper, {
-      Key? key,
-      bool codexModels = false,
-    }) => Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: TextField(
-        key: key,
-        controller: controller,
-        readOnly: codexModels,
-        autocorrect: false,
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: codexModels && controller.text.trim().isEmpty
-              ? 'Account default'
-              : null,
-          helperText: helper,
-          helperMaxLines: 3,
-          suffixIcon: codexModels
-              ? IconButton(
-                  key: const Key('browse-codex-models'),
-                  tooltip: 'Browse Codex models',
-                  icon: const Icon(PhosphorIconsRegular.magnifyingGlass),
-                  onPressed: () => unawaited(_pickCodex()),
-                )
-              : openRouter || controller == _embedding
-              ? IconButton(
-                  tooltip: 'Browse OpenRouter models',
-                  icon: const Icon(PhosphorIconsRegular.magnifyingGlass),
-                  onPressed: () => unawaited(_pick(controller, label)),
-                )
-              : null,
-        ),
-      ),
-    );
-    final selected = _chat.text.trim();
-    final known = _codexModels.any(
-      (model) =>
-          (asJsonString(model['model']) ?? asJsonString(model['id'])) ==
-          selected,
-    );
-    final codexHelper = _codexModels.isEmpty
-        ? 'Leave empty to use the ChatGPT account default.'
-        : 'Models supported by Codex ${_installedVersion ?? 'the installed CLI'}. '
-              'Leave empty for the account default.'
-              '${selected.isNotEmpty && !known ? ' This model is not in the installed catalog.' : ''}';
-    return SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Models', style: Theme.of(context).textTheme.titleMedium),
-          field(
-            _chat,
-            'Chat model',
-            openRouter
-                ? 'Used for conversations and background tasks. Pick one that supports tools.'
-                : codexHelper,
-            key: const Key('chat-model'),
-            codexModels: codexPicker,
-          ),
-          if (openRouter)
-            field(
-              _fast,
-              'Fast model (optional)',
-              'Used for learning, memory extraction, and reranking. Defaults to the chat model.',
-            ),
-          field(
-            _embedding,
-            'Embedding model (optional)',
-            'Enables semantic memory search through OpenRouter, e.g. openai/text-embedding-3-small.',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _testResult() {
-    final ok = asJsonBool(_test!['ok']);
-    final model = asJsonString(_test!['model']);
-    final latency = asJsonInt(_test!['latencyMs']);
-    return InlineNotice(
-      margin: const EdgeInsets.only(top: 16),
-      tone: ok ? NoticeTone.success : NoticeTone.danger,
-      message: ok
-          ? 'Connected${model == null ? '' : ' to $model'} in $latency ms.'
-          : asJsonString(_test!['error']) ?? 'The model did not answer.',
-    );
-  }
 }
