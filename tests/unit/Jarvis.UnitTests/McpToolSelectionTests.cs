@@ -1,5 +1,6 @@
 using Jarvis.Application.Integrations;
 using Jarvis.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Jarvis.UnitTests;
@@ -90,7 +91,7 @@ public sealed class McpServerControlTests
     public async Task Enabled_flag_defaults_on_and_can_be_paused()
     {
         var store = new InMemoryCredentialStore();
-        var registry = new UserMcpServerRegistry(store);
+        var registry = new UserMcpServerRegistry(store, NullLogger<UserMcpServerRegistry>.Instance);
         var owner = Guid.NewGuid();
         var id = "jarvis-mcp-" + Guid.NewGuid().ToString("N");
         await store.SaveSecretAsync(owner, id, "server_config",

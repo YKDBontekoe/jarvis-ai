@@ -1,10 +1,12 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Jarvis.Application.Integrations;
+using Microsoft.Extensions.Logging;
 
 namespace Jarvis.Infrastructure.Persistence;
 
-public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore credentials) : IUserMcpServerRegistry
+public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore credentials,
+    ILogger<UserMcpServerRegistry> logger) : IUserMcpServerRegistry
 {
     private const string ProviderPrefix = IntegrationCredentialProviders.UserMcpPrefix;
     private const string ConfigSecret = IntegrationCredentialProviders.UserMcpConfigSecret;
@@ -21,13 +23,16 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
             if (secrets is null || !secrets.TryGetValue(ConfigSecret, out var json)) continue;
             try
             {
-                var stored = JsonSerializer.Deserialize<StoredServer>(json, JsonOptions);
-                if (stored is not null)
-                    result.Add(ToPublic(provider.Provider, stored, provider.UpdatedAt,
-                        provider.SecretNames.Contains(IntegrationCredentialProviders.UserMcpTokenSecret,
-                            StringComparer.Ordinal)));
+                var stored = Deserialize(json);
+                result.Add(ToPublic(provider.Provider, stored, provider.UpdatedAt,
+                    provider.SecretNames.Contains(IntegrationCredentialProviders.UserMcpTokenSecret,
+                        StringComparer.Ordinal)));
             }
-            catch (JsonException) { }
+            catch (Exception exception) when (exception is JsonException or InvalidMcpServerConfigurationException)
+            {
+                LogInvalidConfiguration(ownerId, provider.Provider, exception);
+                result.Add(InvalidPublic(provider.Provider, provider.UpdatedAt));
+            }
         }
         return result.OrderBy(server => server.Name, StringComparer.OrdinalIgnoreCase).ToArray();
     }
@@ -68,8 +73,12 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         var existing = await credentials.GetSecretsAsync(ownerId, id, cancellationToken);
         if (existing is null || !existing.ContainsKey(ConfigSecret)) return null;
         StoredServer? current = null;
-        try { current = JsonSerializer.Deserialize<StoredServer>(existing[ConfigSecret], JsonOptions); }
-        catch (JsonException) { }
+        try { current = Deserialize(existing[ConfigSecret]); }
+        catch (Exception exception) when (exception is JsonException or InvalidMcpServerConfigurationException)
+        {
+            // Update is the explicit replacement operation, so malformed data must not prevent recovery.
+            LogInvalidConfiguration(ownerId, id, exception);
+        }
         var replacement = await BuildHttpStoredAsync(request, cancellationToken);
         replacement = replacement with { Enabled = current?.Enabled ?? true };
         await credentials.SaveSecretAsync(ownerId, id, ConfigSecret,
@@ -111,8 +120,16 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         if (!IsId(id)) return null;
         var secrets = await credentials.GetSecretsAsync(ownerId, id, cancellationToken);
         if (secrets is null || !secrets.TryGetValue(ConfigSecret, out var json)) return null;
-        var stored = JsonSerializer.Deserialize<StoredServer>(json, JsonOptions);
-        return stored is null ? null : (stored, secrets.ContainsKey(IntegrationCredentialProviders.UserMcpTokenSecret));
+        try
+        {
+            var stored = Deserialize(json);
+            return (stored, secrets.ContainsKey(IntegrationCredentialProviders.UserMcpTokenSecret));
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidMcpServerConfigurationException)
+        {
+            LogInvalidConfiguration(ownerId, id, exception);
+            throw new InvalidMcpServerConfigurationException();
+        }
     }
 
     private static async Task<StoredServer> BuildHttpStoredAsync(AddUserMcpServerRequest request,
@@ -141,6 +158,27 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
     }
 
     public static bool IsId(string? id) => IntegrationCredentialProviders.IsUserMcpServerId(id);
+
+    private static StoredServer Deserialize(string json)
+    {
+        var stored = JsonSerializer.Deserialize<StoredServer>(json, JsonOptions)
+            ?? throw new InvalidMcpServerConfigurationException();
+        if (string.IsNullOrWhiteSpace(stored.Name) || stored.AllowedTools is null ||
+            stored.Transport is not (null or "streamableHttp" or "stdio") ||
+            (stored.Transport is "stdio"
+                ? string.IsNullOrWhiteSpace(stored.Command)
+                : string.IsNullOrWhiteSpace(stored.Endpoint)))
+            throw new InvalidMcpServerConfigurationException();
+        return stored;
+    }
+
+    private void LogInvalidConfiguration(Guid ownerId, string serverId, Exception exception) =>
+        logger.LogWarning(exception, "Invalid MCP configuration for owner {OwnerId} and server {ServerId}; error type {ExceptionType}",
+            ownerId, serverId, exception.GetType().Name);
+
+    private static UserMcpServer InvalidPublic(string id, DateTimeOffset updatedAt) =>
+        new(id, "Invalid MCP server", string.Empty, [], updatedAt, false, false,
+            IsValid: false, ConfigurationIssue: "invalid_configuration");
 
     private static UserMcpServer ToPublic(string id, StoredServer stored, DateTimeOffset updatedAt, bool hasToken) =>
         new(id, stored.Name, stored.Endpoint, stored.AllowedTools, updatedAt, hasToken, stored.Enabled ?? true,
