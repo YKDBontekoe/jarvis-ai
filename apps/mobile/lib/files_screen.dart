@@ -60,11 +60,19 @@ class _FilesScreenState extends State<FilesScreen> {
     });
     try {
       final response = await widget.http.get<dynamic>('/api/v1/files');
-      final collectionsResponse = await widget.http.get<dynamic>('/api/v1/collections');
+      var collections = <Map<String, dynamic>>[];
+      try {
+        final collectionsResponse = await widget.http.get<dynamic>(
+          '/api/v1/collections',
+        );
+        collections = jsonMaps(collectionsResponse.data);
+      } on DioException {
+        // Collections are optional; keep the files list usable without them.
+      }
       if (mounted && revision == _requestRevision) {
         setState(() {
           _files = jsonMaps(response.data);
-          _collections = jsonMaps(collectionsResponse.data);
+          _collections = collections;
         });
       }
     } on DioException {
