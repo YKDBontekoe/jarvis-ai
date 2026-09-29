@@ -195,6 +195,7 @@ mixin _IntegrationsMcp on _IntegrationsController {
       'too_many_tools' => 'More than 80 tools. Narrow the allowlist.',
       'no_matching_tools' => 'None of the selected tools are available',
       'invalid_configuration' => 'Configuration needs attention',
+      'connection_timed_out' => 'Did not respond in time. Retry or check the package.',
       _ => null,
     };
     final (icon, fallback, label, color) = switch (state) {
