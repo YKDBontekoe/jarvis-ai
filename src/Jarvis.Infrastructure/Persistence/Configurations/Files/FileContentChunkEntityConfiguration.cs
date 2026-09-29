@@ -14,6 +14,9 @@ internal sealed class FileContentChunkEntityConfiguration : IEntityTypeConfigura
             builder.Property(x => x.OwnerId).HasColumnName("owner_id");
             builder.Property(x => x.ChunkIndex).HasColumnName("chunk_index");
             builder.Property(x => x.Content).HasColumnName("content").IsRequired();
+            builder.Property(x => x.StartOffset).HasColumnName("start_offset");
+            builder.Property(x => x.EndOffset).HasColumnName("end_offset");
+            builder.Property(x => x.PageNumber).HasColumnName("page_number");
             builder.Property(x => x.Embedding).HasColumnName("embedding").HasColumnType("vector(1536)");
             builder.Property(x => x.SearchText).HasColumnName("search_text").HasColumnType("tsvector")
                 .HasComputedColumnSql("to_tsvector('simple'::regconfig, content)", stored: true);

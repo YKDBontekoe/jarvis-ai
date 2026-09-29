@@ -82,6 +82,10 @@ public static class DependencyInjection
         services.AddHttpClient();
         services.AddScoped<IFileMalwareScanner, ClamAvVirusScanner>();
         services.AddScoped<IFileSearchService, FileSearchService>();
+        services.AddScoped<IConversationFileContextRepository, ConversationFileContextRepository>();
+        services.AddScoped<IConversationFileScopeService, ConversationFileScopeService>();
+        services.AddScoped<IFileCitationCollector, FileCitationCollector>();
+        services.AddScoped<IFileCitationResolver, FileCitationResolver>();
         services.AddJarvisFederatedSearch(configuration);
         services.AddScoped<IObjectStorage, S3ObjectStorage>();
         var objectStorage = configuration.GetSection("ObjectStorage");

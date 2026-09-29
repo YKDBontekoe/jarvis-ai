@@ -37,6 +37,9 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<JarvisTask> Tasks => Set<JarvisTask>();
     public DbSet<StoredFileEntity> Files => Set<StoredFileEntity>();
     public DbSet<FileContentChunkEntity> FileContentChunks => Set<FileContentChunkEntity>();
+    public DbSet<ConversationFileAttachmentEntity> ConversationFileAttachments => Set<ConversationFileAttachmentEntity>();
+    public DbSet<ConversationCollectionAttachmentEntity> ConversationCollectionAttachments =>
+        Set<ConversationCollectionAttachmentEntity>();
     public DbSet<IntegrationCredential> IntegrationCredentials => Set<IntegrationCredential>();
     public DbSet<DailyBriefingPreference> DailyBriefings => Set<DailyBriefingPreference>();
     public DbSet<OwnerSettingEntity> OwnerSettings => Set<OwnerSettingEntity>();

@@ -159,6 +159,7 @@ mixin _ChatScreenSession on _ChatScreenController {
                   role: message['role'] as String,
                   content: message['content'] as String,
                   id: asJsonString(message['id']),
+                  citations: parseMessageCitations(message['citations']),
                 ),
               ),
         )
@@ -169,6 +170,7 @@ mixin _ChatScreenSession on _ChatScreenController {
     if (responding) unawaited(_catchUpRemoteQuery(conversationId));
     _scrollToBottom(jump: true);
     unawaited(_loadRecent());
+    unawaited(_loadConversationSources(conversationId));
     if (!isCurrent() || !isLatestOpen() || _conversationId != conversationId) {
       return;
     }
@@ -270,6 +272,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       _connected = false;
       _sending = false;
       _entries.clear();
+      _attachedSources = [];
       _error = null;
     });
   }

@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Text;
+using System.Text.Json;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Files;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Profiles;
 using Jarvis.Api.Telemetry;
@@ -14,10 +16,12 @@ namespace Jarvis.Api.Realtime;
 public sealed class AgentRunCoordinator(
     IConversationStore conversations,
     IToolApprovalStore approvals,
+    IFileCitationCollector fileCitations,
     IServiceScopeFactory scopes,
     IHubContext<JarvisEventsHub> hub,
     ILogger<AgentRunCoordinator> logger)
 {
+    private static readonly JsonSerializerOptions CitationJsonOptions = new(JsonSerializerDefaults.Web);
     public async Task<Message?> TryRecoverCompletedAssistantAsync(Guid conversationId, string userContent,
         CancellationToken cancellationToken)
     {
@@ -255,14 +259,10 @@ public sealed class AgentRunCoordinator(
             if (!string.IsNullOrWhiteSpace(answer.ToString()))
             {
                 preface = new Message(conversationId, "assistant", answer.ToString(), messageId);
+                AttachCitations(preface);
                 await conversations.AddMessageAsync(preface, cancellationToken);
-                await PublishSafelyAsync(clients, "message.completed", new
-                {
-                    id = preface.Id,
-                    role = preface.Role,
-                    content = preface.Content,
-                    createdAt = preface.CreatedAt
-                }, conversationId, cancellationToken);
+                await PublishSafelyAsync(clients, "message.completed", MessageCompletedPayload(preface),
+                    conversationId, cancellationToken);
             }
             foreach (var request in approvalRequests)
             {
@@ -295,20 +295,38 @@ public sealed class AgentRunCoordinator(
             throw new InvalidOperationException("The agent completed without an assistant response.");
 
         var assistantMessage = new Message(conversationId, "assistant", answer.ToString(), messageId);
+        AttachCitations(assistantMessage);
         await conversations.AddMessageAsync(assistantMessage, cancellationToken);
         if (memorySourceId is { } sourceMessageId && !string.IsNullOrWhiteSpace(memorySource))
             QueueMemoryExtraction(ownerId, conversationId, sourceMessageId, memorySource);
 
-        await PublishSafelyAsync(clients, "message.completed", new
-        {
-            id = assistantMessage.Id,
-            role = assistantMessage.Role,
-            content = assistantMessage.Content,
-            createdAt = assistantMessage.CreatedAt
-        }, conversationId, cancellationToken);
+        await PublishSafelyAsync(clients, "message.completed", MessageCompletedPayload(assistantMessage),
+            conversationId, cancellationToken);
         await PublishSafelyAsync(clients, "agent.completed", new { conversationId }, conversationId,
             cancellationToken);
         return new AgentRunOutcome(assistantMessage, []);
+    }
+
+    private void AttachCitations(Message message)
+    {
+        var drained = fileCitations.Drain();
+        if (drained.Count == 0) return;
+        message.SetCitationsJson(JsonSerializer.Serialize(drained, CitationJsonOptions));
+    }
+
+    private static object MessageCompletedPayload(Message message) => new
+    {
+        id = message.Id,
+        role = message.Role,
+        content = message.Content,
+        createdAt = message.CreatedAt,
+        citations = DeserializeCitations(message.CitationsJson)
+    };
+
+    private static IReadOnlyList<FileCitation>? DeserializeCitations(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        return JsonSerializer.Deserialize<IReadOnlyList<FileCitation>>(json, CitationJsonOptions);
     }
 
     private async Task PublishSafelyAsync(IClientProxy clients, string eventName, object payload,

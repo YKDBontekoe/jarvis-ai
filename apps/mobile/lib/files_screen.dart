@@ -39,6 +39,7 @@ class FilesScreen extends StatefulWidget {
 
 class _FilesScreenState extends State<FilesScreen> {
   List<Map<String, dynamic>> _files = [];
+  List<Map<String, dynamic>> _collections = [];
   bool _loading = true;
   bool _busy = false;
   String? _error;
@@ -59,8 +60,12 @@ class _FilesScreenState extends State<FilesScreen> {
     });
     try {
       final response = await widget.http.get<dynamic>('/api/v1/files');
+      final collectionsResponse = await widget.http.get<dynamic>('/api/v1/collections');
       if (mounted && revision == _requestRevision) {
-        setState(() => _files = jsonMaps(response.data));
+        setState(() {
+          _files = jsonMaps(response.data);
+          _collections = jsonMaps(collectionsResponse.data);
+        });
       }
     } on DioException {
       if (mounted && revision == _requestRevision) {
@@ -182,6 +187,66 @@ class _FilesScreenState extends State<FilesScreen> {
     }
   }
 
+  Future<void> _createCollection() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('New collection'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Collection name'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    setState(() => _busy = true);
+    try {
+      await widget.http.post('/api/v1/collections', data: {'name': name});
+      await _load();
+    } on DioException {
+      if (mounted) _showError('Could not create that collection.');
+    } catch (_) {
+      if (mounted) _showError('Could not create that collection.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _deleteCollection(Map<String, dynamic> collection) async {
+    final id = jsonString(collection, 'id');
+    if (id == null) return;
+    final confirmed = await showJarvisConfirm(
+      context,
+      title: 'Delete collection?',
+      message: 'Files stay in your library; only the grouping is removed.',
+      cancelLabel: 'Keep',
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: PhosphorIconsRegular.trash,
+    );
+    if (!confirmed) return;
+    setState(() => _busy = true);
+    try {
+      await widget.http.delete('/api/v1/collections/$id');
+      await _load();
+    } on DioException {
+      if (mounted) _showError('Could not delete this collection.');
+    } catch (_) {
+      if (mounted) _showError('Could not delete this collection.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
@@ -205,6 +270,12 @@ class _FilesScreenState extends State<FilesScreen> {
           icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
         ),
         HeaderAction(
+          label: 'Collection',
+          icon: PhosphorIconsRegular.folders,
+          onPressed: _createCollection,
+          busy: _busy,
+        ),
+        HeaderAction(
           label: 'Upload',
           icon: PhosphorIconsRegular.uploadSimple,
           onPressed: _upload,
@@ -215,7 +286,7 @@ class _FilesScreenState extends State<FilesScreen> {
     body: ListScreenBody(
       loading: _loading,
       error: _error,
-      isEmpty: _files.isEmpty,
+      isEmpty: _files.isEmpty && _collections.isEmpty,
       onRetry: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.folderOpen,
@@ -224,9 +295,44 @@ class _FilesScreenState extends State<FilesScreen> {
       ),
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-        itemCount: _files.length,
+        itemCount: _collections.length + _files.length,
         itemBuilder: (context, index) {
-          final file = _files[index];
+          if (index < _collections.length) {
+            final collection = _collections[index];
+            final name = asJsonString(collection['name']) ?? 'Collection';
+            final fileIds = collection['fileIds'];
+            final count = fileIds is List ? fileIds.length : 0;
+            return ContentWidth(
+              child: SurfaceCard(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
+                child: Row(
+                  children: [
+                    const IconBadge(icon: PhosphorIconsRegular.folders, size: 44),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          Text(
+                            '$count files',
+                            style: const TextStyle(color: JarvisColors.muted, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Delete collection',
+                      onPressed: _busy ? null : () => _deleteCollection(collection),
+                      icon: const Icon(PhosphorIconsRegular.trash),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          final file = _files[index - _collections.length];
           final name = asJsonString(file['fileName']) ?? 'File';
           final icon = _fileIcon(name);
           final status = asJsonString(file['processingStatus']) ?? 'uploaded';
@@ -247,8 +353,7 @@ class _FilesScreenState extends State<FilesScreen> {
                           name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontSize: 15),
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 15),
                         ),
                         const SizedBox(height: 6),
                         Wrap(

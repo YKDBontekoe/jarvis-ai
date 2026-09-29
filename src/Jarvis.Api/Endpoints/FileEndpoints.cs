@@ -21,7 +21,8 @@ internal static class FileEndpoints
                 return EndpointHelpers.Invalid("query", "Query must contain 1 to 2,000 characters.");
             var hits = await files.SearchAsync(currentUser.OwnerId, query, ct);
             return Results.Ok(hits.Select(hit =>
-                new FileSearchHitDto(hit.FileId, hit.FileName, hit.ChunkIndex, hit.Content, hit.Score)));
+                new FileSearchHitDto(hit.FileId, hit.FileName, hit.ChunkId, hit.ChunkIndex, hit.SanitizedExcerpt,
+                    hit.Score, hit.ExcerptStart, hit.ExcerptEnd, hit.PageNumber, hit.SanitizedExcerpt)));
         }).WithName("SearchFiles");
 
         api.MapPost("/files/{id:guid}/reprocess", async (Guid id, IFileService files, ICurrentUser currentUser,
@@ -77,6 +78,14 @@ internal static class FileEndpoints
                 ICurrentUser currentUser, CancellationToken ct) =>
             await files.DeleteAsync(id, currentUser.OwnerId, ct) ? Results.NoContent() : Results.NotFound())
             .WithName("DeleteFile");
+
+        api.MapGet("/files/citations/{chunkId:guid}", async (Guid chunkId, IFileCitationResolver citations,
+                ICurrentUser currentUser, CancellationToken ct) =>
+            {
+                var citation = await citations.ResolveAsync(chunkId, currentUser.OwnerId, ct);
+                return citation is null ? Results.NotFound() : Results.Ok(citation.ToDto());
+            })
+            .WithName("ResolveFileCitation");
 
         return api;
     }
