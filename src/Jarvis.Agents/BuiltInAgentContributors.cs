@@ -41,6 +41,10 @@ internal sealed class CoreAgentTools(
     ICodingRunStore codingRuns,
     TimeProvider? timeProvider = null) : IAgentToolContributor
 {
+    /// <summary>Skips the approval prompt only when the owner opted into trusted autonomy.</summary>
+    private static AITool Gate(AIFunction function, AgentBuildContext context) =>
+        context.Trusted ? function : new ApprovalRequiredAIFunction(function);
+
     public IEnumerable<AITool> GetTools(AgentBuildContext context)
     {
         var taskTools = new TaskAgentTools(taskService, currentUser, context.Profile);
@@ -70,7 +74,7 @@ internal sealed class CoreAgentTools(
         yield return AIFunctionFactory.Create(automationTools.CreateAutomationAsync);
         yield return AIFunctionFactory.Create(automationTools.EnableAutomationAsync);
         yield return AIFunctionFactory.Create(automationTools.DisableAutomationAsync);
-        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(automationTools.RunAutomationAsync));
+        yield return Gate(AIFunctionFactory.Create(automationTools.RunAutomationAsync), context);
         yield return AIFunctionFactory.Create(memoryTools.ListMemoriesAsync);
         yield return AIFunctionFactory.Create(memoryTools.SearchMemoryAsync);
         yield return AIFunctionFactory.Create(memoryTools.RememberAsync);
@@ -80,16 +84,16 @@ internal sealed class CoreAgentTools(
         yield return AIFunctionFactory.Create(mcpServerTools.ListMcpServersAsync);
         yield return AIFunctionFactory.Create(mcpServerTools.ListHostMcpServersAsync);
         yield return AIFunctionFactory.Create(mcpServerTools.ListMcpConnectionsAsync);
-        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.DiscoverMcpServerToolsAsync));
+        yield return Gate(AIFunctionFactory.Create(mcpServerTools.DiscoverMcpServerToolsAsync), context);
         yield return AIFunctionFactory.Create(mcpServerTools.RequestMcpAuthorizationAsync);
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.AddMcpServerAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.AddMcpStdioServerAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.UpdateMcpServerAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.SetMcpServerEnabledAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.SetMcpServerToolsAsync));
-        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.InvokeMcpToolAsync));
-        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.ReadMcpResourceAsync));
-        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.GetMcpPromptAsync));
+        yield return Gate(AIFunctionFactory.Create(mcpServerTools.InvokeMcpToolAsync), context);
+        yield return Gate(AIFunctionFactory.Create(mcpServerTools.ReadMcpResourceAsync), context);
+        yield return Gate(AIFunctionFactory.Create(mcpServerTools.GetMcpPromptAsync), context);
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.RemoveMcpServerAsync));
 
         if ((configuration.GetSection("Coding:Repositories").Get<CodingRepositoryOption[]>() ?? []).Length > 0)

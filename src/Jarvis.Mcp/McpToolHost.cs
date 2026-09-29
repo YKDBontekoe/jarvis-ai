@@ -5,6 +5,7 @@ using ModelContextProtocol.Client;
 using Jarvis.Application;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Integrations;
+using Jarvis.Application.Settings;
 using System.Net;
 using System.Net.Sockets;
 
@@ -13,7 +14,8 @@ namespace Jarvis.Mcp;
 public sealed partial class McpToolHost(IConfiguration configuration, ILogger<McpToolHost> logger,
     ILoggerFactory loggerFactory,
     ICurrentUser currentUser, IIntegrationCredentialStore credentialStore,
-    IUserMcpServerRegistry userMcpServers, IOwnerMcpPolicyStore ownerPolicy) : IAsyncDisposable
+    IUserMcpServerRegistry userMcpServers, IOwnerMcpPolicyStore ownerPolicy,
+    IOwnerSettingsStore ownerSettings) : IAsyncDisposable
 {
     private readonly List<IAsyncDisposable> _clients = [];
     private IReadOnlyList<AITool> _tools = [];
@@ -113,8 +115,10 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             servers.Add(server);
         }
 
+        var trusted = (await ownerSettings.GetAsync<AutonomySettings>(currentUser.OwnerId,
+            SettingsSections.Autonomy, cancellationToken))?.IsTrusted == true;
         var connections = await Task.WhenAll(servers.Select(server =>
-            ConnectServerAsync(server, cancellationToken)));
+            ConnectServerAsync(server, trusted, cancellationToken)));
 
         foreach (var connection in connections)
         {
@@ -149,7 +153,7 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
     private sealed record ServerConnection(McpServerOptions Server, McpServerConnectionStatus Status,
         McpClient? Client = null, LiveSession? Session = null, IReadOnlyList<AITool>? Tools = null);
 
-    private async Task<ServerConnection> ConnectServerAsync(McpServerOptions server,
+    private async Task<ServerConnection> ConnectServerAsync(McpServerOptions server, bool trusted,
         CancellationToken cancellationToken)
     {
         McpClient? client = null;
@@ -205,7 +209,7 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                     ? tool
                     : new SecretRedactingAIFunction(tool, transportSecrets);
                 protectedFunction = new GuardedMcpTool(protectedFunction, this, serverKey, tool.Name);
-                return autoApproved.Contains(tool.Name)
+                return trusted || autoApproved.Contains(tool.Name)
                     ? (AITool)protectedFunction
                     : new ApprovalRequiredAIFunction(protectedFunction);
             }).ToArray();

@@ -28,6 +28,8 @@ REST:
 
 Transports: **stdio** and **streamableHttp**. Allowlists are explicit tool names (or `*` up to 80 tools). Default = approval required; `AutoApprovedTools` for unattended tools only.
 
+**Autonomy mode** — owner setting `GET/PUT /api/v1/settings/autonomy` (`{ "mode": "ask" | "trusted" }`, default `ask`, changes are audited). In `trusted` mode, allowlisted MCP tools, `InvokeMcpTool`, `ReadMcpResource`, `GetMcpPrompt`, `DiscoverMcpServerTools`, and `RunAutomation` run without a prompt. Code execution (`AddMcpStdioServer`, coding tasks), deletes, MCP registration changes, browser, device, and remote-agent tools always stay approval-gated.
+
 Agent management tools: list/discover/add/update/invoke plus chat setup (`OfferMcpSetup`, `AskForMcpCredential`, `InstallIntegrationPack`) — see [agent-tools.md](agent-tools.md).
 
 Compose overlays:

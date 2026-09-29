@@ -80,8 +80,10 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
                           ?? ModelSettings.Default;
         var chatClient = await chatClients.GetChatClientAsync(ownerId, purpose, cancellationToken,
             ProfileScope.OverlayModels(ownerModels, snapshot));
+        var trusted = (await settings.GetAsync<AutonomySettings>(ownerId, SettingsSections.Autonomy,
+            cancellationToken))?.IsTrusted == true;
         return _agent = agentFactory.Create(chatClient, mcpToolHost.Tools,
-            new AgentBuildContext(ownerId, task?.Id, conversationId, snapshot));
+            new AgentBuildContext(ownerId, task?.Id, conversationId, snapshot, trusted));
     }
 
     private async Task<AssistantProfileSnapshot> ResolveProfileAsync(

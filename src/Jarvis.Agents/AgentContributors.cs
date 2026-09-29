@@ -9,7 +9,8 @@ public sealed record AgentBuildContext(
     Guid OwnerId,
     Guid? ExecutingTaskId,
     Guid? ConversationId = null,
-    AssistantProfileSnapshot? Profile = null)
+    AssistantProfileSnapshot? Profile = null,
+    bool Trusted = false)
 {
     public bool IsBackgroundTask => ExecutingTaskId is not null;
 }
