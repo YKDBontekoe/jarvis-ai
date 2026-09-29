@@ -35,7 +35,7 @@ def write_dummy_ipa(directory: Path, payload: bytes = b"jarvis-ipa-fixture") -> 
 class GenerateSourceTests(unittest.TestCase):
     def test_parse_pubspec_version(self) -> None:
         version, build = gen.parse_pubspec_version(PUBSPEC_PATH)
-        self.assertEqual(version, "1.0.0")
+        self.assertEqual(version, "1.1.0")
         self.assertEqual(build, "1")
 
     def test_builds_source_from_ipa(self) -> None:

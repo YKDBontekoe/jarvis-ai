@@ -1,0 +1,129 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dotnet:
+    name: .NET
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props', 'Directory.Packages.props', 'global.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore Jarvis.sln
+
+      - name: Build
+        run: dotnet build Jarvis.sln --no-restore
+
+      - name: Check formatting
+        run: dotnet format Jarvis.sln --no-restore --verify-no-changes
+
+      - name: Test
+        run: dotnet test Jarvis.sln --no-build
+
+  flutter:
+    name: Flutter
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Cache Pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('apps/mobile/pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Test
+        run: flutter test
+
+  python:
+    name: Python unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test release tooling
+        run: python3 -m unittest discover -s tests/unit/release
+
+      - name: Test AltStore tooling
+        run: python3 -m unittest discover -s tests/unit/altstore
+
+      - name: Test Compose tooling
+        run: python3 -m unittest discover -s tests/unit/compose
+
+  compose:
+    name: Production Compose configuration
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: postgres-test-secret
+      TEMPORAL_PASSWORD: temporal-test-secret
+      S3_ACCESS_KEY: jarvis_object_store
+      S3_SECRET_KEY: s3-test-secret
+      GARAGE_CONFIG_FILE: /tmp/garage.toml
+      JARVIS_UID: "1000"
+      JARVIS_GID: "1000"
+      CODEX_AUTH_FILE: /tmp/codex-auth.json
+      CODEX_HOME_DIR: /tmp/codex-home
+      JARVIS_DATA_PROTECTION_KEYS_DIR: /tmp/jarvis-data-protection-keys
+      AUTH_ISSUER: https://jarvis.example.com
+      AUTH_AUDIENCE: jarvis-api
+      AUTH_SIGNING_KEY: production-test-signing-key-32bytes!
+      JARVIS_DOMAIN: jarvis.example.com
+      LIVEKIT_DOMAIN: voice.example.com
+      JARVIS_WEB_ORIGIN: https://jarvis.example.com
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: jarvis-local-livekit-development-secret
+      VOICE_WORKER_SECRET: voice-test-secret
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate production interpolation
+        run: docker compose -f infra/compose/docker-compose.production.yml config --quiet

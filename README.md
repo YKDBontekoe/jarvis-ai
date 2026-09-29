@@ -87,16 +87,43 @@ Database migrations apply automatically in Development.
 
 ## Tests
 
-Run deterministic unit tests with:
+Run the same validation commands used by CI from the repository root:
 
 ```sh
-dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
-python3 -m unittest tests/unit/altstore/test_generate_source.py tests/unit/compose/test_production_images.py tests/unit/release/test_semver.py
+dotnet restore Jarvis.sln
+dotnet build Jarvis.sln --no-restore
+dotnet format Jarvis.sln --no-restore --verify-no-changes
+dotnet test Jarvis.sln --no-build
+
+(cd apps/mobile && flutter pub get)
+(cd apps/mobile && flutter analyze)
+(cd apps/mobile && dart format --output=none --set-exit-if-changed .)
+(cd apps/mobile && flutter test)
+
+python3 -m unittest discover -s tests/unit/release
+python3 -m unittest discover -s tests/unit/altstore
+python3 -m unittest discover -s tests/unit/compose
+```
+
+Production Compose interpolation is also validated in CI. Run the equivalent check with the non-secret test values used by the Compose unit tests:
+
+```sh
+export POSTGRES_PASSWORD=postgres-test-secret TEMPORAL_PASSWORD=temporal-test-secret
+export S3_ACCESS_KEY=jarvis_object_store S3_SECRET_KEY=s3-test-secret
+export GARAGE_CONFIG_FILE=/tmp/garage.toml JARVIS_UID=1000 JARVIS_GID=1000
+export CODEX_AUTH_FILE=/tmp/codex-auth.json CODEX_HOME_DIR=/tmp/codex-home
+export JARVIS_DATA_PROTECTION_KEYS_DIR=/tmp/jarvis-data-protection-keys
+export AUTH_ISSUER=https://jarvis.example.com AUTH_AUDIENCE=jarvis-api
+export AUTH_SIGNING_KEY=production-test-signing-key-32bytes!
+export JARVIS_DOMAIN=jarvis.example.com LIVEKIT_DOMAIN=voice.example.com
+export JARVIS_WEB_ORIGIN=https://jarvis.example.com
+export LIVEKIT_API_KEY=devkey
+export LIVEKIT_API_SECRET=jarvis-local-livekit-development-secret
+export VOICE_WORKER_SECRET=voice-test-secret
+docker compose -f infra/compose/docker-compose.production.yml config --quiet
 ```
 
 The model-agnostic behavioral evaluation cases live in [`evals/jarvis-core-v1.jsonl`](evals/jarvis-core-v1.jsonl), with isolated-run requirements documented in [`evals/README.md`](evals/README.md). Run them against a disposable Jarvis deployment through the normal API; inference still goes through the Codex CLI app-server.
-
-Flutter widget tests run with `flutter test` from `apps/mobile`.
 
 To exercise the whole flow locally without a ChatGPT OAuth session, point the API and worker at the deterministic Codex app-server fixture in [`tests/e2e/fake_codex_app_server.mjs`](tests/e2e/fake_codex_app_server.mjs). It speaks the same app-server JSON-RPC subset, streams its output, and plans scripted multi-step tool calls (reminders, memory, approvals, clock, and background tasks). With PostgreSQL and a Temporal dev server running:
 
