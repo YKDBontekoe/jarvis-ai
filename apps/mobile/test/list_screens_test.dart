@@ -309,8 +309,11 @@ void main() {
     await open(FilesScreen(http: http.client()));
     expect(find.text('Collection'), findsNothing);
     expect(find.text('Upload'), findsNothing);
-    expect(find.byTooltip('Collection'), findsOneWidget);
-    expect(find.byTooltip('Upload'), findsOneWidget);
+    await tester.tap(find.byTooltip('Add files'));
+    await tester.pumpAndSettle();
+    expect(find.text('New collection'), findsOneWidget);
+    expect(find.text('Upload a file'), findsOneWidget);
+    expect(tester.takeException(), isNull);
 
     await open(TasksScreen(http: http.client()));
     expect(find.text('New task'), findsNothing);

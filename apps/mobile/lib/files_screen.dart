@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -60,7 +62,9 @@ class _FilesScreenState extends State<FilesScreen> {
     });
     try {
       final response = await widget.http.get<dynamic>('/api/v1/files');
-      final collectionsResponse = await widget.http.get<dynamic>('/api/v1/collections');
+      final collectionsResponse = await widget.http.get<dynamic>(
+        '/api/v1/collections',
+      );
       if (mounted && revision == _requestRevision) {
         setState(() {
           _files = jsonMaps(response.data);
@@ -199,7 +203,10 @@ class _FilesScreenState extends State<FilesScreen> {
           decoration: const InputDecoration(hintText: 'Collection name'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
             child: const Text('Create'),
@@ -248,8 +255,9 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _formatSize(dynamic value) {
@@ -269,18 +277,34 @@ class _FilesScreenState extends State<FilesScreen> {
           tooltip: 'Refresh',
           icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
         ),
-        HeaderAction(
-          label: 'Collection',
-          icon: PhosphorIconsRegular.folders,
-          onPressed: _createCollection,
-          busy: _busy,
-        ),
-        HeaderAction(
-          label: 'Upload',
-          icon: PhosphorIconsRegular.uploadSimple,
-          onPressed: _upload,
-          busy: _busy,
-        ),
+        if (MediaQuery.sizeOf(context).width < 720)
+          PopupMenuButton<String>(
+            tooltip: 'Add files',
+            enabled: !_busy,
+            onSelected: (value) {
+              if (value == 'collection') unawaited(_createCollection());
+              if (value == 'upload') unawaited(_upload());
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'collection', child: Text('New collection')),
+              PopupMenuItem(value: 'upload', child: Text('Upload a file')),
+            ],
+            icon: const Icon(PhosphorIconsRegular.plus),
+          )
+        else ...[
+          HeaderAction(
+            label: 'Collection',
+            icon: PhosphorIconsRegular.folders,
+            onPressed: _createCollection,
+            busy: _busy,
+          ),
+          HeaderAction(
+            label: 'Upload',
+            icon: PhosphorIconsRegular.uploadSimple,
+            onPressed: _upload,
+            busy: _busy,
+          ),
+        ],
       ],
     ),
     body: ListScreenBody(
@@ -291,7 +315,8 @@ class _FilesScreenState extends State<FilesScreen> {
       empty: const EmptyState(
         icon: PhosphorIconsRegular.folderOpen,
         title: 'No files yet',
-        message: 'Your files will be stored privately with Jarvis. PDFs and text are indexed so Jarvis can search them.',
+        message:
+            'Your files will be stored privately with Jarvis. PDFs and text are indexed so Jarvis can search them.',
       ),
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
@@ -308,13 +333,19 @@ class _FilesScreenState extends State<FilesScreen> {
                 padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
                 child: Row(
                   children: [
-                    const IconBadge(icon: PhosphorIconsRegular.folders, size: 44),
+                    const IconBadge(
+                      icon: PhosphorIconsRegular.folders,
+                      size: 44,
+                    ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          Text(
+                            name,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
                           Text(
                             '$count files',
                             style: TextStyle(
@@ -327,7 +358,9 @@ class _FilesScreenState extends State<FilesScreen> {
                     ),
                     IconButton(
                       tooltip: 'Delete collection',
-                      onPressed: _busy ? null : () => _deleteCollection(collection),
+                      onPressed: _busy
+                          ? null
+                          : () => _deleteCollection(collection),
                       icon: const Icon(PhosphorIconsRegular.trash),
                     ),
                   ],
@@ -356,7 +389,9 @@ class _FilesScreenState extends State<FilesScreen> {
                           name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 15),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.titleSmall?.copyWith(fontSize: 15),
                         ),
                         const SizedBox(height: 6),
                         Wrap(
