@@ -17,10 +17,11 @@ public sealed class LinkedConversationCopyTests
         Assert.Contains("due now", due);
     }
 
-    [Fact]
-    public void Automation_run_copy_includes_action_results()
+    [Theory]
+    [InlineData("""[{"kind":"notification","status":"completed","detail":null,"resourceId":null}]""")]
+    [InlineData("""[{"Kind":"notification","Status":"completed","Detail":null,"ResourceId":null}]""")]
+    public void Automation_run_copy_includes_action_results(string json)
     {
-        var json = """[{"kind":"notification","status":"completed","detail":null,"resourceId":null}]""";
         var text = LinkedConversationCopy.AutomationRun("Morning", "completed", "Manual run", json);
         Assert.Contains("Morning", text);
         Assert.Contains("completed", text);

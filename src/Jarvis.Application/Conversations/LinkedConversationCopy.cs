@@ -48,12 +48,14 @@ public static class LinkedConversationCopy
         return text.Length <= 200 ? text : text[..199] + "…";
     }
 
+    private static readonly JsonSerializerOptions ResultsJson = new(JsonSerializerDefaults.Web);
+
     private static IReadOnlyList<AutomationActionResult> ParseResults(string? json)
     {
         if (string.IsNullOrWhiteSpace(json)) return [];
         try
         {
-            return JsonSerializer.Deserialize<List<AutomationActionResult>>(json) ?? [];
+            return JsonSerializer.Deserialize<List<AutomationActionResult>>(json, ResultsJson) ?? [];
         }
         catch (JsonException)
         {
