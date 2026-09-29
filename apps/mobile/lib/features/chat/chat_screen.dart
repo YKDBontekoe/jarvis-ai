@@ -87,7 +87,8 @@ class _ChatScreenState extends _ChatScreenController
         _ChatScreenVoice,
         _ChatScreenUi,
         _ChatScreenAuth,
-        _ChatScreenSearch {
+        _ChatScreenSearch,
+        _ChatScreenSources {
   /// Outgoing content fades out before incoming content fades in, so the two
   /// never overlap mid-transition.
   static const _fadeThrough = Interval(.5, 1, curve: Curves.easeOutCubic);

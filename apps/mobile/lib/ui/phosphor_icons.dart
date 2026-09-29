@@ -69,6 +69,7 @@ abstract final class PhosphorIconsRegular {
   static const flowArrow = IconData(0xe6ec, fontFamily: 'PhosphorRegular');
   static const folderOpen = IconData(0xe256, fontFamily: 'PhosphorRegular');
   static const folderSimple = IconData(0xe25a, fontFamily: 'PhosphorRegular');
+  static const folders = IconData(0xe260, fontFamily: 'PhosphorRegular');
   static const gavel = IconData(0xea32, fontFamily: 'PhosphorRegular');
   static const gearSix = IconData(0xe272, fontFamily: 'PhosphorRegular');
   static const globe = IconData(0xe288, fontFamily: 'PhosphorRegular');
