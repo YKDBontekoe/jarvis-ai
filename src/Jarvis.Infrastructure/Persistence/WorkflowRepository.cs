@@ -1,3 +1,4 @@
+using Jarvis.Application.Conversations;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Workflows;
 using Jarvis.Domain.Conversations;
@@ -231,16 +232,35 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
 
     public async Task<ReminderRecord> CreateAsync(Guid ownerId, CreateReminderRequest request, CancellationToken cancellationToken)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var reminder = new Reminder(ownerId, request.Title, request.DueAt, request.Recurrence ?? Reminder.RecurrenceNone,
             request.Weekdays, request.TimeZoneId ?? "UTC", request.LocalTime, request.Until);
+        var (conversation, intro) = LinkedConversationFactory.Create(ownerId, reminder.Title,
+            LinkedConversationCopy.ReminderIntro(reminder.Title));
+        reminder.AttachConversation(conversation.Id);
+        db.Conversations.Add(conversation);
         db.Reminders.Add(reminder);
+        db.Messages.Add(intro);
+        conversation.Touch();
         AddAuditEvent(ownerId, "reminders", "reminder.created", "low", true, reminder.Id);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return reminder.ToRecord();
     }
 
-    public async Task<ReminderRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
-        (await db.Reminders.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId, cancellationToken))?.ToRecord();
+    public async Task<ReminderRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+    {
+        var reminder = await db.Reminders.SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId, cancellationToken);
+        if (reminder is null) return null;
+        if (reminder.ConversationId is null)
+            await AttachReminderConversationAsync(reminder, cancellationToken);
+        return reminder.ToRecord();
+    }
+
+    public async Task<ReminderRecord?> GetByConversationIdAsync(Guid conversationId, Guid ownerId,
+        CancellationToken cancellationToken) =>
+        (await db.Reminders.AsNoTracking().SingleOrDefaultAsync(x =>
+            x.ConversationId == conversationId && x.OwnerId == ownerId, cancellationToken))?.ToRecord();
 
     public async Task<IReadOnlyList<ReminderRecord>> ListRemindersAsync(Guid ownerId, CancellationToken cancellationToken) =>
         (await db.Reminders.AsNoTracking().Where(x => x.OwnerId == ownerId)
@@ -292,6 +312,8 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
             db.Notifications.Add(notification);
             await PushDeliveryQueue.QueueAsync(db, notification, cancellationToken);
         }
+        await PostReminderMessageAsync(reminder, LinkedConversationCopy.ReminderFailed(reminder.Title),
+            cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
@@ -321,6 +343,7 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
 
         reminder.CompleteOccurrence(DateTimeOffset.UtcNow, nextDueAt);
         AddAuditEvent(input.OwnerId, "temporal", "reminder.due", "low", true, input.ReminderId);
+        await PostReminderMessageAsync(reminder, LinkedConversationCopy.ReminderDue(reminder.Title), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new ReminderDeliveryResult(reminder.Status == "pending" && nextDueAt is not null,
@@ -361,6 +384,27 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
     private Task<Reminder?> GetLockedReminderAsync(Guid id, CancellationToken cancellationToken) =>
         db.Reminders.FromSqlInterpolated($"SELECT * FROM reminders WHERE \"Id\" = {id} FOR UPDATE")
             .SingleOrDefaultAsync(cancellationToken);
+
+    private async Task AttachReminderConversationAsync(Reminder reminder, CancellationToken cancellationToken)
+    {
+        if (reminder.ConversationId is not null) return;
+        var (conversation, intro) = LinkedConversationFactory.Create(reminder.OwnerId, reminder.Title,
+            LinkedConversationCopy.ReminderIntro(reminder.Title));
+        reminder.AttachConversation(conversation.Id);
+        db.Conversations.Add(conversation);
+        db.Messages.Add(intro);
+        conversation.Touch();
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task PostReminderMessageAsync(Reminder reminder, string content, CancellationToken cancellationToken)
+    {
+        await AttachReminderConversationAsync(reminder, cancellationToken);
+        if (reminder.ConversationId is not Guid conversationId) return;
+        db.Messages.Add(new Message(conversationId, "assistant", content));
+        var conversation = await db.Conversations.SingleOrDefaultAsync(x => x.Id == conversationId, cancellationToken);
+        conversation?.Touch();
+    }
 
     private void AddAuditEvent(Guid ownerId, string tool, string action, string riskClass,
         bool success, Guid resourceId) =>

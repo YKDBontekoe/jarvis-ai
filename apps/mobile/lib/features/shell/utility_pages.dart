@@ -28,16 +28,17 @@ import '../usage/usage_screen.dart';
 Widget? utilityPageFor(
   String destination,
   Dio http, {
+  Future<void> Function(String conversationId)? onOpenConversation,
   ValueChanged<String>? onAskInChat,
 }) => switch (destination) {
   'tasks' => TasksScreen(http: http),
   'memory' => MemoryScreen(http: http),
   'approvals' => ApprovalsScreen(http: http),
-  'reminders' => RemindersScreen(http: http),
+  'reminders' => RemindersScreen(http: http, onOpenConversation: onOpenConversation),
   'files' => FilesScreen(http: http),
   'audit' => AuditScreen(http: http),
   'watches' => ConditionWatchesScreen(http: http),
-  'automations' => AutomationsScreen(http: http),
+  'automations' => AutomationsScreen(http: http, onOpenConversation: onOpenConversation),
   'briefing' => DailyBriefingScreen(http: http),
   'integrations' => IntegrationsScreen(http: http, onAskInChat: onAskInChat),
   'appearance' => const AppearanceScreen(),

@@ -139,4 +139,24 @@ public sealed class JarvisDbContextModelTests
         context.Entry(audit).State = EntityState.Deleted;
         Assert.Throws<InvalidOperationException>(() => context.SaveChanges());
     }
+
+    [Fact]
+    public void Reminder_and_automation_conversation_links_are_unique()
+    {
+        var reminder = Model.FindEntityType(typeof(Jarvis.Domain.Workflows.Reminder))!;
+        Assert.Contains(reminder.GetIndexes(),
+            index => index.IsUnique
+                && index.Properties.Select(property => property.Name).SequenceEqual(["ConversationId"])
+                && index.GetFilter() == "conversation_id IS NOT NULL");
+        var reminderFk = reminder.GetForeignKeys().Single(fk => fk.Properties.Single().Name == "ConversationId");
+        Assert.Equal(DeleteBehavior.SetNull, reminderFk.DeleteBehavior);
+
+        var automation = Model.FindEntityType(typeof(Jarvis.Domain.Automations.AutomationRule))!;
+        Assert.Contains(automation.GetIndexes(),
+            index => index.IsUnique
+                && index.Properties.Select(property => property.Name).SequenceEqual(["ConversationId"])
+                && index.GetFilter() == "conversation_id IS NOT NULL");
+        var automationFk = automation.GetForeignKeys().Single(fk => fk.Properties.Single().Name == "ConversationId");
+        Assert.Equal(DeleteBehavior.SetNull, automationFk.DeleteBehavior);
+    }
 }

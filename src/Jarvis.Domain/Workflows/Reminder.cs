@@ -52,8 +52,16 @@ public sealed class Reminder
     public TimeOnly? LocalTime { get; private set; }
     public DateOnly? Until { get; private set; }
     public DateTimeOffset? LastDeliveredAt { get; private set; }
+    public Guid? ConversationId { get; private set; }
 
     public bool IsRecurring => Recurrence != RecurrenceNone;
+
+    public void AttachConversation(Guid conversationId)
+    {
+        if (conversationId == Guid.Empty)
+            throw new ArgumentException("A conversation id is required.", nameof(conversationId));
+        ConversationId = conversationId;
+    }
 
     public void MarkScheduleDispatched() => ScheduleDispatchedAt ??= DateTimeOffset.UtcNow;
 

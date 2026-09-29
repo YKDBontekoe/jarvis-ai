@@ -1,3 +1,4 @@
+using Jarvis.Domain.Conversations;
 using Jarvis.Domain.Workflows;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -27,7 +28,11 @@ internal sealed class ReminderConfiguration : IEntityTypeConfiguration<Reminder>
             builder.Property(x => x.LocalTime).HasColumnName("local_time").HasColumnType("time without time zone");
             builder.Property(x => x.Until).HasColumnName("until").HasColumnType("date");
             builder.Property(x => x.LastDeliveredAt).HasColumnName("last_delivered_at");
+            builder.Property(x => x.ConversationId).HasColumnName("conversation_id");
+            builder.HasOne<Conversation>().WithMany().HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.SetNull);
             builder.HasIndex(x => x.WorkflowId).IsUnique();
+            builder.HasIndex(x => x.ConversationId).IsUnique().HasFilter("conversation_id IS NOT NULL");
             builder.HasIndex(x => new { x.OwnerId, x.DueAt });
             builder.HasIndex(x => new { x.Status, x.ScheduleDispatchedAt });
         }

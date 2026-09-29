@@ -109,6 +109,8 @@ internal sealed class CoreAgentContext(
     MemoryReranker reranker,
     IJarvisTaskRepository tasks,
     IConditionWatchRepository watches,
+    IReminderRepository reminders,
+    IAutomationRuleRepository automations,
     IMemoryRecallTracker recalls,
     TimeProvider? timeProvider = null) : IAgentContextContributor
 {
@@ -119,6 +121,7 @@ internal sealed class CoreAgentContext(
         new ClockContextProvider(briefings, context.OwnerId, timeProvider ?? TimeProvider.System),
         new PersonalMemoryContextProvider(memories, reranker, context.OwnerId, recalls, context.Profile),
         new ActiveTasksContextProvider(tasks, context.OwnerId, context.ExecutingTaskId),
-        new ActiveConditionWatchesContextProvider(watches, context.OwnerId)
+        new ActiveConditionWatchesContextProvider(watches, context.OwnerId),
+        new LinkedConversationContextProvider(reminders, automations, context.OwnerId, context.ConversationId)
     ];
 }

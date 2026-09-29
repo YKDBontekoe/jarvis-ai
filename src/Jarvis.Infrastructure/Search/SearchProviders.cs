@@ -22,8 +22,12 @@ internal static class SearchRoutes
     public static SearchRouteTarget Task(Guid taskId) => new("task",
         new Dictionary<string, string> { ["taskId"] = taskId.ToString() });
 
-    public static SearchRouteTarget Reminder(Guid reminderId) => new("reminder",
-        new Dictionary<string, string> { ["reminderId"] = reminderId.ToString() });
+    public static SearchRouteTarget Reminder(Guid reminderId, Guid? conversationId = null)
+    {
+        var parameters = new Dictionary<string, string> { ["reminderId"] = reminderId.ToString() };
+        if (conversationId is Guid id) parameters["conversationId"] = id.ToString();
+        return new("reminder", parameters);
+    }
 
     public static SearchRouteTarget Skill(Guid skillId) => new("skill",
         new Dictionary<string, string> { ["skillId"] = skillId.ToString() });
@@ -138,7 +142,7 @@ public sealed class ReminderSearchProvider(IReminderRepository reminders) : IFed
         {
             if (!SearchRanking.MatchesQuery(reminder.Title, normalized)) continue;
             hits.Add(new FederatedSearchResult(SearchResultKinds.Reminder, reminder.Id.ToString(), reminder.Title,
-                $"Due {reminder.DueAt:u}", reminder.DueAt, SearchRoutes.Reminder(reminder.Id),
+                $"Due {reminder.DueAt:u}", reminder.DueAt, SearchRoutes.Reminder(reminder.Id, reminder.ConversationId),
                 SearchRanking.TextRelevance(reminder.Title, normalized), false));
             if (hits.Count >= limit) break;
         }

@@ -25,9 +25,10 @@ const _weekdayChoices = [
 ];
 
 class RemindersScreen extends StatefulWidget {
-  const RemindersScreen({required this.http, super.key});
+  const RemindersScreen({required this.http, this.onOpenConversation, super.key});
 
   final Dio http;
+  final Future<void> Function(String conversationId)? onOpenConversation;
 
   @override
   State<RemindersScreen> createState() => _RemindersScreenState();
@@ -185,6 +186,31 @@ class _RemindersScreenState extends State<RemindersScreen>
     }
   }
 
+  Future<void> _openChat(Map<String, dynamic> reminder) async {
+    final opener = widget.onOpenConversation;
+    if (opener == null) return;
+    var conversationId = asJsonString(reminder['conversationId']);
+    if (conversationId == null) {
+      final id = jsonId(reminder);
+      if (id == null) return;
+      try {
+        final response = await widget.http.get<dynamic>('/api/v1/reminders/$id');
+        conversationId = asJsonString(jsonObject(response.data)?['conversationId']);
+      } on DioException {
+        if (mounted) _showError('Jarvis could not open that reminder chat.');
+        return;
+      } catch (_) {
+        if (mounted) _showError('Jarvis could not open that reminder chat.');
+        return;
+      }
+    }
+    if (conversationId == null) {
+      if (mounted) _showError('This reminder does not have a chat yet.');
+      return;
+    }
+    await opener(conversationId);
+  }
+
   Future<void> _markRead(Map<String, dynamic> notification) async {
     if (notification['readAt'] != null) return;
     final id = jsonId(notification);
@@ -223,6 +249,39 @@ class _RemindersScreenState extends State<RemindersScreen>
               TaskDetailsScreen(http: widget.http, taskId: sourceId),
         ),
       );
+    } else if ((type == 'reminder.due' || type == 'reminder.failed') &&
+        widget.onOpenConversation != null &&
+        sourceId != null) {
+      try {
+        final response = await widget.http.get<dynamic>('/api/v1/reminders/$sourceId');
+        final conversationId =
+            asJsonString(jsonObject(response.data)?['conversationId']);
+        if (conversationId != null) {
+          await widget.onOpenConversation!(conversationId);
+        } else if (mounted && opensNotificationDetails(type)) {
+          await Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => NotificationDetailsScreen(
+                http: widget.http,
+                notificationType: type!,
+                sourceId: sourceId,
+              ),
+            ),
+          );
+        }
+      } on DioException {
+        if (mounted && opensNotificationDetails(type)) {
+          await Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => NotificationDetailsScreen(
+                http: widget.http,
+                notificationType: type!,
+                sourceId: sourceId,
+              ),
+            ),
+          );
+        }
+      }
     } else if (sourceId != null && opensNotificationDetails(type)) {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -373,6 +432,9 @@ class _RemindersScreenState extends State<RemindersScreen>
               child: SurfaceCard(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.fromLTRB(16, 14, 6, 14),
+                onTap: widget.onOpenConversation == null
+                    ? null
+                    : () => _openChat(reminder),
                 child: Row(
                   children: [
                     IconBadge(
@@ -409,6 +471,12 @@ class _RemindersScreenState extends State<RemindersScreen>
                         ],
                       ),
                     ),
+                    if (widget.onOpenConversation != null)
+                      IconButton(
+                        tooltip: 'Open chat',
+                        onPressed: () => _openChat(reminder),
+                        icon: const Icon(PhosphorIconsRegular.chatCircle, size: 20),
+                      ),
                     if (pending)
                       IconButton(
                         tooltip: 'Cancel reminder',

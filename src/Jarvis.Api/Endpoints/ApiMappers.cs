@@ -34,7 +34,8 @@ internal static class ApiMappers
 
     public static ReminderDto ToDto(this ReminderRecord reminder) => new(reminder.Id, reminder.Title,
         reminder.DueAt, reminder.Status, reminder.CreatedAt, reminder.CompletedAt, reminder.Recurrence,
-        reminder.Weekdays, reminder.TimeZoneId, reminder.LocalTime, reminder.Until, reminder.LastDeliveredAt);
+        reminder.Weekdays, reminder.TimeZoneId, reminder.LocalTime, reminder.Until, reminder.LastDeliveredAt,
+        reminder.ConversationId);
 
     public static ConditionWatchDto ToDto(this ConditionWatchRecord watch) => new(watch.Id, watch.Title,
         watch.Url, watch.JsonPath, watch.Comparison, watch.Threshold, watch.IntervalMinutes, watch.Status,

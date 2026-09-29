@@ -16,7 +16,8 @@ public sealed record AutomationRuleRecord(
     DateTimeOffset? NextRunAt,
     DateTimeOffset? CooldownUntil,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    Guid? ConversationId = null);
 
 public sealed record AutomationRunRecord(
     Guid Id,
@@ -64,8 +65,11 @@ public interface IAutomationRuleRepository
     Task<AutomationRuleRecord> CreateAsync(Guid ownerId, string name, AutomationRuleDefinition definition,
         CancellationToken cancellationToken);
     Task<AutomationRuleRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+    Task<AutomationRuleRecord?> GetByConversationIdAsync(Guid conversationId, Guid ownerId,
+        CancellationToken cancellationToken);
     Task<AutomationRuleRecord?> GetForExecutionAsync(Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<AutomationRuleRecord>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
+    Task<Guid> EnsureConversationAsync(Guid id, CancellationToken cancellationToken);
     Task<AutomationRuleRecord> UpdateDraftAsync(Guid id, Guid ownerId, string name,
         AutomationRuleDefinition definition, CancellationToken cancellationToken);
     Task<AutomationRuleRecord?> EnableAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
@@ -149,7 +153,7 @@ public static class AutomationRecordMapping
     public static AutomationRuleRecord ToRecord(this AutomationRule rule) => new(
         rule.Id, rule.OwnerId, rule.Name, rule.SchemaVersion, rule.DefinitionJson, rule.Status,
         rule.ScheduleWorkflowId, rule.ScheduleDispatchedAt, rule.LastRunAt, rule.NextRunAt, rule.CooldownUntil,
-        rule.CreatedAt, rule.UpdatedAt);
+        rule.CreatedAt, rule.UpdatedAt, rule.ConversationId);
 
     public static AutomationRunRecord ToRecord(this AutomationRun run) => new(
         run.Id, run.RuleId, run.OwnerId, run.WorkflowId, run.IdempotencyKey, run.TriggerKind, run.TriggerReason,

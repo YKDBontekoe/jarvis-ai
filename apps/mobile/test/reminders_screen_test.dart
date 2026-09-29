@@ -81,4 +81,40 @@ void main() {
     expect(find.text('Take out the trash'), findsOneWidget);
     expect(find.textContaining('Weekdays · next'), findsOneWidget);
   });
+
+  testWidgets('open chat uses the linked conversation', (tester) async {
+    http.on('GET', '/api/v1/reminders', [
+      {
+        'id': 'r1',
+        'title': 'Stretch',
+        'dueAt': DateTime.now()
+            .add(const Duration(hours: 1))
+            .toUtc()
+            .toIso8601String(),
+        'status': 'pending',
+        'recurrence': 'none',
+        'conversationId': 'c1',
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+      },
+    ]);
+    http.on('GET', '/api/v1/notifications', <Object>[]);
+    String? opened;
+    tester.view.physicalSize = const Size(900, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildJarvisTheme(),
+        home: RemindersScreen(
+          http: http.client(),
+          onOpenConversation: (id) async => opened = id,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Open chat'));
+    await tester.pumpAndSettle();
+    expect(opened, 'c1');
+  });
 }

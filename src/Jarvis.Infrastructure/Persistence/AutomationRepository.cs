@@ -1,7 +1,9 @@
 using System.Text.Json;
 using Jarvis.Application.Automations;
+using Jarvis.Application.Conversations;
 using Jarvis.Domain.Audit;
 using Jarvis.Domain.Automations;
+using Jarvis.Domain.Conversations;
 using Microsoft.EntityFrameworkCore;
 
 namespace Jarvis.Infrastructure.Persistence;
@@ -11,18 +13,37 @@ public sealed class AutomationRuleRepository(JarvisDbContext db) : IAutomationRu
     public async Task<AutomationRuleRecord> CreateAsync(Guid ownerId, string name, AutomationRuleDefinition definition,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var json = AutomationDefinitionJson.Serialize(definition);
         var rule = new AutomationRule(ownerId, name.Trim(), json, definition.SchemaVersion);
+        var (conversation, intro) = LinkedConversationFactory.Create(ownerId, rule.Name,
+            LinkedConversationCopy.AutomationIntro(rule.Name));
+        rule.AttachConversation(conversation.Id);
+        db.Conversations.Add(conversation);
         db.AutomationRules.Add(rule);
+        db.Messages.Add(intro);
+        conversation.Touch();
         db.AuditEvents.Add(new AuditEvent(ownerId, "automations", "rule.created", "low", true,
             metadataJson: JsonSerializer.Serialize(new { resourceId = rule.Id, trigger = definition.Trigger.Kind })));
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return rule.ToRecord();
     }
 
-    public async Task<AutomationRuleRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
-        (await db.AutomationRules.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId,
-            cancellationToken))?.ToRecord();
+    public async Task<AutomationRuleRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+    {
+        var rule = await db.AutomationRules.SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId,
+            cancellationToken);
+        if (rule is null) return null;
+        if (rule.ConversationId is null)
+            await AttachConversationAsync(rule, cancellationToken);
+        return rule.ToRecord();
+    }
+
+    public async Task<AutomationRuleRecord?> GetByConversationIdAsync(Guid conversationId, Guid ownerId,
+        CancellationToken cancellationToken) =>
+        (await db.AutomationRules.AsNoTracking().SingleOrDefaultAsync(x =>
+            x.ConversationId == conversationId && x.OwnerId == ownerId, cancellationToken))?.ToRecord();
 
     public async Task<AutomationRuleRecord?> GetForExecutionAsync(Guid id, CancellationToken cancellationToken) =>
         (await db.AutomationRules.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, cancellationToken))?.ToRecord();
@@ -102,6 +123,27 @@ public sealed class AutomationRuleRepository(JarvisDbContext db) : IAutomationRu
         db.AutomationRuns.CountAsync(x => x.OwnerId == ownerId &&
             (x.Status == AutomationRunStatuses.Running || x.Status == AutomationRunStatuses.WaitingApproval),
             cancellationToken);
+
+    public async Task<Guid> EnsureConversationAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var rule = await db.AutomationRules.SingleOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException();
+        if (rule.ConversationId is Guid existing) return existing;
+        await AttachConversationAsync(rule, cancellationToken);
+        return rule.ConversationId!.Value;
+    }
+
+    private async Task AttachConversationAsync(AutomationRule rule, CancellationToken cancellationToken)
+    {
+        if (rule.ConversationId is not null) return;
+        var (conversation, intro) = LinkedConversationFactory.Create(rule.OwnerId, rule.Name,
+            LinkedConversationCopy.AutomationIntro(rule.Name));
+        rule.AttachConversation(conversation.Id);
+        db.Conversations.Add(conversation);
+        db.Messages.Add(intro);
+        conversation.Touch();
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }
 
 public sealed class AutomationRunRepository(JarvisDbContext db) : IAutomationRunRepository

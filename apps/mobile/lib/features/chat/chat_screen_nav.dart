@@ -9,6 +9,10 @@ mixin _ChatScreenNav on _ChatScreenController {
     final page = utilityPageFor(
       destination,
       _http,
+      onOpenConversation: (id) async {
+        if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+        await _openConversation(id);
+      },
       onAskInChat: destination == 'integrations'
           ? (prompt) => unawaited(_send(prompt))
           : null,

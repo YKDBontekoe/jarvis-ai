@@ -66,6 +66,7 @@ const searchKindLabels = <String, String>{
   'file': 'Files',
   'task': 'Tasks',
   'reminder': 'Reminders',
+  'automation': 'Automations',
   'skill': 'Skills',
   'graph_entity': 'Knowledge graph',
   'channel_thread': 'Channels',

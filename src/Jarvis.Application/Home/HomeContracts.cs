@@ -11,7 +11,8 @@ public sealed record HomeBriefingDto(
     HomeBriefingScheduleDto? Briefing,
     IReadOnlyList<HomePackDto> Packs);
 
-public sealed record HomeReminderDto(Guid Id, string Title, DateTimeOffset DueAt, string Status, string Recurrence);
+public sealed record HomeReminderDto(Guid Id, string Title, DateTimeOffset DueAt, string Status, string Recurrence,
+    Guid? ConversationId = null);
 public sealed record HomeApprovalDto(Guid Id, string ToolName, DateTimeOffset CreatedAt);
 public sealed record HomeTaskDto(Guid Id, string Title, string Status, DateTimeOffset CreatedAt);
 public sealed record HomeCalendarEventDto(string Title, DateTimeOffset StartAt, DateTimeOffset? EndAt);

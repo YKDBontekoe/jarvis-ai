@@ -35,7 +35,7 @@ public sealed record ReminderRequest(string? Title, DateTimeOffset DueAt, string
     int Weekdays = 0, string? TimeZoneId = null, DateOnly? Until = null, TimeOnly? LocalTime = null);
 public sealed record ReminderDto(Guid Id, string Title, DateTimeOffset DueAt, string Status, DateTimeOffset CreatedAt,
     DateTimeOffset? CompletedAt, string Recurrence, int Weekdays, string TimeZoneId, TimeOnly? LocalTime,
-    DateOnly? Until, DateTimeOffset? LastDeliveredAt);
+    DateOnly? Until, DateTimeOffset? LastDeliveredAt, Guid? ConversationId = null);
 public sealed record ConditionWatchDto(Guid Id, string Title, string Url, string JsonPath, string Comparison,
     double Threshold, int IntervalMinutes, string Status, DateTimeOffset CreatedAt,
     DateTimeOffset? LastCheckedAt, double? LastValue, string Kind = "public_json", string? CredentialProvider = null,

@@ -1,4 +1,5 @@
 using Jarvis.Domain.Automations;
+using Jarvis.Domain.Conversations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -24,7 +25,11 @@ internal sealed class AutomationRuleConfiguration : IEntityTypeConfiguration<Aut
         entity.Property(x => x.CooldownUntil).HasColumnName("cooldown_until");
         entity.Property(x => x.CreatedAt).HasColumnName("created_at");
         entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        entity.Property(x => x.ConversationId).HasColumnName("conversation_id");
+        entity.HasOne<Conversation>().WithMany().HasForeignKey(x => x.ConversationId)
+            .OnDelete(DeleteBehavior.SetNull);
         entity.HasIndex(x => x.ScheduleWorkflowId).IsUnique();
+        entity.HasIndex(x => x.ConversationId).IsUnique().HasFilter("conversation_id IS NOT NULL");
         entity.HasIndex(x => new { x.OwnerId, x.Status, x.UpdatedAt });
         entity.HasIndex(x => new { x.Status, x.ScheduleDispatchedAt });
     }
