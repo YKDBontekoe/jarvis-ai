@@ -9,6 +9,7 @@
     <ProjectReference Include="../../../src/Jarvis.Memory/Jarvis.Memory.csproj" />
     <ProjectReference Include="../../../src/Jarvis.Api/Jarvis.Api.csproj" />
     <ProjectReference Include="../../../src/Jarvis.Workflows/Jarvis.Workflows.csproj" />
+    <ProjectReference Include="../../../workers/Jarvis.Worker/Jarvis.Worker.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
