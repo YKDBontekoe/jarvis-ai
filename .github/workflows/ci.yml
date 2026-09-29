@@ -29,11 +29,20 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Restore .NET tools
+        run: dotnet tool restore
+
       - name: Restore
         run: dotnet restore Jarvis.sln
 
       - name: Build
         run: dotnet build Jarvis.sln --configuration Release --no-restore
+
+      - name: Verify EF migrations match the model
+        run: >-
+          dotnet ef migrations has-pending-model-changes
+          --project src/Jarvis.Infrastructure/Jarvis.Infrastructure.csproj
+          --startup-project src/Jarvis.Api/Jarvis.Api.csproj
 
       - name: Unit tests
         run: >-
@@ -55,7 +64,10 @@ jobs:
           global-json-file: global.json
 
       - name: Restore
-        run: dotnet restore tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj
+        run: dotnet restore Jarvis.sln
+
+      - name: Build
+        run: dotnet build Jarvis.sln --configuration Release --no-restore
 
       - name: Integration tests
         run: >-

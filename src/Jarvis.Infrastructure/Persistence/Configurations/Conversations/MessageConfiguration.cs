@@ -13,6 +13,6 @@ internal sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
             builder.Property(x => x.Id).ValueGeneratedNever();
             builder.Property(x => x.Role).HasMaxLength(20).IsRequired();
             builder.Property(x => x.Content).IsRequired();
-            builder.HasIndex(x => new { x.ConversationId, x.CreatedAt });
+            builder.HasIndex(x => new { x.ConversationId, x.CreatedAt, x.Id });
         }
 }
