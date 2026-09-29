@@ -3,8 +3,12 @@ var workspaceRoot = builder.Configuration["Coding:Repositories:0:Path"] ?? FindG
 
 var postgres = builder.AddPostgres("postgres")
     .WithImage("pgvector/pgvector")
+    // The pgvector tag "pg18" does not parse as major version 18, so
+    // WithDataVolume() mounts /var/lib/postgresql/data. PostgreSQL 18 rejects
+    // that mount and the container exits before the API can start.
     .WithImageTag("pg18")
-    .WithDataVolume();
+    .WithVolume("jarvis-pgvector-data", "/var/lib/postgresql")
+    .WithInitFiles(Path.Combine(workspaceRoot, "infra", "postgres", "init"));
 var database = postgres.AddDatabase("jarvis");
 var voiceWorkerSecret = builder.Configuration["VOICE_WORKER_SECRET"] ?? "jarvis-local-voice-worker-development-secret";
 var livekitApiKey = builder.Configuration["LIVEKIT_API_KEY"] ?? "devkey";
@@ -71,7 +75,8 @@ var api = builder.AddProject<Projects.Jarvis_Api>("jarvis-api")
     .WithEnvironment("LiveKit__InternalUrl", "http://localhost:7880")
     .WithEnvironment("LiveKit__PublicUrl", builder.Configuration["LIVEKIT_PUBLIC_URL"] ?? "ws://localhost:7880")
     .WithEnvironment("Voice__WorkerSecret", voiceWorkerSecret)
-    .WithEnvironment("ASPNETCORE_URLS", builder.Configuration["JARVIS_LISTEN_URL"] ?? "http://localhost:5082")
+    // launchSettings already publishes http://localhost:5082. Forcing ASPNETCORE_URLS
+    // to that same address makes Kestrel bind the Aspire proxy port and the API exits.
     .WaitFor(database)
     .WaitFor(temporal)
     .WaitFor(objectStorage)

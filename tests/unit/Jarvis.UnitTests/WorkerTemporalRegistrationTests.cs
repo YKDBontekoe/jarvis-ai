@@ -7,6 +7,19 @@ using Xunit;
 
 namespace Jarvis.UnitTests;
 
+public sealed class TemporalAddressTests
+{
+    [Theory]
+    [InlineData(null, "localhost:7233")]
+    [InlineData("", "localhost:7233")]
+    [InlineData("localhost:7233", "localhost:7233")]
+    [InlineData("http://127.0.0.1:7233", "127.0.0.1:7233")]
+    [InlineData("tcp://127.0.0.1:7233/", "127.0.0.1:7233")]
+    [InlineData("http://[::1]:7233", "[::1]:7233")]
+    public void Normalize_strips_aspire_endpoint_schemes(string? address, string expected) =>
+        Assert.Equal(expected, TemporalAddress.Normalize(address));
+}
+
 public sealed class WorkerTemporalRegistrationTests
 {
     [Fact]

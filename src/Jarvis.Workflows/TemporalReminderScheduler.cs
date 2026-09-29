@@ -219,7 +219,7 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
         {
             if (_client is null)
             {
-                var address = configuration["Temporal:Address"] ?? "localhost:7233";
+                var address = TemporalAddress.Normalize(configuration["Temporal:Address"]);
                 _client = await TemporalClient.ConnectAsync(new TemporalClientConnectOptions(address));
             }
             return _client;

@@ -1,3 +1,4 @@
+using Jarvis.Workflows;
 using Temporalio.Client;
 
 namespace Jarvis.Worker.Hosting;
@@ -9,7 +10,7 @@ internal sealed class TemporalWorkerHostedService(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var temporalAddress = configuration["Temporal:Address"] ?? "localhost:7233";
+        var temporalAddress = TemporalAddress.Normalize(configuration["Temporal:Address"]);
         logger.LogInformation("Connecting Temporal worker to {TemporalAddress}", temporalAddress);
         var client = await TemporalClient.ConnectAsync(new TemporalClientConnectOptions(temporalAddress));
         using var worker = TemporalWorkerRegistration.CreateWorker(client, services);
