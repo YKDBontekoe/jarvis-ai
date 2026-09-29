@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
@@ -101,7 +102,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
             TextButton(
               onPressed: () => Navigator.pop(context, false),
               style: TextButton.styleFrom(
-                foregroundColor: JarvisColors.inkSoft,
+                foregroundColor: JarvisColors.of(context).inkSoft,
               ),
               child: const Text('Cancel'),
             ),
@@ -141,9 +142,8 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         final message = error.response?.statusCode == 409
             ? 'This approval was already decided.'
             : 'Jarvis could not process this decision.';
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
         await _load();
       }
     } catch (_) {
@@ -224,7 +224,9 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
               ),
               StatusPill(
                 label: pending ? 'Pending' : 'Needs resume',
-                color: pending ? JarvisColors.warning : JarvisColors.danger,
+                color: pending
+                    ? JarvisColors.of(context).warning
+                    : JarvisColors.of(context).danger,
               ),
             ],
           ),
@@ -238,9 +240,8 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
           const SizedBox(height: 16),
           Text(
             'ARGUMENTS',
-            style: Theme.of(
-              context,
-            ).textTheme.labelSmall?.copyWith(color: JarvisColors.muted),
+            style: Theme.of(context).textTheme.labelSmall
+                ?.copyWith(color: JarvisColors.of(context).muted),
           ),
           const SizedBox(height: 8),
           _ArgumentsBlock(
@@ -295,17 +296,17 @@ class _ArgumentsBlock extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: JarvisColors.canvas,
+      color: JarvisColors.of(context).canvas,
       borderRadius: BorderRadius.circular(JarvisRadii.sm),
-      border: Border.all(color: JarvisColors.outline),
+      border: Border.all(color: JarvisColors.of(context).outline),
     ),
     child: SelectableText(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontFamily: 'monospace',
         fontSize: 12.5,
         height: 1.5,
-        color: JarvisColors.ink,
+        color: JarvisColors.of(context).ink,
       ),
     ),
   );

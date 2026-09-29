@@ -94,10 +94,17 @@ mixin _ChatScreenSession on _ChatScreenController {
         !_signingOut;
     final details = await _http.get<dynamic>(
       '/api/v1/conversations/$conversationId',
+      queryParameters: const {'includeMessages': false},
     );
     if (!isLatestOpen()) return;
     final body = jsonObject(details.data);
-    final records = jsonMaps(body?['messages']);
+    final messagePage = await _http.get<dynamic>(
+      '/api/v1/conversations/$conversationId/messages',
+      queryParameters: const {'limit': 50},
+    );
+    if (!isLatestOpen()) return;
+    final page = jsonObject(messagePage.data);
+    final records = jsonMaps(page?['items']);
     final responding = asJsonBool(body?['responding']);
     final approvals = await _loadConversationApprovals(conversationId);
     if (!isLatestOpen()) return;
@@ -121,6 +128,9 @@ mixin _ChatScreenSession on _ChatScreenController {
     if (!isCurrent() || !isLatestOpen()) return;
     setState(() {
       _conversationId = conversationId;
+      _messageCursor = asJsonString(page?['nextCursor']);
+      _hasOlderMessages = asJsonBool(page?['hasMore']);
+      _loadingOlderMessages = false;
       _connected = false;
       _sending = responding;
       _remoteQuery = responding;
@@ -287,8 +297,9 @@ mixin _ChatScreenSession on _ChatScreenController {
   ]) async {
     final expectedGeneration = generation ?? _realtimeGeneration;
     try {
-      final details = await _http.get<dynamic>(
-        '/api/v1/conversations/$conversationId',
+      final messages = await _http.get<dynamic>(
+        '/api/v1/conversations/$conversationId/messages',
+        queryParameters: const {'limit': 50},
       );
       final approvals = await _loadConversationApprovals(conversationId);
       if (!mounted ||
@@ -298,7 +309,7 @@ mixin _ChatScreenSession on _ChatScreenController {
           _signingOut) {
         return;
       }
-      setState(() => _replaceTranscript(jsonObject(details.data), approvals));
+      setState(() => _replaceTranscript(jsonObject(messages.data), approvals));
       if (approvals == null) {
         unawaited(_syncConversationApprovals());
       }
@@ -308,5 +319,67 @@ mixin _ChatScreenSession on _ChatScreenController {
     } catch (_) {
       // Keep the current transcript if history is malformed.
     }
+  }
+
+  Future<void> _loadOlderMessages() async {
+    final conversationId = _conversationId;
+    final cursor = _messageCursor;
+    if (conversationId == null || cursor == null || !_hasOlderMessages ||
+        _loadingOlderMessages) {
+      return;
+    }
+    _loadingOlderMessages = true;
+    try {
+      final response = await _http.get<dynamic>(
+        '/api/v1/conversations/$conversationId/messages',
+        queryParameters: {'limit': 50, 'cursor': cursor},
+      );
+      if (!mounted || _conversationId != conversationId ||
+          _messageCursor != cursor) {
+        return;
+      }
+      final page = jsonObject(response.data);
+      final messages = jsonMaps(page?['items'])
+          .map(_messageEntryFromJson)
+          .whereType<MessageEntry>()
+          .toList();
+      final existingIds = _entries
+          .whereType<MessageEntry>()
+          .map((entry) => entry.id)
+          .whereType<String>()
+          .toSet();
+      messages.removeWhere(
+        (message) =>
+            message.id != null && existingIds.contains(message.id),
+      );
+      final beforeExtent = _scroll.hasClients
+          ? _scroll.position.maxScrollExtent
+          : 0.0;
+      setState(() {
+        _entries.insertAll(0, messages);
+        _messageCursor = asJsonString(page?['nextCursor']);
+        _hasOlderMessages = asJsonBool(page?['hasMore']);
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scroll.hasClients) return;
+        final addedExtent = _scroll.position.maxScrollExtent - beforeExtent;
+        _scroll.jumpTo((_scroll.position.pixels + addedExtent)
+            .clamp(0.0, _scroll.position.maxScrollExtent)
+            .toDouble());
+      });
+    } on DioException {
+      // Keep the current page and allow a later scroll to retry.
+    } finally {
+      _loadingOlderMessages = false;
+    }
+  }
+
+  MessageEntry? _messageEntryFromJson(Map<String, dynamic> message) {
+    if (message['role'] is! String || message['content'] is! String) return null;
+    return MessageEntry(
+      role: message['role'] as String,
+      content: message['content'] as String,
+      id: asJsonString(message['id']),
+    );
   }
 }

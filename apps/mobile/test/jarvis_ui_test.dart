@@ -6,18 +6,19 @@ import 'package:jarvis_mobile/ui/jarvis_ui.dart';
 
 Widget _host(Widget child) => MaterialApp(
   theme: buildJarvisTheme(),
+  darkTheme: buildJarvisTheme(brightness: Brightness.dark),
   home: Scaffold(body: child),
 );
 
 void main() {
   test('status styles share labels and colors across screens', () {
     expect(statusStyle('needs_approval').label, 'Needs approval');
-    expect(statusStyle('needs_approval').color, JarvisColors.warning);
+    expect(statusStyle('needs_approval').color, JarvisColors.light.warning);
     expect(statusStyle('running').label, 'In progress');
-    expect(statusStyle('completed').color, JarvisColors.success);
+    expect(statusStyle('completed').color, JarvisColors.light.success);
     expect(statusStyle('ready').label, 'Ready');
-    expect(statusStyle('ready').color, JarvisColors.success);
-    expect(statusStyle('failed').color, JarvisColors.danger);
+    expect(statusStyle('ready').color, JarvisColors.light.success);
+    expect(statusStyle('failed').color, JarvisColors.light.danger);
     expect(statusStyle('some_new_state').label, 'Some new state');
     expect(statusStyle('').label, 'Unknown');
   });
@@ -55,8 +56,9 @@ void main() {
     expect(tester.hasRunningAnimations, isFalse);
   });
 
-    testWidgets('list screen body keeps rows and shows a retry banner after a refresh error',
-        (tester) async {
+  testWidgets(
+    'list screen body keeps rows and shows a retry banner after a refresh error',
+    (tester) async {
       var retried = false;
       await tester.pumpWidget(
         _host(
@@ -74,7 +76,8 @@ void main() {
       expect(find.text('Could not refresh.'), findsOneWidget);
       await tester.tap(find.text('Retry'));
       expect(retried, isTrue);
-    });
+    },
+  );
 
   testWidgets('error state offers a retry action', (tester) async {
     var retried = false;
@@ -141,6 +144,7 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
     expect(find.text('Your assistant'), findsOneWidget);
+    expect(find.text('Appearance'), findsOneWidget);
     expect(find.text('Integrations'), findsOneWidget);
   });
 }

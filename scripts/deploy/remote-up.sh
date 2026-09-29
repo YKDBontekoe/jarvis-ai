@@ -4,6 +4,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT}"
 
+# Serialize deployments on this host. PostgreSQL advisory locking in the migration
+# command additionally protects against another host running the same release.
+exec 9>"${DEPLOY_LOCK_FILE:-/tmp/jarvis-deploy.lock}"
+if ! flock -n 9; then
+  echo "Another Jarvis deployment is already in progress." >&2
+  exit 1
+fi
+
 ENV_FILE="${ENV_FILE:-infra/compose/.env.production}"
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "Production env file not found: ${ENV_FILE}" >&2
@@ -55,6 +63,13 @@ printf '  %s\n' "${required_images[@]}"
 
 docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" pull \
   jarvis-api jarvis-worker garage
+
+# Start only migration prerequisites, then migrate with the new API image. A
+# failure exits here, before Compose is allowed to replace healthy app containers.
+docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" up \
+  -d --no-build --wait postgres
+docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" run \
+  --rm --no-deps jarvis-migrate
 
 docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" up \
   -d --no-build --remove-orphans

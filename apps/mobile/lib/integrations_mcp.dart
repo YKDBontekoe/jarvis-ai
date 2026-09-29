@@ -28,9 +28,12 @@ mixin _IntegrationsMcp on _IntegrationsController {
                 ),
               ),
               if (!enabled)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(right: 4),
-                  child: StatusPill(label: 'Paused', color: JarvisColors.muted),
+                  child: StatusPill(
+                    label: 'Paused',
+                    color: JarvisColors.of(context).muted,
+                  ),
                 ),
               Switch(
                 value: enabled,
@@ -48,10 +51,10 @@ mixin _IntegrationsMcp on _IntegrationsController {
           const SizedBox(height: 10),
           SelectableText(
             endpoint,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'monospace',
               fontSize: 12.5,
-              color: JarvisColors.inkSoft,
+              color: JarvisColors.of(context).inkSoft,
             ),
           ),
           const SizedBox(height: 10),
@@ -66,12 +69,15 @@ mixin _IntegrationsMcp on _IntegrationsController {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: JarvisColors.surfaceMuted,
+                    color: JarvisColors.of(context).surfaceMuted,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Every exposed tool',
-                    style: TextStyle(fontSize: 12, color: JarvisColors.inkSoft),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: JarvisColors.of(context).inkSoft,
+                    ),
                   ),
                 ),
               if (!allTools)
@@ -82,15 +88,15 @@ mixin _IntegrationsMcp on _IntegrationsController {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: JarvisColors.surfaceMuted,
+                      color: JarvisColors.of(context).surfaceMuted,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       tool,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
-                        color: JarvisColors.inkSoft,
+                        color: JarvisColors.of(context).inkSoft,
                       ),
                     ),
                   ),
@@ -196,31 +202,31 @@ mixin _IntegrationsMcp on _IntegrationsController {
         PhosphorIconsRegular.checkCircle,
         '$toolCount allowlisted tools available',
         'Connected',
-        JarvisColors.success,
+        JarvisColors.of(context).success,
       ),
       'needs_credentials' => (
         PhosphorIconsRegular.key,
         'Owner credentials are required',
         'Needs token',
-        JarvisColors.warning,
+        JarvisColors.of(context).warning,
       ),
       'paused' => (
         PhosphorIconsRegular.pauseCircle,
         'Paused for this account',
         'Paused',
-        JarvisColors.muted,
+        JarvisColors.of(context).muted,
       ),
       'disabled' => (
         PhosphorIconsRegular.prohibit,
         'No tools are allowlisted',
         'Disabled',
-        JarvisColors.muted,
+        JarvisColors.of(context).muted,
       ),
       _ => (
         PhosphorIconsRegular.warningCircle,
         'Server could not be reached',
         'Unavailable',
-        JarvisColors.danger,
+        JarvisColors.of(context).danger,
       ),
     };
     final hostControlled = id == null || id.isEmpty;
@@ -271,16 +277,16 @@ class _MutedLine extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(JarvisRadii.lg),
-      border: Border.all(color: JarvisColors.outlineStrong),
+      border: Border.all(color: JarvisColors.of(context).outlineStrong),
     ),
     child: Row(
       children: [
-        Icon(icon, size: 20, color: JarvisColors.muted),
+        Icon(icon, size: 20, color: JarvisColors.of(context).muted),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(color: JarvisColors.inkSoft),
+            style: TextStyle(color: JarvisColors.of(context).inkSoft),
           ),
         ),
       ],

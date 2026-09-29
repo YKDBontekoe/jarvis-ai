@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import 'ui/phosphor_icons.dart';
 import 'approvals_screen.dart';
 import 'features/chat/chat_widgets.dart';
@@ -92,9 +93,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     final date = jsonDate(value, local: true);
     if (date == null) return '';
     final dateText = MaterialLocalizations.of(context).formatMediumDate(date);
-    final timeText = MaterialLocalizations.of(
-      context,
-    ).formatTimeOfDay(TimeOfDay.fromDateTime(date));
+    final timeText = MaterialLocalizations.of(context)
+        .formatTimeOfDay(TimeOfDay.fromDateTime(date));
     return '$dateText · $timeText';
   }
 
@@ -190,13 +190,13 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                   SurfaceCard(
                     margin: const EdgeInsets.only(top: 12),
                     padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-                    borderColor: JarvisColors.outlineStrong,
+                    borderColor: JarvisColors.of(context).outlineStrong,
                     onTap: () => _openApprovals(conversationId),
                     child: Row(
                       children: [
-                        const IconBadge(
+                        IconBadge(
                           icon: PhosphorIconsRegular.shieldWarning,
-                          color: JarvisColors.warning,
+                          color: JarvisColors.of(context).warning,
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -215,10 +215,10 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                             ],
                           ),
                         ),
-                        const Icon(
+                        Icon(
                           PhosphorIconsRegular.caretRight,
                           size: 16,
-                          color: JarvisColors.inkSoft,
+                          color: JarvisColors.of(context).inkSoft,
                         ),
                       ],
                     ),
@@ -269,8 +269,12 @@ class _TaskMessage extends StatelessWidget {
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      color: isUser ? JarvisColors.surfaceMuted : JarvisColors.surface,
-      borderColor: isUser ? JarvisColors.surfaceMuted : JarvisColors.outline,
+      color: isUser
+          ? JarvisColors.of(context).surfaceMuted
+          : JarvisColors.of(context).surface,
+      borderColor: isUser
+          ? JarvisColors.of(context).surfaceMuted
+          : JarvisColors.of(context).outline,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

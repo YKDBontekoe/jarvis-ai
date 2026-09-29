@@ -19,17 +19,17 @@ part 'skill_editor_sheet.dart';
       'learned' => (
         label: 'Learned',
         icon: PhosphorIconsRegular.sparkle,
-        color: JarvisColors.violet,
+        color: JarvisColors.light.violet,
       ),
       'imported' => (
         label: 'Imported',
         icon: PhosphorIconsRegular.downloadSimple,
-        color: JarvisColors.info,
+        color: JarvisColors.light.info,
       ),
       _ => (
         label: 'Yours',
         icon: PhosphorIconsRegular.user,
-        color: JarvisColors.accent,
+        color: JarvisColors.light.accent,
       ),
     };
 
@@ -200,10 +200,10 @@ class _SkillsScreenState extends State<SkillsScreen> {
           ),
           if (asJsonBool(skill['isLocked'])) ...[
             const SizedBox(width: 6),
-            const Icon(
+            Icon(
               PhosphorIconsRegular.lockSimple,
               size: 14,
-              color: JarvisColors.muted,
+              color: JarvisColors.of(context).muted,
             ),
           ],
         ],
@@ -215,10 +215,10 @@ class _SkillsScreenState extends State<SkillsScreen> {
         overflow: TextOverflow.ellipsis,
       ),
       isThreeLine: true,
-      trailing: const Icon(
+      trailing: Icon(
         PhosphorIconsRegular.caretRight,
         size: 16,
-        color: JarvisColors.muted,
+        color: JarvisColors.of(context).muted,
       ),
       onTap: () => unawaited(_open(skill)),
     );

@@ -26,14 +26,17 @@ mixin _ChatScreenAuth on _ChatScreenController {
                               ? 'Create your account'
                               : 'Sign in to Jarvis',
                           textAlign: TextAlign.center,
-                          style: JarvisType.serif.copyWith(fontSize: 42),
+                          style: JarvisType.serifOf(context)
+                              .copyWith(fontSize: 42),
                         ),
                         const SizedBox(height: 10),
                         Text(
                           'Your private assistant for conversations, tasks, memory, and voice.',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(color: JarvisColors.inkSoft),
+                              ?.copyWith(
+                                color: JarvisColors.of(context).inkSoft,
+                              ),
                         ),
                         const SizedBox(height: 32),
                         TextField(
@@ -78,13 +81,13 @@ mixin _ChatScreenAuth on _ChatScreenController {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Align(
+                        Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
                             'Use 8 or more characters with upper and lower case letters and a number.',
                             style: TextStyle(
                               fontSize: 12.5,
-                              color: JarvisColors.muted,
+                              color: JarvisColors.of(context).muted,
                             ),
                           ),
                         ),
@@ -94,7 +97,7 @@ mixin _ChatScreenAuth on _ChatScreenController {
                           child: FilledButton.icon(
                             onPressed: busy ? null : () => unawaited(_signIn()),
                             style: FilledButton.styleFrom(
-                              backgroundColor: JarvisColors.ink,
+                              backgroundColor: JarvisColors.of(context).ink,
                               minimumSize: const Size.fromHeight(54),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(40),
@@ -133,12 +136,12 @@ mixin _ChatScreenAuth on _ChatScreenController {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
+                        Text(
                           'Your password is checked by Jarvis.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 12.5,
-                            color: JarvisColors.muted,
+                            color: JarvisColors.of(context).muted,
                           ),
                         ),
                         if (_error != null)

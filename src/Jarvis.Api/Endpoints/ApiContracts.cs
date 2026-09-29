@@ -22,6 +22,7 @@ public sealed record ConversationDto(Guid Id, string Title, DateTimeOffset Creat
 public sealed record ConversationDetailsDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     IReadOnlyList<MessageDto> Messages, bool Responding);
 public sealed record MessageDto(Guid Id, string Role, string Content, DateTimeOffset CreatedAt);
+public sealed record MessagePageDto(IReadOnlyList<MessageDto> Items, string? NextCursor, bool HasMore);
 public sealed record ApprovalDecisionRequest(bool Approved);
 public sealed record ToolApprovalDto(Guid Id, Guid ConversationId, string ToolName, string ArgumentsJson,
     string Status, bool? Approved, string ResumeStatus, DateTimeOffset CreatedAt);

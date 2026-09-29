@@ -170,7 +170,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     Text(
                       'ONLINE NOW',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: JarvisColors.muted,
+                        color: JarvisColors.of(context).muted,
                         letterSpacing: .8,
                       ),
                     ),

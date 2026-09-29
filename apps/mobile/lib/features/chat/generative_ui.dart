@@ -123,16 +123,20 @@ abstract class _UiSurfaceCardController extends State<UiSurfaceCard> {
               width: 34,
               height: 34,
               decoration: BoxDecoration(
-                color: JarvisColors.accentSoft,
+                color: JarvisColors.of(context).accentSoft,
                 borderRadius: BorderRadius.circular(11),
               ),
-              child: Icon(icon, size: 18, color: JarvisColors.accentDeep),
+              child: Icon(
+                icon,
+                size: 18,
+                color: JarvisColors.of(context).accentDeep,
+              ),
             ),
             const SizedBox(width: 10),
             Text(
               eyebrow.toUpperCase(),
-              style: const TextStyle(
-                color: JarvisColors.accentDeep,
+              style: TextStyle(
+                color: JarvisColors.of(context).accentDeep,
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 letterSpacing: .8,
@@ -143,13 +147,17 @@ abstract class _UiSurfaceCardController extends State<UiSurfaceCard> {
         const SizedBox(height: 12),
         Text(
           title,
-          style: JarvisType.serif.copyWith(fontSize: 28, height: 1.12),
+          style: JarvisType.serifOf(context)
+              .copyWith(fontSize: 28, height: 1.12),
         ),
         if (body != null) ...[
           const SizedBox(height: 6),
           Text(
             body,
-            style: const TextStyle(color: JarvisColors.inkSoft, height: 1.4),
+            style: TextStyle(
+              color: JarvisColors.of(context).inkSoft,
+              height: 1.4,
+            ),
           ),
         ],
       ],
@@ -178,9 +186,9 @@ class _UiSurfaceCardState extends _UiSurfaceCardController
             for (var index = 0; index < _fields.length; index++)
               _field(_fields[index], last: index == _fields.length - 1),
             ..._confirmButtons(),
-            if (_hint != null) _note(_hint!, JarvisColors.warning),
+            if (_hint != null) _note(_hint!, JarvisColors.of(context).warning),
             if (widget.errorText != null)
-              _note(widget.errorText!, JarvisColors.danger),
+              _note(widget.errorText!, JarvisColors.of(context).danger),
           ],
         ),
       ),
