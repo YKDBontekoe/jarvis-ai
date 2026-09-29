@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentContextContributor, Devices.DeviceContextContributor>();
         services.AddScoped<IAgentToolContributor, Browser.BrowserToolContributor>();
         services.AddScoped<IAgentContextContributor, Browser.BrowserContextContributor>();
+        services.AddScoped<IAgentContextContributor, FileContextContributor>();
         services.AddSingleton<Jarvis.Application.Learning.IMemoryRecallTracker, Learning.MemoryRecallTracker>();
         services.AddScoped<Learning.ReflectionService>();
         services.AddScoped<Learning.HeartbeatService>();

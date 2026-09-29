@@ -10,6 +10,8 @@ class ChatComposer extends StatefulWidget {
     required this.voiceStarting,
     this.onCancel,
     this.onAttach,
+    this.sources = const [],
+    this.onRemoveSource,
     this.awaitingApproval = false,
     this.hint = 'Ask Jarvis anything',
     super.key,
@@ -26,6 +28,8 @@ class ChatComposer extends StatefulWidget {
 
   /// Opens extra actions (files, tasks, reminders); hidden when null.
   final VoidCallback? onAttach;
+  final List<ConversationSourceChip> sources;
+  final ValueChanged<ConversationSourceChip>? onRemoveSource;
   final String hint;
 
   @override
@@ -102,6 +106,35 @@ class _ChatComposerState extends State<ChatComposer> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (widget.sources.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final source in widget.sources)
+                      InputChip(
+                        label: Text(
+                          source.label,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        avatar: Icon(
+                          source.kind == 'collection'
+                              ? PhosphorIconsRegular.folders
+                              : PhosphorIconsRegular.fileText,
+                          size: 14,
+                        ),
+                        onDeleted: widget.onRemoveSource == null
+                            ? null
+                            : () => widget.onRemoveSource!(source),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           TextField(
             controller: widget.controller,
             focusNode: _focus,

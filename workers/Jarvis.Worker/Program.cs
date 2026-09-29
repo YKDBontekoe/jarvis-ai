@@ -460,7 +460,8 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
             var extracted = isImage
                 ? await ExtractImageTextAsync(services, file, buffer, cancellationToken)
                 : await ExtractTextAsync(file, buffer, cancellationToken);
-            if (string.IsNullOrWhiteSpace(extracted))
+            if (string.IsNullOrWhiteSpace(extracted) &&
+                (isImage || file.ContentType != "application/pdf"))
             {
                 if (!isImage)
                 {
@@ -471,12 +472,28 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
                 extracted = $"Image {file.FileName} contained no legible text.";
             }
 
-            extracted = extracted.Length > MaxExtractedCharacters ? extracted[..MaxExtractedCharacters] : extracted;
-            var chunks = SplitIntoChunks(extracted);
-            var indexed = new List<FileContentChunk>(chunks.Count);
-            for (var index = 0; index < chunks.Count; index++)
+            List<FileContentChunk> indexed;
+            if (!isImage && file.ContentType == "application/pdf")
             {
-                indexed.Add(new FileContentChunk(input.FileId, input.OwnerId, index, chunks[index]));
+                buffer.Position = 0;
+                indexed = BuildPdfChunks(input.FileId, input.OwnerId, buffer, cancellationToken);
+            }
+            else
+            {
+                extracted = extracted.Length > MaxExtractedCharacters ? extracted[..MaxExtractedCharacters] : extracted;
+                indexed = BuildTextChunks(input.FileId, input.OwnerId, extracted);
+            }
+
+            if (indexed.Count == 0)
+            {
+                if (!isImage)
+                {
+                    await files.SetProcessingStatusAsync(input.FileId, input.OwnerId, "failed", cancellationToken);
+                    return;
+                }
+
+                indexed = BuildTextChunks(input.FileId, input.OwnerId,
+                    $"Image {file.FileName} contained no legible text.");
             }
 
             await services.GetRequiredService<IFileContentRepository>()
@@ -539,9 +556,53 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
         return response.Text.Trim();
     }
 
-    private static List<string> SplitIntoChunks(string text)
+    private static List<FileContentChunk> BuildPdfChunks(Guid fileId, Guid ownerId, Stream content,
+        CancellationToken cancellationToken)
     {
-        var chunks = new List<string>();
+        using var document = UglyToad.PdfPig.PdfDocument.Open(content);
+        var indexed = new List<FileContentChunk>();
+        var chunkIndex = 0;
+        var globalOffset = 0;
+        foreach (var page in document.GetPages())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (globalOffset >= MaxExtractedCharacters) break;
+            var pageText = UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor.ContentOrderTextExtractor
+                .GetText(page).Trim();
+            if (pageText.Length == 0) continue;
+            if (globalOffset + pageText.Length > MaxExtractedCharacters)
+                pageText = pageText[..Math.Max(0, MaxExtractedCharacters - globalOffset)];
+            foreach (var slice in SplitIntoChunkSlices(pageText))
+            {
+                indexed.Add(new FileContentChunk(fileId, ownerId, chunkIndex++, slice.Text, globalOffset + slice.Start,
+                    globalOffset + slice.End, page.Number));
+                if (indexed.Count >= 120) return indexed;
+            }
+
+            globalOffset += pageText.Length;
+        }
+
+        return indexed;
+    }
+
+    private static List<FileContentChunk> BuildTextChunks(Guid fileId, Guid ownerId, string text)
+    {
+        var indexed = new List<FileContentChunk>();
+        var chunkIndex = 0;
+        foreach (var slice in SplitIntoChunkSlices(text))
+        {
+            indexed.Add(new FileContentChunk(fileId, ownerId, chunkIndex++, slice.Text, slice.Start, slice.End));
+            if (indexed.Count >= 120) break;
+        }
+
+        return indexed;
+    }
+
+    private readonly record struct ChunkSlice(string Text, int Start, int End);
+
+    private static List<ChunkSlice> SplitIntoChunkSlices(string text)
+    {
+        var chunks = new List<ChunkSlice>();
         var start = 0;
         while (start < text.Length && chunks.Count < 120)
         {
@@ -551,11 +612,20 @@ internal sealed class FileProcessingActivities(IServiceScopeFactory scopeFactory
                 var boundary = text.LastIndexOfAny(['\n', ' '], end - 1, Math.Min(400, end - start));
                 if (boundary > start + ChunkLength / 2) end = boundary;
             }
-            var chunk = text[start..end].Trim();
-            if (chunk.Length != 0) chunks.Add(chunk);
+
+            var raw = text[start..end];
+            var chunk = raw.Trim();
+            if (chunk.Length != 0)
+            {
+                var leading = raw.Length - raw.TrimStart().Length;
+                var chunkStart = start + leading;
+                chunks.Add(new ChunkSlice(chunk, chunkStart, chunkStart + chunk.Length));
+            }
+
             if (end == text.Length) break;
             start = Math.Max(start + 1, end - ChunkOverlap);
         }
+
         return chunks;
     }
 }

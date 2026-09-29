@@ -57,6 +57,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   StreamSubscription<RemoteMessage>? _pushOpenedSubscription;
   StreamSubscription<RemoteMessage>? _pushForegroundSubscription;
   final Set<String> _shownPushNotifications = {};
+  List<ConversationSourceChip> _attachedSources = [];
 
   bool get _hasMessages => _entries.any((entry) => entry is MessageEntry);
 
@@ -131,7 +132,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
     Map<Object?, Object?>? event,
   );
   void _appendDelta(String delta);
-  void _completeAssistant(String content, {String? id});
+  void _completeAssistant(String content, {String? id, List<MessageCitation>? citations});
   void _toolEvent(String tool, {bool? success});
   void _settleSubmittingApprovals({ApprovalStatus? fallback});
   void _addApprovals(Iterable<ApprovalEntry> approvals);

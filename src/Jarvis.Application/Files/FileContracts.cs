@@ -18,19 +18,44 @@ public interface IFileRepository
     Task<bool> SetProcessingStatusAsync(Guid id, Guid ownerId, string status, CancellationToken cancellationToken);
 }
 
-public sealed record FileContentChunk(Guid FileId, Guid OwnerId, int Index, string Content);
-public sealed record FileSearchHit(Guid FileId, string FileName, int ChunkIndex, string Content, double Score);
+public sealed record FileContentChunk(
+    Guid FileId,
+    Guid OwnerId,
+    int Index,
+    string Content,
+    int StartOffset = 0,
+    int EndOffset = 0,
+    int? PageNumber = null);
+
+public sealed record FileSearchHit(
+    Guid FileId,
+    string FileName,
+    Guid ChunkId,
+    int ChunkIndex,
+    string Content,
+    double Score,
+    int ExcerptStart,
+    int ExcerptEnd,
+    int? PageNumber,
+    string SanitizedExcerpt);
 
 public interface IFileContentRepository
 {
     Task ReplaceChunksAsync(Guid fileId, Guid ownerId, IReadOnlyList<FileContentChunk> chunks, CancellationToken cancellationToken);
-    Task<IReadOnlyList<FileSearchHit>> SearchTextAsync(Guid ownerId, string query, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FileSearchHit>> SearchTextAsync(Guid ownerId, string query, FileSearchScope scope,
+        CancellationToken cancellationToken);
     Task DeleteChunksAsync(Guid fileId, Guid ownerId, CancellationToken cancellationToken);
 }
 
 public interface IFileSearchService
 {
-    Task<IReadOnlyList<FileSearchHit>> SearchAsync(Guid ownerId, string query, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FileSearchHit>> SearchAsync(Guid ownerId, string query, FileSearchScope scope,
+        CancellationToken cancellationToken);
+}
+
+public interface IConversationFileScopeService
+{
+    Task<FileSearchScope> GetSearchScopeAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);
 }
 
 public interface IFileProcessingScheduler

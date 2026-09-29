@@ -21,7 +21,10 @@ public sealed record SendMessageRequest([Required, StringLength(32_000, MinimumL
 public sealed record ConversationDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 public sealed record ConversationDetailsDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     IReadOnlyList<MessageDto> Messages, bool Responding);
-public sealed record MessageDto(Guid Id, string Role, string Content, DateTimeOffset CreatedAt);
+public sealed record MessageDto(Guid Id, string Role, string Content, DateTimeOffset CreatedAt,
+    IReadOnlyList<FileCitationDto>? Citations = null);
+public sealed record FileCitationDto(Guid FileId, string DisplayName, Guid ChunkId, int ChunkIndex, string Excerpt,
+    int? PageNumber, string SourceStatus = "available");
 public sealed record ApprovalDecisionRequest(bool Approved);
 public sealed record ToolApprovalDto(Guid Id, Guid ConversationId, string ToolName, string ArgumentsJson,
     string Status, bool? Approved, string ResumeStatus, DateTimeOffset CreatedAt);
@@ -45,7 +48,15 @@ public sealed record AuditEventDto(Guid Id, Guid? AgentRunId, string Tool, strin
     Guid? ApprovalId, DateTimeOffset Timestamp, bool Success, string? MetadataJson);
 public sealed record FileDto(Guid Id, string FileName, string ContentType, long SizeBytes, string Sha256,
     DateTimeOffset CreatedAt, string ProcessingStatus);
-public sealed record FileSearchHitDto(Guid FileId, string FileName, int ChunkIndex, string Content, double Score);
+public sealed record FileSearchHitDto(Guid FileId, string FileName, Guid ChunkId, int ChunkIndex, string Content,
+    double Score, int ExcerptStart, int ExcerptEnd, int? PageNumber, string SanitizedExcerpt);
+public sealed record FileCollectionDto(Guid Id, string Name, DateTimeOffset CreatedAt, int FileCount);
+public sealed record FileCollectionRequest([Required, StringLength(120, MinimumLength = 1)] string? Name);
+public sealed record ConversationSourcesDto(IReadOnlyList<ConversationFileSourceDto> Files,
+    IReadOnlyList<ConversationCollectionSourceDto> Collections);
+public sealed record ConversationFileSourceDto(Guid FileId, string FileName, string ProcessingStatus,
+    DateTimeOffset AttachedAt);
+public sealed record ConversationCollectionSourceDto(Guid CollectionId, string Name, DateTimeOffset AttachedAt);
 public sealed record MemoryRequest(string? Kind, string? Content, float Importance = 0.5f, float Confidence = 0.8f,
     DateTimeOffset? ValidUntil = null, bool IsPinned = false);
 public sealed record MemoryDto(Guid Id, string Kind, string Content, float Importance, float Confidence,

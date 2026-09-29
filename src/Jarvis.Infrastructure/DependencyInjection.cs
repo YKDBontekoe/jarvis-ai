@@ -73,6 +73,11 @@ public static class DependencyInjection
         services.AddScoped<IFileService, FileService>();
         services.AddScoped<IFileMalwareScanner, ClamAvVirusScanner>();
         services.AddScoped<IFileSearchService, FileSearchService>();
+        services.AddScoped<IFileCollectionRepository, FileCollectionRepository>();
+        services.AddScoped<IConversationFileContextRepository, ConversationFileContextRepository>();
+        services.AddScoped<IConversationFileScopeService, ConversationFileScopeService>();
+        services.AddScoped<IFileCitationCollector, FileCitationCollector>();
+        services.AddScoped<IFileCitationResolver, FileCitationResolver>();
         services.AddScoped<IObjectStorage, S3ObjectStorage>();
         var objectStorage = configuration.GetSection("ObjectStorage");
         var serviceUrl = objectStorage["ServiceUrl"] ?? throw new InvalidOperationException("ObjectStorage:ServiceUrl is required.");

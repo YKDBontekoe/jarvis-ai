@@ -4,6 +4,7 @@ using Jarvis.Domain.Audit;
 using Jarvis.Domain.Devices;
 using Jarvis.Domain.Workflows;
 using Jarvis.Domain.Integrations;
+using Jarvis.Application.Files;
 using Jarvis.Infrastructure.Identity;
 using Jarvis.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -32,6 +33,11 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<JarvisTask> Tasks => Set<JarvisTask>();
     public DbSet<StoredFileEntity> Files => Set<StoredFileEntity>();
     public DbSet<FileContentChunkEntity> FileContentChunks => Set<FileContentChunkEntity>();
+    public DbSet<FileCollectionEntity> FileCollections => Set<FileCollectionEntity>();
+    public DbSet<FileCollectionMemberEntity> FileCollectionMembers => Set<FileCollectionMemberEntity>();
+    public DbSet<ConversationFileAttachmentEntity> ConversationFileAttachments => Set<ConversationFileAttachmentEntity>();
+    public DbSet<ConversationCollectionAttachmentEntity> ConversationCollectionAttachments =>
+        Set<ConversationCollectionAttachmentEntity>();
     public DbSet<IntegrationCredential> IntegrationCredentials => Set<IntegrationCredential>();
     public DbSet<DailyBriefingPreference> DailyBriefings => Set<DailyBriefingPreference>();
     public DbSet<OwnerSettingEntity> OwnerSettings => Set<OwnerSettingEntity>();
@@ -336,6 +342,9 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.Property(x => x.OwnerId).HasColumnName("owner_id");
             entity.Property(x => x.ChunkIndex).HasColumnName("chunk_index");
             entity.Property(x => x.Content).HasColumnName("content").IsRequired();
+            entity.Property(x => x.StartOffset).HasColumnName("start_offset");
+            entity.Property(x => x.EndOffset).HasColumnName("end_offset");
+            entity.Property(x => x.PageNumber).HasColumnName("page_number");
             entity.Property(x => x.Embedding).HasColumnName("embedding").HasColumnType("vector(1536)");
             entity.Property(x => x.SearchText).HasColumnName("search_text").HasColumnType("tsvector")
                 .HasComputedColumnSql("to_tsvector('simple'::regconfig, content)", stored: true);
@@ -343,6 +352,54 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.HasIndex(x => new { x.OwnerId, x.FileId, x.ChunkIndex }).IsUnique();
             entity.HasIndex(x => x.SearchText).HasMethod("gin");
             entity.HasIndex(x => x.Embedding).HasMethod("hnsw").HasOperators("vector_cosine_ops");
+        });
+
+        modelBuilder.Entity<FileCollectionEntity>(entity =>
+        {
+            entity.ToTable("file_collections");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Name).HasColumnName("name").HasMaxLength(FileCollectionNames.MaxNameLength).IsRequired();
+            entity.Property(x => x.NormalizedName).HasColumnName("normalized_name")
+                .HasMaxLength(FileCollectionNames.MaxNameLength).IsRequired();
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.HasIndex(x => new { x.OwnerId, x.NormalizedName }).IsUnique();
+        });
+
+        modelBuilder.Entity<FileCollectionMemberEntity>(entity =>
+        {
+            entity.ToTable("file_collection_members");
+            entity.HasKey(x => new { x.CollectionId, x.FileId });
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.AddedAt).HasColumnName("added_at");
+            entity.HasOne<FileCollectionEntity>().WithMany().HasForeignKey(x => x.CollectionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<StoredFileEntity>().WithMany().HasForeignKey(x => x.FileId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.OwnerId, x.FileId });
+        });
+
+        modelBuilder.Entity<ConversationFileAttachmentEntity>(entity =>
+        {
+            entity.ToTable("conversation_file_attachments");
+            entity.HasKey(x => new { x.ConversationId, x.FileId });
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.AttachedAt).HasColumnName("attached_at");
+            entity.HasOne<Conversation>().WithMany().HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<StoredFileEntity>().WithMany().HasForeignKey(x => x.FileId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ConversationCollectionAttachmentEntity>(entity =>
+        {
+            entity.ToTable("conversation_collection_attachments");
+            entity.HasKey(x => new { x.ConversationId, x.CollectionId });
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.AttachedAt).HasColumnName("attached_at");
+            entity.HasOne<Conversation>().WithMany().HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<FileCollectionEntity>().WithMany().HasForeignKey(x => x.CollectionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<IntegrationCredential>(entity =>
@@ -649,6 +706,7 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.Property(x => x.Id).ValueGeneratedNever();
             entity.Property(x => x.Role).HasMaxLength(20).IsRequired();
             entity.Property(x => x.Content).IsRequired();
+            entity.Property(x => x.CitationsJson).HasColumnName("citations_json").HasColumnType("jsonb");
             entity.HasIndex(x => new { x.ConversationId, x.CreatedAt });
         });
 

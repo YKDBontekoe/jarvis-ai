@@ -132,23 +132,48 @@ public sealed class FileContentRepository(JarvisDbContext db) : IFileContentRepo
             OwnerId = ownerId,
             ChunkIndex = chunk.Index,
             Content = chunk.Content,
+            StartOffset = chunk.StartOffset,
+            EndOffset = chunk.EndOffset,
+            PageNumber = chunk.PageNumber,
             Embedding = null
         }));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<FileSearchHit>> SearchTextAsync(Guid ownerId, string query, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<FileSearchHit>> SearchTextAsync(Guid ownerId, string query, FileSearchScope scope,
+        CancellationToken cancellationToken)
     {
-        var chunks = await db.FileContentChunks.FromSqlInterpolated($"""
-            SELECT c.* FROM file_content_chunks c
-            JOIN files f ON f."Id" = c.file_id AND f.owner_id = c.owner_id
-            WHERE c.owner_id = {ownerId}
-              AND f.processing_status = 'ready'
-              AND c.search_text @@ websearch_to_tsquery('simple', {query})
-            ORDER BY ts_rank(c.search_text, websearch_to_tsquery('simple', {query})) DESC
-            LIMIT 20
-            """).AsNoTracking().ToListAsync(cancellationToken);
+        if (scope.IsRestricted && scope.FileIds!.Count == 0) return [];
+
+        List<FileContentChunkEntity> chunks;
+        if (scope.IsRestricted)
+        {
+            var fileIds = scope.FileIds!;
+            chunks = await db.FileContentChunks.FromSqlInterpolated($"""
+                SELECT c.* FROM file_content_chunks c
+                JOIN files f ON f."Id" = c.file_id AND f.owner_id = c.owner_id
+                WHERE c.owner_id = {ownerId}
+                  AND f.processing_status = 'ready'
+                  AND c.file_id = ANY({fileIds})
+                  AND c.search_text @@ websearch_to_tsquery('simple', {query})
+                ORDER BY ts_rank(c.search_text, websearch_to_tsquery('simple', {query})) DESC
+                LIMIT 20
+                """).AsNoTracking().ToListAsync(cancellationToken);
+        }
+        else
+        {
+            chunks = await db.FileContentChunks.FromSqlInterpolated($"""
+                SELECT c.* FROM file_content_chunks c
+                JOIN files f ON f."Id" = c.file_id AND f.owner_id = c.owner_id
+                WHERE c.owner_id = {ownerId}
+                  AND f.processing_status = 'ready'
+                  AND c.search_text @@ websearch_to_tsquery('simple', {query})
+                ORDER BY ts_rank(c.search_text, websearch_to_tsquery('simple', {query})) DESC
+                LIMIT 20
+                """).AsNoTracking().ToListAsync(cancellationToken);
+        }
+
         return await AddFileNamesAsync(ownerId, chunks, cancellationToken);
     }
 
@@ -162,6 +187,12 @@ public sealed class FileContentRepository(JarvisDbContext db) : IFileContentRepo
         var names = await db.Files.AsNoTracking().Where(x => x.OwnerId == ownerId && ids.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, x => x.FileName, cancellationToken);
         return chunks.Where(x => names.ContainsKey(x.FileId))
-            .Select(x => new FileSearchHit(x.FileId, names[x.FileId], x.ChunkIndex, x.Content, 0)).ToArray();
+            .Select(x =>
+            {
+                var sanitized = FileReferenceSanitizer.SanitizeExcerpt(x.Content);
+                var excerptEnd = Math.Min(sanitized.Length, x.Content.Length);
+                return new FileSearchHit(x.FileId, names[x.FileId], x.Id, x.ChunkIndex, x.Content, 0,
+                    0, excerptEnd, x.PageNumber, sanitized);
+            }).ToArray();
     }
 }
