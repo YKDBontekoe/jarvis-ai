@@ -17,6 +17,10 @@ abstract class _ChatScreenController extends State<ChatScreen>
   HubConnection? _hub;
   Room? _voiceRoom;
   String? _conversationId;
+  String? _profileId;
+  String? _profileName;
+  bool _profileDeleted = false;
+  String? _preferredProfileId;
   String? _error;
   String? _surfaceError;
   String? _surfaceErrorFor;
@@ -86,6 +90,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   );
   Future<void> _chooseConversation();
   Future<void> _createAndOpenConversation();
+  Future<void> _switchConversationProfile();
   void _openUtility(String destination);
   void _selectDestination(int index);
   Future<void> _reloadConversationEntries(

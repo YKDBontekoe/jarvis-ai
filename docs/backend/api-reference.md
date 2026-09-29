@@ -22,9 +22,10 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/conversations` | Create conversation |
-| GET | `/conversations` | List |
-| GET | `/conversations/{id}` | Messages + responding flag |
+| POST | `/conversations` | Create conversation (`profileId` optional) |
+| GET | `/conversations` | List (includes bound profile name) |
+| GET | `/conversations/{id}` | Messages + responding flag + profile |
+| PUT | `/conversations/{id}/profile` | Switch bound profile snapshot (409 if scope changes without `confirm`) |
 | DELETE | `/conversations/{id}` | Delete chat (not task-backed) |
 | POST | `/conversations/{id}/messages` | Send user message (starts agent turn) |
 | POST | `/conversations/{id}/cancel` | Cancel in-flight run |
@@ -69,7 +70,9 @@ Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints
 | Models | `/settings/models`, `/settings/models/codex`, `/openrouter-key`, `/test`, catalog |
 | Voice | `/settings/voice` |
 | Devices | `/settings/devices` |
-| Persona | `/settings/persona` (see `PersonaEndpoints`) |
+| Persona | `/persona` (see `PersonaEndpoints`) |
+| Profiles | `/profiles` |
+| Collections | `/collections` |
 
 ## Skills
 

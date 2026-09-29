@@ -66,6 +66,9 @@ public static class DependencyInjection
         services.AddScoped<IDailyBriefingNarrator, NoOpDailyBriefingNarrator>();
         services.AddScoped<Jarvis.Application.Settings.IOwnerSettingsStore, OwnerSettingsStore>();
         services.AddScoped<Jarvis.Application.Skills.ISkillRepository, SkillRepository>();
+        services.AddScoped<Jarvis.Application.Profiles.IAssistantProfileRepository, AssistantProfileRepository>();
+        services.AddScoped<Jarvis.Application.Profiles.IAssistantProfileService, Jarvis.Application.Profiles.AssistantProfileService>();
+        services.AddScoped<Jarvis.Application.Files.IDocumentCollectionRepository, DocumentCollectionRepository>();
         services.AddScoped<Jarvis.Application.Persona.IMessageFeedbackRepository, MessageFeedbackRepository>();
         services.AddScoped<Jarvis.Application.Usage.IModelUsageRecorder, ModelUsageRecorder>();
         services.AddScoped<Jarvis.Application.Usage.IUsageDashboard, UsageDashboardService>();

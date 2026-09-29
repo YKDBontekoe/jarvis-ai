@@ -63,6 +63,8 @@ api.MapMemoryEndpoints(app.Logger);
 api.MapModelSettingsEndpoints(app.Logger);
 api.MapSkillEndpoints(app.Logger);
 api.MapPersonaEndpoints();
+api.MapProfileEndpoints();
+api.MapCollectionEndpoints();
 api.MapLearningEndpoints(app.Logger);
 api.MapUsageEndpoints();
 api.MapKnowledgeGraphEndpoints();

@@ -6,7 +6,8 @@ public interface IMemoryRepository
 {
     Task<bool> HasActiveMemoriesAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<MemoryRecord> CreateAsync(Guid ownerId, string kind, string content, float importance, float confidence,
-        string? sourceType, Guid? sourceId, DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken);
+        string? sourceType, Guid? sourceId, DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken,
+        Guid? profileId = null);
     Task<MemoryRecord?> ReplaceAsync(Guid existingId, Guid ownerId, string kind, string content, float importance,
         float confidence, string? sourceType, Guid? sourceId, CancellationToken cancellationToken);
     Task<MemoryRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
@@ -23,7 +24,7 @@ public interface IMemoryService
 {
     Task<MemoryRecord> CreateAsync(Guid ownerId, string kind, string content, float importance, float confidence,
         DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken,
-        string sourceType = "user", Guid? sourceId = null);
+        string sourceType = "user", Guid? sourceId = null, Guid? profileId = null);
     Task<MemoryRecord?> ReplaceAsync(Guid existingId, Guid ownerId, string kind, string content,
         float importance, float confidence, CancellationToken cancellationToken,
         string sourceType = "conversation", Guid? sourceId = null);
@@ -38,7 +39,8 @@ public interface IMemoryService
 
 public interface IConversationMemoryExtractor
 {
-    Task ExtractAndStoreAsync(Guid ownerId, Guid sourceMessageId, string userMessage, CancellationToken cancellationToken);
+    Task ExtractAndStoreAsync(Guid ownerId, Guid sourceMessageId, string userMessage, CancellationToken cancellationToken,
+        Guid? profileId = null);
 }
 
 public static class MemoryKinds

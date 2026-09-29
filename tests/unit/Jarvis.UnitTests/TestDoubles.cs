@@ -9,7 +9,8 @@ internal sealed class FixedChatClientResolver(IChatClient client, EmbeddingModel
 {
     public List<(Guid OwnerId, ModelPurpose Purpose)> Requests { get; } = [];
 
-    public Task<IChatClient> GetChatClientAsync(Guid ownerId, ModelPurpose purpose, CancellationToken cancellationToken)
+    public Task<IChatClient> GetChatClientAsync(Guid ownerId, ModelPurpose purpose, CancellationToken cancellationToken,
+        ModelSettings? overlay = null)
     {
         Requests.Add((ownerId, purpose));
         return Task.FromResult(client);

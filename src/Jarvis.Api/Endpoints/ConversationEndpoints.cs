@@ -3,7 +3,9 @@ using System.Text;
 using Jarvis.Api.Conversations;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Profiles;
 using Jarvis.Application.Workflows;
+using Jarvis.Domain.Conversations;
 
 namespace Jarvis.Api.Endpoints;
 
@@ -11,23 +13,34 @@ internal static class ConversationEndpoints
 {
     public static RouteGroupBuilder MapConversationEndpoints(this RouteGroupBuilder api)
     {
-        api.MapPost("/conversations", async (IConversationStore store, ICurrentUser currentUser,
-            CreateConversationRequest request, CancellationToken ct) =>
+        api.MapPost("/conversations", async (IConversationStore store, IAssistantProfileService profiles,
+            ICurrentUser currentUser, CreateConversationRequest request, CancellationToken ct) =>
         {
             var title = string.IsNullOrWhiteSpace(request.Title) ? "New conversation" : request.Title.Trim();
             if (title.Length > 200) return EndpointHelpers.Invalid("title", "Title must be 200 characters or fewer.");
-            var conversation = await store.CreateAsync(currentUser.OwnerId, title, ct);
-            return Results.Created($"/api/v1/conversations/{conversation.Id}",
-                new ConversationDto(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt));
+            try
+            {
+                var binding = await profiles.CaptureBindingAsync(currentUser.OwnerId, request.ProfileId, ct);
+                var conversation = await store.CreateAsync(currentUser.OwnerId, title, ct, binding);
+                return Results.Created($"/api/v1/conversations/{conversation.Id}",
+                    ToDto(conversation, binding.Name, false));
+            }
+            catch (ArgumentException exception)
+            {
+                return EndpointHelpers.Invalid("profileId", exception.Message);
+            }
         }).WithName("CreateConversation");
 
-        api.MapGet("/conversations", async (IConversationStore store, ICurrentUser currentUser, CancellationToken ct) =>
-                Results.Ok((await store.ListAsync(currentUser.OwnerId, ct))
-                    .Select(x => new ConversationDto(x.Id, x.Title, x.CreatedAt, x.UpdatedAt))))
-            .WithName("ListConversations");
+        api.MapGet("/conversations", async (IConversationStore store, IAssistantProfileService profiles,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var live = (await profiles.ListAsync(currentUser.OwnerId, ct)).ToDictionary(item => item.Id);
+            return Results.Ok((await store.ListAsync(currentUser.OwnerId, ct))
+                .Select(item => ToDto(item, live)));
+        }).WithName("ListConversations");
 
         api.MapGet("/conversations/{conversationId:guid}", async (Guid conversationId, bool? includeMessages,
-            IConversationStore store,
+            IConversationStore store, IAssistantProfileService profiles,
             IJarvisTaskRepository tasks, ICurrentUser currentUser, RemoteQueryHost queries, CancellationToken ct) =>
         {
             var conversation = await store.GetAsync(conversationId, currentUser.OwnerId, ct);
@@ -37,9 +50,11 @@ internal static class ConversationEndpoints
             IReadOnlyList<Jarvis.Domain.Conversations.Message> messages = includeMessages == false
                 ? Array.Empty<Jarvis.Domain.Conversations.Message>()
                 : await store.GetMessagesAsync(conversationId, ct);
+            var live = (await profiles.ListAsync(currentUser.OwnerId, ct)).ToDictionary(item => item.Id);
             return Results.Ok(new ConversationDetailsDto(conversation.Id, conversation.Title, conversation.CreatedAt,
                 conversation.UpdatedAt, messages.Select(message => message.ToDto()).ToArray(),
-                queries.IsResponding(conversationId)));
+                queries.IsResponding(conversationId), conversation.ProfileId, ProfileName(conversation, live),
+                conversation.ProfileVersion, ProfileDeleted(conversation, live)));
         }).WithName("GetConversation");
 
         api.MapGet("/conversations/{conversationId:guid}/messages", async (Guid conversationId, int? limit,
@@ -96,6 +111,43 @@ internal static class ConversationEndpoints
             return Results.NoContent();
         }).WithName("CancelConversationRun");
 
+        api.MapPut("/conversations/{conversationId:guid}/profile", async (Guid conversationId,
+            SwitchConversationProfileRequest request, IConversationStore store, IAssistantProfileService profiles,
+            IJarvisTaskRepository tasks, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var conversation = await store.GetAsync(conversationId, currentUser.OwnerId, ct);
+            if (conversation is null ||
+                await tasks.GetTaskByConversationIdAsync(conversationId, currentUser.OwnerId, ct) is not null)
+                return Results.NotFound();
+            try
+            {
+                var currentBinding = conversation.ProfileId is { } currentId
+                    ? new ProfileBinding(currentId, conversation.ProfileVersion ?? 0,
+                        conversation.ProfileSnapshotJson ?? "", conversation.Title)
+                    : null;
+                var current = await profiles.ResolveSnapshotAsync(currentBinding, currentUser.OwnerId, ct);
+                var nextBinding = await profiles.CaptureBindingAsync(currentUser.OwnerId, request.ProfileId, ct);
+                var next = ProfileJson.Deserialize(nextBinding.SnapshotJson)!;
+                var change = profiles.CompareScope(current, next);
+                if (change.RequiresConfirmation && !request.Confirm)
+                    return Results.Json(new
+                    {
+                        message = "Switching this profile changes tools or knowledge scope. Confirm to continue.",
+                        skillsChanged = change.SkillsChanged,
+                        filesChanged = change.FilesChanged,
+                        memoryChanged = change.MemoryChanged,
+                        details = change.Details
+                    }, statusCode: StatusCodes.Status409Conflict);
+                await store.BindProfileAsync(conversationId, currentUser.OwnerId, nextBinding, ct);
+                conversation = await store.GetAsync(conversationId, currentUser.OwnerId, ct);
+                return Results.Ok(ToDto(conversation!, nextBinding.Name, false));
+            }
+            catch (ArgumentException exception)
+            {
+                return EndpointHelpers.Invalid("profileId", exception.Message);
+            }
+        }).WithName("SwitchConversationProfile");
+
         return api;
     }
 
@@ -128,6 +180,29 @@ internal static class ConversationEndpoints
             return false;
         }
     }
+
+    private static ConversationDto ToDto(Conversation conversation, IReadOnlyDictionary<Guid, AssistantProfileRecord> live)
+    {
+        var snapshot = ProfileJson.Deserialize(conversation.ProfileSnapshotJson);
+        var profileId = conversation.ProfileId ?? snapshot?.ProfileId;
+        var name = snapshot?.Name;
+        if (profileId is { } id && live.TryGetValue(id, out var liveProfile) && name is null)
+            name = liveProfile.Name;
+        if (name is null && snapshot is not null) name = snapshot.Name;
+        var deleted = profileId is { } missing && !live.ContainsKey(missing);
+        return new ConversationDto(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt,
+            profileId, name, conversation.ProfileVersion ?? snapshot?.Version, deleted);
+    }
+
+    private static ConversationDto ToDto(Conversation conversation, string name, bool deleted) =>
+        new(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt,
+            conversation.ProfileId, name, conversation.ProfileVersion, deleted);
+
+    private static string? ProfileName(Conversation conversation, IReadOnlyDictionary<Guid, AssistantProfileRecord> live) =>
+        ToDto(conversation, live).ProfileName;
+
+    private static bool ProfileDeleted(Conversation conversation, IReadOnlyDictionary<Guid, AssistantProfileRecord> live) =>
+        ToDto(conversation, live).ProfileDeleted;
 
     public static RouteGroupBuilder MapApprovalEndpoints(this RouteGroupBuilder api)
     {

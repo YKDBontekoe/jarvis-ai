@@ -37,6 +37,10 @@ Owner-scoped `SKILL.md` documents import/export via `/api/v1/skills`. Agent load
 
 Traits + custom instructions learned from user statements and reply ratings. Tools record traits (`PersonaAgentTools`); context injected each turn.
 
+## Assistant profiles
+
+Owner-defined profiles snapshot persona, skills, collections, model class, and learning policy onto each conversation. See [assistant-profiles.md](assistant-profiles.md). Dreaming skips conversations whose snapshot has `contributeToLearning: false`. Pinned memories can remain available to isolated profiles.
+
 ## Learning loops
 
 | Mechanism | Trigger | Output |

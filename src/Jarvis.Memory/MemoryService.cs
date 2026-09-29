@@ -12,13 +12,13 @@ public sealed class MemoryService(IMemoryRepository repository, IMemoryIndexRepo
 
     public async Task<MemoryRecord> CreateAsync(Guid ownerId, string kind, string content, float importance,
         float confidence, DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken,
-        string sourceType = "user", Guid? sourceId = null)
+        string sourceType = "user", Guid? sourceId = null, Guid? profileId = null)
     {
         Validate(kind, content, importance, confidence);
         if (sourceType is not ("user" or "conversation") || sourceId == Guid.Empty)
             throw new ArgumentException("Memory source metadata is invalid.", nameof(sourceType));
         return await repository.CreateAsync(ownerId, kind, content.Trim(), importance, confidence,
-            sourceType, sourceId, validUntil, isPinned, cancellationToken);
+            sourceType, sourceId, validUntil, isPinned, cancellationToken, profileId);
     }
 
     public async Task<MemoryRecord?> ReplaceAsync(Guid existingId, Guid ownerId, string kind, string content,

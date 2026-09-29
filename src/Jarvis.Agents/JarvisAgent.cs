@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Profiles;
+using Jarvis.Application.Settings;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Conversations;
 using Jarvis.Agents.ModelProviders;
@@ -11,7 +13,8 @@ using Microsoft.Extensions.AI;
 namespace Jarvis.Agents;
 
 public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientResolver chatClients, McpToolHost mcpToolHost,
-    IConversationStore conversations, IJarvisTaskRepository tasks, ICurrentUser currentUser) : IJarvisAgent
+    IConversationStore conversations, IJarvisTaskRepository tasks, IAssistantProfileService profiles,
+    IOwnerSettingsStore settings, ICurrentUser currentUser) : IJarvisAgent
 {
     private static readonly JsonSerializerOptions ArgumentsJsonOptions = new(JsonSerializerDefaults.Web);
     private AIAgent? _agent;
@@ -69,12 +72,43 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
         if (_agent is not null) return _agent;
         await mcpToolHost.InitializeAsync(cancellationToken);
         var ownerId = currentUser.OwnerId;
+        var conversation = await conversations.GetAsync(conversationId, ownerId, cancellationToken);
         var task = await tasks.GetTaskByConversationIdAsync(conversationId, ownerId, cancellationToken);
-        var purpose = task is not null ? ModelPurpose.Reasoning : ModelPurpose.Chat;
-        var chatClient = await chatClients.GetChatClientAsync(ownerId, purpose, cancellationToken);
+        var snapshot = await ResolveProfileAsync(conversation, ownerId, cancellationToken);
+        var purpose = ResolvePurpose(task is not null, snapshot);
+        var ownerModels = await settings.GetAsync<ModelSettings>(ownerId, SettingsSections.Models, cancellationToken)
+                          ?? ModelSettings.Default;
+        var chatClient = await chatClients.GetChatClientAsync(ownerId, purpose, cancellationToken,
+            ProfileScope.OverlayModels(ownerModels, snapshot));
         return _agent = agentFactory.Create(chatClient, mcpToolHost.Tools,
-            new AgentBuildContext(ownerId, task?.Id, conversationId));
+            new AgentBuildContext(ownerId, task?.Id, conversationId, snapshot));
     }
+
+    private async Task<AssistantProfileSnapshot> ResolveProfileAsync(
+        Jarvis.Domain.Conversations.Conversation? conversation, Guid ownerId, CancellationToken cancellationToken)
+    {
+        ProfileBinding? binding = conversation?.ProfileId is { } profileId
+            ? new ProfileBinding(profileId, conversation.ProfileVersion ?? 0,
+                conversation.ProfileSnapshotJson ?? "", conversation.Title)
+            : null;
+        var snapshot = await profiles.ResolveSnapshotAsync(binding, ownerId, cancellationToken);
+        if (conversation is not null && conversation.ProfileSnapshotJson is null)
+        {
+            var captured = await profiles.CaptureBindingAsync(ownerId, snapshot.ProfileId, cancellationToken);
+            await conversations.BindProfileAsync(conversation.Id, ownerId, captured, cancellationToken);
+            snapshot = ProfileJson.Deserialize(captured.SnapshotJson) ?? snapshot;
+        }
+        return snapshot;
+    }
+
+    private static ModelPurpose ResolvePurpose(bool isTask, AssistantProfileSnapshot snapshot) =>
+        snapshot.ModelClass switch
+        {
+            Jarvis.Domain.Profiles.ProfileModelClasses.Fast => ModelPurpose.Background,
+            Jarvis.Domain.Profiles.ProfileModelClasses.Reasoning => ModelPurpose.Reasoning,
+            Jarvis.Domain.Profiles.ProfileModelClasses.Chat => ModelPurpose.Chat,
+            _ => isTask ? ModelPurpose.Reasoning : ModelPurpose.Chat
+        };
 
     private async Task<AgentSession> LoadSessionAsync(AIAgent agent, Guid conversationId,
         CancellationToken cancellationToken)

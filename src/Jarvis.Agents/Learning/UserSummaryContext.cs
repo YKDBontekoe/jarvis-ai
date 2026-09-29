@@ -9,7 +9,9 @@ internal sealed class UserSummaryContextContributor(IOwnerSettingsStore settings
     public int Order => 5;
 
     public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
-        [new UserSummaryContextProvider(settings, context.OwnerId)];
+        context.Profile is { MemoryScope: not Jarvis.Domain.Profiles.MemoryScopes.All }
+            ? []
+            : [new UserSummaryContextProvider(settings, context.OwnerId)];
 }
 
 /// <summary>Appends the dreamed user portrait to the chat system prompt on every turn.</summary>

@@ -63,7 +63,7 @@ class _TasksScreenState extends State<TasksScreen> {
   Future<void> _createTask() async {
     final created = await showDialog<_NewTask>(
       context: context,
-      builder: (_) => const _NewTaskDialog(),
+      builder: (_) => _NewTaskDialog(http: widget.http),
     );
     if (created == null || !mounted) return;
 
@@ -71,7 +71,11 @@ class _TasksScreenState extends State<TasksScreen> {
     try {
       await widget.http.post(
         '/api/v1/tasks',
-        data: {'title': created.title, 'prompt': created.prompt},
+        data: {
+          'title': created.title,
+          'prompt': created.prompt,
+          if (created.profileId != null) 'profileId': created.profileId,
+        },
       );
       await _load();
     } on DioException catch (error) {

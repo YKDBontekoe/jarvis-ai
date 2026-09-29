@@ -6,6 +6,7 @@ Use this table to jump to the right doc and code **before** broad repo search.
 |----------------------|------------|--------------|
 | Add or change HTTP API | [api-reference.md](../backend/api-reference.md) | `src/Jarvis.Api/Endpoints/` |
 | Agent tool or prompt context | [agent-tools.md](../backend/agent-tools.md) | `src/Jarvis.Agents/` |
+| Assistant profiles / context isolation | [assistant-profiles.md](../backend/assistant-profiles.md) | `Jarvis.Application/Profiles/`, `Jarvis.Agents/Profiles/` |
 | Chat streaming / SignalR | [chat-agent-runtime.md](../architecture/chat-agent-runtime.md) | `Jarvis.Api/Conversations/`, hub |
 | Tool approvals stuck | [chat-agent-runtime.md](../architecture/chat-agent-runtime.md) | `Jarvis.Application/Approvals/` |
 | Reminder/watch/task scheduling | [temporal.md](../backend/temporal.md) | `Jarvis.Workflows/`, `Jarvis.Worker` |

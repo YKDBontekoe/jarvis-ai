@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Profiles;
 using Jarvis.Domain.Audit;
 using Jarvis.Domain.Conversations;
 using Microsoft.EntityFrameworkCore;
@@ -9,23 +10,46 @@ namespace Jarvis.Infrastructure.Persistence;
 public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, IConversationHistory
 {
     public async Task<IReadOnlyList<Message>> ListRecentMessagesAsync(Guid ownerId, DateTimeOffset since, int limit,
-        CancellationToken cancellationToken) =>
-        (await db.Messages.AsNoTracking()
-            .Where(message => message.CreatedAt > since &&
-                              db.Conversations.Any(conversation => conversation.Id == message.ConversationId &&
-                                                                   conversation.OwnerId == ownerId))
+        CancellationToken cancellationToken)
+    {
+        var conversations = await db.Conversations.AsNoTracking()
+            .Where(conversation => conversation.OwnerId == ownerId)
+            .Select(conversation => new { conversation.Id, conversation.ProfileSnapshotJson })
+            .ToListAsync(cancellationToken);
+        var allowed = conversations
+            .Where(conversation => ProfileScope.ContributesToLearning(conversation.ProfileSnapshotJson))
+            .Select(conversation => conversation.Id)
+            .ToHashSet();
+        if (allowed.Count == 0) return [];
+
+        return (await db.Messages.AsNoTracking()
+            .Where(message => message.CreatedAt > since && allowed.Contains(message.ConversationId))
             .OrderByDescending(message => message.CreatedAt)
             .Take(limit)
             .ToListAsync(cancellationToken))
-        .OrderBy(message => message.CreatedAt)
-        .ToArray();
+            .OrderBy(message => message.CreatedAt)
+            .ToArray();
+    }
 
-    public async Task<Conversation> CreateAsync(Guid ownerId, string title, CancellationToken cancellationToken)
+    public async Task<Conversation> CreateAsync(Guid ownerId, string title, CancellationToken cancellationToken,
+        ProfileBinding? profile = null)
     {
         var conversation = new Conversation(ownerId, title);
+        if (profile is not null)
+            conversation.BindProfile(profile.ProfileId, profile.Version, profile.SnapshotJson);
         db.Conversations.Add(conversation);
         await db.SaveChangesAsync(cancellationToken);
         return conversation;
+    }
+
+    public async Task BindProfileAsync(Guid conversationId, Guid ownerId, ProfileBinding profile,
+        CancellationToken cancellationToken)
+    {
+        var conversation = await db.Conversations.SingleOrDefaultAsync(
+            x => x.Id == conversationId && x.OwnerId == ownerId, cancellationToken)
+            ?? throw new InvalidOperationException("Conversation was not found.");
+        conversation.BindProfile(profile.ProfileId, profile.Version, profile.SnapshotJson);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public Task<Conversation?> GetAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken) =>

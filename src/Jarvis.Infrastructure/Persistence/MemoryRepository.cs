@@ -12,7 +12,7 @@ public sealed class MemoryRepository(JarvisDbContext db) : IMemoryRepository
 
     public async Task<MemoryRecord> CreateAsync(Guid ownerId, string kind, string content, float importance,
         float confidence, string? sourceType, Guid? sourceId, DateTimeOffset? validUntil, bool isPinned,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, Guid? profileId = null)
     {
         var now = DateTimeOffset.UtcNow;
         var memory = new MemoryEntity
@@ -20,7 +20,7 @@ public sealed class MemoryRepository(JarvisDbContext db) : IMemoryRepository
             Id = Guid.CreateVersion7(), OwnerId = ownerId, Kind = kind, Content = content,
             Importance = importance, Confidence = confidence, Embedding = null, EmbeddingModel = null, GraphIndexedAt = null,
             SourceType = sourceType, SourceId = sourceId, CreatedAt = now, UpdatedAt = now,
-            ValidUntil = validUntil, IsPinned = isPinned
+            ValidUntil = validUntil, IsPinned = isPinned, ProfileId = profileId
         };
         db.Memories.Add(memory);
         await db.SaveChangesAsync(cancellationToken);
@@ -43,7 +43,7 @@ public sealed class MemoryRepository(JarvisDbContext db) : IMemoryRepository
             Id = Guid.CreateVersion7(), OwnerId = ownerId, Kind = kind, Content = content,
             Importance = importance, Confidence = confidence, Embedding = null, EmbeddingModel = null, GraphIndexedAt = null,
             SourceType = sourceType, SourceId = sourceId, CreatedAt = now, UpdatedAt = now,
-            ValidUntil = null, IsPinned = false
+            ValidUntil = null, IsPinned = false, ProfileId = existing.ProfileId
         };
         db.Memories.Add(replacement);
         await db.SaveChangesAsync(cancellationToken);

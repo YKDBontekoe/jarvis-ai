@@ -1,6 +1,8 @@
 using Jarvis.Domain.Approvals;
 using Jarvis.Domain.Audit;
 using Jarvis.Domain.Conversations;
+using Jarvis.Domain.Files;
+using Jarvis.Domain.Profiles;
 using Jarvis.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -90,6 +92,34 @@ public sealed class JarvisDbContextModelTests
     {
         var property = Model.FindEntityType(typeof(MemoryEntity))!.FindProperty(nameof(MemoryEntity.Embedding))!;
         Assert.Equal("vector(1536)", property.GetColumnType());
+    }
+
+    [Fact]
+    public void Assistant_profile_has_one_default_per_owner()
+    {
+        var entity = Model.FindEntityType(typeof(AssistantProfile))!;
+        var index = entity.GetIndexes().Single(item => item.GetDatabaseName() == "ux_assistant_profiles_default");
+        Assert.True(index.IsUnique);
+        Assert.Equal(["OwnerId"], index.Properties.Select(property => property.Name).ToArray());
+        Assert.Equal("is_default = TRUE", index.GetFilter());
+    }
+
+    [Fact]
+    public void Conversation_stores_a_profile_snapshot()
+    {
+        var entity = Model.FindEntityType(typeof(Conversation))!;
+        Assert.NotNull(entity.FindProperty(nameof(Conversation.ProfileSnapshotJson)));
+        Assert.Contains(entity.GetIndexes(),
+            index => index.Properties.Select(property => property.Name).SequenceEqual(["OwnerId", "ProfileId"]));
+    }
+
+    [Fact]
+    public void Document_collections_are_unique_per_owner_name()
+    {
+        var entity = Model.FindEntityType(typeof(DocumentCollection))!;
+        Assert.Contains(entity.GetIndexes(),
+            index => index.IsUnique
+                && index.Properties.Select(property => property.Name).SequenceEqual(["OwnerId", "Name"]));
     }
 
     [Fact]

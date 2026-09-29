@@ -15,7 +15,8 @@ internal sealed class ConversationMemoryExtractor(
     ILogger<ConversationMemoryExtractor> logger) : IConversationMemoryExtractor
 {
 
-    public async Task ExtractAndStoreAsync(Guid ownerId, Guid sourceMessageId, string userMessage, CancellationToken cancellationToken)
+    public async Task ExtractAndStoreAsync(Guid ownerId, Guid sourceMessageId, string userMessage,
+        CancellationToken cancellationToken, Guid? profileId = null)
     {
         if (userMessage.Length < 12 || userMessage.Length > 32_000) return;
 
@@ -100,7 +101,7 @@ internal sealed class ConversationMemoryExtractor(
             }
             var memory = replacement ?? await memories.CreateAsync(ownerId, kind, content,
                 candidate.Importance, candidate.Confidence, validUntil: null, isPinned: false,
-                cancellationToken, sourceType: "conversation", sourceId: sourceMessageId);
+                cancellationToken, sourceType: "conversation", sourceId: sourceMessageId, profileId: profileId);
             known.Add(normalized);
             var wasSuperseded = replacement is not null;
             await auditEvents.AppendAsync(ownerId, "memory", wasSuperseded ? "memory.superseded" : "memory.extracted",

@@ -1,9 +1,11 @@
 using Jarvis.Agents.Skills;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Profiles;
 using Jarvis.Application.Settings;
 using Jarvis.Application.Skills;
 using Jarvis.Application.Workflows;
+using Jarvis.Domain.Profiles;
 using Xunit;
 
 namespace Jarvis.UnitTests;
@@ -132,7 +134,7 @@ public sealed class SkillTests
         await repository.UpsertAsync(Owner, new SkillDraft("proposed-skill", "Use for proposed things.", "Body text long enough."),
             SkillSources.Learned, SkillStatuses.Proposed, true, null, CancellationToken.None);
 
-        var provider = new SkillsContextProvider(repository, Owner);
+        var provider = new SkillsContextProvider(repository, Owner, null);
         var agent = new Microsoft.Agents.AI.ChatClientAgent(new CapturingClient(), new Microsoft.Agents.AI.ChatClientAgentOptions
         {
             AIContextProviders = [provider]
@@ -145,6 +147,31 @@ public sealed class SkillTests
         Assert.DoesNotContain("Body text", client.LastPrompt);
     }
 
+    [Fact]
+    public async Task Context_hides_skills_the_bound_profile_does_not_enable()
+    {
+        var repository = new InMemorySkillRepository();
+        var allowed = await repository.UpsertAsync(Owner,
+            new SkillDraft("briefing", "Morning briefing steps.", "Body text long enough."),
+            SkillSources.User, SkillStatuses.Active, true, null, CancellationToken.None);
+        await repository.UpsertAsync(Owner, new SkillDraft("coding", "How to review pull requests.",
+            "Body text long enough."), SkillSources.User, SkillStatuses.Active, true, null, CancellationToken.None);
+        var snapshot = new AssistantProfileSnapshot(Guid.CreateVersion7(), 1, "Work", null, null, null, null, true,
+            true, [allowed!.Id], false, [], null, null, null, null, MemoryScopes.All, true, true, true, true,
+            DateTimeOffset.UtcNow);
+
+        var provider = new SkillsContextProvider(repository, Owner, snapshot);
+        var agent = new Microsoft.Agents.AI.ChatClientAgent(new CapturingClient(), new Microsoft.Agents.AI.ChatClientAgentOptions
+        {
+            AIContextProviders = [provider]
+        });
+        var client = (CapturingClient)agent.ChatClient.GetService(typeof(CapturingClient))!;
+        await agent.RunAsync("hello");
+
+        Assert.Contains("- briefing: Morning briefing steps.", client.LastPrompt);
+        Assert.DoesNotContain("coding", client.LastPrompt);
+    }
+
     private static (SkillAgentTools, InMemorySkillRepository, RecordingNotifications, InMemorySettingsStore) Create(
         LearningSettings learning)
     {
@@ -152,7 +179,7 @@ public sealed class SkillTests
         var notifications = new RecordingNotifications();
         var settings = new InMemorySettingsStore();
         settings.SaveAsync(Owner, SettingsSections.Learning, learning, CancellationToken.None).GetAwaiter().GetResult();
-        return (new SkillAgentTools(repository, settings, notifications, new NullAudit(), new OwnerUser()),
+        return (new SkillAgentTools(repository, settings, notifications, new NullAudit(), new OwnerUser(), null),
             repository, notifications, settings);
     }
 

@@ -5,12 +5,14 @@ namespace Jarvis.Infrastructure.Files;
 
 public sealed class FileSearchService(IFileContentRepository repository) : IFileSearchService
 {
-    public async Task<IReadOnlyList<FileSearchHit>> SearchAsync(Guid ownerId, string query, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<FileSearchHit>> SearchAsync(Guid ownerId, string query, CancellationToken cancellationToken,
+        IReadOnlyCollection<Guid>? fileIds = null)
     {
         query = query.Trim();
         if (query.Length is < 1 or > 2_000) return [];
+        if (fileIds is { Count: 0 }) return [];
 
-        var textResults = await repository.SearchTextAsync(ownerId, query, cancellationToken);
+        var textResults = await repository.SearchTextAsync(ownerId, query, cancellationToken, fileIds);
         var all = textResults.DistinctBy(hit => (hit.FileId, hit.ChunkIndex))
             .ToDictionary(hit => (hit.FileId, hit.ChunkIndex));
         var scores = new Dictionary<(Guid FileId, int ChunkIndex), double>();

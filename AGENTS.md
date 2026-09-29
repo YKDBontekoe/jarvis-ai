@@ -22,6 +22,7 @@ Full index: **[docs/README.md](docs/README.md)**.
 | Agent tools / Codex turn | [docs/backend/agent-tools.md](docs/backend/agent-tools.md), [docs/architecture/chat-agent-runtime.md](docs/architecture/chat-agent-runtime.md) |
 | Reminders, tasks, watches, dreams | [docs/backend/temporal.md](docs/backend/temporal.md), [docs/backend/memory-knowledge-learning.md](docs/backend/memory-knowledge-learning.md) |
 | MCP / integrations / channels | [docs/backend/integrations-and-mcp.md](docs/backend/integrations-and-mcp.md) |
+| Assistant profiles | [docs/backend/assistant-profiles.md](docs/backend/assistant-profiles.md) |
 | Flutter UI | [docs/mobile/client-architecture.md](docs/mobile/client-architecture.md) |
 | Run locally / test | [docs/operations/local-development.md](docs/operations/local-development.md), [docs/operations/testing.md](docs/operations/testing.md) |
 | Config keys | [docs/operations/configuration.md](docs/operations/configuration.md) |
