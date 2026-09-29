@@ -1,5 +1,6 @@
 using Jarvis.Agents;
 using Jarvis.Application.Approvals;
+using Jarvis.Application.Automations;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
 using Jarvis.Application.Integrations;
@@ -44,6 +45,14 @@ public static class WorkerServiceCollectionExtensions
         services.AddHostedService<TemporalWorkerHostedService>();
         services.AddScoped<IReminderService, ReminderService>();
         services.AddScoped<IConditionWatchService, ConditionWatchService>();
+        services.AddSingleton(TimeProvider.System);
+        services.AddScoped<IDailyBriefingService, DailyBriefingService>();
+        services.AddScoped<IAutomationRuleService, AutomationRuleService>();
+        services.AddScoped<IAutomationTriggerPublisher, AutomationTriggerPublisher>();
+        services.AddScoped<IAutomationRunExecutor, AutomationRunExecutor>();
+        services.AddScoped<AutomationConditionEvaluator>();
+        services.AddScoped<IAutomationMetrics, AutomationMetrics>();
+        services.AddSingleton<IAutomationScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<PublicJsonMetricReader>();
         services.AddScoped<ICalendarFeed, CalendarFeed>();
         services.AddScoped<WatchMetricReader>();
@@ -60,6 +69,9 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton<DailyBriefingActivities>();
         services.AddSingleton<AssistantHeartbeatActivities>();
         services.AddSingleton<AssistantDreamingActivities>();
+        services.AddSingleton<AutomationRunActivities>();
+        services.AddSingleton<AutomationScheduleActivities>();
+        services.AddSingleton<AutomationPollActivities>();
 
         return services;
     }

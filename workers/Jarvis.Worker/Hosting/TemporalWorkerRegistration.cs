@@ -1,6 +1,7 @@
 using Jarvis.Worker.Activities;
 using Jarvis.Worker.Learning;
 using Jarvis.Workflows;
+using Jarvis.Domain.Automations;
 using Temporalio.Client;
 using Temporalio.Worker;
 
@@ -21,6 +22,9 @@ internal static class TemporalWorkerRegistration
         nameof(DailyBriefingWorkflow),
         nameof(AssistantHeartbeatWorkflow),
         nameof(AssistantDreamingWorkflow),
+        nameof(AutomationRunWorkflow),
+        nameof(AutomationScheduleWorkflow),
+        nameof(AutomationPollWorkflow),
     ];
 
     public static readonly IReadOnlyList<string> ActivityTypeNames =
@@ -39,6 +43,12 @@ internal static class TemporalWorkerRegistration
         "DeliverDailyBriefing",
         "RunAssistantHeartbeat",
         "RunAssistantDreaming",
+        "ExecuteAutomationRun",
+        "CompleteAutomationRunAfterApproval",
+        "ResolveAutomationSchedule",
+        "FireAutomationSchedule",
+        "CheckAutomationPollTrigger",
+        "FireAutomationPoll",
     ];
 
     public static TemporalWorker CreateWorker(TemporalClient client, IServiceProvider services)
@@ -51,6 +61,9 @@ internal static class TemporalWorkerRegistration
         var briefings = services.GetRequiredService<DailyBriefingActivities>();
         var heartbeat = services.GetRequiredService<AssistantHeartbeatActivities>();
         var dreaming = services.GetRequiredService<AssistantDreamingActivities>();
+        var automationRuns = services.GetRequiredService<AutomationRunActivities>();
+        var automationSchedules = services.GetRequiredService<AutomationScheduleActivities>();
+        var automationPolls = services.GetRequiredService<AutomationPollActivities>();
 
         return new TemporalWorker(client, new TemporalWorkerOptions(TemporalReminderScheduler.TaskQueue)
             .AddWorkflow<ReminderWorkflow>()
@@ -60,6 +73,9 @@ internal static class TemporalWorkerRegistration
             .AddWorkflow<DailyBriefingWorkflow>()
             .AddWorkflow<AssistantHeartbeatWorkflow>()
             .AddWorkflow<AssistantDreamingWorkflow>()
+            .AddWorkflow<AutomationRunWorkflow>()
+            .AddWorkflow<AutomationScheduleWorkflow>()
+            .AddWorkflow<AutomationPollWorkflow>()
             .AddActivity(reminders.DeliverReminderAsync)
             .AddActivity(reminders.DeliverReminderOccurrenceAsync)
             .AddActivity(reminders.FailReminderAsync)
@@ -73,6 +89,12 @@ internal static class TemporalWorkerRegistration
             .AddActivity(briefings.ResolveScheduleAsync)
             .AddActivity(briefings.DeliverAsync)
             .AddActivity(heartbeat.RunAsync)
-            .AddActivity(dreaming.RunAsync));
+            .AddActivity(dreaming.RunAsync)
+            .AddActivity(automationRuns.ExecuteAsync)
+            .AddActivity(automationRuns.CompleteAfterApprovalAsync)
+            .AddActivity(automationSchedules.ResolveNextFireAsync)
+            .AddActivity(automationSchedules.FireScheduleAsync)
+            .AddActivity(automationPolls.CheckAsync)
+            .AddActivity(automationPolls.FirePollAsync));
     }
 }

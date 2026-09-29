@@ -55,6 +55,7 @@ api.MapAccountAuth();
 api.MapConversationEndpoints();
 api.MapApprovalEndpoints();
 api.MapAutomationEndpoints(app.Logger);
+api.MapOwnerAutomationEndpoints(app.Logger);
 api.MapIntegrationEndpoints();
 api.MapNotificationEndpoints();
 api.MapVoiceEndpoints(app.Logger);
@@ -74,6 +75,7 @@ api.MapA2AManagementEndpoints();
 api.MapDeviceEndpoints();
 api.MapBrowserEndpoints();
 api.MapPersonalAssistantEndpoints();
+api.MapSearchEndpoints();
 
 app.MapA2AProtocol();
 

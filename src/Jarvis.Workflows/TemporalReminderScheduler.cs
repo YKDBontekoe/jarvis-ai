@@ -1,6 +1,8 @@
+using Jarvis.Application.Automations;
 using Jarvis.Application.Workflows;
 using Jarvis.Application.Files;
 using Jarvis.Application.Profiles;
+using Jarvis.Domain.Automations;
 using Jarvis.Domain.Workflows;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -11,7 +13,7 @@ namespace Jarvis.Workflows;
 
 public sealed class TemporalReminderScheduler(IConfiguration configuration) : IFileProcessingScheduler,
     IConditionWatchScheduler, IDailyBriefingScheduler, Jarvis.Application.Learning.IHeartbeatScheduler,
-    Jarvis.Application.Learning.IDreamingScheduler
+    Jarvis.Application.Learning.IDreamingScheduler, IAutomationScheduler
 {
     public const string TaskQueue = "jarvis-workflows";
     private readonly SemaphoreSlim _clientLock = new(1, 1);
@@ -143,6 +145,70 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
         cancellationToken.ThrowIfCancellationRequested();
         await client.GetWorkflowHandle(workflowId).SignalAsync(
             (JarvisTaskWorkflow workflow) => workflow.ResolveApprovalAsync(summary));
+    }
+
+    public async Task ScheduleRuleAsync(AutomationRuleRecord rule, CancellationToken cancellationToken)
+    {
+        var definition = AutomationDefinitionJson.Deserialize(rule.DefinitionJson);
+        var client = await GetClientAsync(cancellationToken);
+        if (definition.Trigger is ScheduleTriggerDefinition)
+        {
+            await client.StartWorkflowAsync(
+                (AutomationScheduleWorkflow workflow) => workflow.RunAsync(
+                    new AutomationScheduleWorkflowInput(rule.Id, rule.OwnerId, rule.ScheduleWorkflowId)),
+                new WorkflowOptions(id: rule.ScheduleWorkflowId, taskQueue: TaskQueue)
+                {
+                    IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
+                    IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
+                });
+            return;
+        }
+
+        if (AutomationTriggerKinds.IsPolling(definition.Trigger.Kind))
+        {
+            var interval = definition.Trigger switch
+            {
+                PublicJsonThresholdTriggerDefinition json => json.IntervalMinutes,
+                DeviceBatteryTriggerDefinition battery => battery.IntervalMinutes,
+                DeviceLocationTriggerDefinition location => location.IntervalMinutes,
+                CalendarWindowTriggerDefinition calendar => calendar.IntervalMinutes,
+                _ => 15
+            };
+            await client.StartWorkflowAsync(
+                (AutomationPollWorkflow workflow) => workflow.RunAsync(
+                    new AutomationPollWorkflowInput(rule.Id, rule.OwnerId, rule.ScheduleWorkflowId, interval)),
+                new WorkflowOptions(id: rule.ScheduleWorkflowId, taskQueue: TaskQueue)
+                {
+                    IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
+                    IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
+                });
+        }
+    }
+
+    public Task CancelRuleScheduleAsync(string scheduleWorkflowId, CancellationToken cancellationToken) =>
+        CancelAsync(scheduleWorkflowId, cancellationToken);
+
+    public async Task StartRunAsync(AutomationRunRecord run, CancellationToken cancellationToken)
+    {
+        var client = await GetClientAsync(cancellationToken);
+        var input = new AutomationRunWorkflowInput(run.RuleId, run.OwnerId, run.Id, run.IdempotencyKey,
+            run.TriggerKind, run.TriggerReason, run.TestRun);
+        await client.StartWorkflowAsync(
+            (AutomationRunWorkflow workflow) => workflow.RunAsync(input),
+            new WorkflowOptions(id: run.WorkflowId, taskQueue: TaskQueue)
+            {
+                IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
+            });
+    }
+
+    public async Task SignalApprovalResolvedAsync(string runWorkflowId, bool approved,
+        CancellationToken cancellationToken)
+    {
+        var client = await GetClientAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        await client.GetWorkflowHandle(runWorkflowId).SignalAsync(
+            (AutomationRunWorkflow workflow) => workflow.ResolveApprovalAsync(approved));
     }
 
     private async Task<TemporalClient> GetClientAsync(CancellationToken cancellationToken)

@@ -3,6 +3,7 @@ using Jarvis.Domain.Audit;
 using Jarvis.Domain.Conversations;
 using Jarvis.Domain.Devices;
 using Jarvis.Domain.Files;
+using Jarvis.Domain.Automations;
 using Jarvis.Domain.Integrations;
 using Jarvis.Domain.Profiles;
 using Jarvis.Domain.Workflows;
@@ -56,6 +57,8 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<DeviceTelemetry> DeviceTelemetry => Set<DeviceTelemetry>();
     public DbSet<McpOAuthSession> McpOAuthSessions => Set<McpOAuthSession>();
     public DbSet<CodingRun> CodingRuns => Set<CodingRun>();
+    public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
+    public DbSet<AutomationRun> AutomationRuns => Set<AutomationRun>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {

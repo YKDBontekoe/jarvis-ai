@@ -111,6 +111,8 @@ abstract class _ChatScreenController extends State<ChatScreen>
 
   Future<void> _enablePush();
   void _handlePushPayload(Map<String, dynamic> data);
+  Future<void> _openSearch(BuildContext context);
+  Future<void> _openSearchRouteFromNotification(Map<String, dynamic> data);
 
   Future<bool> _send([String? text]);
   void _upsertSurface(UiSurfaceEntry surface);

@@ -1,3 +1,4 @@
+using Jarvis.Application.Automations;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Approvals;
@@ -7,6 +8,7 @@ using Jarvis.Application.Memory;
 using Jarvis.Application.Integrations;
 using Jarvis.Infrastructure.Files;
 using Jarvis.Infrastructure.Persistence;
+using Jarvis.Infrastructure.Search;
 using Amazon.Runtime;
 using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
@@ -63,6 +65,9 @@ public static class DependencyInjection
         services.AddScoped<IUserMcpServerRegistry, UserMcpServerRegistry>();
         services.AddScoped<IOwnerMcpPolicyStore, OwnerMcpPolicyStore>();
         services.AddScoped<IDailyBriefingRepository, DailyBriefingRepository>();
+        services.AddScoped<IAutomationRuleRepository, AutomationRuleRepository>();
+        services.AddScoped<IAutomationRunRepository, AutomationRunRepository>();
+        services.AddScoped<IAutomationChannelSender, Jarvis.Infrastructure.Automations.AutomationChannelSender>();
         services.AddScoped<IDailyBriefingNarrator, NoOpDailyBriefingNarrator>();
         services.AddScoped<Jarvis.Application.Settings.IOwnerSettingsStore, OwnerSettingsStore>();
         services.AddScoped<Jarvis.Application.Skills.ISkillRepository, SkillRepository>();
@@ -74,8 +79,10 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Usage.IUsageDashboard, UsageDashboardService>();
         services.AddScoped<Jarvis.Application.Persona.PersonaService>();
         services.AddScoped<IFileService, FileService>();
+        services.AddHttpClient();
         services.AddScoped<IFileMalwareScanner, ClamAvVirusScanner>();
         services.AddScoped<IFileSearchService, FileSearchService>();
+        services.AddJarvisFederatedSearch(configuration);
         services.AddScoped<IObjectStorage, S3ObjectStorage>();
         var objectStorage = configuration.GetSection("ObjectStorage");
         var serviceUrl = objectStorage["ServiceUrl"] ?? throw new InvalidOperationException("ObjectStorage:ServiceUrl is required.");

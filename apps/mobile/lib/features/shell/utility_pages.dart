@@ -8,6 +8,7 @@ import '../../daily_briefing_screen.dart';
 import '../../files_screen.dart';
 import '../../integrations_screen.dart';
 import '../../memory_screen.dart';
+import '../../automations_screen.dart';
 import '../../reminders_screen.dart';
 import '../../tasks_screen.dart';
 import '../agents/agents_screen.dart';
@@ -32,6 +33,7 @@ Widget? utilityPageFor(String destination, Dio http) => switch (destination) {
   'files' => FilesScreen(http: http),
   'audit' => AuditScreen(http: http),
   'watches' => ConditionWatchesScreen(http: http),
+  'automations' => AutomationsScreen(http: http),
   'briefing' => DailyBriefingScreen(http: http),
   'integrations' => IntegrationsScreen(http: http),
   'appearance' => const AppearanceScreen(),
