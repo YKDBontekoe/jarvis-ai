@@ -72,7 +72,9 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
     } on DioException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_problem(error) ?? 'Could not save automation.')),
+        SnackBar(
+          content: Text(_problem(error) ?? 'Could not save automation.'),
+        ),
       );
     }
   }
@@ -91,12 +93,16 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
     await widget.http.post<void>('/api/v1/automations/$id/test-run');
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Test run started. Check run history when it finishes.')),
+      const SnackBar(
+        content: Text('Test run started. Check run history when it finishes.'),
+      ),
     );
   }
 
   Future<void> _showRuns(String id, String name) async {
-    final response = await widget.http.get<dynamic>('/api/v1/automations/$id/runs');
+    final response = await widget.http.get<dynamic>(
+      '/api/v1/automations/$id/runs',
+    );
     final runs = jsonMaps(response.data);
     if (!mounted) return;
     await showModalBottomSheet<void>(
@@ -128,9 +134,18 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-            ? Center(child: Text(_error!, style: Theme.of(context).textTheme.bodyLarge))
+            ? Center(
+                child: Text(
+                  _error!,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              )
             : _rules.isEmpty
-            ? const Center(child: Text('No automations yet. Create one to chain triggers and actions.'))
+            ? const Center(
+                child: Text(
+                  'No automations yet. Create one to chain triggers and actions.',
+                ),
+              )
             : ListView.separated(
                 itemCount: _rules.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 8),
@@ -140,14 +155,18 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
                   final name = asJsonString(rule['name']) ?? 'Automation';
                   final status = asJsonString(rule['status']) ?? 'draft';
                   final definition = rule['definition'];
-                  final trigger = definition is Map ? definition['kind'] ?? definition['trigger'] : null;
+                  final trigger = definition is Map
+                      ? definition['kind'] ?? definition['trigger']
+                      : null;
                   final triggerKind = trigger is Map
                       ? asJsonString(trigger['kind'])
                       : asJsonString(definition?['trigger']?['kind']);
                   return Card(
                     child: ListTile(
                       title: Text(name),
-                      subtitle: Text('${status.toUpperCase()} · trigger ${triggerKind ?? 'unknown'}'),
+                      subtitle: Text(
+                        '${status.toUpperCase()} · trigger ${triggerKind ?? 'unknown'}',
+                      ),
                       trailing: PopupMenuButton<String>(
                         onSelected: (value) async {
                           switch (value) {
@@ -163,11 +182,23 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
                         },
                         itemBuilder: (_) => [
                           if (status != 'enabled')
-                            const PopupMenuItem(value: 'enable', child: Text('Enable')),
+                            const PopupMenuItem(
+                              value: 'enable',
+                              child: Text('Enable'),
+                            ),
                           if (status == 'enabled')
-                            const PopupMenuItem(value: 'disable', child: Text('Disable')),
-                          const PopupMenuItem(value: 'test', child: Text('Test run')),
-                          const PopupMenuItem(value: 'runs', child: Text('Run history')),
+                            const PopupMenuItem(
+                              value: 'disable',
+                              child: Text('Disable'),
+                            ),
+                          const PopupMenuItem(
+                            value: 'test',
+                            child: Text('Test run'),
+                          ),
+                          const PopupMenuItem(
+                            value: 'runs',
+                            child: Text('Run history'),
+                          ),
                         ],
                       ),
                     ),
@@ -177,6 +208,17 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
       ),
     );
   }
+}
+
+String _formatRunStart(BuildContext context, dynamic value) {
+  final parsed = jsonDate(value, local: true);
+  if (parsed == null) return asJsonString(value) ?? '';
+  final localizations = MaterialLocalizations.of(context);
+  final clock = localizations.formatTimeOfDay(
+    TimeOfDay.fromDateTime(parsed),
+    alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+  );
+  return '${localizations.formatMediumDate(parsed)} · $clock';
 }
 
 class _RunHistorySheet extends StatelessWidget {
@@ -193,7 +235,10 @@ class _RunHistorySheet extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Runs · $title', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Runs · $title',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 12),
             Expanded(
               child: runs.isEmpty
@@ -204,11 +249,12 @@ class _RunHistorySheet extends StatelessWidget {
                         final run = runs[index];
                         final status = asJsonString(run['status']) ?? '';
                         final reason = asJsonString(run['triggerReason']) ?? '';
-                        final started = asJsonString(run['startedAt']) ?? '';
                         return ListTile(
                           dense: true,
                           title: Text('$status · $reason'),
-                          subtitle: Text(started),
+                          subtitle: Text(
+                            _formatRunStart(context, run['startedAt']),
+                          ),
                         );
                       },
                     ),
@@ -240,7 +286,8 @@ class _SimpleAutomationDialog extends StatefulWidget {
   const _SimpleAutomationDialog();
 
   @override
-  State<_SimpleAutomationDialog> createState() => _SimpleAutomationDialogState();
+  State<_SimpleAutomationDialog> createState() =>
+      _SimpleAutomationDialogState();
 }
 
 class _SimpleAutomationDialogState extends State<_SimpleAutomationDialog> {
@@ -268,16 +315,38 @@ class _SimpleAutomationDialogState extends State<_SimpleAutomationDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: _name, decoration: const InputDecoration(labelText: 'Name')),
-            TextField(controller: _time, decoration: const InputDecoration(labelText: 'Local time (HH:mm:ss)')),
-            TextField(controller: _zone, decoration: const InputDecoration(labelText: 'IANA time zone')),
-            TextField(controller: _title, decoration: const InputDecoration(labelText: 'Notification title')),
-            TextField(controller: _body, decoration: const InputDecoration(labelText: 'Notification body')),
+            TextField(
+              controller: _name,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            TextField(
+              controller: _time,
+              decoration: const InputDecoration(
+                labelText: 'Local time (HH:mm:ss)',
+              ),
+            ),
+            TextField(
+              controller: _zone,
+              decoration: const InputDecoration(labelText: 'IANA time zone'),
+            ),
+            TextField(
+              controller: _title,
+              decoration: const InputDecoration(
+                labelText: 'Notification title',
+              ),
+            ),
+            TextField(
+              controller: _body,
+              decoration: const InputDecoration(labelText: 'Notification body'),
+            ),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
         FilledButton(
           onPressed: () {
             if (_name.text.trim().isEmpty || _body.text.trim().isEmpty) return;
