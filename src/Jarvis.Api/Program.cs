@@ -41,6 +41,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
 app.UseExceptionHandler();
+app.UseJarvisApiProblemResponses();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();

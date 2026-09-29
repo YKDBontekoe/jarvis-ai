@@ -40,9 +40,8 @@ String? _messageForCode(
 ) {
   switch (code) {
     case JarvisApiErrorCodes.authenticationRequired:
-      return legacyMessage ??
-          problem.detail ??
-          'Your sign-in has expired. Sign in again to continue.';
+      if (legacyMessage != null && legacyMessage.isNotEmpty) return legacyMessage;
+      return 'Your sign-in has expired. Sign in again to continue.';
     case JarvisApiErrorCodes.authorizationForbidden:
       return legacyMessage ??
           problem.detail ??

@@ -72,6 +72,7 @@ internal static class ApiErrorServiceCollectionExtensions
 
             context.HandleResponse();
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            context.Response.Headers.WWWAuthenticate = "Bearer";
             context.Response.ContentType = "application/problem+json";
 
             var problem = JarvisProblemDetails.Create(

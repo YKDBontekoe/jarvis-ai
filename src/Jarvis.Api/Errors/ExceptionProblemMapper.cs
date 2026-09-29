@@ -9,15 +9,24 @@ internal static class ExceptionProblemMapper
 {
     internal readonly record struct MappedProblem(string Code, string Title, int Status, string Detail);
 
-    public static MappedProblem Map(Exception exception)
+    public static MappedProblem Map(Exception exception, HttpContext? httpContext = null)
     {
         if (CancellationExceptions.Unwrap(exception) is not null)
         {
+            if (httpContext?.RequestAborted.IsCancellationRequested == true)
+            {
+                return new MappedProblem(
+                    ApiErrorCodes.RequestCancelled,
+                    "Request cancelled",
+                    StatusCodes.Status499ClientClosedRequest,
+                    "The request was cancelled.");
+            }
+
             return new MappedProblem(
-                ApiErrorCodes.RequestCancelled,
-                "Request cancelled",
-                StatusCodes.Status499ClientClosedRequest,
-                "The request was cancelled.");
+                ApiErrorCodes.Timeout,
+                "Timeout",
+                StatusCodes.Status504GatewayTimeout,
+                "The request timed out.");
         }
 
         return exception switch

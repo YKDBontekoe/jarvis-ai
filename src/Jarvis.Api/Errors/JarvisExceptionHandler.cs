@@ -11,7 +11,7 @@ internal sealed class JarvisExceptionHandler(
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception,
         CancellationToken cancellationToken)
     {
-        var mapped = ExceptionProblemMapper.Map(exception);
+        var mapped = ExceptionProblemMapper.Map(exception, httpContext);
         if (mapped.Status >= StatusCodes.Status500InternalServerError)
             logger.LogError(exception, "Unhandled API exception mapped to {Code}.", mapped.Code);
         else

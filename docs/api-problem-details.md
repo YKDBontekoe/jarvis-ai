@@ -42,3 +42,9 @@ During the mobile rollout, clients should:
 3. Use `firstProblemMessage` / `detail` / `errors` for user-visible text.
 
 Production responses never include stack traces, SQL, credential-bearing URLs, or other sensitive internals. Internal failures use a generic `detail` with `code: internal_error`.
+
+## Pipeline
+
+- Unhandled exceptions are formatted by `IExceptionHandler` (`JarvisExceptionHandler`).
+- `/api/*` responses with HTTP error status codes are normalized by `JarvisApiProblemResponseMiddleware`, including empty `404` responses and legacy `{ "message": "..." }` bodies.
+- JWT bearer challenges return `application/problem+json` and `WWW-Authenticate: Bearer`.

@@ -55,6 +55,35 @@ public sealed class ApiProblemDetailsTests
     }
 
     [Fact]
+    public void ExceptionProblemMapper_maps_client_abort_to_request_cancelled()
+    {
+        var httpContext = new DefaultHttpContext();
+        httpContext.RequestAborted = new CancellationToken(canceled: true);
+        var mapped = ExceptionProblemMapper.Map(new OperationCanceledException(), httpContext);
+        Assert.Equal(ApiErrorCodes.RequestCancelled, mapped.Code);
+        Assert.Equal(StatusCodes.Status499ClientClosedRequest, mapped.Status);
+    }
+
+    [Fact]
+    public void ExceptionProblemMapper_maps_dependency_timeout_to_timeout()
+    {
+        var httpContext = new DefaultHttpContext();
+        var mapped = ExceptionProblemMapper.Map(new TaskCanceledException(), httpContext);
+        Assert.Equal(ApiErrorCodes.Timeout, mapped.Code);
+        Assert.Equal(StatusCodes.Status504GatewayTimeout, mapped.Status);
+    }
+
+    [Fact]
+    public void LegacyErrorResponseParser_reads_message_and_validation_errors()
+    {
+        Assert.Equal("Busy.", LegacyErrorResponseParser.ExtractClientDetail("{\"message\":\"Busy.\"}"));
+        Assert.True(LegacyErrorResponseParser.TryParseValidationErrors(
+            "{\"errors\":{\"email\":[\"Invalid.\"]}}", out var errors));
+        Assert.Equal("Invalid.", errors["email"][0]);
+        Assert.True(LegacyErrorResponseParser.AlreadyProblemContract("{\"code\":\"conflict\"}"));
+    }
+
+    [Fact]
     public void ApplyProductionRedaction_hides_internal_failure_details()
     {
         var problem = new ProblemDetails

@@ -11,12 +11,13 @@ internal static class RemoteQueryResults
         {
             return (await run()).ToHttpResult();
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException exception)
         {
             var httpContext = ApiProblemResults.CurrentContext;
             if (httpContext is null)
                 return Results.StatusCode(StatusCodes.Status499ClientClosedRequest);
-            return ApiProblemResults.RequestCancelled(httpContext);
+            var mapped = ExceptionProblemMapper.Map(exception, httpContext);
+            return ApiProblemResults.Problem(httpContext, mapped.Code, mapped.Title, mapped.Status, mapped.Detail);
         }
     }
 }
