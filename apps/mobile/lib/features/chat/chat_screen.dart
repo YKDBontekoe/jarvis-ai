@@ -19,6 +19,10 @@ import '../../conversations_screen.dart';
 import '../../json_maps.dart';
 import '../../notification_details_screen.dart';
 import '../../notification_routing.dart';
+import '../../file_download_stub.dart'
+    if (dart.library.io) '../../file_download_io.dart'
+    if (dart.library.js_interop) '../../file_download_web.dart'
+    as file_download;
 import '../../task_details_screen.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
@@ -51,6 +55,7 @@ part 'chat_screen_transcript.dart';
 part 'chat_screen_voice.dart';
 part 'chat_screen_ui.dart';
 part 'chat_screen_auth.dart';
+part 'chat_screen_sources.dart';
 part 'chat_screen_search.dart';
 
 const _voiceCapture = AudioCaptureOptions(

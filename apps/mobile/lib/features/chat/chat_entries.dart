@@ -7,6 +7,59 @@ sealed class ChatEntry {
   const ChatEntry();
 }
 
+class MessageCitation {
+  const MessageCitation({
+    required this.fileId,
+    required this.displayName,
+    required this.chunkId,
+    required this.chunkIndex,
+    required this.excerpt,
+    this.pageNumber,
+    this.sourceStatus = 'available',
+  });
+
+  final String fileId;
+  final String displayName;
+  final String chunkId;
+  final int chunkIndex;
+  final String excerpt;
+  final int? pageNumber;
+  final String sourceStatus;
+
+  static MessageCitation? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final fileId = asJsonString(value['fileId'] ?? value['FileId']);
+    final chunkId = asJsonString(value['chunkId'] ?? value['ChunkId']);
+    final name = value['displayName'] ?? value['DisplayName'];
+    if (fileId == null || chunkId == null || name is! String) return null;
+    final index = value['chunkIndex'] ?? value['ChunkIndex'];
+    final excerpt = value['excerpt'] ?? value['Excerpt'];
+    final page = value['pageNumber'] ?? value['PageNumber'];
+    final status = value['sourceStatus'] ?? value['SourceStatus'];
+    return MessageCitation(
+      fileId: fileId,
+      displayName: name,
+      chunkId: chunkId,
+      chunkIndex: index is int ? index : int.tryParse('$index') ?? 0,
+      excerpt: excerpt is String ? excerpt : '',
+      pageNumber: page is int ? page : int.tryParse('$page'),
+      sourceStatus: status is String ? status : 'available',
+    );
+  }
+}
+
+class ConversationSourceChip {
+  const ConversationSourceChip({
+    required this.id,
+    required this.label,
+    required this.kind,
+  });
+
+  final String id;
+  final String label;
+  final String kind;
+}
+
 class MessageEntry extends ChatEntry {
   const MessageEntry({
     required this.role,
@@ -15,6 +68,7 @@ class MessageEntry extends ChatEntry {
     this.failed = false,
     this.id,
     this.rating,
+    this.citations = const [],
   });
 
   final String role;
@@ -27,6 +81,9 @@ class MessageEntry extends ChatEntry {
   /// The owner's feedback on an assistant reply: `up`, `down`, or null.
   final String? rating;
 
+  /// Structured file citations for assistant replies.
+  final List<MessageCitation> citations;
+
   /// A user message whose request did not complete and can be retried.
   final bool failed;
 
@@ -38,6 +95,7 @@ class MessageEntry extends ChatEntry {
     bool? failed,
     String? id,
     String? rating,
+    List<MessageCitation>? citations,
   }) => MessageEntry(
     role: role,
     content: content ?? this.content,
@@ -45,6 +103,7 @@ class MessageEntry extends ChatEntry {
     failed: failed ?? this.failed,
     id: id ?? this.id,
     rating: rating ?? this.rating,
+    citations: citations ?? this.citations,
   );
 }
 
@@ -235,6 +294,11 @@ class UiSurfaceEntry extends ChatEntry {
     status: status ?? this.status,
     schema: schema,
   );
+}
+
+List<MessageCitation> parseMessageCitations(Object? value) {
+  if (value is! List) return const [];
+  return value.map(MessageCitation.fromJson).whereType<MessageCitation>().toList();
 }
 
 class BrowserStepItem {

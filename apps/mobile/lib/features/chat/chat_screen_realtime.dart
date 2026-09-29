@@ -69,7 +69,11 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       final payload = _payload(arguments);
       final content = asJsonString(payload?['content']) ?? '';
       setState(() {
-        _completeAssistant(content, id: asJsonString(payload?['id']));
+        _completeAssistant(
+          content,
+          id: asJsonString(payload?['id']),
+          citations: parseMessageCitations(payload?['citations']),
+        );
         if (content.trim().isNotEmpty) {
           _settleSubmittingApprovals();
         }

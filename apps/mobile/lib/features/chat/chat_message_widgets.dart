@@ -5,6 +5,7 @@ class MessageBubble extends StatefulWidget {
     required this.message,
     this.onRetry,
     this.onRate,
+    this.onCitationTap,
     super.key,
   });
 
@@ -13,6 +14,7 @@ class MessageBubble extends StatefulWidget {
 
   /// Rates an assistant reply `up` or `down`; hidden until the reply is stored.
   final ValueChanged<String>? onRate;
+  final ValueChanged<MessageCitation>? onCitationTap;
 
   @override
   State<MessageBubble> createState() => _MessageBubbleState();
@@ -60,6 +62,28 @@ class _MessageBubbleState extends State<MessageBubble> {
                   padding: const EdgeInsets.only(top: 3),
                   child: JarvisMarkdown(data: message.content),
                 ),
+                if (!message.isUser && message.citations.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final citation in message.citations)
+                          ActionChip(
+                            label: Text(
+                              citation.pageNumber == null
+                                  ? citation.displayName
+                                  : '${citation.displayName} · p.${citation.pageNumber}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            onPressed: widget.onCitationTap == null
+                                ? null
+                                : () => widget.onCitationTap!(citation),
+                          ),
+                      ],
+                    ),
+                  ),
                 if (!message.pending)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),

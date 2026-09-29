@@ -3,6 +3,7 @@ using System.Text;
 using Jarvis.Api.Conversations;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Files;
 using Jarvis.Application.Profiles;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Conversations;
@@ -110,6 +111,66 @@ internal static class ConversationEndpoints
             queries.TryCancel(currentUser.OwnerId, conversationId);
             return Results.NoContent();
         }).WithName("CancelConversationRun");
+
+        api.MapGet("/conversations/{conversationId:guid}/sources", async (Guid conversationId,
+                IConversationStore store, IConversationFileContextRepository sources, IDocumentCollectionRepository collections,
+                IFileRepository files, ICurrentUser currentUser, CancellationToken ct) =>
+            {
+                if (await store.GetAsync(conversationId, currentUser.OwnerId, ct) is null)
+                    return Results.NotFound();
+                var attached = await sources.GetSourcesAsync(conversationId, currentUser.OwnerId, ct);
+                var fileDtos = new List<ConversationFileSourceDto>();
+                foreach (var file in attached.Files)
+                {
+                    var stored = await files.GetAsync(file.FileId, currentUser.OwnerId, ct);
+                    if (stored is null) continue;
+                    fileDtos.Add(new ConversationFileSourceDto(stored.Id, stored.FileName, stored.ProcessingStatus,
+                        file.AttachedAt));
+                }
+
+                var collectionDtos = new List<ConversationCollectionSourceDto>();
+                foreach (var collection in attached.Collections)
+                {
+                    var record = await collections.GetAsync(collection.CollectionId, currentUser.OwnerId, ct);
+                    if (record is null) continue;
+                    collectionDtos.Add(new ConversationCollectionSourceDto(record.Id, record.Name, collection.AttachedAt));
+                }
+
+                return Results.Ok(new ConversationSourcesDto(fileDtos, collectionDtos));
+            })
+            .WithName("GetConversationSources");
+
+        api.MapPost("/conversations/{conversationId:guid}/sources/files/{fileId:guid}",
+                async (Guid conversationId, Guid fileId, IConversationFileContextRepository sources,
+                    ICurrentUser currentUser, CancellationToken ct) =>
+                    await sources.AttachFileAsync(conversationId, fileId, currentUser.OwnerId, ct)
+                        ? Results.NoContent()
+                        : Results.NotFound())
+            .WithName("AttachConversationFile");
+
+        api.MapDelete("/conversations/{conversationId:guid}/sources/files/{fileId:guid}",
+                async (Guid conversationId, Guid fileId, IConversationFileContextRepository sources,
+                    ICurrentUser currentUser, CancellationToken ct) =>
+                    await sources.DetachFileAsync(conversationId, fileId, currentUser.OwnerId, ct)
+                        ? Results.NoContent()
+                        : Results.NotFound())
+            .WithName("DetachConversationFile");
+
+        api.MapPost("/conversations/{conversationId:guid}/sources/collections/{collectionId:guid}",
+                async (Guid conversationId, Guid collectionId, IConversationFileContextRepository sources,
+                    ICurrentUser currentUser, CancellationToken ct) =>
+                    await sources.AttachCollectionAsync(conversationId, collectionId, currentUser.OwnerId, ct)
+                        ? Results.NoContent()
+                        : Results.NotFound())
+            .WithName("AttachConversationCollection");
+
+        api.MapDelete("/conversations/{conversationId:guid}/sources/collections/{collectionId:guid}",
+                async (Guid conversationId, Guid collectionId, IConversationFileContextRepository sources,
+                    ICurrentUser currentUser, CancellationToken ct) =>
+                    await sources.DetachCollectionAsync(conversationId, collectionId, currentUser.OwnerId, ct)
+                        ? Results.NoContent()
+                        : Results.NotFound())
+            .WithName("DetachConversationCollection");
 
         api.MapPut("/conversations/{conversationId:guid}/profile", async (Guid conversationId,
             SwitchConversationProfileRequest request, IConversationStore store, IAssistantProfileService profiles,

@@ -74,6 +74,10 @@ mixin _ChatScreenUi on _ChatScreenController {
           subtitle: Text(subtitle),
           onTap: () {
             Navigator.pop(context);
+            if (to == 'attach-sources') {
+              unawaited(_pickConversationSources());
+              return;
+            }
             _openUtility(to);
           },
         );
@@ -86,6 +90,12 @@ mixin _ChatScreenUi on _ChatScreenController {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                action(
+                  'Attach chat sources',
+                  'Limit file search to selected documents',
+                  PhosphorIconsRegular.folders,
+                  'attach-sources',
+                ),
                 action(
                   'Upload a file',
                   'PDFs and text become searchable',
@@ -302,6 +312,10 @@ mixin _ChatScreenUi on _ChatScreenController {
                     ? null
                     : () => _selectDestination(2),
                 onAttach: _showQuickActions,
+                sources: _sourceChips,
+                onRemoveSource: _conversationId == null
+                    ? null
+                    : (source) => unawaited(_detachSource(source)),
                 sending: _busy,
                 awaitingApproval: _hasPendingApproval,
                 voiceActive: _voiceActive,
@@ -322,6 +336,7 @@ mixin _ChatScreenUi on _ChatScreenController {
       onRate: entry.id == null || _conversationId == null
           ? null
           : (rating) => unawaited(_rate(entry, rating)),
+      onCitationTap: (citation) => unawaited(_openCitation(citation)),
     ),
     ToolRunEntry() => ToolRunView(run: entry),
     ApprovalEntry() => ApprovalCard(

@@ -132,6 +132,9 @@ public sealed class FileContentRepository(JarvisDbContext db) : IFileContentRepo
             OwnerId = ownerId,
             ChunkIndex = chunk.Index,
             Content = chunk.Content,
+            StartOffset = chunk.StartOffset,
+            EndOffset = chunk.EndOffset,
+            PageNumber = chunk.PageNumber,
             Embedding = null
         }));
         await db.SaveChangesAsync(cancellationToken);
@@ -182,6 +185,12 @@ public sealed class FileContentRepository(JarvisDbContext db) : IFileContentRepo
         var names = await db.Files.AsNoTracking().Where(x => x.OwnerId == ownerId && ids.Contains(x.Id))
             .ToDictionaryAsync(x => x.Id, x => x.FileName, cancellationToken);
         return chunks.Where(x => names.ContainsKey(x.FileId))
-            .Select(x => new FileSearchHit(x.FileId, names[x.FileId], x.ChunkIndex, x.Content, 0)).ToArray();
+            .Select(x =>
+            {
+                var sanitized = FileReferenceSanitizer.SanitizeExcerpt(x.Content);
+                var excerptEnd = Math.Min(sanitized.Length, x.Content.Length);
+                return new FileSearchHit(x.FileId, names[x.FileId], x.Id, x.ChunkIndex, x.Content, 0,
+                    0, excerptEnd, x.PageNumber, sanitized);
+            }).ToArray();
     }
 }
