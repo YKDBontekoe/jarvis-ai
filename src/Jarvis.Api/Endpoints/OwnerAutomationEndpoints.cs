@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Jarvis.Application.Automations;
 using Jarvis.Application.Conversations;
 using Jarvis.Domain.Automations;
@@ -50,7 +51,17 @@ internal static class OwnerAutomationEndpoints
         }).WithName("UpdateAutomation");
 
         group.MapPost("/validate", async (SaveAutomationRuleRequest request, IAutomationRuleService automations,
-            CancellationToken ct) => Results.Ok(await automations.ValidateAsync(request.Definition)))
+            CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await automations.ValidateAsync(request.ParseDefinition()));
+            }
+            catch (JsonException exception)
+            {
+                return EndpointHelpers.Invalid("definition", exception.Message);
+            }
+        })
             .WithName("ValidateAutomation");
 
         group.MapPost("/{id:guid}/enable", async (Guid id, IAutomationRuleService automations, ICurrentUser user,

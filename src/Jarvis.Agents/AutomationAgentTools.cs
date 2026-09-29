@@ -29,7 +29,8 @@ internal sealed class AutomationAgentTools(IAutomationRuleService automations, I
         try
         {
             var definition = AutomationDefinitionJson.Parse(definitionJson);
-            var rule = await automations.CreateAsync(currentUser.OwnerId, new SaveAutomationRuleRequest(name, definition),
+            var rule = await automations.CreateAsync(currentUser.OwnerId,
+                new SaveAutomationRuleRequest(name, JsonDocument.Parse(definitionJson).RootElement),
                 cancellationToken);
             return $"Created draft automation '{rule.Name}' ({rule.Id}). Enable it when ready.";
         }

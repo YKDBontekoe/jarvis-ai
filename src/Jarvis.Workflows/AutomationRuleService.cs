@@ -14,18 +14,20 @@ public sealed class AutomationRuleService(
         CancellationToken cancellationToken)
     {
         AutomationRuleValidator.ValidateName(request.Name);
-        AutomationRuleValidator.Validate(request.Definition);
-        return rules.CreateAsync(ownerId, request.Name, request.Definition, cancellationToken);
+        var definition = request.ParseDefinition();
+        AutomationRuleValidator.Validate(definition);
+        return rules.CreateAsync(ownerId, request.Name, definition, cancellationToken);
     }
 
     public async Task<AutomationRuleRecord?> UpdateAsync(Guid id, Guid ownerId, SaveAutomationRuleRequest request,
         CancellationToken cancellationToken)
     {
         AutomationRuleValidator.ValidateName(request.Name);
-        AutomationRuleValidator.Validate(request.Definition);
+        var definition = request.ParseDefinition();
+        AutomationRuleValidator.Validate(definition);
         try
         {
-            return await rules.UpdateDraftAsync(id, ownerId, request.Name, request.Definition, cancellationToken);
+            return await rules.UpdateDraftAsync(id, ownerId, request.Name, definition, cancellationToken);
         }
         catch (KeyNotFoundException)
         {

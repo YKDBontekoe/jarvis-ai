@@ -42,6 +42,8 @@ builder.Services.AddHostedService<TemporalWorkflowReconciler>();
 builder.Services.AddHostedService<MemoryIndexingWorker>();
 builder.Services.AddScoped<IReminderService, ReminderService>();
 builder.Services.AddScoped<IConditionWatchService, ConditionWatchService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IDailyBriefingService, DailyBriefingService>();
 builder.Services.AddScoped<IAutomationRuleService, AutomationRuleService>();
 builder.Services.AddScoped<IAutomationTriggerPublisher, AutomationTriggerPublisher>();
 builder.Services.AddScoped<IAutomationRunExecutor, AutomationRunExecutor>();

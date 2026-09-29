@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Jarvis.Domain.Automations;
 
 namespace Jarvis.Application.Automations;
@@ -33,7 +34,10 @@ public sealed record AutomationRunRecord(
     DateTimeOffset StartedAt,
     DateTimeOffset? CompletedAt);
 
-public sealed record SaveAutomationRuleRequest(string Name, AutomationRuleDefinition Definition);
+public sealed record SaveAutomationRuleRequest(string Name, JsonElement Definition)
+{
+    public AutomationRuleDefinition ParseDefinition() => AutomationDefinitionJson.Deserialize(Definition.GetRawText());
+}
 
 public sealed record AutomationValidationResult(bool Valid, IReadOnlyList<string> Errors);
 
