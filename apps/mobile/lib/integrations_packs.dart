@@ -30,7 +30,9 @@ mixin _IntegrationsPacks on _IntegrationsController {
               ),
               StatusPill(
                 label: installed ? 'Connected' : 'Not connected',
-                color: installed ? JarvisColors.success : JarvisColors.muted,
+                color: installed
+                    ? JarvisColors.of(context).success
+                    : JarvisColors.of(context).muted,
               ),
             ],
           ),
@@ -38,7 +40,10 @@ mixin _IntegrationsPacks on _IntegrationsController {
             const SizedBox(height: 10),
             Text(
               description,
-              style: const TextStyle(color: JarvisColors.inkSoft, height: 1.4),
+              style: TextStyle(
+                color: JarvisColors.of(context).inkSoft,
+                height: 1.4,
+              ),
             ),
           ],
           const SizedBox(height: 8),
@@ -139,8 +144,7 @@ mixin _IntegrationsPacks on _IntegrationsController {
       }
       if (authorize == null) {
         setState(
-          () => _error =
-              'This server did not return an authorization URL. Store a token instead.',
+          () => _error = 'This server did not return an authorization URL. Store a token instead.',
         );
         return;
       }
@@ -176,9 +180,7 @@ mixin _IntegrationsPacks on _IntegrationsController {
           }
           if (state == 'failed') {
             setState(
-              () => _error =
-                  asJsonString(session?['error']) ??
-                  'Authorization did not finish. You can store a token instead.',
+              () => _error = asJsonString(session?['error']) ?? 'Authorization did not finish. You can store a token instead.',
             );
             return;
           }

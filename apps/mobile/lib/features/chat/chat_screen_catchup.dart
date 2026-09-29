@@ -73,10 +73,17 @@ mixin _ChatScreenCatchUp on _ChatScreenController {
     try {
       final details = await _http.get<dynamic>(
         '/api/v1/conversations/$conversationId',
+        queryParameters: const {'includeMessages': false},
       );
       if (!current()) return;
       var payload = jsonObject(details.data);
-      var stored = jsonMaps(payload?['messages']);
+      var messageResponse = await _http.get<dynamic>(
+        '/api/v1/conversations/$conversationId/messages',
+        queryParameters: const {'limit': 50},
+      );
+      if (!current()) return;
+      var messagePage = jsonObject(messageResponse.data);
+      var stored = jsonMaps(messagePage?['items']);
       if (asJsonBool(payload?['responding']) ||
           !serverStoredReply(stored, _pendingQueryText)) {
         if (asJsonBool(payload?['responding'])) {
@@ -94,10 +101,17 @@ mixin _ChatScreenCatchUp on _ChatScreenController {
         if (!current()) return;
         final confirmed = await _http.get<dynamic>(
           '/api/v1/conversations/$conversationId',
+          queryParameters: const {'includeMessages': false},
         );
         if (!current()) return;
         payload = jsonObject(confirmed.data);
-        stored = jsonMaps(payload?['messages']);
+        messageResponse = await _http.get<dynamic>(
+          '/api/v1/conversations/$conversationId/messages',
+          queryParameters: const {'limit': 50},
+        );
+        if (!current()) return;
+        messagePage = jsonObject(messageResponse.data);
+        stored = jsonMaps(messagePage?['items']);
         if (asJsonBool(payload?['responding'])) {
           setState(() {
             _sending = true;
@@ -109,7 +123,7 @@ mixin _ChatScreenCatchUp on _ChatScreenController {
         }
       }
       final sent = _pendingQueryText;
-      stored = jsonMaps(payload?['messages']);
+      stored = jsonMaps(messagePage?['items']);
       final accepted =
           sent == null ||
           stored.any(
@@ -137,7 +151,7 @@ mixin _ChatScreenCatchUp on _ChatScreenController {
       final approvals = await _loadConversationApprovals(conversationId);
       if (!current()) return;
       setState(() {
-        _replaceTranscript(payload, approvals);
+        _replaceTranscript(messagePage, approvals);
         _remoteQuery = false;
         _sending = false;
         _pendingQueryText = null;
@@ -194,7 +208,7 @@ mixin _ChatScreenCatchUp on _ChatScreenController {
     _entries
       ..clear()
       ..addAll(
-        jsonMaps(details?['messages'])
+        jsonMaps(details?['items'])
             .where(
               (message) =>
                   message['role'] is String && message['content'] is String,
@@ -207,6 +221,8 @@ mixin _ChatScreenCatchUp on _ChatScreenController {
               ),
             ),
       );
+    _messageCursor = asJsonString(details?['nextCursor']);
+    _hasOlderMessages = asJsonBool(details?['hasMore']);
     _addApprovals(knownApprovals);
   }
 

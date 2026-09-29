@@ -42,6 +42,64 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Message_pages_are_bounded_stable_and_deterministic_for_equal_timestamps()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var store = new ConversationStore(database);
+        var conversation = await store.CreateAsync(owner, "Long transcript", CancellationToken.None);
+        var messages = Enumerable.Range(0, 205)
+            .Select(index => new Message(conversation.Id, index % 2 == 0 ? "user" : "assistant", $"message-{index}"))
+            .ToArray();
+        database.Messages.AddRange(messages);
+        await database.SaveChangesAsync();
+        var timestamp = DateTimeOffset.UtcNow.AddMinutes(-1);
+        await database.Messages.Where(message => message.ConversationId == conversation.Id)
+            .ExecuteUpdateAsync(update => update.SetProperty(message => message.CreatedAt, timestamp));
+        database.ChangeTracker.Clear();
+
+        var received = new List<Message>();
+        MessageCursor? cursor = null;
+        do
+        {
+            var page = await store.GetMessagePageAsync(conversation.Id, cursor, 37, CancellationToken.None);
+            Assert.InRange(page.Items.Count, 1, 37);
+            received.InsertRange(0, page.Items);
+            cursor = page.NextCursor;
+            if (!page.HasMore) break;
+            Assert.NotNull(cursor);
+        } while (true);
+
+        Assert.Equal(205, received.Count);
+        Assert.Equal(205, received.Select(message => message.Id).Distinct().Count());
+        Assert.Equal(received.OrderBy(message => message.CreatedAt).ThenBy(message => message.Id), received);
+    }
+
+    [Fact]
+    public async Task Message_cursor_remains_valid_after_boundary_deletion_and_concurrent_insert()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var store = new ConversationStore(database);
+        var conversation = await store.CreateAsync(owner, "Changing transcript", CancellationToken.None);
+        for (var index = 0; index < 5; index++)
+            await store.AddMessageAsync(new Message(conversation.Id, "user", index.ToString()), CancellationToken.None);
+
+        var newest = await store.GetMessagePageAsync(conversation.Id, null, 2, CancellationToken.None);
+        var boundary = Assert.IsType<MessageCursor>(newest.NextCursor);
+        database.Messages.Remove(await database.Messages.SingleAsync(message => message.Id == boundary.Id));
+        database.Messages.Add(new Message(conversation.Id, "assistant", "concurrent"));
+        await database.SaveChangesAsync();
+
+        var older = await store.GetMessagePageAsync(conversation.Id, boundary, 10, CancellationToken.None);
+        Assert.False(older.HasMore);
+        Assert.Equal(3, older.Items.Count);
+        Assert.All(older.Items, message => Assert.True(message.CreatedAt < boundary.CreatedAt ||
+            message.CreatedAt == boundary.CreatedAt && message.Id.CompareTo(boundary.Id) < 0));
+        Assert.Empty((await store.GetMessagePageAsync(Guid.CreateVersion7(), null, 10, CancellationToken.None)).Items);
+    }
+
+    [Fact]
     public async Task Memory_search_supports_null_category_and_excludes_other_owners_and_expired_records()
     {
         var owner = Guid.CreateVersion7();

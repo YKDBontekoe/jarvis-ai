@@ -117,7 +117,7 @@ class _SkillEditorSheetState extends State<SkillEditorSheet> {
             widget.import
                 ? 'Paste a SKILL.md file from OpenClaw, Hermes, Claude Code, Codex, or another Jarvis.'
                 : 'Saving locks the skill so Jarvis never overwrites your version.',
-            style: const TextStyle(color: JarvisColors.inkSoft),
+            style: TextStyle(color: JarvisColors.of(context).inkSoft),
           ),
           const SizedBox(height: 16),
           if (widget.import)
@@ -127,8 +127,7 @@ class _SkillEditorSheetState extends State<SkillEditorSheet> {
               minLines: 10,
               maxLines: 18,
               decoration: const InputDecoration(
-                hintText:
-                    '---\nname: my-skill\ndescription: When to use it\n---\n\n1. First step…',
+                hintText: '---\nname: my-skill\ndescription: When to use it\n---\n\n1. First step…',
               ),
             )
           else ...[

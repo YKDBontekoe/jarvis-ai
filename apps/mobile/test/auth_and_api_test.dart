@@ -121,6 +121,7 @@ void main() {
       expect(utilityPageFor('tasks', http), isNotNull);
       expect(utilityPageFor('agents', http), isNotNull);
       expect(utilityPageFor('usage', http), isNotNull);
+      expect(utilityPageFor('appearance', http), isNotNull);
       expect(utilityPageFor('sign_out', http), isNull);
       expect(utilityPageFor('nope', http), isNull);
     },

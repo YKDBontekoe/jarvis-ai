@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import 'ui/phosphor_icons.dart';
 
 import 'http_urls.dart';
@@ -130,9 +131,8 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _condition(Map<String, dynamic> watch) {
@@ -176,8 +176,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
       empty: const EmptyState(
         icon: PhosphorIconsRegular.pulse,
         title: 'No watches yet',
-        message:
-            'No watches yet. Set a threshold and Jarvis will keep an eye on it.',
+        message: 'No watches yet. Set a threshold and Jarvis will keep an eye on it.',
       ),
       child: RefreshIndicator(
         onRefresh: _load,
@@ -217,9 +216,8 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
                     Expanded(
                       child: Text(
                         asJsonString(watch['title']) ?? 'Condition watch',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.titleSmall?.copyWith(fontSize: 15),
+                        style: Theme.of(context).textTheme.titleSmall
+                            ?.copyWith(fontSize: 15),
                       ),
                     ),
                     StatusPill(label: style.label, color: style.color),
@@ -232,16 +230,16 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: JarvisColors.canvas,
+                    color: JarvisColors.of(context).canvas,
                     borderRadius: BorderRadius.circular(JarvisRadii.sm),
-                    border: Border.all(color: JarvisColors.outline),
+                    border: Border.all(color: JarvisColors.of(context).outline),
                   ),
                   child: Text(
                     _condition(watch),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 13,
-                      color: JarvisColors.ink,
+                      color: JarvisColors.of(context).ink,
                     ),
                   ),
                 ),
@@ -280,7 +278,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
   Widget _meta(IconData icon, String text) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(icon, size: 15, color: JarvisColors.muted),
+      Icon(icon, size: 15, color: JarvisColors.of(context).muted),
       const SizedBox(width: 5),
       Text(text, style: Theme.of(context).textTheme.bodySmall),
     ],

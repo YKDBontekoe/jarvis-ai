@@ -24,7 +24,7 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
           });
         }
         return Material(
-          color: JarvisColors.surface,
+          color: JarvisColors.of(context).surface,
           elevation: 18,
           shadowColor: const Color(0x30111113),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
@@ -42,10 +42,10 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
               ),
               children: [
                 const SizedBox(height: 8),
-                const Center(
+                Center(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: JarvisColors.outlineStrong,
+                      color: JarvisColors.of(context).outlineStrong,
                       borderRadius: BorderRadius.all(Radius.circular(99)),
                     ),
                     child: SizedBox(width: 36, height: 4),
@@ -58,11 +58,11 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
                 ],
                 SectionHeader(title),
                 if (listed.isEmpty)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.fromLTRB(4, 4, 4, 12),
                     child: Text(
                       'Nothing matches this filter.',
-                      style: TextStyle(color: JarvisColors.inkSoft),
+                      style: TextStyle(color: JarvisColors.of(context).inkSoft),
                     ),
                   )
                 else
@@ -102,8 +102,8 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
                   ),
                   Text(
                     '${graphTypeLabel(node.type)} · ${node.relationCount} current ${node.relationCount == 1 ? 'fact' : 'facts'}',
-                    style: const TextStyle(
-                      color: JarvisColors.inkSoft,
+                    style: TextStyle(
+                      color: JarvisColors.of(context).inkSoft,
                       fontSize: 12.5,
                     ),
                   ),
@@ -129,7 +129,7 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
           const SizedBox(height: 8),
           Text(
             'Also known as ${node.aliases.join(', ')}',
-            style: const TextStyle(color: JarvisColors.inkSoft),
+            style: TextStyle(color: JarvisColors.of(context).inkSoft),
           ),
         ],
         if (node.summary != null) ...[
@@ -140,14 +140,17 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
           const SizedBox(height: 4),
           Text(
             'Updated ${formatGraphDay(updated)}',
-            style: const TextStyle(fontSize: 12, color: JarvisColors.muted),
+            style: TextStyle(
+              fontSize: 12,
+              color: JarvisColors.of(context).muted,
+            ),
           ),
         ],
         const SizedBox(height: 10),
         if (facts.isEmpty)
-          const Text(
+          Text(
             'No current facts in this view.',
-            style: TextStyle(color: JarvisColors.inkSoft),
+            style: TextStyle(color: JarvisColors.of(context).inkSoft),
           )
         else
           for (final fact in facts) _factRow(fact),
@@ -156,7 +159,10 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               '$extra more in the timeline',
-              style: const TextStyle(fontSize: 12.5, color: JarvisColors.muted),
+              style: TextStyle(
+                fontSize: 12.5,
+                color: JarvisColors.of(context).muted,
+              ),
             ),
           ),
       ],
@@ -166,8 +172,8 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
   Widget _factRow(GraphFactView fact) {
     final other = _snapshot.node(fact.otherId);
     final color = fact.literal
-        ? JarvisColors.inkSoft
-        : graphTypeColor(other?.type);
+        ? JarvisColors.of(context).inkSoft
+        : graphTypeColor(other?.type, context);
     final meta = [
       if (fact.validFrom != null) formatFactRange(fact.validFrom, null),
       ?confidenceLabel(fact.confidence),
@@ -196,19 +202,19 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
                   if (meta.isNotEmpty)
                     Text(
                       meta,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: JarvisColors.muted,
+                        color: JarvisColors.of(context).muted,
                       ),
                     ),
                 ],
               ),
             ),
             if (fact.otherId != null)
-              const Icon(
+              Icon(
                 PhosphorIconsRegular.caretRight,
                 size: 14,
-                color: JarvisColors.muted,
+                color: JarvisColors.of(context).muted,
               ),
           ],
         ),
@@ -221,7 +227,10 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
     return ListTile(
       key: Key('entity-${node.name}'),
       selected: selected,
-      selectedTileColor: graphTypeColor(node.type).withValues(alpha: .08),
+      selectedTileColor: graphTypeColor(
+        node.type,
+        context,
+      ).withValues(alpha: .08),
       leading: _avatar(node, radius: 16),
       title: Text(node.name),
       subtitle: Text(
@@ -234,10 +243,10 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
         tooltip: 'Open timeline',
         visualDensity: VisualDensity.compact,
         onPressed: () => unawaited(_open(node.id)),
-        icon: const Icon(
+        icon: Icon(
           PhosphorIconsRegular.caretRight,
           size: 16,
-          color: JarvisColors.muted,
+          color: JarvisColors.of(context).muted,
         ),
       ),
       onTap: () => _select(node.id),
@@ -259,7 +268,7 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
   }
 
   Widget _avatar(GraphNode node, {required double radius}) {
-    final color = graphTypeColor(node.type);
+    final color = graphTypeColor(node.type, context);
     final letter = node.name.trim().isEmpty
         ? '?'
         : node.name.trim().characters.first.toUpperCase();
