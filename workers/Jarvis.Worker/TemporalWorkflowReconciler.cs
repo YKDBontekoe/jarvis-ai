@@ -1,3 +1,4 @@
+using Jarvis.Application.Automations;
 using Jarvis.Application.Files;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Workflows;
@@ -124,6 +125,18 @@ internal sealed class TemporalWorkflowReconciler(
                             .ScheduleAsync(watch, cancellationToken);
                         await services.GetRequiredService<IConditionWatchRepository>()
                             .MarkScheduleDispatchedAsync(watch.Id, cancellationToken);
+                    }, cancellationToken);
+
+            var automationRepository = services.GetRequiredService<IAutomationRuleRepository>();
+            await automationRepository.RequeueStaleSchedulesAsync(DateTimeOffset.UtcNow, cancellationToken);
+            var automations = await automationRepository.ListPendingScheduleDispatchAsync(cancellationToken);
+            foreach (var automation in automations)
+                await TryScheduleAsync("automation", automation.Id,
+                    async () =>
+                    {
+                        await services.GetRequiredService<IAutomationScheduler>()
+                            .ScheduleRuleAsync(automation, cancellationToken);
+                        await automationRepository.MarkScheduleDispatchedAsync(automation.Id, cancellationToken);
                     }, cancellationToken);
 
             var briefingRepository = services.GetRequiredService<IDailyBriefingRepository>();

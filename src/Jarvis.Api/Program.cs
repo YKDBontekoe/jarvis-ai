@@ -44,6 +44,7 @@ api.MapAccountAuth();
 api.MapConversationEndpoints();
 api.MapApprovalEndpoints();
 api.MapAutomationEndpoints(app.Logger);
+api.MapOwnerAutomationEndpoints(app.Logger);
 api.MapIntegrationEndpoints();
 api.MapNotificationEndpoints();
 api.MapVoiceEndpoints(app.Logger);

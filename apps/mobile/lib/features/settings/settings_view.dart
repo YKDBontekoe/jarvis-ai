@@ -105,6 +105,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         icon: PhosphorIconsRegular.pulse,
         destination: 'watches',
       ),
+      (
+        title: 'Automation rules',
+        subtitle: 'Triggers, conditions, and chained actions',
+        icon: PhosphorIconsRegular.flowArrow,
+        destination: 'automations',
+      ),
     ],
   ),
   (

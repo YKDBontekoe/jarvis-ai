@@ -4,6 +4,7 @@ using Jarvis.Application.Files;
 using Jarvis.Application.Integrations;
 using Jarvis.Application.Learning;
 using Jarvis.Application.Memory;
+using Jarvis.Application.Automations;
 using Jarvis.Application.Workflows;
 using Jarvis.Mcp;
 using Microsoft.Agents.AI;
@@ -19,6 +20,7 @@ internal sealed class CoreAgentTools(
     MemoryReranker reranker,
     IConditionWatchService watchService,
     IReminderService reminderService,
+    IAutomationRuleService automationRules,
     IDailyBriefingRepository briefings,
     IFileSearchService fileSearch,
     IFileRepository fileRepository,
@@ -42,6 +44,7 @@ internal sealed class CoreAgentTools(
             loggerFactory.CreateLogger<MemoryAgentTools>(), recalls);
         var watchTools = new ConditionWatchAgentTools(watchService, currentUser);
         var reminderTools = new ReminderAgentTools(reminderService, currentUser, briefings);
+        var automationTools = new AutomationAgentTools(automationRules, currentUser);
         var fileTools = new FileAgentTools(fileSearch, fileRepository, currentUser);
         var clockTools = new ClockAgentTools(timeProvider ?? TimeProvider.System);
         var mcpServerTools = new McpServerAgentTools(mcpServers, mcpPolicy, configuration, currentUser, mcpToolHost);
@@ -57,6 +60,11 @@ internal sealed class CoreAgentTools(
         yield return AIFunctionFactory.Create(watchTools.CreateConditionWatchAsync);
         yield return AIFunctionFactory.Create(watchTools.ListConditionWatchesAsync);
         yield return AIFunctionFactory.Create(watchTools.CancelConditionWatchAsync);
+        yield return AIFunctionFactory.Create(automationTools.ListAutomationsAsync);
+        yield return AIFunctionFactory.Create(automationTools.CreateAutomationAsync);
+        yield return AIFunctionFactory.Create(automationTools.EnableAutomationAsync);
+        yield return AIFunctionFactory.Create(automationTools.DisableAutomationAsync);
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(automationTools.RunAutomationAsync));
         yield return AIFunctionFactory.Create(memoryTools.ListMemoriesAsync);
         yield return AIFunctionFactory.Create(memoryTools.SearchMemoryAsync);
         yield return AIFunctionFactory.Create(memoryTools.RememberAsync);

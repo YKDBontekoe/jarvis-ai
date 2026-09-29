@@ -2,6 +2,7 @@ using Jarvis.Domain.Conversations;
 using Jarvis.Domain.Approvals;
 using Jarvis.Domain.Audit;
 using Jarvis.Domain.Devices;
+using Jarvis.Domain.Automations;
 using Jarvis.Domain.Workflows;
 using Jarvis.Domain.Integrations;
 using Jarvis.Infrastructure.Identity;
@@ -52,6 +53,8 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<DeviceTelemetry> DeviceTelemetry => Set<DeviceTelemetry>();
     public DbSet<McpOAuthSession> McpOAuthSessions => Set<McpOAuthSession>();
     public DbSet<CodingRun> CodingRuns => Set<CodingRun>();
+    public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
+    public DbSet<AutomationRun> AutomationRuns => Set<AutomationRun>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -249,6 +252,54 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.HasOne<PushDevice>().WithMany().HasForeignKey(x => x.DeviceId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(x => new { x.DeliveredAt, x.NextAttemptAt, x.LeaseUntil });
+        });
+
+        modelBuilder.Entity<AutomationRule>(entity =>
+        {
+            entity.ToTable("automation_rules");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.SchemaVersion).HasColumnName("schema_version");
+            entity.Property(x => x.DefinitionJson).HasColumnName("definition_json").HasMaxLength(32_000).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.ScheduleWorkflowId).HasColumnName("schedule_workflow_id").HasMaxLength(300)
+                .IsRequired();
+            entity.Property(x => x.ScheduleDispatchedAt).HasColumnName("schedule_dispatched_at");
+            entity.Property(x => x.LastRunAt).HasColumnName("last_run_at");
+            entity.Property(x => x.NextRunAt).HasColumnName("next_run_at");
+            entity.Property(x => x.CooldownUntil).HasColumnName("cooldown_until");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            entity.HasIndex(x => x.ScheduleWorkflowId).IsUnique();
+            entity.HasIndex(x => new { x.OwnerId, x.Status, x.UpdatedAt });
+            entity.HasIndex(x => new { x.Status, x.ScheduleDispatchedAt });
+        });
+
+        modelBuilder.Entity<AutomationRun>(entity =>
+        {
+            entity.ToTable("automation_runs");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.RuleId).HasColumnName("rule_id");
+            entity.Property(x => x.OwnerId).HasColumnName("owner_id");
+            entity.Property(x => x.WorkflowId).HasColumnName("workflow_id").HasMaxLength(300).IsRequired();
+            entity.Property(x => x.IdempotencyKey).HasColumnName("idempotency_key").HasMaxLength(200).IsRequired();
+            entity.Property(x => x.TriggerKind).HasColumnName("trigger_kind").HasMaxLength(40).IsRequired();
+            entity.Property(x => x.TriggerReason).HasColumnName("trigger_reason").HasMaxLength(500).IsRequired();
+            entity.Property(x => x.TestRun).HasColumnName("test_run");
+            entity.Property(x => x.Status).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.ActionResultsJson).HasColumnName("action_results_json").HasMaxLength(16_000)
+                .IsRequired();
+            entity.Property(x => x.FailureSummary).HasColumnName("failure_summary").HasMaxLength(500);
+            entity.Property(x => x.ApprovalId).HasColumnName("approval_id");
+            entity.Property(x => x.StartedAt).HasColumnName("started_at");
+            entity.Property(x => x.CompletedAt).HasColumnName("completed_at");
+            entity.HasIndex(x => x.WorkflowId).IsUnique();
+            entity.HasIndex(x => new { x.RuleId, x.IdempotencyKey }).IsUnique();
+            entity.HasIndex(x => new { x.OwnerId, x.StartedAt });
+            entity.HasIndex(x => new { x.RuleId, x.StartedAt });
         });
 
         modelBuilder.Entity<ConditionWatch>(entity =>

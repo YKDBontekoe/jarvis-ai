@@ -1,5 +1,6 @@
 using System.Text;
 using System.Diagnostics;
+using Jarvis.Application.Automations;
 using Jarvis.Application.Workflows;
 using Jarvis.Application.Integrations;
 using Jarvis.Infrastructure;
@@ -41,6 +42,12 @@ builder.Services.AddHostedService<TemporalWorkflowReconciler>();
 builder.Services.AddHostedService<MemoryIndexingWorker>();
 builder.Services.AddScoped<IReminderService, ReminderService>();
 builder.Services.AddScoped<IConditionWatchService, ConditionWatchService>();
+builder.Services.AddScoped<IAutomationRuleService, AutomationRuleService>();
+builder.Services.AddScoped<IAutomationTriggerPublisher, AutomationTriggerPublisher>();
+builder.Services.AddScoped<IAutomationRunExecutor, AutomationRunExecutor>();
+builder.Services.AddScoped<AutomationConditionEvaluator>();
+builder.Services.AddScoped<IAutomationMetrics, AutomationMetrics>();
+builder.Services.AddSingleton<IAutomationScheduler>(services => services.GetRequiredService<TemporalReminderScheduler>());
 builder.Services.AddSingleton<PublicJsonMetricReader>();
 builder.Services.AddScoped<ICalendarFeed, CalendarFeed>();
 builder.Services.AddScoped<WatchMetricReader>();
@@ -61,6 +68,10 @@ var conditionWatchActivities = new ConditionWatchActivities(
 var briefingActivities = new DailyBriefingActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
 var heartbeatActivities = new AssistantHeartbeatActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
 var dreamingActivities = new AssistantDreamingActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
+var automationRunActivities = new AutomationRunActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
+var automationScheduleActivities =
+    new AutomationScheduleActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
+var automationPollActivities = new AutomationPollActivities(host.Services.GetRequiredService<IServiceScopeFactory>());
 using var worker = new TemporalWorker(client, new TemporalWorkerOptions(TemporalReminderScheduler.TaskQueue)
     .AddWorkflow<ReminderWorkflow>()
     .AddWorkflow<FileProcessingWorkflow>()
@@ -69,6 +80,9 @@ using var worker = new TemporalWorker(client, new TemporalWorkerOptions(Temporal
     .AddWorkflow<DailyBriefingWorkflow>()
     .AddWorkflow<AssistantHeartbeatWorkflow>()
     .AddWorkflow<AssistantDreamingWorkflow>()
+    .AddWorkflow<AutomationRunWorkflow>()
+    .AddWorkflow<AutomationScheduleWorkflow>()
+    .AddWorkflow<AutomationPollWorkflow>()
     .AddActivity(activities.DeliverReminderAsync)
     .AddActivity(activities.DeliverReminderOccurrenceAsync)
     .AddActivity(activities.FailReminderAsync)
@@ -82,7 +96,13 @@ using var worker = new TemporalWorker(client, new TemporalWorkerOptions(Temporal
     .AddActivity(briefingActivities.ResolveScheduleAsync)
     .AddActivity(briefingActivities.DeliverAsync)
     .AddActivity(heartbeatActivities.RunAsync)
-    .AddActivity(dreamingActivities.RunAsync));
+    .AddActivity(dreamingActivities.RunAsync)
+    .AddActivity(automationRunActivities.ExecuteAsync)
+    .AddActivity(automationRunActivities.CompleteAfterApprovalAsync)
+    .AddActivity(automationScheduleActivities.ResolveNextFireAsync)
+    .AddActivity(automationScheduleActivities.FireScheduleAsync)
+    .AddActivity(automationPollActivities.CheckAsync)
+    .AddActivity(automationPollActivities.FirePollAsync));
 
 await host.StartAsync();
 try
@@ -106,6 +126,8 @@ internal sealed class ReminderActivities(IServiceScopeFactory scopeFactory) : Re
         await using var scope = scopeFactory.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IReminderRepository>();
         await repository.CompleteAndNotifyAsync(reminder, activity.CancellationToken);
+        await scope.ServiceProvider.GetRequiredService<IAutomationTriggerPublisher>()
+            .PublishReminderDueAsync(reminder.OwnerId, reminder.ReminderId, reminder.Title, activity.CancellationToken);
     }
 
     [Temporalio.Activities.Activity("DeliverReminderOccurrence")]
@@ -117,7 +139,10 @@ internal sealed class ReminderActivities(IServiceScopeFactory scopeFactory) : Re
         activity.Heartbeat(reminder.ReminderId);
         await using var scope = scopeFactory.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IReminderRepository>();
-        return await repository.CompleteAndNotifyAsync(reminder, activity.CancellationToken);
+        var result = await repository.CompleteAndNotifyAsync(reminder, activity.CancellationToken);
+        await scope.ServiceProvider.GetRequiredService<IAutomationTriggerPublisher>()
+            .PublishReminderDueAsync(reminder.OwnerId, reminder.ReminderId, reminder.Title, activity.CancellationToken);
+        return result;
     }
 
     [Temporalio.Activities.Activity("FailReminder")]

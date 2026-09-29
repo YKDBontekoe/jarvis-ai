@@ -27,6 +27,7 @@ mixin _ChatScreenNav on _ChatScreenController {
         destination == 'approvals' ||
         destination == 'watches' ||
         destination == 'reminders' ||
+        destination == 'automations' ||
         destination == 'usage' ||
         destination == 'integrations' ||
         destination == 'coding' ||
