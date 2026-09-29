@@ -65,6 +65,10 @@ internal static class IntegrationEndpoints
             {
                 return EndpointHelpers.Invalid("state", exception.Message);
             }
+            catch (InvalidMcpServerConfigurationException exception)
+            {
+                return Results.Conflict(new { error = "invalid_configuration", message = exception.Message });
+            }
         }).WithName("SetUserMcpServerState");
 
         api.MapPut("/mcp-controls/{name}", async (string name, McpServerStateRequest request,
