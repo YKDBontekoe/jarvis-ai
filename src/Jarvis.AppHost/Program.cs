@@ -1,7 +1,14 @@
 var builder = DistributedApplication.CreateBuilder(args);
 var workspaceRoot = builder.Configuration["Coding:Repositories:0:Path"] ?? FindGitRepositoryRoot(Directory.GetCurrentDirectory());
 
-var postgres = builder.AddPostgres("postgres")
+// A generated password changes on every AppHost start. PostgreSQL only applies
+// POSTGRES_PASSWORD during the first init of the data volume, so the next start
+// fails health checks forever and the API never launches.
+var postgresPassword = builder.AddParameter(
+    "postgres-password",
+    builder.Configuration["POSTGRES_PASSWORD"] ?? "jarvis-local-dev-password",
+    secret: true);
+var postgres = builder.AddPostgres("postgres", password: postgresPassword)
     .WithImage("pgvector/pgvector")
     // The pgvector tag "pg18" does not parse as major version 18, so
     // WithDataVolume() mounts /var/lib/postgresql/data. PostgreSQL 18 rejects
