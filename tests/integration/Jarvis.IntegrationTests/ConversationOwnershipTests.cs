@@ -380,6 +380,82 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
             (await automations.GetByConversationIdAsync(rule.ConversationId.Value, owner, CancellationToken.None))!.Id);
     }
 
+    [Fact]
+    public async Task Conversation_file_attachments_reject_cross_owner_files()
+    {
+        var owner = Guid.CreateVersion7();
+        var otherOwner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var conversations = new ConversationStore(database);
+        var files = new FileRepository(database);
+        var context = new ConversationFileContextRepository(database);
+        var conversation = await conversations.CreateAsync(owner, "Sources", CancellationToken.None);
+        var foreignId = Guid.CreateVersion7();
+        await files.CreateAsync(new StoredFile(foreignId, otherOwner, foreignId.ToString(), "secret.txt", "text/plain",
+            12, new string('0', 64), DateTimeOffset.UtcNow, "ready"), CancellationToken.None);
+
+        Assert.False(await context.AttachFileAsync(conversation.Id, foreignId, owner, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Scoped_file_search_limits_results_to_attached_files()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var conversations = new ConversationStore(database);
+        var files = new FileRepository(database);
+        var contents = new FileContentRepository(database);
+        var context = new ConversationFileContextRepository(database);
+        var conversation = await conversations.CreateAsync(owner, "Scoped", CancellationToken.None);
+        var attachedId = Guid.CreateVersion7();
+        var otherId = Guid.CreateVersion7();
+        foreach (var (id, phrase) in new[] { (attachedId, "alpha project scope"), (otherId, "alpha unrelated") })
+        {
+            await files.CreateAsync(new StoredFile(id, owner, id.ToString(), $"{id}.txt", "text/plain",
+                32, new string('0', 64), DateTimeOffset.UtcNow, "ready"), CancellationToken.None);
+            await contents.ReplaceChunksAsync(id, owner,
+                [new FileContentChunk(id, owner, 0, phrase)], CancellationToken.None);
+        }
+
+        Assert.True(await context.AttachFileAsync(conversation.Id, attachedId, owner, CancellationToken.None));
+        var scopedIds = await context.ResolveScopedFileIdsAsync(conversation.Id, owner, CancellationToken.None);
+        var hits = await contents.SearchTextAsync(owner, "alpha", CancellationToken.None, scopedIds);
+        var hit = Assert.Single(hits);
+        Assert.Equal(attachedId, hit.FileId);
+    }
+
+    [Fact]
+    public async Task Document_collection_names_are_unique_per_owner()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var collections = new DocumentCollectionRepository(database);
+        await collections.CreateAsync(owner, new DocumentCollectionDraft("Project Docs", null), CancellationToken.None);
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            collections.CreateAsync(owner, new DocumentCollectionDraft("Project Docs", null), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Assistant_messages_persist_citations_json()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var conversations = new ConversationStore(database);
+        var conversation = await conversations.CreateAsync(owner, "Citations", CancellationToken.None);
+        var chunkId = Guid.CreateVersion7();
+        var citations = JsonSerializer.Serialize(new[]
+        {
+            new FileCitation(Guid.CreateVersion7(), "notes.txt", chunkId, 0, "excerpt", 2)
+        });
+        var message = new Jarvis.Domain.Conversations.Message(conversation.Id, "assistant", "Answer with source.",
+            citationsJson: citations);
+        await conversations.AddMessageAsync(message, CancellationToken.None);
+        database.ChangeTracker.Clear();
+
+        var stored = Assert.Single(await conversations.GetMessagesAsync(conversation.Id, CancellationToken.None));
+        Assert.Contains(chunkId.ToString(), stored.CitationsJson, StringComparison.Ordinal);
+    }
+
     private JarvisDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<JarvisDbContext>()

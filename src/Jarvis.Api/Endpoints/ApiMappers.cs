@@ -1,14 +1,32 @@
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Audit;
+using Jarvis.Application.Files;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Conversations;
+using System.Text.Json;
 
 namespace Jarvis.Api.Endpoints;
 
 internal static class ApiMappers
 {
-    public static MessageDto ToDto(this Message message) => new(message.Id, message.Role, message.Content,
-        message.CreatedAt);
+    private static readonly JsonSerializerOptions CitationJsonOptions = new(JsonSerializerDefaults.Web);
+
+    public static MessageDto ToDto(this Message message)
+    {
+        IReadOnlyList<FileCitationDto>? citations = null;
+        if (!string.IsNullOrWhiteSpace(message.CitationsJson))
+        {
+            var parsed = JsonSerializer.Deserialize<IReadOnlyList<FileCitation>>(message.CitationsJson,
+                CitationJsonOptions);
+            if (parsed is { Count: > 0 })
+                citations = parsed.Select(citation => citation.ToDto()).ToArray();
+        }
+
+        return new MessageDto(message.Id, message.Role, message.Content, message.CreatedAt, citations);
+    }
+
+    public static FileCitationDto ToDto(this FileCitation citation) => new(citation.FileId, citation.DisplayName,
+        citation.ChunkId, citation.ChunkIndex, citation.Excerpt, citation.PageNumber, citation.SourceStatus);
 
     public static ToolApprovalDto ToDto(this ToolApprovalRecord approval) => new(approval.Id,
         approval.ConversationId, approval.ToolName, approval.ArgumentsJson, approval.Status, approval.Approved,

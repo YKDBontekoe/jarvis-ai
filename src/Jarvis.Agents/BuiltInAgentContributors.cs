@@ -24,6 +24,8 @@ internal sealed class CoreAgentTools(
     IDailyBriefingRepository briefings,
     IFileSearchService fileSearch,
     IFileRepository fileRepository,
+    IConversationFileScopeService conversationFileScope,
+    IFileCitationCollector fileCitations,
     IDocumentCollectionRepository collections,
     IUserMcpServerRegistry mcpServers,
     IOwnerMcpPolicyStore mcpPolicy,
@@ -46,7 +48,8 @@ internal sealed class CoreAgentTools(
         var watchTools = new ConditionWatchAgentTools(watchService, currentUser);
         var reminderTools = new ReminderAgentTools(reminderService, currentUser, briefings);
         var automationTools = new AutomationAgentTools(automationRules, currentUser);
-        var fileTools = new FileAgentTools(fileSearch, fileRepository, collections, currentUser, context.Profile);
+        var fileTools = new FileAgentTools(fileSearch, fileRepository, conversationFileScope, fileCitations, collections,
+            currentUser, context.ConversationId, context.Profile);
         var clockTools = new ClockAgentTools(timeProvider ?? TimeProvider.System);
         var mcpServerTools = new McpServerAgentTools(mcpServers, mcpPolicy, configuration, currentUser, mcpToolHost);
 

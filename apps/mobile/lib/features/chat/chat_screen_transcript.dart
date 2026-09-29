@@ -79,7 +79,7 @@ mixin _ChatScreenTranscript on _ChatScreenController {
 
   void _appendDelta(String delta) => appendAssistantDelta(_entries, delta);
 
-  void _completeAssistant(String content, {String? id}) {
+  void _completeAssistant(String content, {String? id, List<MessageCitation>? citations}) {
     final index = _entries.lastIndexWhere(
       (entry) => entry is MessageEntry && !entry.isUser && entry.pending,
     );
@@ -95,7 +95,12 @@ mixin _ChatScreenTranscript on _ChatScreenController {
       _settleToolRuns();
       return;
     }
-    final message = MessageEntry(role: 'assistant', content: content, id: id);
+    final message = MessageEntry(
+      role: 'assistant',
+      content: content,
+      id: id,
+      citations: citations ?? const [],
+    );
     if (index >= 0) {
       _entries[index] = message;
     } else {

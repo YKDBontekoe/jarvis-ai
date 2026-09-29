@@ -3,6 +3,7 @@ using System;
 using Jarvis.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using NpgsqlTypes;
@@ -13,9 +14,11 @@ using Pgvector;
 namespace Jarvis.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(JarvisDbContext))]
-    partial class JarvisDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260929100424_AddConversationFileSourcesAndCitations")]
+    partial class AddConversationFileSourcesAndCitations
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -155,10 +158,6 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("ConversationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("conversation_id");
-
                     b.Property<DateTimeOffset?>("CooldownUntil")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("cooldown_until");
@@ -214,10 +213,6 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ConversationId")
-                        .IsUnique()
-                        .HasFilter("conversation_id IS NOT NULL");
 
                     b.HasIndex("ScheduleWorkflowId")
                         .IsUnique();
@@ -1155,10 +1150,6 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
 
-                    b.Property<Guid?>("ConversationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("conversation_id");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1224,10 +1215,6 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnName("workflow_id");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ConversationId")
-                        .IsUnique()
-                        .HasFilter("conversation_id IS NOT NULL");
 
                     b.HasIndex("WorkflowId")
                         .IsUnique();
@@ -2584,14 +2571,6 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
-            modelBuilder.Entity("Jarvis.Domain.Automations.AutomationRule", b =>
-                {
-                    b.HasOne("Jarvis.Domain.Conversations.Conversation", null)
-                        .WithMany()
-                        .HasForeignKey("ConversationId")
-                        .OnDelete(DeleteBehavior.SetNull);
-                });
-
             modelBuilder.Entity("Jarvis.Domain.Conversations.AgentSessionState", b =>
                 {
                     b.HasOne("Jarvis.Domain.Conversations.Conversation", null)
@@ -2632,14 +2611,6 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasForeignKey("NotificationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("Jarvis.Domain.Workflows.Reminder", b =>
-                {
-                    b.HasOne("Jarvis.Domain.Conversations.Conversation", null)
-                        .WithMany()
-                        .HasForeignKey("ConversationId")
-                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Jarvis.Infrastructure.Identity.AuthRefreshToken", b =>
