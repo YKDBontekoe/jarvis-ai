@@ -1,6 +1,8 @@
 part of 'chat_screen.dart';
 
-extension _ChatScreenSources on _ChatScreenState {
+// ignore_for_file: annotate_overrides
+
+mixin _ChatScreenSources on _ChatScreenController {
   List<ConversationSourceChip> get _sourceChips => _attachedSources;
 
   Future<void> _loadConversationSources(String conversationId) async {
@@ -85,9 +87,9 @@ extension _ChatScreenSources on _ChatScreenState {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Jarvis searches only attached files and collections in this chat.',
-                  style: TextStyle(color: JarvisColors.muted),
+                  style: TextStyle(color: JarvisColors.of(context).muted),
                 ),
                 const SizedBox(height: 12),
                 if (files.isEmpty && collections.isEmpty)
