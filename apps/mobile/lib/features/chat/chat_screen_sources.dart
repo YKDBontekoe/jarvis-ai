@@ -63,7 +63,7 @@ extension _ChatScreenSources on _ChatScreenState {
     if (conversationId == null) return;
     try {
       final filesResponse = await _http.get<dynamic>('/api/v1/files');
-      final collectionsResponse = await _http.get<dynamic>('/api/v1/file-collections');
+      final collectionsResponse = await _http.get<dynamic>('/api/v1/collections');
       if (!mounted) return;
       final files = jsonMaps(filesResponse.data);
       final collections = jsonMaps(collectionsResponse.data);
@@ -109,7 +109,7 @@ extension _ChatScreenSources on _ChatScreenState {
                   ListTile(
                     leading: const Icon(PhosphorIconsRegular.folders),
                     title: Text('${collection['name']}'),
-                    subtitle: Text('${collection['fileCount']} files'),
+                    subtitle: Text('${(collection['fileIds'] is List ? (collection['fileIds'] as List).length : 0)} files'),
                     onTap: () async {
                       Navigator.pop(context);
                       await _http.post<dynamic>(

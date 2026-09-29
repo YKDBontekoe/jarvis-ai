@@ -2,6 +2,8 @@
 
 Jarvis is a self-hosted personal assistant built as a modular .NET monolith with a Flutter client. This repository is being implemented in vertical slices from the architecture plan.
 
+**Documentation:** Coding agents should start at [`AGENTS.md`](AGENTS.md). Architecture, API maps, and operations guides live under [`docs/`](docs/README.md).
+
 ## Current implementation
 
 - Flutter chat shell with Markdown replies (tables, code blocks, links) and copy, a typing indicator, live tool-activity chips per reply, inline approve/decline cards for approval-gated tool calls, retry for messages that failed to send, a new-chat action, suggested prompts, Enter-to-send, and a navigation rail on wide screens
@@ -14,13 +16,16 @@ Jarvis is a self-hosted personal assistant built as a modular .NET monolith with
 - Usage dashboard at Settings → Usage, the sidebar, and a home summary: Codex CLI and OpenRouter calls with input, output, cached, and reasoning tokens, web searches, estimated OpenRouter cost, messages sent, dreams, memories, and a personalization level based on active memory, pins, variety, and persona
 - Owner-scoped skills (`SKILL.md` import/export) that the agent can load, save, and auto-create when continuous learning is on; Skills screen lists them
 - A learned persona (traits plus custom instructions) from what the user says and how they rate replies, shown under Settings → Persona
+- Owner-defined assistant profiles that snapshot persona, skills, document collections, model class, and learning policy onto each conversation or task, so one install can keep distinct contexts
 - Durable heartbeat/reflection Temporal workflow that writes memories, persona updates, and skills on an interval, with proactive check-in notifications
 - OpenClaw-style dreaming: a nightly three-phase sweep (light → REM → deep) that stages short-term signals, reflects on recurring themes, then scores and promotes, merges, or supersedes memories, tone/persona, and knowledge-graph facts. Each sweep also rewrites a short portrait of the user from the current memories and appends it to the chat system prompt; the next dream revises that same portrait. A reviewable dream diary and portrait are shown under Settings → Learning; diary text is never a promotion source
 - Semantic memory search (OpenAI-compatible embeddings + reciprocal rank fusion) plus a temporal knowledge graph of people, places, and projects. Memory → Knowledge graph opens a pan-and-zoom map with type filters, search, current links, and literal facts (titles, dates, descriptions), plus each entity's timeline. Owners can edit names and summaries, add or close facts, and merge duplicate entities; chat tools propose those writes behind approval
 - Owner-scoped file collections, per-conversation source attachments, scoped file search, structured citations on assistant replies (file id, chunk id, sanitized excerpt, optional page), and PDF page-aware chunking; chat composer source chips and tappable citation chips open owner-verified downloads
 - Personal home screen with a time-based greeting, the latest dream portrait, voice action, upcoming reminders, pending approvals, calendar events from a connected ICS pack, device battery, active task previews, and a shortcut to continue the current conversation; task details open from the preview, and the list refreshes on resume, task notifications, or pull to refresh
 - Approval review is available from Tasks and contextually from a task waiting for approval; task-specific review shows only that task's conversation approvals
-- Persistent primary navigation for Chat, Tasks, Voice, Memory, and Settings; reminders, approvals, files, watches, briefings, models, skills, persona, learning, channels, agents, this device, voice options, integrations, coding runs, usage, and audit log are grouped under Settings
+- Federated search across conversations, memories, files, tasks, reminders, skills, knowledge-graph entities, channel threads, and coding runs via `GET /api/v1/search`, with owner-scoped concurrent providers, per-provider timeouts, capped mixed ranking, and OpenTelemetry provider latency/result metrics (never recording search text)
+- Command palette on desktop/web (`Ctrl`/`⌘`+`K`) and a dedicated mobile search screen with on-device recent queries (cleared on sign-out), result-type filters, and typed route navigation instead of interpolated URLs
+- Persistent primary navigation for Chat, Tasks, Voice, Memory, and Settings; appearance (light, dark, or match this device), reminders, approvals, files, watches, automations, briefings, models, skills, persona, profiles, learning, channels, agents, this device, voice options, integrations, coding runs, usage, and audit log are grouped under Settings
 - ASP.NET Core API with persistent conversations and Agent Framework sessions
 - SignalR events for streamed assistant text and run status through Codex CLI app-server delta notifications
 - User-visible tool activity through SignalR (`tool.started`, `tool.completed`, and `tool.failed`); only tool names and run status are sent, never arguments or results
@@ -38,6 +43,7 @@ Jarvis is a self-hosted personal assistant built as a modular .NET monolith with
 - Idempotent approval persistence guarded by a unique owner/request/tool-call key
 - Durable reminders scheduled through Temporal, including optional daily, weekday, and weekly recurrence in the owner's IANA time zone, with worker-delivered in-app notifications and a database-backed dispatcher recovery path
 - Durable Temporal condition watches for public JSON HTTPS endpoints, authenticated JSON with a stored integration token, this device’s battery or location snapshot, or the next event on a connected ICS calendar, with bounded polling, owner-scoped cancellation, deterministic threshold checks, and notification/push delivery
+- Owner-defined automations (schema version 1) with typed triggers (schedule, manual, reminder due, calendar window, device battery/location, public JSON threshold), optional conditions, and actions (notification, task, preconfigured channel message, agent run) executed through Temporal with stable workflow IDs, idempotent run keys, cooldowns, owner concurrency limits, approval pause/resume for external actions, sanitized run history, and a form-driven Flutter editor under Settings → Automations
 - User-configurable daily morning briefings scheduled by Temporal at an IANA local time zone, with idempotent summaries of that day's reminders (including recurring next fires) and active tasks, plus an optional short persona-aware intro that falls back to the deterministic list if the model is unavailable
 - Reminder and task notifications open their owner-scoped source item from the mobile client
 - Approval-needed notifications are published over the owner-scoped SignalR group and open the approval screen from a foreground snackbar; tool arguments are not included in the event
@@ -87,11 +93,13 @@ Database migrations apply automatically in Development.
 
 ## Tests
 
+Pull requests targeting `main` run [`.github/workflows/ci.yml`](.github/workflows/ci.yml): .NET build and unit tests, PostgreSQL integration tests (Testcontainers), Python release/Compose/AltStore checks, Flutter analyze and widget tests, and API/worker container image builds. Require the **All checks passed** status in branch protection before merging.
+
 Run deterministic unit tests with:
 
 ```sh
 dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
-python3 -m unittest tests/unit/altstore/test_generate_source.py tests/unit/compose/test_production_images.py tests/unit/release/test_semver.py
+scripts/ci/run-python-unit-tests.sh
 ```
 
 The model-agnostic behavioral evaluation cases live in [`evals/jarvis-core-v1.jsonl`](evals/jarvis-core-v1.jsonl), with isolated-run requirements documented in [`evals/README.md`](evals/README.md). Run them against a disposable Jarvis deployment through the normal API; inference still goes through the Codex CLI app-server.
@@ -204,7 +212,7 @@ Add `-f infra/compose/docker-compose.home-assistant.yml` to that command and set
 
 Add `-f infra/compose/docker-compose.github.yml` to enable GitHub. Host builds still need `--build` so the API image includes the pinned MCP server; GHCR images already include it.
 
-Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit media, plus outbound HTTPS for Codex OAuth/model access, Firebase FCM/OAuth, user-configured public condition-watch endpoints, Caddy certificate issuance, ClamAV signature updates, and GHCR pulls. The API applies EF migrations at startup after Postgres is healthy. Temporal owns a separate persistent Postgres database. Garage creates the private `jarvis-files` bucket and its application access key before the API starts. Keep the Compose environment file, Garage config, and Codex OAuth file private, and pin every third-party container image to an audited release or digest before deploying. This production topology has been configuration-validated; live service startup still requires pulling its container images and setting real account signing keys, DNS, Firebase, APNs, and Codex OAuth credentials.
+Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit media, plus outbound HTTPS for Codex OAuth/model access, Firebase FCM/OAuth, user-configured public condition-watch endpoints, Caddy certificate issuance, ClamAV signature updates, and GHCR pulls. The deployment script applies EF migrations after Postgres is healthy and before updating application containers. Temporal owns a separate persistent Postgres database. Garage creates the private `jarvis-files` bucket and its application access key before the API starts. Keep the Compose environment file, Garage config, and Codex OAuth file private, and pin every third-party container image to an audited release or digest before deploying. This production topology has been configuration-validated; live service startup still requires pulling its container images and setting real account signing keys, DNS, Firebase, APNs, and Codex OAuth credentials.
 
 ## GitHub Actions pipelines
 
@@ -249,6 +257,19 @@ Server bootstrap:
 7. In GitHub → Packages, link the two application container packages to this repository so `GITHUB_TOKEN` can push and the deploy job can pull. Keep packages private if the repo is private; the runner logs into GHCR with a short-lived token. For later manual pulls, `docker login ghcr.io` on the host with a PAT that has `read:packages`.
 
 `workflow_dispatch` accepts `skip_deploy` to build/push images without deploying, and an optional extra `image_tag`. Production secrets stay in `.env.production` on the server and are never passed through GitHub Actions. `python3 -m unittest tests/unit/compose/test_production_images.py` checks that Compose interpolates the GHCR image variables.
+
+Production deployment runs `dotnet Jarvis.Api.dll migrate` as a one-shot task before
+replacing the API or worker containers. The task logs the target EF migration, uses a
+PostgreSQL advisory lock, and aborts the deployment on failure. API startup migration
+is intentionally rejected outside Development; local Development startup continues
+to migrate by default and can opt out with `Database__ApplyMigrationsAtStartup=false`.
+
+Migrations shipped in a rolling release must be backward compatible with both the old
+and new API/worker versions. Use expand-and-contract changes: add nullable columns,
+tables, and indexes first; deploy readers/writers that tolerate both schemas; backfill
+separately; and remove or tighten schema only in a later release after old replicas can
+no longer run. Never combine a destructive schema change with the first code release
+that stops using the old shape.
 
 MCP tools are disabled unless configured. Set `Mcp__Servers__0__Name`, `Mcp__Servers__0__Transport`, and `Mcp__Servers__0__AllowedTools__0`; stdio servers also need `Mcp__Servers__0__Command` and optional arguments/environment, while Streamable HTTP servers need `Mcp__Servers__0__Endpoint` and optional headers. Tools are approval-required by default; add an exact tool name to `Mcp__Servers__0__AutoApprovedTools__0` only when unattended execution is intended. Stdio children receive a minimal environment by default. To inject an owner's encrypted integration credentials into a stdio child, set `Mcp__Servers__0__CredentialProvider`, map a child variable to a stored secret name under `CredentialEnvironmentVariables`, and store those values under the same provider slug. For Streamable HTTP, map headers with `CredentialHeaders`; sending mapped credentials requires HTTPS. Store the complete header value (including a `Bearer` scheme when required) in the encrypted credential record. The API opens a scoped MCP connection for each agent run and disposes it when the run finishes. Stored or configured transport values are scrubbed from MCP tool results and errors before those values can reach the model context.
 

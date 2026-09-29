@@ -4,6 +4,7 @@ using Jarvis.Application.Files;
 using Jarvis.Application.Integrations;
 using Jarvis.Application.Learning;
 using Jarvis.Application.Memory;
+using Jarvis.Application.Automations;
 using Jarvis.Application.Workflows;
 using Jarvis.Mcp;
 using Microsoft.Agents.AI;
@@ -19,11 +20,13 @@ internal sealed class CoreAgentTools(
     MemoryReranker reranker,
     IConditionWatchService watchService,
     IReminderService reminderService,
+    IAutomationRuleService automationRules,
     IDailyBriefingRepository briefings,
     IFileSearchService fileSearch,
     IFileRepository fileRepository,
     IConversationFileScopeService conversationFileScope,
     IFileCitationCollector fileCitations,
+    IDocumentCollectionRepository collections,
     IUserMcpServerRegistry mcpServers,
     IOwnerMcpPolicyStore mcpPolicy,
     McpToolHost mcpToolHost,
@@ -39,13 +42,14 @@ internal sealed class CoreAgentTools(
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context)
     {
-        var taskTools = new TaskAgentTools(taskService, currentUser);
+        var taskTools = new TaskAgentTools(taskService, currentUser, context.Profile);
         var memoryTools = new MemoryAgentTools(memoryService, reranker, auditEvents, currentUser,
-            loggerFactory.CreateLogger<MemoryAgentTools>(), recalls);
+            loggerFactory.CreateLogger<MemoryAgentTools>(), recalls, context.Profile);
         var watchTools = new ConditionWatchAgentTools(watchService, currentUser);
         var reminderTools = new ReminderAgentTools(reminderService, currentUser, briefings);
-        var fileTools = new FileAgentTools(fileSearch, fileRepository, conversationFileScope, fileCitations, currentUser,
-            context.ConversationId);
+        var automationTools = new AutomationAgentTools(automationRules, currentUser);
+        var fileTools = new FileAgentTools(fileSearch, fileRepository, conversationFileScope, fileCitations, collections,
+            currentUser, context.ConversationId, context.Profile);
         var clockTools = new ClockAgentTools(timeProvider ?? TimeProvider.System);
         var mcpServerTools = new McpServerAgentTools(mcpServers, mcpPolicy, configuration, currentUser, mcpToolHost);
 
@@ -60,6 +64,11 @@ internal sealed class CoreAgentTools(
         yield return AIFunctionFactory.Create(watchTools.CreateConditionWatchAsync);
         yield return AIFunctionFactory.Create(watchTools.ListConditionWatchesAsync);
         yield return AIFunctionFactory.Create(watchTools.CancelConditionWatchAsync);
+        yield return AIFunctionFactory.Create(automationTools.ListAutomationsAsync);
+        yield return AIFunctionFactory.Create(automationTools.CreateAutomationAsync);
+        yield return AIFunctionFactory.Create(automationTools.EnableAutomationAsync);
+        yield return AIFunctionFactory.Create(automationTools.DisableAutomationAsync);
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(automationTools.RunAutomationAsync));
         yield return AIFunctionFactory.Create(memoryTools.ListMemoriesAsync);
         yield return AIFunctionFactory.Create(memoryTools.SearchMemoryAsync);
         yield return AIFunctionFactory.Create(memoryTools.RememberAsync);
@@ -106,7 +115,7 @@ internal sealed class CoreAgentContext(
     public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
     [
         new ClockContextProvider(briefings, context.OwnerId, timeProvider ?? TimeProvider.System),
-        new PersonalMemoryContextProvider(memories, reranker, context.OwnerId, recalls),
+        new PersonalMemoryContextProvider(memories, reranker, context.OwnerId, recalls, context.Profile),
         new ActiveTasksContextProvider(tasks, context.OwnerId, context.ExecutingTaskId),
         new ActiveConditionWatchesContextProvider(watches, context.OwnerId)
     ];

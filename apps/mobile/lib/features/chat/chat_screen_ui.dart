@@ -54,6 +54,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     onSeeAll: () => _fromSidebar(() => unawaited(_chooseConversation())),
     onUtility: (destination) => _fromSidebar(() => _openUtility(destination)),
     onSettings: () => _fromSidebar(_openSettings),
+    onJarvisSearch: () => _fromSidebar(() => unawaited(_openSearch(context))),
   );
 
   void _dismissKeyboard() => FocusManager.instance.primaryFocus?.unfocus();
@@ -154,22 +155,50 @@ mixin _ChatScreenUi on _ChatScreenController {
                 ),
               ),
         centerTitle: true,
-        title: Row(
+        title: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              voice ? 'Voice' : 'Jarvis',
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -.3,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  voice ? 'Voice' : 'Jarvis',
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -.3,
+                  ),
+                ),
+                const SizedBox(width: 7),
+                _ConnectionDot(connected: _connected),
+              ],
             ),
-            const SizedBox(width: 7),
-            _ConnectionDot(connected: _connected),
+            if (!voice && (_profileName != null || _profileDeleted))
+              GestureDetector(
+                onTap: _busy ? null : _switchConversationProfile,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    _profileDeleted
+                        ? '${_profileName ?? 'Profile'} (deleted)'
+                        : _profileName ?? 'Profile',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: JarvisColors.of(context).inkSoft,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         actions: [
+          if (!voice)
+            CircleIconButton(
+              icon: PhosphorIconsRegular.magnifyingGlass,
+              tooltip: 'Search',
+              onPressed: _signedOut ? null : () => unawaited(_openSearch(context)),
+            ),
           if (!voice)
             CircleIconButton(
               icon: PhosphorIconsRegular.notePencil,
@@ -198,7 +227,7 @@ mixin _ChatScreenUi on _ChatScreenController {
                 TextButton(
                   onPressed: () => setState(() => _error = null),
                   style: TextButton.styleFrom(
-                    foregroundColor: JarvisColors.inkSoft,
+                    foregroundColor: JarvisColors.of(context).inkSoft,
                   ),
                   child: const Text('Dismiss'),
                 ),
@@ -398,7 +427,9 @@ class _ConnectionDot extends StatelessWidget {
       width: 7,
       height: 7,
       decoration: BoxDecoration(
-        color: connected ? JarvisColors.success : JarvisColors.outlineStrong,
+        color: connected
+            ? JarvisColors.of(context).success
+            : JarvisColors.of(context).outlineStrong,
         shape: BoxShape.circle,
       ),
     ),

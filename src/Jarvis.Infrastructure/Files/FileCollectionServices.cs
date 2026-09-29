@@ -6,11 +6,11 @@ namespace Jarvis.Infrastructure.Files;
 
 public sealed class ConversationFileScopeService(IConversationFileContextRepository context) : IConversationFileScopeService
 {
-    public async Task<FileSearchScope> GetSearchScopeAsync(Guid conversationId, Guid ownerId,
+    public async Task<IReadOnlyCollection<Guid>?> ResolveSearchFileIdsAsync(Guid conversationId, Guid ownerId,
         CancellationToken cancellationToken)
     {
         var fileIds = await context.ResolveScopedFileIdsAsync(conversationId, ownerId, cancellationToken);
-        return fileIds.Count == 0 ? FileSearchScope.AllOwnerFiles : new FileSearchScope(fileIds);
+        return fileIds.Count == 0 ? null : fileIds;
     }
 }
 

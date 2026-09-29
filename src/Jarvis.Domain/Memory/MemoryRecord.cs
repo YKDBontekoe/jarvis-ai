@@ -12,6 +12,7 @@ public sealed record MemoryRecord(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     DateTimeOffset? ValidUntil,
-    bool IsPinned);
+    bool IsPinned,
+    Guid? ProfileId = null);
 
 public sealed record MemorySearchHit(MemoryRecord Memory, double Score);

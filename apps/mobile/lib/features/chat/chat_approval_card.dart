@@ -22,20 +22,20 @@ class ApprovalCard extends StatelessWidget {
     final needsRetry =
         approval.retry || approval.status == ApprovalStatus.failed;
     final accent = switch (approval.status) {
-      ApprovalStatus.approved => JarvisColors.success,
-      ApprovalStatus.denied => JarvisColors.muted,
-      ApprovalStatus.failed => JarvisColors.danger,
-      _ => JarvisColors.warning,
+      ApprovalStatus.approved => JarvisColors.of(context).success,
+      ApprovalStatus.denied => JarvisColors.of(context).muted,
+      ApprovalStatus.failed => JarvisColors.of(context).danger,
+      _ => JarvisColors.of(context).warning,
     };
     final submitting = approval.status == ApprovalStatus.submitting;
     return Padding(
       padding: const EdgeInsets.only(left: 40, bottom: 18),
       child: Container(
         decoration: BoxDecoration(
-          color: JarvisColors.surface,
+          color: JarvisColors.of(context).surface,
           borderRadius: BorderRadius.circular(JarvisRadii.lg),
-          border: Border.all(color: JarvisColors.outline),
-          boxShadow: decided ? null : JarvisShadows.soft,
+          border: Border.all(color: JarvisColors.of(context).outline),
+          boxShadow: decided ? null : JarvisShadows.soft(),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -43,9 +43,11 @@ class ApprovalCard extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              decoration: const BoxDecoration(
-                color: JarvisColors.canvas,
-                border: Border(bottom: BorderSide(color: JarvisColors.outline)),
+              decoration: BoxDecoration(
+                color: JarvisColors.of(context).canvas,
+                border: Border(
+                  bottom: BorderSide(color: JarvisColors.of(context).outline),
+                ),
               ),
               child: Row(
                 children: [
@@ -71,10 +73,10 @@ class ApprovalCard extends StatelessWidget {
                                     : 'Approved, but not finished')
                               : 'Jarvis needs your approval',
                       },
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 14.5,
-                        color: JarvisColors.ink,
+                        color: JarvisColors.of(context).ink,
                       ),
                     ),
                   ),
@@ -93,8 +95,8 @@ class ApprovalCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           description.active,
-                          style: const TextStyle(
-                            color: JarvisColors.ink,
+                          style: TextStyle(
+                            color: JarvisColors.of(context).ink,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -107,9 +109,11 @@ class ApprovalCard extends StatelessWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: JarvisColors.canvas,
+                        color: JarvisColors.of(context).canvas,
                         borderRadius: BorderRadius.circular(JarvisRadii.sm),
-                        border: Border.all(color: JarvisColors.outline),
+                        border: Border.all(
+                          color: JarvisColors.of(context).outline,
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,18 +126,18 @@ class ApprovalCard extends StatelessWidget {
                                   children: [
                                     TextSpan(
                                       text: '${humanizeToolName(entry.key)}  ',
-                                      style: const TextStyle(
-                                        color: JarvisColors.muted,
+                                      style: TextStyle(
+                                        color: JarvisColors.of(context).muted,
                                         fontSize: 12.5,
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
                                     TextSpan(
                                       text: '${entry.value}',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontFamily: 'monospace',
                                         fontSize: 12.5,
-                                        color: JarvisColors.ink,
+                                        color: JarvisColors.of(context).ink,
                                       ),
                                     ),
                                   ],

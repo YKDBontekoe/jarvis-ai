@@ -25,29 +25,42 @@ class _ToolChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final description = describeTool(step.tool);
     final (label, color) = switch (step.status) {
-      ToolStepStatus.running => (description.active, JarvisColors.inkSoft),
-      ToolStepStatus.completed => (description.done, JarvisColors.success),
-      ToolStepStatus.failed => (description.failed, JarvisColors.danger),
+      ToolStepStatus.running => (
+        description.active,
+        JarvisColors.of(context).inkSoft,
+      ),
+      ToolStepStatus.completed => (
+        description.done,
+        JarvisColors.of(context).success,
+      ),
+      ToolStepStatus.failed => (
+        description.failed,
+        JarvisColors.of(context).danger,
+      ),
     };
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
       decoration: BoxDecoration(
-        color: JarvisColors.surface,
+        color: JarvisColors.of(context).surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: JarvisColors.outline),
+        border: Border.all(color: JarvisColors.of(context).outline),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(description.icon, size: 14, color: JarvisColors.inkSoft),
+          Icon(
+            description.icon,
+            size: 14,
+            color: JarvisColors.of(context).inkSoft,
+          ),
           const SizedBox(width: 7),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w500,
-              color: JarvisColors.inkSoft,
+              color: JarvisColors.of(context).inkSoft,
             ),
           ),
           const SizedBox(width: 7),

@@ -1,113 +1,7 @@
 using Jarvis.Application.Files;
-using Jarvis.Domain.Files;
 using Microsoft.EntityFrameworkCore;
 
 namespace Jarvis.Infrastructure.Persistence;
-
-public sealed class FileCollectionRepository(JarvisDbContext db) : IFileCollectionRepository
-{
-    public async Task<FileCollection> CreateAsync(Guid ownerId, string name, CancellationToken cancellationToken)
-    {
-        var trimmed = ValidateName(name);
-        var normalized = FileCollectionNames.Normalize(trimmed);
-        if (await db.FileCollections.AsNoTracking()
-                .AnyAsync(x => x.OwnerId == ownerId && x.NormalizedName == normalized, cancellationToken))
-            throw new InvalidOperationException("A collection with that name already exists.");
-
-        var entity = new FileCollectionEntity
-        {
-            Id = Guid.CreateVersion7(),
-            OwnerId = ownerId,
-            Name = trimmed,
-            NormalizedName = normalized,
-            CreatedAt = DateTimeOffset.UtcNow
-        };
-        db.FileCollections.Add(entity);
-        await db.SaveChangesAsync(cancellationToken);
-        return ToRecord(entity);
-    }
-
-    public async Task<FileCollection?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
-        (await db.FileCollections.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId,
-            cancellationToken)) is { } entity
-            ? ToRecord(entity)
-            : null;
-
-    public async Task<IReadOnlyList<FileCollection>> ListAsync(Guid ownerId, CancellationToken cancellationToken) =>
-        (await db.FileCollections.AsNoTracking().Where(x => x.OwnerId == ownerId)
-            .OrderBy(x => x.NormalizedName).ToListAsync(cancellationToken))
-        .Select(ToRecord).ToArray();
-
-    public async Task<bool> RenameAsync(Guid id, Guid ownerId, string name, CancellationToken cancellationToken)
-    {
-        var trimmed = ValidateName(name);
-        var normalized = FileCollectionNames.Normalize(trimmed);
-        if (await db.FileCollections.AsNoTracking()
-                .AnyAsync(x => x.OwnerId == ownerId && x.NormalizedName == normalized && x.Id != id, cancellationToken))
-            throw new InvalidOperationException("A collection with that name already exists.");
-
-        return await db.FileCollections.Where(x => x.Id == id && x.OwnerId == ownerId)
-            .ExecuteUpdateAsync(update => update
-                .SetProperty(x => x.Name, trimmed)
-                .SetProperty(x => x.NormalizedName, normalized), cancellationToken) != 0;
-    }
-
-    public async Task<bool> DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
-        await db.FileCollections.Where(x => x.Id == id && x.OwnerId == ownerId).ExecuteDeleteAsync(cancellationToken) != 0;
-
-    public async Task<bool> AddFileAsync(Guid collectionId, Guid fileId, Guid ownerId, CancellationToken cancellationToken)
-    {
-        var collection = await db.FileCollections.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.Id == collectionId && x.OwnerId == ownerId, cancellationToken);
-        if (collection is null) return false;
-        var file = await db.Files.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.Id == fileId && x.OwnerId == ownerId, cancellationToken);
-        if (file is null || file.ProcessingStatus == "deleting") return false;
-        if (await db.FileCollectionMembers.AsNoTracking()
-                .AnyAsync(x => x.CollectionId == collectionId && x.FileId == fileId, cancellationToken))
-            return true;
-
-        db.FileCollectionMembers.Add(new FileCollectionMemberEntity
-        {
-            CollectionId = collectionId,
-            FileId = fileId,
-            OwnerId = ownerId,
-            AddedAt = DateTimeOffset.UtcNow
-        });
-        await db.SaveChangesAsync(cancellationToken);
-        return true;
-    }
-
-    public async Task<bool> RemoveFileAsync(Guid collectionId, Guid fileId, Guid ownerId, CancellationToken cancellationToken) =>
-        await db.FileCollectionMembers.Where(x => x.CollectionId == collectionId && x.FileId == fileId && x.OwnerId == ownerId)
-            .ExecuteDeleteAsync(cancellationToken) != 0;
-
-    public async Task<IReadOnlyList<StoredFile>> ListFilesAsync(Guid collectionId, Guid ownerId,
-        CancellationToken cancellationToken)
-    {
-        if (!await db.FileCollections.AsNoTracking()
-                .AnyAsync(x => x.Id == collectionId && x.OwnerId == ownerId, cancellationToken))
-            return [];
-
-        var fileIds = await db.FileCollectionMembers.AsNoTracking()
-            .Where(x => x.CollectionId == collectionId && x.OwnerId == ownerId)
-            .Select(x => x.FileId).ToListAsync(cancellationToken);
-        return (await db.Files.AsNoTracking().Where(x => x.OwnerId == ownerId && fileIds.Contains(x.Id))
-                .OrderByDescending(x => x.CreatedAt).ToListAsync(cancellationToken))
-            .Select(x => x.ToRecord()).ToArray();
-    }
-
-    private static string ValidateName(string name)
-    {
-        var trimmed = name.Trim();
-        if (trimmed.Length is < 1 or > FileCollectionNames.MaxNameLength)
-            throw new ArgumentException($"Collection name must contain 1 to {FileCollectionNames.MaxNameLength} characters.");
-        return trimmed;
-    }
-
-    private static FileCollection ToRecord(FileCollectionEntity entity) =>
-        new(entity.Id, entity.OwnerId, entity.Name, entity.CreatedAt);
-}
 
 public sealed class ConversationFileContextRepository(JarvisDbContext db) : IConversationFileContextRepository
 {
@@ -163,7 +57,7 @@ public sealed class ConversationFileContextRepository(JarvisDbContext db) : ICon
         CancellationToken cancellationToken)
     {
         if (!await OwnsConversationAsync(conversationId, ownerId, cancellationToken)) return false;
-        if (!await db.FileCollections.AsNoTracking()
+        if (!await db.DocumentCollections.AsNoTracking()
                 .AnyAsync(x => x.Id == collectionId && x.OwnerId == ownerId, cancellationToken))
             return false;
         if (await db.ConversationCollectionAttachments.AsNoTracking()
@@ -202,7 +96,7 @@ public sealed class ConversationFileContextRepository(JarvisDbContext db) : ICon
 
         var fromCollections = collectionIds.Count == 0
             ? []
-            : await db.FileCollectionMembers.AsNoTracking()
+            : await db.DocumentCollectionFiles.AsNoTracking()
                 .Where(x => collectionIds.Contains(x.CollectionId) && x.OwnerId == ownerId)
                 .Select(x => x.FileId).ToListAsync(cancellationToken);
 

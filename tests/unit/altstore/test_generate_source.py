@@ -35,8 +35,10 @@ def write_dummy_ipa(directory: Path, payload: bytes = b"jarvis-ipa-fixture") -> 
 class GenerateSourceTests(unittest.TestCase):
     def test_parse_pubspec_version(self) -> None:
         version, build = gen.parse_pubspec_version(PUBSPEC_PATH)
-        self.assertEqual(version, "1.0.0")
-        self.assertEqual(build, "1")
+        self.assertRegex(version, r"^\d+\.\d+\.\d+$")
+        self.assertRegex(build, r"^\d+$")
+        pubspec = PUBSPEC_PATH.read_text(encoding="utf-8")
+        self.assertIn(f"version: {version}+{build}", pubspec)
 
     def test_builds_source_from_ipa(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

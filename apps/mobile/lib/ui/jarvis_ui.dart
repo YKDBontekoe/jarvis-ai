@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+
 import 'phosphor_icons.dart';
 
 import '../theme.dart';
@@ -15,8 +16,8 @@ class SurfaceCard extends StatelessWidget {
     this.padding = const EdgeInsets.all(18),
     this.margin = EdgeInsets.zero,
     this.onTap,
-    this.color = JarvisColors.surface,
-    this.borderColor = JarvisColors.outline,
+    this.color,
+    this.borderColor,
     this.radius = JarvisRadii.lg,
     this.elevated = false,
     this.gradient,
@@ -27,24 +28,25 @@ class SurfaceCard extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry margin;
   final VoidCallback? onTap;
-  final Color color;
-  final Color borderColor;
+  final Color? color;
+  final Color? borderColor;
   final double radius;
   final bool elevated;
   final Gradient? gradient;
 
   @override
   Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
     final shape = BorderRadius.circular(radius);
     return Padding(
       padding: margin,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: gradient == null ? color : null,
+          color: gradient == null ? (color ?? colors.surface) : null,
           gradient: gradient,
           borderRadius: shape,
-          border: Border.all(color: borderColor),
-          boxShadow: elevated ? JarvisShadows.soft : null,
+          border: Border.all(color: borderColor ?? colors.outline),
+          boxShadow: elevated ? JarvisShadows.soft(colors.brightness) : null,
         ),
         child: Material(
           type: MaterialType.transparency,
@@ -61,27 +63,25 @@ class SurfaceCard extends StatelessWidget {
 
 /// A tinted rounded-square icon used as the leading visual in rows.
 class IconBadge extends StatelessWidget {
-  const IconBadge({
-    required this.icon,
-    this.color = JarvisColors.ink,
-    this.size = 36,
-    super.key,
-  });
+  const IconBadge({required this.icon, this.color, this.size = 36, super.key});
 
   final IconData icon;
-  final Color color;
+  final Color? color;
   final double size;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      color: JarvisColors.surfaceMuted,
-      borderRadius: BorderRadius.circular(size * .28),
-    ),
-    child: Icon(icon, size: size * .52, color: color),
-  );
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(size * .28),
+      ),
+      child: Icon(icon, size: size * .52, color: color ?? colors.ink),
+    );
+  }
 }
 
 /// A compact status label with a leading dot.
@@ -96,33 +96,36 @@ class StatusPill extends StatelessWidget {
   final Color color;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(7, 3, 9, 3),
-    decoration: BoxDecoration(
-      color: JarvisColors.surfaceMuted,
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: JarvisColors.inkSoft,
-            height: 1.25,
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(7, 3, 9, 3),
+      decoration: BoxDecoration(
+        color: colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: colors.inkSoft,
+              height: 1.25,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 typedef StatusStyle = ({String label, Color color, IconData icon});
@@ -131,12 +134,12 @@ typedef StatusStyle = ({String label, Color color, IconData icon});
 StatusStyle statusStyle(String status) => switch (status) {
   'running' || 'processing' => (
     label: status == 'running' ? 'In progress' : 'Processing',
-    color: JarvisColors.info,
+    color: JarvisColors.light.info,
     icon: PhosphorIconsRegular.hourglassMedium,
   ),
   'needs_approval' => (
     label: 'Needs approval',
-    color: JarvisColors.warning,
+    color: JarvisColors.light.warning,
     icon: PhosphorIconsRegular.shieldWarning,
   ),
   'completed' ||
@@ -146,37 +149,37 @@ StatusStyle statusStyle(String status) => switch (status) {
   'sent' ||
   'ready' => (
     label: status == 'ready' ? 'Ready' : _titleCase(status),
-    color: JarvisColors.success,
+    color: JarvisColors.light.success,
     icon: PhosphorIconsRegular.checkCircle,
   ),
   'failed' || 'error' || 'rejected' => (
     label: _titleCase(status),
-    color: JarvisColors.danger,
+    color: JarvisColors.light.danger,
     icon: PhosphorIconsRegular.warningCircle,
   ),
   'cancelled' || 'canceled' || 'stopped' || 'expired' => (
     label: _titleCase(status),
-    color: JarvisColors.muted,
+    color: JarvisColors.light.muted,
     icon: PhosphorIconsRegular.prohibit,
   ),
   'active' || 'pending' || 'scheduled' => (
     label: _titleCase(status),
-    color: JarvisColors.accent,
+    color: JarvisColors.light.accent,
     icon: PhosphorIconsRegular.clock,
   ),
   'waiting' => (
     label: 'Waiting',
-    color: JarvisColors.violet,
+    color: JarvisColors.light.violet,
     icon: PhosphorIconsRegular.pauseCircle,
   ),
   'queued' => (
     label: 'Queued',
-    color: JarvisColors.inkSoft,
+    color: JarvisColors.light.inkSoft,
     icon: PhosphorIconsRegular.clock,
   ),
   _ => (
     label: status.isEmpty ? 'Unknown' : _titleCase(status),
-    color: JarvisColors.inkSoft,
+    color: JarvisColors.light.inkSoft,
     icon: PhosphorIconsRegular.circle,
   ),
 };
@@ -238,12 +241,18 @@ class EmptyState extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: JarvisColors.surface,
+                  color: JarvisColors.of(context).surface,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: JarvisColors.outline),
-                  boxShadow: JarvisShadows.soft,
+                  border: Border.all(color: JarvisColors.of(context).outline),
+                  boxShadow: JarvisShadows.soft(
+                    JarvisColors.of(context).brightness,
+                  ),
                 ),
-                child: Icon(icon, size: 24, color: JarvisColors.inkSoft),
+                child: Icon(
+                  icon,
+                  size: 24,
+                  color: JarvisColors.of(context).inkSoft,
+                ),
               ),
               const SizedBox(height: 18),
               Text(
@@ -257,7 +266,7 @@ class EmptyState extends StatelessWidget {
                   message!,
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: JarvisColors.inkSoft,
+                    color: JarvisColors.of(context).inkSoft,
                   ),
                 ),
               ],
@@ -369,23 +378,23 @@ class InlineNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     final (fg, bg, icon) = switch (tone) {
       NoticeTone.info => (
-        JarvisColors.inkSoft,
-        JarvisColors.surfaceMuted,
+        JarvisColors.of(context).inkSoft,
+        JarvisColors.of(context).surfaceMuted,
         PhosphorIconsRegular.info,
       ),
       NoticeTone.warning => (
-        JarvisColors.warning,
-        JarvisColors.surfaceMuted,
+        JarvisColors.of(context).warning,
+        JarvisColors.of(context).surfaceMuted,
         PhosphorIconsRegular.warningCircle,
       ),
       NoticeTone.danger => (
-        JarvisColors.danger,
-        JarvisColors.dangerSoft,
+        JarvisColors.of(context).danger,
+        JarvisColors.of(context).dangerSoft,
         PhosphorIconsRegular.warningCircle,
       ),
       NoticeTone.success => (
-        JarvisColors.success,
-        JarvisColors.surfaceMuted,
+        JarvisColors.of(context).success,
+        JarvisColors.of(context).surfaceMuted,
         PhosphorIconsRegular.checkCircle,
       ),
     };
@@ -407,10 +416,10 @@ class InlineNotice extends StatelessWidget {
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13.5,
                   height: 1.4,
-                  color: JarvisColors.ink,
+                  color: JarvisColors.of(context).ink,
                 ),
               ),
             ),
@@ -458,7 +467,9 @@ Future<bool> showJarvisConfirm(
               child: IconBadge(
                 icon: icon,
                 size: 48,
-                color: destructive ? JarvisColors.danger : JarvisColors.accent,
+                color: destructive
+                    ? JarvisColors.of(context).danger
+                    : JarvisColors.of(context).accent,
               ),
             ),
       title: Text(title),
@@ -466,13 +477,17 @@ Future<bool> showJarvisConfirm(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext, false),
-          style: TextButton.styleFrom(foregroundColor: JarvisColors.inkSoft),
+          style: TextButton.styleFrom(
+            foregroundColor: JarvisColors.of(context).inkSoft,
+          ),
           child: Text(cancelLabel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(dialogContext, true),
           style: destructive
-              ? FilledButton.styleFrom(backgroundColor: JarvisColors.danger)
+              ? FilledButton.styleFrom(
+                  backgroundColor: JarvisColors.of(context).danger,
+                )
               : null,
           child: Text(confirmLabel),
         ),
@@ -577,9 +592,9 @@ class CircleIconButton extends StatelessWidget {
       label: tooltip,
       excludeSemantics: true,
       child: Material(
-        color: JarvisColors.surface,
-        shape: const CircleBorder(
-          side: BorderSide(color: JarvisColors.outline),
+        color: JarvisColors.of(context).surface,
+        shape: CircleBorder(
+          side: BorderSide(color: JarvisColors.of(context).outline),
         ),
         shadowColor: const Color(0x14000000),
         elevation: 1.5,
@@ -591,7 +606,9 @@ class CircleIconButton extends StatelessWidget {
             child: Icon(
               icon,
               size: 19,
-              color: onPressed == null ? JarvisColors.muted : JarvisColors.ink,
+              color: onPressed == null
+                  ? JarvisColors.of(context).muted
+                  : JarvisColors.of(context).ink,
             ),
           ),
         ),

@@ -16,11 +16,23 @@ public sealed class Conversation
     public Guid Id { get; private set; }
     public Guid OwnerId { get; private set; }
     public string Title { get; private set; } = string.Empty;
+    public Guid? ProfileId { get; private set; }
+    public int? ProfileVersion { get; private set; }
+    public string? ProfileSnapshotJson { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public List<Message> Messages { get; private set; } = [];
 
     public void Touch() => UpdatedAt = DateTimeOffset.UtcNow;
+
+    public void BindProfile(Guid profileId, int version, string snapshotJson)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(snapshotJson);
+        ProfileId = profileId;
+        ProfileVersion = version;
+        ProfileSnapshotJson = snapshotJson;
+        Touch();
+    }
 
     public void SetTitleFromFirstMessage(string content)
     {

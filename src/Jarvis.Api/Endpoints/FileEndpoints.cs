@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Jarvis.Api.Errors;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
@@ -18,7 +19,7 @@ internal static class FileEndpoints
         {
             if (string.IsNullOrWhiteSpace(query) || query.Length > 2_000)
                 return EndpointHelpers.Invalid("query", "Query must contain 1 to 2,000 characters.");
-            var hits = await files.SearchAsync(currentUser.OwnerId, query, FileSearchScope.AllOwnerFiles, ct);
+            var hits = await files.SearchAsync(currentUser.OwnerId, query, ct);
             return Results.Ok(hits.Select(hit =>
                 new FileSearchHitDto(hit.FileId, hit.FileName, hit.ChunkId, hit.ChunkIndex, hit.SanitizedExcerpt,
                     hit.Score, hit.ExcerptStart, hit.ExcerptEnd, hit.PageNumber, hit.SanitizedExcerpt)));
@@ -51,13 +52,12 @@ internal static class FileEndpoints
                 {
                     await EndpointHelpers.TryAppendAuditAsync(audit, logger, currentUser.OwnerId, "files",
                         "file.malware_rejected", "high", false, null, null, ct);
-                    return Results.UnprocessableEntity(new { message = "The uploaded file was rejected by malware scanning." });
+                    return ApiProblemResults.MalwareRejected();
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
                     logger.LogError(exception, "Could not store an uploaded file for user {OwnerId}.", currentUser.OwnerId);
-                    return Results.Problem("File storage is temporarily unavailable.",
-                        statusCode: StatusCodes.Status503ServiceUnavailable);
+                    return ApiProblemResults.DependencyUnavailable("File storage is temporarily unavailable.");
                 }
             })
             .DisableAntiforgery()
@@ -78,59 +78,6 @@ internal static class FileEndpoints
                 ICurrentUser currentUser, CancellationToken ct) =>
             await files.DeleteAsync(id, currentUser.OwnerId, ct) ? Results.NoContent() : Results.NotFound())
             .WithName("DeleteFile");
-
-        api.MapGet("/file-collections", async (IFileCollectionRepository collections, ICurrentUser currentUser,
-                CancellationToken ct) =>
-            {
-                var items = await collections.ListAsync(currentUser.OwnerId, ct);
-                var counts = new Dictionary<Guid, int>();
-                foreach (var item in items)
-                    counts[item.Id] = (await collections.ListFilesAsync(item.Id, currentUser.OwnerId, ct)).Count;
-                return Results.Ok(items.Select(item =>
-                    new FileCollectionDto(item.Id, item.Name, item.CreatedAt, counts.GetValueOrDefault(item.Id))));
-            })
-            .WithName("ListFileCollections");
-
-        api.MapPost("/file-collections", async (FileCollectionRequest request, IFileCollectionRepository collections,
-                ICurrentUser currentUser, CancellationToken ct) =>
-            {
-                try
-                {
-                    var created = await collections.CreateAsync(currentUser.OwnerId, request.Name!, ct);
-                    return Results.Created($"/api/v1/file-collections/{created.Id}",
-                        new FileCollectionDto(created.Id, created.Name, created.CreatedAt, 0));
-                }
-                catch (ArgumentException exception)
-                {
-                    return EndpointHelpers.Invalid("name", exception.Message);
-                }
-                catch (InvalidOperationException exception)
-                {
-                    return EndpointHelpers.Invalid("name", exception.Message);
-                }
-            })
-            .WithName("CreateFileCollection");
-
-        api.MapDelete("/file-collections/{id:guid}", async (Guid id, IFileCollectionRepository collections,
-                ICurrentUser currentUser, CancellationToken ct) =>
-            await collections.DeleteAsync(id, currentUser.OwnerId, ct) ? Results.NoContent() : Results.NotFound())
-            .WithName("DeleteFileCollection");
-
-        api.MapPost("/file-collections/{collectionId:guid}/files/{fileId:guid}",
-                async (Guid collectionId, Guid fileId, IFileCollectionRepository collections, ICurrentUser currentUser,
-                    CancellationToken ct) =>
-                    await collections.AddFileAsync(collectionId, fileId, currentUser.OwnerId, ct)
-                        ? Results.NoContent()
-                        : Results.NotFound())
-            .WithName("AddFileToCollection");
-
-        api.MapDelete("/file-collections/{collectionId:guid}/files/{fileId:guid}",
-                async (Guid collectionId, Guid fileId, IFileCollectionRepository collections, ICurrentUser currentUser,
-                    CancellationToken ct) =>
-                    await collections.RemoveFileAsync(collectionId, fileId, currentUser.OwnerId, ct)
-                        ? Results.NoContent()
-                        : Results.NotFound())
-            .WithName("RemoveFileFromCollection");
 
         api.MapGet("/files/citations/{chunkId:guid}", async (Guid chunkId, IFileCitationResolver citations,
                 ICurrentUser currentUser, CancellationToken ct) =>

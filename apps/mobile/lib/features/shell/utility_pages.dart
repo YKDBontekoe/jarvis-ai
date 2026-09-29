@@ -8,6 +8,7 @@ import '../../daily_briefing_screen.dart';
 import '../../files_screen.dart';
 import '../../integrations_screen.dart';
 import '../../memory_screen.dart';
+import '../../automations_screen.dart';
 import '../../reminders_screen.dart';
 import '../../tasks_screen.dart';
 import '../agents/agents_screen.dart';
@@ -17,6 +18,8 @@ import '../devices/devices_screen.dart';
 import '../learning/learning_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
 import '../persona/persona_screen.dart';
+import '../profiles/profiles_screen.dart';
+import '../settings/appearance_screen.dart';
 import '../settings/model_settings_screen.dart';
 import '../settings/voice_settings_screen.dart';
 import '../skills/skills_screen.dart';
@@ -30,11 +33,14 @@ Widget? utilityPageFor(String destination, Dio http) => switch (destination) {
   'files' => FilesScreen(http: http),
   'audit' => AuditScreen(http: http),
   'watches' => ConditionWatchesScreen(http: http),
+  'automations' => AutomationsScreen(http: http),
   'briefing' => DailyBriefingScreen(http: http),
   'integrations' => IntegrationsScreen(http: http),
+  'appearance' => const AppearanceScreen(),
   'models' => ModelSettingsScreen(http: http),
   'skills' => SkillsScreen(http: http),
   'persona' => PersonaScreen(http: http),
+  'profiles' => ProfilesScreen(http: http),
   'learning' => LearningScreen(http: http),
   'graph' => KnowledgeGraphScreen(http: http),
   'channels' => ChannelsScreen(http: http),

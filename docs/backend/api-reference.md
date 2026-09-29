@@ -1,0 +1,137 @@
+# HTTP API reference
+
+Base path: **`/api/v1`** (authorized outside Development). OpenAPI: **`/openapi/v1.json`** in Development.
+
+Real-time: **SignalR** `GET /hubs/events` — streamed assistant text and tool lifecycle events.
+
+Agent2Agent (outside `/api/v1` group auth pattern):
+
+- `GET /.well-known/agent-card.json`
+- `POST /a2a` — JSON-RPC with bearer token
+
+## Auth
+
+| Method | Path | Notes |
+|--------|------|-------|
+| POST | `/api/v1/auth/register` | Anonymous if registration enabled |
+| POST | `/api/v1/auth/login` | Returns access + refresh tokens |
+| POST | `/api/v1/auth/refresh` | Rotating refresh |
+| POST | `/api/v1/auth/logout` | |
+
+## Conversations and approvals
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/conversations` | Create conversation (`profileId` optional) |
+| GET | `/conversations` | List (includes bound profile name) |
+| GET | `/conversations/{id}` | Messages + responding flag + profile |
+| PUT | `/conversations/{id}/profile` | Switch bound profile snapshot (409 if scope changes without `confirm`) |
+| DELETE | `/conversations/{id}` | Delete chat (not task-backed) |
+| POST | `/conversations/{id}/messages` | Send user message (starts agent turn) |
+| POST | `/conversations/{id}/cancel` | Cancel in-flight run |
+| GET | `/approvals` | Pending tool approvals |
+| POST | `/approvals/{id}/decision` | Approve or decline |
+
+## Automation
+
+| Area | Paths |
+|------|-------|
+| Reminders | `GET/POST /reminders`, `GET/DELETE /reminders/{id}` |
+| Condition watches | `GET/POST /watches`, `GET/DELETE /watches/{id}` |
+| Tasks | `GET/POST /tasks`, `GET /tasks/{id}`, `GET /tasks/{id}/messages`, cancel endpoints |
+| Daily briefing | `GET/PUT /briefings/daily` (see `AutomationEndpoints`) |
+
+## Memory and learning
+
+| Method | Path |
+|--------|------|
+| GET/POST | `/memory`, `/memory/search`, `/memory/{id}` |
+| PUT/DELETE | `/memory/{id}` |
+| GET/PUT | `/settings/learning` |
+| GET | `/learning/status` |
+| POST | `/learning/run`, `/learning/dream` |
+
+Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints` and `PersonalAssistantEndpoints` (`/graph/...`).
+
+## Files
+
+| Method | Path |
+|--------|------|
+| GET | `/files`, `/files/search` |
+| POST | `/files` (multipart upload) |
+| GET | `/files/{id}/content` |
+| POST | `/files/{id}/reprocess` |
+| DELETE | `/files/{id}` |
+
+## Settings
+
+| Group | Paths |
+|-------|-------|
+| Models | `/settings/models`, `/settings/models/codex`, `/openrouter-key`, `/test`, catalog |
+| Voice | `/settings/voice` |
+| Devices | `/settings/devices` |
+| Persona | `/persona` (see `PersonaEndpoints`) |
+| Profiles | `/profiles` |
+| Collections | `/collections` |
+
+## Skills
+
+`/skills` — CRUD, import/export, status, lock.
+
+## Integrations and MCP
+
+| Path | Purpose |
+|------|---------|
+| `/integrations/credentials` | List configured providers (no values) |
+| `/integrations/{provider}/credentials` | Put/delete secrets |
+| `/integrations/connections` | Per-turn MCP connection status (tool counts) |
+| `/integrations/packs`, `/integrations/oauth/*` | Guided packs and OAuth |
+| `/mcp-servers`, `/mcp-controls/{name}` | Owner MCP registry |
+
+## Channels
+
+`/channels` — WhatsApp/Signal configuration, threads, test send, Signal link/status, WhatsApp webhooks.
+
+## Voice (user)
+
+`POST /voice/session` — LiveKit token + session metadata.
+
+Internal routes under `/voice/internal/{conversationId}/...` are for the voice runtime (secret-protected).
+
+## Browser
+
+`GET /conversations/{id}/browser-sessions`, `GET /browser-sessions/{id}`.
+
+## Surfaces (generative UI)
+
+`GET /conversations/{id}/surfaces`, `POST /ui-surfaces/{id}/actions`.
+
+## Home, devices, coding
+
+| Path | Purpose |
+|------|---------|
+| GET `/home` | Home briefing payload |
+| POST `/devices/telemetry` | Battery/location snapshots |
+| POST `/devices/invoke/{id}/result` | Device capability callback |
+| GET `/coding/runs`, `/coding/runs/{id}` | Coding task history |
+
+## Notifications, push, audit
+
+| Path | Purpose |
+|------|---------|
+| GET `/notifications` | In-app notifications |
+| POST `/notifications/{id}/read` | |
+| PUT/DELETE `/push-devices` | FCM registration |
+| GET `/audit` | Append-only audit events |
+
+## Usage
+
+`GET /usage` — token and activity aggregates (see `UsageEndpoints`).
+
+## Remote agents (A2A management)
+
+Under `/api/v1/agents` and `/api/v1/a2a-tokens` — registry and inbound token hashes.
+
+## Implementation map
+
+Each route group is implemented in `src/Jarvis.Api/Endpoints/*.cs` and registered in `Program.cs`. When adding routes, prefer existing groups and `ICurrentUser` for owner checks.

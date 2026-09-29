@@ -1,6 +1,7 @@
 using Jarvis.Infrastructure.Persistence;
 using Jarvis.Application.Files;
 using Jarvis.Application.Conversations;
+using Jarvis.Domain.Conversations;
 using Jarvis.Application.Approvals;
 using Jarvis.Domain.Approvals;
 using Jarvis.Domain.Files;
@@ -39,6 +40,64 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
         Assert.Null(await store.GetAsync(conversation.Id, otherOwner, CancellationToken.None));
         Assert.Single(await store.ListAsync(owner, CancellationToken.None));
         Assert.Empty(await store.ListAsync(otherOwner, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Message_pages_are_bounded_stable_and_deterministic_for_equal_timestamps()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var store = new ConversationStore(database);
+        var conversation = await store.CreateAsync(owner, "Long transcript", CancellationToken.None);
+        var messages = Enumerable.Range(0, 205)
+            .Select(index => new Message(conversation.Id, index % 2 == 0 ? "user" : "assistant", $"message-{index}"))
+            .ToArray();
+        database.Messages.AddRange(messages);
+        await database.SaveChangesAsync();
+        var timestamp = DateTimeOffset.UtcNow.AddMinutes(-1);
+        await database.Messages.Where(message => message.ConversationId == conversation.Id)
+            .ExecuteUpdateAsync(update => update.SetProperty(message => message.CreatedAt, timestamp));
+        database.ChangeTracker.Clear();
+
+        var received = new List<Message>();
+        MessageCursor? cursor = null;
+        do
+        {
+            var page = await store.GetMessagePageAsync(conversation.Id, cursor, 37, CancellationToken.None);
+            Assert.InRange(page.Items.Count, 1, 37);
+            received.InsertRange(0, page.Items);
+            cursor = page.NextCursor;
+            if (!page.HasMore) break;
+            Assert.NotNull(cursor);
+        } while (true);
+
+        Assert.Equal(205, received.Count);
+        Assert.Equal(205, received.Select(message => message.Id).Distinct().Count());
+        Assert.Equal(received.OrderBy(message => message.CreatedAt).ThenBy(message => message.Id), received);
+    }
+
+    [Fact]
+    public async Task Message_cursor_remains_valid_after_boundary_deletion_and_concurrent_insert()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var store = new ConversationStore(database);
+        var conversation = await store.CreateAsync(owner, "Changing transcript", CancellationToken.None);
+        for (var index = 0; index < 5; index++)
+            await store.AddMessageAsync(new Message(conversation.Id, "user", index.ToString()), CancellationToken.None);
+
+        var newest = await store.GetMessagePageAsync(conversation.Id, null, 2, CancellationToken.None);
+        var boundary = Assert.IsType<MessageCursor>(newest.NextCursor);
+        database.Messages.Remove(await database.Messages.SingleAsync(message => message.Id == boundary.Id));
+        database.Messages.Add(new Message(conversation.Id, "assistant", "concurrent"));
+        await database.SaveChangesAsync();
+
+        var older = await store.GetMessagePageAsync(conversation.Id, boundary, 10, CancellationToken.None);
+        Assert.False(older.HasMore);
+        Assert.Equal(3, older.Items.Count);
+        Assert.All(older.Items, message => Assert.True(message.CreatedAt < boundary.CreatedAt ||
+            message.CreatedAt == boundary.CreatedAt && message.Id.CompareTo(boundary.Id) < 0));
+        Assert.Empty((await store.GetMessagePageAsync(Guid.CreateVersion7(), null, 10, CancellationToken.None)).Items);
     }
 
     [Fact]
@@ -105,7 +164,7 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
                 [new FileContentChunk(id, fileOwner, 0, "Verification invoice renewal terms.")], CancellationToken.None);
         }
 
-        var hits = await contents.SearchTextAsync(owner, "invoice", FileSearchScope.AllOwnerFiles, CancellationToken.None);
+        var hits = await contents.SearchTextAsync(owner, "invoice", CancellationToken.None);
         var hit = Assert.Single(hits);
         Assert.Equal(expectedId, hit.FileId);
         Assert.Equal("invoice.txt", hit.FileName);
@@ -317,22 +376,21 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
         }
 
         Assert.True(await context.AttachFileAsync(conversation.Id, attachedId, owner, CancellationToken.None));
-        var scoped = new FileSearchScope(await context.ResolveScopedFileIdsAsync(conversation.Id, owner,
-            CancellationToken.None));
-        var hits = await contents.SearchTextAsync(owner, "alpha", scoped, CancellationToken.None);
+        var scopedIds = await context.ResolveScopedFileIdsAsync(conversation.Id, owner, CancellationToken.None);
+        var hits = await contents.SearchTextAsync(owner, "alpha", CancellationToken.None, scopedIds);
         var hit = Assert.Single(hits);
         Assert.Equal(attachedId, hit.FileId);
     }
 
     [Fact]
-    public async Task File_collection_names_are_unique_per_owner_when_normalized()
+    public async Task Document_collection_names_are_unique_per_owner()
     {
         var owner = Guid.CreateVersion7();
         await using var database = CreateDbContext();
-        var collections = new FileCollectionRepository(database);
-        await collections.CreateAsync(owner, "Project Docs", CancellationToken.None);
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            collections.CreateAsync(owner, "  project   docs ", CancellationToken.None));
+        var collections = new DocumentCollectionRepository(database);
+        await collections.CreateAsync(owner, new DocumentCollectionDraft("Project Docs", null), CancellationToken.None);
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            collections.CreateAsync(owner, new DocumentCollectionDraft("Project Docs", null), CancellationToken.None));
     }
 
     [Fact]

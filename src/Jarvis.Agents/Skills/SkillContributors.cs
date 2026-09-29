@@ -1,6 +1,7 @@
 using System.Text;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Profiles;
 using Jarvis.Application.Settings;
 using Jarvis.Application.Skills;
 using Jarvis.Application.Workflows;
@@ -18,7 +19,7 @@ internal sealed class SkillToolContributor(
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context)
     {
-        var tools = new SkillAgentTools(skills, settings, notifications, audit, currentUser);
+        var tools = new SkillAgentTools(skills, settings, notifications, audit, currentUser, context.Profile);
         yield return AIFunctionFactory.Create(tools.LoadSkillAsync);
         yield return AIFunctionFactory.Create(tools.ListSkillsAsync);
         yield return AIFunctionFactory.Create(tools.SaveSkillAsync);
@@ -30,11 +31,12 @@ internal sealed class SkillContextContributor(ISkillRepository skills) : IAgentC
     public int Order => 20;
 
     public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
-        [new SkillsContextProvider(skills, context.OwnerId)];
+        [new SkillsContextProvider(skills, context.OwnerId, context.Profile)];
 }
 
 /// <summary>Progressive disclosure: only skill names and descriptions enter each turn; bodies load on demand.</summary>
-internal sealed class SkillsContextProvider(ISkillRepository skills, Guid ownerId) : MessageAIContextProvider
+internal sealed class SkillsContextProvider(ISkillRepository skills, Guid ownerId,
+    AssistantProfileSnapshot? profile) : MessageAIContextProvider
 {
     internal const string Prefix = "Available skills";
     private const int MaxListed = 40;
@@ -44,6 +46,7 @@ internal sealed class SkillsContextProvider(ISkillRepository skills, Guid ownerI
     {
         var active = (await skills.ListAsync(ownerId, cancellationToken))
             .Where(skill => skill.Status == SkillStatuses.Active)
+            .Where(skill => ProfileScope.AllowsSkill(profile, skill.Id))
             .OrderByDescending(skill => skill.UseCount).ThenByDescending(skill => skill.UpdatedAt)
             .Take(MaxListed)
             .ToArray();

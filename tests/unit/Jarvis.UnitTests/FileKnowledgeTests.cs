@@ -25,18 +25,3 @@ public sealed class FileReferenceSanitizerTests
         Assert.Equal(2_400, FileReferenceSanitizer.SanitizeExcerpt(input, maxLength: 2_400).Length);
     }
 }
-
-public sealed class FileSearchScopeTests
-{
-    [Fact]
-    public void Restricted_scope_with_no_files_is_empty()
-    {
-        var scope = new FileSearchScope([]);
-        Assert.True(scope.IsRestricted);
-        Assert.Empty(scope.FileIds!);
-    }
-
-    [Fact]
-    public void All_owner_scope_is_not_restricted() =>
-        Assert.False(FileSearchScope.AllOwnerFiles.IsRestricted);
-}

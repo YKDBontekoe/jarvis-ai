@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import 'ui/phosphor_icons.dart';
 
 import 'features/memory/knowledge_graph_screen.dart';
@@ -92,8 +93,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
     } catch (_) {
       if (mounted && revision == _requestRevision) {
         setState(
-          () => _error =
-              'Jarvis could not load memory. Check the API connection and try again.',
+          () => _error = 'Jarvis could not load memory. Check the API connection and try again.',
         );
       }
     } finally {
@@ -213,9 +213,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -256,15 +255,17 @@ class _MemoryScreenState extends State<MemoryScreen> {
               onSubmitted: (value) => _load(query: value.trim()),
               decoration: InputDecoration(
                 hintText: 'Search what Jarvis remembers',
-                fillColor: JarvisColors.surface,
+                fillColor: JarvisColors.of(context).surface,
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(JarvisRadii.md),
-                  borderSide: const BorderSide(color: JarvisColors.outline),
+                  borderSide: BorderSide(
+                    color: JarvisColors.of(context).outline,
+                  ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(JarvisRadii.md),
-                  borderSide: const BorderSide(
-                    color: JarvisColors.ink,
+                  borderSide: BorderSide(
+                    color: JarvisColors.of(context).ink,
                     width: 1.2,
                   ),
                 ),
@@ -360,8 +361,10 @@ class _MemoryScreenState extends State<MemoryScreen> {
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(16, 10, 6, 14),
-      borderColor: JarvisColors.outline,
-      color: isSuperseded ? JarvisColors.canvas : JarvisColors.surface,
+      borderColor: JarvisColors.of(context).outline,
+      color: isSuperseded
+          ? JarvisColors.of(context).canvas
+          : JarvisColors.of(context).surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -370,9 +373,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
               _KindTag(label: kind, icon: _kindIcon(kind)),
               if (isSuperseded) ...[
                 const SizedBox(width: 6),
-                const StatusPill(
+                StatusPill(
                   label: 'Superseded',
-                  color: JarvisColors.muted,
+                  color: JarvisColors.of(context).muted,
                 ),
               ],
               const Spacer(),
@@ -382,8 +385,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
                 visualDensity: VisualDensity.compact,
                 style: IconButton.styleFrom(
                   foregroundColor: isPinned
-                      ? JarvisColors.ink
-                      : JarvisColors.muted,
+                      ? JarvisColors.of(context).ink
+                      : JarvisColors.of(context).muted,
                 ),
                 icon: Icon(
                   isPinned
@@ -414,28 +417,30 @@ class _MemoryScreenState extends State<MemoryScreen> {
               style: TextStyle(
                 fontSize: 15,
                 height: 1.5,
-                color: isSuperseded ? JarvisColors.inkSoft : JarvisColors.ink,
+                color: isSuperseded
+                    ? JarvisColors.of(context).inkSoft
+                    : JarvisColors.of(context).ink,
                 decoration: isSuperseded ? TextDecoration.lineThrough : null,
-                decorationColor: JarvisColors.muted,
+                decorationColor: JarvisColors.of(context).muted,
               ),
             ),
           ),
           if (memory['sourceType'] == 'conversation')
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(top: 10),
               child: Row(
                 children: [
                   Icon(
                     PhosphorIconsRegular.sparkle,
                     size: 14,
-                    color: JarvisColors.muted,
+                    color: JarvisColors.of(context).muted,
                   ),
                   SizedBox(width: 6),
                   Text(
                     'Learned from a conversation',
                     style: TextStyle(
                       fontSize: 12.5,
-                      color: JarvisColors.inkSoft,
+                      color: JarvisColors.of(context).inkSoft,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -465,16 +470,18 @@ class _MemoryScreenState extends State<MemoryScreen> {
         child: ChoiceChip(
           label: Text(label),
           selected: _selectedKind == value,
-          selectedColor: JarvisColors.ink,
+          selectedColor: JarvisColors.of(context).ink,
           side: BorderSide(
             color: _selectedKind == value
-                ? JarvisColors.ink
-                : JarvisColors.outline,
+                ? JarvisColors.of(context).ink
+                : JarvisColors.of(context).outline,
           ),
           labelStyle: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: _selectedKind == value ? Colors.white : JarvisColors.inkSoft,
+            color: _selectedKind == value
+                ? JarvisColors.of(context).onInk
+                : JarvisColors.of(context).inkSoft,
           ),
           onSelected: (_) {
             setState(() => _selectedKind = value);
@@ -494,14 +501,14 @@ class _KindTag extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(icon, size: 14, color: JarvisColors.muted),
+      Icon(icon, size: 14, color: JarvisColors.of(context).muted),
       const SizedBox(width: 6),
       Text(
         label.isEmpty ? 'Other' : label[0].toUpperCase() + label.substring(1),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12.5,
           fontWeight: FontWeight.w500,
-          color: JarvisColors.muted,
+          color: JarvisColors.of(context).muted,
         ),
       ),
     ],

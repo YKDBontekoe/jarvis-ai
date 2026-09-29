@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Profiles;
 using Jarvis.Domain.Audit;
 using Jarvis.Domain.Conversations;
 using Microsoft.EntityFrameworkCore;
@@ -9,23 +10,46 @@ namespace Jarvis.Infrastructure.Persistence;
 public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, IConversationHistory
 {
     public async Task<IReadOnlyList<Message>> ListRecentMessagesAsync(Guid ownerId, DateTimeOffset since, int limit,
-        CancellationToken cancellationToken) =>
-        (await db.Messages.AsNoTracking()
-            .Where(message => message.CreatedAt > since &&
-                              db.Conversations.Any(conversation => conversation.Id == message.ConversationId &&
-                                                                   conversation.OwnerId == ownerId))
+        CancellationToken cancellationToken)
+    {
+        var conversations = await db.Conversations.AsNoTracking()
+            .Where(conversation => conversation.OwnerId == ownerId)
+            .Select(conversation => new { conversation.Id, conversation.ProfileSnapshotJson })
+            .ToListAsync(cancellationToken);
+        var allowed = conversations
+            .Where(conversation => ProfileScope.ContributesToLearning(conversation.ProfileSnapshotJson))
+            .Select(conversation => conversation.Id)
+            .ToHashSet();
+        if (allowed.Count == 0) return [];
+
+        return (await db.Messages.AsNoTracking()
+            .Where(message => message.CreatedAt > since && allowed.Contains(message.ConversationId))
             .OrderByDescending(message => message.CreatedAt)
             .Take(limit)
             .ToListAsync(cancellationToken))
-        .OrderBy(message => message.CreatedAt)
-        .ToArray();
+            .OrderBy(message => message.CreatedAt)
+            .ToArray();
+    }
 
-    public async Task<Conversation> CreateAsync(Guid ownerId, string title, CancellationToken cancellationToken)
+    public async Task<Conversation> CreateAsync(Guid ownerId, string title, CancellationToken cancellationToken,
+        ProfileBinding? profile = null)
     {
         var conversation = new Conversation(ownerId, title);
+        if (profile is not null)
+            conversation.BindProfile(profile.ProfileId, profile.Version, profile.SnapshotJson);
         db.Conversations.Add(conversation);
         await db.SaveChangesAsync(cancellationToken);
         return conversation;
+    }
+
+    public async Task BindProfileAsync(Guid conversationId, Guid ownerId, ProfileBinding profile,
+        CancellationToken cancellationToken)
+    {
+        var conversation = await db.Conversations.SingleOrDefaultAsync(
+            x => x.Id == conversationId && x.OwnerId == ownerId, cancellationToken)
+            ?? throw new InvalidOperationException("Conversation was not found.");
+        conversation.BindProfile(profile.ProfileId, profile.Version, profile.SnapshotJson);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public Task<Conversation?> GetAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken) =>
@@ -65,6 +89,30 @@ public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, 
     public async Task<IReadOnlyList<Message>> GetMessagesAsync(Guid conversationId, CancellationToken cancellationToken) =>
         await db.Messages.AsNoTracking().Where(x => x.ConversationId == conversationId)
             .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToListAsync(cancellationToken);
+
+    public async Task<MessagePage> GetMessagePageAsync(Guid conversationId, MessageCursor? before, int limit,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(limit, MessagePage.MaximumSize);
+
+        var query = db.Messages.AsNoTracking().Where(message => message.ConversationId == conversationId);
+        if (before is not null)
+            query = query.Where(message => message.CreatedAt < before.CreatedAt ||
+                message.CreatedAt == before.CreatedAt && message.Id.CompareTo(before.Id) < 0);
+
+        var descending = await query.OrderByDescending(message => message.CreatedAt)
+            .ThenByDescending(message => message.Id)
+            .Take(limit + 1)
+            .ToListAsync(cancellationToken);
+        var hasMore = descending.Count > limit;
+        if (hasMore) descending.RemoveAt(descending.Count - 1);
+        descending.Reverse();
+        var nextCursor = hasMore && descending.Count > 0
+            ? new MessageCursor(descending[0].CreatedAt, descending[0].Id)
+            : null;
+        return new MessagePage(descending, nextCursor, hasMore);
+    }
 
     public async Task AddMessageAsync(Message message, CancellationToken cancellationToken)
     {

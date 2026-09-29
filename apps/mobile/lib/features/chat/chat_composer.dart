@@ -96,12 +96,14 @@ class _ChatComposerState extends State<ChatComposer> {
       duration: const Duration(milliseconds: 200),
       padding: const EdgeInsets.fromLTRB(6, 4, 8, 8),
       decoration: BoxDecoration(
-        color: JarvisColors.surface,
+        color: JarvisColors.of(context).surface,
         borderRadius: BorderRadius.circular(26),
         border: Border.all(
-          color: focused ? JarvisColors.outlineStrong : JarvisColors.outline,
+          color: focused
+              ? JarvisColors.of(context).outlineStrong
+              : JarvisColors.of(context).outline,
         ),
-        boxShadow: JarvisShadows.floating,
+        boxShadow: JarvisShadows.floating(),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -143,12 +145,12 @@ class _ChatComposerState extends State<ChatComposer> {
             maxLines: 6,
             textInputAction: TextInputAction.newline,
             keyboardType: TextInputType.multiline,
-            style: const TextStyle(fontSize: 16, color: JarvisColors.ink),
+            style: TextStyle(fontSize: 16, color: JarvisColors.of(context).ink),
             decoration: InputDecoration(
               hintText: widget.voiceActive ? 'Listening…' : widget.hint,
-              hintStyle: const TextStyle(
+              hintStyle: TextStyle(
                 fontSize: 16,
-                color: JarvisColors.muted,
+                color: JarvisColors.of(context).muted,
               ),
               filled: false,
               border: InputBorder.none,
@@ -197,8 +199,8 @@ class _ChatComposerState extends State<ChatComposer> {
                           ),
                           style: IconButton.styleFrom(
                             minimumSize: const Size(38, 38),
-                            backgroundColor: JarvisColors.ink,
-                            foregroundColor: Colors.white,
+                            backgroundColor: JarvisColors.of(context).ink,
+                            foregroundColor: JarvisColors.of(context).onInk,
                           ),
                         )
                       : IconButton.filled(
@@ -206,24 +208,24 @@ class _ChatComposerState extends State<ChatComposer> {
                           tooltip: 'Send',
                           onPressed: _canSend ? widget.onSend : null,
                           icon: widget.sending
-                              ? const SizedBox.square(
+                              ? SizedBox.square(
                                   dimension: 16,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: Colors.white,
+                                    color: JarvisColors.of(context).onInk,
                                   ),
                                 )
                               : const Icon(PhosphorIconsBold.arrowUp, size: 18),
                           style: IconButton.styleFrom(
                             minimumSize: const Size(38, 38),
-                            backgroundColor: JarvisColors.ink,
-                            foregroundColor: Colors.white,
+                            backgroundColor: JarvisColors.of(context).ink,
+                            foregroundColor: JarvisColors.of(context).onInk,
                             disabledBackgroundColor: widget.sending
-                                ? JarvisColors.ink
-                                : JarvisColors.surfaceRaised,
+                                ? JarvisColors.of(context).ink
+                                : JarvisColors.of(context).surfaceRaised,
                             disabledForegroundColor: widget.sending
-                                ? Colors.white
-                                : JarvisColors.muted,
+                                ? JarvisColors.of(context).onInk
+                                : JarvisColors.of(context).muted,
                           ),
                         ),
                 ),
@@ -255,9 +257,15 @@ class _ComposerIconButton extends StatelessWidget {
     icon: Icon(icon, size: 19),
     style: IconButton.styleFrom(
       minimumSize: const Size(38, 38),
-      foregroundColor: danger ? JarvisColors.danger : JarvisColors.ink,
-      backgroundColor: danger ? JarvisColors.dangerSoft : Colors.transparent,
-      shape: const CircleBorder(side: BorderSide(color: JarvisColors.outline)),
+      foregroundColor: danger
+          ? JarvisColors.of(context).danger
+          : JarvisColors.of(context).ink,
+      backgroundColor: danger
+          ? JarvisColors.of(context).dangerSoft
+          : Colors.transparent,
+      shape: CircleBorder(
+        side: BorderSide(color: JarvisColors.of(context).outline),
+      ),
     ),
   );
 }
@@ -321,18 +329,18 @@ class _SuggestionRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: JarvisColors.inkSoft),
+          Icon(icon, size: 18, color: JarvisColors.of(context).inkSoft),
           const Spacer(),
           Text(
             text,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               height: 1.3,
               fontWeight: FontWeight.w500,
               letterSpacing: -.15,
-              color: JarvisColors.ink,
+              color: JarvisColors.of(context).ink,
             ),
           ),
         ],

@@ -38,9 +38,7 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
       final messages = await widget.http.get<dynamic>('$_path/messages');
       var threads = <Map<String, dynamic>>[];
       try {
-        final threadResponse = await widget.http.get<dynamic>(
-          '$_path/threads',
-        );
+        final threadResponse = await widget.http.get<dynamic>('$_path/threads');
         threads = jsonMaps(threadResponse.data);
       } catch (_) {
         threads = const [];
@@ -130,8 +128,7 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
     final confirmed = await showJarvisConfirm(
       context,
       title: 'Disconnect this channel?',
-      message:
-          'Jarvis will stop reading and sending messages on this number. You can connect it again later.',
+      message: 'Jarvis will stop reading and sending messages on this number. You can connect it again later.',
       confirmLabel: 'Disconnect',
       destructive: true,
     );
@@ -170,9 +167,8 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
       return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Webhook URL copied.')));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Webhook URL copied.')));
   }
 
   @override
@@ -228,8 +224,8 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                                 : 'Paused',
                             style: TextStyle(
                               color: asJsonBool(channel['enabled'], true)
-                                  ? JarvisColors.success
-                                  : JarvisColors.muted,
+                                  ? JarvisColors.of(context).success
+                                  : JarvisColors.of(context).muted,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -274,7 +270,7 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                     Text(
                       'THREADS',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: JarvisColors.muted,
+                        color: JarvisColors.of(context).muted,
                         letterSpacing: .8,
                       ),
                     ),
@@ -283,7 +279,9 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: SurfaceCard(
-                          key: Key('channel-thread-${asJsonString(thread['peer'])}'),
+                          key: Key(
+                            'channel-thread-${asJsonString(thread['peer'])}',
+                          ),
                           onTap: () => unawaited(_openThread(thread)),
                           padding: const EdgeInsets.all(14),
                           child: Row(
@@ -299,9 +297,9 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                                   children: [
                                     Text(
                                       asJsonString(thread['peer']) ?? 'Unknown',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleSmall,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall,
                                     ),
                                     Text(
                                       asJsonString(
@@ -312,17 +310,17 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                                           '${asJsonInt(thread['messageCount'])} messages',
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall,
                                     ),
                                   ],
                                 ),
                               ),
-                              const Icon(
+                              Icon(
                                 PhosphorIconsRegular.caretRight,
                                 size: 16,
-                                color: JarvisColors.muted,
+                                color: JarvisColors.of(context).muted,
                               ),
                             ],
                           ),
@@ -333,7 +331,7 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                   Text(
                     'RECENT MESSAGES',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: JarvisColors.muted,
+                      color: JarvisColors.of(context).muted,
                       letterSpacing: .8,
                     ),
                   ),
@@ -357,7 +355,9 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                               Text(
                                 '${asJsonString(message['direction']) == 'out' ? 'Jarvis' : asJsonString(message['peer']) ?? 'Unknown'} · ${asJsonString(message['status']) ?? ''}',
                                 style: Theme.of(context).textTheme.labelSmall
-                                    ?.copyWith(color: JarvisColors.muted),
+                                    ?.copyWith(
+                                      color: JarvisColors.of(context).muted,
+                                    ),
                               ),
                               const SizedBox(height: 4),
                               Text(asJsonString(message['text']) ?? ''),
@@ -371,4 +371,3 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
     );
   }
 }
-

@@ -27,6 +27,7 @@ mixin _ChatScreenNav on _ChatScreenController {
         destination == 'approvals' ||
         destination == 'watches' ||
         destination == 'reminders' ||
+        destination == 'automations' ||
         destination == 'usage' ||
         destination == 'integrations' ||
         destination == 'coding' ||
@@ -168,6 +169,7 @@ mixin _ChatScreenNav on _ChatScreenController {
         }
       }
       await _auth.signOut();
+      await RecentSearchesStore.clearAll();
       await hub?.stop();
     } finally {
       _signingOut = false;

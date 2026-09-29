@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<MemoryReranker>();
         services.AddScoped<IAgentToolContributor, CoreAgentTools>();
         services.AddScoped<IAgentContextContributor, CoreAgentContext>();
+        services.AddScoped<IAgentContextContributor, Profiles.ProfileContextContributor>();
         services.AddScoped<IAgentToolContributor, Skills.SkillToolContributor>();
         services.AddScoped<IAgentContextContributor, Skills.SkillContextContributor>();
         services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();

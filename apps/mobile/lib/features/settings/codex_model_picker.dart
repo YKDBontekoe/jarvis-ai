@@ -83,10 +83,10 @@ class _CodexModelPickerState extends State<CodexModelPicker> {
                         'Use the default model from the signed-in ChatGPT account.',
                       ),
                       trailing: widget.selected.isEmpty
-                          ? const Icon(
+                          ? Icon(
                               PhosphorIconsRegular.check,
                               size: 18,
-                              color: JarvisColors.success,
+                              color: JarvisColors.of(context).success,
                             )
                           : null,
                       onTap: () => Navigator.pop(context, ''),
@@ -104,12 +104,12 @@ class _CodexModelPickerState extends State<CodexModelPicker> {
                       description == null ? id : '$id · $description',
                     ),
                     trailing: asJsonBool(model['supportsImages'])
-                        ? const Tooltip(
+                        ? Tooltip(
                             message: 'Accepts images',
                             child: Icon(
                               PhosphorIconsRegular.image,
                               size: 18,
-                              color: JarvisColors.inkSoft,
+                              color: JarvisColors.of(context).inkSoft,
                             ),
                           )
                         : null,

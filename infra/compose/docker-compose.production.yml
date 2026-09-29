@@ -152,7 +152,7 @@ services:
       Codex__ModelClasses__Realtime: ${CODEX_MODEL_REALTIME:-}
       Jarvis__ModelClass: ${JARVIS_MODEL_CLASS:-}
       ConnectionStrings__jarvis: Host=postgres;Port=5432;Database=jarvis;Username=jarvis;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
-      Database__ApplyMigrationsAtStartup: "true"
+      Database__ApplyMigrationsAtStartup: "false"
       Temporal__Address: temporal:7233
       ObjectStorage__ServiceUrl: http://garage:3900
       ObjectStorage__AccessKey: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
@@ -203,6 +203,26 @@ services:
       retries: 10
       start_period: 90s
     networks: [application, data]
+
+  # One-shot deployment task. It is profile-gated so a normal `compose up` never
+  # reruns migrations; remote-up invokes it explicitly before replacing the API.
+  jarvis-migrate:
+    profiles: [migration]
+    image: ${JARVIS_API_IMAGE:-ghcr.io/ykdbontekoe/jarvis-ai/api:latest}
+    command: ["Jarvis.Api.dll", "migrate"]
+    restart: "no"
+    read_only: true
+    user: "${JARVIS_UID:?Set JARVIS_UID}:${JARVIS_GID:?Set JARVIS_GID}"
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      HOME: /tmp
+      ConnectionStrings__jarvis: Host=postgres;Port=5432;Database=jarvis;Username=jarvis;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    tmpfs:
+      - /tmp:rw,nosuid,size=64m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [data]
 
   jarvis-worker:
     image: ${JARVIS_WORKER_IMAGE:-ghcr.io/ykdbontekoe/jarvis-ai/worker:latest}

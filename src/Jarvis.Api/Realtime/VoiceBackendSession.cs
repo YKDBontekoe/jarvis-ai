@@ -4,6 +4,7 @@ using Jarvis.Api.Security;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Memory;
+using Jarvis.Application.Profiles;
 using Jarvis.Domain.Conversations;
 using Jarvis.Mcp;
 using Microsoft.AspNetCore.SignalR;
@@ -20,13 +21,14 @@ public sealed class VoiceBackendSession(
         CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateOwnerScope(ownerId);
-        var context = new AgentBuildContext(ownerId, null, conversationId);
+        var profile = await ResolveProfileAsync(scope.ServiceProvider, ownerId, conversationId, cancellationToken);
+        var context = new AgentBuildContext(ownerId, null, conversationId, profile);
         var mcp = scope.ServiceProvider.GetRequiredService<McpToolHost>();
         await mcp.InitializeAsync(cancellationToken);
         var functions = scope.ServiceProvider.GetRequiredService<JarvisAgentFactory>()
             .CollectFunctions(mcp.Tools, context);
         var instructions = await scope.ServiceProvider.GetRequiredService<VoiceSessionContext>()
-            .BuildInstructionsAsync(ownerId, cancellationToken);
+            .BuildInstructionsAsync(ownerId, cancellationToken, profile);
         return new VoiceSessionSnapshot(instructions, functions.Select(VoiceTools.Describe).ToArray());
     }
 
@@ -90,8 +92,9 @@ public sealed class VoiceBackendSession(
     {
         var mcp = services.GetRequiredService<McpToolHost>();
         await mcp.InitializeAsync(cancellationToken);
+        var profile = await ResolveProfileAsync(services, ownerId, conversationId, cancellationToken);
         var functions = services.GetRequiredService<JarvisAgentFactory>()
-            .CollectFunctions(mcp.Tools, new AgentBuildContext(ownerId, null, conversationId));
+            .CollectFunctions(mcp.Tools, new AgentBuildContext(ownerId, null, conversationId, profile));
         return functions.FirstOrDefault(tool => string.Equals(tool.Name, toolName, StringComparison.Ordinal));
     }
 
@@ -174,6 +177,19 @@ public sealed class VoiceBackendSession(
             QueueMemoryExtraction(ownerId, conversationId, last.Id, last.Content);
     }
 
+    private static async Task<AssistantProfileSnapshot?> ResolveProfileAsync(IServiceProvider services, Guid ownerId,
+        Guid conversationId, CancellationToken cancellationToken)
+    {
+        var conversations = services.GetRequiredService<IConversationStore>();
+        var profiles = services.GetRequiredService<IAssistantProfileService>();
+        var conversation = await conversations.GetAsync(conversationId, ownerId, cancellationToken);
+        ProfileBinding? binding = conversation?.ProfileId is { } profileId
+            ? new ProfileBinding(profileId, conversation.ProfileVersion ?? 0,
+                conversation.ProfileSnapshotJson ?? "", conversation.Title)
+            : null;
+        return await profiles.ResolveSnapshotAsync(binding, ownerId, cancellationToken);
+    }
+
     private void QueueMemoryExtraction(Guid ownerId, Guid conversationId, Guid sourceMessageId, string source)
     {
         _ = Task.Run(async () =>
@@ -182,8 +198,9 @@ public sealed class VoiceBackendSession(
             {
                 await using var scope = scopes.CreateAsyncScope();
                 using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+                var profile = await ResolveProfileAsync(scope.ServiceProvider, ownerId, conversationId, timeout.Token);
                 await scope.ServiceProvider.GetRequiredService<IConversationMemoryExtractor>()
-                    .ExtractAndStoreAsync(ownerId, sourceMessageId, source, timeout.Token);
+                    .ExtractAndStoreAsync(ownerId, sourceMessageId, source, timeout.Token, profile?.ProfileId);
             }
             catch (OperationCanceledException)
             {

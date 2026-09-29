@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
 import 'ui/phosphor_icons.dart';
 
 import 'file_download_stub.dart'
@@ -59,11 +60,11 @@ class _FilesScreenState extends State<FilesScreen> {
     });
     try {
       final response = await widget.http.get<dynamic>('/api/v1/files');
-      final collections = await widget.http.get<dynamic>('/api/v1/file-collections');
+      final collectionsResponse = await widget.http.get<dynamic>('/api/v1/collections');
       if (mounted && revision == _requestRevision) {
         setState(() {
           _files = jsonMaps(response.data);
-          _collections = jsonMaps(collections.data);
+          _collections = jsonMaps(collectionsResponse.data);
         });
       }
     } on DioException {
@@ -209,7 +210,7 @@ class _FilesScreenState extends State<FilesScreen> {
     if (name == null || name.isEmpty) return;
     setState(() => _busy = true);
     try {
-      await widget.http.post('/api/v1/file-collections', data: {'name': name});
+      await widget.http.post('/api/v1/collections', data: {'name': name});
       await _load();
     } on DioException {
       if (mounted) _showError('Could not create that collection.');
@@ -235,7 +236,7 @@ class _FilesScreenState extends State<FilesScreen> {
     if (!confirmed) return;
     setState(() => _busy = true);
     try {
-      await widget.http.delete('/api/v1/file-collections/$id');
+      await widget.http.delete('/api/v1/collections/$id');
       await _load();
     } on DioException {
       if (mounted) _showError('Could not delete this collection.');
@@ -247,9 +248,8 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _formatSize(dynamic value) {
@@ -291,145 +291,144 @@ class _FilesScreenState extends State<FilesScreen> {
       empty: const EmptyState(
         icon: PhosphorIconsRegular.folderOpen,
         title: 'No files yet',
-        message:
-            'Your files will be stored privately with Jarvis. PDFs and text are indexed so Jarvis can search them.',
+        message: 'Your files will be stored privately with Jarvis. PDFs and text are indexed so Jarvis can search them.',
       ),
       child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-            itemCount: _collections.length + _files.length,
-            itemBuilder: (context, index) {
-              if (index < _collections.length) {
-                final collection = _collections[index];
-                final name = asJsonString(collection['name']) ?? 'Collection';
-                return ContentWidth(
-                  child: SurfaceCard(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
-                    child: Row(
-                      children: [
-                        const IconBadge(icon: PhosphorIconsRegular.folders, size: 44),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                              Text(
-                                '${collection['fileCount'] ?? 0} files',
-                                style: const TextStyle(color: JarvisColors.muted, fontSize: 13),
-                              ),
-                            ],
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+        itemCount: _collections.length + _files.length,
+        itemBuilder: (context, index) {
+          if (index < _collections.length) {
+            final collection = _collections[index];
+            final name = asJsonString(collection['name']) ?? 'Collection';
+            final fileIds = collection['fileIds'];
+            final count = fileIds is List ? fileIds.length : 0;
+            return ContentWidth(
+              child: SurfaceCard(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
+                child: Row(
+                  children: [
+                    const IconBadge(icon: PhosphorIconsRegular.folders, size: 44),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          Text(
+                            '$count files',
+                            style: const TextStyle(color: JarvisColors.muted, fontSize: 13),
                           ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Delete collection',
+                      onPressed: _busy ? null : () => _deleteCollection(collection),
+                      icon: const Icon(PhosphorIconsRegular.trash),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          final file = _files[index - _collections.length];
+          final name = asJsonString(file['fileName']) ?? 'File';
+          final icon = _fileIcon(name);
+          final status = asJsonString(file['processingStatus']) ?? 'uploaded';
+          return ContentWidth(
+            child: SurfaceCard(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
+              onTap: _busy ? null : () => _download(file),
+              child: Row(
+                children: [
+                  IconBadge(icon: icon, size: 44),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 15),
                         ),
-                        IconButton(
-                          tooltip: 'Delete collection',
-                          onPressed: _busy ? null : () => _deleteCollection(collection),
-                          icon: const Icon(PhosphorIconsRegular.trash),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              _formatSize(file['sizeBytes']),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            StatusPill.forStatus(status),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                );
-              }
-              final file = _files[index - _collections.length];
-              final name = asJsonString(file['fileName']) ?? 'File';
-              final icon = _fileIcon(name);
-              final status = asJsonString(file['processingStatus']) ?? 'uploaded';
-              return ContentWidth(
-                child: SurfaceCard(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
-                  onTap: _busy ? null : () => _download(file),
-                  child: Row(
-                    children: [
-                      IconBadge(icon: icon, size: 44),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(
-                                context,
-                              ).textTheme.titleSmall?.copyWith(fontSize: 15),
-                            ),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Text(
-                                  _formatSize(file['sizeBytes']),
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                StatusPill.forStatus(status),
-                              ],
-                            ),
-                          ],
+                  PopupMenuButton<String>(
+                    enabled: !_busy,
+                    icon: const Icon(PhosphorIconsRegular.dotsThree),
+                    onSelected: (action) {
+                      if (action == 'open') {
+                        _download(file);
+                      } else if (action == 'retry') {
+                        _retryIndexing(file);
+                      } else if (action == 'delete') {
+                        _delete(file);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'open',
+                        child: ListTile(
+                          leading: const Icon(
+                            PhosphorIconsRegular.arrowSquareOut,
+                          ),
+                          title: Text(
+                            kIsWeb ? 'Download' : 'Download and open',
+                          ),
+                          contentPadding: EdgeInsets.zero,
                         ),
                       ),
-                      PopupMenuButton<String>(
-                        enabled: !_busy,
-                        icon: const Icon(PhosphorIconsRegular.dotsThree),
-                        onSelected: (action) {
-                          if (action == 'open') {
-                            _download(file);
-                          } else if (action == 'retry') {
-                            _retryIndexing(file);
-                          } else if (action == 'delete') {
-                            _delete(file);
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          PopupMenuItem(
-                            value: 'open',
-                            child: ListTile(
-                              leading: const Icon(
-                                PhosphorIconsRegular.arrowSquareOut,
-                              ),
-                              title: Text(
-                                kIsWeb ? 'Download' : 'Download and open',
-                              ),
-                              contentPadding: EdgeInsets.zero,
+                      if (status == 'failed')
+                        const PopupMenuItem(
+                          value: 'retry',
+                          child: ListTile(
+                            leading: Icon(PhosphorIconsRegular.arrowsClockwise),
+                            title: Text('Retry indexing'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: ListTile(
+                          leading: Icon(
+                            PhosphorIconsRegular.trash,
+                            color: JarvisColors.of(context).danger,
+                          ),
+                          title: Text(
+                            'Delete',
+                            style: TextStyle(
+                              color: JarvisColors.of(context).danger,
                             ),
                           ),
-                          if (status == 'failed')
-                            const PopupMenuItem(
-                              value: 'retry',
-                              child: ListTile(
-                                leading: Icon(
-                                  PhosphorIconsRegular.arrowsClockwise,
-                                ),
-                                title: Text('Retry indexing'),
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-                          const PopupMenuItem(
-                            value: 'delete',
-                            child: ListTile(
-                              leading: Icon(
-                                PhosphorIconsRegular.trash,
-                                color: JarvisColors.danger,
-                              ),
-                              title: Text(
-                                'Delete',
-                                style: TextStyle(color: JarvisColors.danger),
-                              ),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                        ],
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
                     ],
                   ),
-                ),
-              );
-            },
-          ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     ),
   );
 

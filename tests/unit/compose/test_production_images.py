@@ -67,6 +67,22 @@ class ProductionComposeImageTests(unittest.TestCase):
         self.assertIn("image: ghcr.io/example/jarvis-ai/worker:deadbeef", rendered)
         self.assertNotIn("voice-worker", rendered)
 
+    def test_migration_is_an_explicit_one_shot_service(self) -> None:
+        text = COMPOSE_FILE.read_text(encoding="utf-8")
+        self.assertIn("jarvis-migrate:", text)
+        self.assertIn("profiles: [migration]", text)
+        self.assertIn('command: ["Jarvis.Api.dll", "migrate"]', text)
+        self.assertIn('Database__ApplyMigrationsAtStartup: "false"', text)
+
+    def test_deploy_migrates_before_replacing_application_services(self) -> None:
+        deploy = (REPO_ROOT / "scripts" / "deploy" / "remote-up.sh").read_text(
+            encoding="utf-8"
+        )
+        migrate = deploy.index("--rm --no-deps jarvis-migrate")
+        update = deploy.index("-d --no-build --remove-orphans")
+        self.assertLess(migrate, update)
+        self.assertIn("flock -n 9", deploy)
+
     @unittest.skipUnless(shutil.which("docker"), "docker is not installed")
     def test_docker_compose_config_interpolates_images(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

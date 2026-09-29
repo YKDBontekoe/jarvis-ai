@@ -6,6 +6,8 @@ using Jarvis.Application.Conversations;
 using Jarvis.Application.Integrations;
 using Jarvis.Application.Settings;
 
+using Jarvis.Api.Errors;
+
 namespace Jarvis.Api.Endpoints;
 
 public sealed record ModelSettingsDto(string Provider, string? ChatModel, string? FastModel, string? ReasoningEffort,
@@ -141,8 +143,7 @@ internal static class ModelSettingsEndpoints
             catch (HttpRequestException exception)
             {
                 logger.LogWarning(exception, "Could not load the OpenRouter model catalog.");
-                return Results.Problem("OpenRouter's model list is temporarily unavailable.",
-                    statusCode: StatusCodes.Status502BadGateway);
+                return ApiProblemResults.BadGateway("OpenRouter's model list is temporarily unavailable.");
             }
         }).WithName("ListOpenRouterModels");
 

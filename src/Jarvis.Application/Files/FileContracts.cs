@@ -42,20 +42,21 @@ public sealed record FileSearchHit(
 public interface IFileContentRepository
 {
     Task ReplaceChunksAsync(Guid fileId, Guid ownerId, IReadOnlyList<FileContentChunk> chunks, CancellationToken cancellationToken);
-    Task<IReadOnlyList<FileSearchHit>> SearchTextAsync(Guid ownerId, string query, FileSearchScope scope,
-        CancellationToken cancellationToken);
+    Task<IReadOnlyList<FileSearchHit>> SearchTextAsync(Guid ownerId, string query, CancellationToken cancellationToken,
+        IReadOnlyCollection<Guid>? fileIds = null);
     Task DeleteChunksAsync(Guid fileId, Guid ownerId, CancellationToken cancellationToken);
 }
 
 public interface IFileSearchService
 {
-    Task<IReadOnlyList<FileSearchHit>> SearchAsync(Guid ownerId, string query, FileSearchScope scope,
-        CancellationToken cancellationToken);
+    Task<IReadOnlyList<FileSearchHit>> SearchAsync(Guid ownerId, string query, CancellationToken cancellationToken,
+        IReadOnlyCollection<Guid>? fileIds = null);
 }
 
 public interface IConversationFileScopeService
 {
-    Task<FileSearchScope> GetSearchScopeAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);
+    Task<IReadOnlyCollection<Guid>?> ResolveSearchFileIdsAsync(Guid conversationId, Guid ownerId,
+        CancellationToken cancellationToken);
 }
 
 public interface IFileProcessingScheduler

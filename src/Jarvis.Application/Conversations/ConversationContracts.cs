@@ -1,18 +1,31 @@
 using Jarvis.Domain.Conversations;
 using Jarvis.Application.Approvals;
+using Jarvis.Application.Profiles;
 
 namespace Jarvis.Application.Conversations;
 
 public interface IConversationStore
 {
-    Task<Conversation> CreateAsync(Guid ownerId, string title, CancellationToken cancellationToken);
+    Task<Conversation> CreateAsync(Guid ownerId, string title, CancellationToken cancellationToken,
+        ProfileBinding? profile = null);
+    Task BindProfileAsync(Guid conversationId, Guid ownerId, ProfileBinding profile,
+        CancellationToken cancellationToken);
     Task<Conversation?> GetAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<Conversation>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<ConversationDeleteResult> DeleteAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<Message>> GetMessagesAsync(Guid conversationId, CancellationToken cancellationToken);
+    Task<MessagePage> GetMessagePageAsync(Guid conversationId, MessageCursor? before, int limit,
+        CancellationToken cancellationToken);
     Task AddMessageAsync(Message message, CancellationToken cancellationToken);
     Task<string?> GetAgentSessionAsync(Guid conversationId, CancellationToken cancellationToken);
     Task SaveAgentSessionAsync(Guid conversationId, string state, CancellationToken cancellationToken);
+}
+
+public sealed record MessageCursor(DateTimeOffset CreatedAt, Guid Id);
+
+public sealed record MessagePage(IReadOnlyList<Message> Items, MessageCursor? NextCursor, bool HasMore)
+{
+    public const int MaximumSize = 100;
 }
 
 /// <summary>Owner-wide, read-only history used by background learning.</summary>

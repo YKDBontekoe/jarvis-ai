@@ -87,12 +87,29 @@ void main() {
       contains('sign-in has expired'),
     );
     expect(
-      describeApiError(_httpError(status: 503)),
+      describeApiError(
+        _httpError(
+          status: 503,
+          data: {
+            'code': 'dependency_unavailable',
+            'detail': 'A Jarvis service is temporarily unavailable. Please try again.',
+          },
+        ),
+      ),
       contains('temporarily unavailable'),
     );
     expect(
       describeApiError(_httpError(status: 409, data: {'message': 'Busy.'})),
       'Busy.',
+    );
+    expect(
+      describeApiError(
+        _httpError(
+          status: 409,
+          data: {'code': 'conflict', 'detail': 'Busy from problem.'},
+        ),
+      ),
+      'Busy from problem.',
     );
     expect(
       describeApiError(_httpError()),
@@ -121,6 +138,7 @@ void main() {
       expect(utilityPageFor('tasks', http), isNotNull);
       expect(utilityPageFor('agents', http), isNotNull);
       expect(utilityPageFor('usage', http), isNotNull);
+      expect(utilityPageFor('appearance', http), isNotNull);
       expect(utilityPageFor('sign_out', http), isNull);
       expect(utilityPageFor('nope', http), isNull);
     },

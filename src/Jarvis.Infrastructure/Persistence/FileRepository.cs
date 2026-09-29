@@ -141,29 +141,12 @@ public sealed class FileContentRepository(JarvisDbContext db) : IFileContentRepo
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<FileSearchHit>> SearchTextAsync(Guid ownerId, string query, FileSearchScope scope,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<FileSearchHit>> SearchTextAsync(Guid ownerId, string query, CancellationToken cancellationToken,
+        IReadOnlyCollection<Guid>? fileIds = null)
     {
-        if (scope.IsRestricted && scope.FileIds!.Count == 0) return [];
-
-        List<FileContentChunkEntity> chunks;
-        if (scope.IsRestricted)
-        {
-            var fileIds = scope.FileIds!;
-            chunks = await db.FileContentChunks.FromSqlInterpolated($"""
-                SELECT c.* FROM file_content_chunks c
-                JOIN files f ON f."Id" = c.file_id AND f.owner_id = c.owner_id
-                WHERE c.owner_id = {ownerId}
-                  AND f.processing_status = 'ready'
-                  AND c.file_id = ANY({fileIds})
-                  AND c.search_text @@ websearch_to_tsquery('simple', {query})
-                ORDER BY ts_rank(c.search_text, websearch_to_tsquery('simple', {query})) DESC
-                LIMIT 20
-                """).AsNoTracking().ToListAsync(cancellationToken);
-        }
-        else
-        {
-            chunks = await db.FileContentChunks.FromSqlInterpolated($"""
+        if (fileIds is { Count: 0 }) return [];
+        var chunks = fileIds is null
+            ? await db.FileContentChunks.FromSqlInterpolated($"""
                 SELECT c.* FROM file_content_chunks c
                 JOIN files f ON f."Id" = c.file_id AND f.owner_id = c.owner_id
                 WHERE c.owner_id = {ownerId}
@@ -171,10 +154,25 @@ public sealed class FileContentRepository(JarvisDbContext db) : IFileContentRepo
                   AND c.search_text @@ websearch_to_tsquery('simple', {query})
                 ORDER BY ts_rank(c.search_text, websearch_to_tsquery('simple', {query})) DESC
                 LIMIT 20
-                """).AsNoTracking().ToListAsync(cancellationToken);
-        }
-
+                """).AsNoTracking().ToListAsync(cancellationToken)
+            : await FilteredSearchAsync(ownerId, query, fileIds, cancellationToken);
         return await AddFileNamesAsync(ownerId, chunks, cancellationToken);
+    }
+
+    private async Task<List<FileContentChunkEntity>> FilteredSearchAsync(Guid ownerId, string query,
+        IReadOnlyCollection<Guid> fileIds, CancellationToken cancellationToken)
+    {
+        var ids = fileIds.Distinct().ToArray();
+        return await db.FileContentChunks.FromSqlInterpolated($"""
+            SELECT c.* FROM file_content_chunks c
+            JOIN files f ON f."Id" = c.file_id AND f.owner_id = c.owner_id
+            WHERE c.owner_id = {ownerId}
+              AND f.processing_status = 'ready'
+              AND c.file_id = ANY({ids})
+              AND c.search_text @@ websearch_to_tsquery('simple', {query})
+            ORDER BY ts_rank(c.search_text, websearch_to_tsquery('simple', {query})) DESC
+            LIMIT 20
+            """).AsNoTracking().ToListAsync(cancellationToken);
     }
 
     public Task DeleteChunksAsync(Guid fileId, Guid ownerId, CancellationToken cancellationToken) =>

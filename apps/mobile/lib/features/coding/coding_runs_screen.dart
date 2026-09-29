@@ -92,8 +92,7 @@ class _CodingRunsScreenState extends State<CodingRunsScreen> {
       empty: const EmptyState(
         icon: PhosphorIconsRegular.code,
         title: 'No coding runs yet',
-        message:
-            'When you approve a coding task, Jarvis records the isolated worktree and diff here.',
+        message: 'When you approve a coding task, Jarvis records the isolated worktree and diff here.',
       ),
       child: RefreshIndicator(
         onRefresh: _load,
@@ -141,23 +140,23 @@ class _CodingRunsScreenState extends State<CodingRunsScreen> {
                     if (asJsonString(run['repository']) != null)
                       StatusPill(
                         label: asJsonString(run['repository'])!,
-                        color: JarvisColors.inkSoft,
+                        color: JarvisColors.of(context).inkSoft,
                       ),
                     if (files.isNotEmpty)
                       StatusPill(
                         label:
                             '${files.length} ${files.length == 1 ? 'file' : 'files'}',
-                        color: JarvisColors.muted,
+                        color: JarvisColors.of(context).muted,
                       ),
                   ],
                 ),
               ],
             ),
           ),
-          const Icon(
+          Icon(
             PhosphorIconsRegular.caretRight,
             size: 16,
-            color: JarvisColors.muted,
+            color: JarvisColors.of(context).muted,
           ),
         ],
       ),
@@ -213,9 +212,8 @@ class _CodingRunDetailScreenState extends State<_CodingRunDetailScreen> {
   Future<void> _copy(String value) async {
     await Clipboard.setData(ClipboardData(text: value));
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Copied.')));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Copied.')));
   }
 
   @override
@@ -268,12 +266,12 @@ class _CodingRunDetailScreenState extends State<_CodingRunDetailScreen> {
                           if (asJsonString(run['repository']) != null)
                             StatusPill(
                               label: asJsonString(run['repository'])!,
-                              color: JarvisColors.inkSoft,
+                              color: JarvisColors.of(context).inkSoft,
                             ),
                           if (run['exitCode'] is num)
                             StatusPill(
                               label: 'exit ${asJsonInt(run['exitCode'])}',
-                              color: JarvisColors.muted,
+                              color: JarvisColors.of(context).muted,
                             ),
                         ],
                       ),

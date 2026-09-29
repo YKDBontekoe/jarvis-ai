@@ -4,7 +4,14 @@ namespace Jarvis.Application.Integrations;
 
 public sealed record UserMcpServer(string Id, string Name, string Endpoint,
     IReadOnlyList<string> AllowedTools, DateTimeOffset UpdatedAt, bool HasToken, bool Enabled = true,
-    string Transport = "streamableHttp", string? Command = null, IReadOnlyList<string>? Arguments = null);
+    string Transport = "streamableHttp", string? Command = null, IReadOnlyList<string>? Arguments = null,
+    bool IsValid = true, string? ConfigurationIssue = null);
+
+public sealed class InvalidMcpServerConfigurationException : InvalidOperationException
+{
+    public InvalidMcpServerConfigurationException()
+        : base("The MCP server configuration is invalid. Replace or delete the server to recover it.") { }
+}
 
 public sealed record AddUserMcpServerRequest(string Name, string Endpoint, IReadOnlyList<string> AllowedTools);
 

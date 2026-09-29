@@ -67,6 +67,7 @@ python3 -m unittest discover -s tests/unit -p 'test_*.py'
 
 ### Checklist
 
+- [ ] CI (**All checks passed** on this PR) is green
 - [ ] Automated tests added or updated where behavior changed
 - [ ] `README.md` or ops docs updated if setup, secrets, or release steps changed
 - [ ] No secrets, tokens, or production `.env` files committed

@@ -1,4 +1,5 @@
 using Jarvis.Agents;
+using Jarvis.Agents.Profiles;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Memory;
@@ -238,6 +239,7 @@ public sealed class AgentToolTests
         Assert.Contains("RequestMcpAuthorization", defaults);
         Assert.Contains("ask the user to authorize", defaults);
         Assert.Contains("untrusted data", defaults);
+        Assert.DoesNotContain(ProfileContextProvider.Prefix, defaults);
         Assert.DoesNotContain("background task. Carry out", defaults);
 
         var custom = JarvisAgentFactory.BuildInstructions("You are Friday.", executingTask: true);
@@ -322,10 +324,10 @@ public sealed class AgentToolTests
 
         public Task<MemoryRecord> CreateAsync(Guid ownerId, string kind, string content, float importance, float confidence,
             DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken, string sourceType = "user",
-            Guid? sourceId = null)
+            Guid? sourceId = null, Guid? profileId = null)
         {
             var record = new MemoryRecord(Guid.NewGuid(), ownerId, kind, content, importance, confidence, sourceType,
-                sourceId, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, validUntil, isPinned);
+                sourceId, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, validUntil, isPinned, profileId);
             Items.Add(record);
             return Task.FromResult(record);
         }

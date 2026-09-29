@@ -14,8 +14,8 @@ using Pgvector;
 namespace Jarvis.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(JarvisDbContext))]
-    [Migration("20260929071706_AddFileCollectionsAndCitations")]
-    partial class AddFileCollectionsAndCitations
+    [Migration("20260929071758_AddConversationMessageCursorIndex")]
+    partial class AddConversationMessageCursorIndex
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -201,10 +201,6 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("CitationsJson")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("citations_json");
-
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasColumnType("text");
@@ -222,7 +218,7 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ConversationId", "CreatedAt");
+                    b.HasIndex("ConversationId", "CreatedAt", "Id");
 
                     b.ToTable("messages", (string)null);
                 });
@@ -1302,110 +1298,6 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.ToTable("channel_threads", (string)null);
                 });
 
-            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.ConversationCollectionAttachmentEntity", b =>
-                {
-                    b.Property<Guid>("ConversationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CollectionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("AttachedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("attached_at");
-
-                    b.Property<Guid>("OwnerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_id");
-
-                    b.HasKey("ConversationId", "CollectionId");
-
-                    b.HasIndex("CollectionId");
-
-                    b.ToTable("conversation_collection_attachments", (string)null);
-                });
-
-            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.ConversationFileAttachmentEntity", b =>
-                {
-                    b.Property<Guid>("ConversationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("FileId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("AttachedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("attached_at");
-
-                    b.Property<Guid>("OwnerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_id");
-
-                    b.HasKey("ConversationId", "FileId");
-
-                    b.HasIndex("FileId");
-
-                    b.ToTable("conversation_file_attachments", (string)null);
-                });
-
-            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.FileCollectionEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("NormalizedName")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("normalized_name");
-
-                    b.Property<Guid>("OwnerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OwnerId", "NormalizedName")
-                        .IsUnique();
-
-                    b.ToTable("file_collections", (string)null);
-                });
-
-            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.FileCollectionMemberEntity", b =>
-                {
-                    b.Property<Guid>("CollectionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("FileId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("AddedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("added_at");
-
-                    b.Property<Guid>("OwnerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_id");
-
-                    b.HasKey("CollectionId", "FileId");
-
-                    b.HasIndex("FileId");
-
-                    b.HasIndex("OwnerId", "FileId");
-
-                    b.ToTable("file_collection_members", (string)null);
-                });
-
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.FileContentChunkEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1424,10 +1316,6 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("vector(1536)")
                         .HasColumnName("embedding");
 
-                    b.Property<int>("EndOffset")
-                        .HasColumnType("integer")
-                        .HasColumnName("end_offset");
-
                     b.Property<Guid>("FileId")
                         .HasColumnType("uuid")
                         .HasColumnName("file_id");
@@ -1436,20 +1324,12 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("owner_id");
 
-                    b.Property<int?>("PageNumber")
-                        .HasColumnType("integer")
-                        .HasColumnName("page_number");
-
                     b.Property<NpgsqlTsVector>("SearchText")
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("tsvector")
                         .HasColumnName("search_text")
                         .HasComputedColumnSql("to_tsvector('simple'::regconfig, content)", true);
-
-                    b.Property<int>("StartOffset")
-                        .HasColumnType("integer")
-                        .HasColumnName("start_offset");
 
                     b.HasKey("Id");
 
@@ -2356,51 +2236,6 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.HasOne("Jarvis.Domain.Conversations.Conversation", null)
                         .WithMany()
                         .HasForeignKey("ConversationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.ConversationCollectionAttachmentEntity", b =>
-                {
-                    b.HasOne("Jarvis.Infrastructure.Persistence.FileCollectionEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CollectionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Jarvis.Domain.Conversations.Conversation", null)
-                        .WithMany()
-                        .HasForeignKey("ConversationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.ConversationFileAttachmentEntity", b =>
-                {
-                    b.HasOne("Jarvis.Domain.Conversations.Conversation", null)
-                        .WithMany()
-                        .HasForeignKey("ConversationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Jarvis.Infrastructure.Persistence.StoredFileEntity", null)
-                        .WithMany()
-                        .HasForeignKey("FileId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.FileCollectionMemberEntity", b =>
-                {
-                    b.HasOne("Jarvis.Infrastructure.Persistence.FileCollectionEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CollectionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Jarvis.Infrastructure.Persistence.StoredFileEntity", null)
-                        .WithMany()
-                        .HasForeignKey("FileId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

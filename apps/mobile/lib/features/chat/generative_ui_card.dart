@@ -91,7 +91,9 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Material(
-        color: selected ? JarvisColors.accentSoft : JarvisColors.surface,
+        color: selected
+            ? JarvisColors.of(context).accentSoft
+            : JarvisColors.of(context).surface,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
@@ -107,8 +109,8 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: selected
-                    ? JarvisColors.accent
-                    : JarvisColors.outlineStrong,
+                    ? JarvisColors.of(context).accent
+                    : JarvisColors.of(context).outlineStrong,
                 width: selected ? 1.6 : 1,
               ),
             ),
@@ -119,7 +121,9 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
                       ? PhosphorIconsFill.checkCircle
                       : PhosphorIconsRegular.circle,
                   size: 20,
-                  color: selected ? JarvisColors.accent : JarvisColors.muted,
+                  color: selected
+                      ? JarvisColors.of(context).accent
+                      : JarvisColors.of(context).muted,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -136,8 +140,8 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
                       if (subtitle != null)
                         Text(
                           subtitle,
-                          style: const TextStyle(
-                            color: JarvisColors.inkSoft,
+                          style: TextStyle(
+                            color: JarvisColors.of(context).inkSoft,
                             fontSize: 13,
                           ),
                         ),
@@ -166,13 +170,13 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
             height: 26,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: JarvisColors.accentSoft,
+              color: JarvisColors.of(context).accentSoft,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               '${index + 1}',
-              style: const TextStyle(
-                color: JarvisColors.accentDeep,
+              style: TextStyle(
+                color: JarvisColors.of(context).accentDeep,
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
               ),
@@ -190,16 +194,16 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
                 if (subtitle != null)
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      color: JarvisColors.inkSoft,
+                    style: TextStyle(
+                      color: JarvisColors.of(context).inkSoft,
                       fontSize: 13,
                     ),
                   ),
                 if (detail != null)
                   Text(
                     detail,
-                    style: const TextStyle(
-                      color: JarvisColors.muted,
+                    style: TextStyle(
+                      color: JarvisColors.of(context).muted,
                       fontSize: 12.5,
                     ),
                   ),
@@ -333,6 +337,9 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
     final danger = style == 'danger';
     final filled = danger || style == 'primary' || solo;
     final onPressed = _interactive && !busy ? () => _run(id) : null;
+    final filledForeground = danger
+        ? Colors.white
+        : JarvisColors.of(context).onInk;
     final child = Row(
       children: [
         Expanded(
@@ -349,8 +356,8 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
                     fontSize: 12.5,
                     fontWeight: FontWeight.w400,
                     color: filled
-                        ? Colors.white.withValues(alpha: .75)
-                        : JarvisColors.inkSoft,
+                        ? filledForeground.withValues(alpha: .75)
+                        : JarvisColors.of(context).inkSoft,
                   ),
                 ),
             ],
@@ -365,7 +372,7 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
           Icon(
             PhosphorIconsRegular.caretRight,
             size: 16,
-            color: filled ? Colors.white : JarvisColors.muted,
+            color: filled ? filledForeground : JarvisColors.of(context).muted,
           ),
       ],
     );
@@ -376,9 +383,11 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
         ? FilledButton(
             onPressed: onPressed,
             style: FilledButton.styleFrom(
-              backgroundColor: danger ? JarvisColors.danger : JarvisColors.ink,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: JarvisColors.surfaceRaised,
+              backgroundColor: danger
+                  ? JarvisColors.of(context).danger
+                  : JarvisColors.of(context).ink,
+              foregroundColor: filledForeground,
+              disabledBackgroundColor: JarvisColors.of(context).surfaceRaised,
               minimumSize: const Size.fromHeight(52),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               shape: shape,
@@ -389,7 +398,7 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
         : OutlinedButton(
             onPressed: onPressed,
             style: OutlinedButton.styleFrom(
-              foregroundColor: JarvisColors.ink,
+              foregroundColor: JarvisColors.of(context).ink,
               minimumSize: const Size.fromHeight(52),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               shape: shape,
@@ -420,7 +429,7 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: JarvisColors.surfaceMuted,
+        color: JarvisColors.of(context).surfaceMuted,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
@@ -438,8 +447,8 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
                           : PhosphorIconsRegular.x,
                       size: 16,
                       color: answered
-                          ? JarvisColors.success
-                          : JarvisColors.muted,
+                          ? JarvisColors.of(context).success
+                          : JarvisColors.of(context).muted,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -453,8 +462,8 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
                     const SizedBox(width: 8),
                     Text(
                       label,
-                      style: const TextStyle(
-                        color: JarvisColors.muted,
+                      style: TextStyle(
+                        color: JarvisColors.of(context).muted,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -465,8 +474,8 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
                   const SizedBox(height: 8),
                   Text(
                     body,
-                    style: const TextStyle(
-                      color: JarvisColors.inkSoft,
+                    style: TextStyle(
+                      color: JarvisColors.of(context).inkSoft,
                       fontSize: 13,
                     ),
                   ),

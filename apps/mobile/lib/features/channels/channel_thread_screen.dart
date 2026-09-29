@@ -86,9 +86,8 @@ class _ChannelThreadScreenState extends State<ChannelThreadScreen> {
                   children: [
                     Text(
                       '${asJsonString(message['direction']) == 'out' ? 'Jarvis' : asJsonString(message['peer']) ?? widget.peer} · ${asJsonString(message['status']) ?? ''}',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: JarvisColors.muted,
-                      ),
+                      style: Theme.of(context).textTheme.labelSmall
+                          ?.copyWith(color: JarvisColors.of(context).muted),
                     ),
                     const SizedBox(height: 4),
                     Text(asJsonString(message['text']) ?? ''),
