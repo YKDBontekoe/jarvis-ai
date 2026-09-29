@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 
@@ -26,6 +27,10 @@ import '../devices/device_invoke.dart';
 import '../devices/device_telemetry.dart';
 import '../home/home_overview.dart';
 import '../settings/settings_view.dart';
+import '../search/command_palette.dart';
+import '../search/recent_searches_store.dart';
+import '../search/search_navigation.dart';
+import '../search/search_screen.dart';
 import '../shell/sidebar.dart';
 import '../shell/utility_pages.dart';
 import '../voice/chat_gpt_voices.dart';
@@ -46,12 +51,15 @@ part 'chat_screen_transcript.dart';
 part 'chat_screen_voice.dart';
 part 'chat_screen_ui.dart';
 part 'chat_screen_auth.dart';
+part 'chat_screen_search.dart';
 
 const _voiceCapture = AudioCaptureOptions(
   echoCancellation: true,
   noiseSuppression: true,
   autoGainControl: true,
 );
+
+const _wideLayoutWidth = 840.0;
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({this.skipAuthentication = false, super.key});
@@ -73,9 +81,8 @@ class _ChatScreenState extends _ChatScreenController
         _ChatScreenTranscript,
         _ChatScreenVoice,
         _ChatScreenUi,
-        _ChatScreenAuth {
-  static const _wideLayoutWidth = 840.0;
-
+        _ChatScreenAuth,
+        _ChatScreenSearch {
   /// Outgoing content fades out before incoming content fades in, so the two
   /// never overlap mid-transition.
   static const _fadeThrough = Interval(.5, 1, curve: Curves.easeOutCubic);
@@ -128,7 +135,7 @@ class _ChatScreenState extends _ChatScreenController
           ),
         );
         final sidebar = _sidebar(wide: wide);
-        return Scaffold(
+        final shell = Scaffold(
           key: _scaffoldKey,
           drawer: wide
               ? null
@@ -155,6 +162,25 @@ class _ChatScreenState extends _ChatScreenController
                   ],
                 )
               : content,
+        );
+        return Shortcuts(
+          shortcuts: {
+            LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyK):
+                OpenSearchIntent(),
+            LogicalKeySet(LogicalKeyboardKey.meta, LogicalKeyboardKey.keyK):
+                OpenSearchIntent(),
+          },
+          child: Actions(
+            actions: {
+              OpenSearchIntent: CallbackAction<OpenSearchIntent>(
+                onInvoke: (_) {
+                  unawaited(_openSearch(context));
+                  return null;
+                },
+              ),
+            },
+            child: shell,
+          ),
         );
       },
     );

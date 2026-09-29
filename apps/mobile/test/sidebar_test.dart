@@ -27,6 +27,7 @@ void main() {
             if (destination == 'tasks') openedTasks = true;
           },
           onSettings: () {},
+          onJarvisSearch: () {},
         ),
       ),
     );

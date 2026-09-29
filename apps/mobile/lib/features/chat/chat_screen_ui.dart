@@ -54,6 +54,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     onSeeAll: () => _fromSidebar(() => unawaited(_chooseConversation())),
     onUtility: (destination) => _fromSidebar(() => _openUtility(destination)),
     onSettings: () => _fromSidebar(_openSettings),
+    onJarvisSearch: () => _fromSidebar(() => unawaited(_openSearch(context))),
   );
 
   void _dismissKeyboard() => FocusManager.instance.primaryFocus?.unfocus();
@@ -160,6 +161,12 @@ mixin _ChatScreenUi on _ChatScreenController {
           ],
         ),
         actions: [
+          if (!voice)
+            CircleIconButton(
+              icon: PhosphorIconsRegular.magnifyingGlass,
+              tooltip: 'Search',
+              onPressed: _signedOut ? null : () => unawaited(_openSearch(context)),
+            ),
           if (!voice)
             CircleIconButton(
               icon: PhosphorIconsRegular.notePencil,
