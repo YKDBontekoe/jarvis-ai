@@ -134,7 +134,7 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
     final width = MediaQuery.sizeOf(context).width;
     final dialogWidth = width >= 720 ? 640.0 : width * 0.92;
     return Shortcuts(
-      shortcuts: const {
+      shortcuts: {
         LogicalKeySet(LogicalKeyboardKey.escape): DismissIntent(),
       },
       child: Actions(
@@ -146,7 +146,7 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
         },
         child: Center(
           child: Material(
-            color: JarvisColors.canvas,
+            color: JarvisColors.of(context).canvas,
             elevation: 12,
             borderRadius: BorderRadius.circular(18),
             clipBehavior: Clip.antiAlias,
@@ -202,7 +202,10 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                   if (_error != null)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(_error!, style: const TextStyle(color: JarvisColors.danger)),
+                      child: Text(
+                        _error!,
+                        style: TextStyle(color: JarvisColors.of(context).danger),
+                      ),
                     ),
                   Expanded(
                     child: _query.text.trim().isEmpty

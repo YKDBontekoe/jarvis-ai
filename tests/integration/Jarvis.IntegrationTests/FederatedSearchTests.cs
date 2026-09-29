@@ -1,3 +1,4 @@
+using Jarvis.Application.Conversations;
 using Jarvis.Application.Search;
 using Jarvis.Infrastructure.Persistence;
 using Jarvis.Infrastructure.Search;
@@ -34,7 +35,8 @@ public sealed class FederatedSearchTests : IAsyncLifetime
         await store.CreateAsync(otherOwner, "Federated search conversation", CancellationToken.None);
 
         var services = new ServiceCollection();
-        services.AddScoped(_ => store);
+        services.AddLogging();
+        services.AddScoped<IConversationStore>(_ => store);
         services.AddScoped<IFederatedSearchProvider, ConversationSearchProvider>();
         services.AddSingleton<IOptions<FederatedSearchOptions>>(Options.Create(new FederatedSearchOptions()));
         services.AddSingleton<IFederatedSearchService, Jarvis.Infrastructure.Search.FederatedSearchService>();

@@ -20,7 +20,7 @@ public static class SearchRanking
     }
 
     public static string NormalizeQuery(string query) =>
-        query.Trim().Normalize(NormalizationForm.FormKC);
+        query.Trim().Normalize(NormalizationForm.FormKC).ToLowerInvariant();
 
     public static bool MatchesQuery(string haystack, string normalizedQuery)
     {

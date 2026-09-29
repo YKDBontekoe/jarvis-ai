@@ -228,11 +228,11 @@ class SearchResultsBody extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
       itemCount: results.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 6),
+      separatorBuilder: (_, _) => const SizedBox(height: 6),
       itemBuilder: (context, index) {
         final hit = results[index];
         return Material(
-          color: JarvisColors.surfaceMuted,
+          color: JarvisColors.of(context).surfaceMuted,
           borderRadius: BorderRadius.circular(14),
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
@@ -253,7 +253,7 @@ class SearchResultsBody extends StatelessWidget {
                       if (hit.isPinned)
                         const Padding(
                           padding: EdgeInsets.only(left: 8),
-                          child: Icon(PhosphorIconsRegular.pin, size: 16),
+                          child: Icon(PhosphorIconsRegular.pushPin, size: 16),
                         ),
                     ],
                   ),
@@ -261,7 +261,7 @@ class SearchResultsBody extends StatelessWidget {
                   Text(
                     searchKindLabels[hit.kind] ?? hit.kind,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: JarvisColors.inkSoft,
+                      color: JarvisColors.of(context).inkSoft,
                     ),
                   ),
                   if (hit.summary != null && hit.summary!.isNotEmpty) ...[
@@ -270,7 +270,10 @@ class SearchResultsBody extends StatelessWidget {
                       hit.summary!,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: JarvisColors.inkSoft, height: 1.35),
+                      style: TextStyle(
+                        color: JarvisColors.of(context).inkSoft,
+                        height: 1.35,
+                      ),
                     ),
                   ],
                 ],
@@ -304,7 +307,7 @@ class _RecentList extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: recent.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final query = recent[index];
         return ListTile(

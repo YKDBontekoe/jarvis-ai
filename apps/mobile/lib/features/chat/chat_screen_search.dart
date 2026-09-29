@@ -5,7 +5,7 @@ part of 'chat_screen.dart';
 mixin _ChatScreenSearch on _ChatScreenController {
   bool _useCommandPalette(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    return width >= ChatScreen._wideLayoutWidth || kIsWeb;
+    return width >= _wideLayoutWidth || kIsWeb;
   }
 
   Future<void> _openSearch(BuildContext context) async {

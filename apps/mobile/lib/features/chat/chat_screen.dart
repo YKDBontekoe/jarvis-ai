@@ -59,6 +59,8 @@ const _voiceCapture = AudioCaptureOptions(
   autoGainControl: true,
 );
 
+const _wideLayoutWidth = 840.0;
+
 class ChatScreen extends StatefulWidget {
   const ChatScreen({this.skipAuthentication = false, super.key});
 
@@ -81,8 +83,6 @@ class _ChatScreenState extends _ChatScreenController
         _ChatScreenUi,
         _ChatScreenAuth,
         _ChatScreenSearch {
-  static const _wideLayoutWidth = 840.0;
-
   /// Outgoing content fades out before incoming content fades in, so the two
   /// never overlap mid-transition.
   static const _fadeThrough = Interval(.5, 1, curve: Curves.easeOutCubic);
@@ -164,7 +164,7 @@ class _ChatScreenState extends _ChatScreenController
               : content,
         );
         return Shortcuts(
-          shortcuts: const {
+          shortcuts: {
             LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyK):
                 OpenSearchIntent(),
             LogicalKeySet(LogicalKeyboardKey.meta, LogicalKeyboardKey.keyK):
