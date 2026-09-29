@@ -113,111 +113,125 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             servers.Add(server);
         }
 
-        foreach (var server in servers)
+        var connections = await Task.WhenAll(servers.Select(server =>
+            ConnectServerAsync(server, cancellationToken)));
+
+        foreach (var connection in connections)
         {
-            IAsyncDisposable? client = null;
-            try
+            if (connection.Client is null)
             {
-                var credentialResolution = await ResolveCredentialsAsync(server, cancellationToken);
-                if (!credentialResolution.Ready)
-                {
-                    statuses.Add(await BuildStatusAsync(server, "needs_credentials", 0, "credentials_required", true,
-                        null, cancellationToken));
-                    continue;
-                }
-                var serverSecrets = credentialResolution.Secrets;
-                if (IntegrationCredentialProviders.IsUserMcpServerId(server.CredentialProvider))
-                {
-                    if (server.Transport.Equals("streamableHttp", StringComparison.OrdinalIgnoreCase))
-                        await McpServerEndpointValidator.ValidateAsync(server.Endpoint, cancellationToken);
-                }
-
-                var connectedClient = await McpClient.CreateAsync(CreateTransport(server, loggerFactory), cancellationToken: cancellationToken);
-                client = connectedClient;
-                var availableTools = await connectedClient.ListToolsAsync(cancellationToken: cancellationToken);
-                var allowAllTools = McpToolSelection.AllowsAll(server.AllowedTools);
-                var availableNames = availableTools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
-                if (allowAllTools && availableNames.Count > McpToolSelection.MaxTools)
-                {
-                    await CloseQuietlyAsync(connectedClient);
-                    client = null;
-                    statuses.Add(await BuildStatusAsync(server, "unavailable", 0, "too_many_tools", true, null,
-                        cancellationToken));
-                    logger.LogWarning("Skipping MCP server {ServerName}: it exposes {ToolCount} tools, above the {MaxTools} tool limit.",
-                        server.Name, availableNames.Count, McpToolSelection.MaxTools);
-                    continue;
-                }
-                var allowed = allowAllTools
-                    ? availableNames
-                    : server.AllowedTools.ToHashSet(StringComparer.Ordinal);
-                if (server.OwnerNarrowed)
-                {
-                    allowed.IntersectWith(availableNames);
-                    if (allowed.Count == 0)
-                    {
-                        await CloseQuietlyAsync(connectedClient);
-                        client = null;
-                        statuses.Add(await BuildStatusAsync(server, "disabled", 0, "no_matching_tools", true, [],
-                            cancellationToken));
-                        continue;
-                    }
-                }
-                var autoApproved = server.AutoApprovedTools.ToHashSet(StringComparer.Ordinal);
-                if (server.OwnerNarrowed) autoApproved.IntersectWith(allowed);
-                ValidateApprovalPolicy(allowed, autoApproved, server.Name);
-                var transportSecrets = SecretValues(serverSecrets, server);
-                var serverKey = UserServerId(server) ?? server.Name;
-                var selected = availableTools.Where(tool => allowed.Contains(tool.Name)).Select(tool =>
-                {
-                    if (tool is not AIFunction function)
-                        throw new InvalidOperationException($"MCP tool '{tool.Name}' cannot be wrapped in an approval requirement.");
-                    AIFunction protectedFunction = transportSecrets.Length == 0
-                        ? function
-                        : new SecretRedactingAIFunction(function, transportSecrets);
-                    protectedFunction = new GuardedMcpTool(protectedFunction, this, serverKey, tool.Name);
-                    return autoApproved.Contains(tool.Name)
-                        ? (AITool)protectedFunction
-                        : new ApprovalRequiredAIFunction(protectedFunction);
-                }).ToArray();
-                var missing = allowAllTools || server.OwnerNarrowed
-                    ? []
-                    : allowed.Except(availableNames, StringComparer.Ordinal).ToArray();
-                if (missing.Length != 0)
-                    throw new InvalidOperationException($"MCP server '{server.Name}' does not provide allowlisted tools: {string.Join(", ", missing)}.");
-
-                var duplicateTools = selected.Where(tool => toolNames.Contains(tool.Name)).Select(tool => tool.Name).ToArray();
-                if (duplicateTools.Length != 0)
-                    throw new InvalidOperationException($"MCP server '{server.Name}' provides tool names already provided by another configured server.");
-
-                tools.AddRange(selected);
-                foreach (var tool in selected) toolNames.Add(tool.Name);
-                _clients.Add(connectedClient);
-                Remember(server, new LiveSession(connectedClient, transportSecrets));
-                client = null;
-                statuses.Add(await BuildStatusAsync(server, "connected", selected.Length, null, true,
-                    selected.Select(tool => tool.Name).ToArray(), cancellationToken));
-                logger.LogInformation("Connected MCP server {ServerName}; enabled {ToolCount} allowlisted tools.", server.Name, selected.Length);
+                statuses.Add(connection.Status);
+                continue;
             }
-            catch (Exception exception) when (CancellationExceptions.Unwrap(exception) is { } canceled)
+            var selected = new List<AITool>();
+            foreach (var tool in connection.Tools ?? [])
             {
-                if (client is not null) await client.DisposeAsync();
-                throw canceled;
+                if (toolNames.Add(tool.Name)) selected.Add(tool);
+                else
+                    logger.LogWarning("Skipping duplicate MCP tool {ToolName} from server {ServerName}; use InvokeMcpTool to reach it.",
+                        tool.Name, connection.Server.Name);
             }
-            catch (Exception exception)
+            tools.AddRange(selected);
+            _clients.Add(connection.Client);
+            Remember(connection.Server, connection.Session!);
+            statuses.Add(connection.Status with
             {
-                if (client is not null) await CloseQuietlyAsync(client);
-                var issue = exception is ArgumentException or InvalidOperationException
-                    ? "invalid_configuration"
-                    : "server_unavailable";
-                statuses.Add(await BuildStatusAsync(server, "unavailable", 0, issue, true, null, cancellationToken));
-                logger.LogWarning("Skipping MCP server {ServerName} after initialization failure ({FailureType}).",
-                    server.Name, exception.GetType().Name);
-            }
+                ToolCount = selected.Count,
+                Tools = selected.Select(tool => tool.Name).ToArray()
+            });
         }
 
         _tools = tools;
         _statuses = statuses;
         _initialized = true;
+    }
+
+    private sealed record ServerConnection(McpServerOptions Server, McpServerConnectionStatus Status,
+        McpClient? Client = null, LiveSession? Session = null, IReadOnlyList<AITool>? Tools = null);
+
+    private async Task<ServerConnection> ConnectServerAsync(McpServerOptions server,
+        CancellationToken cancellationToken)
+    {
+        McpClient? client = null;
+        try
+        {
+            var credentialResolution = await ResolveCredentialsAsync(server, cancellationToken);
+            if (!credentialResolution.Ready)
+                return new ServerConnection(server, await BuildStatusAsync(server, "needs_credentials", 0,
+                    "credentials_required", true, null, cancellationToken));
+            var serverSecrets = credentialResolution.Secrets;
+            if (IntegrationCredentialProviders.IsUserMcpServerId(server.CredentialProvider) &&
+                server.Transport.Equals("streamableHttp", StringComparison.OrdinalIgnoreCase))
+                await McpServerEndpointValidator.ValidateAsync(server.Endpoint, cancellationToken);
+
+            client = await McpClient.CreateAsync(CreateTransport(server, loggerFactory), cancellationToken: cancellationToken);
+            var availableTools = (await client.ListToolsAsync(cancellationToken: cancellationToken)).ToList();
+            var allowAllTools = McpToolSelection.AllowsAll(server.AllowedTools);
+            var availableNames = availableTools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
+            HashSet<string> allowed;
+            if (allowAllTools)
+            {
+                allowed = availableNames;
+                if (allowed.Count > McpToolSelection.MaxTools)
+                {
+                    logger.LogWarning("MCP server {ServerName} exposes {ToolCount} tools; enabling the first {MaxTools}.",
+                        server.Name, availableNames.Count, McpToolSelection.MaxTools);
+                    allowed = availableNames.Order(StringComparer.Ordinal)
+                        .Take(McpToolSelection.MaxTools).ToHashSet(StringComparer.Ordinal);
+                }
+            }
+            else
+            {
+                allowed = server.AllowedTools.ToHashSet(StringComparer.Ordinal);
+                var missing = allowed.Except(availableNames, StringComparer.Ordinal).ToArray();
+                if (missing.Length != 0)
+                    logger.LogWarning("MCP server {ServerName} no longer provides allowlisted tools: {Tools}.",
+                        server.Name, string.Join(", ", missing));
+                allowed.IntersectWith(availableNames);
+                if (allowed.Count == 0)
+                {
+                    await CloseQuietlyAsync(client);
+                    return new ServerConnection(server, await BuildStatusAsync(server, "disabled", 0,
+                        "no_matching_tools", true, [], cancellationToken));
+                }
+            }
+            var autoApproved = server.AutoApprovedTools.ToHashSet(StringComparer.Ordinal);
+            autoApproved.IntersectWith(allowed);
+            var transportSecrets = SecretValues(serverSecrets, server);
+            var serverKey = UserServerId(server) ?? server.Name;
+            var selected = availableTools.Where(tool => allowed.Contains(tool.Name)).Select(tool =>
+            {
+                AIFunction protectedFunction = transportSecrets.Length == 0
+                    ? tool
+                    : new SecretRedactingAIFunction(tool, transportSecrets);
+                protectedFunction = new GuardedMcpTool(protectedFunction, this, serverKey, tool.Name);
+                return autoApproved.Contains(tool.Name)
+                    ? (AITool)protectedFunction
+                    : new ApprovalRequiredAIFunction(protectedFunction);
+            }).ToArray();
+
+            var status = await BuildStatusAsync(server, "connected", selected.Length, null, true,
+                selected.Select(tool => tool.Name).ToArray(), cancellationToken);
+            logger.LogInformation("Connected MCP server {ServerName}; enabled {ToolCount} tools.", server.Name, selected.Length);
+            return new ServerConnection(server, status, client, new LiveSession(client, transportSecrets), selected);
+        }
+        catch (Exception exception) when (CancellationExceptions.Unwrap(exception) is { } canceled)
+        {
+            if (client is not null) await CloseQuietlyAsync(client);
+            throw canceled;
+        }
+        catch (Exception exception)
+        {
+            if (client is not null) await CloseQuietlyAsync(client);
+            var authorization = McpAuthorization.IsAuthorizationFailure(exception);
+            var issue = authorization ? "authorization_required"
+                : exception is ArgumentException or InvalidOperationException ? "invalid_configuration"
+                : "server_unavailable";
+            logger.LogWarning("Skipping MCP server {ServerName} after initialization failure ({FailureType}).",
+                server.Name, exception.GetType().Name);
+            return new ServerConnection(server, await BuildStatusAsync(server,
+                authorization ? "needs_credentials" : "unavailable", 0, issue, true, null, cancellationToken));
+        }
     }
 
     private async Task<McpServerOptions> CreateUserServerOptionsAsync(UserMcpServer userServer,
