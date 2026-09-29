@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using Jarvis.Agents;
 using Jarvis.Api.Conversations;
+using Jarvis.Api.Errors;
 using Jarvis.Api.Notifications;
 using Jarvis.Api.Realtime;
 using Jarvis.Api.Security;
@@ -39,6 +40,8 @@ internal static class ApiServiceRegistration
     public static void ValidateProductionConfiguration(this WebApplicationBuilder builder)
     {
         if (builder.Environment.IsDevelopment()) return;
+        if (builder.Configuration.GetValue<bool>("Database:ApplyMigrationsAtStartup"))
+            throw new InvalidOperationException("Database:ApplyMigrationsAtStartup is supported only in Development. Run the 'migrate' command before deploying production services.");
         if (string.IsNullOrWhiteSpace(builder.Configuration["Antivirus:Host"]))
             throw new InvalidOperationException("Configure Antivirus:Host with a private ClamAV daemon before running Jarvis outside Development.");
         if (string.IsNullOrWhiteSpace(builder.Configuration["DataProtection:KeysDirectory"]))
@@ -57,7 +60,7 @@ internal static class ApiServiceRegistration
                 options.RequireHttpsMetadata = !isDevelopment;
                 options.MapInboundClaims = false;
                 options.TokenValidationParameters = accountTokens.ValidationParameters();
-                options.Events = new JwtBearerEvents
+                options.Events = ApiErrorServiceCollectionExtensions.CreateJarvisJwtBearerEvents(new JwtBearerEvents
                 {
                     OnTokenValidated = context =>
                     {
@@ -72,7 +75,7 @@ internal static class ApiServiceRegistration
                             context.Token = accessToken;
                         return Task.CompletedTask;
                     }
-                };
+                });
             });
         services.AddAuthorization();
         services.AddHttpContextAccessor();
@@ -84,6 +87,7 @@ internal static class ApiServiceRegistration
     public static IServiceCollection AddJarvisApi(this IServiceCollection services, IConfiguration configuration,
         AccountTokenOptions accountTokens)
     {
+        services.AddJarvisApiErrors();
         services.AddJarvisInfrastructure(configuration);
         services.AddJarvisIdentity(accountTokens);
         services.AddJarvisMemory();

@@ -63,6 +63,12 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
         var statuses = new List<McpServerConnectionStatus>();
         foreach (var userServer in await userMcpServers.ListAsync(currentUser.OwnerId, cancellationToken))
         {
+            if (!userServer.IsValid)
+            {
+                statuses.Add(new McpServerConnectionStatus(userServer.Name, "unavailable", 0,
+                    userServer.ConfigurationIssue, userServer.Id, false, []));
+                continue;
+            }
             if (!userServer.Enabled)
             {
                 statuses.Add(new McpServerConnectionStatus(userServer.Name, "paused", 0, "paused_by_owner",

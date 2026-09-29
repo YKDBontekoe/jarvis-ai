@@ -121,8 +121,7 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
     final confirmed = await showJarvisConfirm(
       context,
       title: 'Delete this skill?',
-      message:
-          'Jarvis stops using it immediately. Its revision history is removed too.',
+      message: 'Jarvis stops using it immediately. Its revision history is removed too.',
       confirmLabel: 'Delete',
       destructive: true,
       icon: PhosphorIconsRegular.trash,
@@ -206,11 +205,11 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
               StatusPill(label: source.label, color: source.color),
               StatusPill(
                 label: 'v${asJsonInt(skill['version'], 1)}',
-                color: JarvisColors.inkSoft,
+                color: JarvisColors.of(context).inkSoft,
               ),
               StatusPill(
                 label: 'Used ${asJsonInt(skill['useCount'])}×',
-                color: JarvisColors.inkSoft,
+                color: JarvisColors.of(context).inkSoft,
               ),
             ],
           ),
@@ -296,9 +295,8 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
             for (final revision in _revisions)
               ListTile(
                 leading: IconBadge(
-                  icon: skillSource(
-                    asJsonString(revision['source']) ?? '',
-                  ).icon,
+                  icon: skillSource(asJsonString(revision['source']) ?? '')
+                      .icon,
                   size: 32,
                 ),
                 title: Text(

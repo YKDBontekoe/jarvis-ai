@@ -91,7 +91,7 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
   Widget build(BuildContext context) {
     final groups = _groups();
     return ColoredBox(
-      color: JarvisColors.canvas,
+      color: JarvisColors.of(context).canvas,
       child: SafeArea(
         right: false,
         child: Column(
@@ -110,13 +110,13 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                         onChanged: (_) => setState(() {}),
                         textInputAction: TextInputAction.search,
                         style: const TextStyle(fontSize: 14.5),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: 'Search',
                           prefixIcon: Icon(
                             PhosphorIconsRegular.magnifyingGlass,
                             size: 18,
                           ),
-                          fillColor: JarvisColors.surfaceMuted,
+                          fillColor: JarvisColors.of(context).surfaceMuted,
                           contentPadding: EdgeInsets.zero,
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -124,7 +124,9 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.all(Radius.circular(12)),
-                            borderSide: BorderSide(color: JarvisColors.outline),
+                            borderSide: BorderSide(
+                              color: JarvisColors.of(context).outline,
+                            ),
                           ),
                         ),
                       ),
@@ -197,20 +199,20 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     padding: const EdgeInsets.fromLTRB(12, 0, 0, 2),
                     child: Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Recents',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: JarvisColors.inkSoft,
+                              color: JarvisColors.of(context).inkSoft,
                             ),
                           ),
                         ),
                         TextButton(
                           onPressed: () => _leaveSearch(widget.onSeeAll),
                           style: TextButton.styleFrom(
-                            foregroundColor: JarvisColors.muted,
+                            foregroundColor: JarvisColors.of(context).muted,
                             visualDensity: VisualDensity.compact,
                             textStyle: const TextStyle(fontSize: 13),
                           ),
@@ -226,9 +228,9 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                         _search.text.isEmpty
                             ? 'Your conversations will appear here.'
                             : 'No conversations match “${_search.text.trim()}”.',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13.5,
-                          color: JarvisColors.muted,
+                          color: JarvisColors.of(context).muted,
                         ),
                       ),
                     ),
@@ -237,10 +239,10 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                       padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
                       child: Text(
                         label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: JarvisColors.muted,
+                          color: JarvisColors.of(context).muted,
                         ),
                       ),
                     ),
@@ -293,7 +295,9 @@ class _NavRow extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 1),
     child: Material(
-      color: selected ? JarvisColors.surfaceRaised : Colors.transparent,
+      color: selected
+          ? JarvisColors.of(context).surfaceRaised
+          : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -306,17 +310,18 @@ class _NavRow extends StatelessWidget {
                 dimension: 22,
                 child: Center(
                   child:
-                      leading ?? Icon(icon, size: 20, color: JarvisColors.ink),
+                      leading ??
+                      Icon(icon, size: 20, color: JarvisColors.of(context).ink),
                 ),
               ),
               const SizedBox(width: 14),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
                   letterSpacing: -.2,
-                  color: JarvisColors.ink,
+                  color: JarvisColors.of(context).ink,
                 ),
               ),
             ],
@@ -340,7 +345,9 @@ class _ConversationRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: selected ? JarvisColors.surfaceRaised : Colors.transparent,
+    color: selected
+        ? JarvisColors.of(context).surfaceRaised
+        : Colors.transparent,
     borderRadius: BorderRadius.circular(10),
     child: InkWell(
       borderRadius: BorderRadius.circular(10),
@@ -354,7 +361,9 @@ class _ConversationRow extends StatelessWidget {
           style: TextStyle(
             fontSize: 14.5,
             letterSpacing: -.1,
-            color: selected ? JarvisColors.ink : JarvisColors.inkSoft,
+            color: selected
+                ? JarvisColors.of(context).ink
+                : JarvisColors.of(context).inkSoft,
             fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
           ),
         ),
@@ -379,14 +388,14 @@ class _SettingsRow extends StatelessWidget {
           Container(
             width: 34,
             height: 34,
-            decoration: const BoxDecoration(
-              color: JarvisColors.ink,
+            decoration: BoxDecoration(
+              color: JarvisColors.of(context).ink,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               PhosphorIconsRegular.user,
               size: 17,
-              color: Colors.white,
+              color: JarvisColors.of(context).onInk,
             ),
           ),
           const SizedBox(width: 12),
@@ -394,12 +403,12 @@ class _SettingsRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Settings',
                   style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w500,
-                    color: JarvisColors.ink,
+                    color: JarvisColors.of(context).ink,
                   ),
                 ),
                 const SizedBox(height: 1),
@@ -410,17 +419,17 @@ class _SettingsRow extends StatelessWidget {
                       height: 6,
                       decoration: BoxDecoration(
                         color: connected
-                            ? JarvisColors.success
-                            : JarvisColors.muted,
+                            ? JarvisColors.of(context).success
+                            : JarvisColors.of(context).muted,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       connected ? 'Connected' : 'Offline',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
-                        color: JarvisColors.muted,
+                        color: JarvisColors.of(context).muted,
                       ),
                     ),
                   ],
@@ -428,10 +437,10 @@ class _SettingsRow extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(
+          Icon(
             PhosphorIconsRegular.gearSix,
             size: 19,
-            color: JarvisColors.inkSoft,
+            color: JarvisColors.of(context).inkSoft,
           ),
         ],
       ),

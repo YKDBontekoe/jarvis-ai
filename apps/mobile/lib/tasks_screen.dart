@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import 'ui/phosphor_icons.dart';
 import 'task_details_screen.dart';
 import 'condition_watches_screen.dart';
@@ -132,9 +133,8 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _date(dynamic value) {
@@ -283,9 +283,8 @@ class _TasksScreenState extends State<TasksScreen> {
               children: [
                 Text(
                   asJsonString(task['title']) ?? 'Task',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontSize: 15),
+                  style: Theme.of(context).textTheme.titleSmall
+                      ?.copyWith(fontSize: 15),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -305,7 +304,7 @@ class _TasksScreenState extends State<TasksScreen> {
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: JarvisColors.inkSoft,
+                      color: JarvisColors.of(context).inkSoft,
                       fontSize: 13.5,
                     ),
                   ),
@@ -320,12 +319,12 @@ class _TasksScreenState extends State<TasksScreen> {
               icon: const Icon(PhosphorIconsRegular.x, size: 20),
             )
           else
-            const Padding(
+            Padding(
               padding: EdgeInsets.all(10),
               child: Icon(
                 PhosphorIconsRegular.caretRight,
                 size: 16,
-                color: JarvisColors.muted,
+                color: JarvisColors.of(context).muted,
               ),
             ),
         ],

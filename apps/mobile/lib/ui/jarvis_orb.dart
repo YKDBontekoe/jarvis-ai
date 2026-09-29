@@ -98,10 +98,12 @@ class _JarvisOrbState extends State<JarvisOrb>
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: JarvisColors.accent.withValues(alpha: .28 * (1 - progress)),
+          color: JarvisColors.of(context).accent
+              .withValues(alpha: .28 * (1 - progress)),
           width: 1.5,
         ),
-        color: JarvisColors.violet.withValues(alpha: .06 * (1 - progress)),
+        color: JarvisColors.of(context).violet
+            .withValues(alpha: .06 * (1 - progress)),
       ),
     ),
   );
@@ -114,7 +116,7 @@ class _JarvisOrbState extends State<JarvisOrb>
       boxShadow: widget.glow
           ? [
               BoxShadow(
-                color: JarvisColors.accent.withValues(alpha: .16),
+                color: JarvisColors.of(context).accent.withValues(alpha: .16),
                 blurRadius: size * .4,
                 offset: Offset(0, size * .14),
               ),

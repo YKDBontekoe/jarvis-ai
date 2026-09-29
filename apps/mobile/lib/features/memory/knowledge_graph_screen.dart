@@ -18,22 +18,25 @@ part 'graph_entity_screen.dart';
 part 'knowledge_graph_viewport.dart';
 part 'knowledge_graph_sheet.dart';
 
-const _typeColors = {
-  'person': JarvisColors.accent,
-  'place': JarvisColors.success,
-  'organization': JarvisColors.info,
-  'project': JarvisColors.warning,
-  'event': JarvisColors.rose,
-  'pet': JarvisColors.violet,
-  'topic': JarvisColors.sky,
-  'thing': JarvisColors.inkSoft,
-};
-
 const _sheetPeek = 0.34;
 const _minScale = 0.12;
 const _maxScale = 3.2;
 
-Color graphTypeColor(String? type) => _typeColors[type] ?? JarvisColors.inkSoft;
+Color graphTypeColor(String? type, [BuildContext? context]) {
+  final colors = context != null
+      ? JarvisColors.of(context)
+      : JarvisColors.light;
+  return switch (type) {
+    'person' => colors.accent,
+    'place' => colors.success,
+    'organization' => colors.info,
+    'project' => colors.warning,
+    'event' => colors.rose,
+    'pet' => colors.violet,
+    'topic' => colors.sky,
+    _ => colors.inkSoft,
+  };
+}
 
 /// Temporal knowledge graph as a pan-and-zoom map of people, places, and facts.
 class KnowledgeGraphScreen extends StatefulWidget {
@@ -274,7 +277,6 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
     }
     return false;
   }
-
 }
 
 class _KnowledgeGraphScreenState extends _KnowledgeGraphController
@@ -318,8 +320,7 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
       empty: const EmptyState(
         icon: PhosphorIconsRegular.graph,
         title: 'No connections yet',
-        message:
-            'As you tell Jarvis about people, places, and projects, it links them here and keeps track of how facts change over time.',
+        message: 'As you tell Jarvis about people, places, and projects, it links them here and keeps track of how facts change over time.',
       ),
       child: _body(),
     ),
@@ -399,7 +400,10 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
           const SizedBox(height: 6),
           Text(
             '$stats · drag to pan, pinch to zoom',
-            style: const TextStyle(fontSize: 12, color: JarvisColors.muted),
+            style: TextStyle(
+              fontSize: 12,
+              color: JarvisColors.of(context).muted,
+            ),
           ),
         ],
       ),
@@ -407,11 +411,15 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
   }
 
   Widget _typeChip(String? type, String label, int count, bool selected) {
-    final color = type == null ? JarvisColors.ink : graphTypeColor(type);
+    final color = type == null
+        ? JarvisColors.of(context).ink
+        : graphTypeColor(type, context);
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Material(
-        color: selected ? color.withValues(alpha: .12) : JarvisColors.surface,
+        color: selected
+            ? color.withValues(alpha: .12)
+            : JarvisColors.of(context).surface,
         borderRadius: BorderRadius.circular(999),
         child: InkWell(
           key: Key('type-filter-${type ?? 'all'}'),
@@ -428,7 +436,7 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                color: selected ? color : JarvisColors.outline,
+                color: selected ? color : JarvisColors.of(context).outline,
               ),
             ),
             child: Row(
@@ -471,11 +479,13 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
           label: semantic
               ? 'Semantic search on · $embedded/$active memories'
               : 'Keyword search only — add an embedding model in Models',
-          color: semantic ? JarvisColors.success : JarvisColors.warning,
+          color: semantic
+              ? JarvisColors.of(context).success
+              : JarvisColors.of(context).warning,
         ),
         StatusPill(
           label: '${asJsonInt(status['graphIndexed'])}/$active memories linked',
-          color: JarvisColors.accent,
+          color: JarvisColors.of(context).accent,
         ),
       ],
     );

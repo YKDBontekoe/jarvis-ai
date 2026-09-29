@@ -91,6 +91,7 @@ class _ChatScreenState extends _ChatScreenController
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _scroll.addListener(_handleTranscriptScroll);
     if (widget.skipAuthentication) _restoringSession = false;
     _attachPushListeners();
     attachJarvisAuthInterceptor(
@@ -140,7 +141,7 @@ class _ChatScreenState extends _ChatScreenController
               ? null
               : Drawer(
                   width: math.min(330, constraints.maxWidth * .86),
-                  backgroundColor: JarvisColors.canvas,
+                  backgroundColor: JarvisColors.of(context).canvas,
                   surfaceTintColor: Colors.transparent,
                   shape: const RoundedRectangleBorder(
                     borderRadius: BorderRadius.horizontal(
@@ -223,5 +224,11 @@ class _ChatScreenState extends _ChatScreenController
     _scroll.dispose();
     _http.close();
     super.dispose();
+  }
+
+  void _handleTranscriptScroll() {
+    if (_scroll.hasClients && _scroll.position.pixels <= 160) {
+      unawaited(_loadOlderMessages());
+    }
   }
 }

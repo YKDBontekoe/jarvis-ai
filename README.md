@@ -2,6 +2,8 @@
 
 Jarvis is a self-hosted personal assistant built as a modular .NET monolith with a Flutter client. This repository is being implemented in vertical slices from the architecture plan.
 
+**Documentation:** Coding agents should start at [`AGENTS.md`](AGENTS.md). Architecture, API maps, and operations guides live under [`docs/`](docs/README.md).
+
 ## Current implementation
 
 - Flutter chat shell with Markdown replies (tables, code blocks, links) and copy, a typing indicator, live tool-activity chips per reply, inline approve/decline cards for approval-gated tool calls, retry for messages that failed to send, a new-chat action, suggested prompts, Enter-to-send, and a navigation rail on wide screens
@@ -23,6 +25,7 @@ Jarvis is a self-hosted personal assistant built as a modular .NET monolith with
 - Federated search across conversations, memories, files, tasks, reminders, skills, knowledge-graph entities, channel threads, and coding runs via `GET /api/v1/search`, with owner-scoped concurrent providers, per-provider timeouts, capped mixed ranking, and OpenTelemetry provider latency/result metrics (never recording search text)
 - Command palette on desktop/web (`Ctrl`/`⌘`+`K`) and a dedicated mobile search screen with on-device recent queries (cleared on sign-out), result-type filters, and typed route navigation instead of interpolated URLs
 - Persistent primary navigation for Chat, Tasks, Voice, Memory, and Settings; reminders, approvals, files, watches, briefings, models, skills, persona, learning, channels, agents, this device, voice options, integrations, coding runs, usage, and audit log are grouped under Settings
+- Persistent primary navigation for Chat, Tasks, Voice, Memory, and Settings; appearance (light, dark, or match this device), reminders, approvals, files, watches, briefings, models, skills, persona, learning, channels, agents, this device, voice options, integrations, coding runs, usage, and audit log are grouped under Settings
 - ASP.NET Core API with persistent conversations and Agent Framework sessions
 - SignalR events for streamed assistant text and run status through Codex CLI app-server delta notifications
 - User-visible tool activity through SignalR (`tool.started`, `tool.completed`, and `tool.failed`); only tool names and run status are sent, never arguments or results
@@ -89,11 +92,13 @@ Database migrations apply automatically in Development.
 
 ## Tests
 
+Pull requests targeting `main` run [`.github/workflows/ci.yml`](.github/workflows/ci.yml): .NET build and unit tests, PostgreSQL integration tests (Testcontainers), Python release/Compose/AltStore checks, Flutter analyze and widget tests, and API/worker container image builds. Require the **All checks passed** status in branch protection before merging.
+
 Run deterministic unit tests with:
 
 ```sh
 dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
-python3 -m unittest tests/unit/altstore/test_generate_source.py tests/unit/compose/test_production_images.py tests/unit/release/test_semver.py
+scripts/ci/run-python-unit-tests.sh
 ```
 
 The model-agnostic behavioral evaluation cases live in [`evals/jarvis-core-v1.jsonl`](evals/jarvis-core-v1.jsonl), with isolated-run requirements documented in [`evals/README.md`](evals/README.md). Run them against a disposable Jarvis deployment through the normal API; inference still goes through the Codex CLI app-server.
@@ -206,7 +211,7 @@ Add `-f infra/compose/docker-compose.home-assistant.yml` to that command and set
 
 Add `-f infra/compose/docker-compose.github.yml` to enable GitHub. Host builds still need `--build` so the API image includes the pinned MCP server; GHCR images already include it.
 
-Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit media, plus outbound HTTPS for Codex OAuth/model access, Firebase FCM/OAuth, user-configured public condition-watch endpoints, Caddy certificate issuance, ClamAV signature updates, and GHCR pulls. The API applies EF migrations at startup after Postgres is healthy. Temporal owns a separate persistent Postgres database. Garage creates the private `jarvis-files` bucket and its application access key before the API starts. Keep the Compose environment file, Garage config, and Codex OAuth file private, and pin every third-party container image to an audited release or digest before deploying. This production topology has been configuration-validated; live service startup still requires pulling its container images and setting real account signing keys, DNS, Firebase, APNs, and Codex OAuth credentials.
+Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit media, plus outbound HTTPS for Codex OAuth/model access, Firebase FCM/OAuth, user-configured public condition-watch endpoints, Caddy certificate issuance, ClamAV signature updates, and GHCR pulls. The deployment script applies EF migrations after Postgres is healthy and before updating application containers. Temporal owns a separate persistent Postgres database. Garage creates the private `jarvis-files` bucket and its application access key before the API starts. Keep the Compose environment file, Garage config, and Codex OAuth file private, and pin every third-party container image to an audited release or digest before deploying. This production topology has been configuration-validated; live service startup still requires pulling its container images and setting real account signing keys, DNS, Firebase, APNs, and Codex OAuth credentials.
 
 ## GitHub Actions pipelines
 
@@ -251,6 +256,19 @@ Server bootstrap:
 7. In GitHub → Packages, link the two application container packages to this repository so `GITHUB_TOKEN` can push and the deploy job can pull. Keep packages private if the repo is private; the runner logs into GHCR with a short-lived token. For later manual pulls, `docker login ghcr.io` on the host with a PAT that has `read:packages`.
 
 `workflow_dispatch` accepts `skip_deploy` to build/push images without deploying, and an optional extra `image_tag`. Production secrets stay in `.env.production` on the server and are never passed through GitHub Actions. `python3 -m unittest tests/unit/compose/test_production_images.py` checks that Compose interpolates the GHCR image variables.
+
+Production deployment runs `dotnet Jarvis.Api.dll migrate` as a one-shot task before
+replacing the API or worker containers. The task logs the target EF migration, uses a
+PostgreSQL advisory lock, and aborts the deployment on failure. API startup migration
+is intentionally rejected outside Development; local Development startup continues
+to migrate by default and can opt out with `Database__ApplyMigrationsAtStartup=false`.
+
+Migrations shipped in a rolling release must be backward compatible with both the old
+and new API/worker versions. Use expand-and-contract changes: add nullable columns,
+tables, and indexes first; deploy readers/writers that tolerate both schemas; backfill
+separately; and remove or tighten schema only in a later release after old replicas can
+no longer run. Never combine a destructive schema change with the first code release
+that stops using the old shape.
 
 MCP tools are disabled unless configured. Set `Mcp__Servers__0__Name`, `Mcp__Servers__0__Transport`, and `Mcp__Servers__0__AllowedTools__0`; stdio servers also need `Mcp__Servers__0__Command` and optional arguments/environment, while Streamable HTTP servers need `Mcp__Servers__0__Endpoint` and optional headers. Tools are approval-required by default; add an exact tool name to `Mcp__Servers__0__AutoApprovedTools__0` only when unattended execution is intended. Stdio children receive a minimal environment by default. To inject an owner's encrypted integration credentials into a stdio child, set `Mcp__Servers__0__CredentialProvider`, map a child variable to a stored secret name under `CredentialEnvironmentVariables`, and store those values under the same provider slug. For Streamable HTTP, map headers with `CredentialHeaders`; sending mapped credentials requires HTTPS. Store the complete header value (including a `Bearer` scheme when required) in the encrypted credential record. The API opens a scoped MCP connection for each agent run and disposes it when the run finishes. Stored or configured transport values are scrubbed from MCP tool results and errors before those values can reach the model context.
 

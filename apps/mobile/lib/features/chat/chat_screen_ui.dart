@@ -195,7 +195,7 @@ mixin _ChatScreenUi on _ChatScreenController {
                 TextButton(
                   onPressed: () => setState(() => _error = null),
                   style: TextButton.styleFrom(
-                    foregroundColor: JarvisColors.inkSoft,
+                    foregroundColor: JarvisColors.of(context).inkSoft,
                   ),
                   child: const Text('Dismiss'),
                 ),
@@ -390,7 +390,9 @@ class _ConnectionDot extends StatelessWidget {
       width: 7,
       height: 7,
       decoration: BoxDecoration(
-        color: connected ? JarvisColors.success : JarvisColors.outlineStrong,
+        color: connected
+            ? JarvisColors.of(context).success
+            : JarvisColors.of(context).outlineStrong,
         shape: BoxShape.circle,
       ),
     ),

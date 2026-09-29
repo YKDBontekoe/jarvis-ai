@@ -117,9 +117,9 @@ void main() {
           ],
         },
       })!;
-    expect(surface.schema['kind'], 'choice');
-    expect(surface.schema.length, 2);
-    expect(surfaceAwaitsReply(surface), isTrue);
+      expect(surface.schema['kind'], 'choice');
+      expect(surface.schema.length, 2);
+      expect(surfaceAwaitsReply(surface), isTrue);
     },
   );
 
@@ -251,7 +251,7 @@ void main() {
               ],
             },
           ),
-          onAction: (_, __) => pending.future,
+          onAction: (_, _) => pending.future,
         ),
       ),
     );
@@ -515,6 +515,7 @@ void main() {
     tester,
   ) async {
     await show(tester, SettingsView(connected: true, onOpen: (_) {}));
+    expect(find.byKey(const Key('settings-appearance')), findsOneWidget);
     expect(find.byKey(const Key('settings-usage')), findsOneWidget);
     expect(find.byKey(const Key('settings-agents')), findsOneWidget);
     expect(find.byKey(const Key('settings-devices')), findsOneWidget);

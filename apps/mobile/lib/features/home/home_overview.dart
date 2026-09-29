@@ -164,9 +164,10 @@ class _HomeOverviewState extends State<HomeOverview>
         cancelToken: request,
       );
       final tasks =
-          jsonMaps(
-              response.data,
-            ).map(_ActiveTask.fromJson).whereType<_ActiveTask>().toList()
+          jsonMaps(response.data)
+              .map(_ActiveTask.fromJson)
+              .whereType<_ActiveTask>()
+              .toList()
             ..sort((a, b) {
               final priority = a.priority.compareTo(b.priority);
               return priority != 0
@@ -223,7 +224,10 @@ class _HomeOverviewState extends State<HomeOverview>
           SurfaceCard(
             child: Text(
               portrait,
-              style: const TextStyle(color: JarvisColors.inkSoft, height: 1.45),
+              style: TextStyle(
+                color: JarvisColors.of(context).inkSoft,
+                height: 1.45,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -287,8 +291,7 @@ class _HomeOverviewState extends State<HomeOverview>
           _BriefingListCard(
             icon: PhosphorIconsRegular.calendarBlank,
             title: 'Connect a calendar',
-            subtitle:
-                'Subscribe to an ICS feed in Integrations so today’s events appear here.',
+            subtitle: 'Subscribe to an ICS feed in Integrations so today’s events appear here.',
             onTap: widget.onOpenIntegrations,
           ),
         ],
@@ -372,18 +375,18 @@ class _HomeOverviewState extends State<HomeOverview>
                 Text(
                   '$memories ${memories == 1 ? 'memory' : 'memories'} · ${formatTokenCount(tokens)} tokens this week'
                   '${cost is num ? ' · ${formatUsd(cost)}' : ''}',
-                  style: const TextStyle(
-                    color: JarvisColors.inkSoft,
+                  style: TextStyle(
+                    color: JarvisColors.of(context).inkSoft,
                     fontSize: 13,
                   ),
                 ),
               ],
             ),
           ),
-          const Icon(
+          Icon(
             PhosphorIconsRegular.caretRight,
             size: 16,
-            color: JarvisColors.muted,
+            color: JarvisColors.of(context).muted,
           ),
         ],
       ),
@@ -460,11 +463,11 @@ class _HomeOverviewState extends State<HomeOverview>
                         '$_today  ·  $_greeting',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: JarvisColors.muted,
+                          color: JarvisColors.of(context).muted,
                         ),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
+                      Text(
                         'What do you need?',
                         textAlign: TextAlign.center,
                         style: TextStyle(
@@ -472,7 +475,7 @@ class _HomeOverviewState extends State<HomeOverview>
                           fontSize: 40,
                           height: 1.1,
                           letterSpacing: -.6,
-                          color: JarvisColors.ink,
+                          color: JarvisColors.of(context).ink,
                         ),
                       ),
                       const SizedBox(height: 22),
@@ -537,7 +540,7 @@ class _HomeOverviewState extends State<HomeOverview>
                           child: Text(
                             'Or try one of these:',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: JarvisColors.muted,
+                              color: JarvisColors.of(context).muted,
                             ),
                           ),
                         ),

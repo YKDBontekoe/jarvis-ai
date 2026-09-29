@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
@@ -116,7 +117,9 @@ class _AuditRow extends StatelessWidget {
     final timestamp = jsonDate(event['timestamp'], local: true);
     final metadata = asJsonString(event['metadataJson']);
     final risk = asJsonString(event['riskClass']) ?? 'unknown risk';
-    final color = success ? JarvisColors.success : JarvisColors.danger;
+    final color = success
+        ? JarvisColors.of(context).success
+        : JarvisColors.of(context).danger;
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -128,13 +131,15 @@ class _AuditRow extends StatelessWidget {
                 Container(
                   width: 2,
                   height: 18,
-                  color: first ? Colors.transparent : JarvisColors.outline,
+                  color: first
+                      ? Colors.transparent
+                      : JarvisColors.of(context).outline,
                 ),
                 Container(
                   width: 12,
                   height: 12,
                   decoration: BoxDecoration(
-                    color: JarvisColors.surface,
+                    color: JarvisColors.of(context).surface,
                     shape: BoxShape.circle,
                     border: Border.all(color: color, width: 3),
                   ),
@@ -142,7 +147,9 @@ class _AuditRow extends StatelessWidget {
                 Expanded(
                   child: Container(
                     width: 2,
-                    color: last ? Colors.transparent : JarvisColors.outline,
+                    color: last
+                        ? Colors.transparent
+                        : JarvisColors.of(context).outline,
                   ),
                 ),
               ],
@@ -178,7 +185,7 @@ class _AuditRow extends StatelessWidget {
                         Text(
                           _formatTime(timestamp),
                           style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: JarvisColors.muted),
+                              ?.copyWith(color: JarvisColors.of(context).muted),
                         ),
                     ],
                   ),
@@ -197,10 +204,10 @@ class _AuditRow extends StatelessWidget {
                       metadata,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
-                        color: JarvisColors.inkSoft,
+                        color: JarvisColors.of(context).inkSoft,
                       ),
                     ),
                   ],
@@ -216,15 +223,15 @@ class _AuditRow extends StatelessWidget {
   static Color _riskColor(String risk) {
     final value = risk.toLowerCase();
     if (value.contains('high') || value.contains('destructive')) {
-      return JarvisColors.danger;
+      return JarvisColors.light.danger;
     }
     if (value.contains('medium') || value.contains('write')) {
-      return JarvisColors.warning;
+      return JarvisColors.light.warning;
     }
     if (value.contains('low') || value.contains('read')) {
-      return JarvisColors.success;
+      return JarvisColors.light.success;
     }
-    return JarvisColors.inkSoft;
+    return JarvisColors.light.inkSoft;
   }
 
   static String _formatTime(DateTime value) =>
@@ -241,15 +248,15 @@ class _Tag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     decoration: BoxDecoration(
-      color: JarvisColors.surfaceMuted,
+      color: JarvisColors.of(context).surfaceMuted,
       borderRadius: BorderRadius.circular(8),
     ),
     child: Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         fontFamily: 'monospace',
         fontSize: 12,
-        color: JarvisColors.inkSoft,
+        color: JarvisColors.of(context).inkSoft,
       ),
     ),
   );

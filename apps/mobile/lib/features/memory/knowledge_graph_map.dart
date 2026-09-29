@@ -17,7 +17,7 @@ class _MapNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = graphTypeColor(node.type);
+    final color = graphTypeColor(node.type, context);
     final diameter = selected ? 26.0 : (node.isYou ? 20.0 : 16.0);
     return Opacity(
       opacity: dimmed ? .32 : 1,
@@ -48,10 +48,10 @@ class _MapNode extends StatelessWidget {
                     color: color,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: JarvisColors.surface,
+                      color: JarvisColors.of(context).surface,
                       width: selected ? 3 : 2,
                     ),
-                    boxShadow: JarvisShadows.soft,
+                    boxShadow: JarvisShadows.soft(),
                   ),
                 ),
               ),
@@ -62,10 +62,11 @@ class _MapNode extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 constraints: const BoxConstraints(maxWidth: 108),
                 decoration: BoxDecoration(
-                  color: JarvisColors.surface.withValues(alpha: .94),
+                  color: JarvisColors.of(context).surface
+                      .withValues(alpha: .94),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: selected ? color : JarvisColors.outline,
+                    color: selected ? color : JarvisColors.of(context).outline,
                   ),
                 ),
                 child: Text(
@@ -76,7 +77,7 @@ class _MapNode extends StatelessWidget {
                   style: TextStyle(
                     fontSize: node.isYou || selected ? 12 : 11,
                     fontWeight: FontWeight.w600,
-                    color: JarvisColors.ink,
+                    color: JarvisColors.of(context).ink,
                   ),
                 ),
               ),
@@ -108,13 +109,14 @@ class _MapEdge {
 }
 
 class _GraphPainter extends CustomPainter {
-  const _GraphPainter(this.edges);
+  const _GraphPainter(this.edges, this.colors);
 
   final List<_MapEdge> edges;
+  final JarvisColors colors;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final dot = Paint()..color = const Color(0xffe3dfd6);
+    final dot = Paint()..color = colors.outline;
     for (var x = 22.0; x < size.width; x += 28) {
       for (var y = 22.0; y < size.height; y += 28) {
         canvas.drawCircle(Offset(x, y), 1.15, dot);
@@ -140,10 +142,10 @@ class _GraphPainter extends CustomPainter {
       final painter = TextPainter(
         text: TextSpan(
           text: label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: JarvisColors.inkSoft,
+            color: colors.inkSoft,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -157,12 +159,12 @@ class _GraphPainter extends CustomPainter {
       );
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect, const Radius.circular(6)),
-        Paint()..color = JarvisColors.surface.withValues(alpha: .94),
+        Paint()..color = colors.surface.withValues(alpha: .94),
       );
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect, const Radius.circular(6)),
         Paint()
-          ..color = JarvisColors.outline
+          ..color = colors.outline
           ..style = PaintingStyle.stroke,
       );
       painter.paint(canvas, origin);
@@ -195,5 +197,6 @@ class _GraphPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GraphPainter oldDelegate) => oldDelegate.edges != edges;
+  bool shouldRepaint(_GraphPainter oldDelegate) =>
+      oldDelegate.edges != edges || oldDelegate.colors != colors;
 }

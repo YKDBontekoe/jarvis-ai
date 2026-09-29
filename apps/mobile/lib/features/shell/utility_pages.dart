@@ -17,6 +17,7 @@ import '../devices/devices_screen.dart';
 import '../learning/learning_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
 import '../persona/persona_screen.dart';
+import '../settings/appearance_screen.dart';
 import '../settings/model_settings_screen.dart';
 import '../settings/voice_settings_screen.dart';
 import '../skills/skills_screen.dart';
@@ -32,6 +33,7 @@ Widget? utilityPageFor(String destination, Dio http) => switch (destination) {
   'watches' => ConditionWatchesScreen(http: http),
   'briefing' => DailyBriefingScreen(http: http),
   'integrations' => IntegrationsScreen(http: http),
+  'appearance' => const AppearanceScreen(),
   'models' => ModelSettingsScreen(http: http),
   'skills' => SkillsScreen(http: http),
   'persona' => PersonaScreen(http: http),

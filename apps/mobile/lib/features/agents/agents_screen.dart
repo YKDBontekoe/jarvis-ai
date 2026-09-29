@@ -240,7 +240,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
                 Text(
                   'REMOTE AGENTS',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: JarvisColors.muted,
+                    color: JarvisColors.of(context).muted,
                     letterSpacing: .8,
                   ),
                 ),
@@ -271,7 +271,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
                 Text(
                   'INBOUND TOKENS',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: JarvisColors.muted,
+                    color: JarvisColors.of(context).muted,
                     letterSpacing: .8,
                   ),
                 ),

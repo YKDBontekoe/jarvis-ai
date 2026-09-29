@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Jarvis.Api.Errors;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Memory;
@@ -33,7 +34,7 @@ internal static class MemoryEndpoints
         api.MapPost("/memory", async (IMemoryService memory, IAuditEventStore audit,
             ICurrentUser currentUser, MemoryRequest request, CancellationToken ct) =>
         {
-            if (!Validate(request, out var errors)) return Results.ValidationProblem(errors);
+            if (!Validate(request, out var errors)) return ApiProblemResults.Validation(errors);
             var record = await memory.CreateAsync(currentUser.OwnerId, request.Kind!, request.Content!,
                 request.Importance, request.Confidence, request.ValidUntil, request.IsPinned, ct);
             await EndpointHelpers.TryAppendAuditAsync(audit, logger, currentUser.OwnerId, "memory", "memory.created",
@@ -51,7 +52,7 @@ internal static class MemoryEndpoints
         api.MapPut("/memory/{id:guid}", async (Guid id, IMemoryService memory, IAuditEventStore audit,
             ICurrentUser currentUser, MemoryRequest request, CancellationToken ct) =>
         {
-            if (!Validate(request, out var errors)) return Results.ValidationProblem(errors);
+            if (!Validate(request, out var errors)) return ApiProblemResults.Validation(errors);
             if (await memory.GetAsync(id, currentUser.OwnerId, ct) is null) return Results.NotFound();
             var record = await memory.UpdateAsync(id, currentUser.OwnerId, request.Kind!, request.Content!,
                 request.Importance, request.Confidence, request.ValidUntil, request.IsPinned, ct);

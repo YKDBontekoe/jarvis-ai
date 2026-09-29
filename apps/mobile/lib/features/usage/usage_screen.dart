@@ -209,8 +209,11 @@ class _UsageScreenState extends State<UsageScreen> {
         'Jarvis is just getting to know you.';
     return SurfaceCard(
       key: const Key('usage-personalization'),
-      gradient: const LinearGradient(
-        colors: [JarvisColors.accentSoft, JarvisColors.surface],
+      gradient: LinearGradient(
+        colors: [
+          JarvisColors.of(context).accentSoft,
+          JarvisColors.of(context).surface,
+        ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
@@ -227,8 +230,8 @@ class _UsageScreenState extends State<UsageScreen> {
                 const SizedBox(height: 4),
                 Text(
                   summary,
-                  style: const TextStyle(
-                    color: JarvisColors.inkSoft,
+                  style: TextStyle(
+                    color: JarvisColors.of(context).inkSoft,
                     height: 1.35,
                   ),
                 ),
@@ -260,9 +263,9 @@ class _UsageScreenState extends State<UsageScreen> {
   Widget _chip(String label) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     decoration: BoxDecoration(
-      color: JarvisColors.surface,
+      color: JarvisColors.of(context).surface,
       borderRadius: BorderRadius.circular(999),
-      border: Border.all(color: JarvisColors.outline),
+      border: Border.all(color: JarvisColors.of(context).outline),
     ),
     child: Text(label, style: const TextStyle(fontSize: 12)),
   );
@@ -336,7 +339,10 @@ class _UsageScreenState extends State<UsageScreen> {
             children: [
               Text(
                 label,
-                style: const TextStyle(color: JarvisColors.muted, fontSize: 12),
+                style: TextStyle(
+                  color: JarvisColors.of(context).muted,
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(height: 4),
               Text(value, style: Theme.of(context).textTheme.titleLarge),
@@ -344,8 +350,8 @@ class _UsageScreenState extends State<UsageScreen> {
                 const SizedBox(height: 2),
                 Text(
                   caption,
-                  style: const TextStyle(
-                    color: JarvisColors.inkSoft,
+                  style: TextStyle(
+                    color: JarvisColors.of(context).inkSoft,
                     fontSize: 12,
                   ),
                 ),
@@ -379,8 +385,8 @@ class _UsageScreenState extends State<UsageScreen> {
                     Text(title, style: Theme.of(context).textTheme.titleMedium),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: JarvisColors.inkSoft,
+                      style: TextStyle(
+                        color: JarvisColors.of(context).inkSoft,
                         fontSize: 13,
                       ),
                     ),
@@ -433,7 +439,10 @@ class _UsageScreenState extends State<UsageScreen> {
             const SizedBox(height: 10),
             Text(
               line,
-              style: const TextStyle(color: JarvisColors.inkSoft, fontSize: 13),
+              style: TextStyle(
+                color: JarvisColors.of(context).inkSoft,
+                fontSize: 13,
+              ),
             ),
           ],
           if (_period != 'all') ...[
@@ -441,15 +450,18 @@ class _UsageScreenState extends State<UsageScreen> {
             Text(
               'All time · ${asJsonInt(provider['lifetimeCalls'])} calls · ${formatTokenCount(asJsonInt(provider['lifetimeTotalTokens']))} tokens'
               '${showCost ? ' · ${_money(provider, lifetime: true)}' : ''}',
-              style: const TextStyle(color: JarvisColors.muted, fontSize: 12),
+              style: TextStyle(
+                color: JarvisColors.of(context).muted,
+                fontSize: 12,
+              ),
             ),
           ],
           if (asJsonString(provider['costNote']) case final note?) ...[
             const SizedBox(height: 8),
             Text(
               note,
-              style: const TextStyle(
-                color: JarvisColors.muted,
+              style: TextStyle(
+                color: JarvisColors.of(context).muted,
                 fontSize: 12,
                 height: 1.35,
               ),
@@ -465,7 +477,7 @@ class _UsageScreenState extends State<UsageScreen> {
     children: [
       Text(
         label,
-        style: const TextStyle(color: JarvisColors.muted, fontSize: 11),
+        style: TextStyle(color: JarvisColors.of(context).muted, fontSize: 11),
       ),
       Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
     ],
@@ -485,15 +497,15 @@ class _UsageScreenState extends State<UsageScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!hasTokens)
-            const Text(
+            Text(
               'No model calls in this period yet.',
-              style: TextStyle(color: JarvisColors.inkSoft),
+              style: TextStyle(color: JarvisColors.of(context).inkSoft),
             )
           else
             SizedBox(
               height: 132,
               child: CustomPaint(
-                painter: _UsageChartPainter(days),
+                painter: _UsageChartPainter(days, JarvisColors.of(context)),
                 child: const SizedBox.expand(),
               ),
             ),
@@ -501,15 +513,21 @@ class _UsageScreenState extends State<UsageScreen> {
           Wrap(
             spacing: 14,
             runSpacing: 6,
-            children: const [
-              _Legend(color: JarvisColors.accent, label: 'Codex'),
-              _Legend(color: JarvisColors.violet, label: 'OpenRouter'),
+            children: [
+              _Legend(color: JarvisColors.of(context).accent, label: 'Codex'),
+              _Legend(
+                color: JarvisColors.of(context).violet,
+                label: 'OpenRouter',
+              ),
             ],
           ),
           const SizedBox(height: 6),
           Text(
             note ?? 'Days follow $zone.',
-            style: const TextStyle(color: JarvisColors.muted, fontSize: 12),
+            style: TextStyle(
+              color: JarvisColors.of(context).muted,
+              fontSize: 12,
+            ),
           ),
         ],
       ),
@@ -519,10 +537,10 @@ class _UsageScreenState extends State<UsageScreen> {
   Widget _models() {
     final models = jsonMaps(_usage?['models']);
     if (models.isEmpty) {
-      return const SurfaceCard(
+      return SurfaceCard(
         child: Text(
           'Model calls will show up here after your next conversation.',
-          style: TextStyle(color: JarvisColors.inkSoft),
+          style: TextStyle(color: JarvisColors.of(context).inkSoft),
         ),
       );
     }
@@ -577,7 +595,7 @@ class _UsageScreenState extends State<UsageScreen> {
                 _period == 'all'
                     ? _total(item.$2).toString()
                     : '${_inPeriod(item.$2)} · ${_total(item.$2)} all time',
-                style: const TextStyle(color: JarvisColors.inkSoft),
+                style: TextStyle(color: JarvisColors.of(context).inkSoft),
               ),
             ),
           ],
@@ -698,7 +716,10 @@ class _ScoreRing extends StatelessWidget {
     child: SizedBox.square(
       dimension: 84,
       child: CustomPaint(
-        painter: _RingPainter(score.clamp(0, 100) / 100),
+        painter: _RingPainter(
+          score.clamp(0, 100) / 100,
+          JarvisColors.of(context),
+        ),
         child: Center(
           child: Text('$score', style: Theme.of(context).textTheme.titleLarge),
         ),
@@ -708,20 +729,21 @@ class _ScoreRing extends StatelessWidget {
 }
 
 class _RingPainter extends CustomPainter {
-  const _RingPainter(this.progress);
+  const _RingPainter(this.progress, this.colors);
 
   final double progress;
+  final JarvisColors colors;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final radius = size.width / 2 - 5;
     final track = Paint()
-      ..color = JarvisColors.outline
+      ..color = colors.outline
       ..style = PaintingStyle.stroke
       ..strokeWidth = 6;
     final arc = Paint()
-      ..color = JarvisColors.accent
+      ..color = colors.accent
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 6;
@@ -737,7 +759,7 @@ class _RingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_RingPainter oldDelegate) =>
-      oldDelegate.progress != progress;
+      oldDelegate.progress != progress || oldDelegate.colors != colors;
 }
 
 class _Legend extends StatelessWidget {
@@ -758,16 +780,17 @@ class _Legend extends StatelessWidget {
       const SizedBox(width: 6),
       Text(
         label,
-        style: const TextStyle(fontSize: 12, color: JarvisColors.inkSoft),
+        style: TextStyle(fontSize: 12, color: JarvisColors.of(context).inkSoft),
       ),
     ],
   );
 }
 
 class _UsageChartPainter extends CustomPainter {
-  _UsageChartPainter(this.days);
+  _UsageChartPainter(this.days, this.colors);
 
   final List<Map<String, dynamic>> days;
+  final JarvisColors colors;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -780,8 +803,8 @@ class _UsageChartPainter extends CustomPainter {
     }
     final slot = size.width / days.length;
     final barWidth = math.min(10.0, slot * 0.55);
-    final codexPaint = Paint()..color = JarvisColors.accent;
-    final openRouterPaint = Paint()..color = JarvisColors.violet;
+    final codexPaint = Paint()..color = colors.accent;
+    final openRouterPaint = Paint()..color = colors.violet;
     for (final (index, day) in days.indexed) {
       final codex =
           asJsonInt(day['codexTokens']) / maxTokens * (size.height - 4);
@@ -816,5 +839,5 @@ class _UsageChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_UsageChartPainter oldDelegate) =>
-      oldDelegate.days != days;
+      oldDelegate.days != days || oldDelegate.colors != colors;
 }
