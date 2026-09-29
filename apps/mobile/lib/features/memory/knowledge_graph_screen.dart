@@ -190,12 +190,28 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
     _motion.forward(from: 0);
   }
 
+  Offset _contentFocal() {
+    final nodes = _typedNodes;
+    if (nodes.isEmpty) {
+      return Offset(_viewport.width / 2, _viewport.height / 2);
+    }
+    var sum = Offset.zero;
+    for (final node in nodes) {
+      sum += MatrixUtils.transformPoint(_transform.value, _worldPoint(node.id));
+    }
+    final center = sum / nodes.length.toDouble();
+    return Offset(
+      center.dx.clamp(0, _viewport.width),
+      center.dy.clamp(0, _viewport.height),
+    );
+  }
+
   void _zoomBy(double factor) {
     if (_viewport.isEmpty) return;
     final current = _transform.value.getMaxScaleOnAxis();
     final next = (current * factor).clamp(_minScale, _maxScale);
     if ((next - current).abs() < 0.01) return;
-    final focal = Offset(_viewport.width / 2, _viewport.height * .32);
+    final focal = _contentFocal();
     final scene = MatrixUtils.transformPoint(
       Matrix4.inverted(_transform.value),
       focal,
@@ -320,7 +336,8 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
       empty: const EmptyState(
         icon: PhosphorIconsRegular.graph,
         title: 'No connections yet',
-        message: 'As you tell Jarvis about people, places, and projects, it links them here and keeps track of how facts change over time.',
+        message:
+            'As you tell Jarvis about people, places, and projects, it links them here and keeps track of how facts change over time.',
       ),
       child: _body(),
     ),
