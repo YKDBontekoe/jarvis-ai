@@ -1,3 +1,4 @@
+using Jarvis.Api.Errors;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Workflows;
 
@@ -50,8 +51,7 @@ internal static class AutomationEndpoints
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 logger.LogError(exception, "Temporal could not schedule a reminder for user {OwnerId}.", currentUser.OwnerId);
-                return Results.Problem("Reminder service is temporarily unavailable.",
-                    statusCode: StatusCodes.Status503ServiceUnavailable);
+                return ApiProblemResults.DependencyUnavailable("Reminder service is temporarily unavailable.");
             }
         }).WithName("CreateReminder");
 
@@ -92,8 +92,7 @@ internal static class AutomationEndpoints
             {
                 logger.LogError(exception, "Temporal could not schedule a condition watch for user {OwnerId}.",
                     currentUser.OwnerId);
-                return Results.Problem("Condition watch service is temporarily unavailable.",
-                    statusCode: StatusCodes.Status503ServiceUnavailable);
+                return ApiProblemResults.DependencyUnavailable("Condition watch service is temporarily unavailable.");
             }
         }).WithName("CreateConditionWatch");
 
@@ -140,8 +139,7 @@ internal static class AutomationEndpoints
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 logger.LogError(exception, "Temporal could not start a task for user {OwnerId}.", currentUser.OwnerId);
-                return Results.Problem("Task service is temporarily unavailable.",
-                    statusCode: StatusCodes.Status503ServiceUnavailable);
+                return ApiProblemResults.DependencyUnavailable("Task service is temporarily unavailable.");
             }
         }).WithName("CreateTask");
 
