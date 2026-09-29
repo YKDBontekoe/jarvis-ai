@@ -428,7 +428,9 @@ class _RemindersScreenState extends State<RemindersScreen>
             final status = asJsonString(reminder['status']) ?? 'pending';
             final pending = status == 'pending';
             final style = statusStyle(status);
-            return ContentWidth(
+            return FadeSlideIn(
+              index: index,
+              child: ContentWidth(
               child: SurfaceCard(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.fromLTRB(16, 14, 6, 14),
@@ -486,6 +488,7 @@ class _RemindersScreenState extends State<RemindersScreen>
                   ],
                 ),
               ),
+              ),
             );
           },
         );
@@ -517,7 +520,9 @@ class _RemindersScreenState extends State<RemindersScreen>
             final notification = _notifications[index];
             final unread = notification['readAt'] == null;
             final body = asJsonString(notification['body']) ?? '';
-            return ContentWidth(
+            return FadeSlideIn(
+              index: index,
+              child: ContentWidth(
               child: SurfaceCard(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -579,6 +584,7 @@ class _RemindersScreenState extends State<RemindersScreen>
                       ),
                   ],
                 ),
+              ),
               ),
             );
           },

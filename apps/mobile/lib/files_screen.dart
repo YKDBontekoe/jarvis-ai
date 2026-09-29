@@ -282,6 +282,7 @@ class _FilesScreenState extends State<FilesScreen> {
           icon: PhosphorIconsRegular.folders,
           onPressed: _createCollection,
           busy: _busy,
+          collapsesWhenNarrow: true,
         ),
         HeaderAction(
           label: 'Upload',

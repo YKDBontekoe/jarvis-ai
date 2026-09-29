@@ -134,6 +134,7 @@ class _IntegrationsScreenState extends _IntegrationsController
           HeaderAction(
             label: 'Ask Jarvis',
             icon: PhosphorIconsRegular.chatCircle,
+            collapsesWhenNarrow: true,
             onPressed: () {
               final ask = widget.onAskInChat!;
               Navigator.of(context).pop();

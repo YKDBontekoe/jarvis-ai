@@ -212,7 +212,8 @@ class _TasksScreenState extends State<TasksScreen> {
                 children: [
                   _summary(),
                   const SizedBox(height: 18),
-                  for (final task in _tasks) _taskCard(task),
+                  for (final (index, task) in _tasks.indexed)
+                    FadeSlideIn(index: index + 1, child: _taskCard(task)),
                 ],
               ),
             ),

@@ -8,6 +8,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../memory/graph_model.dart';
 
 /// Agent2Agent peers Jarvis can delegate to, plus inbound tokens other agents use.
 class AgentsScreen extends StatefulWidget {
@@ -237,79 +238,55 @@ class _AgentsScreenState extends State<AgentsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'REMOTE AGENTS',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: JarvisColors.of(context).muted,
-                    letterSpacing: .8,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (_agents.isEmpty)
-                  const Text(
-                    'Add another assistant’s Agent2Agent URL. Jarvis will ask before delegating.',
-                  )
-                else
-                  for (final agent in _agents)
-                    SurfaceCard(
-                      child: ListTile(
-                        leading: const IconBadge(
+                FadeSlideIn(
+                  child: _section(
+                    title: 'Remote agents',
+                    description:
+                        'Add another assistant’s Agent2Agent URL. Jarvis will ask before delegating.',
+                    children: [
+                      if (_agents.isEmpty)
+                        const _EmptyRow(
                           icon: PhosphorIconsRegular.robot,
+                          message: 'No remote agents yet.',
                         ),
-                        title: Text(asJsonString(agent['name']) ?? 'Agent'),
-                        subtitle: Text(asJsonString(agent['url']) ?? ''),
-                        trailing: IconButton(
-                          tooltip: 'Remove',
-                          onPressed: () => unawaited(
-                            _removeAgent(asJsonString(agent['id'])),
-                          ),
-                          icon: const Icon(PhosphorIconsRegular.trash),
-                        ),
-                      ),
-                    ),
-                const SizedBox(height: 24),
-                Text(
-                  'INBOUND TOKENS',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: JarvisColors.of(context).muted,
-                    letterSpacing: .8,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Other agents use these bearer tokens at POST /a2a. Copy a token when you create it; Jarvis only stores a hash.',
-                ),
-                const SizedBox(height: 8),
-                FilledButton.icon(
-                  onPressed: () => unawaited(_createToken()),
-                  icon: const Icon(PhosphorIconsRegular.key),
-                  label: const Text('Create token'),
-                ),
-                if (_newToken != null)
-                  InlineNotice(
-                    message: 'Copy this token now: $_newToken',
-                    tone: NoticeTone.info,
-                    margin: const EdgeInsets.only(top: 12),
-                    actions: [
-                      TextButton(
-                        onPressed: () => unawaited(_copyNewToken()),
-                        child: const Text('Copy'),
-                      ),
+                      for (final agent in _agents) _agentCard(agent),
                     ],
                   ),
-                const SizedBox(height: 8),
-                for (final token in _tokens)
-                  ListTile(
-                    leading: const Icon(PhosphorIconsRegular.key),
-                    title: Text(asJsonString(token['name']) ?? 'Token'),
-                    subtitle: Text(asJsonString(token['createdAt']) ?? ''),
-                    trailing: IconButton(
-                      tooltip: 'Remove token',
-                      onPressed: () =>
-                          unawaited(_removeToken(asJsonString(token['id']))),
-                      icon: const Icon(PhosphorIconsRegular.trash),
+                ),
+                const SizedBox(height: 28),
+                FadeSlideIn(
+                  index: 1,
+                  child: _section(
+                    title: 'Inbound tokens',
+                    description:
+                        'Other agents use these bearer tokens at POST /a2a. Copy a token when you create it; Jarvis only stores a hash.',
+                    action: OutlinedButton.icon(
+                      onPressed: () => unawaited(_createToken()),
+                      icon: const Icon(PhosphorIconsRegular.key, size: 18),
+                      label: const Text('Create token'),
                     ),
+                    children: [
+                      if (_newToken != null)
+                        InlineNotice(
+                          message: 'Copy this token now: $_newToken',
+                          tone: NoticeTone.info,
+                          margin: const EdgeInsets.only(bottom: 10),
+                          actions: [
+                            TextButton(
+                              onPressed: () => unawaited(_copyNewToken()),
+                              child: const Text('Copy'),
+                            ),
+                          ],
+                        ),
+                      if (_tokens.isEmpty && _newToken == null)
+                        const _EmptyRow(
+                          icon: PhosphorIconsRegular.key,
+                          message: 'No tokens yet.',
+                        ),
+                      for (final token in _tokens) _tokenCard(token),
+                    ],
                   ),
+                ),
               ],
             ),
           ),
@@ -317,4 +294,130 @@ class _AgentsScreenState extends State<AgentsScreen> {
       ),
     ),
   );
+
+  Widget _section({
+    required String title,
+    required String description,
+    required List<Widget> children,
+    Widget? action,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      SectionHeader(title, padding: const EdgeInsets.fromLTRB(4, 0, 0, 4)),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+        child: Text(
+          description,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.45),
+        ),
+      ),
+      ...children,
+      if (action != null)
+        Align(alignment: Alignment.centerLeft, child: action),
+    ],
+  );
+
+  Widget _agentCard(Map<String, dynamic> agent) => SurfaceCard(
+    margin: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+    child: Row(
+      children: [
+        const IconBadge(icon: PhosphorIconsRegular.robot),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                asJsonString(agent['name']) ?? 'Agent',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                asJsonString(agent['url']) ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: 'Remove',
+          onPressed: () => unawaited(_removeAgent(asJsonString(agent['id']))),
+          icon: const Icon(PhosphorIconsRegular.trash, size: 20),
+        ),
+      ],
+    ),
+  );
+
+  Widget _tokenCard(Map<String, dynamic> token) {
+    final created = jsonDate(token['createdAt'], local: true);
+    return SurfaceCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+      child: Row(
+        children: [
+          const IconBadge(icon: PhosphorIconsRegular.key),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  asJsonString(token['name']) ?? 'Token',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                if (created != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Created ${formatGraphDay(created)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Remove token',
+            onPressed: () => unawaited(_removeToken(asJsonString(token['id']))),
+            icon: const Icon(PhosphorIconsRegular.trash, size: 20),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A quiet placeholder inside a section that has nothing to list yet.
+class _EmptyRow extends StatelessWidget {
+  const _EmptyRow({required this.icon, required this.message});
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(JarvisRadii.lg),
+        border: Border.all(color: colors.outline),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: colors.muted),
+          const SizedBox(width: 12),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colors.inkSoft,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

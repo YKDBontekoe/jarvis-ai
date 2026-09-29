@@ -198,7 +198,10 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         itemCount: _approvals.length,
         itemBuilder: (context, index) =>
-            ContentWidth(child: _approvalCard(_approvals[index])),
+            FadeSlideIn(
+              index: index,
+              child: ContentWidth(child: _approvalCard(_approvals[index])),
+            ),
       ),
     ),
   );
