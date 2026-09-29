@@ -1,3 +1,4 @@
+using Jarvis.Application.Automations;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Approvals;
@@ -64,6 +65,9 @@ public static class DependencyInjection
         services.AddScoped<IUserMcpServerRegistry, UserMcpServerRegistry>();
         services.AddScoped<IOwnerMcpPolicyStore, OwnerMcpPolicyStore>();
         services.AddScoped<IDailyBriefingRepository, DailyBriefingRepository>();
+        services.AddScoped<IAutomationRuleRepository, AutomationRuleRepository>();
+        services.AddScoped<IAutomationRunRepository, AutomationRunRepository>();
+        services.AddScoped<IAutomationChannelSender, Jarvis.Infrastructure.Automations.AutomationChannelSender>();
         services.AddScoped<IDailyBriefingNarrator, NoOpDailyBriefingNarrator>();
         services.AddScoped<Jarvis.Application.Settings.IOwnerSettingsStore, OwnerSettingsStore>();
         services.AddScoped<Jarvis.Application.Skills.ISkillRepository, SkillRepository>();
@@ -72,6 +76,7 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Usage.IUsageDashboard, UsageDashboardService>();
         services.AddScoped<Jarvis.Application.Persona.PersonaService>();
         services.AddScoped<IFileService, FileService>();
+        services.AddHttpClient();
         services.AddScoped<IFileMalwareScanner, ClamAvVirusScanner>();
         services.AddScoped<IFileSearchService, FileSearchService>();
         services.AddJarvisFederatedSearch(configuration);

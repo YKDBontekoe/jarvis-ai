@@ -1,0 +1,72 @@
+namespace Jarvis.Domain.Automations;
+
+public sealed class AutomationRun
+{
+    private AutomationRun() { }
+
+    public AutomationRun(Guid ruleId, Guid ownerId, string workflowId, string idempotencyKey,
+        string triggerKind, string triggerReason, bool testRun = false)
+    {
+        Id = Guid.CreateVersion7();
+        RuleId = ruleId;
+        OwnerId = ownerId;
+        WorkflowId = workflowId;
+        IdempotencyKey = idempotencyKey;
+        TriggerKind = triggerKind;
+        TriggerReason = triggerReason;
+        TestRun = testRun;
+        Status = AutomationRunStatuses.Running;
+        StartedAt = DateTimeOffset.UtcNow;
+    }
+
+    public Guid Id { get; private set; }
+    public Guid RuleId { get; private set; }
+    public Guid OwnerId { get; private set; }
+    public string WorkflowId { get; private set; } = string.Empty;
+    public string IdempotencyKey { get; private set; } = string.Empty;
+    public string TriggerKind { get; private set; } = string.Empty;
+    public string TriggerReason { get; private set; } = string.Empty;
+    public bool TestRun { get; private set; }
+    public string Status { get; private set; } = AutomationRunStatuses.Running;
+    public string ActionResultsJson { get; private set; } = "[]";
+    public string? FailureSummary { get; private set; }
+    public Guid? ApprovalId { get; private set; }
+    public DateTimeOffset StartedAt { get; private set; }
+    public DateTimeOffset? CompletedAt { get; private set; }
+
+    public void MarkWaitingApproval(Guid approvalId)
+    {
+        Status = AutomationRunStatuses.WaitingApproval;
+        ApprovalId = approvalId;
+    }
+
+    public void Complete(string actionResultsJson)
+    {
+        Status = AutomationRunStatuses.Completed;
+        ActionResultsJson = actionResultsJson;
+        CompletedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void Fail(string? summary, string actionResultsJson)
+    {
+        Status = AutomationRunStatuses.Failed;
+        FailureSummary = summary;
+        ActionResultsJson = actionResultsJson;
+        CompletedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void Cancel()
+    {
+        Status = AutomationRunStatuses.Cancelled;
+        CompletedAt = DateTimeOffset.UtcNow;
+    }
+}
+
+public static class AutomationRunStatuses
+{
+    public const string Running = "running";
+    public const string WaitingApproval = "waiting_approval";
+    public const string Completed = "completed";
+    public const string Failed = "failed";
+    public const string Cancelled = "cancelled";
+}

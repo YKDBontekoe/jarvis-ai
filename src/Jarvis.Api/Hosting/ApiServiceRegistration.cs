@@ -8,6 +8,7 @@ using Jarvis.Api.Security;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
 using Jarvis.Application.Integrations;
+using Jarvis.Application.Automations;
 using Jarvis.Application.Workflows;
 using Jarvis.Infrastructure;
 using Jarvis.Infrastructure.Identity;
@@ -100,6 +101,9 @@ internal static class ApiServiceRegistration
         services.AddScoped<IReminderService, ReminderService>();
         services.AddScoped<IConditionWatchService, ConditionWatchService>();
         services.AddScoped<IDailyBriefingService, DailyBriefingService>();
+        services.AddScoped<IAutomationRuleService, AutomationRuleService>();
+        services.AddScoped<IAutomationTriggerPublisher, AutomationTriggerPublisher>();
+        services.AddSingleton<IAutomationScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddScoped<IJarvisTaskRepository, WorkflowRepository>();
         services.AddScoped<IJarvisTaskService, JarvisTaskService>();
         services.AddSingleton<PublicJsonMetricReader>();

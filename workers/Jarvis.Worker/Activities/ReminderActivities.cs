@@ -1,4 +1,5 @@
 using Jarvis.Application.Workflows;
+using Jarvis.Application.Automations;
 using Jarvis.Worker.Hosting;
 using Jarvis.Workflows;
 using Temporalio.Activities;
@@ -17,6 +18,8 @@ internal sealed class ReminderActivities(IServiceScopeFactory scopeFactory) : Re
         await using var scope = scopeFactory.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IReminderRepository>();
         await repository.CompleteAndNotifyAsync(reminder, activity.CancellationToken);
+        await scope.ServiceProvider.GetRequiredService<IAutomationTriggerPublisher>()
+            .PublishReminderDueAsync(reminder.OwnerId, reminder.ReminderId, reminder.Title, activity.CancellationToken);
     }
 
     [Activity("DeliverReminderOccurrence")]
@@ -28,7 +31,10 @@ internal sealed class ReminderActivities(IServiceScopeFactory scopeFactory) : Re
         activity.Heartbeat(reminder.ReminderId);
         await using var scope = scopeFactory.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IReminderRepository>();
-        return await repository.CompleteAndNotifyAsync(reminder, activity.CancellationToken);
+        var result = await repository.CompleteAndNotifyAsync(reminder, activity.CancellationToken);
+        await scope.ServiceProvider.GetRequiredService<IAutomationTriggerPublisher>()
+            .PublishReminderDueAsync(reminder.OwnerId, reminder.ReminderId, reminder.Title, activity.CancellationToken);
+        return result;
     }
 
     [Activity("FailReminder")]
