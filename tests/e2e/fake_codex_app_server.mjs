@@ -21,6 +21,8 @@ const CONTEXT_PREFIXES = [
   'Remote agents',
   'Generative UI',
   'Browser agent',
+  'Active assistant profile',
+  'MCP and integrations',
 ];
 
 const send = message => process.stdout.write(JSON.stringify(message) + '\n');
