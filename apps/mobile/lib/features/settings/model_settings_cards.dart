@@ -7,10 +7,13 @@ mixin _ModelSettingsCards on _ModelSettingsController {
       children: [
         Text('Provider', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'ChatGPT uses the server’s signed-in Codex session for conversations. '
           'OpenRouter uses your own key for chat—or only for the optional embedding model while chat stays on Codex.',
-          style: TextStyle(color: JarvisColors.inkSoft, height: 1.4),
+          style: TextStyle(
+            color: JarvisColors.of(context).inkSoft,
+            height: 1.4,
+          ),
         ),
         const SizedBox(height: 14),
         SegmentedButton<String>(
@@ -59,10 +62,10 @@ mixin _ModelSettingsCards on _ModelSettingsController {
                       ? 'Up to date'
                       : 'Installed',
                   color: _updateAvailable
-                      ? JarvisColors.warning
+                      ? JarvisColors.of(context).warning
                       : _canUpdate && latest != null
-                      ? JarvisColors.success
-                      : JarvisColors.muted,
+                      ? JarvisColors.of(context).success
+                      : JarvisColors.of(context).muted,
                 ),
             ],
           ),
@@ -71,7 +74,10 @@ mixin _ModelSettingsCards on _ModelSettingsController {
             latest == null
                 ? 'Installed $installed.'
                 : 'Installed $installed. Latest release is $latest.',
-            style: const TextStyle(color: JarvisColors.inkSoft, height: 1.4),
+            style: TextStyle(
+              color: JarvisColors.of(context).inkSoft,
+              height: 1.4,
+            ),
           ),
           if (_codexLoading)
             const Padding(
@@ -106,8 +112,8 @@ mixin _ModelSettingsCards on _ModelSettingsController {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 _updateBlocked!,
-                style: const TextStyle(
-                  color: JarvisColors.inkSoft,
+                style: TextStyle(
+                  color: JarvisColors.of(context).inkSoft,
                   height: 1.4,
                 ),
               ),
@@ -141,15 +147,20 @@ mixin _ModelSettingsCards on _ModelSettingsController {
             ),
             StatusPill(
               label: _keyConfigured ? 'Saved' : 'Not set',
-              color: _keyConfigured ? JarvisColors.success : JarvisColors.muted,
+              color: _keyConfigured
+                  ? JarvisColors.of(context).success
+                  : JarvisColors.of(context).muted,
             ),
           ],
         ),
         if (embeddingOnly) ...[
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Required only when you pick an embedding model below. Chat stays on Codex.',
-            style: TextStyle(color: JarvisColors.inkSoft, height: 1.4),
+            style: TextStyle(
+              color: JarvisColors.of(context).inkSoft,
+              height: 1.4,
+            ),
           ),
         ],
         const SizedBox(height: 12),
@@ -177,7 +188,7 @@ mixin _ModelSettingsCards on _ModelSettingsController {
               TextButton(
                 onPressed: _saving ? null : () => unawaited(_removeKey()),
                 style: TextButton.styleFrom(
-                  foregroundColor: JarvisColors.danger,
+                  foregroundColor: JarvisColors.of(context).danger,
                 ),
                 child: const Text('Remove'),
               ),

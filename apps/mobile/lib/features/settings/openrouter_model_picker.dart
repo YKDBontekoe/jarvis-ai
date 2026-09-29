@@ -140,12 +140,12 @@ class _OpenRouterModelPickerState extends State<OpenRouterModelPicker> {
                           '${_price(model['completionPricePerMillion'])} out per 1M',
                         ),
                         trailing: asJsonBool(model['supportsTools'])
-                            ? const Tooltip(
+                            ? Tooltip(
                                 message: 'Supports tools',
                                 child: Icon(
                                   PhosphorIconsRegular.puzzlePiece,
                                   size: 18,
-                                  color: JarvisColors.success,
+                                  color: JarvisColors.of(context).success,
                                 ),
                               )
                             : null,

@@ -93,9 +93,8 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
     final date = jsonDate(raw, local: true);
     if (date == null) return '';
     final dateText = MaterialLocalizations.of(context).formatMediumDate(date);
-    final timeText = MaterialLocalizations.of(
-      context,
-    ).formatTimeOfDay(TimeOfDay.fromDateTime(date));
+    final timeText = MaterialLocalizations.of(context)
+        .formatTimeOfDay(TimeOfDay.fromDateTime(date));
     return '$dateText · $timeText';
   }
 
@@ -141,12 +140,15 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: JarvisColors.muted),
+        Icon(icon, size: 18, color: JarvisColors.of(context).muted),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(color: JarvisColors.inkSoft, height: 1.4),
+            style: TextStyle(
+              color: JarvisColors.of(context).inkSoft,
+              height: 1.4,
+            ),
           ),
         ),
       ],

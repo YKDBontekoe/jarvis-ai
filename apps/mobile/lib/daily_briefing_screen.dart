@@ -161,9 +161,11 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
                       Container(
                         padding: const EdgeInsets.all(22),
                         decoration: BoxDecoration(
-                          color: JarvisColors.surface,
+                          color: JarvisColors.of(context).surface,
                           borderRadius: BorderRadius.circular(JarvisRadii.lg),
-                          border: Border.all(color: JarvisColors.outline),
+                          border: Border.all(
+                            color: JarvisColors.of(context).outline,
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,15 +185,15 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
                                   ? 'Every day · ${_zone.text}'
                                   : 'Briefing is off',
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                color: JarvisColors.inkSoft,
+                                color: JarvisColors.of(context).inkSoft,
                               ),
                             ),
                             const SizedBox(height: 14),
-                            const Text(
+                            Text(
                               'A daily reminder with what is coming up in Jarvis: reminders due today and active tasks.',
                               style: TextStyle(
                                 height: 1.5,
-                                color: JarvisColors.inkSoft,
+                                color: JarvisColors.of(context).inkSoft,
                               ),
                             ),
                           ],
@@ -224,12 +226,12 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
                         textCapitalization: TextCapitalization.none,
                         autocorrect: false,
                         onChanged: (_) => _discardSavedNotice(),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Time zone',
                           hintText: 'Europe/Amsterdam',
                           helperText: 'Use an IANA time zone identifier.',
                           prefixIcon: Icon(PhosphorIconsRegular.globeSimple),
-                          fillColor: JarvisColors.surface,
+                          fillColor: JarvisColors.of(context).surface,
                         ),
                       ),
                       const SizedBox(height: 24),

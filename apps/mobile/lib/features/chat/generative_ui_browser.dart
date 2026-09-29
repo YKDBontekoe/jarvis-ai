@@ -37,8 +37,8 @@ class BrowserTimelineView extends StatelessWidget {
                           : PhosphorIconsRegular.warningCircle,
                       size: 14,
                       color: step.success
-                          ? JarvisColors.success
-                          : JarvisColors.danger,
+                          ? JarvisColors.of(context).success
+                          : JarvisColors.of(context).danger,
                     ),
                     const SizedBox(width: 8),
                     Expanded(

@@ -228,14 +228,18 @@ class _PersonaScreenState extends State<PersonaScreen> {
                         'What Jarvis has learned',
                         trailing: Text(
                           '${_traits.length} rules',
-                          style: const TextStyle(color: JarvisColors.muted),
+                          style: TextStyle(
+                            color: JarvisColors.of(context).muted,
+                          ),
                         ),
                       ),
                       if (_traits.isEmpty)
-                        const SurfaceCard(
+                        SurfaceCard(
                           child: Text(
                             'Nothing yet. Tell Jarvis how you like things done, rate replies with 👍 or 👎, or turn on the learning heartbeat — it picks up your preferences over time.',
-                            style: TextStyle(color: JarvisColors.inkSoft),
+                            style: TextStyle(
+                              color: JarvisColors.of(context).inkSoft,
+                            ),
                           ),
                         )
                       else
@@ -254,16 +258,19 @@ class _PersonaScreenState extends State<PersonaScreen> {
   );
 
   Widget _intro() => SurfaceCard(
-    gradient: const LinearGradient(
-      colors: [JarvisColors.accentSoft, JarvisColors.surface],
+    gradient: LinearGradient(
+      colors: [
+        JarvisColors.of(context).accentSoft,
+        JarvisColors.of(context).surface,
+      ],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     ),
     child: Row(
       children: [
-        const IconBadge(
+        IconBadge(
           icon: PhosphorIconsRegular.userCircle,
-          color: JarvisColors.accent,
+          color: JarvisColors.of(context).accent,
           size: 44,
         ),
         const SizedBox(width: 14),
@@ -280,7 +287,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
                 _lastReflected == null
                     ? 'Learned from what you say, your feedback, and reflection.'
                     : 'Last reflection ${_relative(_lastReflected!)}.',
-                style: const TextStyle(color: JarvisColors.inkSoft),
+                style: TextStyle(color: JarvisColors.of(context).inkSoft),
               ),
             ],
           ),
@@ -324,8 +331,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
           maxLength: 4000,
           decoration: const InputDecoration(
             labelText: 'Your instructions for Jarvis',
-            hintText:
-                'Anything Jarvis should always keep in mind — your role, priorities, pet peeves…',
+            hintText: 'Anything Jarvis should always keep in mind — your role, priorities, pet peeves…',
             alignLabelWithHint: true,
           ),
         ),
@@ -355,7 +361,9 @@ class _PersonaScreenState extends State<PersonaScreen> {
       key: Key('trait-${trait['id']}'),
       leading: IconBadge(
         icon: category.$2,
-        color: learned ? JarvisColors.violet : JarvisColors.accent,
+        color: learned
+            ? JarvisColors.of(context).violet
+            : JarvisColors.of(context).accent,
         size: 36,
       ),
       title: Text(asJsonString(trait['statement']) ?? ''),
@@ -374,8 +382,10 @@ class _PersonaScreenState extends State<PersonaScreen> {
                 child: LinearProgressIndicator(
                   value: pinned ? 1 : confidence,
                   minHeight: 4,
-                  backgroundColor: JarvisColors.surfaceMuted,
-                  color: pinned ? JarvisColors.accent : JarvisColors.violet,
+                  backgroundColor: JarvisColors.of(context).surfaceMuted,
+                  color: pinned
+                      ? JarvisColors.of(context).accent
+                      : JarvisColors.of(context).violet,
                 ),
               ),
             ),
@@ -392,16 +402,18 @@ class _PersonaScreenState extends State<PersonaScreen> {
             icon: Icon(
               pinned ? PhosphorIconsFill.pushPin : PhosphorIconsRegular.pushPin,
               size: 18,
-              color: pinned ? JarvisColors.accent : JarvisColors.muted,
+              color: pinned
+                  ? JarvisColors.of(context).accent
+                  : JarvisColors.of(context).muted,
             ),
           ),
           IconButton(
             tooltip: 'Forget',
             onPressed: _saving ? null : () => unawaited(_remove(trait)),
-            icon: const Icon(
+            icon: Icon(
               PhosphorIconsRegular.trash,
               size: 18,
-              color: JarvisColors.muted,
+              color: JarvisColors.of(context).muted,
             ),
           ),
         ],
