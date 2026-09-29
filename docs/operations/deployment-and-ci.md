@@ -25,9 +25,12 @@ Bootstrap and deploy scripts: `scripts/deploy/remote-up.sh`.
 
 | Workflow | Purpose |
 |----------|---------|
+| `ci.yml` | PRs to `main`: .NET build/tests, Python checks, Flutter analyze/tests, container image builds |
 | `create-release-tag.yml` | Tag on merge |
 | `release-ios.yml` | Unsigned IPA + AltStore source |
 | `deploy-backend.yml` | Build/push `api` and `worker` to GHCR; deploy via self-hosted runner |
+
+Require the **All checks passed** job from `ci.yml` in branch protection before merging to `main`.
 
 Repository secrets: `DEPLOY_PATH`, optional `DEPLOY_COMPOSE_FILES` for tunnel/proxy overlays.
 

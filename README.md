@@ -89,11 +89,13 @@ Database migrations apply automatically in Development.
 
 ## Tests
 
+Pull requests targeting `main` run [`.github/workflows/ci.yml`](.github/workflows/ci.yml): .NET build and unit tests, PostgreSQL integration tests (Testcontainers), Python release/Compose/AltStore checks, Flutter analyze and widget tests, and API/worker container image builds. Require the **All checks passed** status in branch protection before merging.
+
 Run deterministic unit tests with:
 
 ```sh
 dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
-python3 -m unittest tests/unit/altstore/test_generate_source.py tests/unit/compose/test_production_images.py tests/unit/release/test_semver.py
+scripts/ci/run-python-unit-tests.sh
 ```
 
 The model-agnostic behavioral evaluation cases live in [`evals/jarvis-core-v1.jsonl`](evals/jarvis-core-v1.jsonl), with isolated-run requirements documented in [`evals/README.md`](evals/README.md). Run them against a disposable Jarvis deployment through the normal API; inference still goes through the Codex CLI app-server.

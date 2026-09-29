@@ -59,9 +59,11 @@ JarvisApiProblem? parseJarvisApiProblem(dynamic data) {
     for (final entry in errorsRaw.entries) {
       if (entry.key is! String) continue;
       final messages = jsonStrings(entry.value);
-      if (messages.isNotEmpty) errors![entry.key as String] = messages;
+      if (messages.isNotEmpty) {
+        errors[entry.key as String] = messages;
+      }
     }
-    if (errors!.isEmpty) errors = null;
+    if (errors.isEmpty) errors = null;
   }
 
   return JarvisApiProblem(

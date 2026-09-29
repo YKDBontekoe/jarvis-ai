@@ -92,6 +92,8 @@ abstract class _ChatScreenController extends State<ChatScreen>
     String conversationId, [
     int? generation,
   ]);
+  // Declared for part implementations; invoked from chat_screen.dart.
+  // ignore: unused_element
   Future<void> _loadOlderMessages();
   Future<void> _signIn();
   Future<void> _signOut();
