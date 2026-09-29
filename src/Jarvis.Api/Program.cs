@@ -6,6 +6,12 @@ using Jarvis.Infrastructure.Identity;
 using Jarvis.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
+if (args is ["migrate"])
+{
+    Environment.ExitCode = await MigrationCommand.RunAsync(args);
+    return;
+}
+
 if (args is ["voice-mcp"])
 {
     await Jarvis.Api.Realtime.VoiceMcpStdio.RunAsync();
@@ -22,7 +28,7 @@ builder.Services.AddJarvisApi(builder.Configuration, accountTokens);
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("Database:ApplyMigrationsAtStartup"))
+if (app.Environment.IsDevelopment() && builder.Configuration.GetValue("Database:ApplyMigrationsAtStartup", true))
 {
     await using var scope = app.Services.CreateAsyncScope();
     await scope.ServiceProvider.GetRequiredService<JarvisDbContext>().Database.MigrateAsync();
