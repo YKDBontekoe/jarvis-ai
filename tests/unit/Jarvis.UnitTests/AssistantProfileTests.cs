@@ -13,8 +13,8 @@ public sealed class AssistantProfileTests
 {
     private static readonly Guid Owner = Guid.Parse("01996b8c-6000-7000-8000-00000000aabb");
     private static readonly Guid Other = Guid.Parse("01996b8c-6000-7000-8000-00000000ccdd");
-    private static readonly Guid SkillA = Guid.Parse("01996b8c-6000-7000-8000-00000000s001");
-    private static readonly Guid SkillB = Guid.Parse("01996b8c-6000-7000-8000-00000000s002");
+    private static readonly Guid SkillA = Guid.Parse("01996b8c-6000-7000-8000-00000000a001");
+    private static readonly Guid SkillB = Guid.Parse("01996b8c-6000-7000-8000-00000000a002");
     private static readonly Guid CollectionA = Guid.Parse("01996b8c-6000-7000-8000-00000000c001");
 
     [Fact]
