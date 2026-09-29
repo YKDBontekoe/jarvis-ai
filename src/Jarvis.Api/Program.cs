@@ -1,4 +1,5 @@
 using Jarvis.Api.Endpoints;
+using Jarvis.Api.Errors;
 using Jarvis.Api.Hosting;
 using Jarvis.Api.Realtime;
 using Jarvis.Api.Security;
@@ -28,6 +29,8 @@ builder.Services.AddJarvisApi(builder.Configuration, accountTokens);
 
 var app = builder.Build();
 
+ApiProblemResults.Configure(app.Services.GetRequiredService<IHttpContextAccessor>());
+
 if (app.Environment.IsDevelopment() && builder.Configuration.GetValue("Database:ApplyMigrationsAtStartup", true))
 {
     await using var scope = app.Services.CreateAsyncScope();
@@ -37,6 +40,8 @@ if (app.Environment.IsDevelopment() && builder.Configuration.GetValue("Database:
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
+app.UseExceptionHandler();
+app.UseJarvisApiProblemResponses();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
