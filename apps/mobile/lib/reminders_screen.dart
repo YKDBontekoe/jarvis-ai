@@ -710,7 +710,9 @@ class _GroupHeader extends StatelessWidget {
   Widget build(BuildContext context) => ContentWidth(
     child: Padding(
       padding: const EdgeInsets.fromLTRB(4, 10, 0, 8),
-      child: Text(
+      child: SizedBox(
+        width: double.infinity,
+        child: Text(
         label,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
           color: label == 'Overdue'
@@ -718,6 +720,7 @@ class _GroupHeader extends StatelessWidget {
               : JarvisColors.of(context).muted,
           letterSpacing: .3,
         ),
+      ),
       ),
     ),
   );
