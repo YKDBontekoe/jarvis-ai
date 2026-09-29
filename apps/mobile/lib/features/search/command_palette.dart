@@ -79,6 +79,15 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
 
   void _scheduleSearch() {
     _debounce?.cancel();
+    if (_query.text.trim().isEmpty) {
+      setState(() {
+        _results = const [];
+        _error = null;
+        _loading = false;
+      });
+      return;
+    }
+    setState(() => _loading = true);
     _debounce = Timer(const Duration(milliseconds: 180), () => unawaited(_runSearch()));
   }
 

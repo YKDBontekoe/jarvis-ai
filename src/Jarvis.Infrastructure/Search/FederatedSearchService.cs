@@ -27,9 +27,11 @@ public sealed class FederatedSearchService(
         var activeProviders = _providers.Where(provider => kindsFilter is null or { Count: 0 } ||
             provider.ResultKinds.Overlaps(kindsFilter)).ToArray();
 
-        var providerTasks = activeProviders.Select(provider => QueryProviderAsync(provider, ownerId,
-            normalizedQuery, kindsFilter, cancellationToken)).ToArray();
-        var outcomes = await Task.WhenAll(providerTasks);
+        // Providers share one scoped DbContext, which cannot run queries concurrently.
+        var outcomes = new List<(SearchProviderStatus Status, IReadOnlyList<FederatedSearchResult> Results)>(
+            activeProviders.Length);
+        foreach (var provider in activeProviders)
+            outcomes.Add(await QueryProviderAsync(provider, ownerId, normalizedQuery, kindsFilter, cancellationToken));
 
         var statuses = outcomes.Select(item => item.Status).ToArray();
         var merged = outcomes.SelectMany(item => item.Results).ToList();

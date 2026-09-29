@@ -66,6 +66,26 @@ public sealed class FederatedSearchTests
     }
 
     [Fact]
+    public async Task Providers_do_not_overlap_queries()
+    {
+        var active = 0;
+        var overlapped = false;
+        async Task<IReadOnlyList<FederatedSearchResult>> Search(Guid _)
+        {
+            if (Interlocked.Increment(ref active) > 1) overlapped = true;
+            await Task.Delay(40);
+            Interlocked.Decrement(ref active);
+            return [];
+        }
+
+        var service = CreateService(
+            new StubProvider("memories", SearchResultKinds.Memory, Owner, "hello", Search),
+            new StubProvider("files", SearchResultKinds.File, Owner, "hello", Search));
+        await service.SearchAsync(Owner, "hello", null, CancellationToken.None);
+        Assert.False(overlapped);
+    }
+
+    [Fact]
     public async Task Provider_timeout_returns_partial_results()
     {
         var service = CreateServiceWithOptions([
