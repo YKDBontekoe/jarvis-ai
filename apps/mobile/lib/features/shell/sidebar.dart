@@ -21,6 +21,7 @@ class JarvisSidebar extends StatefulWidget {
     required this.onSeeAll,
     required this.onUtility,
     required this.onSettings,
+    required this.onJarvisSearch,
     super.key,
   });
 
@@ -35,6 +36,7 @@ class JarvisSidebar extends StatefulWidget {
   final VoidCallback onSeeAll;
   final ValueChanged<String> onUtility;
   final VoidCallback onSettings;
+  final VoidCallback onJarvisSearch;
 
   @override
   State<JarvisSidebar> createState() => _JarvisSidebarState();
@@ -129,6 +131,12 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     ),
                   ),
                   const SizedBox(width: 10),
+                  CircleIconButton(
+                    icon: PhosphorIconsRegular.magnifyingGlass,
+                    tooltip: 'Search Jarvis',
+                    onPressed: () => _leaveSearch(widget.onJarvisSearch),
+                  ),
+                  const SizedBox(width: 6),
                   CircleIconButton(
                     icon: PhosphorIconsRegular.notePencil,
                     tooltip: 'New chat',

@@ -49,6 +49,7 @@ dependencies:
   url_launcher: ^6.3.2
   geolocator: ^13.0.4
   battery_plus: ^6.2.3
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:

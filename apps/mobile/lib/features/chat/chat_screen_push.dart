@@ -113,6 +113,10 @@ mixin _ChatScreenPush on _ChatScreenController {
   void _handlePushPayload(Map<String, dynamic> data) {
     if (!mounted || _signedOut) return;
     unawaited(_markPushNotificationRead(asJsonString(data['notificationId'])));
+    if (searchRouteFromNotification(data) != null) {
+      unawaited(_openSearchRouteFromNotification(data));
+      return;
+    }
     final type = asJsonString(data['type']);
     final sourceId = asJsonString(data['sourceId']);
     if (opensApprovalScreen(type)) {
