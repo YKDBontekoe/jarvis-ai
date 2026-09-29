@@ -237,7 +237,7 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
             }),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _memoryScope,
+            initialValue: _memoryScope,
             decoration: const InputDecoration(labelText: 'Memory recall'),
             items: const [
               DropdownMenuItem(value: 'all', child: Text('All memories')),
@@ -248,7 +248,7 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            value: _modelClass ?? '',
+            initialValue: _modelClass ?? '',
             decoration: const InputDecoration(labelText: 'Model class'),
             items: const [
               DropdownMenuItem(value: '', child: Text('Inherit owner default')),

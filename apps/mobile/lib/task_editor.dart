@@ -100,7 +100,7 @@ class _NewTaskDialogState extends State<_NewTaskDialog> {
           if (_profiles.length > 1) ...[
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _profileId,
+              initialValue: _profileId,
               decoration: const InputDecoration(labelText: 'Assistant profile'),
               items: [
                 for (final profile in _profiles)
