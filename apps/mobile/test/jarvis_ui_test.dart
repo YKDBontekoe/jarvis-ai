@@ -23,6 +23,31 @@ void main() {
     expect(statusStyle('').label, 'Unknown');
   });
 
+  testWidgets('header actions keep their label on a wide window', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      _host(HeaderAction(label: 'New task', icon: Icons.add, onPressed: () {})),
+    );
+    expect(find.text('New task'), findsOneWidget);
+  });
+
+  testWidgets('header actions collapse to an icon on a phone', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      _host(HeaderAction(label: 'New task', icon: Icons.add, onPressed: () {})),
+    );
+    expect(find.text('New task'), findsNothing);
+    expect(find.byTooltip('New task'), findsOneWidget);
+  });
+
   testWidgets('status pill renders the mapped label', (tester) async {
     await tester.pumpWidget(_host(StatusPill.forStatus('cancelled')));
     expect(find.text('Cancelled'), findsOneWidget);

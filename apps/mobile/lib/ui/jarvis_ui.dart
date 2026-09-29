@@ -513,28 +513,46 @@ class HeaderAction extends StatelessWidget {
   final bool busy;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(left: 4, right: 12),
-    child: FilledButton.icon(
-      onPressed: busy ? null : onPressed,
-      style: FilledButton.styleFrom(
-        minimumSize: const Size(0, 34),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(JarvisRadii.sm + 2),
+  Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 720;
+    if (compact) {
+      return IconButton(
+        tooltip: label,
+        onPressed: busy ? null : onPressed,
+        icon: busy
+            ? const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 1.8),
+              )
+            : Icon(icon),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, right: 12),
+      child: FilledButton.icon(
+        onPressed: busy ? null : onPressed,
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 34),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(JarvisRadii.sm + 2),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w500,
+          ),
         ),
-        textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500),
+        icon: busy
+            ? const SizedBox.square(
+                dimension: 14,
+                child: CircularProgressIndicator(strokeWidth: 1.8),
+              )
+            : Icon(icon, size: 16),
+        label: Text(label),
       ),
-      icon: busy
-          ? const SizedBox.square(
-              dimension: 14,
-              child: CircularProgressIndicator(strokeWidth: 1.8),
-            )
-          : Icon(icon, size: 16),
-      label: Text(label),
-    ),
-  );
+    );
+  }
 }
 
 /// Rows grouped in one card, separated by inset hairlines.
