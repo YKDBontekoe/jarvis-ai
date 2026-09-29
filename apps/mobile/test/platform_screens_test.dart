@@ -251,7 +251,7 @@ void main() {
               ],
             },
           ),
-          onAction: (_, __) => pending.future,
+          onAction: (_, _) => pending.future,
         ),
       ),
     );

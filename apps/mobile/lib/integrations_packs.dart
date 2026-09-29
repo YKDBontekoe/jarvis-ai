@@ -115,6 +115,7 @@ mixin _IntegrationsPacks on _IntegrationsController {
     }
   }
 
+  @override
   Future<void> _connectOAuth({String? server, String? endpoint}) async {
     final target = (server ?? '').trim();
     final url = (endpoint ?? '').trim();

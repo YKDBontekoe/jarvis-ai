@@ -1,6 +1,7 @@
 using Jarvis.Infrastructure.Persistence;
 using Jarvis.Application.Files;
 using Jarvis.Application.Conversations;
+using Jarvis.Domain.Conversations;
 using Jarvis.Application.Approvals;
 using Jarvis.Domain.Approvals;
 using Jarvis.Domain.Files;
