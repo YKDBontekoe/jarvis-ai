@@ -316,4 +316,33 @@ void main() {
     expect(find.text('task_write'), findsOneWidget);
     expect(find.text('unrelated_write'), findsNothing);
   });
+
+  testWidgets('home actions stack on a phone when a chat can continue', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(440, 956);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HomeOverview(
+            http: http,
+            mark: const Icon(Icons.blur_on),
+            ready: false,
+            voiceStarting: false,
+            onTalk: () {},
+            onOpenTasks: () {},
+            onContinueConversation: () {},
+            refreshRevision: 0,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Talk to Jarvis'), findsOneWidget);
+    expect(find.text('Continue conversation'), findsOneWidget);
+  });
 }

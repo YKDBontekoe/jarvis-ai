@@ -164,10 +164,9 @@ class _HomeOverviewState extends State<HomeOverview>
         cancelToken: request,
       );
       final tasks =
-          jsonMaps(response.data)
-              .map(_ActiveTask.fromJson)
-              .whereType<_ActiveTask>()
-              .toList()
+          jsonMaps(
+              response.data,
+            ).map(_ActiveTask.fromJson).whereType<_ActiveTask>().toList()
             ..sort((a, b) {
               final priority = a.priority.compareTo(b.priority);
               return priority != 0
@@ -291,7 +290,8 @@ class _HomeOverviewState extends State<HomeOverview>
           _BriefingListCard(
             icon: PhosphorIconsRegular.calendarBlank,
             title: 'Connect a calendar',
-            subtitle: 'Subscribe to an ICS feed in Integrations so today’s events appear here.',
+            subtitle:
+                'Subscribe to an ICS feed in Integrations so today’s events appear here.',
             onTap: widget.onOpenIntegrations,
           ),
         ],
@@ -479,12 +479,9 @@ class _HomeOverviewState extends State<HomeOverview>
                         ),
                       ),
                       const SizedBox(height: 22),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          FilledButton.icon(
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final talk = FilledButton.icon(
                             onPressed: widget.onTalk,
                             style: FilledButton.styleFrom(
                               minimumSize: const Size(0, 44),
@@ -509,21 +506,37 @@ class _HomeOverviewState extends State<HomeOverview>
                                   ? 'Connecting…'
                                   : 'Talk to Jarvis',
                             ),
-                          ),
-                          if (widget.onContinueConversation != null)
-                            TextButton.icon(
-                              onPressed: widget.onContinueConversation,
-                              style: TextButton.styleFrom(
-                                minimumSize: const Size(0, 44),
-                                shape: const StadiumBorder(),
-                              ),
-                              icon: const Icon(
-                                PhosphorIconsRegular.arrowUpRight,
-                                size: 16,
-                              ),
-                              label: const Text('Continue conversation'),
-                            ),
-                        ],
+                          );
+                          final resume = widget.onContinueConversation == null
+                              ? null
+                              : TextButton.icon(
+                                  onPressed: widget.onContinueConversation,
+                                  style: TextButton.styleFrom(
+                                    minimumSize: const Size(0, 44),
+                                    shape: const StadiumBorder(),
+                                  ),
+                                  icon: const Icon(
+                                    PhosphorIconsRegular.arrowUpRight,
+                                    size: 16,
+                                  ),
+                                  label: const Text('Continue conversation'),
+                                );
+                          if (resume != null && constraints.maxWidth < 460) {
+                            return Column(
+                              children: [
+                                talk,
+                                const SizedBox(height: 8),
+                                resume,
+                              ],
+                            );
+                          }
+                          return Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [talk, if (resume != null) resume],
+                          );
+                        },
                       ),
                       const SizedBox(height: 36),
                       if (_briefing != null) ...[
