@@ -13,6 +13,9 @@ mixin _ChatScreenNav on _ChatScreenController {
         if (Navigator.of(context).canPop()) Navigator.of(context).pop();
         await _openConversation(id);
       },
+      onAskInChat: destination == 'integrations'
+          ? (prompt) => unawaited(_send(prompt))
+          : null,
     );
     if (destination == 'sign_out') {
       unawaited(_signOut());

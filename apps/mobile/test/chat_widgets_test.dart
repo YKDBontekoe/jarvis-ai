@@ -143,6 +143,8 @@ void main() {
     expect(describeTool('CreateReminder').done, 'Scheduled a reminder');
     expect(describeTool('RequestMcpAuthorization').active,
         'Asking you to authorize an integration');
+    expect(describeTool('OfferMcpSetup').active, 'Opening integration setup');
+    expect(describeTool('AskForMcpCredential').done, 'Asked for a token in chat');
     expect(describeTool('SearchMemoryAsync').active, 'Searching memory');
     expect(
       describeTool('github_create_issue').active,
@@ -525,5 +527,12 @@ void main() {
     );
     await tester.tap(find.text('What do you know about me?'));
     expect(selected, 'What do you know about me?');
+    final setup = find.textContaining('Show the setup card.');
+    await tester.ensureVisible(setup);
+    await tester.tap(setup);
+    expect(
+      selected,
+      'Help me add or manage an MCP server or integration in this chat. Show the setup card.',
+    );
   });
 }

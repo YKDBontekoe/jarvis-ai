@@ -7,15 +7,17 @@ import 'theme.dart';
 import 'json_maps.dart';
 import 'http_urls.dart';
 import 'ui/jarvis_ui.dart';
+import 'features/chat/mcp_setup.dart';
 
 part 'integrations_credentials.dart';
 part 'integrations_mcp.dart';
 part 'integrations_packs.dart';
 
 class IntegrationsScreen extends StatefulWidget {
-  const IntegrationsScreen({required this.http, super.key});
+  const IntegrationsScreen({required this.http, this.onAskInChat, super.key});
 
   final Dio http;
+  final ValueChanged<String>? onAskInChat;
 
   @override
   State<IntegrationsScreen> createState() => _IntegrationsScreenState();
@@ -128,6 +130,16 @@ class _IntegrationsScreenState extends _IntegrationsController
     appBar: AppBar(
       title: const Text('Integrations'),
       actions: [
+        if (widget.onAskInChat != null)
+          HeaderAction(
+            label: 'Ask Jarvis',
+            icon: PhosphorIconsRegular.chatCircle,
+            onPressed: () {
+              final ask = widget.onAskInChat!;
+              Navigator.of(context).pop();
+              ask(mcpSetupPrompt);
+            },
+          ),
         HeaderAction(
           label: 'Add',
           icon: PhosphorIconsRegular.plus,
@@ -163,7 +175,7 @@ class _IntegrationsScreenState extends _IntegrationsController
     return [
       const InlineNotice(
         tone: NoticeTone.info,
-        message: 'Secrets are encrypted before storage. Values stay hidden and are injected only into configured MCP connections.',
+        message: 'Add, authorize, pause, and remove MCP servers in chat. This page is the encrypted token vault and a status list.',
       ),
       if (_error != null)
         InlineNotice(
@@ -208,7 +220,7 @@ class _IntegrationsScreenState extends _IntegrationsController
       else if (_connections.isEmpty && _managedServers.isEmpty)
         const _MutedLine(
           icon: PhosphorIconsRegular.cloudSlash,
-          text: 'No MCP servers are configured on this Jarvis host.',
+          text: 'No MCP servers yet. Ask Jarvis in chat to connect one.',
         ),
       for (final connection in _connections) _connectionCard(connection),
       const SizedBox(height: 28),

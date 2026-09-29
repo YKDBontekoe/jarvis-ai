@@ -29,6 +29,7 @@ Widget? utilityPageFor(
   String destination,
   Dio http, {
   Future<void> Function(String conversationId)? onOpenConversation,
+  ValueChanged<String>? onAskInChat,
 }) => switch (destination) {
   'tasks' => TasksScreen(http: http),
   'memory' => MemoryScreen(http: http),
@@ -39,7 +40,7 @@ Widget? utilityPageFor(
   'watches' => ConditionWatchesScreen(http: http),
   'automations' => AutomationsScreen(http: http, onOpenConversation: onOpenConversation),
   'briefing' => DailyBriefingScreen(http: http),
-  'integrations' => IntegrationsScreen(http: http),
+  'integrations' => IntegrationsScreen(http: http, onAskInChat: onAskInChat),
   'appearance' => const AppearanceScreen(),
   'models' => ModelSettingsScreen(http: http),
   'skills' => SkillsScreen(http: http),

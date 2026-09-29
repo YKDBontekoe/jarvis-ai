@@ -30,6 +30,20 @@ public static class IntegrationCredentialProviders
 
     public static bool IsUserMcpTokenSecret(string? secretName) =>
         string.Equals(secretName, UserMcpTokenSecret, StringComparison.Ordinal);
+
+    public const string PackPrefix = "jarvis-pack-";
+
+    public static bool IsPackProvider(string? provider) =>
+        !string.IsNullOrEmpty(provider) &&
+        provider.StartsWith(PackPrefix, StringComparison.Ordinal);
+
+    public static string? PackId(string? provider) =>
+        IsPackProvider(provider) ? provider![PackPrefix.Length..] : null;
+
+    /// <summary>Providers a chat secret field may write: host slugs, user MCP servers, and integration packs.</summary>
+    public static bool AllowsChatSecret(string? provider) =>
+        !string.IsNullOrEmpty(provider) &&
+        (!IsReserved(provider) || IsUserMcpManaged(provider) || IsPackProvider(provider));
 }
 
 public interface IIntegrationCredentialStore

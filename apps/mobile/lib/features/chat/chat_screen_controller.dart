@@ -158,4 +158,10 @@ abstract class _ChatScreenController extends State<ChatScreen>
   void _scrollToBottom({bool jump = false});
   void _dismissKeyboard();
   Widget _settingsBody();
+
+  List<ConversationSourceChip> get _sourceChips;
+  Future<void> _loadConversationSources(String conversationId);
+  Future<void> _pickConversationSources();
+  Future<void> _detachSource(ConversationSourceChip source);
+  Future<void> _openCitation(MessageCitation citation);
 }

@@ -237,6 +237,8 @@ public sealed class AgentToolTests
         Assert.Contains("ListMemories for a general overview", defaults);
         Assert.Contains("live Codex web search", defaults);
         Assert.Contains("RequestMcpAuthorization", defaults);
+        Assert.Contains("OfferMcpSetup", defaults);
+        Assert.Contains("AskForMcpCredential", defaults);
         Assert.Contains("ask the user to authorize", defaults);
         Assert.Contains("untrusted data", defaults);
         Assert.DoesNotContain(ProfileContextProvider.Prefix, defaults);
