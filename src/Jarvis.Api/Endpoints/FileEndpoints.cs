@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Jarvis.Api.Errors;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
@@ -50,13 +51,12 @@ internal static class FileEndpoints
                 {
                     await EndpointHelpers.TryAppendAuditAsync(audit, logger, currentUser.OwnerId, "files",
                         "file.malware_rejected", "high", false, null, null, ct);
-                    return Results.UnprocessableEntity(new { message = "The uploaded file was rejected by malware scanning." });
+                    return ApiProblemResults.MalwareRejected();
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
                     logger.LogError(exception, "Could not store an uploaded file for user {OwnerId}.", currentUser.OwnerId);
-                    return Results.Problem("File storage is temporarily unavailable.",
-                        statusCode: StatusCodes.Status503ServiceUnavailable);
+                    return ApiProblemResults.DependencyUnavailable("File storage is temporarily unavailable.");
                 }
             })
             .DisableAntiforgery()

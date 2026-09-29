@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using Jarvis.Agents;
 using Jarvis.Api.Conversations;
+using Jarvis.Api.Errors;
 using Jarvis.Api.Notifications;
 using Jarvis.Api.Realtime;
 using Jarvis.Api.Security;
@@ -57,7 +58,7 @@ internal static class ApiServiceRegistration
                 options.RequireHttpsMetadata = !isDevelopment;
                 options.MapInboundClaims = false;
                 options.TokenValidationParameters = accountTokens.ValidationParameters();
-                options.Events = new JwtBearerEvents
+                options.Events = ApiErrorServiceCollectionExtensions.CreateJarvisJwtBearerEvents(new JwtBearerEvents
                 {
                     OnTokenValidated = context =>
                     {
@@ -72,7 +73,7 @@ internal static class ApiServiceRegistration
                             context.Token = accessToken;
                         return Task.CompletedTask;
                     }
-                };
+                });
             });
         services.AddAuthorization();
         services.AddHttpContextAccessor();
@@ -84,6 +85,7 @@ internal static class ApiServiceRegistration
     public static IServiceCollection AddJarvisApi(this IServiceCollection services, IConfiguration configuration,
         AccountTokenOptions accountTokens)
     {
+        services.AddJarvisApiErrors();
         services.AddJarvisInfrastructure(configuration);
         services.AddJarvisIdentity(accountTokens);
         services.AddJarvisMemory();

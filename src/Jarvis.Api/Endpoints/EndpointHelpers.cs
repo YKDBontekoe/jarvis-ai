@@ -1,3 +1,4 @@
+using Jarvis.Api.Errors;
 using Jarvis.Api.Realtime;
 using Jarvis.Application.Audit;
 using Microsoft.AspNetCore.SignalR;
@@ -7,7 +8,7 @@ namespace Jarvis.Api.Endpoints;
 internal static class EndpointHelpers
 {
     public static IResult Invalid(string field, string message) =>
-        Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });
+        ApiProblemResults.Validation(field, message);
 
     public static async Task TryAppendAuditAsync(IAuditEventStore audit, ILogger logger, Guid ownerId, string tool,
         string action, string riskClass, bool success, Guid? approvalId, string? metadataJson,

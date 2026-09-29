@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Jarvis.Agents;
+using Jarvis.Api.Errors;
 using Jarvis.Api.Realtime;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Security;
@@ -31,7 +32,7 @@ internal static class VoiceEndpoints
                 string.IsNullOrWhiteSpace(workerSecret) ||
                 !Uri.TryCreate(serverUrl, UriKind.Absolute, out var parsedUrl) ||
                 parsedUrl.Scheme is not ("ws" or "wss"))
-                return Results.Problem("LiveKit is not configured.", statusCode: StatusCodes.Status503ServiceUnavailable);
+                return ApiProblemResults.DependencyUnavailable("LiveKit is not configured.");
 
             var room = $"jarvis-{request.ConversationId:N}-{Guid.CreateVersion7():N}";
             var voice = await ResolveVoiceAsync(settings, codex, currentUser.OwnerId, ct);
@@ -44,8 +45,7 @@ internal static class VoiceEndpoints
             {
                 logger.LogError(exception, "Could not start the in-process voice runtime for conversation {ConversationId}.",
                     request.ConversationId);
-                return Results.Problem("Voice service is temporarily unavailable.",
-                    statusCode: StatusCodes.Status503ServiceUnavailable);
+                return ApiProblemResults.DependencyUnavailable("Voice service is temporarily unavailable.");
             }
 
             var identity = Guid.CreateVersion7().ToString("N");
