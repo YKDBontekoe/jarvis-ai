@@ -89,7 +89,8 @@ public static class DependencyInjection
         services.AddJarvisFederatedSearch(configuration);
         services.AddScoped<IObjectStorage, S3ObjectStorage>();
         var objectStorage = configuration.GetSection("ObjectStorage");
-        var serviceUrl = objectStorage["ServiceUrl"] ?? throw new InvalidOperationException("ObjectStorage:ServiceUrl is required.");
+        var serviceUrl = ObjectStorageUrl.Normalize(
+            objectStorage["ServiceUrl"] ?? throw new InvalidOperationException("ObjectStorage:ServiceUrl is required."));
         var accessKey = objectStorage["AccessKey"] ?? throw new InvalidOperationException("ObjectStorage:AccessKey is required.");
         var secretKey = objectStorage["SecretKey"] ?? throw new InvalidOperationException("ObjectStorage:SecretKey is required.");
         var region = objectStorage["Region"] ?? "us-east-1";
