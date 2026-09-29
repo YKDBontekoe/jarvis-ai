@@ -240,16 +240,18 @@ class _RemindersScreenState extends State<RemindersScreen>
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _formatDate(dynamic raw) {
     final date = jsonDate(raw, local: true);
     if (date == null) return '';
     final dateLabel = MaterialLocalizations.of(context).formatMediumDate(date);
-    final timeLabel = MaterialLocalizations.of(context)
-        .formatTimeOfDay(TimeOfDay.fromDateTime(date));
+    final timeLabel = MaterialLocalizations.of(
+      context,
+    ).formatTimeOfDay(TimeOfDay.fromDateTime(date));
     return '$dateLabel · $timeLabel';
   }
 
@@ -298,6 +300,8 @@ class _RemindersScreenState extends State<RemindersScreen>
             ),
             child: TabBar(
               controller: _tabs,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
               tabs: [
                 const Tab(text: 'Reminders'),
                 Tab(
@@ -387,8 +391,9 @@ class _RemindersScreenState extends State<RemindersScreen>
                         children: [
                           Text(
                             asJsonString(reminder['title']) ?? '',
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(fontSize: 15),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.titleSmall?.copyWith(fontSize: 15),
                           ),
                           const SizedBox(height: 6),
                           Wrap(

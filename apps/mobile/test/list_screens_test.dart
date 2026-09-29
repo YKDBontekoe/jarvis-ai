@@ -7,6 +7,7 @@ import 'package:jarvis_mobile/conversations_screen.dart';
 import 'package:jarvis_mobile/daily_briefing_screen.dart';
 import 'package:jarvis_mobile/files_screen.dart';
 import 'package:jarvis_mobile/memory_screen.dart';
+import 'package:jarvis_mobile/reminders_screen.dart';
 import 'package:jarvis_mobile/tasks_screen.dart';
 import 'package:jarvis_mobile/features/profiles/profiles_screen.dart';
 
@@ -285,5 +286,42 @@ void main() {
     expect(body['threshold'], 100);
     expect(body['intervalMinutes'], 15);
     expect(body['kind'], 'public_json');
+  });
+
+  testWidgets('phone app bars keep primary actions on screen', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    http.on('GET', '/api/v1/files', []);
+    http.on('GET', '/api/v1/collections', []);
+    http.on('GET', '/api/v1/tasks', []);
+    http.on('GET', '/api/v1/memory', []);
+    http.on('GET', '/api/v1/reminders', []);
+    http.on('GET', '/api/v1/notifications', []);
+
+    Future<void> open(Widget screen) async {
+      await tester.pumpWidget(MaterialApp(home: screen));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+
+    await open(FilesScreen(http: http.client()));
+    expect(find.text('Collection'), findsNothing);
+    expect(find.text('Upload'), findsNothing);
+    expect(find.byTooltip('Collection'), findsOneWidget);
+    expect(find.byTooltip('Upload'), findsOneWidget);
+
+    await open(TasksScreen(http: http.client()));
+    expect(find.text('New task'), findsNothing);
+    expect(find.byTooltip('New task'), findsOneWidget);
+
+    await open(MemoryScreen(http: http.client()));
+    expect(find.text('Add'), findsNothing);
+    expect(find.byTooltip('Add'), findsOneWidget);
+
+    await open(RemindersScreen(http: http.client()));
+    expect(find.text('New'), findsNothing);
+    expect(find.byTooltip('New'), findsOneWidget);
   });
 }
