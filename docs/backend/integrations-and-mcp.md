@@ -4,7 +4,7 @@
 
 - Stored per owner, encrypted with Data Protection.
 - API never returns secret values—only provider id and field names.
-- Flutter: `apps/mobile/lib/integrations_*.dart` and Settings → Integrations.
+- Flutter: `apps/mobile/lib/integrations_*.dart` and Settings → Integrations (token vault). **Chat is the primary place to add, authorize, pause, and remove MCP servers** via `OfferMcpSetup`, secret cards (`AskForMcpCredential`), and OAuth (`RequestMcpAuthorization`).
 
 REST:
 
@@ -28,7 +28,7 @@ REST:
 
 Transports: **stdio** and **streamableHttp**. Allowlists are explicit tool names (or `*` up to 80 tools). Default = approval required; `AutoApprovedTools` for unattended tools only.
 
-Agent management tools: list/discover/add/update/invoke (see [agent-tools.md](agent-tools.md)).
+Agent management tools: list/discover/add/update/invoke plus chat setup (`OfferMcpSetup`, `AskForMcpCredential`, `InstallIntegrationPack`) — see [agent-tools.md](agent-tools.md).
 
 Compose overlays:
 

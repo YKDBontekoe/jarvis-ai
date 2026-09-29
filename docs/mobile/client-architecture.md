@@ -38,7 +38,8 @@ Top-level screens outside `features/`: `conversations_screen.dart`, `reminders_s
 
 ## Generative UI
 
-- `generative_ui.dart`, `generative_ui_card.dart` — native cards (`RenderUi`): choices, forms, status, lists.
+- `generative_ui.dart`, `generative_ui_card.dart` — native cards (`RenderUi`): choices, forms (including secret token fields), status, and lists. Authorization actions may open a public HTTPS URL.
+- MCP setup starts in chat (`OfferMcpSetup`); Settings → Integrations is the encrypted vault.
 - Only the latest card is interactive; older cards collapse to receipts.
 - Actions: `POST /api/v1/ui-surfaces/{id}/actions`.
 

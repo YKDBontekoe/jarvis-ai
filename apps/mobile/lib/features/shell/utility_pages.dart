@@ -25,7 +25,11 @@ import '../settings/voice_settings_screen.dart';
 import '../skills/skills_screen.dart';
 import '../usage/usage_screen.dart';
 
-Widget? utilityPageFor(String destination, Dio http) => switch (destination) {
+Widget? utilityPageFor(
+  String destination,
+  Dio http, {
+  ValueChanged<String>? onAskInChat,
+}) => switch (destination) {
   'tasks' => TasksScreen(http: http),
   'memory' => MemoryScreen(http: http),
   'approvals' => ApprovalsScreen(http: http),
@@ -35,7 +39,7 @@ Widget? utilityPageFor(String destination, Dio http) => switch (destination) {
   'watches' => ConditionWatchesScreen(http: http),
   'automations' => AutomationsScreen(http: http),
   'briefing' => DailyBriefingScreen(http: http),
-  'integrations' => IntegrationsScreen(http: http),
+  'integrations' => IntegrationsScreen(http: http, onAskInChat: onAskInChat),
   'appearance' => const AppearanceScreen(),
   'models' => ModelSettingsScreen(http: http),
   'skills' => SkillsScreen(http: http),

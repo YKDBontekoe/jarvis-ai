@@ -40,7 +40,7 @@ public sealed partial class McpToolHost
                 askUser = secrets is null,
                 mustAsk = secrets is null,
                 nextStep = secrets is null
-                    ? $"Ask the user to authorize '{server.Name}' in Settings → Integrations under provider '{provider}' and credential name 'token' before using it."
+                    ? $"Ask the user to authorize '{server.Name}' in this chat. Call AskForMcpCredential with provider '{provider}'."
                     : null
             });
         }

@@ -42,6 +42,7 @@ import '../voice/voice_stage.dart';
 import 'chat_entries.dart';
 import 'chat_widgets.dart';
 import 'generative_ui.dart';
+import 'mcp_setup.dart';
 import 'remote_query.dart';
 
 part 'chat_screen_controller.dart';
@@ -87,6 +88,7 @@ class _ChatScreenState extends _ChatScreenController
         _ChatScreenVoice,
         _ChatScreenUi,
         _ChatScreenAuth,
+        _ChatScreenSources,
         _ChatScreenSearch {
   /// Outgoing content fades out before incoming content fades in, so the two
   /// never overlap mid-transition.

@@ -49,15 +49,78 @@ public static class IntegrationPackCatalog
             "ics", ["calendar_events_list", "calendar_event_create"], "npx",
             ["-y", "@cocal/google-calendar-mcp"], null, true),
         new(IntegrationPackIds.Mail, "Mail", "mail",
-            "Connect a mail MCP server so Jarvis can search and draft messages. Store the token through OAuth or Integrations — never in chat.",
+            "Connect a mail MCP server so Jarvis can search and draft messages. Authorize it in this chat with OAuth or a secret card — never paste tokens into the transcript.",
             "oauth", ["list_emails", "search_emails", "draft_email"], "npx",
             ["-y", "@gongrzhe/server-gmail-autoauth-mcp"], null, false),
         new(IntegrationPackIds.Contacts, "Contacts", "contacts",
-            "Connect a contacts MCP server so Jarvis can look up people you know. Authorization stays in Integrations.",
+            "Connect a contacts MCP server so Jarvis can look up people you know. Authorize it in this chat.",
             "oauth", ["list_contacts", "search_contacts"], "npx",
             ["-y", "@modelcontextprotocol/server-google-contacts"], null, false)
     ];
 
     public static IntegrationPack? Find(string? id) =>
         All.FirstOrDefault(pack => pack.Id.Equals(id?.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    public static async Task<IReadOnlyList<IntegrationPackStatus>> ListAsync(IIntegrationCredentialStore credentials,
+        IUserMcpServerRegistry servers, Guid ownerId, CancellationToken cancellationToken)
+    {
+        var list = await servers.ListAsync(ownerId, cancellationToken);
+        var statuses = new List<IntegrationPackStatus>();
+        foreach (var pack in All)
+        {
+            var secrets = await credentials.GetStatusAsync(ownerId, IntegrationPackIds.Provider(pack.Id),
+                cancellationToken);
+            var mcp = list.FirstOrDefault(server =>
+                server.Name.Contains(pack.Name, StringComparison.OrdinalIgnoreCase));
+            statuses.Add(new IntegrationPackStatus(pack, secrets is not null || mcp is not null,
+                secrets?.SecretNames.Contains("token", StringComparer.OrdinalIgnoreCase) == true,
+                secrets?.SecretNames.Contains("ics_url", StringComparer.OrdinalIgnoreCase) == true,
+                mcp?.Id));
+        }
+        return statuses;
+    }
+}
+
+public static class IntegrationPackInstaller
+{
+    public static async Task<IntegrationPackStatus> InstallAsync(Guid ownerId, string packId,
+        InstallIntegrationPackRequest request, IIntegrationCredentialStore credentials,
+        IUserMcpServerRegistry servers, CancellationToken cancellationToken)
+    {
+        var pack = IntegrationPackCatalog.Find(packId)
+                   ?? throw new ArgumentException("Unknown integration pack.");
+        string? mcpId = null;
+        if (pack.SupportsIcs && !string.IsNullOrWhiteSpace(request.IcsUrl))
+        {
+            var url = await McpServerEndpointValidator.ValidateAsync(request.IcsUrl, cancellationToken);
+            await credentials.SaveSecretAsync(ownerId, IntegrationPackIds.Provider(pack.Id), "ics_url", url,
+                cancellationToken);
+            if (!string.IsNullOrWhiteSpace(request.IcsToken))
+                await credentials.SaveSecretAsync(ownerId, IntegrationPackIds.Provider(pack.Id), "token",
+                    request.IcsToken, cancellationToken);
+        }
+        var wantsMcp = !string.IsNullOrWhiteSpace(request.Endpoint) ||
+                       !string.IsNullOrWhiteSpace(request.Command) || !pack.SupportsIcs;
+        var tools = request.AllowedTools is { Count: > 0 } ? request.AllowedTools : pack.SuggestedTools;
+        if (wantsMcp && !string.IsNullOrWhiteSpace(request.Endpoint))
+        {
+            var server = await servers.AddAsync(ownerId,
+                new AddUserMcpServerRequest(pack.Name, request.Endpoint, tools), cancellationToken);
+            mcpId = server.Id;
+        }
+        else if (wantsMcp)
+        {
+            var command = request.Command ?? pack.SuggestedCommand
+                          ?? throw new ArgumentException("This pack needs an MCP command or HTTPS endpoint.");
+            var arguments = request.Arguments ?? pack.SuggestedArguments ?? [];
+            var server = await servers.AddStdioAsync(ownerId,
+                new AddUserMcpStdioServerRequest(pack.Name, command, arguments, tools), cancellationToken);
+            mcpId = server.Id;
+        }
+        var secrets = await credentials.GetStatusAsync(ownerId, IntegrationPackIds.Provider(pack.Id),
+            cancellationToken);
+        return new IntegrationPackStatus(pack, true,
+            secrets?.SecretNames.Contains("token") == true,
+            secrets?.SecretNames.Contains("ics_url") == true, mcpId);
+    }
 }

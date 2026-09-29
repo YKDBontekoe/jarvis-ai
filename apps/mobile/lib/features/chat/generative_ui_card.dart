@@ -281,6 +281,9 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
             builder: (fieldContext) => TextField(
               controller: controller,
               enabled: _interactive && _busyAction == null,
+              obscureText: type == 'secret',
+              enableSuggestions: type != 'secret',
+              autocorrect: type != 'secret',
               textInputAction: last
                   ? TextInputAction.done
                   : TextInputAction.next,
@@ -500,7 +503,15 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
 
   Future<void> _run(String actionId) async {
     if (widget.onAction == null || _busyAction != null) return;
-    final hint = _validationHint(actionId);
+    Map<String, dynamic>? action;
+    for (final item in _actions) {
+      if (asString(item['id']) == actionId) {
+        action = item;
+        break;
+      }
+    }
+    final skipFields = asString(action?['url']) != null;
+    final hint = skipFields ? null : _validationHint(actionId);
     if (hint != null) {
       setState(() => _hint = hint);
       return;
@@ -510,6 +521,8 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
       _busyAction = actionId;
     });
     try {
+      final url = parsePublicHttpsUrl(asString(action?['url']));
+      if (url != null) await launchHttpUrl(url);
       await widget.onAction!(actionId, _payload(actionId));
     } finally {
       if (mounted) setState(() => _busyAction = null);
@@ -527,7 +540,8 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
     final textFields = [
       for (final field in _fields)
         if ((asString(field['type']) ?? 'text') == 'text' ||
-            (asString(field['type']) ?? 'text') == 'number')
+            (asString(field['type']) ?? 'text') == 'number' ||
+            (asString(field['type']) ?? 'text') == 'secret')
           field,
     ];
     if (textFields.isNotEmpty &&
@@ -559,7 +573,9 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
       } else {
         final value = (type == 'choice' ? (_values[id] ?? '') : _text(id))
             .trim();
-        if (value.isNotEmpty) payload[id] = _clip(value);
+        if (value.isNotEmpty) {
+          payload[id] = _clip(value, type == 'secret' ? 8192 : 500);
+        }
       }
     }
     final selected = _itemById.containsKey(actionId) ? actionId : _selectedItem;
@@ -573,6 +589,6 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
 
   String _text(String id) => _controllers[id]?.text ?? _values[id] ?? '';
 
-  String _clip(String value) =>
-      value.length <= 500 ? value : value.substring(0, 500);
+  String _clip(String value, [int max = 500]) =>
+      value.length <= max ? value : value.substring(0, max);
 }

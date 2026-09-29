@@ -43,6 +43,9 @@ public static class DependencyInjection
         services.AddScoped<MemoryReranker>();
         services.AddScoped<IAgentToolContributor, CoreAgentTools>();
         services.AddScoped<IAgentContextContributor, CoreAgentContext>();
+        services.AddScoped<IAgentToolContributor, McpSetupToolContributor>();
+        services.AddScoped<IAgentContextContributor, McpContextContributor>();
+        services.AddScoped<Jarvis.Application.Integrations.IMcpOAuthService, Jarvis.Mcp.McpOAuthService>();
         services.AddScoped<IAgentContextContributor, Profiles.ProfileContextContributor>();
         services.AddScoped<IAgentToolContributor, Skills.SkillToolContributor>();
         services.AddScoped<IAgentContextContributor, Skills.SkillContextContributor>();

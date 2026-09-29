@@ -6,6 +6,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../../http_urls.dart';
 import 'chat_entries.dart';
 
 part 'generative_ui_card.dart';
@@ -106,7 +107,11 @@ abstract class _UiSurfaceCardController extends State<UiSurfaceCard> {
       'choice' => (PhosphorIconsRegular.handTap, 'Choose one'),
       'form' => (
         PhosphorIconsRegular.notePencil,
-        _fields.length > 1 ? 'A few questions' : 'A question',
+        _fields.any((field) => asString(field['type']) == 'secret')
+            ? 'A secret'
+            : _fields.length > 1
+            ? 'A few questions'
+            : 'A question',
       ),
       'list' => (PhosphorIconsRegular.listChecks, 'At a glance'),
       'status' => (PhosphorIconsRegular.lightning, 'Status'),

@@ -58,10 +58,19 @@ void main() {
       },
       'nope',
     ]);
+    http.on('GET', '/api/v1/collections', [
+      'nope',
+      {
+        'id': 'c1',
+        'name': 'Work docs',
+        'fileIds': ['f1'],
+      },
+    ]);
     await show(tester, FilesScreen(http: http.client()));
 
     expect(tester.takeException(), isNull);
     expect(find.text('notes.txt'), findsOneWidget);
+    expect(find.text('Work docs'), findsOneWidget);
   });
 
   testWidgets('conversations skip invalid list rows instead of crashing', (

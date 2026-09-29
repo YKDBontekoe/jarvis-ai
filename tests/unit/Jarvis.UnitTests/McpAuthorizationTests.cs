@@ -18,7 +18,8 @@ public sealed class McpAuthorizationTests
             startUrl: "https://mcp.example.net/authorize");
         using var document = JsonDocument.Parse(json);
         Assert.Equal("https://mcp.example.net/authorize", document.RootElement.GetProperty("startUrl").GetString());
-        Assert.Contains("Jarvis connect link", document.RootElement.GetProperty("message").GetString());
+        Assert.Contains("Ask the user to authorize this MCP server in this chat", document.RootElement.GetProperty("message").GetString());
+        Assert.Contains("Authorize", document.RootElement.GetProperty("message").GetString());
         Assert.DoesNotContain("store a token under provider", document.RootElement.GetProperty("message").GetString());
     }
 
@@ -35,9 +36,10 @@ public sealed class McpAuthorizationTests
         Assert.Equal("github", root.GetProperty("provider").GetString());
         Assert.Equal("https://github.com/login/oauth/authorize", root.GetProperty("authorizationUrl").GetString());
         Assert.Contains("Ask the user to authorize", root.GetProperty("message").GetString());
-        Assert.Contains("Settings → Integrations", root.GetProperty("message").GetString());
-        Assert.Contains("Never collect the token in chat", root.GetProperty("message").GetString());
+        Assert.Contains("this chat", root.GetProperty("message").GetString());
+        Assert.Contains("AskForMcpCredential", root.GetProperty("message").GetString());
         Assert.DoesNotContain("localhost", json);
+        Assert.DoesNotContain("Settings → Integrations", json);
     }
 
     [Fact]

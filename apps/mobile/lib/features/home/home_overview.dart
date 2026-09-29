@@ -10,6 +10,7 @@ import '../../task_details_screen.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../chat/chat_widgets.dart';
+import '../chat/mcp_setup.dart';
 import '../usage/usage_screen.dart';
 
 part 'home_overview_widgets.dart';
@@ -286,13 +287,15 @@ class _HomeOverviewState extends State<HomeOverview>
             onTap: widget.onOpenIntegrations,
           ),
         ] else if (asJsonBool(calendar['connected']) == false &&
-            widget.onOpenIntegrations != null) ...[
+            (widget.onSuggestion != null || widget.onOpenIntegrations != null)) ...[
           const SizedBox(height: 12),
           _BriefingListCard(
             icon: PhosphorIconsRegular.calendarBlank,
             title: 'Connect a calendar',
-            subtitle: 'Subscribe to an ICS feed in Integrations so today’s events appear here.',
-            onTap: widget.onOpenIntegrations,
+            subtitle: 'Ask Jarvis in chat to subscribe to an ICS feed so today’s events appear here.',
+            onTap: widget.onSuggestion == null
+                ? widget.onOpenIntegrations
+                : () => widget.onSuggestion!(mcpCalendarPrompt),
           ),
         ],
         if (device != null) ...[
@@ -308,7 +311,8 @@ class _HomeOverviewState extends State<HomeOverview>
             ].join(' · '),
           ),
         ],
-        if (missingPacks.isNotEmpty && widget.onOpenIntegrations != null) ...[
+        if (missingPacks.isNotEmpty &&
+            (widget.onSuggestion != null || widget.onOpenIntegrations != null)) ...[
           const SizedBox(height: 12),
           _BriefingListCard(
             icon: PhosphorIconsRegular.plugsConnected,
@@ -316,7 +320,11 @@ class _HomeOverviewState extends State<HomeOverview>
             subtitle: missingPacks
                 .map((pack) => asJsonString(pack['name']) ?? 'Pack')
                 .join(' · '),
-            onTap: widget.onOpenIntegrations,
+            onTap: widget.onSuggestion == null
+                ? widget.onOpenIntegrations
+                : () => widget.onSuggestion!(
+                    'Help me connect ${missingPacks.map((pack) => asJsonString(pack['name']) ?? 'this').join(', ')} in this chat. Show the setup card.',
+                  ),
           ),
         ],
         if (widget.onOpenCoding != null) ...[

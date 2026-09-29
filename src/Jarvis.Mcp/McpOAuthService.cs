@@ -90,7 +90,7 @@ public sealed class McpOAuthService(
         {
             logger.LogWarning(exception, "MCP OAuth token exchange failed.");
             await sessions.MarkCompletedAsync(session.Id, false, "token_exchange_failed", cancellationToken);
-            return FailPage("Jarvis could not complete authorization. You can store a token in Settings → Integrations.");
+            return FailPage("Jarvis could not complete authorization. You can paste a token in chat using the secret card.");
         }
     }
 

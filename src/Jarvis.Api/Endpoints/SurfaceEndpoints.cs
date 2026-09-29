@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Jarvis.Api.Conversations;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Integrations;
 using Jarvis.Application.Realtime;
 using Jarvis.Application.Surfaces;
 
@@ -26,7 +27,7 @@ internal static class SurfaceEndpoints
 
         api.MapPost("/ui-surfaces/{id:guid}/actions", async (Guid id, UiSurfaceActionRequest request,
             IUiSurfaceRepository surfaces, RemoteQueryExecutor remote, ICurrentUser currentUser,
-            IRealtimePublisher realtime, CancellationToken ct) =>
+            IRealtimePublisher realtime, IIntegrationCredentialStore credentials, CancellationToken ct) =>
         {
             var surface = await surfaces.GetAsync(currentUser.OwnerId, id, ct);
             if (surface is null) return Results.NotFound();
@@ -36,13 +37,30 @@ internal static class SurfaceEndpoints
             if (string.IsNullOrEmpty(actionId) || actionId.Length > 40)
                 return EndpointHelpers.Invalid("actionId", "Choose one of the card's actions.");
             var values = request.Values ?? [];
-            if (values.Count > 12)
+            if (values.Count > UiSurfaceAnswers.MaxFieldValues)
                 return EndpointHelpers.Invalid("values", "Send at most 12 field values.");
-            if (values.Any(pair => pair.Key.Length > 40 || pair.Value.Length > 500))
+            if (!UiSurfaceSchema.TryParse(surface.SchemaJson, out var schema))
+            {
+                using var empty = JsonDocument.Parse("{}");
+                schema = empty.RootElement.Clone();
+            }
+            if (values.Any(pair => pair.Key.Length > 40 ||
+                                   !UiSurfaceAnswers.IsAllowedValue(schema, pair.Key, pair.Value)))
                 return EndpointHelpers.Invalid("values", "Field values must be short.");
-            var valuesJson = JsonSerializer.Serialize(values);
+            try
+            {
+                foreach (var secret in UiSurfaceAnswers.SecretsToStore(schema, values))
+                    await credentials.SaveSecretAsync(currentUser.OwnerId, secret.Provider, secret.SecretName,
+                        secret.Value, CancellationToken.None);
+            }
+            catch (ArgumentException exception)
+            {
+                return EndpointHelpers.Invalid("credential", exception.Message);
+            }
+            var stored = UiSurfaceAnswers.Redact(schema, values);
+            var valuesJson = JsonSerializer.Serialize(stored);
             await surfaces.CompleteAsync(currentUser.OwnerId, id, actionId, valuesJson, CancellationToken.None);
-            var content = DescribeAnswer(surface, actionId, values);
+            var content = UiSurfaceAnswers.Describe(surface.Title, actionId, values, schema);
             ConversationTurnResult result;
             try
             {
@@ -69,20 +87,6 @@ internal static class SurfaceEndpoints
         using var document = JsonDocument.Parse(surface.SchemaJson);
         return new UiSurfaceDto(surface.Id, surface.ConversationId, surface.Kind, surface.Title, surface.Status,
             document.RootElement.Clone(), surface.CreatedAt);
-    }
-
-    internal static string DescribeAnswer(UiSurfaceRecord surface, string actionId,
-        IReadOnlyDictionary<string, string> values)
-    {
-        if (values.TryGetValue("label", out var label) && !string.IsNullOrWhiteSpace(label))
-            return $"I picked \"{label.Trim()}\".";
-        var answers = values
-            .Where(pair => pair.Key is not "choice" and not "label" && !string.IsNullOrWhiteSpace(pair.Value))
-            .Select(pair => $"{pair.Key}: {pair.Value.Trim()}")
-            .ToArray();
-        if (answers.Length > 0)
-            return $"My answers for \"{surface.Title}\": {string.Join("; ", answers)}.";
-        return $"I chose '{actionId}' on the {surface.Title} card.";
     }
 
     private static object Payload(UiSurfaceRecord surface) => new
