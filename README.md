@@ -2,6 +2,8 @@
 
 Jarvis is a self-hosted personal assistant built as a modular .NET monolith with a Flutter client. This repository is being implemented in vertical slices from the architecture plan.
 
+**Documentation:** Coding agents should start at [`AGENTS.md`](AGENTS.md). Architecture, API maps, and operations guides live under [`docs/`](docs/README.md).
+
 ## Current implementation
 
 - Flutter chat shell with Markdown replies (tables, code blocks, links) and copy, a typing indicator, live tool-activity chips per reply, inline approve/decline cards for approval-gated tool calls, retry for messages that failed to send, a new-chat action, suggested prompts, Enter-to-send, and a navigation rail on wide screens
