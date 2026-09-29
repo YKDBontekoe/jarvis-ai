@@ -51,6 +51,10 @@ void main() {
     expect(find.text('Paused'), findsWidgets);
     expect(find.text('Every exposed tool'), findsOneWidget);
     expect(find.text('Pause'), findsOneWidget);
+    expect(
+      find.textContaining('Add, authorize, pause, and remove MCP servers in chat'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
@@ -64,6 +68,40 @@ void main() {
     expect(http.sent('PUT', '/api/v1/mcp-controls/github').single.body, {
       'enabled': false,
     });
+  });
+
+  testWidgets('Ask Jarvis returns a chat prompt and leaves the page', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/integrations/credentials', <Object>[]);
+    http.on('GET', '/api/v1/integrations/connections', <Object>[]);
+    http.on('GET', '/api/v1/mcp-servers', <Object>[]);
+    String? asked;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => IntegrationsScreen(
+                    http: http.client(),
+                    onAskInChat: (prompt) => asked = prompt,
+                  ),
+                ),
+              );
+            },
+            child: const Text('Open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ask Jarvis'));
+    await tester.pumpAndSettle();
+    expect(asked, contains('Show the setup card'));
+    expect(find.text('Integrations'), findsNothing);
   });
 
   testWidgets('guided calendar pack posts an ICS URL without MCP', (

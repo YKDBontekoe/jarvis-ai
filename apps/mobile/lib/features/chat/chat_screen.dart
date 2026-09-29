@@ -38,6 +38,7 @@ import '../voice/voice_stage.dart';
 import 'chat_entries.dart';
 import 'chat_widgets.dart';
 import 'generative_ui.dart';
+import 'mcp_setup.dart';
 import 'remote_query.dart';
 
 part 'chat_screen_controller.dart';

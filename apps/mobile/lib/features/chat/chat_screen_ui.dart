@@ -110,6 +110,19 @@ mixin _ChatScreenUi on _ChatScreenController {
                   PhosphorIconsRegular.notebook,
                   'memory',
                 ),
+                ListTile(
+                  leading: const IconBadge(
+                    icon: PhosphorIconsRegular.plugsConnected,
+                  ),
+                  title: const Text('Connect a tool'),
+                  subtitle: const Text(
+                    'Add GitHub, calendar, or any MCP server in this chat',
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    unawaited(_send(mcpSetupPrompt));
+                  },
+                ),
               ],
             ),
           ),

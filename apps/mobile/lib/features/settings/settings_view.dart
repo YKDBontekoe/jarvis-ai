@@ -83,7 +83,7 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
       ),
       (
         title: 'Integrations',
-        subtitle: 'Packs, MCP servers, OAuth, and credentials',
+        subtitle: 'Token vault — add and manage MCP servers in chat',
         icon: PhosphorIconsRegular.plugsConnected,
         destination: 'integrations',
       ),

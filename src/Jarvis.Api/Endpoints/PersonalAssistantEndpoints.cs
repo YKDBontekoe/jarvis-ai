@@ -28,67 +28,23 @@ internal static class PersonalAssistantEndpoints
 
         api.MapGet("/integrations/packs", async (IIntegrationCredentialStore credentials,
             IUserMcpServerRegistry servers, ICurrentUser currentUser, CancellationToken ct) =>
-        {
-            var list = await servers.ListAsync(currentUser.OwnerId, ct);
-            var statuses = new List<IntegrationPackStatus>();
-            foreach (var pack in IntegrationPackCatalog.All)
-            {
-                var secrets = await credentials.GetStatusAsync(currentUser.OwnerId,
-                    IntegrationPackIds.Provider(pack.Id), ct);
-                var mcp = list.FirstOrDefault(server =>
-                    server.Name.Contains(pack.Name, StringComparison.OrdinalIgnoreCase));
-                statuses.Add(new IntegrationPackStatus(pack, secrets is not null || mcp is not null,
-                    secrets?.SecretNames.Contains("token", StringComparer.OrdinalIgnoreCase) == true,
-                    secrets?.SecretNames.Contains("ics_url", StringComparer.OrdinalIgnoreCase) == true,
-                    mcp?.Id));
-            }
-            return Results.Ok(statuses);
-        }).WithName("ListIntegrationPacks");
+            Results.Ok(await IntegrationPackCatalog.ListAsync(credentials, servers, currentUser.OwnerId, ct)))
+            .WithName("ListIntegrationPacks");
 
         api.MapPost("/integrations/packs/{id}", async (string id, InstallIntegrationPackRequest request,
             IIntegrationCredentialStore credentials, IUserMcpServerRegistry servers, ICurrentUser currentUser,
             CancellationToken ct) =>
         {
-            var pack = IntegrationPackCatalog.Find(id);
-            if (pack is null) return Results.NotFound();
             try
             {
-                string? mcpId = null;
-                if (pack.SupportsIcs && !string.IsNullOrWhiteSpace(request.IcsUrl))
-                {
-                    var url = await McpServerEndpointValidator.ValidateAsync(request.IcsUrl, ct);
-                    await credentials.SaveSecretAsync(currentUser.OwnerId, IntegrationPackIds.Provider(pack.Id),
-                        "ics_url", url, ct);
-                    if (!string.IsNullOrWhiteSpace(request.IcsToken))
-                        await credentials.SaveSecretAsync(currentUser.OwnerId, IntegrationPackIds.Provider(pack.Id),
-                            "token", request.IcsToken, ct);
-                }
-                var wantsMcp = !string.IsNullOrWhiteSpace(request.Endpoint) ||
-                               !string.IsNullOrWhiteSpace(request.Command) || !pack.SupportsIcs;
-                var tools = request.AllowedTools is { Count: > 0 } ? request.AllowedTools : pack.SuggestedTools;
-                if (wantsMcp && !string.IsNullOrWhiteSpace(request.Endpoint))
-                {
-                    var server = await servers.AddAsync(currentUser.OwnerId,
-                        new AddUserMcpServerRequest(pack.Name, request.Endpoint, tools), ct);
-                    mcpId = server.Id;
-                }
-                else if (wantsMcp)
-                {
-                    var command = request.Command ?? pack.SuggestedCommand!;
-                    var arguments = request.Arguments ?? pack.SuggestedArguments ?? [];
-                    var server = await servers.AddStdioAsync(currentUser.OwnerId,
-                        new AddUserMcpStdioServerRequest(pack.Name, command, arguments, tools), ct);
-                    mcpId = server.Id;
-                }
-                var secrets = await credentials.GetStatusAsync(currentUser.OwnerId,
-                    IntegrationPackIds.Provider(pack.Id), ct);
-                return Results.Ok(new IntegrationPackStatus(pack, true,
-                    secrets?.SecretNames.Contains("token") == true,
-                    secrets?.SecretNames.Contains("ics_url") == true, mcpId));
+                return Results.Ok(await IntegrationPackInstaller.InstallAsync(currentUser.OwnerId, id, request,
+                    credentials, servers, ct));
             }
             catch (ArgumentException exception)
             {
-                return EndpointHelpers.Invalid("pack", exception.Message);
+                return exception.Message.Contains("Unknown", StringComparison.Ordinal)
+                    ? Results.NotFound()
+                    : EndpointHelpers.Invalid("pack", exception.Message);
             }
         }).WithName("InstallIntegrationPack");
 

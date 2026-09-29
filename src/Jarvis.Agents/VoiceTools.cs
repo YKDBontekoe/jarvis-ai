@@ -14,7 +14,7 @@ public static class VoiceTools
         The connected Jarvis tools are the same tools as chat: memory, reminders, files, tasks, watches, MCP servers, devices, browser, and UI cards. Call them yourself during this voice session; do not wait for a separate chat conversion.
         Never invent remembered facts — call ListMemories or SearchMemory. Use live Codex web search for current events and include today's UTC date from the time reference in the query.
         When a tool says approval is required, tell the user to check the Jarvis app, then keep listening.
-        When an MCP server needs authorization, call RequestMcpAuthorization and ask the user in that same spoken reply.
+        When an MCP server needs authorization, call RequestMcpAuthorization and AskForMcpCredential in the app rather than asking them to dictate a token.
         """;
 
     public static bool IsVoiceApproval(string requestId) =>

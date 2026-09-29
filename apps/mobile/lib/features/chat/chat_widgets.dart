@@ -9,6 +9,7 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'chat_entries.dart';
+import 'mcp_setup.dart';
 import 'tool_catalog.dart';
 
 part 'chat_message_widgets.dart';

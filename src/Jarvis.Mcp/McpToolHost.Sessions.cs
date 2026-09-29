@@ -61,7 +61,7 @@ public sealed partial class McpToolHost
                     cancellationToken);
                 return McpAuthorizationDiscovery.AuthorizationFailureMessage(target, target, url);
             }
-            return "Could not inspect MCP server. It may require authentication or may be unavailable. Ask the user to authorize it in Settings → Integrations before trying again, and keep credentials out of chat.";
+            return "Could not inspect MCP server. It may require authentication or may be unavailable. Call RequestMcpAuthorization, then AskForMcpCredential if a token must be pasted. Keep credentials out of chat text.";
         }
     }
 
@@ -76,14 +76,14 @@ public sealed partial class McpToolHost
             if (resolved.Error is not null) return resolved.Error;
             var credential = await ResolveCredentialsAsync(resolved.Server!, cancellationToken);
             if (credential.Ready)
-                return "This MCP server already has stored credentials. Discover its tools. If it still fails, ask the user to rotate the token in Settings → Integrations.";
+                return "This MCP server already has stored credentials. Discover its tools. If it still fails, call AskForMcpCredential so the user can rotate the token in this chat.";
             var url = await McpAuthorizationDiscovery.DiscoverAuthorizationUrlAsync(resolved.Server!.Endpoint, null,
                 cancellationToken);
             return McpAuthorization.FormatAsk(resolved.Server.Name,
                 string.IsNullOrWhiteSpace(resolved.Server.CredentialProvider)
                     ? resolved.Server.Name.ToLowerInvariant()
                     : resolved.Server.CredentialProvider,
-                url, extra: "Ask the user now and wait until they finish authorization. They can tap Connect on Settings → Integrations to finish OAuth in Jarvis.");
+                url, extra: "Ask the user now and wait until they finish authorization. Render an Authorize card or call AskForMcpCredential; do not send them to Settings.");
         }
         if (string.IsNullOrWhiteSpace(endpoint))
             return "Name the MCP server or pass its public HTTPS endpoint so Jarvis can request authorization.";
@@ -136,7 +136,7 @@ public sealed partial class McpToolHost
                     cancellationToken);
                 return McpAuthorizationDiscovery.AuthorizationFailureMessage(serverKey, serverKey, url);
             }
-            return "The MCP tool call failed. If it needs authorization, ask the user to authorize it in Settings → Integrations and try again.";
+            return "The MCP tool call failed. If it needs authorization, call RequestMcpAuthorization and try again.";
         }
     }
 
@@ -355,7 +355,7 @@ public sealed partial class McpToolHost
             tools = Array.Empty<object>(),
             authorization = JsonSerializer.Deserialize<JsonElement>(
                 McpAuthorization.FormatAsk(server.Name, provider)),
-            nextStep = $"Ask the user to authorize '{server.Name}' now. Store a token in Settings → Integrations under provider '{provider}' and credential name 'token', then discover again with serverId '{server.Name}'."
+            nextStep = $"Ask the user to authorize '{server.Name}' now. Call AskForMcpCredential with provider '{provider}', then discover again with serverId '{server.Name}'."
         }, JsonOptions);
     }
 

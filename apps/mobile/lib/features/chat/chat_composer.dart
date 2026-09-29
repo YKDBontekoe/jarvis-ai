@@ -245,7 +245,7 @@ class SuggestionChips extends StatelessWidget {
   static const suggestions = [
     (PhosphorIconsRegular.alarm, 'Remind me to stretch in 20 minutes'),
     (PhosphorIconsRegular.brain, 'What do you know about me?'),
-    (PhosphorIconsRegular.calendarBlank, 'What reminders do I have?'),
+    (PhosphorIconsRegular.plugsConnected, mcpSetupPrompt),
     (
       PhosphorIconsRegular.globeSimple,
       'Research the best espresso grinders in the background',

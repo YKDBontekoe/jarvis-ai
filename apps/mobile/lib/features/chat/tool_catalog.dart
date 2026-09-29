@@ -114,6 +114,21 @@ const _catalog = <String, ToolDescription>{
     'Asked you to authorize an integration',
     PhosphorIconsRegular.key,
   ),
+  'OfferMcpSetup': ToolDescription(
+    'Opening integration setup',
+    'Opened integration setup',
+    PhosphorIconsRegular.plugsConnected,
+  ),
+  'AskForMcpCredential': ToolDescription(
+    'Asking for a token in chat',
+    'Asked for a token in chat',
+    PhosphorIconsRegular.key,
+  ),
+  'InstallIntegrationPack': ToolDescription(
+    'Installing a guided integration',
+    'Installed a guided integration',
+    PhosphorIconsRegular.plugsConnected,
+  ),
   'AddMcpServer': ToolDescription(
     'Adding an integration',
     'Added an integration',

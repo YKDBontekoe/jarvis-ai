@@ -6,7 +6,13 @@ mixin _ChatScreenNav on _ChatScreenController {
   void _openUtility(String destination) {
     if (_signedOut || _signingOut) return;
     _dismissKeyboard();
-    final page = utilityPageFor(destination, _http);
+    final page = utilityPageFor(
+      destination,
+      _http,
+      onAskInChat: destination == 'integrations'
+          ? (prompt) => unawaited(_send(prompt))
+          : null,
+    );
     if (destination == 'sign_out') {
       unawaited(_signOut());
     } else if (page != null) {

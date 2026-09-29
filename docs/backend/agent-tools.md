@@ -7,6 +7,7 @@ Tools are exposed to the model through **Microsoft Agent Framework** `AITool` in
 | Contributor | Tools / behavior |
 |-------------|------------------|
 | **CoreAgentTools** | Clock, reminders, files, tasks, watches, memory, MCP admin/invoke, optional coding |
+| **McpSetupToolContributor** | `OfferMcpSetup`, `AskForMcpCredential`, `InstallIntegrationPack` |
 | **SkillToolContributor** | Load/list/save skills |
 | **PersonaToolContributor** | Record persona traits |
 | **KnowledgeGraphToolContributor** | Graph search and proposed writes (approval-gated) |
@@ -29,7 +30,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Tasks | `TaskAgentTools` list/cancel/create | Create hidden during background task turns |
 | Watches | `ConditionWatchAgentTools` | — |
 | Memory | `MemoryAgentTools` list/search/remember | **Forget** requires approval |
-| MCP | `McpServerAgentTools` | Discover/add/update/invoke/read prompt/resource/remove mostly **approval** |
+| MCP | `McpServerAgentTools` + `McpSetupAgentTools` | Discover/add/update/invoke/read prompt/resource/remove mostly **approval**; setup and secret cards in chat |
 | Coding | `CodexCodingTools.RunCodingTaskAsync` | **Approval**; only if `Coding:Repositories` configured |
 
 Browser, surface, device, skill, persona, graph, and remote-agent tools are defined in their respective folders under `src/Jarvis.Agents/`.
@@ -43,6 +44,7 @@ Browser, surface, device, skill, persona, graph, and remote-agent tools are defi
 - Active tasks and watches
 - Persona, skills, user dream portrait, knowledge graph summaries, device/browser/session state
 - Bound assistant profile (`ProfileContextContributor`) as untrusted working notes
+- MCP servers, host connections, and pack status (`McpContextContributor`) so chat can manage them without a Settings detour
 
 Order is controlled by `Order` on each contributor (`CoreAgentContext` uses `Order => 0`).
 

@@ -24,8 +24,10 @@ public sealed record McpAuthorizationAsk(
 public static class McpAuthorization
 {
     public const string RequiredStatus = "authorization_required";
-    public const string IntegrationsPath = "Settings → Integrations";
+    public const string IntegrationsPath = "this chat";
     public const string TokenSecretName = IntegrationCredentialProviders.UserMcpTokenSecret;
+    public const string ChatCredentialHint =
+        "Call AskForMcpCredential with that provider so they can paste a token into a secret field in this chat. Never collect the token as chat text or in tool arguments.";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Regex WwwParam = new(
         @"([A-Za-z][A-Za-z0-9_-]*)\s*=\s*(?:""([^""]*)""|([^\s,]+))",
@@ -40,17 +42,15 @@ public static class McpAuthorization
         var metadata = NormalizePublicHttpsUrl(resourceMetadataUrl);
         var connect = NormalizePublicHttpsUrl(startUrl);
         var message = connect is not null
-            ? "Ask the user to authorize this MCP server before using it. Include this Jarvis connect link as a Markdown link " +
-              $"in your reply: {connect}. You may also open it on a connected device with OpenUrlOnDevice. " +
-              "Wait until they finish authorization. Never collect the token in chat."
+            ? "Ask the user to authorize this MCP server in this chat. RenderUi a card with an Authorize action whose url is this connect link " +
+              $"({connect}). You may also open it with OpenUrlOnDevice. Wait until they finish authorization. " +
+              $"If they need to paste a token instead, {ChatCredentialHint}"
             : url is null
-            ? "Ask the user to authorize this MCP server before using it. Open Settings → Integrations, " +
-              $"store a token under provider '{providerId ?? serverName}' as credential name '{TokenSecretName}', " +
-              "then tell you when they have finished. Do not continue as if the server is connected, and never collect the token in chat."
-            : "Ask the user to authorize this MCP server before using it. Include this authorization URL as a Markdown link " +
-              $"in your reply: {url}. You may also open it on a connected device with OpenUrlOnDevice. " +
-              "Wait until they finish authorization. If they prefer a token, they can store it in Settings → Integrations " +
-              $"under provider '{providerId ?? serverName}' as credential name '{TokenSecretName}'. Never collect the token in chat.";
+            ? "Ask the user to authorize this MCP server in this chat. " +
+              $"Provider '{providerId ?? serverName}'. {ChatCredentialHint}"
+            : "Ask the user to authorize this MCP server in this chat. RenderUi a card with an Authorize action whose url is " +
+              $"{url}. You may also open it with OpenUrlOnDevice. Wait until they finish authorization. " +
+              $"If they prefer a token, provider '{providerId ?? serverName}'. {ChatCredentialHint}";
         if (!string.IsNullOrWhiteSpace(extra))
             message += " " + extra.Trim();
         return JsonSerializer.Serialize(new McpAuthorizationAsk(

@@ -224,6 +224,49 @@ void main() {
     expect(values?['day'], 'I walk the dog');
   });
 
+  testWidgets('secret fields stay obscured and submit the token', (tester) async {
+    Map<String, String>? values;
+    await show(
+      tester,
+      Scaffold(
+        body: UiSurfaceCard(
+          surface: const UiSurfaceEntry(
+            id: 'surf-secret',
+            title: 'Save a token',
+            status: 'open',
+            schema: {
+              'kind': 'form',
+              'title': 'Save a token',
+              'credentialProvider': 'github',
+              'fields': [
+                {
+                  'id': 'token',
+                  'label': 'Access token',
+                  'type': 'secret',
+                  'placeholder': 'Paste the token',
+                },
+              ],
+              'actions': [
+                {'id': 'save', 'label': 'Save token', 'style': 'primary'},
+              ],
+            },
+          ),
+          onAction: (_, submitted) async {
+            values = submitted;
+          },
+        ),
+      ),
+    );
+
+    expect(find.text('A SECRET'), findsOneWidget);
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.obscureText, isTrue);
+    await tester.enterText(find.byType(TextField), 'ghp_secret');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save token'));
+    await tester.pump();
+    expect(values?['token'], 'ghp_secret');
+  });
+
   testWidgets('clears action spinners when the card is no longer interactive', (
     tester,
   ) async {

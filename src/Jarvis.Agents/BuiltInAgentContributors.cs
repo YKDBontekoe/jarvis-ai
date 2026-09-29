@@ -28,6 +28,7 @@ internal sealed class CoreAgentTools(
     IUserMcpServerRegistry mcpServers,
     IOwnerMcpPolicyStore mcpPolicy,
     McpToolHost mcpToolHost,
+    IMcpOAuthService mcpOAuth,
     IAuditEventStore auditEvents,
     ICurrentUser currentUser,
     IMemoryRecallTracker recalls,
@@ -48,7 +49,8 @@ internal sealed class CoreAgentTools(
         var automationTools = new AutomationAgentTools(automationRules, currentUser);
         var fileTools = new FileAgentTools(fileSearch, fileRepository, collections, currentUser, context.Profile);
         var clockTools = new ClockAgentTools(timeProvider ?? TimeProvider.System);
-        var mcpServerTools = new McpServerAgentTools(mcpServers, mcpPolicy, configuration, currentUser, mcpToolHost);
+        var mcpServerTools = new McpServerAgentTools(mcpServers, mcpPolicy, configuration, currentUser, mcpToolHost,
+            mcpOAuth);
 
         yield return AIFunctionFactory.Create(clockTools.GetCurrentTime);
         yield return AIFunctionFactory.Create(reminderTools.CreateReminderAsync);
