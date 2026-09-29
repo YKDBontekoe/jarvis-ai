@@ -1,0 +1,161 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend build and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: true
+
+      - name: Restore
+        run: dotnet restore Jarvis.sln
+
+      - name: Build
+        run: dotnet build Jarvis.sln --configuration Release --no-restore
+
+      - name: Unit tests
+        run: >-
+          dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
+          --configuration Release
+          --no-build
+          --verbosity normal
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: true
+
+      - name: Restore
+        run: dotnet restore tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj
+
+      - name: Integration tests
+        run: >-
+          dotnet test tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj
+          --configuration Release
+          --verbosity normal
+
+  python:
+    name: Python unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python unit tests
+        run: scripts/ci/run-python-unit-tests.sh
+
+  mobile:
+    name: Mobile analyze and tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --fatal-infos --fatal-warnings
+
+      - name: Test
+        run: flutter test
+
+  container-images:
+    name: Container image (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            dockerfile: infra/compose/Dockerfile
+            build-args: PROJECT_PATH=src/Jarvis.Api/Jarvis.Api.csproj
+          - name: worker
+            dockerfile: infra/compose/Dockerfile
+            build-args: PROJECT_PATH=workers/Jarvis.Worker/Jarvis.Worker.csproj
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          load: true
+          build-args: ${{ matrix.build-args }}
+          tags: jarvis-ci-${{ matrix.name }}:test
+          cache-from: type=gha,scope=ci-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=ci-${{ matrix.name }}
+
+  required:
+    name: All checks passed
+    runs-on: ubuntu-latest
+    needs:
+      - backend
+      - integration
+      - python
+      - mobile
+      - container-images
+    if: always()
+    steps:
+      - name: Require successful jobs
+        run: |
+          set -euo pipefail
+          check() {
+            local name="$1"
+            local result="$2"
+            if [[ "$result" != "success" ]]; then
+              echo "::error::Job $name finished with $result"
+              exit 1
+            fi
+          }
+          check backend "${{ needs.backend.result }}"
+          check integration "${{ needs.integration.result }}"
+          check python "${{ needs.python.result }}"
+          check mobile "${{ needs.mobile.result }}"
+          check container-images "${{ needs.container-images.result }}"
