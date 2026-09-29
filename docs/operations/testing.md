@@ -11,9 +11,7 @@ Covers domain rules, agents, endpoints helpers, compaction, MCP redaction, and r
 ## Python unit tests (release/compose/altstore)
 
 ```sh
-python3 -m unittest tests/unit/altstore/test_generate_source.py \
-  tests/unit/compose/test_production_images.py \
-  tests/unit/release/test_semver.py
+scripts/ci/run-python-unit-tests.sh
 ```
 
 ## Integration tests
@@ -57,7 +55,7 @@ Model-agnostic scenarios: `evals/jarvis-core-v1.jsonl` — see [evals/README.md]
 
 ## CI expectations
 
-GitHub Actions build backend on release tags; iOS IPA workflow is separate. Validate Compose image interpolation locally with the Python production compose test.
+[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs on every pull request to `main`: backend unit and integration tests, Python release/compose/AltStore tests, Flutter analyze and widget tests, and API/worker image builds (no push). Release tags still trigger `release-ios.yml` and `deploy-backend.yml`.
 
 ## Agent guidance
 
