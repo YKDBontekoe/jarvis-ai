@@ -1,6 +1,7 @@
 using Jarvis.Application.Automations;
 using Jarvis.Application.Workflows;
 using Jarvis.Application.Files;
+using Jarvis.Application.Profiles;
 using Jarvis.Domain.Automations;
 using Jarvis.Domain.Workflows;
 using Microsoft.Extensions.Configuration;
@@ -321,16 +322,19 @@ public sealed class JarvisTaskService(
     IJarvisTaskRepository tasks,
     TemporalReminderScheduler scheduler,
     ITaskRunAbort taskRunAbort,
+    IAssistantProfileService profiles,
     ILogger<JarvisTaskService> logger) : IJarvisTaskService
 {
-    public async Task<JarvisTaskRecord> CreateAsync(Guid ownerId, string title, string prompt, CancellationToken cancellationToken)
+    public async Task<JarvisTaskRecord> CreateAsync(Guid ownerId, string title, string prompt, CancellationToken cancellationToken,
+        Guid? profileId = null)
     {
         title = title.Trim();
         prompt = prompt.Trim();
         if (title.Length is < 1 or > 200) throw new ArgumentException("Task title must contain 1 to 200 characters.", nameof(title));
         if (prompt.Length is < 1 or > 32_000) throw new ArgumentException("Task instructions must contain 1 to 32,000 characters.", nameof(prompt));
 
-        var task = await tasks.CreateWithConversationAsync(ownerId, title, prompt, cancellationToken);
+        var binding = await profiles.CaptureBindingAsync(ownerId, profileId, cancellationToken);
+        var task = await tasks.CreateWithConversationAsync(ownerId, title, prompt, cancellationToken, binding);
         try
         {
             await scheduler.ScheduleTaskAsync(task, cancellationToken);

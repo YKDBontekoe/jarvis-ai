@@ -46,6 +46,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         destination: 'persona',
       ),
       (
+        title: 'Profiles',
+        subtitle: 'Personas, skills, files, models, and learning per context',
+        icon: PhosphorIconsRegular.identificationCard,
+        destination: 'profiles',
+      ),
+      (
         title: 'Skills',
         subtitle: 'Procedures Jarvis learned or you taught it',
         icon: PhosphorIconsRegular.magicWand,

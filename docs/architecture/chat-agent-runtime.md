@@ -6,10 +6,10 @@ Interactive chat is the primary path: Flutter sends a message, the API runs an a
 
 1. **Client** — `POST /api/v1/conversations/{id}/messages` with message body (`ConversationEndpoints`).
 2. **Remote query host** — `RemoteQueryExecutor` runs the turn without tying lifetime to the HTTP connection (mobile disconnect does not cancel the run by default).
-3. **Agent** — `IJarvisAgent` (implementation in `Jarvis.Agents`) builds an Microsoft Agent Framework agent with:
-   - **Chat client** — `CodexCliChatClient` (Codex app-server) or OpenRouter when owner settings select it (`ChatClientResolver`).
-   - **Tools** — aggregated from `IAgentToolContributor` registrations.
-   - **Context** — `IAgentContextContributor` providers (clock, pinned memory, active tasks, watches, persona, skills, graph, surfaces, devices, browser session, remote agents).
+3. **Agent** — `IJarvisAgent` (implementation in `Jarvis.Agents`) resolves the conversation’s bound profile snapshot, then `JarvisAgentFactory` builds a Microsoft Agent Framework agent with:
+   - **Chat client** — `CodexCliChatClient` (Codex app-server) or OpenRouter when owner settings select it (`ChatClientResolver`). Profiles may overlay model class, model ids, and reasoning effort; they cannot change the owner’s provider.
+   - **Tools** — aggregated from `IAgentToolContributor` registrations, then filtered by the snapshot (skills, files). Approval wrappers and MCP operator allowlists stay in force.
+   - **Context** — `IAgentContextContributor` providers (clock, pinned memory, active tasks, watches, persona, skills, bound profile, graph, surfaces, devices, browser session, remote agents). Profile text is untrusted working notes, not privileged system instructions.
 4. **Codex adapter** — Spawns Codex CLI in a restricted sandbox; streams deltas; Jarvis executes tool calls locally with approval gates. Web search uses Codex `standalone_web_search` when enabled.
 5. **Persistence** — Messages and session state via `IConversationStore` and Agent Framework session store; compaction trims old groups above token budget while keeping recent tool groups intact.
 6. **Realtime** — `JarvisEventsHub` at `/hubs/events` publishes assistant text deltas and `tool.started` / `tool.completed` / `tool.failed` (names only, no args).
@@ -45,4 +45,4 @@ Voice uses LiveKit rooms and an in-process C# runtime (`Jarvis.Api/Realtime`). C
 
 Per-owner settings (`/api/v1/settings/models`) choose Codex vs OpenRouter, model IDs per class (fast, reasoning, coding, vision, embedding), and optional Codex CLI self-update under `$CODEX_HOME/cli`.
 
-See [backend/agent-tools.md](../backend/agent-tools.md) and [operations/configuration.md](../operations/configuration.md).
+See [backend/agent-tools.md](../backend/agent-tools.md), [backend/assistant-profiles.md](../backend/assistant-profiles.md), and [operations/configuration.md](../operations/configuration.md).

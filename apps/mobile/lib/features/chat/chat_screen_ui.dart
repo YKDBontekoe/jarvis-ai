@@ -145,19 +145,41 @@ mixin _ChatScreenUi on _ChatScreenController {
                 ),
               ),
         centerTitle: true,
-        title: Row(
+        title: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              voice ? 'Voice' : 'Jarvis',
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -.3,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  voice ? 'Voice' : 'Jarvis',
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -.3,
+                  ),
+                ),
+                const SizedBox(width: 7),
+                _ConnectionDot(connected: _connected),
+              ],
             ),
-            const SizedBox(width: 7),
-            _ConnectionDot(connected: _connected),
+            if (!voice && (_profileName != null || _profileDeleted))
+              GestureDetector(
+                onTap: _busy ? null : _switchConversationProfile,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    _profileDeleted
+                        ? '${_profileName ?? 'Profile'} (deleted)'
+                        : _profileName ?? 'Profile',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: JarvisColors.of(context).inkSoft,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         actions: [

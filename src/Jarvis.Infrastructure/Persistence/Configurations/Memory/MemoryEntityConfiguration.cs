@@ -24,9 +24,11 @@ internal sealed class MemoryEntityConfiguration : IEntityTypeConfiguration<Memor
             builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             builder.Property(x => x.ValidUntil).HasColumnName("valid_until");
             builder.Property(x => x.IsPinned).HasColumnName("is_pinned");
+            builder.Property(x => x.ProfileId).HasColumnName("profile_id");
             builder.Property(x => x.SearchVector).HasColumnName("search_vector").HasColumnType("tsvector")
                 .HasComputedColumnSql("to_tsvector('simple'::regconfig, content)", stored: true);
             builder.HasIndex(x => new { x.OwnerId, x.Kind });
+            builder.HasIndex(x => new { x.OwnerId, x.ProfileId });
             builder.HasIndex(x => x.SearchVector).HasMethod("gin");
             builder.HasIndex(x => x.Content).HasMethod("gin").HasOperators("gin_trgm_ops");
             builder.HasIndex(x => x.Embedding).HasMethod("hnsw").HasOperators("vector_cosine_ops");

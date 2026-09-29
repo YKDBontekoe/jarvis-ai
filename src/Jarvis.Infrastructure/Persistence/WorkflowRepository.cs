@@ -3,6 +3,7 @@ using Jarvis.Domain.Workflows;
 using Jarvis.Domain.Conversations;
 using Jarvis.Domain.Approvals;
 using Jarvis.Domain.Audit;
+using Jarvis.Application.Profiles;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -58,10 +59,12 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
     }
 
     public async Task<JarvisTaskRecord> CreateWithConversationAsync(Guid ownerId, string title, string prompt,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, ProfileBinding? profile = null)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var conversation = new Conversation(ownerId, title);
+        if (profile is not null)
+            conversation.BindProfile(profile.ProfileId, profile.Version, profile.SnapshotJson);
         db.Conversations.Add(conversation);
         var task = new JarvisTask(ownerId, title, prompt);
         task.AttachConversation(conversation.Id);

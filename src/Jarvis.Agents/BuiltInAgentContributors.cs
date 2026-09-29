@@ -24,6 +24,7 @@ internal sealed class CoreAgentTools(
     IDailyBriefingRepository briefings,
     IFileSearchService fileSearch,
     IFileRepository fileRepository,
+    IDocumentCollectionRepository collections,
     IUserMcpServerRegistry mcpServers,
     IOwnerMcpPolicyStore mcpPolicy,
     McpToolHost mcpToolHost,
@@ -39,13 +40,13 @@ internal sealed class CoreAgentTools(
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context)
     {
-        var taskTools = new TaskAgentTools(taskService, currentUser);
+        var taskTools = new TaskAgentTools(taskService, currentUser, context.Profile);
         var memoryTools = new MemoryAgentTools(memoryService, reranker, auditEvents, currentUser,
-            loggerFactory.CreateLogger<MemoryAgentTools>(), recalls);
+            loggerFactory.CreateLogger<MemoryAgentTools>(), recalls, context.Profile);
         var watchTools = new ConditionWatchAgentTools(watchService, currentUser);
         var reminderTools = new ReminderAgentTools(reminderService, currentUser, briefings);
         var automationTools = new AutomationAgentTools(automationRules, currentUser);
-        var fileTools = new FileAgentTools(fileSearch, fileRepository, currentUser);
+        var fileTools = new FileAgentTools(fileSearch, fileRepository, collections, currentUser, context.Profile);
         var clockTools = new ClockAgentTools(timeProvider ?? TimeProvider.System);
         var mcpServerTools = new McpServerAgentTools(mcpServers, mcpPolicy, configuration, currentUser, mcpToolHost);
 
@@ -111,7 +112,7 @@ internal sealed class CoreAgentContext(
     public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
     [
         new ClockContextProvider(briefings, context.OwnerId, timeProvider ?? TimeProvider.System),
-        new PersonalMemoryContextProvider(memories, reranker, context.OwnerId, recalls),
+        new PersonalMemoryContextProvider(memories, reranker, context.OwnerId, recalls, context.Profile),
         new ActiveTasksContextProvider(tasks, context.OwnerId, context.ExecutingTaskId),
         new ActiveConditionWatchesContextProvider(watches, context.OwnerId)
     ];

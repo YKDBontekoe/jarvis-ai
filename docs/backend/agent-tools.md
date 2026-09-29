@@ -42,6 +42,7 @@ Browser, surface, device, skill, persona, graph, and remote-agent tools are defi
 - Pinned/relevant memory (`PersonalMemoryContextProvider`)
 - Active tasks and watches
 - Persona, skills, user dream portrait, knowledge graph summaries, device/browser/session state
+- Bound assistant profile (`ProfileContextContributor`) as untrusted working notes
 
 Order is controlled by `Order` on each contributor (`CoreAgentContext` uses `Order => 0`).
 

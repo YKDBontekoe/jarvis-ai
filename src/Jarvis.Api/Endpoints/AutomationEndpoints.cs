@@ -133,8 +133,13 @@ internal static class AutomationEndpoints
                 return EndpointHelpers.Invalid("prompt", "Instructions must contain 1 to 32,000 characters.");
             try
             {
-                var task = await tasks.CreateAsync(currentUser.OwnerId, request.Title, request.Prompt, ct);
+                var task = await tasks.CreateAsync(currentUser.OwnerId, request.Title, request.Prompt, ct,
+                    request.ProfileId);
                 return Results.Created($"/api/v1/tasks/{task.Id}", task.ToDto());
+            }
+            catch (ArgumentException exception)
+            {
+                return EndpointHelpers.Invalid("profileId", exception.Message);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {

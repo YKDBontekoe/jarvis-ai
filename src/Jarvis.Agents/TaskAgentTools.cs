@@ -1,11 +1,13 @@
 using System.ComponentModel;
 using System.Text;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Profiles;
 using Jarvis.Application.Workflows;
 
 namespace Jarvis.Agents;
 
-internal sealed class TaskAgentTools(IJarvisTaskService tasks, ICurrentUser currentUser)
+internal sealed class TaskAgentTools(IJarvisTaskService tasks, ICurrentUser currentUser,
+    AssistantProfileSnapshot? profile)
 {
     private const int MaxListedTasks = 15;
 
@@ -22,7 +24,8 @@ internal sealed class TaskAgentTools(IJarvisTaskService tasks, ICurrentUser curr
 
         try
         {
-            var task = await tasks.CreateAsync(currentUser.OwnerId, title, instructions, cancellationToken);
+            var task = await tasks.CreateAsync(currentUser.OwnerId, title, instructions, cancellationToken,
+                profile?.ProfileId);
             return $"Started background task '{task.Title}' (task ID {task.Id}, status {task.Status}). It will continue through Temporal and appear in Tasks.";
         }
         catch (ArgumentException exception)

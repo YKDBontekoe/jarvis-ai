@@ -184,6 +184,7 @@ abstract final class PhosphorIconsFill {
   static const star = IconData(0xe46a, fontFamily: 'PhosphorFill');
   static const thumbsDown = IconData(0xe48c, fontFamily: 'PhosphorFill');
   static const thumbsUp = IconData(0xe48e, fontFamily: 'PhosphorFill');
+  static const userCircle = IconData(0xe4c4, fontFamily: 'PhosphorFill');
 }
 
 abstract final class PhosphorIconsBold {

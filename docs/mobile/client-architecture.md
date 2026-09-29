@@ -20,7 +20,7 @@ Android emulator: `http://10.0.2.2:5082`. Physical devices need LAN-reachable AP
 | `features/memory/` | Memory list/editor, knowledge graph map |
 | `features/tasks/` | `tasks_screen.dart`, `task_details_screen.dart`, editors |
 | `features/settings/` | Models (Codex/OpenRouter), voice, nested settings hub |
-| `features/skills/`, `persona/`, `learning/` | Owner tuning surfaces |
+| `features/skills/`, `persona/`, `profiles/`, `learning/` | Owner tuning surfaces |
 | `features/channels/` | WhatsApp & Signal |
 | `features/devices/` | This-device capabilities and telemetry |
 | `features/agents/` | Remote agent registry |

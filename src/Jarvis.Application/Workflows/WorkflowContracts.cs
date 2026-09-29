@@ -1,4 +1,5 @@
 using Jarvis.Domain.Workflows;
+using Jarvis.Application.Profiles;
 
 namespace Jarvis.Application.Workflows;
 
@@ -19,7 +20,7 @@ public sealed record JarvisTaskRecord(Guid Id, Guid OwnerId, string Title, strin
 
 public sealed record JarvisTaskWorkflowInput(Guid TaskId);
 public sealed record JarvisTaskApprovalInput(Guid TaskId, string Summary);
-public sealed record CreateJarvisTaskRequest(string Title, string Prompt);
+public sealed record CreateJarvisTaskRequest(string Title, string Prompt, Guid? ProfileId = null);
 
 public sealed record ReminderWorkflowInput(Guid ReminderId, Guid OwnerId, string Title, DateTimeOffset DueAt);
 
@@ -136,7 +137,8 @@ public interface IPushDeviceRepository
 public interface IJarvisTaskRepository
 {
     Task<JarvisTaskRecord> CreateAsync(Guid ownerId, string title, string prompt, Guid conversationId, CancellationToken cancellationToken);
-    Task<JarvisTaskRecord> CreateWithConversationAsync(Guid ownerId, string title, string prompt, CancellationToken cancellationToken);
+    Task<JarvisTaskRecord> CreateWithConversationAsync(Guid ownerId, string title, string prompt, CancellationToken cancellationToken,
+        ProfileBinding? profile = null);
     Task<JarvisTaskRecord?> GetTaskAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<JarvisTaskRecord?> GetTaskByIdAsync(Guid id, CancellationToken cancellationToken);
     Task<JarvisTaskRecord?> GetTaskByConversationIdAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);
@@ -157,7 +159,8 @@ public interface IJarvisTaskRepository
 
 public interface IJarvisTaskService
 {
-    Task<JarvisTaskRecord> CreateAsync(Guid ownerId, string title, string prompt, CancellationToken cancellationToken);
+    Task<JarvisTaskRecord> CreateAsync(Guid ownerId, string title, string prompt, CancellationToken cancellationToken,
+        Guid? profileId = null);
     Task<IReadOnlyList<JarvisTaskRecord>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<bool> CancelAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task CompleteAfterApprovalAsync(Guid? taskId, Guid ownerId, string summary, CancellationToken cancellationToken);

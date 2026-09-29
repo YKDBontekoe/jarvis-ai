@@ -128,6 +128,10 @@ mixin _ChatScreenSession on _ChatScreenController {
     if (!isCurrent() || !isLatestOpen()) return;
     setState(() {
       _conversationId = conversationId;
+      _profileId = asJsonString(body?['profileId']);
+      _profileName = asJsonString(body?['profileName']);
+      _profileDeleted = asJsonBool(body?['profileDeleted']);
+      if (_profileId != null) _preferredProfileId = _profileId;
       _messageCursor = asJsonString(page?['nextCursor']);
       _hasOlderMessages = asJsonBool(page?['hasMore']);
       _loadingOlderMessages = false;
@@ -260,6 +264,9 @@ mixin _ChatScreenSession on _ChatScreenController {
     if (!mounted || _signedOut || _signingOut) return;
     setState(() {
       _conversationId = null;
+      _profileId = null;
+      _profileName = null;
+      _profileDeleted = false;
       _connected = false;
       _sending = false;
       _entries.clear();
@@ -271,7 +278,10 @@ mixin _ChatScreenSession on _ChatScreenController {
     try {
       final response = await _http.post<dynamic>(
         '/api/v1/conversations',
-        data: const {'title': 'New conversation'},
+        data: {
+          'title': 'New conversation',
+          if (_preferredProfileId != null) 'profileId': _preferredProfileId,
+        },
       );
       final id = asJsonString(jsonObject(response.data)?['id']);
       if (id == null || id.isEmpty) {
@@ -371,6 +381,85 @@ mixin _ChatScreenSession on _ChatScreenController {
       // Keep the current page and allow a later scroll to retry.
     } finally {
       _loadingOlderMessages = false;
+    }
+  }
+
+  Future<void> _switchConversationProfile() async {
+    if (_conversationId == null || _busy) return;
+    try {
+      final response = await _http.get<dynamic>('/api/v1/profiles');
+      final profiles = jsonMaps(response.data)
+          .where((item) => jsonString(item, 'id') != null)
+          .toList();
+      if (!mounted || profiles.isEmpty) return;
+      final selected = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const ListTile(title: Text('Switch assistant profile')),
+              for (final profile in profiles)
+                ListTile(
+                  leading: Icon(
+                    asJsonBool(profile['isDefault'])
+                        ? PhosphorIconsFill.userCircle
+                        : PhosphorIconsRegular.userCircle,
+                  ),
+                  title: Text(asJsonString(profile['name']) ?? 'Profile'),
+                  subtitle: asJsonString(profile['description']) == null
+                      ? null
+                      : Text(asJsonString(profile['description'])!),
+                  selected: jsonString(profile, 'id') == _profileId,
+                  onTap: () => Navigator.pop(context, profile),
+                ),
+            ],
+          ),
+        ),
+      );
+      if (selected == null || !mounted) return;
+      final id = jsonString(selected, 'id');
+      if (id == null || id == _profileId) return;
+      var confirm = false;
+      while (true) {
+        try {
+          final updated = await _http.put<dynamic>(
+            '/api/v1/conversations/$_conversationId/profile',
+            data: {'profileId': id, 'confirm': confirm},
+          );
+          final body = jsonObject(updated.data);
+          if (!mounted) return;
+          setState(() {
+            _profileId = asJsonString(body?['profileId']) ?? id;
+            _profileName = asJsonString(body?['profileName']) ??
+                asJsonString(selected['name']);
+            _profileDeleted = asJsonBool(body?['profileDeleted']);
+            _preferredProfileId = _profileId;
+          });
+          return;
+        } on DioException catch (error) {
+          if (error.response?.statusCode != 409 || confirm) rethrow;
+          final details = jsonStrings(jsonObject(error.response?.data)?['details']);
+          final confirmed = await showJarvisConfirm(
+            context,
+            title: 'Switch profile?',
+            message: details.isEmpty
+                ? 'This changes the tools or knowledge Jarvis can use in this conversation.'
+                : details.join('\n'),
+            cancelLabel: 'Keep current profile',
+            confirmLabel: 'Switch',
+            icon: PhosphorIconsRegular.identificationCard,
+          );
+          if (!confirmed || !mounted) return;
+          confirm = true;
+        }
+      }
+    } on DioException catch (error) {
+      if (mounted) setState(() => _error = describeApiError(error));
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Could not switch the assistant profile.');
+      }
     }
   }
 

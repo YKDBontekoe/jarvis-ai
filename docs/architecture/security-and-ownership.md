@@ -32,7 +32,7 @@ Configure `DataProtection:KeysDirectory` to a persistent `0700` directory in pro
 
 ## Approvals and risk
 
-Default: MCP tools, memory forget, browser navigation, coding runs, remote agent delegation, and many MCP admin operations require explicit user approval. Auto-approve only via explicit `Mcp__Servers__*__AutoApprovedTools` configuration.
+Default: MCP tools, memory forget, browser navigation, coding runs, remote agent delegation, and many MCP admin operations require explicit user approval. Auto-approve only via explicit `Mcp__Servers__*__AutoApprovedTools` configuration. Owner-defined assistant profiles cannot unwrap `ApprovalRequiredAIFunction` or change MCP operator allowlists; see [assistant-profiles.md](../backend/assistant-profiles.md).
 
 ## Multi-tenant gaps
 

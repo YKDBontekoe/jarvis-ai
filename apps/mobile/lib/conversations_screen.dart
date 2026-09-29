@@ -202,7 +202,11 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          _formatDate(conversation['updatedAt']),
+                          [
+                            _formatDate(conversation['updatedAt']),
+                            if (asJsonString(conversation['profileName']) != null)
+                              asJsonString(conversation['profileName'])!,
+                          ].join(' · '),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],

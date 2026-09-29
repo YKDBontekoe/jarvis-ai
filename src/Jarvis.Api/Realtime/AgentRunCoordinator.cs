@@ -4,6 +4,7 @@ using System.Text;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Memory;
+using Jarvis.Application.Profiles;
 using Jarvis.Api.Telemetry;
 using Jarvis.Domain.Conversations;
 using Microsoft.AspNetCore.SignalR;
@@ -336,8 +337,18 @@ public sealed class AgentRunCoordinator(
             {
                 await using var scope = scopes.CreateAsyncScope();
                 using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+                var store = scope.ServiceProvider.GetRequiredService<IConversationStore>();
+                var profiles = scope.ServiceProvider.GetRequiredService<IAssistantProfileService>();
+                var conversation = await store.GetAsync(conversationId, ownerId, timeout.Token);
+                ProfileBinding? binding = conversation?.ProfileId is { } profileId
+                    ? new ProfileBinding(profileId, conversation.ProfileVersion ?? 0,
+                        conversation.ProfileSnapshotJson ?? "", conversation.Title)
+                    : null;
+                var snapshot = await profiles.ResolveSnapshotAsync(binding, ownerId, timeout.Token);
+                if (!ProfileScope.AllowsRemember(snapshot) || !ProfileScope.ContributesToLearning(snapshot))
+                    return;
                 await scope.ServiceProvider.GetRequiredService<IConversationMemoryExtractor>()
-                    .ExtractAndStoreAsync(ownerId, sourceMessageId, source, timeout.Token);
+                    .ExtractAndStoreAsync(ownerId, sourceMessageId, source, timeout.Token, snapshot.ProfileId);
             }
             catch (OperationCanceledException)
             {

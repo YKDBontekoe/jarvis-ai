@@ -1,10 +1,15 @@
+using Jarvis.Application.Profiles;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
 namespace Jarvis.Agents;
 
 /// <summary>Identifies the owner and run shape an agent is being built for.</summary>
-public sealed record AgentBuildContext(Guid OwnerId, Guid? ExecutingTaskId, Guid? ConversationId = null)
+public sealed record AgentBuildContext(
+    Guid OwnerId,
+    Guid? ExecutingTaskId,
+    Guid? ConversationId = null,
+    AssistantProfileSnapshot? Profile = null)
 {
     public bool IsBackgroundTask => ExecutingTaskId is not null;
 }

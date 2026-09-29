@@ -64,7 +64,7 @@ flowchart LR
 | Conversations | `Conversations/` | `JarvisAgent`, compaction | `ConversationEndpoints` |
 | Tasks / reminders / watches | `Workflows/` | `TaskAgentTools`, `ReminderAgentTools`, … | `AutomationEndpoints` |
 | Memory / graph | `Memory/` (+ `Jarvis.Memory`) | `MemoryAgentTools`, graph contributors | `MemoryEndpoints`, graph in `PersonalAssistantEndpoints` |
-| Skills / persona / learning | `Skills/`, `Persona/`, `Learning/` | matching contributors | `SkillEndpoints`, `PersonaEndpoints`, `LearningEndpoints` |
+| Skills / persona / profiles / learning | `Skills/`, `Persona/`, `Profiles/`, `Learning/` | matching contributors | `SkillEndpoints`, `PersonaEndpoints`, `ProfileEndpoints`, `LearningEndpoints` |
 | Files | `Files/` | `FileAgentTools` | `FileEndpoints` |
 | Integrations / MCP | `Integrations/` | `McpServerAgentTools`, `Jarvis.Mcp` | `IntegrationEndpoints` |
 | Channels | `Channels/` | (delivery services) | `ChannelEndpoints` |

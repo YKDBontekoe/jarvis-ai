@@ -26,7 +26,7 @@ src/Jarvis.Api/              Endpoints, hubs, voice realtime
 
 Each folder under `Jarvis.Application/` roughly matches a product area:
 
-`Conversations`, `Workflows`, `Memory`, `Files`, `Integrations`, `Approvals`, `Channels`, `Devices`, `Home`, `Learning`, `Persona`, `Skills`, `Browser`, `Realtime`, `Usage`, `Audit`, `Agents`, `Security`, `Settings`, `Surfaces`.
+`Conversations`, `Workflows`, `Memory`, `Files`, `Integrations`, `Approvals`, `Channels`, `Devices`, `Home`, `Learning`, `Persona`, `Profiles`, `Skills`, `Browser`, `Realtime`, `Usage`, `Audit`, `Agents`, `Security`, `Settings`, `Surfaces`.
 
 Persistence models and migrations: `Jarvis.Infrastructure/Persistence/`.
 

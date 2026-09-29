@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace Jarvis.Api.Endpoints;
 
-public sealed record CreateConversationRequest(string? Title);
+public sealed record CreateConversationRequest(string? Title, Guid? ProfileId = null);
 public sealed record VoiceSessionRequest(Guid ConversationId);
 public sealed record VoiceSessionDto(string ServerUrl, string Room, string Identity, string Token,
     DateTimeOffset ExpiresAt, bool HandsFree, bool Captions, string? Voice);
@@ -18,9 +18,11 @@ public sealed record VoiceToolDto(string Name, string Description, JsonElement I
 public sealed record VoiceSessionBootstrapDto(string Instructions, IReadOnlyList<VoiceToolDto> Tools);
 public sealed record VoiceToolCallResultDto(string Result, bool IsError, bool ApprovalRequired);
 public sealed record SendMessageRequest([Required, StringLength(32_000, MinimumLength = 1)] string? Content);
-public sealed record ConversationDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+public sealed record ConversationDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
+    Guid? ProfileId = null, string? ProfileName = null, int? ProfileVersion = null, bool ProfileDeleted = false);
 public sealed record ConversationDetailsDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
-    IReadOnlyList<MessageDto> Messages, bool Responding);
+    IReadOnlyList<MessageDto> Messages, bool Responding, Guid? ProfileId = null, string? ProfileName = null,
+    int? ProfileVersion = null, bool ProfileDeleted = false);
 public sealed record MessageDto(Guid Id, string Role, string Content, DateTimeOffset CreatedAt);
 public sealed record MessagePageDto(IReadOnlyList<MessageDto> Items, string? NextCursor, bool HasMore);
 public sealed record ApprovalDecisionRequest(bool Approved);
@@ -36,7 +38,8 @@ public sealed record ConditionWatchDto(Guid Id, string Title, string Url, string
     DateTimeOffset? LastCheckedAt, double? LastValue, string Kind = "public_json", string? CredentialProvider = null,
     double? Latitude = null, double? Longitude = null, double? RadiusMeters = null, int? MinutesBefore = null);
 public sealed record JarvisTaskDto(Guid Id, string Title, string Prompt, string Status, Guid ConversationId,
-    DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt, string? Summary);
+    DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt, string? Summary,
+    Guid? ProfileId = null);
 public sealed record NotificationDto(Guid Id, string Type, string Title, string Body, Guid? SourceId,
     DateTimeOffset CreatedAt, DateTimeOffset? ReadAt);
 public sealed record PushDeviceRequest(string? Token, string? Platform);

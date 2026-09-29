@@ -80,6 +80,10 @@ public sealed class JarvisAgentFactory(
         return tools;
     }
 
+    /// <summary>
+    /// Shared safety preamble. Profile, persona, and skill text must not be concatenated here —
+    /// they are untrusted owner context injected by <see cref="IAgentContextContributor"/> implementations.
+    /// </summary>
     internal static string BuildInstructions(string? configuredPersona, bool executingTask)
     {
         var instructions = string.IsNullOrWhiteSpace(configuredPersona) ? DefaultPersona.Trim() : configuredPersona.Trim();

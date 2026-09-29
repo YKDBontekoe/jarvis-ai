@@ -5,13 +5,14 @@ using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Learning;
 using Jarvis.Application.Memory;
+using Jarvis.Application.Profiles;
 using Microsoft.Extensions.Logging;
 
 namespace Jarvis.Agents;
 
 internal sealed partial class MemoryAgentTools(IMemoryService memories, MemoryReranker reranker,
     IAuditEventStore audit, ICurrentUser currentUser, ILogger<MemoryAgentTools> logger,
-    IMemoryRecallTracker? recalls = null)
+    IMemoryRecallTracker? recalls = null, AssistantProfileSnapshot? profile = null)
 {
     private const int MaxResultCharacters = 8_000;
 
@@ -24,6 +25,7 @@ internal sealed partial class MemoryAgentTools(IMemoryService memories, MemoryRe
 
         var hits = await memories.SearchAsync(currentUser.OwnerId, query, cancellationToken);
         hits = await reranker.RerankAsync(currentUser.OwnerId, query, hits, cancellationToken);
+        hits = hits.Where(hit => ProfileScope.AllowsMemory(profile, hit.Memory)).ToArray();
         if (hits.Count == 0) return "No matching saved memories were found.";
 
         var result = new System.Text.StringBuilder(
@@ -45,6 +47,7 @@ internal sealed partial class MemoryAgentTools(IMemoryService memories, MemoryRe
         var now = DateTimeOffset.UtcNow;
         var saved = (await memories.ListAsync(currentUser.OwnerId, null, cancellationToken))
             .Where(memory => memory.ValidUntil is null || memory.ValidUntil > now)
+            .Where(memory => ProfileScope.AllowsMemory(profile, memory))
             .ToList();
         if (saved.Count == 0) return "No active saved memories were found for this user.";
 
@@ -83,6 +86,8 @@ internal sealed partial class MemoryAgentTools(IMemoryService memories, MemoryRe
         if (LooksLikeSecret(text))
             return "I did not save that memory because it appears to contain a credential or secret. Store secrets in Integrations instead.";
 
+        if (!ProfileScope.AllowsRemember(profile))
+            return "Remembering facts is turned off for this assistant profile.";
         var existing = (await memories.SearchAsync(currentUser.OwnerId, text, cancellationToken))
             .Select(hit => hit.Memory)
             .FirstOrDefault(memory => string.Equals(Normalize(memory.Content), Normalize(text), StringComparison.Ordinal));
@@ -90,7 +95,8 @@ internal sealed partial class MemoryAgentTools(IMemoryService memories, MemoryRe
             return $"That is already saved (memory ID {existing.Id}).";
 
         var record = await memories.CreateAsync(currentUser.OwnerId, normalizedKind, text, importance: pin ? 0.9f : 0.7f,
-            confidence: 0.95f, validUntil: null, isPinned: pin, cancellationToken, sourceType: "user");
+            confidence: 0.95f, validUntil: null, isPinned: pin, cancellationToken, sourceType: "user",
+            profileId: profile?.ProfileId);
         try
         {
             await audit.AppendAsync(currentUser.OwnerId, "memory", "memory.created", "moderate", true, null,

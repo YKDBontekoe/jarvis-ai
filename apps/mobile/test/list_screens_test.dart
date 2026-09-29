@@ -8,6 +8,7 @@ import 'package:jarvis_mobile/daily_briefing_screen.dart';
 import 'package:jarvis_mobile/files_screen.dart';
 import 'package:jarvis_mobile/memory_screen.dart';
 import 'package:jarvis_mobile/tasks_screen.dart';
+import 'package:jarvis_mobile/features/profiles/profiles_screen.dart';
 
 import 'support/fixture_http.dart';
 
@@ -79,6 +80,27 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Trip planning'), findsOneWidget);
     expect(find.text('Missing id'), findsNothing);
+  });
+
+  testWidgets('profiles skip invalid list rows instead of crashing', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/profiles', [
+      'nope',
+      {
+        'id': 'p1',
+        'name': 'Work',
+        'description': 'Office context',
+        'isDefault': false,
+        'memoryScope': 'profile',
+      },
+      3,
+    ]);
+    await show(tester, ProfilesScreen(http: http.client()));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Work'), findsOneWidget);
+    expect(find.textContaining('Office context'), findsOneWidget);
   });
 
   testWidgets('a non-list memory payload shows the empty state', (

@@ -19,6 +19,7 @@ This folder is the canonical reference for humans and coding agents working in t
 |-------|----------|
 | HTTP API surface (`/api/v1`, hubs, A2A) | [backend/api-reference.md](backend/api-reference.md) |
 | Agent tools and contributors | [backend/agent-tools.md](backend/agent-tools.md) |
+| Assistant profiles | [backend/assistant-profiles.md](backend/assistant-profiles.md) |
 | Temporal workflows and worker | [backend/temporal.md](backend/temporal.md) |
 | Memory, knowledge graph, learning | [backend/memory-knowledge-learning.md](backend/memory-knowledge-learning.md) |
 | MCP, integrations, channels, browser | [backend/integrations-and-mcp.md](backend/integrations-and-mcp.md) |

@@ -2,13 +2,15 @@ using System.ComponentModel;
 using System.Text;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Persona;
+using Jarvis.Application.Profiles;
 using Jarvis.Application.Settings;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
 namespace Jarvis.Agents.Persona;
 
-internal sealed class PersonaAgentTools(PersonaService persona, IOwnerSettingsStore settings, ICurrentUser currentUser)
+internal sealed class PersonaAgentTools(PersonaService persona, IOwnerSettingsStore settings, ICurrentUser currentUser,
+    AssistantProfileSnapshot? profile)
 {
     [Description("Record how the user wants you to work with them — tone, answer format, language, working style, boundaries, or schedule — when they state it or clearly show it (for example 'keep it short', 'always answer in Dutch', 'don't message me before 9'). Use Remember for facts about their life instead.")]
     public async Task<string> LearnPreferenceAsync(
@@ -21,7 +23,8 @@ internal sealed class PersonaAgentTools(PersonaService persona, IOwnerSettingsSt
         var ownerId = currentUser.OwnerId;
         var learning = await settings.GetAsync<LearningSettings>(ownerId, SettingsSections.Learning, cancellationToken)
                        ?? LearningSettings.Default;
-        if (!learning.LearnPersona) return "The user turned off persona learning; follow the preference for this conversation only.";
+        if (!ProfileScope.AllowsPersonaLearning(profile, learning))
+            return "Persona learning is off for this profile; follow the preference for this conversation only.";
         if (MemoryAgentTools.LooksLikeSecret(statement)) return "That looks like a credential, so it was not saved.";
         try
         {
@@ -42,7 +45,7 @@ internal sealed class PersonaToolContributor(PersonaService persona, IOwnerSetti
     ICurrentUser currentUser) : IAgentToolContributor
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context) =>
-        [AIFunctionFactory.Create(new PersonaAgentTools(persona, settings, currentUser).LearnPreferenceAsync)];
+        [AIFunctionFactory.Create(new PersonaAgentTools(persona, settings, currentUser, context.Profile).LearnPreferenceAsync)];
 }
 
 internal sealed class PersonaContextContributor(PersonaService persona) : IAgentContextContributor
@@ -50,7 +53,9 @@ internal sealed class PersonaContextContributor(PersonaService persona) : IAgent
     public int Order => -10;
 
     public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
-        [new PersonaContextProvider(persona, context.OwnerId)];
+        context.Profile is { IncludeOwnerPersona: false }
+            ? []
+            : [new PersonaContextProvider(persona, context.OwnerId)];
 }
 
 /// <summary>Injects the owner's custom instructions and strongest learned traits at the start of every turn.</summary>

@@ -1,11 +1,15 @@
 using Jarvis.Domain.Conversations;
 using Jarvis.Application.Approvals;
+using Jarvis.Application.Profiles;
 
 namespace Jarvis.Application.Conversations;
 
 public interface IConversationStore
 {
-    Task<Conversation> CreateAsync(Guid ownerId, string title, CancellationToken cancellationToken);
+    Task<Conversation> CreateAsync(Guid ownerId, string title, CancellationToken cancellationToken,
+        ProfileBinding? profile = null);
+    Task BindProfileAsync(Guid conversationId, Guid ownerId, ProfileBinding profile,
+        CancellationToken cancellationToken);
     Task<Conversation?> GetAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<Conversation>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<ConversationDeleteResult> DeleteAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);

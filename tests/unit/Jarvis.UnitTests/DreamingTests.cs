@@ -508,10 +508,10 @@ public sealed class DreamingTests
 
         public Task<MemoryRecord> CreateAsync(Guid ownerId, string kind, string content, float importance, float confidence,
             DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken, string sourceType = "user",
-            Guid? sourceId = null)
+            Guid? sourceId = null, Guid? profileId = null)
         {
             var record = new MemoryRecord(Guid.NewGuid(), ownerId, kind, content, importance, confidence, sourceType,
-                sourceId, Now, Now, validUntil, isPinned);
+                sourceId, Now, Now, validUntil, isPinned, profileId);
             Items.Add(record);
             return Task.FromResult(record);
         }

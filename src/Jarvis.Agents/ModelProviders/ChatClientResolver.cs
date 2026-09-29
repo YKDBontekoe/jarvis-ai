@@ -22,7 +22,8 @@ public enum ModelPurpose
 /// <summary>Resolves the owner's configured model provider for a purpose.</summary>
 public interface IChatClientResolver
 {
-    Task<IChatClient> GetChatClientAsync(Guid ownerId, ModelPurpose purpose, CancellationToken cancellationToken);
+    Task<IChatClient> GetChatClientAsync(Guid ownerId, ModelPurpose purpose, CancellationToken cancellationToken,
+        ModelSettings? overlay = null);
 
     /// <summary>Returns null when no embedding model is configured for the owner or the server.</summary>
     Task<EmbeddingModel?> GetEmbeddingModelAsync(Guid ownerId, CancellationToken cancellationToken);
@@ -39,14 +40,17 @@ internal sealed class ChatClientResolver(
     IModelPriceLookup prices,
     ILogger<ChatClientResolver> logger) : IChatClientResolver
 {
-    private readonly Dictionary<(Guid, ModelPurpose), IChatClient> _chatClients = [];
+    private readonly Dictionary<(Guid, ModelPurpose, string, string?, string?, string?), IChatClient> _chatClients = [];
     private readonly Dictionary<Guid, EmbeddingModel?> _embeddingModels = [];
 
     public async Task<IChatClient> GetChatClientAsync(Guid ownerId, ModelPurpose purpose,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, ModelSettings? overlay = null)
     {
-        if (_chatClients.TryGetValue((ownerId, purpose), out var cached)) return cached;
-        var settings = await GetSettingsAsync(ownerId, cancellationToken);
+        var ownerSettings = await GetSettingsAsync(ownerId, cancellationToken);
+        var settings = overlay is null ? ownerSettings : Merge(ownerSettings, overlay);
+        var cacheKey = (ownerId, purpose, settings.Provider, settings.ChatModel, settings.FastModel,
+            settings.ReasoningEffort);
+        if (_chatClients.TryGetValue(cacheKey, out var cached)) return cached;
         IChatClient client = codexClient;
         var provider = UsageProviders.Codex;
         if (settings.UsesOpenRouter && await GetOpenRouterKeyAsync(ownerId, cancellationToken) is { } apiKey)
@@ -71,7 +75,7 @@ internal sealed class ChatClientResolver(
         if ((purpose is ModelPurpose.Chat or ModelPurpose.Reasoning) && settings.ReasoningEffort is { } effort)
             client = new ReasoningEffortChatClient(client, effort);
         client = new UsageRecordingChatClient(client, usage, prices, ownerId, provider, PurposeName(purpose), logger);
-        _chatClients[(ownerId, purpose)] = client;
+        _chatClients[cacheKey] = client;
         return client;
     }
 
@@ -91,6 +95,13 @@ internal sealed class ChatClientResolver(
         _embeddingModels[ownerId] = model;
         return model;
     }
+
+    private static ModelSettings Merge(ModelSettings owner, ModelSettings overlay) => owner with
+    {
+        ChatModel = overlay.ChatModel ?? owner.ChatModel,
+        FastModel = overlay.FastModel ?? owner.FastModel,
+        ReasoningEffort = overlay.ReasoningEffort ?? owner.ReasoningEffort
+    };
 
     private async Task<ModelSettings> GetSettingsAsync(Guid ownerId, CancellationToken cancellationToken) =>
         await settingsStore.GetAsync<ModelSettings>(ownerId, SettingsSections.Models, cancellationToken)
