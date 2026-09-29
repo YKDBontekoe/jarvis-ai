@@ -39,6 +39,8 @@ internal static class ApiServiceRegistration
     public static void ValidateProductionConfiguration(this WebApplicationBuilder builder)
     {
         if (builder.Environment.IsDevelopment()) return;
+        if (builder.Configuration.GetValue<bool>("Database:ApplyMigrationsAtStartup"))
+            throw new InvalidOperationException("Database:ApplyMigrationsAtStartup is supported only in Development. Run the 'migrate' command before deploying production services.");
         if (string.IsNullOrWhiteSpace(builder.Configuration["Antivirus:Host"]))
             throw new InvalidOperationException("Configure Antivirus:Host with a private ClamAV daemon before running Jarvis outside Development.");
         if (string.IsNullOrWhiteSpace(builder.Configuration["DataProtection:KeysDirectory"]))
