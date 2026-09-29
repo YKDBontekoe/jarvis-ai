@@ -215,9 +215,9 @@ class JarvisColors extends ThemeExtension<JarvisColors> {
 
 class JarvisRadii {
   static const sm = 8.0;
-  static const md = 12.0;
-  static const lg = 16.0;
-  static const xl = 22.0;
+  static const md = 10.0;
+  static const lg = 14.0;
+  static const xl = 20.0;
 }
 
 /// Editorial serif for greetings and hero headlines; everything else is Inter.
@@ -332,8 +332,8 @@ TextTheme _textTheme(JarvisColors colors) {
       fontWeight: FontWeight.w500,
       letterSpacing: -.15,
     ),
-    bodyLarge: base.copyWith(fontSize: 16, height: 1.5),
-    bodyMedium: base.copyWith(fontSize: 14.5, height: 1.45),
+    bodyLarge: base.copyWith(fontSize: 16, height: 1.5, letterSpacing: 0),
+    bodyMedium: base.copyWith(fontSize: 14.5, height: 1.45, letterSpacing: 0),
     bodySmall: base.copyWith(
       fontSize: 12.5,
       height: 1.4,
@@ -579,7 +579,7 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
     ),
     dividerTheme: DividerThemeData(
       color: colors.outline,
-      thickness: 1,
+      thickness: .75,
       space: 1,
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(
