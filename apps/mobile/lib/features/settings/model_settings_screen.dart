@@ -151,7 +151,8 @@ class _ModelSettingsScreenState extends _ModelSettingsController
         _applyCodex(data);
         _codexLoading = false;
         final efforts = _effortsForCodexModel(_catalogModel(_chat.text));
-        if (_reasoningEffort.isNotEmpty && !efforts.contains(_reasoningEffort)) {
+        if (_reasoningEffort.isNotEmpty &&
+            !efforts.contains(_reasoningEffort)) {
           _reasoningEffort = '';
         }
       });

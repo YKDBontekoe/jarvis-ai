@@ -72,7 +72,8 @@ class VoiceStage extends StatelessWidget {
                         _title,
                         key: ValueKey(phase),
                         textAlign: TextAlign.center,
-                        style: JarvisType.serif.copyWith(fontSize: 40),
+                        style: JarvisType.serifOf(context)
+                            .copyWith(fontSize: 40),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -80,7 +81,7 @@ class VoiceStage extends StatelessWidget {
                       _subtitle,
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyLarge?.copyWith(
-                        color: JarvisColors.inkSoft,
+                        color: JarvisColors.of(context).inkSoft,
                         height: 1.4,
                       ),
                     ),
@@ -100,8 +101,8 @@ class VoiceStage extends StatelessWidget {
                       onPressed: _live || canStart ? onPrimary : null,
                       style: FilledButton.styleFrom(
                         backgroundColor: _live
-                            ? JarvisColors.danger
-                            : JarvisColors.ink,
+                            ? JarvisColors.of(context).danger
+                            : JarvisColors.of(context).ink,
                         minimumSize: const Size(220, 56),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(40),
@@ -117,7 +118,9 @@ class VoiceStage extends StatelessWidget {
                                   ? PhosphorIconsRegular.stop
                                   : PhosphorIconsRegular.microphone,
                             ),
-                      label: Text(_live ? 'End voice chat' : 'Start voice chat'),
+                      label: Text(
+                        _live ? 'End voice chat' : 'Start voice chat',
+                      ),
                     ),
                     if (onToggleMute != null) ...[
                       const SizedBox(height: 12),
@@ -129,7 +132,9 @@ class VoiceStage extends StatelessWidget {
                               ? PhosphorIconsRegular.microphoneSlash
                               : PhosphorIconsRegular.microphone,
                         ),
-                        label: Text(muted ? 'Unmute microphone' : 'Mute microphone'),
+                        label: Text(
+                          muted ? 'Unmute microphone' : 'Mute microphone',
+                        ),
                       ),
                     ],
                     if (!_live) ...[
@@ -199,21 +204,25 @@ class _VoicePill extends StatelessWidget {
     key: const Key('voice-name'),
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
     decoration: BoxDecoration(
-      color: JarvisColors.surface.withValues(alpha: .9),
+      color: JarvisColors.of(context).surface.withValues(alpha: .9),
       borderRadius: BorderRadius.circular(40),
-      border: Border.all(color: JarvisColors.outline),
+      border: Border.all(color: JarvisColors.of(context).outline),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(PhosphorIconsRegular.waveform, size: 15, color: JarvisColors.inkSoft),
+        Icon(
+          PhosphorIconsRegular.waveform,
+          size: 15,
+          color: JarvisColors.of(context).inkSoft,
+        ),
         const SizedBox(width: 6),
         Text(
           'ChatGPT voice · $voiceName',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: JarvisColors.inkSoft,
+            color: JarvisColors.of(context).inkSoft,
           ),
         ),
       ],
@@ -238,7 +247,7 @@ class _CaptionCard extends StatelessWidget {
           Text(
             assistant ? 'Jarvis' : 'You',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: JarvisColors.muted,
+              color: JarvisColors.of(context).muted,
               letterSpacing: .4,
             ),
           ),
@@ -248,7 +257,8 @@ class _CaptionCard extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 6,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.35),
+            style: Theme.of(context).textTheme.bodyLarge
+                ?.copyWith(height: 1.35),
           ),
         ],
       ),
@@ -266,21 +276,21 @@ class _VoiceHint extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     decoration: BoxDecoration(
-      color: JarvisColors.surface.withValues(alpha: .8),
+      color: JarvisColors.of(context).surface.withValues(alpha: .8),
       borderRadius: BorderRadius.circular(40),
-      border: Border.all(color: JarvisColors.outline),
+      border: Border.all(color: JarvisColors.of(context).outline),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 15, color: JarvisColors.inkSoft),
+        Icon(icon, size: 15, color: JarvisColors.of(context).inkSoft),
         const SizedBox(width: 6),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12.5,
             fontWeight: FontWeight.w500,
-            color: JarvisColors.inkSoft,
+            color: JarvisColors.of(context).inkSoft,
           ),
         ),
       ],
@@ -295,9 +305,21 @@ class _VoiceBackdrop extends StatelessWidget {
   Widget build(BuildContext context) => const IgnorePointer(
     child: Stack(
       children: [
-        Positioned(top: -120, left: -80, child: _Blob(size: 360, color: Color(0x1c7c6cff))),
-        Positioned(bottom: -140, right: -100, child: _Blob(size: 420, color: Color(0x1638bdf8))),
-        Positioned(top: 180, right: -60, child: _Blob(size: 220, color: Color(0x12f472b6))),
+        Positioned(
+          top: -120,
+          left: -80,
+          child: _Blob(size: 360, color: Color(0x1c7c6cff)),
+        ),
+        Positioned(
+          bottom: -140,
+          right: -100,
+          child: _Blob(size: 420, color: Color(0x1638bdf8)),
+        ),
+        Positioned(
+          top: 180,
+          right: -60,
+          child: _Blob(size: 220, color: Color(0x12f472b6)),
+        ),
       ],
     ),
   );

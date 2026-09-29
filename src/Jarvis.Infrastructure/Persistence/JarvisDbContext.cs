@@ -649,7 +649,7 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
             entity.Property(x => x.Id).ValueGeneratedNever();
             entity.Property(x => x.Role).HasMaxLength(20).IsRequired();
             entity.Property(x => x.Content).IsRequired();
-            entity.HasIndex(x => new { x.ConversationId, x.CreatedAt });
+            entity.HasIndex(x => new { x.ConversationId, x.CreatedAt, x.Id });
         });
 
         modelBuilder.Entity<AgentSessionState>(entity =>

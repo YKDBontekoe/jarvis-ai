@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import 'ui/phosphor_icons.dart';
 
 import 'theme.dart';
@@ -162,8 +163,7 @@ class _IntegrationsScreenState extends _IntegrationsController
     return [
       const InlineNotice(
         tone: NoticeTone.info,
-        message:
-            'Secrets are encrypted before storage. Values stay hidden and are injected only into configured MCP connections.',
+        message: 'Secrets are encrypted before storage. Values stay hidden and are injected only into configured MCP connections.',
       ),
       if (_error != null)
         InlineNotice(
@@ -176,8 +176,7 @@ class _IntegrationsScreenState extends _IntegrationsController
       if (_packs.isEmpty)
         const _MutedLine(
           icon: PhosphorIconsRegular.plugsConnected,
-          text:
-              'Calendar, mail, and contacts packs appear here when the server supports them.',
+          text: 'Calendar, mail, and contacts packs appear here when the server supports them.',
         )
       else
         for (final pack in _packs) _packCard(pack),
@@ -186,16 +185,14 @@ class _IntegrationsScreenState extends _IntegrationsController
       _featuredCard(
         title: 'Home Assistant',
         icon: PhosphorIconsRegular.house,
-        description:
-            'Enable Home Assistant’s MCP Server integration, expose the entities Jarvis may use, and configure HOME_ASSISTANT_MCP_URL on the Jarvis host. Store a long-lived access token here; Jarvis adds the bearer scheme when connecting. Jarvis asks for approval before every Home Assistant action.',
+        description: 'Enable Home Assistant’s MCP Server integration, expose the entities Jarvis may use, and configure HOME_ASSISTANT_MCP_URL on the Jarvis host. Store a long-lived access token here; Jarvis adds the bearer scheme when connecting. Jarvis asks for approval before every Home Assistant action.',
         provider: 'home-assistant',
       ),
       const SizedBox(height: 12),
       _featuredCard(
         title: 'GitHub',
         icon: PhosphorIconsRegular.code,
-        description:
-            'Enable the GitHub MCP Compose overlay, then store a least-privilege personal access token here. Jarvis exposes repository, issue, and pull request tools. In chat it can pause GitHub or narrow those tools. Each operation asks for approval.',
+        description: 'Enable the GitHub MCP Compose overlay, then store a least-privilege personal access token here. Jarvis exposes repository, issue, and pull request tools. In chat it can pause GitHub or narrow those tools. Each operation asks for approval.',
         provider: 'github',
       ),
       const SizedBox(height: 28),

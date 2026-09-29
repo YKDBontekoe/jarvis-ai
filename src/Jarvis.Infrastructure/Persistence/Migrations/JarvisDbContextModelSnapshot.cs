@@ -215,7 +215,7 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ConversationId", "CreatedAt");
+                    b.HasIndex("ConversationId", "CreatedAt", "Id");
 
                     b.ToTable("messages", (string)null);
                 });

@@ -240,18 +240,16 @@ class _RemindersScreenState extends State<RemindersScreen>
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _formatDate(dynamic raw) {
     final date = jsonDate(raw, local: true);
     if (date == null) return '';
     final dateLabel = MaterialLocalizations.of(context).formatMediumDate(date);
-    final timeLabel = MaterialLocalizations.of(
-      context,
-    ).formatTimeOfDay(TimeOfDay.fromDateTime(date));
+    final timeLabel = MaterialLocalizations.of(context)
+        .formatTimeOfDay(TimeOfDay.fromDateTime(date));
     return '$dateLabel · $timeLabel';
   }
 
@@ -295,7 +293,7 @@ class _RemindersScreenState extends State<RemindersScreen>
             margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: JarvisColors.surfaceRaised,
+              color: JarvisColors.of(context).surfaceRaised,
               borderRadius: BorderRadius.circular(JarvisRadii.md),
             ),
             child: TabBar(
@@ -315,13 +313,13 @@ class _RemindersScreenState extends State<RemindersScreen>
                             vertical: 1,
                           ),
                           decoration: BoxDecoration(
-                            color: JarvisColors.ink,
+                            color: JarvisColors.of(context).ink,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
                             '$_unreadCount',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: JarvisColors.of(context).onInk,
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                             ),
@@ -389,9 +387,8 @@ class _RemindersScreenState extends State<RemindersScreen>
                         children: [
                           Text(
                             asJsonString(reminder['title']) ?? '',
-                            style: Theme.of(
-                              context,
-                            ).textTheme.titleSmall?.copyWith(fontSize: 15),
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontSize: 15),
                           ),
                           const SizedBox(height: 6),
                           Wrap(
@@ -456,8 +453,10 @@ class _RemindersScreenState extends State<RemindersScreen>
               child: SurfaceCard(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                color: unread ? JarvisColors.surface : JarvisColors.canvas,
-                borderColor: JarvisColors.outline,
+                color: unread
+                    ? JarvisColors.of(context).surface
+                    : JarvisColors.of(context).canvas,
+                borderColor: JarvisColors.of(context).outline,
                 onTap: () => _openNotification(notification),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -482,10 +481,10 @@ class _RemindersScreenState extends State<RemindersScreen>
                             const SizedBox(height: 4),
                             Text(
                               body,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13.5,
                                 height: 1.4,
-                                color: JarvisColors.inkSoft,
+                                color: JarvisColors.of(context).inkSoft,
                               ),
                             ),
                           ],
@@ -493,7 +492,9 @@ class _RemindersScreenState extends State<RemindersScreen>
                           Text(
                             _formatDate(notification['createdAt']),
                             style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: JarvisColors.muted),
+                                ?.copyWith(
+                                  color: JarvisColors.of(context).muted,
+                                ),
                           ),
                         ],
                       ),
@@ -503,8 +504,8 @@ class _RemindersScreenState extends State<RemindersScreen>
                         margin: const EdgeInsets.only(top: 6, left: 8),
                         width: 9,
                         height: 9,
-                        decoration: const BoxDecoration(
-                          color: JarvisColors.accent,
+                        decoration: BoxDecoration(
+                          color: JarvisColors.of(context).accent,
                           shape: BoxShape.circle,
                         ),
                       ),

@@ -222,10 +222,10 @@ mixin _IntegrationsCredentials on _IntegrationsController {
         ? 'Token stored'
         : 'Not configured';
     final statusColor = _credentialsFailed
-        ? JarvisColors.danger
+        ? JarvisColors.of(context).danger
         : configured
-        ? JarvisColors.success
-        : JarvisColors.muted;
+        ? JarvisColors.of(context).success
+        : JarvisColors.of(context).muted;
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,10 +246,10 @@ mixin _IntegrationsCredentials on _IntegrationsController {
           const SizedBox(height: 12),
           Text(
             description,
-            style: const TextStyle(
+            style: TextStyle(
               height: 1.5,
               fontSize: 13.5,
-              color: JarvisColors.inkSoft,
+              color: JarvisColors.of(context).inkSoft,
             ),
           ),
           const SizedBox(height: 16),
