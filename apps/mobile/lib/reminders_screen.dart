@@ -258,7 +258,7 @@ class _RemindersScreenState extends State<RemindersScreen>
             asJsonString(jsonObject(response.data)?['conversationId']);
         if (conversationId != null) {
           await widget.onOpenConversation!(conversationId);
-        } else if (opensNotificationDetails(type)) {
+        } else if (mounted && opensNotificationDetails(type)) {
           await Navigator.of(context).push<void>(
             MaterialPageRoute<void>(
               builder: (_) => NotificationDetailsScreen(
@@ -270,7 +270,7 @@ class _RemindersScreenState extends State<RemindersScreen>
           );
         }
       } on DioException {
-        if (sourceId != null && opensNotificationDetails(type)) {
+        if (mounted && opensNotificationDetails(type)) {
           await Navigator.of(context).push<void>(
             MaterialPageRoute<void>(
               builder: (_) => NotificationDetailsScreen(
