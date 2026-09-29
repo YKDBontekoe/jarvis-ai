@@ -43,6 +43,9 @@ mixin _ChatScreenVoice on _ChatScreenController {
       final sessionResponse = await _http.post<dynamic>(
         '/api/v1/voice/session',
         data: {'conversationId': conversationId},
+        // Codex realtime can take up to a minute to answer; the default
+        // receive timeout would abandon a session the server is still building.
+        options: Options(receiveTimeout: const Duration(seconds: 75)),
       );
       if (!isCurrent()) return;
       final session = jsonObject(sessionResponse.data);

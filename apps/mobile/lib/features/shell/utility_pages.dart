@@ -35,6 +35,11 @@ Widget? utilityPageFor(
   'memory' => MemoryScreen(http: http),
   'approvals' => ApprovalsScreen(http: http),
   'reminders' => RemindersScreen(http: http, onOpenConversation: onOpenConversation),
+  'notifications' => RemindersScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+    initialTab: RemindersTab.notifications,
+  ),
   'files' => FilesScreen(http: http),
   'audit' => AuditScreen(http: http),
   'watches' => ConditionWatchesScreen(http: http),

@@ -41,8 +41,9 @@ internal static class VoiceEndpoints
                 await voiceRuntime.StartSessionAsync(room, request.ConversationId, currentUser.OwnerId,
                     voice.Voice, ct);
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (Exception exception) when (!ct.IsCancellationRequested)
             {
+                // Includes Codex realtime's own startup timeouts, which are not the caller hanging up.
                 logger.LogError(exception, "Could not start the in-process voice runtime for conversation {ConversationId}.",
                     request.ConversationId);
                 return ApiProblemResults.DependencyUnavailable("Voice service is temporarily unavailable.");

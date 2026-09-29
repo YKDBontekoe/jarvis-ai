@@ -24,11 +24,30 @@ mixin _ChatScreenNav on _ChatScreenController {
     }
   }
 
+  Future<void> _refreshUnreadNotifications() async {
+    if (_signedOut || _signingOut) return;
+    try {
+      final response = await _http.get<dynamic>('/api/v1/notifications');
+      if (!mounted) return;
+      final unread = jsonMaps(
+        response.data,
+      ).where((item) => item['readAt'] == null).length;
+      if (unread != _unreadNotifications) {
+        setState(() => _unreadNotifications = unread);
+      }
+    } on DioException {
+      // The badge is a hint; leave the last known count when offline.
+    } catch (_) {
+      // Malformed payloads never break the header.
+    }
+  }
+
   Future<void> _openUtilityPage(String destination, Widget page) async {
     await Navigator.of(
       context,
     ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
     if (!mounted || _signedOut || _signingOut) return;
+    unawaited(_refreshUnreadNotifications());
     if (destination == 'approvals') {
       await _syncConversationApprovals();
     }

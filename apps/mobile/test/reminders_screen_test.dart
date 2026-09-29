@@ -117,4 +117,64 @@ void main() {
     await tester.pumpAndSettle();
     expect(opened, 'c1');
   });
+
+  testWidgets('reminders group into overdue, upcoming and finished', (
+    tester,
+  ) async {
+    final now = DateTime.now().toUtc();
+    String at(Duration offset) => now.add(offset).toIso8601String();
+    http.on('GET', '/api/v1/reminders', [
+      {'id': 'a', 'title': 'Late thing', 'dueAt': at(const Duration(hours: -2)), 'status': 'pending'},
+      {'id': 'b', 'title': 'Next week thing', 'dueAt': at(const Duration(days: 8)), 'status': 'pending'},
+      {'id': 'c', 'title': 'Old thing', 'dueAt': at(const Duration(days: -3)), 'status': 'delivered'},
+    ]);
+    http.on('GET', '/api/v1/notifications', <Object>[]);
+    await show(tester);
+
+    for (final heading in ['Overdue', 'Upcoming', 'Finished']) {
+      expect(find.text(heading), findsOneWidget);
+    }
+    expect(
+      tester.getTopLeft(find.text('Late thing')).dy,
+      lessThan(tester.getTopLeft(find.text('Next week thing')).dy),
+    );
+    expect(
+      tester.getTopLeft(find.text('Next week thing')).dy,
+      lessThan(tester.getTopLeft(find.text('Old thing')).dy),
+    );
+  });
+
+  testWidgets('notifications open on request and can all be marked read', (
+    tester,
+  ) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    http.on('GET', '/api/v1/reminders', <Object>[]);
+    http.on('GET', '/api/v1/notifications', [
+      {'id': 'n1', 'type': 'task.completed', 'title': 'Task finished', 'body': 'One', 'createdAt': now, 'readAt': null},
+      {'id': 'n2', 'type': 'task.completed', 'title': 'Another finished', 'body': 'Two', 'createdAt': now, 'readAt': null},
+    ]);
+    http.on('POST', '/api/v1/notifications/n1/read', <String, Object>{});
+    http.on('POST', '/api/v1/notifications/n2/read', <String, Object>{});
+    tester.view.physicalSize = const Size(900, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildJarvisTheme(),
+        home: RemindersScreen(
+          http: http.client(),
+          initialTab: RemindersTab.notifications,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('Task finished'), findsOneWidget);
+    await tester.tap(find.byTooltip('Mark all as read'));
+    await tester.pumpAndSettle();
+    expect(http.sent('POST', '/api/v1/notifications/n1/read'), hasLength(1));
+    expect(http.sent('POST', '/api/v1/notifications/n2/read'), hasLength(1));
+  });
 }

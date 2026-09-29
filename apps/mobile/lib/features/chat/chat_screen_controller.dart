@@ -51,6 +51,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   String? _pendingQueryText;
   int _selectedDestination = 0;
   int _homeRevision = 0;
+  int _unreadNotifications = 0;
   bool _showHome = true;
   int _realtimeGeneration = 0;
   int _openGeneration = 0;
@@ -93,6 +94,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _createAndOpenConversation();
   Future<void> _switchConversationProfile();
   void _openUtility(String destination);
+  Future<void> _refreshUnreadNotifications();
   void _selectDestination(int index);
   Future<void> _reloadConversationEntries(
     String conversationId, [

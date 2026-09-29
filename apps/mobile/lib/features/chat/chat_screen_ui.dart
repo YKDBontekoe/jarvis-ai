@@ -207,6 +207,11 @@ mixin _ChatScreenUi on _ChatScreenController {
         ),
         actions: [
           if (!voice)
+            _NotificationBell(
+              unread: _unreadNotifications,
+              onPressed: _signedOut ? null : () => _openUtility('notifications'),
+            ),
+          if (!voice)
             CircleIconButton(
               icon: PhosphorIconsRegular.magnifyingGlass,
               tooltip: 'Search',
@@ -447,4 +452,63 @@ class _ConnectionDot extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Top-bar bell that opens notifications and shows how many are unread.
+class _NotificationBell extends StatelessWidget {
+  const _NotificationBell({required this.unread, required this.onPressed});
+
+  final int unread;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final label = unread > 0
+        ? 'Notifications, $unread unread'
+        : 'Notifications';
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        CircleIconButton(
+          icon: unread > 0
+              ? PhosphorIconsRegular.bellRinging
+              : PhosphorIconsRegular.bell,
+          tooltip: label,
+          onPressed: onPressed,
+        ),
+        if (unread > 0)
+          Positioned(
+            top: -2,
+            right: -2,
+            child: IgnorePointer(
+              child: AnimatedScale(
+                scale: 1,
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutBack,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 18),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: colors.danger,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: colors.canvas, width: 2),
+                  ),
+                  child: Text(
+                    unread > 99 ? '99+' : '$unread',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10.5,
+                      height: 1.3,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }

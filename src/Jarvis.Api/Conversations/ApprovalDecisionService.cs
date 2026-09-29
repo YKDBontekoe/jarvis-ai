@@ -113,6 +113,16 @@ public sealed class ApprovalDecisionService(
         {
             await approvals.MarkResumeFailedAsync(approvalId, ownerId, CancellationToken.None);
             if (ct.IsCancellationRequested) throw;
+            if (!abort.IsCancellationRequested)
+            {
+                // Nobody cancelled the run: a step inside it (an MCP server, the model) timed out. Say so and
+                // leave the decision retryable instead of claiming the task was cancelled.
+                logger.LogWarning("Tool approval {ApprovalId} timed out while resuming its agent run.", approvalId);
+                await EndpointHelpers.PublishAgentFailedAsync(hub, logger, decided.ConversationId,
+                    ConversationTurnService.FailureMessage);
+                return new ConversationTurnResult.Failed(
+                    "Jarvis timed out finishing this tool call. It can be retried from Tool approvals.");
+            }
             await EndpointHelpers.PublishAgentFailedAsync(hub, logger, decided.ConversationId, CancelledMessage);
             return new ConversationTurnResult.Conflict(CancelledMessage);
         }

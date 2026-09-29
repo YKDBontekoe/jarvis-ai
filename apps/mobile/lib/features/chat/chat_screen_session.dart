@@ -40,6 +40,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       if (stale()) return;
       await _openConversation(conversationId, showHome: true);
       if (stale()) return;
+      unawaited(_refreshUnreadNotifications());
       if (Firebase.apps.isNotEmpty) {
         final initialPush = await FirebaseMessaging.instance
             .getInitialMessage();

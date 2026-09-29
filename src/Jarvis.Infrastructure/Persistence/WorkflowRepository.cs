@@ -172,12 +172,26 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         if (!await db.Notifications.AnyAsync(x => x.Id == task.Id, cancellationToken))
         {
             var notification = new Notification(task.Id, task.OwnerId, "task.completed",
-                "Task finished", task.Title, task.Id);
+                "Task finished", TaskFinishedBody(task.Title, summary), task.Id);
             db.Notifications.Add(notification);
             await PushDeliveryQueue.QueueAsync(db, notification, cancellationToken);
         }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <summary>The task title plus the first line of its result, so the notification is useful on its own.</summary>
+    public static string TaskFinishedBody(string title, string summary)
+    {
+        const int maxPreview = 160;
+        var firstLine = (summary ?? string.Empty)
+            .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Where(line => !line.StartsWith('#'))
+            .Select(line => line.TrimStart('-', '*', '>', ' ').Replace("**", string.Empty))
+            .FirstOrDefault(line => line.Length > 0);
+        if (firstLine is null) return title;
+        if (firstLine.Length > maxPreview) firstLine = firstLine[..(maxPreview - 1)].TrimEnd() + "…";
+        return $"{title}: {firstLine}";
     }
 
     public async Task FailAsync(Guid id, string summary, CancellationToken cancellationToken)
