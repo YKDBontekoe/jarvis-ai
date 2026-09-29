@@ -66,6 +66,30 @@ public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, 
         await db.Messages.AsNoTracking().Where(x => x.ConversationId == conversationId)
             .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToListAsync(cancellationToken);
 
+    public async Task<MessagePage> GetMessagePageAsync(Guid conversationId, MessageCursor? before, int limit,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(limit, MessagePage.MaximumSize);
+
+        var query = db.Messages.AsNoTracking().Where(message => message.ConversationId == conversationId);
+        if (before is not null)
+            query = query.Where(message => message.CreatedAt < before.CreatedAt ||
+                message.CreatedAt == before.CreatedAt && message.Id.CompareTo(before.Id) < 0);
+
+        var descending = await query.OrderByDescending(message => message.CreatedAt)
+            .ThenByDescending(message => message.Id)
+            .Take(limit + 1)
+            .ToListAsync(cancellationToken);
+        var hasMore = descending.Count > limit;
+        if (hasMore) descending.RemoveAt(descending.Count - 1);
+        descending.Reverse();
+        var nextCursor = hasMore && descending.Count > 0
+            ? new MessageCursor(descending[0].CreatedAt, descending[0].Id)
+            : null;
+        return new MessagePage(descending, nextCursor, hasMore);
+    }
+
     public async Task AddMessageAsync(Message message, CancellationToken cancellationToken)
     {
         db.Messages.Add(message);

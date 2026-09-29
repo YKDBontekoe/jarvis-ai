@@ -10,8 +10,14 @@ mixin _LearningCards on _LearningController {
     return SurfaceCard(
       gradient: LinearGradient(
         colors: enabled
-            ? const [JarvisColors.accentSoft, JarvisColors.surface]
-            : const [JarvisColors.surface, JarvisColors.surface],
+            ? [
+                JarvisColors.of(context).accentSoft,
+                JarvisColors.of(context).surface,
+              ]
+            : [
+                JarvisColors.of(context).surface,
+                JarvisColors.of(context).surface,
+              ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
@@ -22,7 +28,9 @@ mixin _LearningCards on _LearningController {
             children: [
               IconBadge(
                 icon: PhosphorIconsRegular.pulse,
-                color: enabled ? JarvisColors.accent : JarvisColors.muted,
+                color: enabled
+                    ? JarvisColors.of(context).accent
+                    : JarvisColors.of(context).muted,
                 size: 44,
               ),
               const SizedBox(width: 14),
@@ -39,7 +47,7 @@ mixin _LearningCards on _LearningController {
                       enabled
                           ? 'Reflects and checks in every ${_interval(minutes)}.'
                           : 'Off — Jarvis only learns during conversations.',
-                      style: const TextStyle(color: JarvisColors.inkSoft),
+                      style: TextStyle(color: JarvisColors.of(context).inkSoft),
                     ),
                   ],
                 ),
@@ -75,9 +83,9 @@ mixin _LearningCards on _LearningController {
                 child: Text(
                   asJsonString(_state['lastSummary']) ??
                       'No heartbeat has run yet.',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: JarvisColors.inkSoft,
+                    color: JarvisColors.of(context).inkSoft,
                   ),
                 ),
               ),
@@ -106,8 +114,14 @@ mixin _LearningCards on _LearningController {
     return SurfaceCard(
       gradient: LinearGradient(
         colors: enabled
-            ? const [JarvisColors.accentSoft, JarvisColors.surface]
-            : const [JarvisColors.surface, JarvisColors.surface],
+            ? [
+                JarvisColors.of(context).accentSoft,
+                JarvisColors.of(context).surface,
+              ]
+            : [
+                JarvisColors.of(context).surface,
+                JarvisColors.of(context).surface,
+              ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
@@ -118,7 +132,9 @@ mixin _LearningCards on _LearningController {
             children: [
               IconBadge(
                 icon: PhosphorIconsRegular.sparkle,
-                color: enabled ? JarvisColors.accent : JarvisColors.muted,
+                color: enabled
+                    ? JarvisColors.of(context).accent
+                    : JarvisColors.of(context).muted,
                 size: 44,
               ),
               const SizedBox(width: 14),
@@ -135,7 +151,7 @@ mixin _LearningCards on _LearningController {
                       enabled
                           ? 'Consolidates memories, facts, and tone around ${_clockHour(hour)}.'
                           : 'Off — Jarvis will not improve stored memories overnight.',
-                      style: const TextStyle(color: JarvisColors.inkSoft),
+                      style: TextStyle(color: JarvisColors.of(context).inkSoft),
                     ),
                   ],
                 ),
@@ -171,9 +187,9 @@ mixin _LearningCards on _LearningController {
                 child: Text(
                   asJsonString(_dreaming['lastSummary']) ??
                       'No dream has run yet.',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: JarvisColors.inkSoft,
+                    color: JarvisColors.of(context).inkSoft,
                   ),
                 ),
               ),
@@ -200,10 +216,10 @@ mixin _LearningCards on _LearningController {
     final summary = asJsonString(_dreaming['userSummary']);
     final updated = _when(asJsonString(_dreaming['userSummaryUpdatedAt']));
     if (summary == null || summary.trim().isEmpty) {
-      return const SurfaceCard(
+      return SurfaceCard(
         child: Text(
           'After a dream, Jarvis writes a short portrait from your memories and adds it to every chat. The next dream revises it. The portrait is background — not a memory of its own.',
-          style: TextStyle(color: JarvisColors.inkSoft),
+          style: TextStyle(color: JarvisColors.of(context).inkSoft),
         ),
       );
     }
@@ -216,7 +232,10 @@ mixin _LearningCards on _LearningController {
             const SizedBox(height: 8),
             Text(
               'Updated $updated. Included in chat as background.',
-              style: const TextStyle(fontSize: 12.5, color: JarvisColors.muted),
+              style: TextStyle(
+                fontSize: 12.5,
+                color: JarvisColors.of(context).muted,
+              ),
             ),
           ],
         ],
@@ -227,10 +246,10 @@ mixin _LearningCards on _LearningController {
   Widget _diary() {
     final entries = jsonMaps(_dreaming['diary']);
     if (entries.isEmpty) {
-      return const SurfaceCard(
+      return SurfaceCard(
         child: Text(
           'After a dream, Jarvis writes a short diary of what it staged, reflected on, and promoted. The diary is for you to review — it is never stored as a memory.',
-          style: TextStyle(color: JarvisColors.inkSoft),
+          style: TextStyle(color: JarvisColors.of(context).inkSoft),
         ),
       );
     }
@@ -311,9 +330,12 @@ mixin _LearningCards on _LearningController {
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Jarvis keeps learning quietly but sends no check-ins during these hours (your briefing time zone).',
-            style: TextStyle(fontSize: 12.5, color: JarvisColors.muted),
+            style: TextStyle(
+              fontSize: 12.5,
+              color: JarvisColors.of(context).muted,
+            ),
           ),
         ],
       ),
@@ -322,10 +344,10 @@ mixin _LearningCards on _LearningController {
 
   Widget _timeline() {
     if (_activity.isEmpty) {
-      return const SurfaceCard(
+      return SurfaceCard(
         child: Text(
           'Nothing learned yet. Chat with Jarvis, rate replies, or tap “Reflect now”.',
-          style: TextStyle(color: JarvisColors.inkSoft),
+          style: TextStyle(color: JarvisColors.of(context).inkSoft),
         ),
       );
     }

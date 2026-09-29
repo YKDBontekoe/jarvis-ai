@@ -14,7 +14,7 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
           clipBehavior: Clip.hardEdge,
           children: [
             ColoredBox(
-              color: JarvisColors.canvas,
+              color: JarvisColors.of(context).canvas,
               child: InteractiveViewer(
                 transformationController: _transform,
                 constrained: false,
@@ -29,7 +29,10 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
                     behavior: HitTestBehavior.opaque,
                     onTap: _clearSelection,
                     child: CustomPaint(
-                      painter: _GraphPainter(_mapEdges()),
+                      painter: _GraphPainter(
+                        _mapEdges(),
+                        JarvisColors.of(context),
+                      ),
                       size: Size(_world, _world),
                     ),
                   ),
@@ -185,8 +188,9 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
                   (!matched.contains(link.fromId) ||
                       !matched.contains(link.toId))));
       final color = isProminent
-          ? graphTypeColor(_snapshot.node(link.fromId)?.type)
-          : JarvisColors.outlineStrong.withValues(alpha: faded ? .28 : .9);
+          ? graphTypeColor(_snapshot.node(link.fromId)?.type, context)
+          : JarvisColors.of(context).outlineStrong
+                .withValues(alpha: faded ? .28 : .9);
       edges.add(
         _MapEdge(
           from: _worldPoint(link.fromId),

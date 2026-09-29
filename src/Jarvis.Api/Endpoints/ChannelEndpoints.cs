@@ -8,6 +8,8 @@ using Jarvis.Application.Integrations;
 using Jarvis.Application.Security;
 using Microsoft.EntityFrameworkCore;
 
+using Jarvis.Api.Errors;
+
 namespace Jarvis.Api.Endpoints;
 
 public sealed record ChannelDto(Guid Id, string Kind, string DisplayName, string Account, bool Enabled,
@@ -125,7 +127,7 @@ internal static class ChannelEndpoints
             }
             catch (Exception exception) when (exception is HttpRequestException or JsonException or TaskCanceledException)
             {
-                return Results.Problem("The signal-cli service is not reachable.", statusCode: StatusCodes.Status502BadGateway);
+                return ApiProblemResults.BadGateway("The signal-cli service is not reachable.");
             }
         }).WithName("GetSignalStatus");
 
@@ -133,11 +135,11 @@ internal static class ChannelEndpoints
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(options.SignalBaseUrl))
-                return Results.Problem("Signal is not configured on this server.", statusCode: StatusCodes.Status503ServiceUnavailable);
+                return ApiProblemResults.DependencyUnavailable("Signal is not configured on this server.");
             using var response = await httpClients.CreateClient("signal")
                 .GetAsync($"{options.SignalBaseUrl.TrimEnd('/')}/v1/qrcodelink?device_name=Jarvis", ct);
             if (!response.IsSuccessStatusCode)
-                return Results.Problem("signal-cli could not create a link code.", statusCode: StatusCodes.Status502BadGateway);
+                return ApiProblemResults.BadGateway("signal-cli could not create a link code.");
             return Results.File(await response.Content.ReadAsByteArrayAsync(ct), "image/png");
         }).WithName("GetSignalLinkCode");
 

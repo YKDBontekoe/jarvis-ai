@@ -54,8 +54,7 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
     final confirmed = await showJarvisConfirm(
       context,
       title: 'Forget this entity?',
-      message:
-          'Jarvis removes it and every fact that links to it from the graph. Your memories stay.',
+      message: 'Jarvis removes it and every fact that links to it from the graph. Your memories stay.',
       confirmLabel: 'Forget',
       destructive: true,
       icon: PhosphorIconsRegular.trash,
@@ -177,9 +176,9 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
     try {
       final response = await widget.http.get<dynamic>('/api/v1/graph/entities');
       if (!mounted) return;
-      final others = jsonMaps(
-        response.data,
-      ).where((item) => asJsonString(item['id']) != widget.entityId).toList();
+      final others = jsonMaps(response.data)
+          .where((item) => asJsonString(item['id']) != widget.entityId)
+          .toList();
       if (others.isEmpty) {
         setState(
           () => _error = 'There is no other entity to merge into this one.',
@@ -289,17 +288,20 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
                         children: [
                           StatusPill(
                             label: graphTypeLabel(asJsonString(entity['type'])),
-                            color: graphTypeColor(asJsonString(entity['type'])),
+                            color: graphTypeColor(
+                              asJsonString(entity['type']),
+                              context,
+                            ),
                           ),
                           for (final alias in jsonStrings(entity['aliases']))
                             StatusPill(
                               label: 'aka $alias',
-                              color: JarvisColors.muted,
+                              color: JarvisColors.of(context).muted,
                             ),
                           if (updated != null)
                             StatusPill(
                               label: 'Updated ${formatGraphDay(updated)}',
-                              color: JarvisColors.inkSoft,
+                              color: JarvisColors.of(context).inkSoft,
                             ),
                         ],
                       ),
@@ -328,10 +330,10 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
     required bool currentFacts,
   }) {
     if (facts.isEmpty) {
-      return const SurfaceCard(
+      return SurfaceCard(
         child: Text(
           'Nothing recorded yet.',
-          style: TextStyle(color: JarvisColors.inkSoft),
+          style: TextStyle(color: JarvisColors.of(context).inkSoft),
         ),
       );
     }
@@ -344,7 +346,9 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
               icon: currentFacts
                   ? PhosphorIconsRegular.checkCircle
                   : PhosphorIconsRegular.clockCounterClockwise,
-              color: currentFacts ? JarvisColors.success : JarvisColors.muted,
+              color: currentFacts
+                  ? JarvisColors.of(context).success
+                  : JarvisColors.of(context).muted,
               size: 32,
             ),
             title: Text(
@@ -352,8 +356,8 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
               '${asJsonString(fact['objectName']) ?? asJsonString(fact['objectValue']) ?? ''}',
               style: currentFacts
                   ? null
-                  : const TextStyle(
-                      color: JarvisColors.inkSoft,
+                  : TextStyle(
+                      color: JarvisColors.of(context).inkSoft,
                       decoration: TextDecoration.lineThrough,
                     ),
             ),

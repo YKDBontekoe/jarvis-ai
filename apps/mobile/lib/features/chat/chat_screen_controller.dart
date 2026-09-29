@@ -11,6 +11,9 @@ abstract class _ChatScreenController extends State<ChatScreen>
   final _password = TextEditingController();
   final _scroll = ScrollController();
   final _entries = <ChatEntry>[];
+  String? _messageCursor;
+  bool _hasOlderMessages = false;
+  bool _loadingOlderMessages = false;
   HubConnection? _hub;
   Room? _voiceRoom;
   String? _conversationId;
@@ -89,6 +92,9 @@ abstract class _ChatScreenController extends State<ChatScreen>
     String conversationId, [
     int? generation,
   ]);
+  // Declared for part implementations; invoked from chat_screen.dart.
+  // ignore: unused_element
+  Future<void> _loadOlderMessages();
   Future<void> _signIn();
   Future<void> _signOut();
   Future<void> _retryConnection();
@@ -100,6 +106,8 @@ abstract class _ChatScreenController extends State<ChatScreen>
 
   Future<void> _enablePush();
   void _handlePushPayload(Map<String, dynamic> data);
+  Future<void> _openSearch(BuildContext context);
+  Future<void> _openSearchRouteFromNotification(Map<String, dynamic> data);
 
   Future<bool> _send([String? text]);
   void _upsertSurface(UiSurfaceEntry surface);

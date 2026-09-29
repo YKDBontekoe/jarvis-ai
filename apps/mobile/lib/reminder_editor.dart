@@ -117,7 +117,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
             ],
             const SizedBox(height: 10),
             ListTile(
-              tileColor: JarvisColors.surfaceMuted,
+              tileColor: JarvisColors.of(context).surfaceMuted,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(JarvisRadii.md),
               ),
@@ -138,7 +138,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
             ),
             const SizedBox(height: 8),
             ListTile(
-              tileColor: JarvisColors.surfaceMuted,
+              tileColor: JarvisColors.of(context).surfaceMuted,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(JarvisRadii.md),
               ),

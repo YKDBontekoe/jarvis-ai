@@ -112,9 +112,8 @@ class _ChannelEditorSheetState extends State<ChannelEditorSheet> {
               _whatsapp
                   ? 'Use the phone number ID, access token, app secret, and verify token from Meta Developer → WhatsApp → API Setup.'
                   : 'Enter the Signal account number that signal-cli is registered as, then allow the phones that may talk to Jarvis.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: JarvisColors.inkSoft),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: JarvisColors.of(context).inkSoft),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -143,8 +142,7 @@ class _ChannelEditorSheetState extends State<ChannelEditorSheet> {
               decoration: const InputDecoration(
                 labelText: 'Allowed phone numbers',
                 hintText: '+31612345678',
-                helperText:
-                    'One international number per line. Only these can talk to Jarvis.',
+                helperText: 'One international number per line. Only these can talk to Jarvis.',
               ),
             ),
             const SizedBox(height: 10),

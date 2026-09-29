@@ -33,17 +33,17 @@ class _TasksPlaceholder extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(JarvisRadii.lg),
-      border: Border.all(color: JarvisColors.outline),
-      color: JarvisColors.surface,
+      border: Border.all(color: JarvisColors.of(context).outline),
+      color: JarvisColors.of(context).surface,
     ),
     child: Row(
       children: [
-        Icon(icon, size: 20, color: JarvisColors.muted),
+        Icon(icon, size: 20, color: JarvisColors.of(context).muted),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(color: JarvisColors.inkSoft),
+            style: TextStyle(color: JarvisColors.of(context).inkSoft),
           ),
         ),
       ],
@@ -81,10 +81,10 @@ class _TaskRow extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(
+          Icon(
             PhosphorIconsRegular.caretRight,
             size: 16,
-            color: JarvisColors.muted,
+            color: JarvisColors.of(context).muted,
           ),
         ],
       ),
@@ -182,8 +182,8 @@ class _BriefingListCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    color: JarvisColors.inkSoft,
+                  style: TextStyle(
+                    color: JarvisColors.of(context).inkSoft,
                     fontSize: 13,
                     height: 1.35,
                   ),
@@ -193,10 +193,10 @@ class _BriefingListCard extends StatelessWidget {
           ),
         ),
         if (onTap != null)
-          const Icon(
+          Icon(
             PhosphorIconsRegular.caretRight,
             size: 16,
-            color: JarvisColors.muted,
+            color: JarvisColors.of(context).muted,
           ),
       ],
     ),

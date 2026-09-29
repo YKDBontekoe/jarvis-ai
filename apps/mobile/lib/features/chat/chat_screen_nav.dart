@@ -169,6 +169,7 @@ mixin _ChatScreenNav on _ChatScreenController {
         }
       }
       await _auth.signOut();
+      await RecentSearchesStore.clearAll();
       await hub?.stop();
     } finally {
       _signingOut = false;

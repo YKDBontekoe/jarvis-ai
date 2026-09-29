@@ -61,9 +61,9 @@ Future<({String? result, String? error})> performDeviceCapability({
         }
         return (result: 'Shown on this device.', error: null);
       case 'battery':
-        return readDeviceBattery();
+        return await readDeviceBattery();
       case 'location':
-        return readDeviceLocation();
+        return await readDeviceLocation();
       default:
         return (
           result: null,

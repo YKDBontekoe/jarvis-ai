@@ -14,6 +14,17 @@ typedef SettingsDestination = ({
 /// Settings groups in display order. Each destination is opened by the app shell's utility router.
 const List<(String, List<SettingsDestination>)> settingsGroups = [
   (
+    'App',
+    [
+      (
+        title: 'Appearance',
+        subtitle: 'Light, dark, or match this device',
+        icon: PhosphorIconsRegular.circleHalf,
+        destination: 'appearance',
+      ),
+    ],
+  ),
+  (
     'Assistant',
     [
       (
@@ -192,18 +203,20 @@ class SettingsView extends StatelessWidget {
                 ),
               ),
               for (final (title, items) in settingsGroups)
-                _group(context, title, [for (final item in items) _tile(item)]),
+                _group(context, title, [
+                  for (final item in items) _tile(context, item),
+                ]),
               if (onSignOut != null)
                 _group(context, 'Account', [
                   ListTile(
-                    leading: const IconBadge(
+                    leading: IconBadge(
                       icon: PhosphorIconsRegular.signOut,
-                      color: JarvisColors.danger,
+                      color: JarvisColors.of(context).danger,
                       size: 34,
                     ),
-                    title: const Text(
+                    title: Text(
                       'Sign out',
-                      style: TextStyle(color: JarvisColors.danger),
+                      style: TextStyle(color: JarvisColors.of(context).danger),
                     ),
                     onTap: onSignOut,
                   ),
@@ -226,7 +239,7 @@ class SettingsView extends StatelessWidget {
               child: Text(
                 title.toUpperCase(),
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: JarvisColors.muted,
+                  color: JarvisColors.of(context).muted,
                   letterSpacing: .8,
                 ),
               ),
@@ -246,15 +259,15 @@ class SettingsView extends StatelessWidget {
         ),
       );
 
-  Widget _tile(SettingsDestination item) => ListTile(
+  Widget _tile(BuildContext context, SettingsDestination item) => ListTile(
     key: Key('settings-${item.destination}'),
     leading: IconBadge(icon: item.icon, size: 34),
     title: Text(item.title),
     subtitle: Text(item.subtitle),
-    trailing: const Icon(
+    trailing: Icon(
       PhosphorIconsRegular.caretRight,
       size: 16,
-      color: JarvisColors.muted,
+      color: JarvisColors.of(context).muted,
     ),
     onTap: () => onOpen(item.destination),
   );

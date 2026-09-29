@@ -54,6 +54,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     onSeeAll: () => _fromSidebar(() => unawaited(_chooseConversation())),
     onUtility: (destination) => _fromSidebar(() => _openUtility(destination)),
     onSettings: () => _fromSidebar(_openSettings),
+    onJarvisSearch: () => _fromSidebar(() => unawaited(_openSearch(context))),
   );
 
   void _dismissKeyboard() => FocusManager.instance.primaryFocus?.unfocus();
@@ -162,6 +163,12 @@ mixin _ChatScreenUi on _ChatScreenController {
         actions: [
           if (!voice)
             CircleIconButton(
+              icon: PhosphorIconsRegular.magnifyingGlass,
+              tooltip: 'Search',
+              onPressed: _signedOut ? null : () => unawaited(_openSearch(context)),
+            ),
+          if (!voice)
+            CircleIconButton(
               icon: PhosphorIconsRegular.notePencil,
               tooltip: 'New chat',
               onPressed: _busy ? null : _startNewChat,
@@ -188,7 +195,7 @@ mixin _ChatScreenUi on _ChatScreenController {
                 TextButton(
                   onPressed: () => setState(() => _error = null),
                   style: TextButton.styleFrom(
-                    foregroundColor: JarvisColors.inkSoft,
+                    foregroundColor: JarvisColors.of(context).inkSoft,
                   ),
                   child: const Text('Dismiss'),
                 ),
@@ -383,7 +390,9 @@ class _ConnectionDot extends StatelessWidget {
       width: 7,
       height: 7,
       decoration: BoxDecoration(
-        color: connected ? JarvisColors.success : JarvisColors.outlineStrong,
+        color: connected
+            ? JarvisColors.of(context).success
+            : JarvisColors.of(context).outlineStrong,
         shape: BoxShape.circle,
       ),
     ),

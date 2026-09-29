@@ -146,8 +146,8 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
                                       ? PhosphorIconsRegular.waveform
                                       : PhosphorIconsRegular.microphone,
                                   color: _voice == asJsonString(voice['id'])
-                                      ? JarvisColors.ink
-                                      : JarvisColors.muted,
+                                      ? JarvisColors.of(context).ink
+                                      : JarvisColors.of(context).muted,
                                 ),
                                 title: Text(
                                   asJsonString(voice['name']) ??

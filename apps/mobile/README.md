@@ -1,17 +1,11 @@
 # jarvis_mobile
 
-A new Flutter project.
+Flutter client for Jarvis.
 
-## Getting Started
+## Search
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Desktop and web: press `Ctrl`/`⌘`+`K` or use the sidebar/app-bar search control to open the command palette.
+- Phones: the app bar and sidebar search buttons open the full-screen federated search UI.
+- Results navigate through typed `route` targets returned by `GET /api/v1/search` (conversations, memories, files, tasks, reminders, skills, graph entities, channel threads, coding runs).
+- Recent queries are stored locally with `shared_preferences` and cleared when you sign out.
+- Push payloads that include `routeKind` (and route parameters) deep-link through the same navigation helper.

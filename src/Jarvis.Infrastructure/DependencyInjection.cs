@@ -8,6 +8,7 @@ using Jarvis.Application.Memory;
 using Jarvis.Application.Integrations;
 using Jarvis.Infrastructure.Files;
 using Jarvis.Infrastructure.Persistence;
+using Jarvis.Infrastructure.Search;
 using Amazon.Runtime;
 using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
@@ -78,6 +79,7 @@ public static class DependencyInjection
         services.AddHttpClient();
         services.AddScoped<IFileMalwareScanner, ClamAvVirusScanner>();
         services.AddScoped<IFileSearchService, FileSearchService>();
+        services.AddJarvisFederatedSearch(configuration);
         services.AddScoped<IObjectStorage, S3ObjectStorage>();
         var objectStorage = configuration.GetSection("ObjectStorage");
         var serviceUrl = objectStorage["ServiceUrl"] ?? throw new InvalidOperationException("ObjectStorage:ServiceUrl is required.");
