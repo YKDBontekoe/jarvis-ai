@@ -46,7 +46,10 @@ internal sealed partial class ReminderAgentTools(
             var suffix = string.IsNullOrEmpty(rule)
                 ? AgentText.Time(reminder.DueAt)
                 : $"{rule} (next {AgentText.Time(reminder.DueAt)})";
-            return $"Reminder scheduled (reminder ID {reminder.Id}) for {suffix}: {reminder.Title}";
+            var chat = reminder.ConversationId is Guid conversationId
+                ? $" Its chat is conversation ID {conversationId}."
+                : string.Empty;
+            return $"Reminder scheduled (reminder ID {reminder.Id}) for {suffix}: {reminder.Title}.{chat}";
         }
         catch (ArgumentException exception)
         {

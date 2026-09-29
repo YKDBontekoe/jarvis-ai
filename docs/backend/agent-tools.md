@@ -41,6 +41,7 @@ Browser, surface, device, skill, persona, graph, and remote-agent tools are defi
 - Clock + briefing timezone (`ClockContextProvider`)
 - Pinned/relevant memory (`PersonalMemoryContextProvider`)
 - Active tasks and watches
+- Linked reminder or automation for the current conversation
 - Persona, skills, user dream portrait, knowledge graph summaries, device/browser/session state
 - Bound assistant profile (`ProfileContextContributor`) as untrusted working notes
 

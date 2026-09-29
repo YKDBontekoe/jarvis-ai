@@ -52,4 +52,14 @@ public sealed class AutomationRuleTests
         Assert.True(AutomationActionPolicy.RequiresApproval(new AgentRunActionDefinition("t", "p")));
         Assert.False(AutomationActionPolicy.RequiresApproval(new NotificationActionDefinition("t", "b")));
     }
+
+    [Fact]
+    public void AttachConversation_stores_the_linked_chat()
+    {
+        var rule = new AutomationRule(Guid.CreateVersion7(), "Morning", "{}", 1);
+        var conversationId = Guid.CreateVersion7();
+        rule.AttachConversation(conversationId);
+        Assert.Equal(conversationId, rule.ConversationId);
+        Assert.Throws<ArgumentException>(() => rule.AttachConversation(Guid.Empty));
+    }
 }

@@ -30,8 +30,16 @@ public sealed class AutomationRule
     public DateTimeOffset? CooldownUntil { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+    public Guid? ConversationId { get; private set; }
 
     public const int ScheduleStaleGraceMinutes = 30;
+
+    public void AttachConversation(Guid conversationId)
+    {
+        if (conversationId == Guid.Empty)
+            throw new ArgumentException("A conversation id is required.", nameof(conversationId));
+        ConversationId = conversationId;
+    }
 
     public void UpdateDraft(string name, string definitionJson, int schemaVersion)
     {

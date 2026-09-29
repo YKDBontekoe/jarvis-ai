@@ -43,4 +43,14 @@ public sealed class ReminderTests
         Assert.False(reminder.IsOverdueDispatchStale(now));
         Assert.NotNull(reminder.LastDeliveredAt);
     }
+
+    [Fact]
+    public void AttachConversation_stores_the_linked_chat()
+    {
+        var reminder = new Reminder(Guid.CreateVersion7(), "Standup", DateTimeOffset.UtcNow.AddHours(1));
+        var conversationId = Guid.CreateVersion7();
+        reminder.AttachConversation(conversationId);
+        Assert.Equal(conversationId, reminder.ConversationId);
+        Assert.Throws<ArgumentException>(() => reminder.AttachConversation(Guid.Empty));
+    }
 }

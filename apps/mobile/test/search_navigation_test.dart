@@ -20,4 +20,15 @@ void main() {
     expect(route?.parameters['connectionId'], 'conn');
     expect(route?.parameters['peer'], '+15551212');
   });
+
+  test('reminder route prefers a linked conversation', () {
+    final route = searchRouteFromNotification({
+      'routeKind': 'reminder',
+      'reminderId': 'r1',
+      'conversationId': 'c1',
+    });
+    expect(route?.kind, 'reminder');
+    expect(route?.parameters['conversationId'], 'c1');
+    expect(route?.parameters['reminderId'], 'r1');
+  });
 }

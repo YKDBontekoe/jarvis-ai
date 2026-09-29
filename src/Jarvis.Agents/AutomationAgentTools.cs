@@ -32,7 +32,10 @@ internal sealed class AutomationAgentTools(IAutomationRuleService automations, I
             var rule = await automations.CreateAsync(currentUser.OwnerId,
                 new SaveAutomationRuleRequest(name, JsonDocument.Parse(definitionJson).RootElement),
                 cancellationToken);
-            return $"Created draft automation '{rule.Name}' ({rule.Id}). Enable it when ready.";
+            return $"Created draft automation '{rule.Name}' ({rule.Id}). Enable it when ready." +
+                   (rule.ConversationId is Guid conversationId
+                       ? $" Its chat is conversation ID {conversationId}."
+                       : string.Empty);
         }
         catch (Exception exception) when (exception is JsonException or ArgumentException)
         {

@@ -5,9 +5,10 @@ import 'ui/phosphor_icons.dart';
 import 'json_maps.dart';
 
 class AutomationsScreen extends StatefulWidget {
-  const AutomationsScreen({required this.http, super.key});
+  const AutomationsScreen({required this.http, this.onOpenConversation, super.key});
 
   final Dio http;
+  final Future<void> Function(String conversationId)? onOpenConversation;
 
   @override
   State<AutomationsScreen> createState() => _AutomationsScreenState();
@@ -95,6 +96,34 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
     );
   }
 
+  Future<void> _openChat(Map<String, dynamic> rule) async {
+    final opener = widget.onOpenConversation;
+    if (opener == null) return;
+    var conversationId = asJsonString(rule['conversationId']);
+    if (conversationId == null) {
+      final id = asJsonString(rule['id']);
+      if (id == null || id.isEmpty) return;
+      try {
+        final response = await widget.http.get<dynamic>('/api/v1/automations/$id');
+        conversationId = asJsonString(jsonObject(response.data)?['conversationId']);
+      } on DioException {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Jarvis could not open that automation chat.')),
+        );
+        return;
+      }
+    }
+    if (conversationId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This automation does not have a chat yet.')),
+      );
+      return;
+    }
+    await opener(conversationId);
+  }
+
   Future<void> _showRuns(String id, String name) async {
     final response = await widget.http.get<dynamic>('/api/v1/automations/$id/runs');
     final runs = jsonMaps(response.data);
@@ -148,9 +177,12 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
                     child: ListTile(
                       title: Text(name),
                       subtitle: Text('${status.toUpperCase()} · trigger ${triggerKind ?? 'unknown'}'),
+                      onTap: widget.onOpenConversation == null ? null : () => _openChat(rule),
                       trailing: PopupMenuButton<String>(
                         onSelected: (value) async {
                           switch (value) {
+                            case 'chat':
+                              await _openChat(rule);
                             case 'enable':
                               await _enable(id);
                             case 'disable':
@@ -162,6 +194,8 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
                           }
                         },
                         itemBuilder: (_) => [
+                          if (widget.onOpenConversation != null)
+                            const PopupMenuItem(value: 'chat', child: Text('Open chat')),
                           if (status != 'enabled')
                             const PopupMenuItem(value: 'enable', child: Text('Enable')),
                           if (status == 'enabled')

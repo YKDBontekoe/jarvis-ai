@@ -169,7 +169,8 @@ internal static class OwnerAutomationEndpoints
         rule.NextRunAt,
         rule.CooldownUntil,
         rule.CreatedAt,
-        rule.UpdatedAt
+        rule.UpdatedAt,
+        rule.ConversationId
     };
 
     private static object ToRunDto(AutomationRunRecord run) => new

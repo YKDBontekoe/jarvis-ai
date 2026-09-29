@@ -36,7 +36,8 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 
 | Area | Paths |
 |------|-------|
-| Reminders | `GET/POST /reminders`, `GET/DELETE /reminders/{id}` |
+| Reminders | `GET/POST /reminders`, `GET/DELETE /reminders/{id}` (`conversationId` on each reminder) |
+| Owner automations | `GET/POST /automations`, enable/run/history (`conversationId` on each rule; see [automations.md](../automations.md)) |
 | Condition watches | `GET/POST /watches`, `GET/DELETE /watches/{id}` |
 | Tasks | `GET/POST /tasks`, `GET /tasks/{id}`, `GET /tasks/{id}/messages`, cancel endpoints |
 | Daily briefing | `GET/PUT /briefings/daily` (see `AutomationEndpoints`) |

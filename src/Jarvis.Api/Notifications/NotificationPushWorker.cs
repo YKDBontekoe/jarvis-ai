@@ -114,8 +114,8 @@ public sealed class NotificationPushWorker(
             {
                 var accessToken = await credential.UnderlyingCredential
                     .GetAccessTokenForRequestAsync(cancellationToken: cancellationToken);
-                using var response = await SendAsync(projectId, device.Token, notification, accessToken,
-                    cancellationToken);
+                using var response = await SendAsync(projectId, device.Token, notification,
+                    await BuildPushDataAsync(db, notification, cancellationToken), accessToken, cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
                     await db.PushDeliveries.Where(x => x.NotificationId == candidate.NotificationId &&
@@ -154,7 +154,8 @@ public sealed class NotificationPushWorker(
     }
 
     private async Task<HttpResponseMessage> SendAsync(string projectId, string token,
-        Notification notification, string accessToken, CancellationToken cancellationToken)
+        Notification notification, Dictionary<string, string> data, string accessToken,
+        CancellationToken cancellationToken)
     {
         var client = httpClientFactory.CreateClient("firebase-messaging");
         using var request = new HttpRequestMessage(HttpMethod.Post,
@@ -166,18 +167,50 @@ public sealed class NotificationPushWorker(
             {
                 token,
                 notification = new { title = notification.Title, body = notification.Body },
-                data = new Dictionary<string, string>
-                {
-                    ["notificationId"] = notification.Id.ToString("D"),
-                    ["type"] = notification.Type,
-                    ["sourceId"] = notification.SourceId?.ToString("D") ?? string.Empty
-                },
+                data,
                 android = new { priority = "HIGH", notification = new { channel_id = "jarvis_notifications" } },
                 apns = new { headers = new Dictionary<string, string> { ["apns-priority"] = "10" },
                     payload = new { aps = new { sound = "default" } } }
             }
         });
         return await client.SendAsync(request, cancellationToken);
+    }
+
+    private static async Task<Dictionary<string, string>> BuildPushDataAsync(JarvisDbContext db,
+        Notification notification, CancellationToken cancellationToken)
+    {
+        var data = new Dictionary<string, string>
+        {
+            ["notificationId"] = notification.Id.ToString("D"),
+            ["type"] = notification.Type,
+            ["sourceId"] = notification.SourceId?.ToString("D") ?? string.Empty
+        };
+        if (notification.SourceId is not Guid sourceId) return data;
+
+        Guid? conversationId = notification.Type switch
+        {
+            "reminder.due" or "reminder.failed" => await db.Reminders.AsNoTracking()
+                .Where(x => x.Id == sourceId && x.OwnerId == notification.OwnerId)
+                .Select(x => x.ConversationId)
+                .FirstOrDefaultAsync(cancellationToken),
+            "automation.notification" => await db.AutomationRules.AsNoTracking()
+                .Where(x => x.Id == sourceId && x.OwnerId == notification.OwnerId)
+                .Select(x => x.ConversationId)
+                .FirstOrDefaultAsync(cancellationToken),
+            "automation.approval" => await (
+                from run in db.AutomationRuns.AsNoTracking()
+                join rule in db.AutomationRules.AsNoTracking() on run.RuleId equals rule.Id
+                where run.Id == sourceId && run.OwnerId == notification.OwnerId
+                select rule.ConversationId).FirstOrDefaultAsync(cancellationToken),
+            _ => null
+        };
+        if (conversationId is Guid id)
+        {
+            data["routeKind"] = "conversation";
+            data["conversationId"] = id.ToString("D");
+        }
+
+        return data;
     }
 
     private static async Task RecordFailureAsync(JarvisDbContext db, Guid notificationId, Guid deviceId,

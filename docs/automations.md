@@ -2,6 +2,8 @@
 
 Automations combine a **typed trigger**, optional **conditions**, and one or more **typed actions**. Definitions are stored as JSON schema version `1`; Jarvis does not store executable scripts.
 
+Each reminder and automation rule has a **linked conversation** (`conversationId`). Fires and runs post assistant messages there so the owner can reply in chat (cancel, reschedule, enable/disable). Those chats appear in the conversation list; task-backed threads stay hidden.
+
 ## API
 
 - `GET /api/v1/automations` — list rules

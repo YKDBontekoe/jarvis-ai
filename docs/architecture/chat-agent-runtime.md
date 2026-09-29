@@ -22,7 +22,7 @@ Idempotency: approval rows are guarded by a unique key on owner + request + tool
 
 ## Background tasks
 
-`CreateTaskAsync` is **not** offered during an executing background task turn (`context.IsBackgroundTask`). Task conversations use separate session IDs; deleting a normal conversation does not remove task-backed threads.
+`CreateTaskAsync` is **not** offered during an executing background task turn (`context.IsBackgroundTask`). Task conversations use separate session IDs; deleting a normal conversation does not remove task-backed threads. Reminder and automation chats are ordinary interactive conversations (`conversationId` on the reminder or rule) so the owner can reply when they fire.
 
 Temporal runs task workflows (`JarvisTaskWorkflow`); the worker hosts activities that invoke the same agent stack with `WorkerCurrentUser`.
 

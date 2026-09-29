@@ -6,7 +6,7 @@ namespace Jarvis.Application.Workflows;
 public sealed record ReminderRecord(Guid Id, Guid OwnerId, string Title, DateTimeOffset DueAt,
     string WorkflowId, string Status, DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt,
     string Recurrence = "none", int Weekdays = 0, string TimeZoneId = "UTC", TimeOnly? LocalTime = null,
-    DateOnly? Until = null, DateTimeOffset? LastDeliveredAt = null);
+    DateOnly? Until = null, DateTimeOffset? LastDeliveredAt = null, Guid? ConversationId = null);
 
 public sealed record CreateReminderRequest(string Title, DateTimeOffset DueAt, string? Recurrence = null,
     int Weekdays = 0, string? TimeZoneId = null, DateOnly? Until = null, TimeOnly? LocalTime = null);
@@ -107,6 +107,7 @@ public interface IReminderRepository
 {
     Task<ReminderRecord> CreateAsync(Guid ownerId, CreateReminderRequest request, CancellationToken cancellationToken);
     Task<ReminderRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+    Task<ReminderRecord?> GetByConversationIdAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ReminderRecord>> ListRemindersAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ReminderRecord>> ListPendingForSchedulingAsync(CancellationToken cancellationToken);
     Task<int> RequeueOverdueDispatchedAsync(DateTimeOffset utcNow, CancellationToken cancellationToken);
@@ -185,7 +186,7 @@ public static class WorkflowRecordMapping
     public static ReminderRecord ToRecord(this Reminder reminder) => new(reminder.Id, reminder.OwnerId,
         reminder.Title, reminder.DueAt, reminder.WorkflowId, reminder.Status, reminder.CreatedAt, reminder.CompletedAt,
         reminder.Recurrence, reminder.Weekdays, reminder.TimeZoneId, reminder.LocalTime, reminder.Until,
-        reminder.LastDeliveredAt);
+        reminder.LastDeliveredAt, reminder.ConversationId);
 
     public static NotificationRecord ToRecord(this Notification notification) => new(notification.Id,
         notification.Type, notification.Title, notification.Body, notification.SourceId,

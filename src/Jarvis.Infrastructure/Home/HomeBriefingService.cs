@@ -28,7 +28,8 @@ public sealed class HomeBriefingService(
             .Where(item => item.DueAt <= horizon && item.Status != "cancelled")
             .OrderBy(item => item.DueAt)
             .Take(8)
-            .Select(item => new HomeReminderDto(item.Id, item.Title, item.DueAt, item.Status, item.Recurrence))
+            .Select(item => new HomeReminderDto(item.Id, item.Title, item.DueAt, item.Status, item.Recurrence,
+                item.ConversationId))
             .ToArray();
         var approvalList = (await approvals.ListActionableAsync(ownerId, cancellationToken))
             .Take(8)

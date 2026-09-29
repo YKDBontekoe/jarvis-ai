@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../automations_screen.dart';
 import '../../json_maps.dart';
 import '../../memory_screen.dart';
 import '../../reminders_screen.dart';
@@ -24,7 +25,7 @@ SearchRouteTarget? searchRouteFromNotification(Map<String, dynamic> data) {
       if (value != null) params[entry.key.toString()] = value;
     }
   }
-  for (final key in ['conversationId', 'memoryId', 'fileId', 'taskId', 'reminderId', 'skillId', 'entityId', 'connectionId', 'peer', 'runId']) {
+  for (final key in ['conversationId', 'memoryId', 'fileId', 'taskId', 'reminderId', 'automationId', 'skillId', 'entityId', 'connectionId', 'peer', 'runId']) {
     final value = asJsonString(data[key]);
     if (value != null) params.putIfAbsent(_routeParamForKey(key), () => value);
   }
@@ -37,6 +38,7 @@ String _routeParamForKey(String key) => switch (key) {
   'fileId' => 'fileId',
   'taskId' => 'taskId',
   'reminderId' => 'reminderId',
+  'automationId' => 'automationId',
   'skillId' => 'skillId',
   'entityId' => 'entityId',
   'connectionId' => 'connectionId',
@@ -76,8 +78,33 @@ Future<void> navigateSearchRoute(
         return;
       }
     case 'reminder':
+      final conversationId = route.parameters['conversationId'];
+      if (conversationId != null) {
+        await onConversation(conversationId);
+        return;
+      }
       await Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(builder: (_) => RemindersScreen(http: http)),
+        MaterialPageRoute<void>(
+          builder: (_) => RemindersScreen(
+            http: http,
+            onOpenConversation: onConversation,
+          ),
+        ),
+      );
+      return;
+    case 'automation':
+      final conversationId = route.parameters['conversationId'];
+      if (conversationId != null) {
+        await onConversation(conversationId);
+        return;
+      }
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => AutomationsScreen(
+            http: http,
+            onOpenConversation: onConversation,
+          ),
+        ),
       );
       return;
     case 'skill':

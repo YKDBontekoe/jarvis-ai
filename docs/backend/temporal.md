@@ -15,7 +15,8 @@ Defined in `src/Jarvis.Workflows/`:
 
 | Workflow | Purpose |
 |----------|---------|
-| `ReminderWorkflow` | Fire reminders (incl. recurrence in owner IANA TZ) |
+| `ReminderWorkflow` | Fire reminders (incl. recurrence in owner IANA TZ) and post to the reminder’s linked chat |
+| `AutomationScheduleWorkflow` / `AutomationPollWorkflow` / `AutomationRunWorkflow` | Owner automations; run results post to the rule’s linked chat |
 | `ConditionWatchWorkflow` | Poll metrics / device / calendar thresholds |
 | `JarvisTaskWorkflow` | Background agent tasks with approval linkage |
 | `FileProcessingWorkflow` | Extract/index uploaded documents |

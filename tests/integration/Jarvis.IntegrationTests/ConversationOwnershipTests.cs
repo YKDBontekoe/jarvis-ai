@@ -1,9 +1,10 @@
 using Jarvis.Infrastructure.Persistence;
-using Jarvis.Application.Files;
-using Jarvis.Application.Conversations;
-using Jarvis.Domain.Conversations;
 using Jarvis.Application.Approvals;
+using Jarvis.Application.Conversations;
+using Jarvis.Application.Files;
+using Jarvis.Application.Workflows;
 using Jarvis.Domain.Approvals;
+using Jarvis.Domain.Conversations;
 using Jarvis.Domain.Files;
 using Jarvis.Domain.Workflows;
 using Microsoft.EntityFrameworkCore;
@@ -336,6 +337,47 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
             .ToListAsync());
         Assert.Equal("failed",
             (await database.ToolApprovals.SingleAsync(x => x.Id == created.Approval.Id)).ResumeStatus);
+    }
+
+    [Fact]
+    public async Task Creating_a_reminder_adds_an_interactive_conversation()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var reminders = new WorkflowRepository(database);
+        var conversations = new ConversationStore(database);
+        var reminder = await reminders.CreateAsync(owner,
+            new CreateReminderRequest("Stretch", DateTimeOffset.UtcNow.AddHours(1)), CancellationToken.None);
+
+        Assert.NotNull(reminder.ConversationId);
+        Assert.Contains(await conversations.ListAsync(owner, CancellationToken.None),
+            item => item.Id == reminder.ConversationId);
+        var messages = await conversations.GetMessagesAsync(reminder.ConversationId.Value, CancellationToken.None);
+        Assert.Contains(messages, message => message.Role == "assistant" && message.Content.Contains("Stretch"));
+        Assert.Equal(reminder.Id,
+            (await reminders.GetByConversationIdAsync(reminder.ConversationId.Value, owner, CancellationToken.None))!.Id);
+    }
+
+    [Fact]
+    public async Task Creating_an_automation_adds_an_interactive_conversation()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var automations = new AutomationRuleRepository(database);
+        var conversations = new ConversationStore(database);
+        var definition = new Jarvis.Application.Automations.AutomationRuleDefinition(
+            Jarvis.Domain.Automations.AutomationSchema.CurrentVersion,
+            new Jarvis.Application.Automations.ManualTriggerDefinition(),
+            null,
+            [new Jarvis.Application.Automations.NotificationActionDefinition("Hi", "There")],
+            null);
+        var rule = await automations.CreateAsync(owner, "Morning ping", definition, CancellationToken.None);
+
+        Assert.NotNull(rule.ConversationId);
+        Assert.Contains(await conversations.ListAsync(owner, CancellationToken.None),
+            item => item.Id == rule.ConversationId);
+        Assert.Equal(rule.Id,
+            (await automations.GetByConversationIdAsync(rule.ConversationId.Value, owner, CancellationToken.None))!.Id);
     }
 
     private JarvisDbContext CreateDbContext()

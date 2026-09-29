@@ -1,10 +1,11 @@
-using System.Diagnostics;
 using System.Text.Json;
 using Jarvis.Application.Audit;
 using Microsoft.Extensions.Logging;
 using Jarvis.Application.Automations;
+using Jarvis.Application.Conversations;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Automations;
+using Jarvis.Domain.Conversations;
 
 namespace Jarvis.Workflows;
 
@@ -14,6 +15,7 @@ public sealed class AutomationRunExecutor(
     INotificationRepository notifications,
     IJarvisTaskService tasks,
     IAutomationChannelSender channelSender,
+    IConversationStore conversations,
     AutomationConditionEvaluator conditions,
     IAuditEventStore auditEvents,
     TimeProvider timeProvider,
@@ -70,6 +72,8 @@ public sealed class AutomationRunExecutor(
                     approvalId, JsonSerializer.Serialize(new { runId = input.RunId, action = action.Kind }),
                     cancellationToken);
                 results.Add(new AutomationActionResult(action.Kind, "waiting_approval", null, approvalId));
+                await PostToLinkedChatAsync(rule, LinkedConversationCopy.AutomationWaitingApproval(rule.Name,
+                    action.Kind), cancellationToken);
                 return new AutomationRunActivityResult(false, Serialize(results), true);
             }
 
@@ -95,7 +99,29 @@ public sealed class AutomationRunExecutor(
             ? AutomationScheduleClock.GetNextScheduleFireUtc(timeProvider.GetUtcNow(), schedule)
             : null;
         await rules.UpdateScheduleStateAsync(input.RuleId, next, cooldown, cancellationToken);
+        var failed = results.Any(result => result.Status == "failed");
+        await PostToLinkedChatAsync(rule, LinkedConversationCopy.AutomationRun(rule.Name,
+            failed ? "failed" : "completed", input.TriggerReason, json, input.TestRun), cancellationToken);
         return new AutomationRunActivityResult(true, json, false);
+    }
+
+    private async Task PostToLinkedChatAsync(AutomationRuleRecord rule, string content,
+        CancellationToken cancellationToken)
+    {
+        var conversationId = rule.ConversationId;
+        if (conversationId is null)
+        {
+            try
+            {
+                conversationId = await rules.EnsureConversationAsync(rule.Id, cancellationToken);
+            }
+            catch (KeyNotFoundException)
+            {
+                return;
+            }
+        }
+
+        await conversations.AddMessageAsync(new Message(conversationId.Value, "assistant", content), cancellationToken);
     }
 
     private async Task<AutomationActionResult> ExecuteActionAsync(AutomationRunWorkflowInput input,
