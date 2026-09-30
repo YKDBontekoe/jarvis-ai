@@ -62,7 +62,8 @@ public sealed class ChannelMessageRouter(
         I'm Jarvis. Message me like you would in the app.
         • /new — start a fresh conversation
         • /status — what I'm waiting on
-        • YES or NO — answer an approval request
+        • YES or NO — answer an approval request from this chat
+        Approvals from app chats, tasks and automations can only be decided in the Jarvis app.
         """;
 
     private static readonly HashSet<string> Yes = new(StringComparer.OrdinalIgnoreCase)
@@ -105,9 +106,12 @@ public sealed class ChannelMessageRouter(
             .Where(approval => approval.Status == "pending").ToList();
         if (text.Equals("/status", StringComparison.OrdinalIgnoreCase))
         {
-            await messenger.SendAsync(connection, sender, pending.Count == 0
+            var elsewhere = await CountPendingElsewhereAsync(ownerId, pending, cancellationToken);
+            var status = pending.Count == 0
                 ? "Nothing is waiting on you here. Ask me anything."
-                : $"I'm waiting for your approval to run {pending[0].ToolName}. Reply YES or NO.", cancellationToken);
+                : $"I'm waiting for your approval to run {pending[0].ToolName}. Reply YES or NO.";
+            await messenger.SendAsync(connection, sender,
+                elsewhere == 0 ? status : status + "\n\n" + AppOnlyNotice(connection.Kind, elsewhere), cancellationToken);
             return;
         }
 
@@ -121,6 +125,13 @@ public sealed class ChannelMessageRouter(
         else if (pending.Count > 0)
         {
             await messenger.SendAsync(connection, sender, ApprovalPrompt(pending[0]), cancellationToken);
+            return;
+        }
+        else if ((Yes.Contains(normalizedAnswer) || No.Contains(normalizedAnswer)) &&
+                 await CountPendingElsewhereAsync(ownerId, pending, cancellationToken) is var otherPending and > 0)
+        {
+            // A bare YES/NO would otherwise go to the agent as chat and look like a decision that never happened.
+            await messenger.SendAsync(connection, sender, AppOnlyNotice(connection.Kind, otherPending), cancellationToken);
             return;
         }
         else
@@ -149,6 +160,19 @@ public sealed class ChannelMessageRouter(
         var arguments = approval.ArgumentsJson.Length <= 400 ? approval.ArgumentsJson : approval.ArgumentsJson[..400] + "…";
         return $"🔐 I need your approval to run *{approval.ToolName}*.\n{arguments}\n\nReply YES to approve or NO to decline.";
     }
+
+    /// <summary>Pending tool approvals that a YES/NO in this chat cannot reach.</summary>
+    private async Task<int> CountPendingElsewhereAsync(Guid ownerId, IReadOnlyList<ToolApprovalRecord> here,
+        CancellationToken cancellationToken)
+    {
+        var hereIds = here.Select(item => item.Id).ToHashSet();
+        return (await approvals.ListActionableAsync(ownerId, cancellationToken))
+            .Count(item => item.Status == "pending" && !hereIds.Contains(item.Id));
+    }
+
+    internal static string AppOnlyNotice(string kind, int count) =>
+        $"⚠️ {count} other approval{(count == 1 ? " is" : "s are")} waiting in the Jarvis app. " +
+        $"Approvals from app chats, tasks and automations can't be decided from {ChannelKinds.Label(kind)} — open the Jarvis app.";
 
     private async Task<Guid> GetOrCreateConversationAsync(ChannelConnectionRecord connection, string sender,
         CancellationToken cancellationToken)

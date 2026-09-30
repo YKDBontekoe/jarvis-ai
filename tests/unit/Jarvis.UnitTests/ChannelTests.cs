@@ -5,6 +5,7 @@ using Jarvis.Api.Channels;
 using Jarvis.Api.Conversations;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Channels;
+using Jarvis.Application.Workflows;
 using Jarvis.Domain.Conversations;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -132,8 +133,64 @@ public sealed class ChannelTests
         Assert.False(ChannelNotificationForwarder.CanMessage(connection with { LastInboundAt = now.AddHours(-25) }, now));
         Assert.False(ChannelNotificationForwarder.CanMessage(connection with { LastInboundAt = null }, now));
         Assert.True(ChannelNotificationForwarder.CanMessage(connection with { Kind = ChannelKinds.Signal, LastInboundAt = null }, now));
-        Assert.False(ChannelNotificationForwarder.ShouldForward("approval.required"));
-        Assert.True(ChannelNotificationForwarder.ShouldForward("reminder.due"));
+        Assert.False(ChannelNotificationForwarder.ShouldForward(connection, "approval.required"));
+        Assert.True(ChannelNotificationForwarder.ShouldForward(connection, "reminder.due"));
+    }
+
+    [Fact]
+    public void Notification_categories_default_to_everything_but_approvals_and_can_be_narrowed()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var connection = new ChannelConnectionRecord(Guid.NewGuid(), Guid.NewGuid(), ChannelKinds.WhatsAppLinked, "Phone",
+            "+31612345678", true, ["+31612345678"], true, null, "key", null, null, null, now, now, now);
+
+        Assert.True(ChannelNotificationForwarder.ShouldForward(connection, "briefing.daily"));
+        Assert.True(ChannelNotificationForwarder.ShouldForward(connection, "some.future.type"));
+        Assert.False(ChannelNotificationForwarder.ShouldForward(connection, "automation.approval"));
+
+        var approvalsOnly = connection with { NotificationCategories = [ChannelNotificationCategories.Approvals] };
+        Assert.True(ChannelNotificationForwarder.ShouldForward(approvalsOnly, "approval.required"));
+        Assert.True(ChannelNotificationForwarder.ShouldForward(approvalsOnly, "automation.approval"));
+        Assert.False(ChannelNotificationForwarder.ShouldForward(approvalsOnly, "reminder.due"));
+    }
+
+    [Fact]
+    public void Category_requests_are_normalized_and_unknown_categories_are_rejected()
+    {
+        Assert.Equal(["reminders", "approvals"], ChannelNotificationCategories.Normalize(["Approvals", "reminders", "approvals"]));
+        Assert.Null(ChannelNotificationCategories.Normalize(null));
+        Assert.Throws<ArgumentException>(() => ChannelNotificationCategories.Normalize(["everything"]));
+
+        var request = new SaveChannelRequest(ChannelKinds.WhatsAppLinked, "WhatsApp", "+31612345678", true,
+            ["+31612345678"], true, null, null, ["Tasks"]);
+        Assert.Equal(["tasks"], ChannelValidation.Normalize(request, creating: true).NotificationCategories);
+        Assert.Throws<ArgumentException>(() => ChannelValidation.Normalize(request with { NotificationCategories = ["nope"] }, true));
+    }
+
+    [Fact]
+    public void Forwarded_approvals_say_when_they_must_be_decided_in_the_jarvis_app()
+    {
+        var approval = new NotificationRecord(Guid.NewGuid(), "approval.required", "Approval needed",
+            "Jarvis is waiting for approval to run SendEmail.", Guid.NewGuid(), DateTimeOffset.UtcNow, null);
+
+        var here = ChannelNotificationForwarder.Compose(ChannelKinds.WhatsAppLinked, approval, decidableHere: true);
+        var appOnly = ChannelNotificationForwarder.Compose(ChannelKinds.WhatsAppLinked, approval, decidableHere: false);
+        var automation = ChannelNotificationForwarder.Compose(ChannelKinds.WhatsAppLinked,
+            approval with { Type = "automation.approval" }, decidableHere: null);
+        var reminder = ChannelNotificationForwarder.Compose(ChannelKinds.WhatsAppLinked,
+            approval with { Type = "reminder.due", Title = "Reminder", Body = "Call mom" }, decidableHere: null);
+
+        Assert.Contains("Reply YES to approve or NO to decline", here);
+        Assert.DoesNotContain("Jarvis app", here);
+        Assert.Contains("can't be approved from WhatsApp", appOnly);
+        Assert.Contains("Open the Jarvis app", appOnly);
+        Assert.DoesNotContain("Reply YES", appOnly);
+        Assert.Contains("can't be decided from WhatsApp", automation);
+        Assert.Contains("Open the Jarvis app", automation);
+        Assert.DoesNotContain("Jarvis app", reminder);
+        Assert.Contains("can't be decided from WhatsApp", ChannelMessageRouter.AppOnlyNotice(ChannelKinds.WhatsAppLinked, 2));
+        Assert.Contains("2 other approvals are", ChannelMessageRouter.AppOnlyNotice(ChannelKinds.WhatsAppLinked, 2));
+        Assert.Contains("1 other approval is", ChannelMessageRouter.AppOnlyNotice(ChannelKinds.Signal, 1));
     }
 
     [Fact]

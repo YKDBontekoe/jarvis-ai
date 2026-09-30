@@ -89,6 +89,10 @@ class _ChannelAllowedSendersSheetState
             widget.channel['forwardNotifications'],
           ),
           'notifyRecipient': notifyRecipient,
+          if (widget.channel['notificationCategories'] != null)
+            'notificationCategories': jsonStrings(
+              widget.channel['notificationCategories'],
+            ),
         },
       );
       if (!mounted) return;

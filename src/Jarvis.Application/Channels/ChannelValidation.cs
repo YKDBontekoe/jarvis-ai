@@ -51,6 +51,6 @@ public static class ChannelValidation
             throw new ArgumentException("Credentials must be single-line values of up to 1,000 characters.");
 
         return new SaveChannelRequest(kind, name, account, request.Enabled, senders, request.ForwardNotifications,
-            notify, secrets);
+            notify, secrets, ChannelNotificationCategories.Normalize(request.NotificationCategories));
     }
 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Jarvis.Api.Security;
+using Jarvis.Application.Approvals;
 using Jarvis.Application.Channels;
 using Jarvis.Application.Workflows;
 
@@ -182,26 +183,81 @@ public sealed class ChannelNotificationForwarder(IServiceScopeFactory scopes, IL
         {
             await using var scope = scopes.CreateOwnerScope(connection.OwnerId);
             var services = scope.ServiceProvider;
+            var channels = services.GetRequiredService<IChannelRepository>();
             var notifications = (await services.GetRequiredService<INotificationRepository>()
                     .ListNotificationsAsync(connection.OwnerId, cancellationToken))
                 .Where(item => item.CreatedAt > connection.NotificationsForwardedUntil)
                 .OrderBy(item => item.CreatedAt)
                 .ToArray();
             if (notifications.Length == 0) continue;
+            var wanted = notifications.Where(item => ShouldForward(connection, item.Type)).ToArray();
             var recipient = connection.NotifyRecipient ?? connection.AllowedSenders.FirstOrDefault();
-            if (recipient is not null && CanMessage(connection, DateTimeOffset.UtcNow))
+            if (recipient is not null && wanted.Length > 0)
             {
-                var messenger = services.GetRequiredService<ChannelMessenger>();
-                foreach (var notification in notifications.Where(item => ShouldForward(item.Type)))
-                    await messenger.SendAsync(connection, recipient, $"🔔 **{notification.Title}**\n{notification.Body}",
+                if (CanMessage(connection, DateTimeOffset.UtcNow))
+                {
+                    var messenger = services.GetRequiredService<ChannelMessenger>();
+                    foreach (var notification in wanted)
+                    {
+                        var text = await ComposeAsync(connection, recipient, notification, services, cancellationToken);
+                        if (text is not null) await messenger.SendAsync(connection, recipient, text, cancellationToken);
+                    }
+                }
+                else
+                {
+                    // Surface the gap on the channel instead of dropping notifications without a trace.
+                    await channels.RecordOutboundAsync(connection.Id, recipient,
+                        $"{wanted.Length} notification(s) were not sent to WhatsApp.", WindowClosedError,
                         cancellationToken);
+                }
             }
-            await services.GetRequiredService<IChannelRepository>()
-                .AdvanceNotificationWatermarkAsync(connection.Id, notifications[^1].CreatedAt, cancellationToken);
+            await channels.AdvanceNotificationWatermarkAsync(connection.Id, notifications[^1].CreatedAt,
+                cancellationToken);
         }
     }
 
-    internal static bool ShouldForward(string type) => type != "approval.required";
+    internal const string WindowClosedError =
+        "WhatsApp only allows messages within 24 hours of your last message to Jarvis. " +
+        "Message Jarvis on WhatsApp to reopen it, or check the Jarvis app.";
+
+    internal static bool ShouldForward(ChannelConnectionRecord connection, string type) =>
+        ChannelNotificationCategories.IsEnabled(connection.NotificationCategories, type);
+
+    private static async Task<string?> ComposeAsync(ChannelConnectionRecord connection, string recipient,
+        NotificationRecord notification, IServiceProvider services, CancellationToken cancellationToken)
+    {
+        if (notification.Type != "approval.required" || notification.SourceId is not { } approvalId)
+            return Compose(connection.Kind, notification, decidableHere: null);
+
+        var approval = await services.GetRequiredService<IToolApprovalStore>()
+            .GetActionableAsync(approvalId, connection.OwnerId, cancellationToken);
+        if (approval is null || approval.Status != "pending") return null; // Decided elsewhere already.
+        var thread = await services.GetRequiredService<IChannelRepository>().GetThreadConversationAsync(
+            connection.Id, ChannelAddresses.Normalize(recipient), cancellationToken);
+        return Compose(connection.Kind, notification,
+            decidableHere: approval.TaskId is null && thread == approval.ConversationId);
+    }
+
+    /// <summary>
+    /// Builds the message. <paramref name="decidableHere"/> is only used for tool approvals: true when a YES/NO reply
+    /// in this chat decides it, false when it can only be decided in the Jarvis app.
+    /// </summary>
+    internal static string Compose(string kind, NotificationRecord notification, bool? decidableHere)
+    {
+        var app = ChannelKinds.Label(kind);
+        return notification.Type switch
+        {
+            "approval.required" when decidableHere == true =>
+                $"🔐 **{notification.Title}**\n{notification.Body}\nReply YES to approve or NO to decline.",
+            "approval.required" =>
+                $"🔐 **{notification.Title}**\n{notification.Body}\n" +
+                $"⚠️ This can't be approved from {app}. Open the Jarvis app to review and decide.",
+            "automation.approval" =>
+                $"🔐 **{notification.Title}**\n{notification.Body}\n" +
+                $"⚠️ Automation approvals can't be decided from {app}. Open the Jarvis app to review and decide.",
+            _ => $"🔔 **{notification.Title}**\n{notification.Body}"
+        };
+    }
 
     /// <summary>
     /// The WhatsApp Cloud API only allows free-form business messages within 24 hours of the user's last message.

@@ -153,6 +153,41 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
     ).showSnackBar(const SnackBar(content: Text('Allowed senders updated.')));
   }
 
+  Future<void> _editNotifications() async {
+    final channel = _channel;
+    if (channel == null || _busy) return;
+    final updated = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) =>
+          ChannelNotificationsSheet(http: widget.http, channel: channel),
+    );
+    if (updated == null || !mounted) return;
+    setState(() => _channel = updated);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Notifications updated.')));
+  }
+
+  String _forwardingSummary(Map<String, dynamic> channel) {
+    final labels = {
+      for (final category in channelNotificationCategories)
+        category.id: category.label,
+    };
+    final selected = channel['notificationCategories'] == null
+        ? defaultChannelNotificationCategories()
+        : jsonStrings(channel['notificationCategories']).toSet();
+    final names = [
+      for (final category in channelNotificationCategories)
+        if (selected.contains(category.id)) labels[category.id]!,
+    ];
+    final to =
+        asJsonString(channel['notifyRecipient']) ?? 'the first allowed number';
+    return names.isEmpty
+        ? 'No notification types selected.'
+        : 'Forwards ${names.join(', ').toLowerCase()} to $to.';
+  }
+
   Future<void> _disconnect() async {
     final confirmed = await showJarvisConfirm(
       context,
@@ -282,14 +317,30 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                             label: const Text('Edit allowed senders'),
                           ),
                         ),
-                        if (asJsonBool(channel['forwardNotifications']))
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              'Forwards notifications to ${asJsonString(channel['notifyRecipient']) ?? 'the first allowed number'}.',
-                              style: Theme.of(context).textTheme.bodySmall,
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            key: const Key('channel-edit-notifications'),
+                            onPressed: _busy
+                                ? null
+                                : () => unawaited(_editNotifications()),
+                            icon: const Icon(
+                              PhosphorIconsRegular.pencilSimple,
+                              size: 16,
                             ),
+                            label: const Text('Edit notifications'),
                           ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            asJsonBool(channel['forwardNotifications'])
+                                ? _forwardingSummary(channel)
+                                : 'Notifications are not forwarded.',
+                            key: const Key('channel-forward-summary'),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
                         if (asJsonString(channel['kind']) == 'whatsapp_linked' &&
                             asJsonString(channel['lastError']) != null)
                           Align(
