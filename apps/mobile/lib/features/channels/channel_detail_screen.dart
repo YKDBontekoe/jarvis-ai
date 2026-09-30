@@ -137,6 +137,22 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
     if (linked != null && mounted) unawaited(_load());
   }
 
+  Future<void> _editAllowedSenders() async {
+    final channel = _channel;
+    if (channel == null || _busy) return;
+    final updated = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) =>
+          ChannelAllowedSendersSheet(http: widget.http, channel: channel),
+    );
+    if (updated == null || !mounted) return;
+    setState(() => _channel = updated);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Allowed senders updated.')));
+  }
+
   Future<void> _disconnect() async {
     final confirmed = await showJarvisConfirm(
       context,
@@ -244,8 +260,27 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                           ),
                         ),
                         Text(
-                          'Allowed senders: ${jsonStrings(channel['allowedSenders']).join(', ')}',
+                          'Allowed senders',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          jsonStrings(channel['allowedSenders']).join(', '),
                           style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            key: const Key('channel-edit-allowed-senders'),
+                            onPressed: _busy
+                                ? null
+                                : () => unawaited(_editAllowedSenders()),
+                            icon: const Icon(
+                              PhosphorIconsRegular.pencilSimple,
+                              size: 16,
+                            ),
+                            label: const Text('Edit allowed senders'),
+                          ),
                         ),
                         if (asJsonBool(channel['forwardNotifications']))
                           Padding(
