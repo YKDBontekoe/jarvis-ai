@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Jarvis.Application.Search;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -8,7 +9,8 @@ namespace Jarvis.Infrastructure.Search;
 public sealed class FederatedSearchService(
     IEnumerable<IFederatedSearchProvider> providers,
     IOptions<FederatedSearchOptions> options,
-    ILogger<FederatedSearchService> logger) : IFederatedSearchService
+    ILogger<FederatedSearchService> logger,
+    IServiceScopeFactory? scopeFactory = null) : IFederatedSearchService
 {
     private readonly FederatedSearchOptions _options = options.Value;
     private readonly IFederatedSearchProvider[] _providers = providers.ToArray();
@@ -48,7 +50,11 @@ public sealed class FederatedSearchService(
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(_options.ProviderTimeout);
-            var results = await provider.SearchAsync(ownerId, query, _options.MaxPerProvider, timeout.Token);
+            // Providers run concurrently, and a DbContext is not thread-safe, so each one gets its own scope.
+            await using var scope = scopeFactory?.CreateAsyncScope();
+            var isolated = scope?.ServiceProvider.GetServices<IFederatedSearchProvider>()
+                .FirstOrDefault(candidate => candidate.ProviderId == provider.ProviderId) ?? provider;
+            var results = await isolated.SearchAsync(ownerId, query, _options.MaxPerProvider, timeout.Token);
             if (kindsFilter is { Count: > 0 })
                 results = results.Where(hit => kindsFilter.Contains(hit.Kind)).ToArray();
             SearchDiagnostics.ProviderLatency.Record(stopwatch.Elapsed.TotalMilliseconds,

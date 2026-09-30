@@ -477,7 +477,7 @@ class _RemindersScreenState extends State<RemindersScreen>
         preferredSize: const Size.fromHeight(56),
         child: ContentWidth(
           child: Container(
-            height: 44,
+            constraints: const BoxConstraints(minHeight: 44),
             margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
@@ -487,9 +487,16 @@ class _RemindersScreenState extends State<RemindersScreen>
             child: TabBar(
               controller: _tabs,
               tabs: [
-                const Tab(text: 'Reminders'),
+                const Tab(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text('Reminders'),
+                  ),
+                ),
                 Tab(
-                  child: Row(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text('Notifications'),
@@ -515,6 +522,7 @@ class _RemindersScreenState extends State<RemindersScreen>
                         ),
                       ],
                     ],
+                  ),
                   ),
                 ),
               ],

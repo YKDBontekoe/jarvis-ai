@@ -7,7 +7,7 @@ internal static class SearchEndpoints
 {
     public static RouteGroupBuilder MapSearchEndpoints(this RouteGroupBuilder api)
     {
-        api.MapGet("/search", async (IFederatedSearchService search, ICurrentUser currentUser, string query,
+        api.MapGet("/search", async (IFederatedSearchService search, ICurrentUser currentUser, string? query,
                 string? kinds, CancellationToken ct) =>
             {
                 if (string.IsNullOrWhiteSpace(query))
@@ -22,7 +22,7 @@ internal static class SearchEndpoints
                     kindFilter = parsed;
                 }
 
-                var response = await search.SearchAsync(currentUser.OwnerId, query, kindFilter, ct);
+                var response = await search.SearchAsync(currentUser.OwnerId, query!, kindFilter, ct);
                 return Results.Ok(new FederatedSearchResponseDto(
                     response.Results.Select(ToDto).ToArray(),
                     response.Providers.Select(status => new SearchProviderStatusDto(status.ProviderId, status.Succeeded,

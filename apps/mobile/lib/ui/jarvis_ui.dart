@@ -209,13 +209,15 @@ class StatusPill extends StatelessWidget {
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: colors.inkSoft,
-              height: 1.25,
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: colors.inkSoft,
+                height: 1.25,
+              ),
             ),
           ),
         ],
@@ -660,15 +662,20 @@ class HeaderAction extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool busy;
 
-  /// Drops the label on narrow screens so it never crowds out the app bar title.
+  /// Marks a secondary action: it drops its label on narrow screens so it never
+  /// crowds out the app bar title, and uses a quieter tonal fill.
   final bool collapsesWhenNarrow;
 
   static const _narrowWidth = 480.0;
 
   @override
   Widget build(BuildContext context) {
+    // Large text leaves no room for a label next to the title, whatever the
+    // screen width, so every action falls back to its icon.
+    final bigText = MediaQuery.textScalerOf(context).scale(14) > 14 * 1.3;
     final iconOnly =
-        collapsesWhenNarrow && MediaQuery.sizeOf(context).width < _narrowWidth;
+        bigText ||
+        (collapsesWhenNarrow && MediaQuery.sizeOf(context).width < _narrowWidth);
     final leading = busy
         ? const SizedBox.square(
             dimension: 14,
@@ -683,7 +690,7 @@ class HeaderAction extends StatelessWidget {
 
   Widget _iconOnly(Widget leading) => Tooltip(
     message: label,
-    child: FilledButton(
+    child: _button(
       onPressed: busy ? null : onPressed,
       style: _style().copyWith(
         minimumSize: const WidgetStatePropertyAll(Size(34, 34)),
@@ -693,12 +700,35 @@ class HeaderAction extends StatelessWidget {
     ),
   );
 
-  Widget _labelled(Widget leading) => FilledButton.icon(
+  Widget _labelled(Widget leading) => _button(
     onPressed: busy ? null : onPressed,
     style: _style(),
-    icon: leading,
-    label: Text(label),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [leading, const SizedBox(width: 8), Text(label)],
+    ),
   );
+
+  Widget _button({
+    required VoidCallback? onPressed,
+    required ButtonStyle style,
+    required Widget child,
+  }) => collapsesWhenNarrow
+      ? Builder(
+          builder: (context) => FilledButton.tonal(
+            onPressed: onPressed,
+            style: style.copyWith(
+              backgroundColor: WidgetStatePropertyAll(
+                JarvisColors.of(context).surfaceRaised,
+              ),
+              foregroundColor: WidgetStatePropertyAll(
+                JarvisColors.of(context).ink,
+              ),
+            ),
+            child: child,
+          ),
+        )
+      : FilledButton(onPressed: onPressed, style: style, child: child);
 
   ButtonStyle _style() => FilledButton.styleFrom(
     minimumSize: const Size(0, 34),

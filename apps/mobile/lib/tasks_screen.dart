@@ -184,6 +184,7 @@ class _TasksScreenState extends State<TasksScreen> {
           icon: PhosphorIconsRegular.plus,
           onPressed: _createTask,
           busy: _creating,
+          collapsesWhenNarrow: true,
         ),
       ],
     ),
@@ -254,7 +255,7 @@ class _TasksScreenState extends State<TasksScreen> {
                       const SizedBox(height: 2),
                       Text(
                         label,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall,
                       ),

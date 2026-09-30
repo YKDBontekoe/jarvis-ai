@@ -4,11 +4,15 @@ class ApprovalCard extends StatelessWidget {
   const ApprovalCard({
     required this.approval,
     required this.onDecide,
+    this.loadMemoryText,
     super.key,
   });
 
   final ApprovalEntry approval;
   final void Function(bool approved) onDecide;
+
+  /// Looks up the text of a memory so its approval shows what will be lost.
+  final Future<String?> Function(String memoryId)? loadMemoryText;
 
   @override
   Widget build(BuildContext context) {
@@ -119,33 +123,44 @@ class ApprovalCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           for (final entry in arguments.take(6))
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 3),
-                              child: Text.rich(
-                                TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: '${humanizeToolName(entry.key)}  ',
-                                      style: TextStyle(
-                                        color: JarvisColors.of(context).muted,
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    TextSpan(
-                                      text: '${entry.value}',
-                                      style: TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontSize: 12.5,
-                                        color: JarvisColors.of(context).ink,
-                                      ),
-                                    ),
-                                  ],
+                            if (entry.key == 'memoryId' &&
+                                loadMemoryText != null &&
+                                approval.toolName == 'ForgetMemory')
+                              _MemoryPreview(
+                                memoryId: '${entry.value}',
+                                load: loadMemoryText!,
+                              )
+                            else
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 3,
                                 ),
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
+                                child: Text.rich(
+                                  TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text:
+                                            '${humanizeToolName(entry.key)}  ',
+                                        style: TextStyle(
+                                          color: JarvisColors.of(context).muted,
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text: '${entry.value}',
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 12.5,
+                                          color: JarvisColors.of(context).ink,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
                         ],
                       ),
                     ),
@@ -205,6 +220,59 @@ class ApprovalCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Shows the text of the memory an approval is about, falling back to a
+/// short label while loading or when it cannot be read.
+class _MemoryPreview extends StatefulWidget {
+  const _MemoryPreview({required this.memoryId, required this.load});
+
+  final String memoryId;
+  final Future<String?> Function(String memoryId) load;
+
+  @override
+  State<_MemoryPreview> createState() => _MemoryPreviewState();
+}
+
+class _MemoryPreviewState extends State<_MemoryPreview> {
+  late final Future<String?> _text = widget.load(widget.memoryId);
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return FutureBuilder<String?>(
+      future: _text,
+      builder: (context, snapshot) {
+        final text = snapshot.data;
+        final label = snapshot.connectionState != ConnectionState.done
+            ? 'Loading…'
+            : (text == null || text.isEmpty ? 'This memory' : '“$text”');
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Memory  ',
+                  style: TextStyle(
+                    color: colors.muted,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                TextSpan(
+                  text: label,
+                  style: TextStyle(fontSize: 14, color: colors.ink),
+                ),
+              ],
+            ),
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+      },
     );
   }
 }

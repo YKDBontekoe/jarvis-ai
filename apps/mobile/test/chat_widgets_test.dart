@@ -303,6 +303,28 @@ void main() {
     },
   );
 
+  testWidgets('forget approval shows the memory text instead of its id', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        ApprovalCard(
+          approval: const ApprovalEntry(
+            id: 'a9',
+            toolName: 'ForgetMemory',
+            argumentsJson: '{"memoryId":"0199-abc"}',
+          ),
+          onDecide: (_) {},
+          loadMemoryText: (id) async => id == '0199-abc' ? 'I like jazz' : null,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('I like jazz', findRichText: true), findsOneWidget);
+    expect(find.textContaining('0199-abc', findRichText: true), findsNothing);
+  });
+
   testWidgets('pending Approve ignores a leftover decline decision', (
     tester,
   ) async {

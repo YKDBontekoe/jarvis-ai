@@ -147,7 +147,11 @@ class _ChatComposerState extends State<ChatComposer> {
             keyboardType: TextInputType.multiline,
             style: TextStyle(fontSize: 16, color: JarvisColors.of(context).ink),
             decoration: InputDecoration(
-              hintText: widget.voiceActive ? 'Listening…' : widget.hint,
+              hintText: widget.voiceActive
+                  ? 'Listening…'
+                  : widget.awaitingApproval
+                  ? 'Approve or decline above to continue'
+                  : widget.hint,
               hintStyle: TextStyle(
                 fontSize: 16,
                 color: JarvisColors.of(context).muted,

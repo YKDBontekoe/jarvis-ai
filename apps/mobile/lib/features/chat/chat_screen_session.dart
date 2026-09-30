@@ -256,7 +256,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       await _createAndOpenConversation();
     } else if (selection?.conversationId != null) {
       if (selection!.conversationId == _conversationId) {
-        setState(() => _showHome = false);
+        _showTranscript();
         return;
       }
       if (!mounted || _signedOut || _signingOut) return;
