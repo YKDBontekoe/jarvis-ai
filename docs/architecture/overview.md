@@ -43,7 +43,7 @@ flowchart LR
 |-----------|------|
 | **Jarvis.Api** | HTTP `/api/v1`, SignalR, voice bridge, webhooks (WhatsApp), A2A (`/a2a`), OpenAPI in Development |
 | **Jarvis.Worker** | Temporal activities: reminders, watches, tasks, file indexing, heartbeat/dreaming, briefing |
-| **Jarvis.AppHost** | .NET Aspire orchestration for local PostgreSQL, Temporal dev server, SeaweedFS, ClamAV, LiveKit, signal-cli |
+| **Jarvis.AppHost** | .NET Aspire orchestration for local PostgreSQL, Temporal dev server, SeaweedFS, ClamAV, LiveKit, signal-cli, WhatsApp bridge |
 | **apps/mobile** | Chat, tasks, memory, settings, voice (LiveKit), device node, channels |
 | **PostgreSQL** | Conversations, identity, memory, files metadata, integrations (encrypted), audit, graph |
 | **Object storage** | Private file blobs (Garage/SeaweedFS/S3) |

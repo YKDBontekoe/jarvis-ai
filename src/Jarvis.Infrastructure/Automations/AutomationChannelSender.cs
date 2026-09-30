@@ -28,6 +28,8 @@ public sealed class AutomationChannelSender(
         {
             if (connection.Kind == ChannelKinds.WhatsApp)
                 await SendWhatsAppAsync(connection, secrets, recipient, body, cancellationToken);
+            else if (connection.Kind == ChannelKinds.WhatsAppLinked)
+                await SendWhatsAppLinkedAsync(connection, recipient, body, cancellationToken);
             else if (connection.Kind == ChannelKinds.Signal)
                 await SendSignalAsync(connection, recipient, body, cancellationToken);
             else
@@ -67,6 +69,23 @@ public sealed class AutomationChannelSender(
         using var response = await http.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException($"WhatsApp rejected the message ({(int)response.StatusCode}).");
+    }
+
+    private async Task SendWhatsAppLinkedAsync(ChannelConnectionRecord connection, string recipient, string body,
+        CancellationToken cancellationToken)
+    {
+        var baseUrl = configuration["Channels:WhatsAppBridge:BaseUrl"]
+                      ?? throw new InvalidOperationException("Channels:WhatsAppBridge:BaseUrl is not configured.");
+        using var request = new HttpRequestMessage(HttpMethod.Post,
+            $"{baseUrl.TrimEnd('/')}/sessions/{connection.Id:D}/send")
+        {
+            Content = JsonContent.Create(new { to = ChannelAddresses.Normalize(recipient), text = body })
+        };
+        if (configuration["Channels:WhatsAppBridge:Token"] is { Length: > 0 } token)
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var response = await httpClientFactory.CreateClient().SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"The WhatsApp bridge rejected the message ({(int)response.StatusCode}).");
     }
 
     private async Task SendSignalAsync(ChannelConnectionRecord connection, string recipient, string body,

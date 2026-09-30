@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -11,11 +12,12 @@ import '../../ui/phosphor_icons.dart';
 
 part 'channel_detail_screen.dart';
 part 'channel_editor_sheet.dart';
+part 'channel_link_sheet.dart';
 part 'channel_thread_screen.dart';
 
 ({String label, IconData icon, Color color}) channelKind(String kind) =>
     switch (kind) {
-      'whatsapp' => (
+      'whatsapp' || 'whatsapp_linked' => (
         label: 'WhatsApp',
         icon: PhosphorIconsRegular.whatsappLogo,
         color: const Color(0xff16a34a),
@@ -32,8 +34,8 @@ part 'channel_thread_screen.dart';
       ),
     };
 
-/// Connect WhatsApp Cloud API or Signal, restrict who can talk to Jarvis, and
-/// review recent messages.
+/// Link WhatsApp or Signal by scanning a QR code (or connect the WhatsApp Cloud
+/// API), restrict who can talk to Jarvis, and review recent messages.
 class ChannelsScreen extends StatefulWidget {
   const ChannelsScreen({required this.http, super.key});
 
@@ -46,6 +48,7 @@ class ChannelsScreen extends StatefulWidget {
 class _ChannelsScreenState extends State<ChannelsScreen> {
   List<Map<String, dynamic>> _channels = const [];
   Map<String, dynamic> _signal = const {};
+  Map<String, dynamic> _providers = const {};
   bool _loading = true;
   String? _error;
   int _requestRevision = 0;
@@ -72,10 +75,22 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
       } catch (_) {
         // Ignore a malformed Signal status payload.
       }
+      Map<String, dynamic> providers = const {};
+      try {
+        final response = await widget.http.get<dynamic>(
+          '/api/v1/channels/providers',
+        );
+        providers = jsonObject(response.data) ?? const {};
+      } on DioException {
+        // Older servers do not report providers; assume linking is unavailable.
+      } catch (_) {
+        // Ignore a malformed providers payload.
+      }
       if (!mounted || revision != _requestRevision) return;
       setState(() {
         _channels = jsonMaps(channels.data);
         _signal = signal;
+        _providers = providers;
         _loading = false;
         _error = null;
       });
@@ -116,6 +131,27 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
     if (created == true && mounted) unawaited(_load());
   }
 
+  Future<void> _link(String kind, {String? channelId}) async {
+    final linked = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) =>
+          ChannelLinkSheet(http: widget.http, kind: kind, channelId: channelId),
+    );
+    if (linked == null || !mounted) return;
+    unawaited(_load());
+    final label = channelKind(kind).label;
+    final phone = asJsonString(linked['phone']);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '$label linked${phone == null ? '' : ' as $phone'}. '
+          'Message yourself in $label to chat with Jarvis.',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final signalReady = asJsonBool(_signal['configured']);
@@ -139,7 +175,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
           icon: PhosphorIconsRegular.whatsappLogo,
           title: 'No messaging channels yet',
           message:
-              'Connect WhatsApp or Signal so you can talk to Jarvis from your phone. Only numbers you allow can send messages.',
+              'Link WhatsApp or Signal by scanning a QR code so you can talk to Jarvis from your phone. Only numbers you allow can send messages.',
           action: FilledButton.icon(
             onPressed: () => unawaited(_pickKind()),
             icon: const Icon(PhosphorIconsRegular.plus),
@@ -153,7 +189,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
               ContentWidth(
                 child: InlineNotice(
                   message:
-                      'Signal needs signal-cli on the server. WhatsApp works with a Meta Cloud API app.',
+                      'Signal needs signal-cli on the server. WhatsApp links by QR code when the WhatsApp bridge is running, or through a Meta Cloud API app.',
                   tone: NoticeTone.info,
                   margin: const EdgeInsets.only(bottom: 12),
                 ),
@@ -207,7 +243,9 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
   }
 
   Future<void> _pickKind() async {
-    final kind = await showModalBottomSheet<String>(
+    final whatsappLink = asJsonBool(_providers['whatsAppLink']);
+    final signalLink = asJsonBool(_providers['signal']);
+    final choice = await showModalBottomSheet<String>(
       context: context,
       builder: (context) => SafeArea(
         child: Padding(
@@ -216,30 +254,55 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                key: const Key('connect-whatsapp'),
+                key: const Key('connect-whatsapp-qr'),
+                enabled: whatsappLink,
                 leading: IconBadge(
                   icon: PhosphorIconsRegular.whatsappLogo,
                   color: const Color(0xff16a34a),
                 ),
                 title: const Text('WhatsApp'),
-                subtitle: const Text('Official Cloud API with a webhook'),
-                onTap: () => Navigator.pop(context, 'whatsapp'),
+                subtitle: Text(
+                  whatsappLink
+                      ? 'Scan a QR code — no Meta account needed'
+                      : 'Needs the WhatsApp bridge on the server',
+                ),
+                onTap: () => Navigator.pop(context, 'whatsapp_linked'),
               ),
               ListTile(
                 key: const Key('connect-signal'),
+                enabled: signalLink,
                 leading: IconBadge(
                   icon: PhosphorIconsRegular.chatsCircle,
                   color: JarvisColors.of(context).info,
                 ),
                 title: const Text('Signal'),
-                subtitle: const Text('Link through signal-cli on this server'),
+                subtitle: Text(
+                  signalLink
+                      ? 'Scan a QR code to link this server'
+                      : 'Needs signal-cli on the server',
+                ),
                 onTap: () => Navigator.pop(context, 'signal'),
+              ),
+              ListTile(
+                key: const Key('connect-whatsapp'),
+                leading: IconBadge(
+                  icon: PhosphorIconsRegular.gearSix,
+                  color: JarvisColors.of(context).muted,
+                ),
+                title: const Text('WhatsApp Business API'),
+                subtitle: const Text('Advanced: Meta Cloud API with a webhook'),
+                onTap: () => Navigator.pop(context, 'whatsapp'),
               ),
             ],
           ),
         ),
       ),
     );
-    if (kind != null && mounted) unawaited(_create(kind));
+    if (choice == null || !mounted) return;
+    if (choice == 'whatsapp') {
+      unawaited(_create(choice));
+    } else {
+      unawaited(_link(choice));
+    }
   }
 }

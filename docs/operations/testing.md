@@ -35,7 +35,7 @@ Fixtures under `tests/e2e/`:
 | Script | Covers |
 |--------|--------|
 | `local_fixture_flow.mjs` | Streaming, tools, approvals, memory, reminders, Temporal task |
-| `channels_flow.mjs` | WhatsApp/Signal with `fake_channels.mjs` |
+| `channels_flow.mjs` | WhatsApp Cloud/Signal with `fake_channels.mjs` (QR linking is covered by unit and widget tests) |
 | `platform_flow.mjs` | A2A, devices, voice options; `JARVIS_PLATFORM_CHAT=1` for `RenderUi` |
 
 Uses `fake_codex_app_server.mjs` instead of real Codex:

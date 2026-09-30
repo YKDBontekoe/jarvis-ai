@@ -101,7 +101,7 @@ Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints
 
 ## Channels
 
-`/channels` — WhatsApp/Signal configuration, threads, test send, Signal link/status, WhatsApp webhooks.
+`/channels` — WhatsApp/Signal configuration, threads, test send, QR linking (`POST /channels/link`, `GET /channels/link/{linkId}`, `GET /channels/providers`), Signal status, WhatsApp Cloud webhooks.
 
 ## Voice (user)
 

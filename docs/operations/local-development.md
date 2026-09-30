@@ -26,7 +26,7 @@ set -a && source infra/compose/.env && set +a
 dotnet run --project src/Jarvis.AppHost
 ```
 
-Starts API (default `http://localhost:5082`), PostgreSQL (pgvector), Temporal (7233/8233), SeaweedFS, ClamAV, LiveKit, optional signal-cli. Migrations apply automatically in Development.
+Starts API (default `http://localhost:5082`), PostgreSQL (pgvector), Temporal (7233/8233), SeaweedFS, ClamAV, LiveKit, optional signal-cli and the WhatsApp bridge. Migrations apply automatically in Development.
 
 Coding repo allowlist: AppHost sets `Coding__Repositories__0__Path` to the git root.
 

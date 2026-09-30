@@ -8,7 +8,7 @@ public static class ChannelValidation
     public static SaveChannelRequest Normalize(SaveChannelRequest request, bool creating)
     {
         var kind = request.Kind?.Trim().ToLowerInvariant();
-        if (!ChannelKinds.IsValid(kind)) throw new ArgumentException("Choose whatsapp or signal.");
+        if (!ChannelKinds.IsValid(kind)) throw new ArgumentException("Choose whatsapp, whatsapp_linked or signal.");
         var name = request.DisplayName?.Trim();
         if (string.IsNullOrEmpty(name) || name.Length > 80)
             throw new ArgumentException("Give the channel a name of up to 80 characters.");

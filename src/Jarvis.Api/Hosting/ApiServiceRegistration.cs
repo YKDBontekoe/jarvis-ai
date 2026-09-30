@@ -27,13 +27,18 @@ internal static class ApiServiceRegistration
         services.AddSingleton(Channels.ChannelOptions.From(configuration));
         services.AddHttpClient<Channels.WhatsAppCloudTransport>(client => client.Timeout = TimeSpan.FromSeconds(20));
         services.AddHttpClient<Channels.SignalRestTransport>(client => client.Timeout = TimeSpan.FromSeconds(20));
+        services.AddHttpClient<Channels.WhatsAppBridgeClient>(client => client.Timeout = TimeSpan.FromSeconds(20));
         services.AddHttpClient("signal", client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddScoped<Channels.IChannelTransport>(provider => provider.GetRequiredService<Channels.WhatsAppCloudTransport>());
         services.AddScoped<Channels.IChannelTransport>(provider => provider.GetRequiredService<Channels.SignalRestTransport>());
+        services.AddScoped<Channels.WhatsAppLinkedTransport>();
+        services.AddScoped<Channels.IChannelTransport>(provider => provider.GetRequiredService<Channels.WhatsAppLinkedTransport>());
+        services.AddSingleton<Channels.ChannelLinkService>();
         services.AddScoped<Channels.ChannelMessenger>();
         services.AddScoped<Channels.ChannelMessageRouter>();
         services.AddHostedService<Channels.ChannelInboundProcessor>();
         services.AddHostedService<Channels.SignalReceiver>();
+        services.AddHostedService<Channels.WhatsAppLinkedReceiver>();
         services.AddHostedService<Channels.ChannelNotificationForwarder>();
         return services;
     }

@@ -8,7 +8,7 @@ File: `infra/compose/docker-compose.production.yml`
 - **Jarvis API + Worker** (GHCR images in CI)
 - **PostgreSQL** (app + Temporal DB)
 - **Garage** S3-compatible storage
-- **ClamAV**, **LiveKit**, private **signal-cli**
+- **ClamAV**, **LiveKit**, private **signal-cli** and **whatsapp-bridge** (built on the host from `workers/whatsapp-bridge`)
 - Only edge/media ports published; databases stay on private networks
 
 Env template: `infra/compose/.env.production.example` → `.env.production` (mode `0600`).

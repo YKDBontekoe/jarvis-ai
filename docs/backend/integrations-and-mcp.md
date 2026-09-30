@@ -37,8 +37,19 @@ Compose overlays:
 
 ## Channels
 
-- **WhatsApp Cloud API** — webhooks at `/api/v1/channels/whatsapp/{key}/webhook`.
-- **Signal** — signal-cli REST (`Channels__Signal__BaseUrl`); bundled in Aspire/Compose dev.
+- **WhatsApp (QR link, default)** — kind `whatsapp_linked`. Jarvis links as a companion device through the Baileys-based `workers/whatsapp-bridge` sidecar (`Channels__WhatsAppBridge__BaseUrl`, optional `__Token`); bundled in Aspire and both Compose files. No Meta account, webhook, or public URL needed.
+- **Signal** — kind `signal`, signal-cli REST (`Channels__Signal__BaseUrl`); linked as a secondary device by QR code.
+- **WhatsApp Cloud API (advanced)** — kind `whatsapp`, webhooks at `/api/v1/channels/whatsapp/{key}/webhook`.
+
+### One-tap linking
+
+`ChannelLinkService` (`Jarvis.Api/Channels`) drives both QR flows:
+
+1. `POST /channels/link {kind, channelId?}` starts an attempt and returns `{linkId, state, qrImage}` (`qrImage` is a PNG data URL). Pass `channelId` to re-link an existing WhatsApp channel.
+2. The app shows the QR and polls `GET /channels/link/{linkId}` (2 s). WhatsApp QR codes rotate; `state` is `waiting`, `linked`, `expired` or `failed`.
+3. On scan the channel is created automatically: account = the scanned number, that number is the only allowed sender (so the owner can use "Message yourself"), notifications forward to it. Add more senders in the channel detail screen.
+
+`GET /channels/providers` reports which flows the server supports. For WhatsApp the bridge session id equals the channel connection id; inbound messages are pulled by `WhatsAppLinkedReceiver` (poll + ack, deduped by external id), outbound go through `WhatsAppLinkedTransport`. Deleting the channel logs the device out via the bridge. Signal "Note to Self" sync messages are accepted as owner messages (`SignalReceiver.ParseEnvelopes`).
 
 Allowlist per channel; replies approval-gated. Thread history in API + Flutter `features/channels/`.
 

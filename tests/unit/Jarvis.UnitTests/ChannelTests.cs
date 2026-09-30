@@ -148,4 +148,60 @@ public sealed class ChannelTests
         Assert.Null(missing.SignalBaseUrl);
         Assert.Null(ChannelOptions.From(new ConfigurationBuilder().Build()).SignalBaseUrl);
     }
+
+    [Fact]
+    public void Linked_whatsapp_needs_only_a_phone_number_and_no_credentials()
+    {
+        var request = new SaveChannelRequest(ChannelKinds.WhatsAppLinked, "WhatsApp", "+31 6 1234 5678", true,
+            ["+31612345678"], true, "+31612345678", null);
+
+        var normalized = ChannelValidation.Normalize(request, creating: true);
+
+        Assert.Equal("+31612345678", normalized.Account);
+        Assert.Empty(ChannelKinds.SecretNames(ChannelKinds.WhatsAppLinked));
+        Assert.Throws<ArgumentException>(() => ChannelValidation.Normalize(request with { Account = "abc" }, true));
+        Assert.True(ChannelKinds.IsWhatsApp(ChannelKinds.WhatsAppLinked));
+        Assert.Equal("WhatsApp", ChannelKinds.Label(ChannelKinds.WhatsAppLinked));
+    }
+
+    [Fact]
+    public void Signal_note_to_self_sync_messages_count_as_the_owner_talking()
+    {
+        using var document = JsonDocument.Parse("""
+            [{"envelope":{"sourceNumber":"+31612345678","timestamp":1,"syncMessage":{"sentMessage":
+               {"timestamp":1727450000000,"destinationNumber":"+31612345678","message":"Note to self"}}}},
+             {"envelope":{"sourceNumber":"+31612345678","timestamp":2,"syncMessage":{"sentMessage":
+               {"timestamp":1727450000001,"destinationNumber":"+31699999999","message":"Chat with someone else"}}}}]
+            """);
+
+        Assert.Equal(("+31612345678", "Note to self", "+31612345678:1727450000000"),
+            SignalReceiver.ParseEnvelopes(document.RootElement, "+31612345678").Single());
+        Assert.Empty(SignalReceiver.ParseEnvelopes(document.RootElement));
+    }
+
+    [Fact]
+    public void Linked_whatsapp_formats_like_whatsapp_and_has_no_service_window()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var connection = new ChannelConnectionRecord(Guid.NewGuid(), Guid.NewGuid(), ChannelKinds.WhatsAppLinked, "Phone",
+            "+31612345678", true, ["+31612345678"], true, null, "key", null, null, null, now, now, now);
+
+        Assert.Equal("*Hi*", ChannelText.FromMarkdown(ChannelKinds.WhatsAppLinked, "**Hi**"));
+        Assert.True(ChannelNotificationForwarder.CanMessage(connection, now));
+    }
+
+    [Fact]
+    public void Channel_options_read_the_whatsapp_bridge()
+    {
+        var options = ChannelOptions.From(new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["Channels:WhatsAppBridge:BaseUrl"] = " http://whatsapp-bridge:3000 ",
+                ["Channels:WhatsAppBridge:Token"] = "secret"
+            }).Build());
+
+        Assert.Equal("http://whatsapp-bridge:3000", options.WhatsAppBridgeUrl);
+        Assert.Equal("secret", options.WhatsAppBridgeToken);
+        Assert.Null(ChannelOptions.From(new ConfigurationBuilder().Build()).WhatsAppBridgeUrl);
+    }
 }

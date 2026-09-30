@@ -162,7 +162,7 @@ public sealed class ChannelMessageRouter(
     private async Task<Guid> StartConversationAsync(ChannelConnectionRecord connection, string sender,
         CancellationToken cancellationToken)
     {
-        var title = $"{(connection.Kind == ChannelKinds.WhatsApp ? "WhatsApp" : "Signal")} · {connection.DisplayName}";
+        var title = $"{ChannelKinds.Label(connection.Kind)} · {connection.DisplayName}";
         var conversation = await conversations.CreateAsync(connection.OwnerId, title, cancellationToken);
         await channels.SetThreadConversationAsync(connection.Id, sender, conversation.Id, cancellationToken);
         return conversation.Id;

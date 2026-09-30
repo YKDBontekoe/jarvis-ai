@@ -52,6 +52,16 @@ if (string.IsNullOrWhiteSpace(signalCliUrl))
         .WithHttpEndpoint(port: 8080, targetPort: 8080);
 }
 
+var whatsAppBridgeUrl = builder.Configuration["Channels:WhatsAppBridge:BaseUrl"]
+                        ?? builder.Configuration["WHATSAPP_BRIDGE_URL"];
+IResourceBuilder<ContainerResource>? whatsAppBridge = null;
+if (string.IsNullOrWhiteSpace(whatsAppBridgeUrl))
+{
+    whatsAppBridge = builder.AddDockerfile("whatsapp-bridge", Path.Combine(workspaceRoot, "workers", "whatsapp-bridge"))
+        .WithVolume("jarvis-whatsapp-bridge-data", "/data")
+        .WithHttpEndpoint(port: 3000, targetPort: 3000);
+}
+
 var api = builder.AddProject<Projects.Jarvis_Api>("jarvis-api")
     .WithReference(database)
     .WithEnvironment("Coding__Repositories__0__Name", "jarvis")
@@ -81,6 +91,10 @@ if (signalCli is not null)
     api.WithEnvironment("Channels__Signal__BaseUrl", signalCli.GetEndpoint("http")).WaitFor(signalCli);
 else
     api.WithEnvironment("Channels__Signal__BaseUrl", signalCliUrl!);
+if (whatsAppBridge is not null)
+    api.WithEnvironment("Channels__WhatsAppBridge__BaseUrl", whatsAppBridge.GetEndpoint("http")).WaitFor(whatsAppBridge);
+else
+    api.WithEnvironment("Channels__WhatsAppBridge__BaseUrl", whatsAppBridgeUrl!);
 if (!string.IsNullOrWhiteSpace(builder.Configuration["Jarvis:ModelClass"]))
     api.WithEnvironment("Jarvis__ModelClass", builder.Configuration["Jarvis:ModelClass"]!);
 foreach (var modelClass in builder.Configuration.GetSection("Codex:ModelClasses").GetChildren())
@@ -101,6 +115,10 @@ var worker = builder.AddProject<Projects.Jarvis_Worker>("jarvis-worker")
     .WaitFor(database)
     .WaitFor(temporal)
     .WaitFor(objectStorage);
+if (whatsAppBridge is not null)
+    worker.WithEnvironment("Channels__WhatsAppBridge__BaseUrl", whatsAppBridge.GetEndpoint("http"));
+else
+    worker.WithEnvironment("Channels__WhatsAppBridge__BaseUrl", whatsAppBridgeUrl!);
 if (!string.IsNullOrWhiteSpace(builder.Configuration["Jarvis:ModelClass"]))
     worker.WithEnvironment("Jarvis__ModelClass", builder.Configuration["Jarvis:ModelClass"]!);
 foreach (var modelClass in builder.Configuration.GetSection("Codex:ModelClasses").GetChildren())

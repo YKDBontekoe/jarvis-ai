@@ -18,6 +18,8 @@ public sealed record ChannelDto(Guid Id, string Kind, string DisplayName, string
     DateTimeOffset? LastOutboundAt, string? LastError, DateTimeOffset CreatedAt);
 public sealed record ChannelTestRequest(string? Recipient);
 public sealed record SignalStatusDto(bool Configured, IReadOnlyList<string> Accounts);
+public sealed record ChannelLinkRequest(string? Kind, Guid? ChannelId);
+public sealed record ChannelProvidersDto(bool WhatsAppLink, bool Signal, bool WhatsAppCloud);
 
 internal static class ChannelEndpoints
 {
@@ -42,6 +44,8 @@ internal static class ChannelEndpoints
             SaveChannelRequest normalized;
             try { normalized = ChannelValidation.Normalize(request, creating: true); }
             catch (ArgumentException exception) { return EndpointHelpers.Invalid("channel", exception.Message); }
+            if (normalized.Kind == ChannelKinds.WhatsAppLinked)
+                return EndpointHelpers.Invalid("channel", "Link WhatsApp by scanning a QR code (POST /channels/link).");
             if (normalized.Kind == ChannelKinds.Signal && string.IsNullOrWhiteSpace(options.SignalBaseUrl))
                 return EndpointHelpers.Invalid("channel",
                     "Signal needs the signal-cli service. Set Channels:Signal:BaseUrl on the server first.");
@@ -73,11 +77,21 @@ internal static class ChannelEndpoints
         }).WithName("UpdateChannel");
 
         channels.MapDelete("/{id:guid}", async (Guid id, IChannelRepository repository,
-            IIntegrationCredentialStore credentials, IAuditEventStore audit, ICurrentUser currentUser,
-            CancellationToken ct) =>
+            IIntegrationCredentialStore credentials, IAuditEventStore audit, WhatsAppBridgeClient bridge,
+            ICurrentUser currentUser, CancellationToken ct) =>
         {
-            if (!await repository.DeleteAsync(currentUser.OwnerId, id, ct)) return Results.NotFound();
+            var existing = await repository.GetAsync(currentUser.OwnerId, id, ct);
+            if (existing is null || !await repository.DeleteAsync(currentUser.OwnerId, id, ct)) return Results.NotFound();
             await credentials.DeleteAsync(currentUser.OwnerId, ChannelMessenger.SecretsProvider(id), ct);
+            if (existing.Kind == ChannelKinds.WhatsAppLinked && bridge.Configured)
+            {
+                // Unlinks this device from the phone's "Linked devices" list; a dead bridge must not block removal.
+                try { await bridge.DeleteAsync(id, ct); }
+                catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+                {
+                    logger.LogWarning(exception, "Could not unlink WhatsApp session {ConnectionId}.", id);
+                }
+            }
             await EndpointHelpers.TryAppendAuditAsync(audit, logger, currentUser.OwnerId, "channels",
                 "channel.disconnected", "moderate", true, null, JsonSerializer.Serialize(new { resourceId = id }), ct);
             return Results.NoContent();
@@ -114,6 +128,46 @@ internal static class ChannelEndpoints
                 Results.Ok(await repository.ListThreadMessagesAsync(currentUser.OwnerId, id,
                     WebUtility.UrlDecode(peer), 100, ct)))
             .WithName("ListChannelThreadMessages");
+
+        channels.MapGet("/providers", (ChannelLinkService links) =>
+            Results.Ok(new ChannelProvidersDto(links.WhatsAppAvailable, links.SignalAvailable, true)))
+            .WithName("GetChannelProviders");
+
+        channels.MapPost("/link", async (ChannelLinkRequest request, ChannelLinkService links,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var kind = request.Kind?.Trim().ToLowerInvariant();
+            if (kind == ChannelKinds.WhatsApp) kind = ChannelKinds.WhatsAppLinked;
+            if (kind is not (ChannelKinds.WhatsAppLinked or ChannelKinds.Signal))
+                return EndpointHelpers.Invalid("kind", "Choose whatsapp or signal.");
+            try
+            {
+                var status = await links.StartAsync(currentUser.OwnerId, kind, request.ChannelId, ct);
+                return status is null ? Results.NotFound() : Results.Ok(status);
+            }
+            catch (ChannelLinkUnavailableException exception)
+            {
+                return ApiProblemResults.DependencyUnavailable(exception.Message);
+            }
+            catch (Exception exception) when (exception is HttpRequestException or JsonException or TaskCanceledException)
+            {
+                return ApiProblemResults.BadGateway($"The {ChannelKinds.Label(kind)} link service is not reachable.");
+            }
+        }).WithName("StartChannelLink");
+
+        channels.MapGet("/link/{linkId:guid}", async (Guid linkId, ChannelLinkService links,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            try
+            {
+                var status = await links.GetAsync(currentUser.OwnerId, linkId, ct);
+                return status is null ? Results.NotFound() : Results.Ok(status);
+            }
+            catch (Exception exception) when (exception is HttpRequestException or JsonException or TaskCanceledException)
+            {
+                return ApiProblemResults.BadGateway("The link service is not reachable.");
+            }
+        }).WithName("GetChannelLink");
 
         channels.MapGet("/signal/status", async (ChannelOptions options, IHttpClientFactory httpClients,
             CancellationToken ct) =>
