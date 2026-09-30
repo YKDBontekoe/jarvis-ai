@@ -64,6 +64,64 @@ public sealed class DreamingTests
         Assert.True(home.LightBoost > 0);
     }
 
+    [Fact]
+    public void Light_sleep_counts_persisted_recalls_so_nightly_dreaming_sees_chat_usage()
+    {
+        var recalled = Memory("fact", "The user commutes by train on Tuesdays.", 0.6f, Now.AddDays(-10)) with
+        {
+            AccessCount = 5, LastAccessedAt = Now.AddDays(-1)
+        };
+        var untouched = Memory("fact", "The user owns a monstera plant.", 0.6f, Now.AddDays(-10));
+
+        // No in-process recall records: the worker's tracker never sees chat traffic from the API process.
+        var staged = DreamingRanker.Stage([recalled, untouched], [], [], Now);
+
+        var used = Assert.Single(staged, item => item.MemoryId == recalled.Id);
+        var idle = Assert.Single(staged, item => item.MemoryId == untouched.Id);
+        Assert.Equal(6, used.SignalCount);
+        Assert.Equal(2, used.UniqueSources);
+        Assert.Equal(Now.AddDays(-1), used.LastSeenAt);
+        Assert.True(DreamingRanker.Score(used, Now) > DreamingRanker.Score(idle, Now));
+    }
+
+    [Fact]
+    public void Review_selection_puts_new_memories_first_and_stays_bounded()
+    {
+        var old = Enumerable.Range(0, 120)
+            .Select(index => Memory("fact", $"Old fact {index} about topic{index}.", 0.5f, Now.AddDays(-30 - index)))
+            .ToArray();
+        var fresh = Memory("fact", "The user started learning Japanese.", 0.6f, Now.AddHours(-3));
+        var stored = old.Append(fresh).ToArray();
+        var staged = DreamingRanker.Stage(stored, [], [], Now);
+
+        var reviewed = DreamingService.SelectForReview(staged, stored, Now.AddDays(-1), Now, limit: 20);
+
+        Assert.Equal(20, reviewed.Count);
+        Assert.Equal(fresh.Id, reviewed[0].Id);
+        Assert.Equal(20, reviewed.Select(memory => memory.Id).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task Sweep_removes_duplicates_beyond_the_newest_eighty_memories()
+    {
+        var settings = new InMemorySettingsStore();
+        await settings.SaveAsync(Owner, SettingsSections.Learning, LearningSettings.Default, default);
+        var store = new DreamMemoryStore();
+        for (var index = 0; index < 90; index++)
+            store.Add(Owner, "fact", $"Filler fact {index} about topic{index} and item{index * 7}.", 0.5f, 0.9f,
+                Now.AddDays(-index));
+        var keeper = store.Add(Owner, "fact", "The user's dentist is in Lombok, Utrecht.", 0.8f, 0.9f, Now.AddDays(-200));
+        var copy = store.Add(Owner, "fact", "The user's dentist is in Lombok, Utrecht", 0.5f, 0.8f, Now.AddDays(-150));
+        var service = Create(settings, new PersonaService(settings), store, new RecordingGraph(),
+            new RecordingNotifications(), """{"themes":[],"persona":[],"memories":[],"facts":[],"diary":""}""");
+
+        var outcome = await service.SweepAsync(Owner, force: true, default);
+
+        Assert.Equal(1, outcome.Deduplicated);
+        Assert.Contains(store.Items, item => item.Id == keeper.Id);
+        Assert.DoesNotContain(store.Items, item => item.Id == copy.Id);
+    }
+
     [Theory]
     [InlineData(2, 60)]
     [InlineData(3, 1440)]
@@ -549,6 +607,9 @@ public sealed class DreamingTests
         public Task<MemoryRecord?> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance,
             float confidence, DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
+
+        public Task RecordRecallAsync(Guid ownerId, IReadOnlyCollection<Guid> memoryIds,
+            CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task<IReadOnlyList<MemorySearchHit>> SearchAsync(Guid ownerId, string query,
             CancellationToken cancellationToken, string? kind = null) =>

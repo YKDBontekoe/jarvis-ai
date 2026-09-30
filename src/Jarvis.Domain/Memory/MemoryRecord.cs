@@ -13,6 +13,8 @@ public sealed record MemoryRecord(
     DateTimeOffset UpdatedAt,
     DateTimeOffset? ValidUntil,
     bool IsPinned,
-    Guid? ProfileId = null);
+    Guid? ProfileId = null,
+    int AccessCount = 0,
+    DateTimeOffset? LastAccessedAt = null);
 
 public sealed record MemorySearchHit(MemoryRecord Memory, double Score);

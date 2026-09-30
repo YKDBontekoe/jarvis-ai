@@ -51,7 +51,7 @@ public sealed class MemoryIndexRepository(JarvisDbContext db) : IMemoryIndexRepo
             await active.CountAsync(x => x.GraphIndexedAt != null, cancellationToken), model);
     }
 
-    public async Task<IReadOnlyList<MemoryRecord>> SearchSemanticAsync(Guid ownerId, MemoryEmbedding query,
+    public async Task<IReadOnlyList<MemorySearchHit>> SearchSemanticAsync(Guid ownerId, MemoryEmbedding query,
         string? kind, double minimumSimilarity, int limit, CancellationToken cancellationToken)
     {
         var vector = new Vector(query.Vector);
@@ -61,7 +61,8 @@ public sealed class MemoryIndexRepository(JarvisDbContext db) : IMemoryIndexRepo
             .OrderBy(x => x.Distance)
             .Take(limit)
             .ToListAsync(cancellationToken);
-        return hits.Where(hit => 1 - hit.Distance >= minimumSimilarity).Select(hit => hit.Memory.ToRecord()).ToArray();
+        return hits.Where(hit => 1 - hit.Distance >= minimumSimilarity)
+            .Select(hit => new MemorySearchHit(hit.Memory.ToRecord(), 1 - hit.Distance)).ToArray();
     }
 
     private IQueryable<MemoryEntity> Active(Guid ownerId) =>

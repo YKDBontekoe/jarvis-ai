@@ -11,9 +11,26 @@ Jarvis combines **structured memory**, **semantic search**, a **temporal knowled
 
 ### Search pipeline
 
-1. PostgreSQL FTS + trigram merged via **reciprocal rank fusion**.
-2. Up to eight candidates **reranked** via Codex CLI path (8s timeout) with fallback to DB order.
-3. Pinned unexpired memories included in bounded agent context (`PersonalMemoryContextProvider`).
+1. **Query analysis** (`MemoryQuery`): chat turns are full sentences, so stopwords (Dutch and English) are dropped, the
+   remaining terms are OR-ed instead of all being required, terms of four or more letters become prefix queries after
+   light suffix stripping (`training` → `train:*`, `woon` also finds `woont`), and a small Dutch–English lexicon adds
+   the other language's word at half weight.
+2. **Lexical retrieval** (`MemoryRepository.SearchLexicalAsync`, one round trip): every term is weighted by its inverse
+   document frequency within the owner's active memories and by memory length (BM25-style), normalised so 1 means all
+   original terms matched. Terms the keyword match missed get a pg_trgm word-similarity score, which catches typos and
+   Dutch compounds (`gesprek` in `salarisgesprek`). Each term is looked up through the GIN indexes.
+3. **Semantic retrieval** (when an embedding model is configured): the embedding request runs while the keyword query
+   runs; pgvector returns cosine similarities.
+4. **Hybrid ranking** (`MemoryRanking`): keyword and semantic relevance are fused as a probabilistic OR, then scaled by
+   importance, a recency curve (90-day half-life) that recall refreshes, and a log-scaled recall count. A
+   score-adaptive cut drops hits below 35% of the best one, near duplicates are skipped, and at most eight remain.
+5. **Recall tracking**: memories that reach the model get `access_count` and `last_accessed_at` updated, which feeds
+   ranking and dreaming (also in the worker process).
+6. **Reranking**: chat context (`PersonalMemoryContextProvider`) never waits on a model rerank. The `SearchMemory` tool
+   reranks through the background model (8s timeout) only when the top hit does not clearly win (`MemoryReranker`).
+7. Pinned unexpired memories are always included in the bounded agent context.
+
+Retrieval quality and speed are measured offline with `tests/eval/Jarvis.MemoryEval` (see its README).
 
 Agent tools: `SearchMemory`, `ListMemories`, `Remember`, `Forget` (approval). See [agent-tools.md](agent-tools.md).
 
@@ -58,6 +75,10 @@ Owner-defined profiles snapshot persona, skills, collections, model class, and l
 | **Manual** | `POST /learning/run`, `/learning/dream` | On-demand for testing |
 
 Dream diary and portrait are visible under Settings → Learning; diary text is **not** used as a promotion source.
+
+Dreaming stages **every** active memory (up to 500) for near-duplicate detection, and counts persisted recalls
+(`access_count`, `last_accessed_at`; a recall on a later day counts as a second source). The REM model call reviews a
+bounded set: memories written or changed since the last dream first, then the strongest staged candidates.
 
 Settings: `/api/v1/settings/learning`.
 

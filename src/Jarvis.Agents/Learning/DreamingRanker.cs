@@ -55,12 +55,23 @@ internal static class DreamingRanker
             .Where(token => token.Length >= 3)
             .ToHashSet(StringComparer.Ordinal);
 
-    public static double Jaccard(string left, string right)
+    public static double Jaccard(string left, string right) => Jaccard(left, right, null);
+
+    /// <summary>Token Jaccard with an optional token cache; dreaming compares every memory with every other one.</summary>
+    internal static double Jaccard(string left, string right, Dictionary<string, HashSet<string>>? cache)
     {
-        var a = Tokens(left);
-        var b = Tokens(right);
+        var a = CachedTokens(left, cache);
+        var b = CachedTokens(right, cache);
         if (a.Count == 0 || b.Count == 0) return Canonical(left) == Canonical(right) && Canonical(left).Length > 0 ? 1 : 0;
-        return a.Intersect(b, StringComparer.Ordinal).Count() / (double)a.Union(b, StringComparer.Ordinal).Count();
+        var shared = a.Count(b.Contains);
+        return shared / (double)(a.Count + b.Count - shared);
+    }
+
+    private static HashSet<string> CachedTokens(string value, Dictionary<string, HashSet<string>>? cache)
+    {
+        if (cache is null) return Tokens(value);
+        if (!cache.TryGetValue(value, out var tokens)) cache[value] = tokens = Tokens(value);
+        return tokens;
     }
 
     public static double Richness(string kind, string content)
@@ -85,22 +96,33 @@ internal static class DreamingRanker
                 Queries: group.Max(item => item.UniqueQueries),
                 Last: group.Max(item => item.LastHitAt)));
 
+        var tokens = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        var userMessages = messages.Where(message => message.Role == "user").ToArray();
         var staged = new List<DreamCandidate>();
         foreach (var memory in memories.Where(item => item.ValidUntil is null || item.ValidUntil > now))
         {
             recallById.TryGetValue(memory.Id, out var recall);
-            var mentions = messages.Count(message =>
-                message.Role == "user" && Jaccard(memory.Content, message.Content) >= MentionJaccard);
-            var mentionDays = messages
-                .Where(message => message.Role == "user" && Jaccard(memory.Content, message.Content) >= MentionJaccard)
+            var mentioned = userMessages
+                .Where(message => Jaccard(memory.Content, message.Content, tokens) >= MentionJaccard)
+                .ToArray();
+            var mentions = mentioned.Length;
+            var mentionDays = mentioned
                 .Select(message => DateOnly.FromDateTime(message.CreatedAt.UtcDateTime))
                 .Distinct()
                 .Count();
-            var signalCount = Math.Max(1, 1 + mentions + recall.Hits);
-            var uniqueSources = 1 + mentionDays + Math.Max(0, recall.Queries);
+            // Recall counts persist on the memory itself, so nightly dreaming in the worker sees what chat recalled in
+            // the API process. The in-process tracker overlaps with them, so take the larger rather than the sum.
+            var recallHits = Math.Max(recall.Hits, memory.AccessCount);
+            // A memory recalled on a later day than it was written is a spaced-repetition signal: it stayed useful.
+            var recalledLater = memory.LastAccessedAt is { } accessed && accessed.Date > memory.CreatedAt.Date ? 1 : 0;
+            var signalCount = Math.Max(1, 1 + mentions + recallHits);
+            var uniqueSources = 1 + mentionDays + Math.Max(Math.Max(0, recall.Queries), recalledLater);
             var first = memory.CreatedAt;
-            var last = new[] { memory.UpdatedAt, recall.Last == default ? memory.UpdatedAt : recall.Last }
-                .Max();
+            var last = new[]
+            {
+                memory.UpdatedAt, recall.Last == default ? memory.UpdatedAt : recall.Last,
+                memory.LastAccessedAt ?? memory.UpdatedAt
+            }.Max();
             var daySpan = Math.Max(0, (last.Date - first.Date).Days);
             staged.Add(new DreamCandidate(
                 Canonical(memory.Content),
@@ -118,20 +140,20 @@ internal static class DreamingRanker
                 daySpan,
                 Math.Clamp(memory.Importance * memory.Confidence, 0, 1),
                 Richness(memory.Kind, memory.Content),
-                mentions > 0 || recall.Hits > 0 ? 0.04 : 0,
+                mentions > 0 || recallHits > 0 ? 0.04 : 0,
                 0));
         }
 
-        MergeNearDuplicates(staged);
+        MergeNearDuplicates(staged, tokens);
 
-        var leftover = messages
-            .Where(item => item.Role == "user" && item.Content.Length >= 12)
-            .Where(item => staged.All(candidate => Jaccard(candidate.Content, item.Content) < MentionJaccard))
+        var leftover = userMessages
+            .Where(item => item.Content.Length >= 12)
+            .Where(item => staged.All(candidate => Jaccard(candidate.Content, item.Content, tokens) < MentionJaccard))
             .ToList();
         while (leftover.Count > 0)
         {
             var message = leftover[0];
-            var cluster = leftover.Where(other => Jaccard(message.Content, other.Content) >= RelatedJaccard).ToArray();
+            var cluster = leftover.Where(other => Jaccard(message.Content, other.Content, tokens) >= RelatedJaccard).ToArray();
             leftover.RemoveAll(cluster.Contains);
             if (cluster.Length < 2) continue;
             var first = cluster.Min(item => item.CreatedAt);
@@ -160,8 +182,10 @@ internal static class DreamingRanker
     }
 
     /// <summary>Collapse near-duplicate memory candidates so frequency accumulates on one keeper.</summary>
-    internal static void MergeNearDuplicates(List<DreamCandidate> staged)
+    internal static void MergeNearDuplicates(List<DreamCandidate> staged,
+        Dictionary<string, HashSet<string>>? tokens = null)
     {
+        tokens ??= new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         for (var index = 0; index < staged.Count; index++)
         {
             var keeper = staged[index];
@@ -170,7 +194,7 @@ internal static class DreamingRanker
             {
                 var candidate = staged[other];
                 if (candidate.MemoryId is null || keeper.Kind != candidate.Kind) continue;
-                if (Jaccard(keeper.Content, candidate.Content) < RelatedJaccard) continue;
+                if (Jaccard(keeper.Content, candidate.Content, tokens) < RelatedJaccard) continue;
                 staged[index] = Combine(keeper, candidate);
                 keeper = staged[index];
                 staged.RemoveAt(other);

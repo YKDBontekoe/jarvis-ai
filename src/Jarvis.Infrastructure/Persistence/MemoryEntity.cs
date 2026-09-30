@@ -21,8 +21,10 @@ public sealed class MemoryEntity
     public DateTimeOffset? ValidUntil { get; set; }
     public bool IsPinned { get; set; }
     public Guid? ProfileId { get; set; }
+    public int AccessCount { get; set; }
+    public DateTimeOffset? LastAccessedAt { get; set; }
     public NpgsqlTypes.NpgsqlTsVector SearchVector { get; set; } = null!;
 
     public MemoryRecord ToRecord() => new(Id, OwnerId, Kind, Content, Importance, Confidence,
-        SourceType, SourceId, CreatedAt, UpdatedAt, ValidUntil, IsPinned, ProfileId);
+        SourceType, SourceId, CreatedAt, UpdatedAt, ValidUntil, IsPinned, ProfileId, AccessCount, LastAccessedAt);
 }

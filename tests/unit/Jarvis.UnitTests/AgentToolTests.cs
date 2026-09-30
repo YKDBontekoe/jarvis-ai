@@ -273,6 +273,31 @@ public sealed class AgentToolTests
         Assert.Equal(["ListReminders", "CancelReminder"], client.ToolNamesCalled);
     }
 
+    [Fact]
+    public async Task Search_memory_records_recalls_for_ranking_and_dreaming()
+    {
+        var memories = new FakeMemoryService();
+        var commute = await memories.CreateAsync(OwnerId, "routine", "Commutes by train", 0.5f, 0.9f, null, false,
+            default);
+        await memories.CreateAsync(OwnerId, "fact", "Owns a cargo bike", 0.5f, 0.9f, null, false, default);
+
+        var result = await CreateMemoryTools(memories, new FakeAuditStore()).SearchMemoryAsync("how I travel by train",
+            default);
+
+        Assert.Contains("Commutes by train", result);
+        Assert.Equal([commute.Id], memories.Recalled);
+    }
+
+    [Fact]
+    public void Memory_reranking_is_skipped_when_the_top_hit_clearly_wins()
+    {
+        MemorySearchHit Hit(double score) => new(new MemoryRecord(Guid.NewGuid(), OwnerId, "fact", "x", 0.5f, 0.9f,
+            "user", null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, false), score);
+
+        Assert.True(MemoryReranker.IsConfident([Hit(0.9), Hit(0.5), Hit(0.4)]));
+        Assert.False(MemoryReranker.IsConfident([Hit(0.9), Hit(0.8), Hit(0.4)]));
+    }
+
     private static MemoryAgentTools CreateMemoryTools(FakeMemoryService memories, IAuditEventStore audit) =>
         new(memories, new MemoryReranker(new FixedChatClientResolver(new EchoContextClient()),
                 NullLogger<MemoryReranker>.Instance), audit,
@@ -354,6 +379,15 @@ public sealed class AgentToolTests
         }
 
         public List<string> SearchQueries { get; } = [];
+
+        public List<Guid> Recalled { get; } = [];
+
+        public Task RecordRecallAsync(Guid ownerId, IReadOnlyCollection<Guid> memoryIds,
+            CancellationToken cancellationToken)
+        {
+            Recalled.AddRange(memoryIds);
+            return Task.CompletedTask;
+        }
 
         public Task<IReadOnlyList<MemorySearchHit>> SearchAsync(Guid ownerId, string query,
             CancellationToken cancellationToken, string? kind = null)

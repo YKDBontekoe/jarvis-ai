@@ -110,7 +110,8 @@ public sealed class KnowledgeMemoryTests : IAsyncLifetime
         var hits = await index.SearchSemanticAsync(owner, new MemoryEmbedding("m1", Vector(0.9f, 0.1f)), null, 0.3, 10,
             CancellationToken.None);
 
-        Assert.Equal([bread.Id], hits.Select(hit => hit.Id));
+        Assert.Equal([bread.Id], hits.Select(hit => hit.Memory.Id));
+        Assert.InRange(hits[0].Score, 0.99, 1.0);
         Assert.Equal(1, (await index.GetStatusAsync(owner, CancellationToken.None)).Active - 2);
         Assert.Single(await index.ListNeedingEmbeddingAsync(owner, "m1", 10, CancellationToken.None));
     }
@@ -152,6 +153,42 @@ public sealed class KnowledgeMemoryTests : IAsyncLifetime
         vector[0] = x;
         vector[1] = y;
         return vector;
+    }
+
+    [Fact]
+    public async Task Lexical_search_ors_terms_weights_rare_words_and_tracks_recalls()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var memories = new MemoryRepository(database);
+        var sister = await memories.CreateAsync(owner, "relationship", "Anna is the user's sister and lives in Rotterdam.",
+            0.7f, 0.9f, "user", null, null, false, CancellationToken.None);
+        var salary = await memories.CreateAsync(owner, "event", "Heeft in november een salarisgesprek met Priya.",
+            0.6f, 0.9f, "user", null, null, false, CancellationToken.None);
+        for (var index = 0; index < 5; index++)
+            await memories.CreateAsync(owner, "fact", $"The user lives near park {index}.", 0.5f, 0.9f, "user", null,
+                null, false, CancellationToken.None);
+
+        // Natural questions: not every word has to match, and the rare word (a name) outweighs a common one.
+        var hits = await memories.SearchLexicalAsync(owner, MemoryQuery.Parse("Where does Anna live these days?"), null,
+            30, CancellationToken.None);
+        Assert.Equal(sister.Id, hits[0].Memory.Id);
+        Assert.True(hits[0].TextScore > hits[1].TextScore);
+        // Dutch compound: "gesprek" only exists inside "salarisgesprek", so the trigram step finds it.
+        var compound = await memories.SearchLexicalAsync(owner, MemoryQuery.Parse("Wanneer is het gesprek?"), null, 30,
+            CancellationToken.None);
+        Assert.Equal(salary.Id, Assert.Single(compound).Memory.Id);
+
+        await memories.RecordAccessAsync(owner, [sister.Id, sister.Id], CancellationToken.None);
+        await memories.RecordAccessAsync(Guid.CreateVersion7(), [sister.Id], CancellationToken.None);
+        var recalled = await memories.GetAsync(sister.Id, owner, CancellationToken.None);
+        Assert.Equal(1, recalled!.AccessCount);
+        Assert.NotNull(recalled.LastAccessedAt);
+
+        var replacement = await memories.ReplaceAsync(sister.Id, owner, "relationship",
+            "Anna is the user's sister and lives in Delft.", 0.7f, 0.9f, "conversation", null, CancellationToken.None);
+        Assert.Equal(1, replacement!.AccessCount);
+        Assert.Equal(recalled.LastAccessedAt, replacement.LastAccessedAt);
     }
 
     private JarvisDbContext CreateDbContext() => new(new DbContextOptionsBuilder<JarvisDbContext>()

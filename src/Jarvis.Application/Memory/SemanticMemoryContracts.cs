@@ -24,6 +24,7 @@ public interface IMemoryIndexRepository
     Task SetEmbeddingAsync(Guid memoryId, Guid ownerId, MemoryEmbedding embedding, CancellationToken cancellationToken);
     Task MarkGraphIndexedAsync(Guid memoryId, Guid ownerId, CancellationToken cancellationToken);
     Task<MemoryIndexStatus> GetStatusAsync(Guid ownerId, CancellationToken cancellationToken);
-    Task<IReadOnlyList<MemoryRecord>> SearchSemanticAsync(Guid ownerId, MemoryEmbedding query, string? kind,
+    /// <summary>Nearest memories by cosine similarity; each hit's score is the similarity.</summary>
+    Task<IReadOnlyList<MemorySearchHit>> SearchSemanticAsync(Guid ownerId, MemoryEmbedding query, string? kind,
         double minimumSimilarity, int limit, CancellationToken cancellationToken);
 }

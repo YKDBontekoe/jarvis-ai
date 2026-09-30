@@ -1,0 +1,155 @@
+using System.Diagnostics;
+using System.Globalization;
+using System.Text.Json;
+using Jarvis.Infrastructure.Persistence;
+using Jarvis.Memory;
+using Microsoft.EntityFrameworkCore;
+using Pgvector.EntityFrameworkCore;
+
+// Offline retrieval eval for the memory bank. Seeds mock memories into a scratch PostgreSQL database and scores
+// IMemoryService.SearchAsync against graded relevance labels. Usage:
+//   MEMORY_EVAL_DB="Host=localhost;Database=jarvis_eval;Username=jarvis;Password=..." dotnet run -- [label]
+var connectionString = Environment.GetEnvironmentVariable("MEMORY_EVAL_DB")
+    ?? throw new InvalidOperationException("Set MEMORY_EVAL_DB to a scratch PostgreSQL connection string.");
+var label = args.FirstOrDefault() ?? "run";
+// "--held-out" scores queries written before any tuning and never used to tune. "--updates" scores corrections
+// and restatements: memory extraction can only dedupe or supersede a memory that search returns for the new message.
+var heldOut = args.Contains("--held-out");
+var updates = args.Contains("--updates");
+// "--scale N" adds N filler memories built from the dataset's own vocabulary to test speed and ranking under load.
+var scaleIndex = Array.IndexOf(args, "--scale");
+var fillers = scaleIndex >= 0 && scaleIndex + 1 < args.Length ? int.Parse(args[scaleIndex + 1], CultureInfo.InvariantCulture) : 0;
+const int Runs = 7;
+
+var dataset = JsonSerializer.Deserialize<Dataset>(
+    await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "dataset.json")),
+    new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+
+JarvisDbContext CreateDb() => new(new DbContextOptionsBuilder<JarvisDbContext>()
+    .UseNpgsql(connectionString, npgsql => npgsql.UseVector()).Options);
+
+await using (var setup = CreateDb())
+{
+    await setup.Database.MigrateAsync();
+    await setup.Database.ExecuteSqlRawAsync("DELETE FROM memories");
+}
+
+var owner = Guid.CreateVersion7();
+var otherOwner = Guid.CreateVersion7();
+var idsByKey = new Dictionary<string, Guid>();
+var keysById = new Dictionary<Guid, string>();
+var foreignIds = new HashSet<Guid>();
+await using (var seed = CreateDb())
+{
+    var service = new MemoryService(new MemoryRepository(seed));
+    foreach (var memory in dataset.Memories)
+    {
+        var record = await service.CreateAsync(owner, memory.Kind, memory.Content, memory.Importance, 0.9f, null,
+            memory.Pinned, CancellationToken.None, sourceType: memory.SourceType ?? "conversation");
+        idsByKey[memory.Key] = record.Id;
+        keysById[record.Id] = memory.Key;
+        var at = DateTimeOffset.UtcNow.AddDays(-memory.AgeDays);
+        await seed.Memories.Where(x => x.Id == record.Id).ExecuteUpdateAsync(s => s
+            .SetProperty(x => x.CreatedAt, at).SetProperty(x => x.UpdatedAt, at)
+            .SetProperty(x => x.ValidUntil, memory.Expired ? at.AddDays(1) : null));
+    }
+    var vocabulary = dataset.Memories.SelectMany(memory => memory.Content.Split(' ')).Distinct().ToArray();
+    var random = new Random(42);
+    for (var filler = 0; filler < fillers; filler++)
+        await service.CreateAsync(owner, "other", string.Join(' ',
+                Enumerable.Range(0, 8 + random.Next(10)).Select(_ => vocabulary[random.Next(vocabulary.Length)])),
+            0.3f, 0.9f, null, false, CancellationToken.None);
+    foreach (var content in dataset.OtherOwnerMemories)
+        foreignIds.Add((await service.CreateAsync(otherOwner, "fact", content, 0.9f, 0.9f, null, false,
+            CancellationToken.None)).Id);
+}
+
+// Autovacuum keeps planner statistics fresh in a running system; do the same so plans are realistic.
+await using (var analyze = CreateDb())
+    await analyze.Database.ExecuteSqlRawAsync("ANALYZE memories");
+
+var expiredIds = dataset.Memories.Where(x => x.Expired).Select(x => idsByKey[x.Key]).ToHashSet();
+var results = new List<QueryResult>();
+var latencies = new List<double>();
+foreach (var query in updates ? dataset.UpdateStatements ?? [] : heldOut ? dataset.HeldOutQueries ?? [] : dataset.Queries)
+{
+    IReadOnlyList<Guid> ranked = [];
+    IReadOnlyList<double> scores = [];
+    var queryLatencies = new List<double>();
+    for (var run = 0; run < Runs; run++)
+    {
+        // A fresh context per call mirrors a scoped request in the API.
+        await using var db = CreateDb();
+        var service = new MemoryService(new MemoryRepository(db));
+        var started = Stopwatch.GetTimestamp();
+        var hits = await service.SearchAsync(owner, query.Text, CancellationToken.None);
+        var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+        if (run > 0) // run 0 warms the connection pool and query plans
+        {
+            latencies.Add(elapsed);
+            queryLatencies.Add(elapsed);
+        }
+        ranked = hits.Select(hit => hit.Memory.Id).ToArray();
+        scores = hits.Select(hit => hit.Score).ToArray();
+    }
+    results.Add(Score(query, ranked) with
+    {
+        MedianMs = queryLatencies.Order().ElementAt(queryLatencies.Count / 2),
+        // Before this change every chat turn with three or more hits waited on a model rerank (up to 8 s). Now chat
+        // turns never do, and the SearchMemory tool only does when the top hit does not clearly win (MemoryReranker).
+        RerankEligible = scores.Count >= 3,
+        RerankAmbiguous = scores.Count >= 3 && scores[0] < 1.5 * scores[1]
+    });
+}
+
+double Mean(Func<QueryResult, double> selector) => results.Average(selector);
+latencies.Sort();
+double Percentile(double p) => latencies[(int)Math.Clamp(Math.Ceiling(p * latencies.Count) - 1, 0, latencies.Count - 1)];
+var summary = new
+{
+    label,
+    queries = results.Count,
+    recallAt3 = Mean(r => r.RecallAt3),
+    recallAt8 = Mean(r => r.RecallAt8),
+    primaryHitAt1 = Mean(r => r.PrimaryAt1),
+    mrr = Mean(r => r.Mrr),
+    ndcgAt8 = Mean(r => r.NdcgAt8),
+    noiseShare = results.Sum(r => r.Irrelevant) / (double)Math.Max(1, results.Sum(r => r.Returned)),
+    avgReturned = Mean(r => r.Returned),
+    emptyQueries = results.Count(r => r.Returned == 0),
+    expiredLeaks = results.Sum(r => r.ExpiredLeaks),
+    otherOwnerLeaks = results.Sum(r => r.ForeignLeaks),
+    turnsThatWaitedOnRerankBefore = results.Count(r => r.RerankEligible),
+    toolSearchesThatStillRerank = results.Count(r => r.RerankAmbiguous),
+    p50Ms = Percentile(0.50),
+    p95Ms = Percentile(0.95)
+};
+Console.WriteLine(JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true }));
+foreach (var result in results)
+    Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+        $"{result.RecallAt8:0.00} {result.Mrr:0.00} {result.MedianMs,6:0.0}ms [{string.Join(", ", result.TopKeys)}]  {result.Query}"));
+
+QueryResult Score(Query query, IReadOnlyList<Guid> ranked)
+{
+    int Grade(Guid id) => keysById.TryGetValue(id, out var key) ? query.Relevant.GetValueOrDefault(key) : 0;
+    var relevant = query.Relevant.Count;
+    var foundAt = (int k) => ranked.Take(k).Count(id => Grade(id) > 0) / (double)relevant;
+    var firstPrimary = ranked.Select((id, index) => (id, index)).FirstOrDefault(x => Grade(x.id) == 2);
+    var mrr = Grade(firstPrimary.id) == 2 ? 1d / (firstPrimary.index + 1) : 0;
+    double Dcg(IEnumerable<int> grades) => grades.Select((g, i) => (Math.Pow(2, g) - 1) / Math.Log2(i + 2)).Sum();
+    var ideal = Dcg(query.Relevant.Values.OrderByDescending(g => g).Take(8));
+    return new QueryResult(query.Text, foundAt(3), foundAt(8),
+        ranked.Count > 0 && Grade(ranked[0]) == 2 ? 1 : 0, mrr, Dcg(ranked.Take(8).Select(Grade)) / ideal,
+        ranked.Count, ranked.Count(id => Grade(id) == 0), ranked.Count(expiredIds.Contains),
+        ranked.Count(foreignIds.Contains),
+        ranked.Take(5).Select(id => keysById.GetValueOrDefault(id, "?")).ToArray());
+}
+
+internal sealed record Dataset(List<SeedMemory> Memories, List<string> OtherOwnerMemories, List<Query> Queries,
+    List<Query>? HeldOutQueries = null, List<Query>? UpdateStatements = null);
+internal sealed record SeedMemory(string Key, string Kind, string Content, double AgeDays, float Importance,
+    bool Pinned = false, bool Expired = false, string? SourceType = null);
+internal sealed record Query(string Text, Dictionary<string, int> Relevant);
+internal sealed record QueryResult(string Query, double RecallAt3, double RecallAt8, double PrimaryAt1, double Mrr,
+    double NdcgAt8, int Returned, int Irrelevant, int ExpiredLeaks, int ForeignLeaks, string[] TopKeys,
+    double MedianMs = 0, bool RerankEligible = false, bool RerankAmbiguous = false);

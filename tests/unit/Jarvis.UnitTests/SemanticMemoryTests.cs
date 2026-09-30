@@ -18,13 +18,12 @@ public sealed class SemanticMemoryTests
         var semanticOnly = Memory("The user loves sourdough baking.");
         var repository = Fake<IMemoryRepository>.Create(
             ("HasActiveMemoriesAsync", _ => true),
-            ("SearchTextAsync", _ => (IReadOnlyList<MemoryRecord>)[keyword]),
-            ("SearchTrigramAsync", _ => (IReadOnlyList<MemoryRecord>)[]));
+            ("SearchLexicalAsync", _ => (IReadOnlyList<MemoryLexicalMatch>)[new(keyword, 1, 0)]));
         string? searchedModel = null;
         var index = Fake<IMemoryIndexRepository>.Create(("SearchSemanticAsync", args =>
         {
             searchedModel = ((MemoryEmbedding)args[1]!).Model;
-            return (IReadOnlyList<MemoryRecord>)[semanticOnly, keyword];
+            return (IReadOnlyList<MemorySearchHit>)[new(semanticOnly, 0.72), new(keyword, 0.7)];
         }));
         var embedder = Fake<IMemoryEmbedder>.Create(("EmbedAsync", _ =>
             (IReadOnlyList<MemoryEmbedding>?)[new MemoryEmbedding("openrouter:embed", [1f, 0f])]));
@@ -42,8 +41,7 @@ public sealed class SemanticMemoryTests
         var keyword = Memory("The user prefers window seats.");
         var repository = Fake<IMemoryRepository>.Create(
             ("HasActiveMemoriesAsync", _ => true),
-            ("SearchTextAsync", _ => (IReadOnlyList<MemoryRecord>)[keyword]),
-            ("SearchTrigramAsync", _ => (IReadOnlyList<MemoryRecord>)[]));
+            ("SearchLexicalAsync", _ => (IReadOnlyList<MemoryLexicalMatch>)[new(keyword, 1, 0)]));
         var embedder = Fake<IMemoryEmbedder>.Create(("EmbedAsync", _ =>
             Task.FromException<IReadOnlyList<MemoryEmbedding>?>(new HttpRequestException("provider down"))));
 
@@ -51,6 +49,90 @@ public sealed class SemanticMemoryTests
             .SearchAsync(Owner, "window", default);
 
         Assert.Equal(keyword.Id, Assert.Single(hits).Memory.Id);
+    }
+
+    [Fact]
+    public async Task Search_without_embeddings_skips_the_existence_check_and_sends_or_terms()
+    {
+        MemoryQuery? sent = null;
+        var repository = Fake<IMemoryRepository>.Create(("SearchLexicalAsync", args =>
+        {
+            sent = (MemoryQuery)args[1]!;
+            return (IReadOnlyList<MemoryLexicalMatch>)[];
+        }));
+
+        Assert.Empty(await new MemoryService(repository).SearchAsync(Owner, "Hoe heet mijn zus ook alweer?", default));
+
+        Assert.Equal(["zus", "sister"], sent!.Terms.Select(term => term.Term));
+        Assert.Equal([1d, 0.5], sent.Terms.Select(term => term.Weight));
+    }
+
+    [Theory]
+    [InlineData("Where does my sister work?", "sister:*|work:*|zus|werk:*|job")]
+    [InlineData("Is Anna still training for the marathon?", "anna:*|train:*|marathon:*|trein:*")]
+    [InlineData("Waar woon ik?", "woon:*|live:*")]
+    [InlineData("the and of mijn", "")]
+    public void Query_parsing_drops_stopwords_stems_and_adds_translations(string text, string expected)
+    {
+        var query = MemoryQuery.Parse(text);
+
+        Assert.Equal(expected, string.Join('|', query.Terms.Select(term => term.TsQuery)));
+        Assert.All(query.Terms, term => Assert.Matches("^[\\p{L}\\p{N}]+(:\\*)?$", term.TsQuery));
+    }
+
+    [Fact]
+    public void Query_terms_are_safe_tsquery_lexemes_for_hostile_input()
+    {
+        var query = MemoryQuery.Parse("x' | !(y) & z:* <-> 'drop table memories; -- ümlaut café");
+
+        Assert.All(query.Terms, term => Assert.Matches("^[\\p{L}\\p{N}]+(:\\*)?$", term.TsQuery));
+        Assert.Contains(query.Terms, term => term.Term == "café");
+        Assert.True(query.Terms.Count <= MemoryQuery.MaxTerms);
+    }
+
+    [Fact]
+    public void Ranking_prefers_relevance_then_importance_recency_and_use()
+    {
+        var now = Recorded.AddDays(10);
+        var strong = Memory("The user's sister is Anna.") with { Importance = 0.2f };
+        var weakButImportant = Memory("Anna likes tea.") with { Importance = 1f, AccessCount = 20 };
+        var fresh = Memory("Anna moved to Delft.") with { UpdatedAt = now };
+        var stale = Memory("Anna moved to Leiden.") with { UpdatedAt = now.AddDays(-400) };
+
+        var hits = MemoryRanking.Rank(
+            [new(strong, 1, 0), new(weakButImportant, 0.5, 0), new(stale, 0.6, 0), new(fresh, 0.6, 0)], [], now);
+
+        // Relevance dominates; between equally relevant memories the fresher one wins, and importance plus use can
+        // lift a less relevant memory above a stale one.
+        Assert.Equal([strong.Id, fresh.Id, weakButImportant.Id, stale.Id], hits.Select(hit => hit.Memory.Id));
+    }
+
+    [Fact]
+    public void Ranking_cuts_the_weak_tail_and_skips_near_duplicates()
+    {
+        var top = Memory("The user is vegetarian and does not eat fish.");
+        var copy = Memory("The user is vegetarian and does not eat fish!");
+        var related = Memory("The user hates cilantro.");
+        var noise = Memory("The user has a monstera.");
+
+        var hits = MemoryRanking.Rank([new(top, 1, 0), new(copy, 0.95, 0), new(related, 0.5, 0), new(noise, 0.1, 0)],
+            [], Recorded);
+
+        Assert.Equal([top.Id, related.Id], hits.Select(hit => hit.Memory.Id));
+    }
+
+    [Fact]
+    public void Ranking_rewards_agreement_between_keyword_and_semantic_hits()
+    {
+        var both = Memory("The user bakes sourdough on Sundays.");
+        var keywordOnly = Memory("The user bought sourdough flour.");
+        var semanticOnly = Memory("The user enjoys baking bread.");
+
+        var hits = MemoryRanking.Rank([new(both, 0.6, 0), new(keywordOnly, 0.6, 0)],
+            [new(both, 0.6), new(semanticOnly, 0.7)], Recorded);
+
+        Assert.Equal(both.Id, hits[0].Memory.Id);
+        Assert.Equal(3, hits.Count);
     }
 
     [Fact]

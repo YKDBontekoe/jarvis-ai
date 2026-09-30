@@ -389,6 +389,9 @@ public sealed class JournalTests
         public Task<IReadOnlyList<MemoryRecord>> ListPinnedAsync(Guid ownerId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
+        public Task RecordRecallAsync(Guid ownerId, IReadOnlyCollection<Guid> memoryIds,
+            CancellationToken cancellationToken) => Task.CompletedTask;
+
         public Task<IReadOnlyList<MemorySearchHit>> SearchAsync(Guid ownerId, string query,
             CancellationToken cancellationToken, string? kind = null) => throw new NotSupportedException();
     }

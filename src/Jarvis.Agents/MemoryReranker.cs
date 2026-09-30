@@ -13,7 +13,7 @@ internal sealed class MemoryReranker(IChatClientResolver chatClients, ILogger<Me
         IReadOnlyList<MemorySearchHit> hits, CancellationToken cancellationToken)
     {
         var candidates = hits.Take(8).ToArray();
-        if (candidates.Length < 3) return hits;
+        if (candidates.Length < 3 || IsConfident(candidates)) return hits;
 
         var request = JsonSerializer.Serialize(new
         {
@@ -70,4 +70,13 @@ internal sealed class MemoryReranker(IChatClientResolver chatClients, ILogger<Me
             return hits;
         }
     }
+
+    /// <summary>
+    /// Adaptive reranking: a model call costs seconds, so it only runs when the hybrid ranking is ambiguous. A top
+    /// hit that clearly outscores the runner-up is kept as is.
+    /// </summary>
+    internal static bool IsConfident(IReadOnlyList<MemorySearchHit> candidates) =>
+        candidates[0].Score >= ConfidentMargin * candidates[1].Score;
+
+    internal const double ConfidentMargin = 1.5;
 }

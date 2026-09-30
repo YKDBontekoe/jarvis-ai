@@ -35,6 +35,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jarvis.UnitTests", "tests\u
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jarvis.IntegrationTests", "tests\integration\Jarvis.IntegrationTests\Jarvis.IntegrationTests.csproj", "{CCAD885D-D8A0-48C0-838B-44D40978ED53}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jarvis.MemoryEval", "tests\eval\Jarvis.MemoryEval\Jarvis.MemoryEval.csproj", "{571A0A86-18BF-4E2E-9EBC-E330C0C01FDB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -201,6 +203,18 @@ Global
 		{CCAD885D-D8A0-48C0-838B-44D40978ED53}.Release|x64.Build.0 = Release|Any CPU
 		{CCAD885D-D8A0-48C0-838B-44D40978ED53}.Release|x86.ActiveCfg = Release|Any CPU
 		{CCAD885D-D8A0-48C0-838B-44D40978ED53}.Release|x86.Build.0 = Release|Any CPU
+		{571A0A86-18BF-4E2E-9EBC-E330C0C01FDB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{571A0A86-18BF-4E2E-9EBC-E330C0C01FDB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{571A0A86-18BF-4E2E-9EBC-E330C0C01FDB}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{571A0A86-18BF-4E2E-9EBC-E330C0C01FDB}.Debug|x64.Build.0 = Debug|Any CPU
+		{571A0A86-18BF-4E2E-9EBC-E330C0C01FDB}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{571A0A86-18BF-4E2E-9EBC-E330C0C01FDB}.Debug|x86.Build.0 = Debug|Any CPU
+		{571A0A86-18BF-4E2E-9EBC-E330C0C01FDB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{571A0A86-18BF-4E2E-9EBC-E330C0C01FDB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{571A0A86-18BF-4E2E-9EBC-E330C0C01FDB}.Release|x64.ActiveCfg = Release|Any CPU
+		{571A0A86-18BF-4E2E-9EBC-E330C0C01FDB}.Release|x64.Build.0 = Release|Any CPU
+		{571A0A86-18BF-4E2E-9EBC-E330C0C01FDB}.Release|x86.ActiveCfg = Release|Any CPU
+		{571A0A86-18BF-4E2E-9EBC-E330C0C01FDB}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -219,5 +233,6 @@ Global
 		{9E73FB10-C632-4C29-A986-830D451DEE95} = {20543853-AF10-B830-2A3D-9FE9F6ECBF6C}
 		{1D445CAD-551B-4549-AD64-C1EAAD5666EA} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{CCAD885D-D8A0-48C0-838B-44D40978ED53} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{571A0A86-18BF-4E2E-9EBC-E330C0C01FDB} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
