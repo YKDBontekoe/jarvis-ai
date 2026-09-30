@@ -356,7 +356,10 @@ mixin _ChatScreenUi on _ChatScreenController {
           : (rating) => unawaited(_rate(entry, rating)),
       onCitationTap: (citation) => unawaited(_openCitation(citation)),
     ),
-    ToolRunEntry() => ToolRunView(run: entry),
+    ToolRunEntry() => ToolRunView(
+      run: entry,
+      onOpenTasks: () => _openUtility('tasks'),
+    ),
     ApprovalEntry() => ApprovalCard(
       approval: entry,
       onDecide: (approved) => unawaited(_decide(entry, approved)),

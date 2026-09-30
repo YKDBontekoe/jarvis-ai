@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'approvals_screen.dart';
+import 'features/chat/tool_catalog.dart';
+import 'api/api_config.dart';
 import 'features/coding/coding_run_detail_screen.dart';
 import 'daily_briefing_screen.dart';
 import 'notification_details_screen.dart';
@@ -52,6 +54,9 @@ class _RemindersScreenState extends State<RemindersScreen>
   );
   List<Map<String, dynamic>> _reminders = [];
   List<Map<String, dynamic>> _notifications = [];
+  // Pending approvals keyed by id, so an approval notification can be decided in place.
+  Map<String, Map<String, dynamic>> _pendingApprovals = {};
+  final Set<String> _decidingApprovals = {};
   bool _loading = true;
   bool _remindersFailed = false;
   bool _notificationsFailed = false;
@@ -97,6 +102,22 @@ class _RemindersScreenState extends State<RemindersScreen>
         notificationsFailed = true;
       } catch (_) {
         notificationsFailed = true;
+      }
+      try {
+        final approvals = await widget.http.get<dynamic>('/api/v1/approvals');
+        if (mounted && revision == _requestRevision) {
+          setState(
+            () => _pendingApprovals = {
+              for (final approval in jsonMaps(approvals.data))
+                if (approval['status'] == 'pending' && jsonId(approval) != null)
+                  jsonId(approval)!: approval,
+            },
+          );
+        }
+      } on DioException {
+        // Approvals still open from the notification; this only hides the shortcut.
+      } catch (_) {
+        // Same: a malformed list never blocks the inbox.
       }
       if (mounted && revision == _requestRevision) {
         setState(() {
@@ -236,6 +257,73 @@ class _RemindersScreenState extends State<RemindersScreen>
     } catch (_) {
       if (mounted) _showError('Jarvis could not update that notification.');
     }
+  }
+
+  Future<void> _decideApproval(String approvalId, bool approved) async {
+    setState(() => _decidingApprovals.add(approvalId));
+    try {
+      // Resuming the paused agent run can take a while, so wait for it.
+      await widget.http.post<dynamic>(
+        '/api/v1/approvals/$approvalId/decision',
+        data: {'approved': approved},
+        options: longRunningOptions(),
+      );
+    } on DioException catch (error) {
+      if (mounted) {
+        _showError(
+          firstProblemMessage(error.response?.data) ??
+              'Jarvis could not record that decision.',
+        );
+      }
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not record that decision.');
+    }
+    if (!mounted) return;
+    setState(() => _decidingApprovals.remove(approvalId));
+    await _load();
+  }
+
+  Widget _approvalActions(Map<String, dynamic> approval) {
+    final id = jsonId(approval)!;
+    final busy = _decidingApprovals.contains(id);
+    final tool = describeTool(asJsonString(approval['toolName']) ?? '');
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Wants to: ${tool.active.toLowerCase()}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: JarvisColors.of(context).ink,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              OutlinedButton(
+                onPressed: busy ? null : () => _decideApproval(id, false),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 38)),
+                child: const Text('Decline'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: busy ? null : () => _decideApproval(id, true),
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 38)),
+                icon: busy
+                    ? const SizedBox.square(
+                        dimension: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(PhosphorIconsRegular.check, size: 18),
+                label: Text(busy ? 'Working…' : 'Approve'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _markAllRead() async {
@@ -678,6 +766,11 @@ class _RemindersScreenState extends State<RemindersScreen>
                               ),
                             ),
                           ],
+                          if (asJsonString(notification['type']) == 'approval.required' &&
+                              _pendingApprovals[asJsonString(notification['sourceId'])] != null)
+                            _approvalActions(
+                              _pendingApprovals[asJsonString(notification['sourceId'])]!,
+                            ),
                           const SizedBox(height: 6),
                           Text(
                             _formatDate(notification['createdAt']),

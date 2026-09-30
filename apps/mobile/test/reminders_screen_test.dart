@@ -177,4 +177,36 @@ void main() {
     expect(http.sent('POST', '/api/v1/notifications/n1/read'), hasLength(1));
     expect(http.sent('POST', '/api/v1/notifications/n2/read'), hasLength(1));
   });
+
+  testWidgets('an approval notification can be approved in place', (tester) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    http.on('GET', '/api/v1/reminders', <Object>[]);
+    http.on('GET', '/api/v1/notifications', [
+      {'id': 'n1', 'type': 'approval.required', 'title': 'Approval needed', 'body': 'Jarvis is waiting for approval to run InvokeMcpTool.', 'sourceId': 'a1', 'createdAt': now, 'readAt': null},
+    ]);
+    http.on('GET', '/api/v1/approvals', [
+      {'id': 'a1', 'toolName': 'InvokeMcpTool', 'status': 'pending'},
+    ]);
+    http.on('POST', '/api/v1/approvals/a1/decision', {'id': 'm1', 'role': 'assistant', 'content': 'Done.'});
+    tester.view.physicalSize = const Size(900, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildJarvisTheme(),
+        home: RemindersScreen(
+          http: http.client(),
+          initialTab: RemindersTab.notifications,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Wants to:'), findsOneWidget);
+    await tester.tap(find.text('Approve'));
+    await tester.pumpAndSettle();
+    final sent = http.sent('POST', '/api/v1/approvals/a1/decision').single.body as Map;
+    expect(sent['approved'], true);
+  });
 }
