@@ -42,6 +42,7 @@ class VoiceStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final speaking = phase == 'speaking';
+    final waiting = phase == 'connecting' || phase == 'reconnecting';
     final listening = phase == 'listening' || speaking;
     return Stack(
       children: [
@@ -62,8 +63,8 @@ class VoiceStage extends StatelessWidget {
                       child: Center(
                         child: JarvisOrb(
                           size: speaking ? 148 : 128,
-                          animate: phase == 'connecting' || speaking,
-                          listening: listening && phase != 'connecting',
+                          animate: waiting || speaking,
+                          listening: listening,
                         ),
                       ),
                     ),
@@ -113,7 +114,7 @@ class VoiceStage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(40),
                         ),
                       ),
-                      icon: phase == 'connecting'
+                      icon: waiting
                           ? const SizedBox.square(
                               dimension: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
@@ -176,6 +177,7 @@ class VoiceStage extends StatelessWidget {
 
   String get _title => switch (phase) {
     'connecting' => 'Connecting',
+    'reconnecting' => 'Reconnecting',
     'listening' => muted ? 'Muted' : 'Listening',
     'thinking' => 'One moment',
     'speaking' => 'Speaking',
@@ -184,6 +186,10 @@ class VoiceStage extends StatelessWidget {
 
   String get _subtitle {
     if (phase == 'connecting') return 'Opening a ChatGPT voice session.';
+    if (phase == 'reconnecting') {
+      return 'Your connection dropped. Jarvis keeps the conversation open '
+          'while it reconnects.';
+    }
     if (phase == 'thinking') return 'Jarvis is working on that.';
     if (phase == 'speaking') {
       return '$voiceName is speaking. Talk when you want to interrupt.';
@@ -262,8 +268,9 @@ class _CaptionCard extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 6,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyLarge
-                ?.copyWith(height: 1.35),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(height: 1.35),
           ),
         ],
       ),

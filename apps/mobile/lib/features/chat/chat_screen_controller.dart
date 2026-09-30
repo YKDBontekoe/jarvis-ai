@@ -41,6 +41,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   String _voicePhase = 'idle';
   String _voiceName = '';
   bool _voiceMuted = false;
+  bool _voiceReconnecting = false;
   bool _voiceUserStop = false;
   int _voiceGeneration = 0;
   CancelToken? _runCancel;

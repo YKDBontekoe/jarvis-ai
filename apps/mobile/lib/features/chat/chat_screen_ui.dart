@@ -459,6 +459,7 @@ mixin _ChatScreenUi on _ChatScreenController {
   String get _shownVoicePhase {
     if (_voiceStarting) return 'connecting';
     if (!_voiceActive) return 'idle';
+    if (_voiceReconnecting) return 'reconnecting';
     return _voicePhase;
   }
 
