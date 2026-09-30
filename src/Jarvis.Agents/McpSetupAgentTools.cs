@@ -43,8 +43,8 @@ internal sealed class McpSetupAgentTools(
             style = option.Id is "https" or "stdio" or "manage" ? "secondary" : "primary"
         }), JsonOptions);
         return UiSurfaceRender.RenderAsync(surfaces, realtime, currentUser, id, UiSurfaceKinds.Choice,
-            "Connect a tool",
-            "Jarvis can add, authorize, pause, and remove MCP servers in this chat. Pick what you want to set up.",
+            "Connect an app",
+            "Pick an app, and Jarvis sets it up with you right here.",
             items, null, actions, null, cancellationToken);
     }
 
@@ -71,20 +71,20 @@ internal sealed class McpSetupAgentTools(
             new
             {
                 id = "token",
-                label = "Access token",
+                label = "Access key",
                 type = "secret",
-                placeholder = "Paste the token",
+                placeholder = "Paste the key",
                 secretName = name
             }
         }, JsonOptions);
         var actions = JsonSerializer.Serialize(new[]
         {
-            new { id = "save", label = "Save token", style = "primary" }
+            new { id = "save", label = "Save key", style = "primary" }
         }, JsonOptions);
         return UiSurfaceRender.RenderAsync(surfaces, realtime, currentUser, id, UiSurfaceKinds.Form,
-            string.IsNullOrWhiteSpace(title) ? "Save a token" : title.Trim(),
+            string.IsNullOrWhiteSpace(title) ? "Save an access key" : title.Trim(),
             string.IsNullOrWhiteSpace(body)
-                ? $"This stays in Jarvis and is never shown back in chat. Provider: {slug}."
+                ? "Stored encrypted in Jarvis and never shown in chat again."
                 : body.Trim(),
             null, fields, actions, slug, cancellationToken);
     }

@@ -26,9 +26,7 @@ mixin _IntegrationsCredentials on _IntegrationsController {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(
-            replacing ? 'Replace credential' : 'Add integration credential',
-          ),
+          title: Text(replacing ? 'Replace access key' : 'Paste an access key'),
           content: SizedBox(
             width: 420,
             child: Column(
@@ -40,8 +38,10 @@ mixin _IntegrationsCredentials on _IntegrationsController {
                     autocorrect: false,
                     textCapitalization: TextCapitalization.none,
                     decoration: const InputDecoration(
-                      labelText: 'Provider slug',
+                      labelText: 'App ID',
                       hintText: 'home-assistant',
+                      helperText:
+                          'The name your Jarvis server uses for this app',
                     ),
                   ),
                 if (secretName == null)
@@ -50,7 +50,7 @@ mixin _IntegrationsCredentials on _IntegrationsController {
                     autocorrect: false,
                     textCapitalization: TextCapitalization.none,
                     decoration: const InputDecoration(
-                      labelText: 'Credential name',
+                      labelText: 'Key name',
                       hintText: 'token',
                     ),
                   ),
@@ -60,7 +60,9 @@ mixin _IntegrationsCredentials on _IntegrationsController {
                   autocorrect: false,
                   enableSuggestions: false,
                   decoration: InputDecoration(
-                    labelText: 'Secret value',
+                    labelText: 'Access key',
+                    helperText:
+                        'Stored encrypted. Jarvis never shows it again.',
                     suffixIcon: IconButton(
                       tooltip: obscure ? 'Show value' : 'Hide value',
                       onPressed: () => setDialogState(() => obscure = !obscure),
@@ -104,8 +106,7 @@ mixin _IntegrationsCredentials on _IntegrationsController {
                           nameValue.isEmpty ||
                           value.trim().isEmpty) {
                         setDialogState(
-                          () => dialogError =
-                              'Enter a provider, credential name, and value.',
+                          () => dialogError = 'Fill in every field.',
                         );
                         return;
                       }
@@ -121,7 +122,7 @@ mixin _IntegrationsCredentials on _IntegrationsController {
                       } on DioException catch (error) {
                         final message =
                             firstProblemMessage(error.response?.data) ??
-                            'Could not save credential.';
+                            'Could not save the key.';
                         if (dialogContext.mounted) {
                           setDialogState(() {
                             dialogError = message;
@@ -131,7 +132,7 @@ mixin _IntegrationsCredentials on _IntegrationsController {
                       } catch (_) {
                         if (dialogContext.mounted) {
                           setDialogState(() {
-                            dialogError = 'Could not save credential.';
+                            dialogError = 'Could not save the key.';
                             saving = false;
                           });
                         }
@@ -156,8 +157,8 @@ mixin _IntegrationsCredentials on _IntegrationsController {
   Future<void> _deleteSecret(String provider, String secretName) async {
     final confirmed = await showJarvisConfirm(
       context,
-      title: 'Delete credential?',
-      message: 'Remove $secretName from $provider?',
+      title: 'Delete this key?',
+      message: 'Jarvis can’t use ${_appInfo(provider).name} with it anymore.',
       confirmLabel: 'Delete',
       destructive: true,
       icon: PhosphorIconsRegular.key,
@@ -170,17 +171,17 @@ mixin _IntegrationsCredentials on _IntegrationsController {
       );
       if (mounted) await _load();
     } on DioException {
-      if (mounted) setState(() => _error = 'Could not delete credential.');
+      if (mounted) setState(() => _error = 'Could not delete the key.');
     } catch (_) {
-      if (mounted) setState(() => _error = 'Could not delete credential.');
+      if (mounted) setState(() => _error = 'Could not delete the key.');
     }
   }
 
   Future<void> _deleteProvider(String provider) async {
     final confirmed = await showJarvisConfirm(
       context,
-      title: 'Remove integration credentials?',
-      message: 'Delete all stored credentials for $provider?',
+      title: 'Delete all keys for ${_appInfo(provider).name}?',
+      message: 'Jarvis can’t sign in to it anymore until you add a key again.',
       confirmLabel: 'Delete all',
       destructive: true,
       icon: PhosphorIconsRegular.trash,
@@ -194,78 +195,161 @@ mixin _IntegrationsCredentials on _IntegrationsController {
       if (mounted) await _load();
     } on DioException {
       if (mounted) {
-        setState(() => _error = 'Could not remove integration credentials.');
+        setState(() => _error = 'Could not delete those keys.');
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'Could not remove integration credentials.');
+        setState(() => _error = 'Could not delete those keys.');
       }
     }
   }
 
-  Widget _featuredCard({
-    required String title,
-    required IconData icon,
-    required String description,
-    required String provider,
-  }) {
-    final configured =
-        !_credentialsFailed &&
-        _providers.any(
-          (item) =>
-              item['provider'] == provider &&
-              jsonStrings(item['secretNames']).contains('token'),
-        );
-    final statusLabel = _credentialsFailed
-        ? 'Couldn’t load'
-        : configured
-        ? 'Token stored'
-        : 'Not configured';
-    final statusColor = _credentialsFailed
-        ? JarvisColors.of(context).danger
-        : configured
-        ? JarvisColors.of(context).success
-        : JarvisColors.of(context).muted;
-    return SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              IconBadge(icon: icon, size: 44),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
+  bool _hasKey(String provider) =>
+      !_credentialsFailed &&
+      _providers.any(
+        (item) =>
+            item['provider'] == provider &&
+            jsonStrings(item['secretNames']).contains('token'),
+      );
+
+  /// An app the Jarvis host can run once the owner stores an access key.
+  @override
+  Widget _featuredRow({required String provider, required String steps}) {
+    final info = _appInfo(provider);
+    final added = _hasKey(provider);
+    void open() => _showFeaturedSheet(info, provider, steps, added);
+    return _SuggestionRow(
+      key: Key('suggest-$provider'),
+      icon: info.icon,
+      title: info.name,
+      subtitle: info.what ?? '',
+      trailing: added ? const _AddedLabel() : _SetUpButton(onPressed: open),
+      onTap: open,
+    );
+  }
+
+  Future<void> _showFeaturedSheet(
+    _AppInfo info,
+    String provider,
+    String steps,
+    bool added,
+  ) async {
+    final ask = widget.onAskInChat;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        final colors = JarvisColors.of(sheetContext);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    IconBadge(icon: info.icon, size: 44),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(info.name, style: theme.textTheme.titleLarge),
+                    ),
+                  ],
                 ),
-              ),
-              StatusPill(label: statusLabel, color: statusColor),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            description,
-            style: TextStyle(
-              height: 1.5,
-              fontSize: 13.5,
-              color: JarvisColors.of(context).inkSoft,
+                const SizedBox(height: 16),
+                Text(
+                  info.what ?? '',
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.45,
+                    color: colors.ink,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  steps,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: colors.inkSoft,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Jarvis asks for your OK before it acts in ${info.name}, unless you allowed that action in advance.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    color: colors.muted,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: () => Navigator.pop(sheetContext, 'key'),
+                  child: Text(
+                    added ? 'Replace access key' : 'Paste access key',
+                  ),
+                ),
+                if (ask != null) ...[
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => Navigator.pop(sheetContext, 'chat'),
+                    child: const Text('Ask Jarvis to help'),
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: () =>
-                _editSecret(provider: provider, secretName: 'token'),
-            icon: const Icon(PhosphorIconsRegular.key, size: 18),
-            label: const Text('Set or rotate token'),
-          ),
-        ],
+        );
+      },
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case 'key':
+        await _editSecret(provider: provider, secretName: 'token');
+      case 'chat':
+        _askInChat(
+          'Help me connect ${info.name} in this chat. Show the setup card.',
+        );
+    }
+  }
+
+  /// Saved keys are rarely needed, so they sit folded at the bottom.
+  Widget _savedKeys(List<Map<String, dynamic>> providers) {
+    final colors = JarvisColors.of(context);
+    final count = providers.fold<int>(
+      0,
+      (sum, item) => sum + jsonStrings(item['secretNames']).length,
+    );
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        key: const Key('saved-keys'),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        title: Text(
+          'Saved keys',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        subtitle: Text(
+          _credentialsFailed
+              ? 'Could not load your saved keys.'
+              : count == 0
+              ? 'None yet. Keys are stored encrypted and never shown again.'
+              : '${count == 1 ? '1 key' : '$count keys'}, stored encrypted and never shown again.',
+          style: TextStyle(fontSize: 13, color: colors.muted),
+        ),
+        children: [for (final item in providers) _providerCard(item)],
       ),
     );
   }
 
   Widget _providerCard(Map<String, dynamic> provider) {
     final slug = asJsonString(provider['provider']) ?? '';
+    final info = _appInfo(slug);
     final names = jsonStrings(provider['secretNames']);
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
@@ -275,16 +359,16 @@ mixin _IntegrationsCredentials on _IntegrationsController {
         children: [
           Row(
             children: [
-              const IconBadge(icon: PhosphorIconsRegular.lockSimple),
+              IconBadge(icon: info.icon),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  slug,
+                  info.name,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
               IconButton(
-                tooltip: 'Remove all credentials',
+                tooltip: 'Remove all keys for ${info.name}',
                 onPressed: () => _deleteProvider(slug),
                 icon: const Icon(PhosphorIconsRegular.trash, size: 20),
               ),
@@ -296,12 +380,12 @@ mixin _IntegrationsCredentials on _IntegrationsController {
               dense: true,
               contentPadding: const EdgeInsets.only(left: 4),
               leading: const Icon(PhosphorIconsRegular.key, size: 19),
-              title: Text(name),
-              subtitle: const Text('Stored securely · value hidden'),
+              title: Text(_secretLabel(name)),
+              subtitle: const Text('Saved · hidden'),
               trailing: Wrap(
                 children: [
                   IconButton(
-                    tooltip: 'Replace value',
+                    tooltip: 'Replace',
                     onPressed: () =>
                         _editSecret(provider: slug, secretName: name),
                     icon: const Icon(
@@ -310,7 +394,7 @@ mixin _IntegrationsCredentials on _IntegrationsController {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Delete value',
+                    tooltip: 'Delete',
                     onPressed: () => _deleteSecret(slug, name),
                     icon: const Icon(
                       PhosphorIconsRegular.minusCircle,

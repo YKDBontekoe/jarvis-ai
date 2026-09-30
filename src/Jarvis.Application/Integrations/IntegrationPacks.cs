@@ -45,15 +45,15 @@ public static class IntegrationPackCatalog
     public static readonly IReadOnlyList<IntegrationPack> All =
     [
         new(IntegrationPackIds.Calendar, "Calendar", "calendar",
-            "Subscribe to an ICS/iCal feed for today’s events, and optionally attach a calendar MCP server so Jarvis can list or create events.",
+            "See today’s events from your calendar link, and optionally let Jarvis add new events.",
             "ics", ["calendar_events_list", "calendar_event_create"], "npx",
             ["-y", "@cocal/google-calendar-mcp"], null, true),
         new(IntegrationPackIds.Mail, "Mail", "mail",
-            "Connect a mail MCP server so Jarvis can search and draft messages. Authorize it in this chat with OAuth or a secret card — never paste tokens into the transcript.",
+            "Let Jarvis search your email and draft replies. You sign in once; never paste passwords into chat.",
             "oauth", ["list_emails", "search_emails", "draft_email"], "npx",
             ["-y", "@gongrzhe/server-gmail-autoauth-mcp"], null, false),
         new(IntegrationPackIds.Contacts, "Contacts", "contacts",
-            "Connect a contacts MCP server so Jarvis can look up people you know. Authorize it in this chat.",
+            "Let Jarvis look up people you know. You sign in once.",
             "oauth", ["list_contacts", "search_contacts"], "npx",
             ["-y", "@modelcontextprotocol/server-google-contacts"], null, false)
     ];

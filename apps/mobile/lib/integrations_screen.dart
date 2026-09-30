@@ -9,6 +9,7 @@ import 'http_urls.dart';
 import 'ui/jarvis_ui.dart';
 import 'features/chat/mcp_setup.dart';
 
+part 'integrations_apps.dart';
 part 'integrations_credentials.dart';
 part 'integrations_mcp.dart';
 part 'integrations_packs.dart';
@@ -39,6 +40,8 @@ abstract class _IntegrationsController extends State<IntegrationsScreen> {
   Future<void> _load();
   Future<void> _editSecret({String? provider, String? secretName});
   Future<void> _connectOAuth({String? server, String? endpoint});
+  void _askInChat(String prompt);
+  Widget _featuredRow({required String provider, required String steps});
 }
 
 class _IntegrationsScreenState extends _IntegrationsController
@@ -66,10 +69,10 @@ class _IntegrationsScreenState extends _IntegrationsController
         setState(() => _providers = jsonMaps(response.data));
       } on DioException {
         credentialsFailed = true;
-        error = 'Could not load integration credentials.';
+        error = 'Could not load your saved keys.';
       } catch (_) {
         credentialsFailed = true;
-        error = 'Could not load integration credentials.';
+        error = 'Could not load your saved keys.';
       }
       try {
         final connectionResponse = await widget.http.get<dynamic>(
@@ -79,10 +82,10 @@ class _IntegrationsScreenState extends _IntegrationsController
         setState(() => _connections = jsonMaps(connectionResponse.data));
       } on DioException {
         connectionsFailed = true;
-        error ??= 'Could not load integration connections.';
+        error ??= 'Could not check how your apps are doing.';
       } catch (_) {
         connectionsFailed = true;
-        error ??= 'Could not load integration connections.';
+        error ??= 'Could not check how your apps are doing.';
       }
       try {
         final serversResponse = await widget.http.get<dynamic>(
@@ -92,10 +95,10 @@ class _IntegrationsScreenState extends _IntegrationsController
         setState(() => _managedServers = jsonMaps(serversResponse.data));
       } on DioException {
         serversFailed = true;
-        error ??= 'Could not load MCP servers.';
+        error ??= 'Could not load your apps.';
       } catch (_) {
         serversFailed = true;
-        error ??= 'Could not load MCP servers.';
+        error ??= 'Could not load your apps.';
       }
       try {
         final packsResponse = await widget.http.get<dynamic>(
@@ -119,7 +122,7 @@ class _IntegrationsScreenState extends _IntegrationsController
       if (mounted && revision == _requestRevision) {
         setState(() {
           _loading = false;
-          _error ??= 'Could not load integration credentials.';
+          _error ??= 'Could not load your saved keys.';
         });
       }
     }
@@ -128,23 +131,12 @@ class _IntegrationsScreenState extends _IntegrationsController
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Integrations'),
+      title: const Text('Connected apps'),
       actions: [
-        if (widget.onAskInChat != null)
-          HeaderAction(
-            label: 'Ask Jarvis',
-            icon: PhosphorIconsRegular.chatCircle,
-            collapsesWhenNarrow: true,
-            onPressed: () {
-              final ask = widget.onAskInChat!;
-              Navigator.of(context).pop();
-              ask(mcpSetupPrompt);
-            },
-          ),
         HeaderAction(
           label: 'Add',
           icon: PhosphorIconsRegular.plus,
-          onPressed: () => _editSecret(),
+          onPressed: _showAddSheet,
         ),
       ],
     ),
@@ -153,7 +145,7 @@ class _IntegrationsScreenState extends _IntegrationsController
         : RefreshIndicator(
             onRefresh: _load,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
               children: [
                 ContentWidth(
                   child: Column(
@@ -166,84 +158,123 @@ class _IntegrationsScreenState extends _IntegrationsController
           ),
   );
 
+  /// One place to start anything new: chat for guided setup, or a key for
+  /// an app the server already knows about.
+  Future<void> _showAddSheet() async {
+    final ask = widget.onAskInChat;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Text(
+                  'Connect an app',
+                  style: Theme.of(sheetContext).textTheme.titleLarge,
+                ),
+              ),
+              if (ask != null)
+                ListTile(
+                  leading: const IconBadge(
+                    icon: PhosphorIconsRegular.chatCircle,
+                  ),
+                  title: const Text('Ask Jarvis to set it up'),
+                  subtitle: const Text(
+                    'Jarvis walks you through it in chat. Easiest.',
+                  ),
+                  onTap: () => Navigator.pop(sheetContext, 'chat'),
+                ),
+              ListTile(
+                leading: const IconBadge(icon: PhosphorIconsRegular.key),
+                title: const Text('Paste an access key'),
+                subtitle: const Text(
+                  'For an app that is already set up on your Jarvis server',
+                ),
+                onTap: () => Navigator.pop(sheetContext, 'key'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case 'chat':
+        _askInChat(mcpSetupPrompt);
+      case 'key':
+        await _editSecret();
+    }
+  }
+
+  @override
+  void _askInChat(String prompt) {
+    final ask = widget.onAskInChat;
+    if (ask == null) return;
+    Navigator.of(context).pop();
+    ask(prompt);
+  }
+
   List<Widget> _content() {
-    final providers = _providers
+    final keys = _providers
         .where(
           (item) =>
               !(asJsonString(item['provider']) ?? '').startsWith('jarvis-mcp-'),
         )
         .toList();
+    final connections = _connectionCards();
+    final attention = _needsAttentionCount();
     return [
-      const InlineNotice(
-        tone: NoticeTone.info,
-        message: 'Add, authorize, pause, and remove MCP servers in chat. This page is the encrypted token vault and a status list.',
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+        child: Text(
+          'Connect the apps you already use, so Jarvis can help with them. '
+          'Jarvis asks for your OK before it acts in them, unless you allowed that action in advance.',
+          style: TextStyle(
+            fontSize: 14.5,
+            height: 1.45,
+            color: JarvisColors.of(context).inkSoft,
+          ),
+        ),
       ),
       if (_error != null)
         InlineNotice(
           message: _error!,
           tone: NoticeTone.danger,
-          margin: const EdgeInsets.only(top: 12),
+          margin: const EdgeInsets.only(top: 16),
         ),
-      const SizedBox(height: 24),
-      const SectionHeader('Guided packs'),
-      if (_packs.isEmpty)
+      const SizedBox(height: 28),
+      SectionHeader(
+        'Your apps',
+        trailing: attention == 0
+            ? null
+            : StatusPill(
+                label: attention == 1 ? '1 needs you' : '$attention need you',
+                color: JarvisColors.of(context).warning,
+              ),
+      ),
+      if ((_connectionsFailed || _serversFailed) && connections.isEmpty)
+        _MutedLine(
+          icon: PhosphorIconsRegular.cloudSlash,
+          text: 'Could not load your apps. Pull down to try again.',
+        )
+      else if (connections.isEmpty)
         const _MutedLine(
           icon: PhosphorIconsRegular.plugsConnected,
-          text: 'Calendar, mail, and contacts packs appear here when the server supports them.',
+          text: 'Nothing connected yet. Pick an app below to get started.',
         )
       else
-        for (final pack in _packs) _packCard(pack),
+        ...connections,
       const SizedBox(height: 28),
-      const SectionHeader('Featured'),
-      _featuredCard(
-        title: 'Home Assistant',
-        icon: PhosphorIconsRegular.house,
-        description: 'Enable Home Assistant’s MCP Server integration, expose the entities Jarvis may use, and configure HOME_ASSISTANT_MCP_URL on the Jarvis host. Store a long-lived access token here; Jarvis adds the bearer scheme when connecting. Jarvis asks for approval before every Home Assistant action.',
-        provider: 'home-assistant',
-      ),
-      const SizedBox(height: 12),
-      _featuredCard(
-        title: 'GitHub',
-        icon: PhosphorIconsRegular.code,
-        description: 'Enable the GitHub MCP Compose overlay, then store a least-privilege personal access token here. Jarvis exposes repository, issue, and pull request tools. In chat it can pause GitHub or narrow those tools. Each operation asks for approval.',
-        provider: 'github',
-      ),
+      const SectionHeader('Add an app'),
+      _suggestions(),
       const SizedBox(height: 28),
-      const SectionHeader('MCP connections'),
-      for (final server in _managedServers) _managedServerCard(server),
-      if ((_connectionsFailed || _serversFailed) &&
-          _connections.isEmpty &&
-          _managedServers.isEmpty)
-        const _MutedLine(
-          icon: PhosphorIconsRegular.cloudSlash,
-          text: 'Could not load MCP servers.',
-        )
-      else if (_connections.isEmpty && _managedServers.isEmpty)
-        const _MutedLine(
-          icon: PhosphorIconsRegular.cloudSlash,
-          text: 'No MCP servers yet. Ask Jarvis in chat to connect one.',
-        ),
-      // A registered server shows its live status on its own card above.
-      for (final connection in _connections)
-        if (!_managedServers.any(
-          (server) =>
-              asJsonString(server['id']) != null &&
-              asJsonString(server['id']) == asJsonString(connection['id']),
-        ))
-          _connectionCard(connection),
-      const SizedBox(height: 28),
-      const SectionHeader('Stored credentials'),
-      if (_credentialsFailed)
-        const _MutedLine(
-          icon: PhosphorIconsRegular.key,
-          text: 'Could not load integration credentials.',
-        )
-      else if (providers.isEmpty)
-        const _MutedLine(
-          icon: PhosphorIconsRegular.key,
-          text: 'No integration credentials yet.',
-        ),
-      for (final item in providers) _providerCard(item),
+      _savedKeys(keys),
     ];
   }
 }

@@ -292,7 +292,7 @@ class _HomeOverviewState extends State<HomeOverview>
           _BriefingListCard(
             icon: PhosphorIconsRegular.calendarBlank,
             title: 'Connect a calendar',
-            subtitle: 'Ask Jarvis in chat to subscribe to an ICS feed so today’s events appear here.',
+            subtitle: 'Ask Jarvis to add your calendar so today’s events show up here.',
             onTap: widget.onSuggestion == null
                 ? widget.onOpenIntegrations
                 : () => widget.onSuggestion!(mcpCalendarPrompt),
@@ -373,8 +373,8 @@ class _HomeOverviewState extends State<HomeOverview>
         onTap: () => widget.onSuggestion!('Hi Jarvis! What can you help me with?'),
       ),
       _StartStep(
-        label: 'Connect a tool',
-        hint: 'Calendar, mail, GitHub and more',
+        label: 'Connect an app',
+        hint: 'Calendar, mail, GitHub, and more',
         done: connected,
         onTap: () => widget.onSuggestion!(mcpSetupPrompt),
       ),
