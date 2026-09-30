@@ -22,7 +22,7 @@ mixin _ChatScreenUi on _ChatScreenController {
   Widget _sidebar({required bool wide}) => JarvisSidebar(
     conversations: _recent,
     selectedConversationId: _showHome ? null : _conversationId,
-    homeSelected: _showHome && _selectedDestination == 0,
+    homeSelected: _showHome && _selectedDestination == 0 && _utilityPane == null,
     connected: _connected,
     onHome: () => _fromSidebar(() {
       if (_hasPendingApproval) {
@@ -63,7 +63,14 @@ mixin _ChatScreenUi on _ChatScreenController {
     _dismissKeyboard();
     final scaffold = _scaffoldKey.currentState;
     if (scaffold?.isDrawerOpen ?? false) scaffold!.closeDrawer();
-    action();
+    // Anything chosen in the sidebar replaces whatever the content area shows.
+    _closeUtilityPane();
+    _openingFromSidebar = true;
+    try {
+      action();
+    } finally {
+      _openingFromSidebar = false;
+    }
   }
 
   void _showQuickActions() {
@@ -206,6 +213,11 @@ mixin _ChatScreenUi on _ChatScreenController {
           ],
         ),
         actions: [
+          if (!voice)
+            _NotificationBell(
+              unread: _unreadNotifications,
+              onPressed: _signedOut ? null : () => _openUtility('notifications'),
+            ),
           if (!voice)
             CircleIconButton(
               icon: PhosphorIconsRegular.magnifyingGlass,
@@ -351,7 +363,10 @@ mixin _ChatScreenUi on _ChatScreenController {
           : (rating) => unawaited(_rate(entry, rating)),
       onCitationTap: (citation) => unawaited(_openCitation(citation)),
     ),
-    ToolRunEntry() => ToolRunView(run: entry),
+    ToolRunEntry() => ToolRunView(
+      run: entry,
+      onOpenTasks: () => _openUtility('tasks'),
+    ),
     ApprovalEntry() => ApprovalCard(
       approval: entry,
       onDecide: (approved) => unawaited(_decide(entry, approved)),
@@ -408,7 +423,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     ready: _conversationId != null,
     voiceStarting: _voiceStarting,
     onTalk:
-        _conversationId == null || _busy || _hasPendingApproval || !_connected
+        _conversationId == null || _busy || _hasPendingApproval
         ? null
         : () => _selectDestination(2),
     onOpenTasks: () => _openUtility('tasks'),
@@ -447,4 +462,63 @@ class _ConnectionDot extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Top-bar bell that opens notifications and shows how many are unread.
+class _NotificationBell extends StatelessWidget {
+  const _NotificationBell({required this.unread, required this.onPressed});
+
+  final int unread;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final label = unread > 0
+        ? 'Notifications, $unread unread'
+        : 'Notifications';
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        CircleIconButton(
+          icon: unread > 0
+              ? PhosphorIconsRegular.bellRinging
+              : PhosphorIconsRegular.bell,
+          tooltip: label,
+          onPressed: onPressed,
+        ),
+        if (unread > 0)
+          Positioned(
+            top: -2,
+            right: -2,
+            child: IgnorePointer(
+              child: AnimatedScale(
+                scale: 1,
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutBack,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 18),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: colors.danger,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: colors.canvas, width: 2),
+                  ),
+                  child: Text(
+                    unread > 99 ? '99+' : '$unread',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10.5,
+                      height: 1.3,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }

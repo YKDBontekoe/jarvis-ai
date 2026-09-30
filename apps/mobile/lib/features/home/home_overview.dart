@@ -352,6 +352,44 @@ class _HomeOverviewState extends State<HomeOverview>
     return '${local.month}/${local.day} $hour';
   }
 
+  /// First-run steps, or null once the account has settled in (or usage is unknown).
+  /// The card only nudges new accounts: it disappears after a handful of messages.
+  List<_StartStep>? get _checklist {
+    final usage = _usage;
+    if (usage == null || widget.onSuggestion == null) return null;
+    final activity = jsonObject(usage['activity']) ?? const {};
+    final sent = asJsonInt(jsonObject(activity['messagesSent'])?['total']);
+    if (sent >= 20) return null;
+    final memories = asJsonInt(
+      jsonObject(usage['personalization'])?['activeMemories'],
+    );
+    final packs = jsonMaps(_briefing?['packs']);
+    final connected = packs.any((pack) => asJsonBool(pack['installed']));
+    final steps = [
+      _StartStep(
+        label: 'Say hello',
+        hint: 'Ask what Jarvis can do',
+        done: sent > 0,
+        onTap: () => widget.onSuggestion!('Hi Jarvis! What can you help me with?'),
+      ),
+      _StartStep(
+        label: 'Connect a tool',
+        hint: 'Calendar, mail, GitHub and more',
+        done: connected,
+        onTap: () => widget.onSuggestion!(mcpSetupPrompt),
+      ),
+      _StartStep(
+        label: 'Help Jarvis know you',
+        hint: 'It remembers what matters to you',
+        done: memories > 0,
+        onTap: () => widget.onSuggestion!(
+          'Ask me a few questions so you can get to know me, and remember my answers.',
+        ),
+      ),
+    ];
+    return steps.every((step) => step.done) ? const [] : steps;
+  }
+
   Widget _usageCard() {
     final usage = _usage;
     if (usage == null) return const SizedBox.shrink();
@@ -534,6 +572,10 @@ class _HomeOverviewState extends State<HomeOverview>
                         ],
                       ),
                       const SizedBox(height: 36),
+                      if (_checklist case final steps? when steps.isNotEmpty) ...[
+                        _GetStartedCard(steps: steps),
+                        const SizedBox(height: 20),
+                      ],
                       if (_briefing != null) ...[
                         _briefingSections(),
                         const SizedBox(height: 28),
@@ -622,6 +664,124 @@ class _HomeOverviewState extends State<HomeOverview>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StartStep {
+  const _StartStep({
+    required this.label,
+    required this.hint,
+    required this.done,
+    required this.onTap,
+  });
+
+  final String label;
+  final String hint;
+  final bool done;
+  final VoidCallback onTap;
+}
+
+/// A short checklist that guides a new account through its first minutes.
+class _GetStartedCard extends StatelessWidget {
+  const _GetStartedCard({required this.steps});
+
+  final List<_StartStep> steps;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final done = steps.where((step) => step.done).length;
+    return SurfaceCard(
+      key: const Key('home-get-started'),
+      elevated: true,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Get started',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              Text(
+                '$done of ${steps.length}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(end: done / steps.length),
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, _) => LinearProgressIndicator(
+                value: value,
+                minHeight: 4,
+                backgroundColor: colors.surfaceMuted,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          for (final step in steps)
+            InkWell(
+              borderRadius: BorderRadius.circular(JarvisRadii.md),
+              onTap: step.done ? null : step.onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: Icon(
+                        step.done
+                            ? PhosphorIconsRegular.checkCircle
+                            : PhosphorIconsRegular.circle,
+                        key: ValueKey(step.done),
+                        size: 22,
+                        color: step.done ? colors.success : colors.muted,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            step.label,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: step.done ? colors.muted : colors.ink,
+                              decoration: step.done
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                          if (!step.done)
+                            Text(
+                              step.hint,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (!step.done)
+                      Icon(
+                        PhosphorIconsRegular.caretRight,
+                        size: 16,
+                        color: colors.muted,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -86,6 +86,35 @@ internal static class PersonalAssistantEndpoints
             await runs.GetAsync(id, currentUser.OwnerId, ct) is { } run ? Results.Ok(run) : Results.NotFound())
             .WithName("GetCodingRun");
 
+        api.MapGet("/coding/runs/{id:guid}/diff", async (Guid id, ICodingPullRequestService pullRequests,
+                ICurrentUser currentUser, CancellationToken ct) =>
+            await CodingPullRequestResult(async () => Results.Ok(await pullRequests.GetDiffAsync(id, currentUser.OwnerId, ct))))
+            .WithName("GetCodingRunDiff");
+
+        api.MapGet("/coding/runs/{id:guid}/pull-request", async (Guid id, ICodingPullRequestService pullRequests,
+                ICurrentUser currentUser, CancellationToken ct) =>
+            await CodingPullRequestResult(async () =>
+                await pullRequests.GetStatusAsync(id, currentUser.OwnerId, ct) is { } status
+                    ? Results.Ok(status)
+                    : Results.NotFound()))
+            .WithName("GetCodingRunPullRequest");
+
+        api.MapPost("/coding/runs/{id:guid}/pull-request", async (Guid id, OpenPullRequestRequest? request,
+                ICodingPullRequestService pullRequests, ICurrentUser currentUser, CancellationToken ct) =>
+            await CodingPullRequestResult(async () =>
+                Results.Ok(await pullRequests.PublishAsync(id, currentUser.OwnerId, request?.Title, request?.Body, ct))))
+            .WithName("OpenCodingRunPullRequest");
+
+        api.MapPost("/coding/runs/{id:guid}/pull-request/merge", async (Guid id,
+                ICodingPullRequestService pullRequests, ICurrentUser currentUser, CancellationToken ct) =>
+            await CodingPullRequestResult(async () => Results.Ok(await pullRequests.MergeAsync(id, currentUser.OwnerId, ct))))
+            .WithName("MergeCodingRunPullRequest");
+
+        api.MapPost("/coding/runs/{id:guid}/pull-request/close", async (Guid id,
+                ICodingPullRequestService pullRequests, ICurrentUser currentUser, CancellationToken ct) =>
+            await CodingPullRequestResult(async () => Results.Ok(await pullRequests.CloseAsync(id, currentUser.OwnerId, ct))))
+            .WithName("CloseCodingRunPullRequest");
+
         api.MapPut("/graph/entities/{id:guid}", async (Guid id, UpdateGraphEntityRequest request,
             IKnowledgeGraphRepository graph, ICurrentUser currentUser, CancellationToken ct) =>
         {
@@ -129,5 +158,24 @@ internal static class PersonalAssistantEndpoints
         }).WithName("MergeKnowledgeGraphEntities");
 
         return api;
+    }
+
+    /// <summary>Runs a pull-request operation and turns its failures into stable API problems.</summary>
+    private static async Task<IResult> CodingPullRequestResult(Func<Task<IResult>> operation)
+    {
+        try
+        {
+            return await operation();
+        }
+        catch (CodingPullRequestException exception)
+        {
+            return exception.Code switch
+            {
+                "not_found" or "github_not_found" => Jarvis.Api.Errors.ApiProblemResults.NotFound(exception.Message),
+                "not_configured" or "git_missing" => Jarvis.Api.Errors.ApiProblemResults.DependencyUnavailable(exception.Message),
+                "github_error" or "publish_failed" => Jarvis.Api.Errors.ApiProblemResults.BadGateway(exception.Message),
+                _ => Jarvis.Api.Errors.ApiProblemResults.Conflict(exception.Message)
+            };
+        }
     }
 }

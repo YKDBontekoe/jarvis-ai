@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'approvals_screen.dart';
+import 'features/chat/tool_catalog.dart';
+import 'api/api_config.dart';
+import 'features/coding/coding_run_detail_screen.dart';
 import 'daily_briefing_screen.dart';
 import 'notification_details_screen.dart';
 import 'notification_routing.dart';
@@ -24,10 +27,18 @@ const _weekdayChoices = [
   (64, 'Sun'),
 ];
 
+enum RemindersTab { reminders, notifications }
+
 class RemindersScreen extends StatefulWidget {
-  const RemindersScreen({required this.http, this.onOpenConversation, super.key});
+  const RemindersScreen({
+    required this.http,
+    this.onOpenConversation,
+    this.initialTab = RemindersTab.reminders,
+    super.key,
+  });
 
   final Dio http;
+  final RemindersTab initialTab;
   final Future<void> Function(String conversationId)? onOpenConversation;
 
   @override
@@ -36,9 +47,16 @@ class RemindersScreen extends StatefulWidget {
 
 class _RemindersScreenState extends State<RemindersScreen>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 2, vsync: this);
+  late final TabController _tabs = TabController(
+    length: 2,
+    vsync: this,
+    initialIndex: widget.initialTab.index,
+  );
   List<Map<String, dynamic>> _reminders = [];
   List<Map<String, dynamic>> _notifications = [];
+  // Pending approvals keyed by id, so an approval notification can be decided in place.
+  Map<String, Map<String, dynamic>> _pendingApprovals = {};
+  final Set<String> _decidingApprovals = {};
   bool _loading = true;
   bool _remindersFailed = false;
   bool _notificationsFailed = false;
@@ -84,6 +102,22 @@ class _RemindersScreenState extends State<RemindersScreen>
         notificationsFailed = true;
       } catch (_) {
         notificationsFailed = true;
+      }
+      try {
+        final approvals = await widget.http.get<dynamic>('/api/v1/approvals');
+        if (mounted && revision == _requestRevision) {
+          setState(
+            () => _pendingApprovals = {
+              for (final approval in jsonMaps(approvals.data))
+                if (approval['status'] == 'pending' && jsonId(approval) != null)
+                  jsonId(approval)!: approval,
+            },
+          );
+        }
+      } on DioException {
+        // Approvals still open from the notification; this only hides the shortcut.
+      } catch (_) {
+        // Same: a malformed list never blocks the inbox.
       }
       if (mounted && revision == _requestRevision) {
         setState(() {
@@ -225,6 +259,89 @@ class _RemindersScreenState extends State<RemindersScreen>
     }
   }
 
+  Future<void> _decideApproval(String approvalId, bool approved) async {
+    setState(() => _decidingApprovals.add(approvalId));
+    try {
+      // Resuming the paused agent run can take a while, so wait for it.
+      await widget.http.post<dynamic>(
+        '/api/v1/approvals/$approvalId/decision',
+        data: {'approved': approved},
+        options: longRunningOptions(),
+      );
+    } on DioException catch (error) {
+      if (mounted) {
+        _showError(
+          firstProblemMessage(error.response?.data) ??
+              'Jarvis could not record that decision.',
+        );
+      }
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not record that decision.');
+    }
+    if (!mounted) return;
+    setState(() => _decidingApprovals.remove(approvalId));
+    await _load();
+  }
+
+  Widget _approvalActions(Map<String, dynamic> approval) {
+    final id = jsonId(approval)!;
+    final busy = _decidingApprovals.contains(id);
+    final tool = describeTool(asJsonString(approval['toolName']) ?? '');
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Wants to: ${tool.active.toLowerCase()}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: JarvisColors.of(context).ink,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              OutlinedButton(
+                onPressed: busy ? null : () => _decideApproval(id, false),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 38)),
+                child: const Text('Decline'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: busy ? null : () => _decideApproval(id, true),
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 38)),
+                icon: busy
+                    ? const SizedBox.square(
+                        dimension: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(PhosphorIconsRegular.check, size: 18),
+                label: Text(busy ? 'Working…' : 'Approve'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _markAllRead() async {
+    final unread = _notifications.where((item) => item['readAt'] == null);
+    final ids = [for (final item in unread) ?jsonId(item)];
+    if (ids.isEmpty) return;
+    try {
+      await Future.wait([
+        for (final id in ids) widget.http.post('/api/v1/notifications/$id/read'),
+      ]);
+    } on DioException {
+      if (mounted) _showError('Jarvis could not mark everything as read.');
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not mark everything as read.');
+    }
+    if (mounted) await _load();
+  }
+
   Future<void> _openNotification(Map<String, dynamic> notification) async {
     await _markRead(notification);
     if (!mounted) return;
@@ -234,6 +351,12 @@ class _RemindersScreenState extends State<RemindersScreen>
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) => ApprovalsScreen(http: widget.http),
+        ),
+      );
+    } else if (opensCodingRun(type) && sourceId != null) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => CodingRunDetailScreen(http: widget.http, runId: sourceId),
         ),
       );
     } else if (opensDailyBriefing(type)) {
@@ -333,6 +456,12 @@ class _RemindersScreenState extends State<RemindersScreen>
     appBar: AppBar(
       title: const Text('Reminders'),
       actions: [
+        if (_unreadCount > 0)
+          IconButton(
+            onPressed: _markAllRead,
+            tooltip: 'Mark all as read',
+            icon: const Icon(PhosphorIconsRegular.checkCircle),
+          ),
         IconButton(
           onPressed: _load,
           tooltip: 'Refresh',
@@ -409,6 +538,77 @@ class _RemindersScreenState extends State<RemindersScreen>
     ),
   );
 
+  /// Pending reminders first (overdue, today, upcoming) then finished ones,
+  /// each under a small heading so the list reads as a timeline.
+  List<Object> get _reminderRows {
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
+    final endOfToday = startOfToday.add(const Duration(days: 1));
+    final buckets = <String, List<Map<String, dynamic>>>{
+      'Overdue': [],
+      'Today': [],
+      'Upcoming': [],
+      'Finished': [],
+    };
+    final sorted = [..._reminders]
+      ..sort((a, b) {
+        final left = jsonDate(a['dueAt']);
+        final right = jsonDate(b['dueAt']);
+        if (left == null || right == null) return 0;
+        return left.compareTo(right);
+      });
+    for (final reminder in sorted) {
+      final due = jsonDate(reminder['dueAt'], local: true);
+      final pending = (asJsonString(reminder['status']) ?? 'pending') == 'pending';
+      final key = !pending
+          ? 'Finished'
+          : due == null || !due.isBefore(endOfToday)
+          ? 'Upcoming'
+          : due.isBefore(now)
+          ? 'Overdue'
+          : 'Today';
+      buckets[key]!.add(reminder);
+    }
+    return [
+      for (final entry in buckets.entries)
+        if (entry.value.isNotEmpty) ...[entry.key, ...entry.value],
+    ];
+  }
+
+  /// Notifications grouped by the day they arrived, newest first.
+  List<Object> get _notificationRows {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    String label(DateTime? date) {
+      if (date == null) return 'Earlier';
+      final day = DateTime(date.year, date.month, date.day);
+      final days = today.difference(day).inDays;
+      if (days <= 0) return 'Today';
+      if (days == 1) return 'Yesterday';
+      if (days < 7) return 'This week';
+      return 'Earlier';
+    }
+
+    final sorted = [..._notifications]
+      ..sort((a, b) {
+        final left = jsonDate(a['createdAt']);
+        final right = jsonDate(b['createdAt']);
+        if (left == null || right == null) return 0;
+        return right.compareTo(left);
+      });
+    final rows = <Object>[];
+    String? current;
+    for (final notification in sorted) {
+      final heading = label(jsonDate(notification['createdAt'], local: true));
+      if (heading != current) {
+        rows.add(heading);
+        current = heading;
+      }
+      rows.add(notification);
+    }
+    return rows;
+  }
+
   int get _unreadCount =>
       _notifications.where((item) => item['readAt'] == null).length;
 
@@ -422,13 +622,17 @@ class _RemindersScreenState extends State<RemindersScreen>
         )
       : ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-          itemCount: _reminders.length,
+          itemCount: _reminderRows.length,
           itemBuilder: (context, index) {
-            final reminder = _reminders[index];
+            final row = _reminderRows[index];
+            if (row is String) return _GroupHeader(row);
+            final reminder = row as Map<String, dynamic>;
             final status = asJsonString(reminder['status']) ?? 'pending';
             final pending = status == 'pending';
             final style = statusStyle(status);
-            return ContentWidth(
+            return FadeSlideIn(
+              index: index,
+              child: ContentWidth(
               child: SurfaceCard(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.fromLTRB(16, 14, 6, 14),
@@ -486,6 +690,7 @@ class _RemindersScreenState extends State<RemindersScreen>
                   ],
                 ),
               ),
+              ),
             );
           },
         );
@@ -495,6 +700,7 @@ class _RemindersScreenState extends State<RemindersScreen>
     'task.completed' => PhosphorIconsRegular.checkCircle,
     'task.failed' => PhosphorIconsRegular.warningCircle,
     'approval.required' => PhosphorIconsRegular.shieldCheck,
+    'coding.pr.ready' || 'coding.run.ready' => PhosphorIconsRegular.code,
     'watch.triggered' || 'watch.failed' => PhosphorIconsRegular.pulse,
     _ => PhosphorIconsRegular.bell,
   };
@@ -512,12 +718,16 @@ class _RemindersScreenState extends State<RemindersScreen>
         )
       : ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-          itemCount: _notifications.length,
+          itemCount: _notificationRows.length,
           itemBuilder: (context, index) {
-            final notification = _notifications[index];
+            final row = _notificationRows[index];
+            if (row is String) return _GroupHeader(row);
+            final notification = row as Map<String, dynamic>;
             final unread = notification['readAt'] == null;
             final body = asJsonString(notification['body']) ?? '';
-            return ContentWidth(
+            return FadeSlideIn(
+              index: index,
+              child: ContentWidth(
               child: SurfaceCard(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -556,6 +766,11 @@ class _RemindersScreenState extends State<RemindersScreen>
                               ),
                             ),
                           ],
+                          if (asJsonString(notification['type']) == 'approval.required' &&
+                              _pendingApprovals[asJsonString(notification['sourceId'])] != null)
+                            _approvalActions(
+                              _pendingApprovals[asJsonString(notification['sourceId'])]!,
+                            ),
                           const SizedBox(height: 6),
                           Text(
                             _formatDate(notification['createdAt']),
@@ -580,7 +795,34 @@ class _RemindersScreenState extends State<RemindersScreen>
                   ],
                 ),
               ),
+              ),
             );
           },
         );
+}
+
+/// Small caption above a run of rows in a grouped list.
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => ContentWidth(
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(4, 10, 0, 8),
+      child: SizedBox(
+        width: double.infinity,
+        child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: label == 'Overdue'
+              ? JarvisColors.of(context).danger
+              : JarvisColors.of(context).muted,
+          letterSpacing: .3,
+        ),
+      ),
+      ),
+    ),
+  );
 }

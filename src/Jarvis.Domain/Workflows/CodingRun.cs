@@ -15,4 +15,13 @@ public sealed class CodingRun
     public int? ExitCode { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
+
+    /// <summary>Branch pushed for review, set when a pull request is opened.</summary>
+    public string? BranchName { get; set; }
+    public string? PullRequestRepository { get; set; }
+    public int? PullRequestNumber { get; set; }
+    public string? PullRequestUrl { get; set; }
+
+    /// <summary>open, merged, or closed.</summary>
+    public string? PullRequestState { get; set; }
 }

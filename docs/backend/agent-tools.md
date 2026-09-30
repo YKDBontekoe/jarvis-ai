@@ -66,3 +66,33 @@ Order is controlled by `Order` on each contributor (`CoreAgentContext` uses `Ord
 The voice MCP child reuses the same tool surface through internal HTTP callbacks (`VoiceEndpoints` internal routes).
 
 See [chat-agent-runtime.md](../architecture/chat-agent-runtime.md) for turn lifecycle.
+
+## Self-fix (Jarvis proposes changes to its own code)
+
+Opt-in. Mark one `Coding:Repositories` entry as Jarvis's own source and give it a GitHub target:
+
+```
+Coding__Repositories__0__Name=jarvis
+Coding__Repositories__0__Path=/path/to/jarvis-ai
+Coding__Repositories__0__SelfFix=true
+Coding__Repositories__0__GitHubRepository=owner/jarvis-ai
+Coding__Repositories__0__BaseBranch=main            # optional, default main
+Coding__Repositories__0__RemoteUrl=...              # optional, default https://github.com/{GitHubRepository}.git
+```
+
+The owner saves a GitHub token (fine-grained: repository *Contents* and *Pull requests* read/write) as the `github` integration credential in Settings → Integrations.
+
+Tools (`SelfFixAgentTools`, chat only, never in background tasks):
+
+| Tool | Approval | What it does |
+|------|----------|--------------|
+| `GetRecentJarvisFaults` | no | Recent distinct warnings/errors from Jarvis's own code: log *templates*, exception types, code locations. No rendered values, so no user data. |
+| `ProposeJarvisFix` | yes | Runs a coding task in the isolated, network-less snapshot, then opens a pull request. One approval covers both. |
+
+Flow and guarantees:
+
+- The change is made in a history-free snapshot (see `CodexCodingTools`); `ICodingPullRequestService` then clones the base branch, applies the patch, and pushes a unique `jarvis/fix-…` branch using the owner's token (passed via environment, never argv), then opens the PR. It never pushes to the base branch and never force-pushes; a failed PR deletes its pushed branch.
+- Changes to `.github/`, git internals, and credential files are refused. Security-sensitive areas (approvals, identity, MCP host, migrations, `Program.cs`, infra) are allowed but flagged in the review UI and the PR body.
+- **Merging is only reachable from the app** (`POST /api/v1/coding/runs/{id}/pull-request/merge`), squash-merges pinned to the reviewed head SHA, and is blocked while checks fail or run. No agent tool can merge or close.
+- Endpoints: `GET /coding/runs/{id}/diff`, `GET|POST /coding/runs/{id}/pull-request`, `POST …/merge`, `POST …/close`. Notifications `coding.pr.ready` / `coding.run.ready` open the review screen (`CodingRunDetailScreen`).
+- Deploying a merged fix is your normal release process; Jarvis does not deploy itself.

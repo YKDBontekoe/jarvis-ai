@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Devices.IDeviceTelemetryStore, DeviceTelemetryStore>();
         services.AddScoped<Jarvis.Application.Integrations.IMcpOAuthSessionStore, McpOAuthSessionStore>();
         services.AddScoped<ICodingRunStore, CodingRunStore>();
+        services.AddScoped<ICodingPullRequestService, Jarvis.Infrastructure.Coding.GitHubCodingPullRequestService>();
         services.AddScoped<Jarvis.Application.Home.IHomeBriefingService, Jarvis.Infrastructure.Home.HomeBriefingService>();
         services.AddScoped<Jarvis.Application.Surfaces.IUiSurfaceRepository, UiSurfaceRepository>();
         services.AddScoped<Jarvis.Application.Agents.IRemoteAgentRepository, RemoteAgentRepository>();

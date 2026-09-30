@@ -138,10 +138,25 @@ public sealed class CodingRunStore(JarvisDbContext db) : ICodingRunStore
             ? ToRecord(row)
             : null;
 
+    public async Task<CodingRunRecord?> SetPullRequestAsync(Guid id, Guid ownerId, string? branchName,
+        string repository, int number, string url, string state, CancellationToken cancellationToken)
+    {
+        var row = await db.CodingRuns.SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId, cancellationToken);
+        if (row is null) return null;
+        if (!string.IsNullOrWhiteSpace(branchName)) row.BranchName = branchName;
+        row.PullRequestRepository = repository;
+        row.PullRequestNumber = number;
+        row.PullRequestUrl = Truncate(url, 500);
+        row.PullRequestState = state;
+        await db.SaveChangesAsync(cancellationToken);
+        return ToRecord(row);
+    }
+
     private static CodingRunRecord ToRecord(CodingRun row) =>
         new(row.Id, row.OwnerId, row.Repository, row.Task, row.Status, row.WorktreePath, row.DiffSummary,
             string.IsNullOrWhiteSpace(row.ChangedFiles) ? [] : row.ChangedFiles.Split('\n'),
-            row.Summary, row.Error, row.ExitCode, row.CreatedAt, row.CompletedAt);
+            row.Summary, row.Error, row.ExitCode, row.CreatedAt, row.CompletedAt, row.BranchName,
+            row.PullRequestRepository, row.PullRequestNumber, row.PullRequestUrl, row.PullRequestState);
 
     private static string? Truncate(string? value, int max) =>
         string.IsNullOrEmpty(value) ? value : value.Length <= max ? value : value[..max];

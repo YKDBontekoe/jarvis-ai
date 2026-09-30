@@ -49,4 +49,28 @@ void main() {
     expect(find.text('Create your account'), findsOneWidget);
     expect(find.text('Create account'), findsOneWidget);
   });
+
+  testWidgets('on a wide screen tasks open beside the sidebar', (tester) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(const JarvisApp(skipAuthentication: true));
+    await tester.pumpAndSettle();
+    expect(find.text('Recents'), findsOneWidget);
+
+    await tester.tap(find.text('Tasks').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Recents'), findsOneWidget, reason: 'sidebar stays visible');
+    expect(find.text('New task'), findsOneWidget);
+
+    await tester.tap(find.text('Memory').first);
+    await tester.pumpAndSettle();
+    expect(find.text('New task'), findsNothing);
+    expect(find.text('Recents'), findsOneWidget);
+
+    await tester.tap(find.text('Jarvis').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Ask Jarvis anything'), findsOneWidget);
+  });
 }

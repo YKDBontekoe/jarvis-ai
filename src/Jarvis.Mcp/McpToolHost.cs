@@ -132,9 +132,14 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                         await McpServerEndpointValidator.ValidateAsync(server.Endpoint, cancellationToken);
                 }
 
-                var connectedClient = await McpClient.CreateAsync(CreateTransport(server, loggerFactory), cancellationToken: cancellationToken);
+                // A server that hangs while starting (for example an npx package that cannot download) must
+                // cost one status entry, not the whole agent turn, so bound the connect and tool listing.
+                using var connectTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                connectTimeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(server.ConnectionTimeoutSeconds, 1, 300)));
+                var connectedClient = await McpClient.CreateAsync(CreateTransport(server, loggerFactory),
+                    cancellationToken: connectTimeout.Token);
                 client = connectedClient;
-                var availableTools = await connectedClient.ListToolsAsync(cancellationToken: cancellationToken);
+                var availableTools = await connectedClient.ListToolsAsync(cancellationToken: connectTimeout.Token);
                 var allowAllTools = McpToolSelection.AllowsAll(server.AllowedTools);
                 var availableNames = availableTools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
                 if (allowAllTools && availableNames.Count > McpToolSelection.MaxTools)
@@ -198,7 +203,8 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                     selected.Select(tool => tool.Name).ToArray(), cancellationToken));
                 logger.LogInformation("Connected MCP server {ServerName}; enabled {ToolCount} allowlisted tools.", server.Name, selected.Length);
             }
-            catch (Exception exception) when (CancellationExceptions.Unwrap(exception) is { } canceled)
+            catch (Exception exception) when (cancellationToken.IsCancellationRequested &&
+                                              CancellationExceptions.Unwrap(exception) is { } canceled)
             {
                 if (client is not null) await client.DisposeAsync();
                 throw canceled;
@@ -208,6 +214,7 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                 if (client is not null) await CloseQuietlyAsync(client);
                 var issue = exception is ArgumentException or InvalidOperationException
                     ? "invalid_configuration"
+                    : CancellationExceptions.Unwrap(exception) is not null ? "connection_timed_out"
                     : "server_unavailable";
                 statuses.Add(await BuildStatusAsync(server, "unavailable", 0, issue, true, null, cancellationToken));
                 logger.LogWarning("Skipping MCP server {ServerName} after initialization failure ({FailureType}).",

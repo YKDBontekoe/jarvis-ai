@@ -38,8 +38,11 @@ mixin _ModelSettingsCards on _ModelSettingsController {
   );
 
   Widget _codexCard() {
-    final installed = _installedVersion ?? 'unknown';
+    final installed = _installedVersion;
     final latest = _latestVersion;
+    final installedText = installed == null
+        ? 'Installed version unknown.'
+        : 'Installed $installed.';
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -72,8 +75,8 @@ mixin _ModelSettingsCards on _ModelSettingsController {
           const SizedBox(height: 10),
           Text(
             latest == null
-                ? 'Installed $installed.'
-                : 'Installed $installed. Latest release is $latest.',
+                ? installedText
+                : '$installedText Latest release is $latest.',
             style: TextStyle(
               color: JarvisColors.of(context).inkSoft,
               height: 1.4,
@@ -174,6 +177,7 @@ mixin _ModelSettingsCards on _ModelSettingsController {
             labelText: _keyConfigured ? 'Replace key' : 'sk-or-…',
             helperText:
                 'Stored encrypted on your Jarvis server; never shown again.',
+            helperMaxLines: 2,
           ),
         ),
         const SizedBox(height: 10),

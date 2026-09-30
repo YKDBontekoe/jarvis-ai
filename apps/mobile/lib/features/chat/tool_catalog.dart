@@ -104,6 +104,11 @@ const _catalog = <String, ToolDescription>{
     'Checked host integrations',
     PhosphorIconsRegular.plugsConnected,
   ),
+  'ListMcpServerTools': ToolDescription(
+    'Looking at an integration’s tools',
+    'Looked at an integration’s tools',
+    PhosphorIconsRegular.plugsConnected,
+  ),
   'DiscoverMcpServerTools': ToolDescription(
     'Discovering integration tools',
     'Discovered integration tools',

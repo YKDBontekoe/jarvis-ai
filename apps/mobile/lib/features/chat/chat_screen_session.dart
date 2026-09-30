@@ -40,6 +40,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       if (stale()) return;
       await _openConversation(conversationId, showHome: true);
       if (stale()) return;
+      unawaited(_refreshUnreadNotifications());
       if (Firebase.apps.isNotEmpty) {
         final initialPush = await FirebaseMessaging.instance
             .getInitialMessage();
@@ -87,6 +88,7 @@ mixin _ChatScreenSession on _ChatScreenController {
     bool showHome = false,
   }) async {
     final openGeneration = ++_openGeneration;
+    _closeUtilityPane();
     bool isLatestOpen() =>
         mounted &&
         openGeneration == _openGeneration &&

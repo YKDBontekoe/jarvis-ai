@@ -1,5 +1,8 @@
 bool opensApprovalScreen(String? type) => type == 'approval.required';
 
+bool opensCodingRun(String? type) =>
+    type == 'coding.pr.ready' || type == 'coding.run.ready';
+
 bool opensDailyBriefing(String? type) => type == 'briefing.daily';
 
 bool opensTaskDetails(String? type) =>

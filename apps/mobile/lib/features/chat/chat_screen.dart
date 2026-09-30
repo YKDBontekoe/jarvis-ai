@@ -18,6 +18,7 @@ import '../../auth/auth_validation.dart';
 import '../../conversations_screen.dart';
 import '../../json_maps.dart';
 import '../../notification_details_screen.dart';
+import '../coding/coding_run_detail_screen.dart';
 import '../../notification_routing.dart';
 import '../../file_download_stub.dart'
     if (dart.library.io) '../../file_download_io.dart'
@@ -127,6 +128,7 @@ class _ChatScreenState extends _ChatScreenController
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= _wideLayoutWidth;
+        _isWide = wide;
         final voice = _selectedDestination == 2;
         final content = Scaffold(
           extendBodyBehindAppBar: voice,
@@ -165,7 +167,21 @@ class _ChatScreenState extends _ChatScreenController
                   children: [
                     SizedBox(width: 292, child: sidebar),
                     const VerticalDivider(width: 1),
-                    Expanded(child: content),
+                    Expanded(
+                      child: _utilityPane == null
+                          ? content
+                          : KeyedSubtree(
+                              key: ValueKey(_paneRevision),
+                              child: Navigator(
+                                onGenerateRoute: (_) => MaterialPageRoute<void>(
+                                  builder: (routeContext) {
+                                    _paneContext = routeContext;
+                                    return _utilityPane!;
+                                  },
+                                ),
+                              ),
+                            ),
+                    ),
                   ],
                 )
               : content,

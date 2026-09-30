@@ -10,7 +10,11 @@ mixin _ChatScreenNav on _ChatScreenController {
       destination,
       _http,
       onOpenConversation: (id) async {
-        if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+        if (_isWide) {
+          _closeUtilityPane();
+        } else if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
         await _openConversation(id);
       },
       onAskInChat: destination == 'integrations'
@@ -20,7 +24,62 @@ mixin _ChatScreenNav on _ChatScreenController {
     if (destination == 'sign_out') {
       unawaited(_signOut());
     } else if (page != null) {
-      unawaited(_openUtilityPage(destination, page));
+      if (_isWide) {
+        _showInPane(destination, page);
+      } else {
+        unawaited(_openUtilityPage(destination, page));
+      }
+    }
+  }
+
+  /// Shows [page] in the wide layout's content area. Opened from the sidebar it
+  /// replaces what is there; opened from inside a page it stacks, so Back works.
+  void _showInPane(String destination, Widget page) {
+    final paneContext = _paneContext;
+    if (_utilityPane != null &&
+        !_openingFromSidebar &&
+        paneContext != null &&
+        paneContext.mounted) {
+      unawaited(
+        Navigator.of(paneContext).push<void>(
+          MaterialPageRoute<void>(builder: (_) => page),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _utilityPane = page;
+      _paneDestination = destination;
+      _paneRevision++;
+    });
+  }
+
+  void _closeUtilityPane() {
+    if (_utilityPane == null) return;
+    final destination = _paneDestination;
+    setState(() {
+      _utilityPane = null;
+      _paneDestination = null;
+      _paneContext = null;
+    });
+    unawaited(_afterUtility(destination ?? ''));
+  }
+
+  Future<void> _refreshUnreadNotifications() async {
+    if (_signedOut || _signingOut) return;
+    try {
+      final response = await _http.get<dynamic>('/api/v1/notifications');
+      if (!mounted) return;
+      final unread = jsonMaps(
+        response.data,
+      ).where((item) => item['readAt'] == null).length;
+      if (unread != _unreadNotifications) {
+        setState(() => _unreadNotifications = unread);
+      }
+    } on DioException {
+      // The badge is a hint; leave the last known count when offline.
+    } catch (_) {
+      // Malformed payloads never break the header.
     }
   }
 
@@ -28,7 +87,13 @@ mixin _ChatScreenNav on _ChatScreenController {
     await Navigator.of(
       context,
     ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
+    await _afterUtility(destination);
+  }
+
+  /// Refreshes whatever a utility page may have changed once it closes.
+  Future<void> _afterUtility(String destination) async {
     if (!mounted || _signedOut || _signingOut) return;
+    unawaited(_refreshUnreadNotifications());
     if (destination == 'approvals') {
       await _syncConversationApprovals();
     }
@@ -53,10 +118,9 @@ mixin _ChatScreenNav on _ChatScreenController {
           _hasPendingApproval ||
           _signedOut ||
           _signingOut ||
-          !_connected ||
           _conversationId == null) {
-        if (!_connected || _conversationId == null) {
-          setState(() => _error = 'Connect to Jarvis before starting voice.');
+        if (_conversationId == null) {
+          setState(() => _error = 'Open a conversation before starting voice.');
         }
         return;
       }
@@ -65,6 +129,7 @@ mixin _ChatScreenNav on _ChatScreenController {
       return;
     }
     _dismissKeyboard();
+    _closeUtilityPane();
     if (_voiceActive || _voiceStarting) unawaited(_stopVoice());
     setState(() => _selectedDestination = index);
   }
@@ -246,19 +311,25 @@ mixin _ChatScreenNav on _ChatScreenController {
     }
   }
 
-  void _openSettings() => unawaited(
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('Settings')),
-          body: _settingsBody(),
-        ),
+  void _openSettings() {
+    Widget page() => Scaffold(
+      appBar: AppBar(title: const Text('Settings')),
+      body: _settingsBody(),
+    );
+    if (_isWide) {
+      _showInPane('settings', page());
+      return;
+    }
+    unawaited(
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(builder: (_) => page()),
       ),
-    ),
-  );
+    );
+  }
 
   void _startNewChat() {
     _dismissKeyboard();
+    _closeUtilityPane();
     if (_selectedDestination != 0) setState(() => _selectedDestination = 0);
     if (!_hasMessages && _conversationId != null) {
       setState(() => _showHome = true);

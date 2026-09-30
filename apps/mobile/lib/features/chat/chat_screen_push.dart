@@ -133,6 +133,12 @@ mixin _ChatScreenPush on _ChatScreenController {
       );
       return;
     }
+    if (opensCodingRun(type) && sourceId != null) {
+      unawaited(
+        _openPushedDetail(CodingRunDetailScreen(http: _http, runId: sourceId)),
+      );
+      return;
+    }
     if (sourceId == null || !opensNotificationDetails(type)) {
       _openUtility('reminders');
       return;

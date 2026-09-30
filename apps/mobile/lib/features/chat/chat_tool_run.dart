@@ -1,9 +1,12 @@
 part of 'chat_widgets.dart';
 
 class ToolRunView extends StatelessWidget {
-  const ToolRunView({required this.run, super.key});
+  const ToolRunView({required this.run, this.onOpenTasks, super.key});
 
   final ToolRunEntry run;
+
+  /// Lets a finished "started a background task" step jump to the Tasks list.
+  final VoidCallback? onOpenTasks;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -11,15 +14,26 @@ class ToolRunView extends StatelessWidget {
     child: Wrap(
       spacing: 6,
       runSpacing: 6,
-      children: [for (final step in run.steps) _ToolChip(step: step)],
+      children: [
+        for (final step in run.steps)
+          _ToolChip(
+            step: step,
+            onTap:
+                step.tool == 'CreateTask' &&
+                    step.status == ToolStepStatus.completed
+                ? onOpenTasks
+                : null,
+          ),
+      ],
     ),
   );
 }
 
 class _ToolChip extends StatelessWidget {
-  const _ToolChip({required this.step});
+  const _ToolChip({required this.step, this.onTap});
 
   final ToolStep step;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +52,7 @@ class _ToolChip extends StatelessWidget {
         JarvisColors.of(context).danger,
       ),
     };
-    return AnimatedContainer(
+    final chip = AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
       decoration: BoxDecoration(
@@ -80,7 +94,28 @@ class _ToolChip extends StatelessWidget {
               color: color,
             ),
           },
+          if (onTap != null) ...[
+            const SizedBox(width: 6),
+            Text(
+              'View',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: JarvisColors.of(context).ink,
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+    if (onTap == null) return chip;
+    return Semantics(
+      button: true,
+      label: '$label. View tasks',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: chip,
       ),
     );
   }

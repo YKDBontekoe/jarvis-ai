@@ -29,6 +29,8 @@ public sealed record FileCitationDto(Guid FileId, string DisplayName, Guid Chunk
     int? PageNumber, string SourceStatus = "available");
 public sealed record MessagePageDto(IReadOnlyList<MessageDto> Items, string? NextCursor, bool HasMore);
 public sealed record ApprovalDecisionRequest(bool Approved);
+
+public sealed record OpenPullRequestRequest(string? Title, string? Body);
 public sealed record ToolApprovalDto(Guid Id, Guid ConversationId, string ToolName, string ArgumentsJson,
     string Status, bool? Approved, string ResumeStatus, DateTimeOffset CreatedAt);
 public sealed record ReminderRequest(string? Title, DateTimeOffset DueAt, string? Recurrence = null,

@@ -12,9 +12,11 @@ mixin _ChatScreenVoice on _ChatScreenController {
       return;
     }
     final conversationId = _conversationId;
-    if (conversationId == null || !_connected) {
+    // Audio runs over LiveKit, so voice can start even while live updates
+    // (used only for captions) are reconnecting.
+    if (conversationId == null) {
       setState(() {
-        _error = 'Connect to Jarvis before starting voice.';
+        _error = 'Open a conversation before starting voice.';
         if (_selectedDestination == 2) _selectedDestination = 0;
       });
       return;
@@ -43,6 +45,9 @@ mixin _ChatScreenVoice on _ChatScreenController {
       final sessionResponse = await _http.post<dynamic>(
         '/api/v1/voice/session',
         data: {'conversationId': conversationId},
+        // Codex realtime can take up to a minute to answer; the default
+        // receive timeout would abandon a session the server is still building.
+        options: Options(receiveTimeout: const Duration(seconds: 75)),
       );
       if (!isCurrent()) return;
       final session = jsonObject(sessionResponse.data);

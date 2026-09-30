@@ -28,6 +28,51 @@ void main() {
     expect(find.text('Cancelled'), findsOneWidget);
   });
 
+  testWidgets('FadeSlideIn eases rows in and skips motion when reduced', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host(const FadeSlideIn(child: Text('row'))));
+    expect(tester.widget<Opacity>(find.byType(Opacity)).opacity, 0);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Opacity>(find.byType(Opacity)).opacity, 1);
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(disableAnimations: true),
+        child: _host(const FadeSlideIn(child: Text('row'))),
+      ),
+    );
+    expect(find.byType(Opacity), findsNothing);
+    expect(find.text('row'), findsOneWidget);
+  });
+
+  testWidgets('header actions drop their label on narrow screens', (
+    tester,
+  ) async {
+    Future<void> show(double width) async {
+      tester.view.physicalSize = Size(width, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        _host(
+          HeaderAction(
+            label: 'Collection',
+            icon: Icons.add,
+            onPressed: () {},
+            collapsesWhenNarrow: true,
+          ),
+        ),
+      );
+    }
+
+    await show(390);
+    expect(find.text('Collection'), findsNothing);
+    expect(find.byTooltip('Collection'), findsOneWidget);
+    await show(800);
+    expect(find.text('Collection'), findsOneWidget);
+  });
+
   testWidgets('the orb is idle and decorative unless asked otherwise', (
     tester,
   ) async {

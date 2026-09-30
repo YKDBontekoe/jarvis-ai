@@ -125,6 +125,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
           !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
+      setState(() => _unreadNotifications++);
       if (event['type'] == 'task.completed' ||
           event['type'] == 'task.failed' ||
           event['type'] == 'approval.required') {

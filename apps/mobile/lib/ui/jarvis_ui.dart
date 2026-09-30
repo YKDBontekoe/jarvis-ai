@@ -9,8 +9,83 @@ import '../theme.dart';
 
 part 'jarvis_orb.dart';
 
+/// Fades and lifts its child into place once, staggered by [index] so rows
+/// arrive in sequence. Skips the motion when the device asks to reduce it.
+class FadeSlideIn extends StatefulWidget {
+  const FadeSlideIn({
+    required this.child,
+    this.index = 0,
+    this.offset = 10,
+    super.key,
+  });
+
+  final Widget child;
+
+  /// Position in a list; later rows start later (capped so long lists stay quick).
+  final int index;
+
+  /// Vertical distance, in logical pixels, the child travels while fading in.
+  final double offset;
+
+  @override
+  State<FadeSlideIn> createState() => _FadeSlideInState();
+}
+
+class _FadeSlideInState extends State<FadeSlideIn>
+    with SingleTickerProviderStateMixin {
+  static const _stepMs = 40;
+  static const _travelMs = 320;
+
+  late final AnimationController _controller;
+  late final Animation<double> _progress;
+
+  @override
+  void initState() {
+    super.initState();
+    final delay = _stepMs * widget.index.clamp(0, 8);
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: delay + _travelMs),
+    );
+    _progress = CurvedAnimation(
+      parent: _controller,
+      curve: Interval(
+        delay / (delay + _travelMs),
+        1,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      return widget.child;
+    }
+    return AnimatedBuilder(
+      animation: _progress,
+      child: widget.child,
+      builder: (context, child) => Opacity(
+        opacity: _progress.value,
+        child: Transform.translate(
+          offset: Offset(0, (1 - _progress.value) * widget.offset),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
 /// A white, rounded surface with a hairline border and optional tap target.
-class SurfaceCard extends StatelessWidget {
+/// Tappable cards ease down slightly while pressed.
+class SurfaceCard extends StatefulWidget {
   const SurfaceCard({
     required this.child,
     this.padding = const EdgeInsets.all(18),
@@ -35,25 +110,46 @@ class SurfaceCard extends StatelessWidget {
   final Gradient? gradient;
 
   @override
+  State<SurfaceCard> createState() => _SurfaceCardState();
+}
+
+class _SurfaceCardState extends State<SurfaceCard> {
+  var _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed != value) setState(() => _pressed = value);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
-    final shape = BorderRadius.circular(radius);
+    final shape = BorderRadius.circular(widget.radius);
     return Padding(
-      padding: margin,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: gradient == null ? (color ?? colors.surface) : null,
-          gradient: gradient,
-          borderRadius: shape,
-          border: Border.all(color: borderColor ?? colors.outline),
-          boxShadow: elevated ? JarvisShadows.soft(colors.brightness) : null,
-        ),
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
+      padding: widget.margin,
+      child: AnimatedScale(
+        scale: _pressed && widget.onTap != null ? .985 : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: widget.gradient == null
+                ? (widget.color ?? colors.surface)
+                : null,
+            gradient: widget.gradient,
             borderRadius: shape,
-            onTap: onTap,
-            child: Padding(padding: padding, child: child),
+            border: Border.all(color: widget.borderColor ?? colors.outline),
+            boxShadow: widget.elevated
+                ? JarvisShadows.soft(colors.brightness)
+                : null,
+          ),
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              borderRadius: shape,
+              onTap: widget.onTap,
+              onHighlightChanged: widget.onTap == null ? null : _setPressed,
+              child: Padding(padding: widget.padding, child: widget.child),
+            ),
           ),
         ),
       ),
@@ -234,44 +330,47 @@ class EmptyState extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(32, 24, 32, 96),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: JarvisColors.of(context).surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: JarvisColors.of(context).outline),
-                  boxShadow: JarvisShadows.soft(
-                    JarvisColors.of(context).brightness,
+          child: FadeSlideIn(
+            offset: 14,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: JarvisColors.of(context).surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: JarvisColors.of(context).outline),
+                    boxShadow: JarvisShadows.soft(
+                      JarvisColors.of(context).brightness,
+                    ),
                   ),
-                ),
-                child: Icon(
-                  icon,
-                  size: 24,
-                  color: JarvisColors.of(context).inkSoft,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleMedium,
-              ),
-              if (message != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  message!,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  child: Icon(
+                    icon,
+                    size: 24,
                     color: JarvisColors.of(context).inkSoft,
                   ),
                 ),
+                const SizedBox(height: 18),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium,
+                ),
+                if (message != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    message!,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: JarvisColors.of(context).inkSoft,
+                    ),
+                  ),
+                ],
+                if (action != null) ...[const SizedBox(height: 20), action!],
               ],
-              if (action != null) ...[const SizedBox(height: 20), action!],
-            ],
+            ),
           ),
         ),
       ),
@@ -349,10 +448,17 @@ class LoadingState extends StatelessWidget {
   const LoadingState({super.key});
 
   @override
-  Widget build(BuildContext context) => const Center(
-    child: SizedBox.square(
-      dimension: 28,
-      child: CircularProgressIndicator(strokeWidth: 2.6),
+  Widget build(BuildContext context) => Center(
+    // Waits a beat before appearing so fast loads never flash a spinner.
+    child: TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 500),
+      curve: const Interval(.3, 1, curve: Curves.easeOut),
+      builder: (context, value, child) => Opacity(opacity: value, child: child),
+      child: const SizedBox.square(
+        dimension: 28,
+        child: CircularProgressIndicator(strokeWidth: 2.6),
+      ),
     ),
   );
 }
@@ -504,6 +610,7 @@ class HeaderAction extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.busy = false,
+    this.collapsesWhenNarrow = false,
     super.key,
   });
 
@@ -512,27 +619,58 @@ class HeaderAction extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool busy;
 
+  /// Drops the label on narrow screens so it never crowds out the app bar title.
+  final bool collapsesWhenNarrow;
+
+  static const _narrowWidth = 480.0;
+
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(left: 4, right: 12),
-    child: FilledButton.icon(
+  Widget build(BuildContext context) {
+    final iconOnly =
+        collapsesWhenNarrow && MediaQuery.sizeOf(context).width < _narrowWidth;
+    final leading = busy
+        ? const SizedBox.square(
+            dimension: 14,
+            child: CircularProgressIndicator(strokeWidth: 1.8),
+          )
+        : Icon(icon, size: iconOnly ? 18 : 16);
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, right: 12),
+      child: iconOnly ? _iconOnly(leading) : _labelled(leading),
+    );
+  }
+
+  Widget _iconOnly(Widget leading) => Tooltip(
+    message: label,
+    child: FilledButton(
       onPressed: busy ? null : onPressed,
-      style: FilledButton.styleFrom(
-        minimumSize: const Size(0, 34),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(JarvisRadii.sm + 2),
-        ),
-        textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500),
+      style: _style().copyWith(
+        minimumSize: const WidgetStatePropertyAll(Size(34, 34)),
+        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
       ),
-      icon: busy
-          ? const SizedBox.square(
-              dimension: 14,
-              child: CircularProgressIndicator(strokeWidth: 1.8),
-            )
-          : Icon(icon, size: 16),
-      label: Text(label),
+      child: Semantics(label: label, excludeSemantics: true, child: leading),
+    ),
+  );
+
+  Widget _labelled(Widget leading) => FilledButton.icon(
+    onPressed: busy ? null : onPressed,
+    style: _style(),
+    icon: leading,
+    label: Text(label),
+  );
+
+  ButtonStyle _style() => FilledButton.styleFrom(
+    minimumSize: const Size(0, 34),
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(JarvisRadii.sm + 2),
+    ),
+    textStyle: const TextStyle(
+      fontFamily: 'Inter',
+      fontSize: 13.5,
+      fontWeight: FontWeight.w500,
+      letterSpacing: -.1,
     ),
   );
 }

@@ -134,6 +134,7 @@ class _IntegrationsScreenState extends _IntegrationsController
           HeaderAction(
             label: 'Ask Jarvis',
             icon: PhosphorIconsRegular.chatCircle,
+            collapsesWhenNarrow: true,
             onPressed: () {
               final ask = widget.onAskInChat!;
               Navigator.of(context).pop();
@@ -222,7 +223,14 @@ class _IntegrationsScreenState extends _IntegrationsController
           icon: PhosphorIconsRegular.cloudSlash,
           text: 'No MCP servers yet. Ask Jarvis in chat to connect one.',
         ),
-      for (final connection in _connections) _connectionCard(connection),
+      // A registered server shows its live status on its own card above.
+      for (final connection in _connections)
+        if (!_managedServers.any(
+          (server) =>
+              asJsonString(server['id']) != null &&
+              asJsonString(server['id']) == asJsonString(connection['id']),
+        ))
+          _connectionCard(connection),
       const SizedBox(height: 28),
       const SectionHeader('Stored credentials'),
       if (_credentialsFailed)

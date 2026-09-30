@@ -170,7 +170,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
           final id = jsonString(conversation, 'id');
           if (id == null) return const SizedBox.shrink();
           final selected = id == widget.selectedConversationId;
-          return ContentWidth(
+          return FadeSlideIn(
+            index: index,
+            child: ContentWidth(
             child: SurfaceCard(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
@@ -228,6 +230,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                   ),
                 ],
               ),
+            ),
             ),
           );
         },

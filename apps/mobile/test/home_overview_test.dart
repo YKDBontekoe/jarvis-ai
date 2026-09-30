@@ -316,4 +316,69 @@ void main() {
     expect(find.text('task_write'), findsOneWidget);
     expect(find.text('unrelated_write'), findsNothing);
   });
+
+  testWidgets('a new account sees a get-started checklist that hides once done', (
+    tester,
+  ) async {
+    final prompts = <String>[];
+    var revision = 0;
+    adapter.responses['/api/v1/usage'] = {
+      'activity': {
+        'messagesSent': {'total': 0},
+      },
+      'personalization': {'activeMemories': 0},
+      'codex': {},
+      'openRouter': {},
+    };
+    adapter.responses['/api/v1/home'] = {'packs': <Object>[]};
+
+    Future<void> pump() async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HomeOverview(
+              http: http,
+              mark: const Icon(Icons.blur_on),
+              ready: true,
+              voiceStarting: false,
+              onTalk: () {},
+              onOpenTasks: () {},
+              onOpenUsage: () {},
+              onSuggestion: prompts.add,
+              refreshRevision: revision,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await pump();
+    expect(find.text('Get started'), findsOneWidget);
+    expect(find.text('0 of 3'), findsOneWidget);
+    await tester.tap(find.text('Say hello'));
+    expect(prompts, hasLength(1));
+
+    // Once every step is done the card goes away.
+    adapter.responses['/api/v1/usage'] = {
+      'activity': {
+        'messagesSent': {'total': 3},
+      },
+      'personalization': {'activeMemories': 4},
+      'codex': {},
+      'openRouter': {},
+    };
+    adapter.responses['/api/v1/home'] = {
+      'packs': [
+        {'name': 'Calendar', 'installed': true},
+      ],
+    };
+    revision++;
+    await pump();
+    expect(find.text('Get started'), findsNothing);
+  });
 }

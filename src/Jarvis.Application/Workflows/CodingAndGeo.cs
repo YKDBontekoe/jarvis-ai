@@ -2,7 +2,9 @@ namespace Jarvis.Application.Workflows;
 
 public sealed record CodingRunRecord(Guid Id, Guid OwnerId, string Repository, string Task, string Status,
     string WorktreePath, string? DiffSummary, IReadOnlyList<string> ChangedFiles, string? Summary, string? Error,
-    int? ExitCode, DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt);
+    int? ExitCode, DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt, string? BranchName = null,
+    string? PullRequestRepository = null, int? PullRequestNumber = null, string? PullRequestUrl = null,
+    string? PullRequestState = null);
 
 public sealed record SaveCodingRunRequest(Guid Id, Guid OwnerId, string Repository, string Task, string Status,
     string WorktreePath, string? DiffSummary, IReadOnlyList<string>? ChangedFiles, string? Summary, string? Error,
@@ -13,6 +15,10 @@ public interface ICodingRunStore
     Task<CodingRunRecord> UpsertAsync(SaveCodingRunRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<CodingRunRecord>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<CodingRunRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+
+    /// <summary>Records the pull request opened for a run, or updates its state (open, merged, closed).</summary>
+    Task<CodingRunRecord?> SetPullRequestAsync(Guid id, Guid ownerId, string? branchName, string repository,
+        int number, string url, string state, CancellationToken cancellationToken);
 }
 
 public static class GeoDistance
