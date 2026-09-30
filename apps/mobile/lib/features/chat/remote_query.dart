@@ -67,3 +67,16 @@ Duration realtimeReconnectDelay(int previousRetryCount) {
       : 30;
   return Duration(seconds: base);
 }
+
+/// True when the transcript is scrolled close enough to the end to follow a
+/// streaming reply. Scrolling further up pauses auto-follow.
+bool isNearTranscriptBottom(
+  double pixels,
+  double maxScrollExtent, {
+  double threshold = 120,
+}) => maxScrollExtent - pixels <= threshold;
+
+/// Max height for the pinned question card so the transcript and composer keep
+/// room on small screens and with the keyboard open.
+double pinnedSurfaceMaxHeight(double availableHeight) =>
+    (availableHeight * .35).clamp(120.0, 360.0).toDouble();

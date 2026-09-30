@@ -504,6 +504,17 @@ class InlineNotice extends StatelessWidget {
         PhosphorIconsRegular.checkCircle,
       ),
     };
+    // Large text would squeeze the message to nothing beside the buttons.
+    final stacked =
+        actions.isNotEmpty && MediaQuery.textScalerOf(context).scale(10) > 13;
+    final text = Text(
+      message,
+      style: TextStyle(
+        fontSize: 13.5,
+        height: 1.4,
+        color: JarvisColors.of(context).ink,
+      ),
+    );
     return Padding(
       padding: margin,
       child: Container(
@@ -515,23 +526,32 @@ class InlineNotice extends StatelessWidget {
               ? Border.all(color: fg.withValues(alpha: .15))
               : null,
         ),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: fg),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  height: 1.4,
-                  color: JarvisColors.of(context).ink,
-                ),
+        child: stacked
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(icon, size: 20, color: fg),
+                      const SizedBox(width: 10),
+                      Expanded(child: text),
+                    ],
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Wrap(children: actions),
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  Icon(icon, size: 20, color: fg),
+                  const SizedBox(width: 10),
+                  Expanded(child: text),
+                  ...actions,
+                ],
               ),
-            ),
-            ...actions,
-          ],
-        ),
       ),
     );
   }
@@ -712,7 +732,7 @@ class CircleIconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
-    this.size = 40,
+    this.size = 44,
     super.key,
   });
 

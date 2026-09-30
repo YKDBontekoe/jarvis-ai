@@ -3,7 +3,9 @@ part of 'chat_screen.dart';
 // ignore_for_file: annotate_overrides
 
 mixin _ChatScreenUi on _ChatScreenController {
-  void _scrollToBottom({bool jump = false}) {
+  void _scrollToBottom({bool jump = false, bool force = false}) {
+    // A reader who scrolled up keeps their place while a reply streams in.
+    if (!force && !_nearBottom) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scroll.hasClients) return;
       final target = _scroll.position.maxScrollExtent;
@@ -22,7 +24,8 @@ mixin _ChatScreenUi on _ChatScreenController {
   Widget _sidebar({required bool wide}) => JarvisSidebar(
     conversations: _recent,
     selectedConversationId: _showHome ? null : _conversationId,
-    homeSelected: _showHome && _selectedDestination == 0 && _utilityPane == null,
+    homeSelected:
+        _showHome && _selectedDestination == 0 && _utilityPane == null,
     connected: _connected,
     onHome: () => _fromSidebar(() {
       if (_hasPendingApproval) {
@@ -148,208 +151,230 @@ mixin _ChatScreenUi on _ChatScreenController {
     );
   }
 
-  PreferredSizeWidget _topBar({required bool wide, required bool voice}) =>
-      AppBar(
-        toolbarHeight: 64,
-        backgroundColor: voice ? Colors.transparent : null,
-        automaticallyImplyLeading: false,
-        leadingWidth: 64,
-        leading: voice
-            ? Center(
-                child: CircleIconButton(
-                  icon: PhosphorIconsRegular.x,
-                  tooltip: 'Close voice',
-                  onPressed: () => _selectDestination(0),
-                ),
-              )
-            : wide
-            ? null
-            : Center(
-                child: CircleIconButton(
-                  icon: PhosphorIconsRegular.list,
-                  tooltip: 'Menu',
-                  onPressed: () {
-                    _dismissKeyboard();
-                    _scaffoldKey.currentState?.openDrawer();
-                  },
-                ),
-              ),
-        centerTitle: true,
-        title: Column(
+  PreferredSizeWidget _topBar({
+    required bool wide,
+    required bool voice,
+  }) => AppBar(
+    toolbarHeight: 64,
+    backgroundColor: voice ? Colors.transparent : null,
+    automaticallyImplyLeading: false,
+    leadingWidth: 64,
+    leading: voice
+        ? Center(
+            child: CircleIconButton(
+              icon: PhosphorIconsRegular.x,
+              tooltip: 'Close voice',
+              onPressed: () => _selectDestination(0),
+            ),
+          )
+        : wide
+        ? null
+        : Center(
+            child: CircleIconButton(
+              icon: PhosphorIconsRegular.list,
+              tooltip: 'Menu',
+              onPressed: () {
+                _dismissKeyboard();
+                _scaffoldKey.currentState?.openDrawer();
+              },
+            ),
+          ),
+    centerTitle: true,
+    title: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  voice ? 'Voice' : 'Jarvis',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -.3,
-                  ),
-                ),
-                const SizedBox(width: 7),
-                _ConnectionDot(connected: _connected),
-              ],
-            ),
-            if (!voice && (_profileName != null || _profileDeleted))
-              GestureDetector(
-                onTap: _busy ? null : _switchConversationProfile,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    _profileDeleted
-                        ? '${_profileName ?? 'Profile'} (deleted)'
-                        : _profileName ?? 'Profile',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: JarvisColors.of(context).inkSoft,
-                    ),
-                  ),
+            Flexible(
+              child: Text(
+                voice ? 'Voice' : 'Jarvis',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -.3,
                 ),
               ),
+            ),
+            const SizedBox(width: 7),
+            _ConnectionDot(connected: _connected),
           ],
         ),
-        actions: [
-          if (!voice)
-            _NotificationBell(
-              unread: _unreadNotifications,
-              onPressed: _signedOut ? null : () => _openUtility('notifications'),
+        if (!voice && (_profileName != null || _profileDeleted))
+          GestureDetector(
+            onTap: _busy ? null : _switchConversationProfile,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                _profileDeleted
+                    ? '${_profileName ?? 'Profile'} (deleted)'
+                    : _profileName ?? 'Profile',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: JarvisColors.of(context).inkSoft,
+                ),
+              ),
             ),
-          if (!voice)
-            CircleIconButton(
-              icon: PhosphorIconsRegular.magnifyingGlass,
-              tooltip: 'Search',
-              onPressed: _signedOut ? null : () => unawaited(_openSearch(context)),
-            ),
-          if (!voice)
-            CircleIconButton(
-              icon: PhosphorIconsRegular.notePencil,
-              tooltip: 'New chat',
-              onPressed: _busy ? null : _startNewChat,
-            ),
-          const SizedBox(width: 12),
-        ],
-      );
+          ),
+      ],
+    ),
+    actions: [
+      if (!voice)
+        _NotificationBell(
+          unread: _unreadNotifications,
+          onPressed: _signedOut ? null : () => _openUtility('notifications'),
+        ),
+      if (!voice)
+        CircleIconButton(
+          icon: PhosphorIconsRegular.magnifyingGlass,
+          tooltip: 'Search',
+          onPressed: _signedOut ? null : () => unawaited(_openSearch(context)),
+        ),
+      if (!voice)
+        CircleIconButton(
+          icon: PhosphorIconsRegular.notePencil,
+          tooltip: 'New chat',
+          onPressed: _busy ? null : _startNewChat,
+        ),
+      const SizedBox(width: 12),
+    ],
+  );
 
   Widget _chatBody() => SafeArea(
-    child: Column(
-      children: [
-        if (_error != null)
-          ContentWidth(
-            maxWidth: 808,
-            child: InlineNotice(
-              message: _error!,
-              margin: const EdgeInsets.fromLTRB(14, 4, 14, 8),
-              actions: [
-                if (_conversationId == null || !_connected)
+    child: LayoutBuilder(
+      builder: (context, bodyConstraints) => Column(
+        children: [
+          if (_error != null)
+            ContentWidth(
+              maxWidth: 808,
+              child: InlineNotice(
+                message: _error!,
+                margin: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+                actions: [
+                  if (_conversationId == null || !_connected)
+                    TextButton(
+                      onPressed: _retryConnection,
+                      child: const Text('Retry'),
+                    ),
+                  TextButton(
+                    onPressed: () => setState(() => _error = null),
+                    style: TextButton.styleFrom(
+                      foregroundColor: JarvisColors.of(context).inkSoft,
+                    ),
+                    child: const Text('Dismiss'),
+                  ),
+                ],
+              ),
+            )
+          else if (!_connected && _conversationId != null)
+            ContentWidth(
+              maxWidth: 808,
+              child: InlineNotice(
+                message: 'Realtime updates are offline.',
+                margin: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+                actions: [
                   TextButton(
                     onPressed: _retryConnection,
                     child: const Text('Retry'),
                   ),
-                TextButton(
-                  onPressed: () => setState(() => _error = null),
-                  style: TextButton.styleFrom(
-                    foregroundColor: JarvisColors.of(context).inkSoft,
-                  ),
-                  child: const Text('Dismiss'),
-                ),
-              ],
+                ],
+              ),
             ),
-          )
-        else if (!_connected && _conversationId != null)
-          ContentWidth(
-            maxWidth: 808,
-            child: InlineNotice(
-              message: 'Realtime updates are offline.',
-              margin: const EdgeInsets.fromLTRB(14, 4, 14, 8),
-              actions: [
-                TextButton(
-                  onPressed: _retryConnection,
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-        Expanded(
-          child: (_showHome && !_hasPendingApproval) || _entries.isEmpty
-              ? _welcome()
-              : ListView.builder(
-                  controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
-                  itemCount: _entries.length,
-                  itemBuilder: (context, index) => Align(
-                    alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 760),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: _entryView(_entries[index]),
+          Expanded(
+            child: (_showHome && !_hasPendingApproval) || _entries.isEmpty
+                ? _welcome()
+                : Stack(
+                    children: [
+                      Positioned.fill(
+                        child: ListView.builder(
+                          controller: _scroll,
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+                          itemCount: _entries.length,
+                          itemBuilder: (context, index) => Align(
+                            alignment: Alignment.topCenter,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 760),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: _entryView(_entries[index]),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                      if (!_nearBottom)
+                        Positioned(
+                          right: 16,
+                          bottom: 8,
+                          child: CircleIconButton(
+                            icon: PhosphorIconsRegular.caretDown,
+                            tooltip: 'Jump to latest',
+                            size: 44,
+                            onPressed: () => _scrollToBottom(force: true),
+                          ),
+                        ),
+                    ],
                   ),
-                ),
-        ),
-        if (_liveSurface case final live? when surfaceAwaitsReply(live))
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final height = constraints.maxHeight.isFinite
-                  ? constraints.maxHeight
-                  : 640.0;
-              return ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: 788,
-                  maxHeight: math.min(360, height * 0.42),
-                ),
-                child: ListView(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
-                  children: [
-                    UiSurfaceCard(
-                      key: ValueKey('live-${live.id}'),
-                      surface: live,
-                      pinned: true,
-                      errorText: _surfaceErrorFor == live.id
-                          ? _surfaceError
-                          : null,
-                      onAction: (action, values) =>
-                          _submitSurface(live, action, values),
-                    ),
-                  ],
-                ),
-              );
-            },
           ),
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 788),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
-              child: ChatComposer(
-                controller: _input,
-                onSend: () => unawaited(_send()),
-                onCancel: _busy ? () => unawaited(_cancelActiveRun()) : null,
-                onVoice:
-                    _conversationId == null ||
-                        (_busy && !_voiceActive && !_voiceStarting)
-                    ? null
-                    : () => _selectDestination(2),
-                onAttach: _showQuickActions,
-                sources: _sourceChips,
-                onRemoveSource: _conversationId == null
-                    ? null
-                    : (source) => unawaited(_detachSource(source)),
-                sending: _busy,
-                awaitingApproval: _hasPendingApproval,
-                voiceActive: _voiceActive,
-                voiceStarting: _voiceStarting,
+          if (_liveSurface case final live? when surfaceAwaitsReply(live))
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 788,
+                maxHeight: pinnedSurfaceMaxHeight(bodyConstraints.maxHeight),
+              ),
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
+                children: [
+                  UiSurfaceCard(
+                    key: ValueKey('live-${live.id}'),
+                    surface: live,
+                    pinned: true,
+                    errorText: _surfaceErrorFor == live.id
+                        ? _surfaceError
+                        : null,
+                    onAction: (action, values) =>
+                        _submitSurface(live, action, values),
+                  ),
+                ],
+              ),
+            ),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 788),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+                child: ChatComposer(
+                  controller: _input,
+                  onSend: () => unawaited(_send()),
+                  onCancel: _busy ? () => unawaited(_cancelActiveRun()) : null,
+                  onVoice:
+                      _conversationId == null ||
+                          (_busy && !_voiceActive && !_voiceStarting)
+                      ? null
+                      : () => _selectDestination(2),
+                  onAttach: _showQuickActions,
+                  sources: _sourceChips,
+                  onRemoveSource: _conversationId == null
+                      ? null
+                      : (source) => unawaited(_detachSource(source)),
+                  sending: _busy,
+                  awaitingApproval: _hasPendingApproval,
+                  voiceActive: _voiceActive,
+                  voiceStarting: _voiceStarting,
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 
@@ -422,8 +447,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     mark: const JarvisOrb(size: 56),
     ready: _conversationId != null,
     voiceStarting: _voiceStarting,
-    onTalk:
-        _conversationId == null || _busy || _hasPendingApproval
+    onTalk: _conversationId == null || _busy || _hasPendingApproval
         ? null
         : () => _selectDestination(2),
     onOpenTasks: () => _openUtility('tasks'),
@@ -498,7 +522,10 @@ class _NotificationBell extends StatelessWidget {
                 curve: Curves.easeOutBack,
                 child: Container(
                   constraints: const BoxConstraints(minWidth: 18),
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
                   decoration: BoxDecoration(
                     color: colors.danger,
                     borderRadius: BorderRadius.circular(20),

@@ -117,6 +117,7 @@ mixin _ChatScreenSession on _ChatScreenController {
     _catchUpGeneration++;
     _pendingQueryText = null;
     final generation = ++_realtimeGeneration;
+    _discardDeltas();
     bool isCurrent() =>
         mounted &&
         generation == _realtimeGeneration &&
@@ -170,7 +171,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       _error = null;
     });
     if (responding) unawaited(_catchUpRemoteQuery(conversationId));
-    _scrollToBottom(jump: true);
+    _scrollToBottom(jump: true, force: true);
     unawaited(_loadRecent());
     unawaited(_loadConversationSources(conversationId));
     if (!isCurrent() || !isLatestOpen() || _conversationId != conversationId) {

@@ -198,7 +198,7 @@ class _ChatComposerState extends State<ChatComposer> {
                             size: 18,
                           ),
                           style: IconButton.styleFrom(
-                            minimumSize: const Size(38, 38),
+                            minimumSize: const Size(44, 44),
                             backgroundColor: JarvisColors.of(context).ink,
                             foregroundColor: JarvisColors.of(context).onInk,
                           ),
@@ -217,7 +217,7 @@ class _ChatComposerState extends State<ChatComposer> {
                                 )
                               : const Icon(PhosphorIconsBold.arrowUp, size: 18),
                           style: IconButton.styleFrom(
-                            minimumSize: const Size(38, 38),
+                            minimumSize: const Size(44, 44),
                             backgroundColor: JarvisColors.of(context).ink,
                             foregroundColor: JarvisColors.of(context).onInk,
                             disabledBackgroundColor: widget.sending
@@ -256,7 +256,7 @@ class _ComposerIconButton extends StatelessWidget {
     onPressed: onPressed,
     icon: Icon(icon, size: 19),
     style: IconButton.styleFrom(
-      minimumSize: const Size(38, 38),
+      minimumSize: const Size(44, 44),
       foregroundColor: danger
           ? JarvisColors.of(context).danger
           : JarvisColors.of(context).ink,

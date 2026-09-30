@@ -27,9 +27,31 @@ mixin _ChatScreenRealtime on _ChatScreenController {
   ) {
     hub.on(event, (arguments) {
       try {
+        // Apply buffered text first so events keep their order.
+        if (event != 'message.delta') _flushDeltas();
         handler(arguments);
       } catch (_) {}
     });
+  }
+
+  void _flushDeltas() {
+    _deltaTimer?.cancel();
+    _deltaTimer = null;
+    if (_deltaBuffer.isEmpty) return;
+    final text = _deltaBuffer.toString();
+    _deltaBuffer.clear();
+    if (!mounted) return;
+    setState(() {
+      _showHome = false;
+      _appendDelta(text);
+    });
+    _scrollToBottom(jump: true);
+  }
+
+  void _discardDeltas() {
+    _deltaTimer?.cancel();
+    _deltaTimer = null;
+    _deltaBuffer.clear();
   }
 
   Future<void> _connectRealtime([int? generation]) async {
@@ -58,11 +80,8 @@ mixin _ChatScreenRealtime on _ChatScreenController {
           !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
-      setState(() {
-        _showHome = false;
-        _appendDelta(delta);
-      });
-      _scrollToBottom();
+      _deltaBuffer.write(delta);
+      _deltaTimer ??= Timer(const Duration(milliseconds: 60), _flushDeltas);
     });
     _onHub(hub, 'message.completed', (arguments) {
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
