@@ -191,6 +191,65 @@ void main() {
     expect(find.byTooltip('Copy reply'), findsNothing);
   });
 
+  testWidgets('the typing indicator names the step and counts time', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        const MessageBubble(
+          message: MessageEntry(role: 'assistant', content: '', pending: true),
+          thinkingLabel: 'Working out the next step',
+        ),
+      ),
+    );
+    expect(find.text('Working out the next step'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 12));
+    expect(find.text('Working out the next step · 12s'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Jarvis: Working out the next step'),
+      findsOneWidget,
+    );
+  });
+
+  test('thinking label follows the tools of the current reply', () {
+    const user = MessageEntry(role: 'user', content: 'Plan my day');
+    const placeholder = MessageEntry(
+      role: 'assistant',
+      content: '',
+      pending: true,
+    );
+    expect(thinkingLabel([user, placeholder]), 'Thinking');
+    expect(
+      thinkingLabel([
+        user,
+        const ToolRunEntry([ToolStep('ListReminders', ToolStepStatus.running)]),
+        placeholder,
+      ]),
+      'Working',
+    );
+    expect(
+      thinkingLabel([
+        user,
+        const ToolRunEntry([
+          ToolStep('ListReminders', ToolStepStatus.completed),
+          ToolStep('WebSearch', ToolStepStatus.failed),
+        ]),
+        placeholder,
+      ]),
+      'Working out the next step · 2 steps done',
+    );
+    expect(
+      thinkingLabel([
+        const ToolRunEntry([ToolStep('Old', ToolStepStatus.completed)]),
+        user,
+        placeholder,
+      ]),
+      'Thinking',
+    );
+    expect(describeTool('WebSearch').active, 'Searching the web');
+  });
+
   testWidgets('failed user messages offer a retry', (tester) async {
     var retried = false;
     await tester.pumpWidget(

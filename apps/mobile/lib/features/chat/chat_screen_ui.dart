@@ -426,6 +426,9 @@ mixin _ChatScreenUi on _ChatScreenController {
           ? null
           : (rating) => unawaited(_rate(entry, rating)),
       onCitationTap: (citation) => unawaited(_openCitation(citation)),
+      thinkingLabel: entry.pending && entry.content.isEmpty
+          ? thinkingLabel(_entries)
+          : 'Thinking',
     ),
     ToolRunEntry() => ToolRunView(
       run: entry,
