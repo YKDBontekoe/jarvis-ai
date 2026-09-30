@@ -248,19 +248,15 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                 {
                     assistant = ParseAssistantMessage(document.RootElement, toolNames);
                 }
-                catch (InvalidOperationException exception) when (exception.InnerException is JsonException)
+                catch (InvalidOperationException exception) when (RetryInstruction(exception) is not null)
                 {
                     // The structured response schema stores function arguments as JSON text so it can
                     // represent each tool's own schema. If the model returns malformed JSON in that
-                    // string, ask once for a complete replacement instead of failing the whole turn.
+                    // string, or names a function that does not exist, ask once for a corrected
+                    // response instead of failing the whole turn.
                     rawResponse.Clear();
                     textDecoder = new StructuredTextStreamDecoder();
-                    var retryPrompt = prompt with
-                    {
-                        Text = prompt.Text + "\n\nYour previous tool call had invalid JSON in argumentsJson. " +
-                            "Retry the same intended tool call with argumentsJson containing one complete, valid JSON object. " +
-                            "Do not execute an incomplete call. If you cannot repair it, return a concise text response."
-                    };
+                    var retryPrompt = prompt with { Text = prompt.Text + "\n\n" + RetryInstruction(exception) };
                     var retryStarted = Stopwatch.GetTimestamp();
                     var retryOutcome = "failed";
                     try
@@ -451,7 +447,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
         return parameters.TryGetProperty("type", out var type) && IsNativeWebSearchItem(type.GetString());
     }
 
-    private static ChatMessage ParseAssistantMessage(JsonElement root, IReadOnlySet<string> toolNames)
+    internal static ChatMessage ParseAssistantMessage(JsonElement root, IReadOnlySet<string> toolNames)
     {
         if (!root.TryGetProperty("type", out var typeElement))
             throw new InvalidOperationException("Codex CLI returned a response without a type.");
@@ -465,7 +461,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
 
         var name = root.GetProperty("name").GetString() ?? string.Empty;
         if (!toolNames.Contains(name))
-            throw new InvalidOperationException($"Codex CLI requested an unknown Jarvis tool: {name}");
+            throw new UnknownToolCallException(name);
 
         var argumentsJson = root.GetProperty("argumentsJson").GetString() ?? "{}";
         Dictionary<string, object?> arguments;
@@ -480,6 +476,24 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
         }
         return new ChatMessage(ChatRole.Assistant,
             [new FunctionCallContent(Guid.NewGuid().ToString("N"), name, arguments)]);
+    }
+
+    internal static string? RetryInstruction(InvalidOperationException exception) => exception switch
+    {
+        UnknownToolCallException unknown =>
+            $"Your previous response asked for a Jarvis function named '{Limit(unknown.ToolName, 80)}', which does not exist. " +
+            "Use only an exact name from the Available Jarvis functions list, or return a concise text response if none fits.",
+        { InnerException: JsonException } =>
+            "Your previous tool call had invalid JSON in argumentsJson. " +
+            "Retry the same intended tool call with argumentsJson containing one complete, valid JSON object. " +
+            "Do not execute an incomplete call. If you cannot repair it, return a concise text response.",
+        _ => null
+    };
+
+    internal sealed class UnknownToolCallException(string toolName)
+        : InvalidOperationException($"Codex CLI requested an unknown Jarvis tool: {toolName}")
+    {
+        public string ToolName { get; } = toolName;
     }
 
     internal static PromptPayload BuildPrompt(IEnumerable<ChatMessage> messages, ChatOptions? options,
@@ -513,6 +527,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
             }
         }
         prompt.AppendLine("\nConversation:");
+        var toolNamesByCallId = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var message in messages)
         {
             prompt.Append("\n[").Append(message.Role.Value).AppendLine("]");
@@ -538,9 +553,17 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                     prompt.Append("[Attached image ").Append(images.Count).AppendLine("]");
                 }
                 else if (content is FunctionCallContent call)
+                {
+                    toolNamesByCallId[call.CallId] = call.Name;
                     prompt.Append("Jarvis tool request: ").Append(call.Name).Append(' ').AppendLine(JsonSerializer.Serialize(call.Arguments, PromptJsonOptions));
+                }
                 else if (content is FunctionResultContent result)
-                    prompt.Append("Jarvis tool result: ").AppendLine(JsonSerializer.Serialize(result.Result, PromptJsonOptions));
+                {
+                    prompt.Append("Jarvis tool result");
+                    if (toolNamesByCallId.TryGetValue(result.CallId, out var resultToolName))
+                        prompt.Append(" (").Append(resultToolName).Append(')');
+                    prompt.Append(": ").AppendLine(JsonSerializer.Serialize(result.Result, PromptJsonOptions));
+                }
                 else
                     prompt.Append(content.GetType().Name).Append(": ").AppendLine(JsonSerializer.Serialize(content, PromptJsonOptions));
                 if (prompt.Length > MaxPromptLength)

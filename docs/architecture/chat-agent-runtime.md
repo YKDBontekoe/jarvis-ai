@@ -20,6 +20,12 @@ Tools wrapped in `ApprovalRequiredAIFunction` (see `BuiltInAgentContributors.cs`
 
 Idempotency: approval rows are guarded by a unique key on owner + request + tool call id.
 
+## Tool failures and self-correction
+
+`ToolFailureFeedback` (in `Jarvis.Agents`) is the function invoker for every agent turn. Input validation errors thrown by tools (`ArgumentException`, `FormatException`, `JsonException`) are passed back to the model, capped at 400 characters, so it can fix its arguments and retry within the same turn. Every other exception becomes a generic "the tool failed" result; the real exception is only logged. The invoker runs after approval gating, so it never sees a call the user has not approved.
+
+When Codex names a function that does not exist, `CodexCliChatClient` asks once for a corrected response instead of failing the turn, the same way it already retries malformed `argumentsJson`. Tool results in the Codex prompt carry the tool name, so multi-step chains stay readable.
+
 ## Background tasks
 
 `CreateTaskAsync` is **not** offered during an executing background task turn (`context.IsBackgroundTask`). Task conversations use separate session IDs; deleting a normal conversation does not remove task-backed threads. Reminder and automation chats are ordinary interactive conversations (`conversationId` on the reminder or rule) so the owner can reply when they fire.
