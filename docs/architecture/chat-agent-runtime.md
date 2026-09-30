@@ -12,13 +12,19 @@ Interactive chat is the primary path: Flutter sends a message, the API runs an a
    - **Context** — `IAgentContextContributor` providers (clock, pinned memory, active tasks, watches, persona, skills, bound profile, graph, surfaces, devices, browser session, remote agents). Profile text is untrusted working notes, not privileged system instructions.
 4. **Codex adapter** — Spawns Codex CLI in a restricted sandbox; streams deltas; Jarvis executes tool calls locally with approval gates. Web search uses Codex `standalone_web_search` when enabled.
 5. **Persistence** — Messages and session state via `IConversationStore` and Agent Framework session store; compaction trims old groups above token budget while keeping recent tool groups intact.
-6. **Realtime** — `JarvisEventsHub` at `/hubs/events` publishes assistant text deltas and `tool.started` / `tool.completed` / `tool.failed` (names only, no args).
+6. **Realtime** — `JarvisEventsHub` at `/hubs/events` publishes assistant text deltas and `tool.started` / `tool.completed` / `tool.failed` (names only, no args). Codex's native web search is reported the same way as a `WebSearch` tool step (`NativeToolProgress`), carried in update metadata so it never enters the stored transcript. While a reply has no text yet, the Flutter typing indicator names the current step (thinking, working, working out the next step) and shows elapsed seconds after 8 s.
 
 ## Tool approval flow
 
 Tools wrapped in `ApprovalRequiredAIFunction` (see `BuiltInAgentContributors.cs` and MCP/browser/coding wrappers) create a pending approval row. The client lists `GET /api/v1/approvals` and posts a decision to `/approvals/{id}/decision`. The agent run resumes with the user's choice.
 
 Idempotency: approval rows are guarded by a unique key on owner + request + tool call id.
+
+## Tool failures and self-correction
+
+`ToolFailureFeedback` (in `Jarvis.Agents`) is the function invoker for every agent turn. Input validation errors thrown by tools (`ArgumentException`, `FormatException`, `JsonException`) are passed back to the model, capped at 400 characters, so it can fix its arguments and retry within the same turn. Every other exception becomes a generic "the tool failed" result; the real exception is only logged. The invoker runs after approval gating, so it never sees a call the user has not approved.
+
+When Codex names a function that does not exist, `CodexCliChatClient` asks once for a corrected response instead of failing the turn, the same way it already retries malformed `argumentsJson`. Tool results in the Codex prompt carry the tool name, so multi-step chains stay readable.
 
 ## Background tasks
 

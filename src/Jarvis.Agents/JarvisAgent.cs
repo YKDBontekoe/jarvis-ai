@@ -141,6 +141,13 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
                     .Select(call => call.CallId)
                     .ToHashSet(StringComparer.Ordinal);
 
+                if (NativeToolProgress.Read(update) is { } native)
+                {
+                    if (native.Phase == "started" ? activeTools.TryAdd(native.ToolCallId, native.ToolName)
+                            : activeTools.Remove(native.ToolCallId))
+                        yield return new AgentStreamEvent(ToolProgress: native);
+                }
+
                 foreach (var text in update.Contents.OfType<TextContent>())
                 {
                     if (!string.IsNullOrEmpty(text.Text)) yield return new AgentStreamEvent(TextDelta: text.Text);

@@ -168,10 +168,8 @@ mixin _ChatScreenUi on _ChatScreenController {
                   leading: const IconBadge(
                     icon: PhosphorIconsRegular.plugsConnected,
                   ),
-                  title: const Text('Connect a tool'),
-                  subtitle: const Text(
-                    'Add GitHub, calendar, or any MCP server in this chat',
-                  ),
+                  title: const Text('Connect an app'),
+                  subtitle: const Text('Calendar, mail, GitHub, and more'),
                   onTap: () {
                     Navigator.pop(context);
                     unawaited(_send(mcpSetupPrompt));
@@ -426,6 +424,9 @@ mixin _ChatScreenUi on _ChatScreenController {
           ? null
           : (rating) => unawaited(_rate(entry, rating)),
       onCitationTap: (citation) => unawaited(_openCitation(citation)),
+      thinkingLabel: entry.pending && entry.content.isEmpty
+          ? thinkingLabel(_entries)
+          : 'Thinking',
     ),
     ToolRunEntry() => ToolRunView(
       run: entry,
@@ -459,6 +460,7 @@ mixin _ChatScreenUi on _ChatScreenController {
   String get _shownVoicePhase {
     if (_voiceStarting) return 'connecting';
     if (!_voiceActive) return 'idle';
+    if (_voiceReconnecting) return 'reconnecting';
     return _voicePhase;
   }
 

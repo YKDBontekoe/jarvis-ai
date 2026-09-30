@@ -183,7 +183,7 @@ class _LearningScreenState extends _LearningController with _LearningCards {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Learning & heartbeat')),
+    appBar: AppBar(title: const Text('Learning')),
     body: _loading
         ? const LoadingState()
         : RefreshIndicator(

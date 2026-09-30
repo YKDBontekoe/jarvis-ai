@@ -47,23 +47,39 @@ void main() {
   ) async {
     await show(tester);
 
-    expect(find.text('Calendar'), findsOneWidget);
-    expect(find.text('Paused'), findsWidgets);
-    expect(find.text('Every exposed tool'), findsOneWidget);
-    expect(find.text('Pause'), findsOneWidget);
-    expect(
-      find.textContaining('Add, authorize, pause, and remove MCP servers in chat'),
-      findsOneWidget,
-    );
+    expect(find.text('Calendar'), findsWidgets);
+    expect(find.text('Paused'), findsOneWidget);
+    // The host GitHub server gets its friendly name and plain status.
+    expect(find.text('GitHub'), findsWidgets);
+    expect(find.text('Working'), findsOneWidget);
+    expect(find.textContaining('Jarvis can use 4 actions'), findsOneWidget);
+    expect(find.textContaining('MCP'), findsNothing);
 
-    await tester.tap(find.byType(Switch));
+    // Technical details stay folded away until asked for.
+    expect(find.text('Everything this app offers'), findsNothing);
+    await tester.tap(find.text('Details').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Everything this app offers'), findsOneWidget);
+    expect(find.text('https://tools.example.net/mcp'), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('app-jarvis-mcp-abc')),
+        matching: find.byType(Switch),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(
       http.sent('PUT', '/api/v1/mcp-servers/jarvis-mcp-abc/state').single.body,
       {'enabled': true},
     );
 
-    await tester.tap(find.text('Pause'));
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('app-github')),
+        matching: find.byType(Switch),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(http.sent('PUT', '/api/v1/mcp-controls/github').single.body, {
       'enabled': false,
@@ -98,10 +114,12 @@ void main() {
     );
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Ask Jarvis'));
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ask Jarvis to set it up'));
     await tester.pumpAndSettle();
     expect(asked, contains('Show the setup card'));
-    expect(find.text('Integrations'), findsNothing);
+    expect(find.text('Connected apps'), findsNothing);
   });
 
   testWidgets('guided calendar pack posts an ICS URL without MCP', (
@@ -125,9 +143,7 @@ void main() {
         'hasIcs': false,
       },
     ]);
-    http.on('POST', '/api/v1/integrations/packs/calendar', {
-      'installed': true,
-    });
+    http.on('POST', '/api/v1/integrations/packs/calendar', {'installed': true});
     tester.view.physicalSize = const Size(900, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -136,7 +152,7 @@ void main() {
       MaterialApp(home: IntegrationsScreen(http: http.client())),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Set up'));
+    await tester.tap(find.text('Set up').first);
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byType(TextFormField).first,
@@ -182,12 +198,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Unavailable'), findsOneWidget);
-    expect(find.textContaining('Did not respond in time'), findsOneWidget);
+    expect(find.text('Can’t connect'), findsOneWidget);
+    expect(find.textContaining('took too long to answer'), findsOneWidget);
+    expect(find.text('1 needs you'), findsOneWidget);
     // The status lives on the server's own card, not in a second duplicate card.
     expect(find.text('Files'), findsOneWidget);
     final before = http.sent('GET', '/api/v1/integrations/connections').length;
-    await tester.tap(find.text('Retry'));
+    await tester.tap(find.text('Try again'));
     await tester.pumpAndSettle();
     expect(
       http.sent('GET', '/api/v1/integrations/connections').length,

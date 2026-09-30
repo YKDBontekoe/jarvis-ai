@@ -14,7 +14,7 @@ typedef SettingsDestination = ({
 /// Settings groups in display order. Each destination is opened by the app shell's utility router.
 const List<(String, List<SettingsDestination>)> settingsGroups = [
   (
-    'App',
+    'General',
     [
       (
         title: 'Appearance',
@@ -22,52 +22,34 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         icon: PhosphorIconsRegular.circleHalf,
         destination: 'appearance',
       ),
+      (
+        title: 'Voice',
+        subtitle: 'The voice Jarvis speaks with, and hands-free listening',
+        icon: PhosphorIconsRegular.microphone,
+        destination: 'voice-settings',
+      ),
+      (
+        title: 'Morning briefing',
+        subtitle: 'When your daily summary arrives',
+        icon: PhosphorIconsRegular.sunHorizon,
+        destination: 'briefing',
+      ),
     ],
   ),
   (
-    'Assistant',
+    'Connections',
     [
       (
-        title: 'Models',
-        subtitle: 'Codex or OpenRouter chat, reasoning, and embeddings',
-        icon: PhosphorIconsRegular.cpu,
-        destination: 'models',
-      ),
-      (
-        title: 'Learning & heartbeat',
-        subtitle: 'Continuous learning, dreaming, and check-ins',
-        icon: PhosphorIconsRegular.pulse,
-        destination: 'learning',
-      ),
-      (
-        title: 'Persona',
-        subtitle: 'How Jarvis has learned to work with you',
-        icon: PhosphorIconsRegular.userCircle,
-        destination: 'persona',
-      ),
-      (
-        title: 'Profiles',
-        subtitle: 'Personas, skills, files, models, and learning per context',
-        icon: PhosphorIconsRegular.identificationCard,
-        destination: 'profiles',
-      ),
-      (
-        title: 'Skills',
-        subtitle: 'Procedures Jarvis learned or you taught it',
-        icon: PhosphorIconsRegular.magicWand,
-        destination: 'skills',
+        title: 'Connected apps',
+        subtitle: 'Calendar, mail, smart home, and more',
+        icon: PhosphorIconsRegular.plugsConnected,
+        destination: 'integrations',
       ),
       (
         title: 'WhatsApp & Signal',
-        subtitle: 'Chat with Jarvis from your phone',
+        subtitle: 'Chat with Jarvis from your messaging apps',
         icon: PhosphorIconsRegular.whatsappLogo,
         destination: 'channels',
-      ),
-      (
-        title: 'Agents',
-        subtitle: 'Agent2Agent peers and inbound tokens',
-        icon: PhosphorIconsRegular.robot,
-        destination: 'agents',
       ),
       (
         title: 'This device',
@@ -75,87 +57,115 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         icon: PhosphorIconsRegular.deviceMobile,
         destination: 'devices',
       ),
-      (
-        title: 'Voice',
-        subtitle: 'ChatGPT voice, hands-free listening, and captions',
-        icon: PhosphorIconsRegular.microphone,
-        destination: 'voice-settings',
-      ),
-      (
-        title: 'Integrations',
-        subtitle: 'Token vault — add and manage MCP servers in chat',
-        icon: PhosphorIconsRegular.plugsConnected,
-        destination: 'integrations',
-      ),
-      (
-        title: 'Coding runs',
-        subtitle: 'Review isolated worktrees and diffs',
-        icon: PhosphorIconsRegular.code,
-        destination: 'coding',
-      ),
-      (
-        title: 'Approvals',
-        subtitle: 'Review actions Jarvis needs permission to run',
-        icon: PhosphorIconsRegular.shieldCheck,
-        destination: 'approvals',
-      ),
-      (
-        title: 'Morning briefing',
-        subtitle: 'Choose your daily briefing schedule and time zone',
-        icon: PhosphorIconsRegular.sunHorizon,
-        destination: 'briefing',
-      ),
     ],
   ),
   (
-    'Automations',
+    'Routines',
     [
       (
         title: 'Reminders and notifications',
-        subtitle: 'View scheduled reminders and alerts',
+        subtitle: 'What Jarvis reminds you of, and what it sent you',
         icon: PhosphorIconsRegular.bell,
         destination: 'reminders',
       ),
       (
         title: 'Condition watches',
-        subtitle: 'Manage threshold alerts',
+        subtitle: 'Get a heads-up when something changes',
         icon: PhosphorIconsRegular.pulse,
         destination: 'watches',
       ),
       (
         title: 'Automation rules',
-        subtitle: 'Triggers, conditions, and chained actions',
+        subtitle: 'When something happens, Jarvis does something',
         icon: PhosphorIconsRegular.flowArrow,
         destination: 'automations',
       ),
     ],
   ),
   (
-    'Data',
+    'How Jarvis works with you',
     [
       (
-        title: 'Usage',
-        subtitle: 'Tokens, Codex, OpenRouter costs, memories, and dreams',
-        icon: PhosphorIconsRegular.chartBar,
-        destination: 'usage',
+        title: 'Persona',
+        subtitle: 'What Jarvis has learned about working with you',
+        icon: PhosphorIconsRegular.userCircle,
+        destination: 'persona',
       ),
       (
-        title: 'Knowledge graph',
-        subtitle: 'Pan, search, and inspect people, places, and projects',
-        icon: PhosphorIconsRegular.graph,
-        destination: 'graph',
+        title: 'Skills',
+        subtitle: 'Step-by-step routines Jarvis knows',
+        icon: PhosphorIconsRegular.magicWand,
+        destination: 'skills',
+      ),
+      (
+        title: 'Profiles',
+        subtitle: 'Separate setups, such as work and home',
+        icon: PhosphorIconsRegular.identificationCard,
+        destination: 'profiles',
+      ),
+      (
+        title: 'Learning',
+        subtitle: 'How Jarvis learns, reflects, and checks in',
+        icon: PhosphorIconsRegular.pulse,
+        destination: 'learning',
+      ),
+    ],
+  ),
+  (
+    'Privacy & data',
+    [
+      (
+        title: 'Approvals',
+        subtitle: 'Actions waiting for your OK',
+        icon: PhosphorIconsRegular.shieldCheck,
+        destination: 'approvals',
+      ),
+      (
+        title: 'Activity log',
+        subtitle: 'Everything Jarvis did, and when',
+        icon: PhosphorIconsRegular.listChecks,
+        destination: 'audit',
       ),
       (
         title: 'Files',
-        subtitle: 'Browse uploaded documents',
+        subtitle: 'Documents you shared with Jarvis',
         icon: PhosphorIconsRegular.folderOpen,
         destination: 'files',
       ),
       (
-        title: 'Audit log',
-        subtitle: 'Review Jarvis activity',
-        icon: PhosphorIconsRegular.listChecks,
-        destination: 'audit',
+        title: 'Knowledge graph',
+        subtitle: 'People, places, and projects Jarvis knows about',
+        icon: PhosphorIconsRegular.graph,
+        destination: 'graph',
+      ),
+      (
+        title: 'Usage',
+        subtitle: 'How much you use Jarvis, and what it costs',
+        icon: PhosphorIconsRegular.chartBar,
+        destination: 'usage',
+      ),
+    ],
+  ),
+  (
+    'Advanced',
+    [
+      (
+        title: 'Models',
+        subtitle: 'Which AI models Jarvis runs on',
+        icon: PhosphorIconsRegular.cpu,
+        destination: 'models',
+      ),
+      (
+        title: 'Coding runs',
+        subtitle: 'Code changes Jarvis made for you to review',
+        icon: PhosphorIconsRegular.code,
+        destination: 'coding',
+      ),
+      (
+        title: 'Other agents',
+        subtitle: 'Let other AI assistants work with Jarvis',
+        icon: PhosphorIconsRegular.robot,
+        destination: 'agents',
       ),
     ],
   ),

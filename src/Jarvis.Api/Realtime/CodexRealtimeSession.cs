@@ -279,19 +279,17 @@ internal sealed class CodexRealtimeSession : IAsyncDisposable
             try
             {
                 await Task.Delay(20, token);
-                short[] frame;
+                List<short[]> frames;
                 lock (_microphoneGate)
+                    frames = VoicePcm.TakeFrames(_microphone, VoicePcm.Rate / 50);
+                if (frames.Count == 0 || _audioFormat is not { } format) continue;
+                // Send every whole frame that is waiting: a timer tick is never exactly 20 ms, and sending one
+                // frame per tick let the backlog (and so the delay before Jarvis hears you) grow all session.
+                foreach (var frame in frames)
                 {
-                    var take = Math.Min(_microphone.Count, VoicePcm.Rate / 50);
-                    if (take <= 0) continue;
-                    frame = _microphone.GetRange(0, take).ToArray();
-                    _microphone.RemoveRange(0, take);
+                    var encoded = _encoder.EncodeAudio(VoicePcm.ToOpusPcm(frame), format);
+                    if (encoded.Length > 0) _peer.SendAudio((uint)(frame.Length * 2), encoded);
                 }
-
-                if (_audioFormat is not { } format) continue;
-                var encoded = _encoder.EncodeAudio(VoicePcm.ToOpusPcm(frame), format);
-                if (encoded.Length == 0) continue;
-                _peer.SendAudio((uint)(frame.Length * 2), encoded);
             }
             catch (OperationCanceledException)
             {

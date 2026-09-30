@@ -6,10 +6,14 @@ class MessageBubble extends StatefulWidget {
     this.onRetry,
     this.onRate,
     this.onCitationTap,
+    this.thinkingLabel = 'Thinking',
     super.key,
   });
 
   final MessageEntry message;
+
+  /// What the typing indicator says while the reply has no text yet.
+  final String thinkingLabel;
   final VoidCallback? onRetry;
 
   /// Rates an assistant reply `up` or `down`; hidden until the reply is stored.
@@ -40,9 +44,12 @@ class _MessageBubbleState extends State<MessageBubble> {
     final message = widget.message;
     if (message.isUser) return _userBubble(context, message);
     if (message.pending && message.content.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.only(bottom: 18),
-        child: Align(alignment: Alignment.centerLeft, child: TypingIndicator()),
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 18),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: TypingIndicator(label: widget.thinkingLabel),
+        ),
       );
     }
     return Padding(
@@ -380,7 +387,13 @@ class JarvisMarkdown extends StatelessWidget {
 }
 
 class TypingIndicator extends StatefulWidget {
-  const TypingIndicator({super.key});
+  const TypingIndicator({this.label = 'Thinking', super.key});
+
+  /// Short status such as "Thinking" or "Working out the next step".
+  final String label;
+
+  /// Elapsed time appears after this long, so quick replies stay quiet.
+  static const elapsedAfter = Duration(seconds: 8);
 
   @override
   State<TypingIndicator> createState() => _TypingIndicatorState();
@@ -400,51 +413,80 @@ class _TypingIndicatorState extends State<TypingIndicator>
   }
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    label: 'Jarvis is thinking',
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const JarvisAvatar(size: 28),
-        const SizedBox(width: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: JarvisColors.of(context).surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: JarvisColors.of(context).outline),
-          ),
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, _) => Row(
-              children: [
-                for (var i = 0; i < 3; i++)
-                  Transform.translate(
-                    offset: Offset(
-                      0,
-                      -3 * _pulse((_controller.value + i * .18) % 1),
-                    ),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 2.5),
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color.lerp(
-                          JarvisColors.of(context).outlineStrong,
-                          JarvisColors.of(context).inkSoft,
-                          _pulse((_controller.value + i * .18) % 1),
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Semantics(
+      label: 'Jarvis: ${widget.label}',
+      liveRegion: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const JarvisAvatar(size: 28),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: colors.outline),
+              ),
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) => Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var i = 0; i < 3; i++)
+                      Transform.translate(
+                        offset: Offset(
+                          0,
+                          -3 * _pulse((_controller.value + i * .18) % 1),
+                        ),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color.lerp(
+                              colors.outlineStrong,
+                              colors.inkSoft,
+                              _pulse((_controller.value + i * .18) % 1),
+                            ),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: ExcludeSemantics(
+                        child: Text(
+                          _statusText(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: colors.inkSoft,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
+
+  String _statusText() {
+    final elapsed = _controller.lastElapsedDuration ?? Duration.zero;
+    if (elapsed < TypingIndicator.elapsedAfter) return widget.label;
+    return '${widget.label} · ${elapsed.inSeconds}s';
+  }
 
   static double _pulse(double t) => t < .5 ? t * 2 : (1 - t) * 2;
 }

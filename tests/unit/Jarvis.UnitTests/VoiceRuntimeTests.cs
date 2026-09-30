@@ -108,6 +108,19 @@ public sealed class VoicePlaybackGateRuntimeTests
     }
 
     [Fact]
+    public void Next_reply_is_heard_again_after_a_barge_in()
+    {
+        var gate = new VoicePlaybackGate();
+        gate.AllowRealtimeOutput();
+        gate.Duck(true);
+        Assert.Null(gate.AcceptFrame());
+
+        Assert.True(gate.ResumeForNewReply());
+        Assert.NotNull(gate.AcceptFrame());
+        Assert.False(gate.ResumeForNewReply());
+    }
+
+    [Fact]
     public void Queued_generation_is_invalid_after_duck()
     {
         var gate = new VoicePlaybackGate();
@@ -122,6 +135,19 @@ public sealed class VoicePlaybackGateRuntimeTests
 
 public sealed class VoicePcmTests
 {
+    [Fact]
+    public void Microphone_backlog_is_sent_as_whole_frames()
+    {
+        var buffer = Enumerable.Range(0, 1_000).Select(i => (short)i).ToList();
+        var frames = VoicePcm.TakeFrames(buffer, 480);
+        Assert.Equal(2, frames.Count);
+        Assert.All(frames, frame => Assert.Equal(480, frame.Length));
+        Assert.Equal((short)480, frames[1][0]);
+        Assert.Equal(40, buffer.Count);
+        Assert.Equal((short)960, buffer[0]);
+        Assert.Empty(VoicePcm.TakeFrames(buffer, 480));
+    }
+
     [Fact]
     public void Opus_round_trip_keeps_24khz_mono_samples()
     {

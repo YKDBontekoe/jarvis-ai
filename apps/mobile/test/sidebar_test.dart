@@ -9,8 +9,11 @@ Widget _host(Widget child) => MaterialApp(
 );
 
 void main() {
-  testWidgets('sidebar navigation dismisses the keyboard', (tester) async {
+  testWidgets('sidebar has one search entry and core destinations', (
+    tester,
+  ) async {
     var openedTasks = false;
+    var searched = false;
     await tester.pumpWidget(
       _host(
         JarvisSidebar(
@@ -27,21 +30,21 @@ void main() {
             if (destination == 'tasks') openedTasks = true;
           },
           onSettings: () {},
-          onJarvisSearch: () {},
+          onJarvisSearch: () => searched = true,
         ),
       ),
     );
 
-    await tester.tap(find.byType(TextField));
-    await tester.pump();
-    await tester.enterText(find.byType(TextField), 'jo');
-    expect(FocusManager.instance.primaryFocus?.hasFocus, isTrue);
+    expect(find.byType(TextField), findsNothing);
+    for (final label in ['Files', 'Usage', 'Coding']) {
+      expect(find.text(label), findsNothing);
+    }
+
+    await tester.tap(find.text('Search'));
+    expect(searched, isTrue);
 
     await tester.tap(find.text('Tasks'));
     await tester.pumpAndSettle();
-
     expect(openedTasks, isTrue);
-    expect(tester.widget<TextField>(find.byType(TextField)).focusNode?.hasFocus,
-        isFalse);
   });
 }

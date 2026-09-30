@@ -274,6 +274,11 @@ const _catalog = <String, ToolDescription>{
     'Checked battery',
     PhosphorIconsRegular.batteryFull,
   ),
+  'WebSearch': ToolDescription(
+    'Searching the web',
+    'Searched the web',
+    PhosphorIconsRegular.magnifyingGlass,
+  ),
   'BrowseTheWeb': ToolDescription(
     'Using the isolated browser',
     'Used the isolated browser',
