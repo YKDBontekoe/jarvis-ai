@@ -8,6 +8,7 @@ import 'approvals_screen.dart';
 import 'theme.dart';
 import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
+import 'ui/plain_text.dart';
 
 part 'task_editor.dart';
 
@@ -305,7 +306,7 @@ class _TasksScreenState extends State<TasksScreen> {
                 if (summary?.isNotEmpty == true) ...[
                   const SizedBox(height: 8),
                   Text(
-                    summary!,
+                    plainPreview(summary!),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(

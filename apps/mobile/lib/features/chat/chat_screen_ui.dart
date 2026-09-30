@@ -22,7 +22,7 @@ mixin _ChatScreenUi on _ChatScreenController {
   Widget _sidebar({required bool wide}) => JarvisSidebar(
     conversations: _recent,
     selectedConversationId: _showHome ? null : _conversationId,
-    homeSelected: _showHome && _selectedDestination == 0,
+    homeSelected: _showHome && _selectedDestination == 0 && _utilityPane == null,
     connected: _connected,
     onHome: () => _fromSidebar(() {
       if (_hasPendingApproval) {
@@ -63,7 +63,14 @@ mixin _ChatScreenUi on _ChatScreenController {
     _dismissKeyboard();
     final scaffold = _scaffoldKey.currentState;
     if (scaffold?.isDrawerOpen ?? false) scaffold!.closeDrawer();
-    action();
+    // Anything chosen in the sidebar replaces whatever the content area shows.
+    _closeUtilityPane();
+    _openingFromSidebar = true;
+    try {
+      action();
+    } finally {
+      _openingFromSidebar = false;
+    }
   }
 
   void _showQuickActions() {

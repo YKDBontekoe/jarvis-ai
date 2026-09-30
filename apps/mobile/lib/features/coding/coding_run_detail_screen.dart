@@ -9,6 +9,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../../ui/plain_text.dart';
 
 /// Review surface for one coding run: what changed, whether it has a pull
 /// request, and the owner's decision to open, merge, or close it. Merging only
@@ -217,7 +218,7 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
                     margin: const EdgeInsets.only(bottom: 12),
                   ),
                 Text(
-                  asJsonString(run['task']) ?? 'Coding task',
+                  codingTaskTitle(asJsonString(run['task']) ?? ''),
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 10),

@@ -52,6 +52,15 @@ abstract class _ChatScreenController extends State<ChatScreen>
   int _selectedDestination = 0;
   int _homeRevision = 0;
   int _unreadNotifications = 0;
+
+  // On wide screens utility pages (tasks, memory, settings…) open inside the
+  // content area so the sidebar stays put; narrow screens push full-screen routes.
+  bool _isWide = false;
+  Widget? _utilityPane;
+  String? _paneDestination;
+  int _paneRevision = 0;
+  BuildContext? _paneContext;
+  bool _openingFromSidebar = false;
   bool _showHome = true;
   int _realtimeGeneration = 0;
   int _openGeneration = 0;
@@ -95,6 +104,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _switchConversationProfile();
   void _openUtility(String destination);
   Future<void> _refreshUnreadNotifications();
+  void _closeUtilityPane();
   void _selectDestination(int index);
   Future<void> _reloadConversationEntries(
     String conversationId, [

@@ -88,6 +88,7 @@ mixin _ChatScreenSession on _ChatScreenController {
     bool showHome = false,
   }) async {
     final openGeneration = ++_openGeneration;
+    _closeUtilityPane();
     bool isLatestOpen() =>
         mounted &&
         openGeneration == _openGeneration &&

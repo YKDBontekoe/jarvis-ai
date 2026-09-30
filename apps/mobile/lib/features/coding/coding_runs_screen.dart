@@ -7,6 +7,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../../ui/plain_text.dart';
 import 'coding_run_detail_screen.dart';
 
 /// Lists approval-gated coding runs and their isolated worktree diffs.
@@ -126,7 +127,7 @@ class _CodingRunsScreenState extends State<CodingRunsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  asJsonString(run['task']) ?? 'Coding task',
+                  codingTaskTitle(asJsonString(run['task']) ?? ''),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleSmall,

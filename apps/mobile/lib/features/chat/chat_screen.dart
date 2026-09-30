@@ -128,6 +128,7 @@ class _ChatScreenState extends _ChatScreenController
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= _wideLayoutWidth;
+        _isWide = wide;
         final voice = _selectedDestination == 2;
         final content = Scaffold(
           extendBodyBehindAppBar: voice,
@@ -166,7 +167,21 @@ class _ChatScreenState extends _ChatScreenController
                   children: [
                     SizedBox(width: 292, child: sidebar),
                     const VerticalDivider(width: 1),
-                    Expanded(child: content),
+                    Expanded(
+                      child: _utilityPane == null
+                          ? content
+                          : KeyedSubtree(
+                              key: ValueKey(_paneRevision),
+                              child: Navigator(
+                                onGenerateRoute: (_) => MaterialPageRoute<void>(
+                                  builder: (routeContext) {
+                                    _paneContext = routeContext;
+                                    return _utilityPane!;
+                                  },
+                                ),
+                              ),
+                            ),
+                    ),
                   ],
                 )
               : content,
