@@ -23,6 +23,11 @@ internal sealed class CodingRunConfiguration : IEntityTypeConfiguration<CodingRu
             builder.Property(x => x.ExitCode).HasColumnName("exit_code");
             builder.Property(x => x.CreatedAt).HasColumnName("created_at");
             builder.Property(x => x.CompletedAt).HasColumnName("completed_at");
+            builder.Property(x => x.BranchName).HasColumnName("branch_name").HasMaxLength(200);
+            builder.Property(x => x.PullRequestRepository).HasColumnName("pull_request_repository").HasMaxLength(200);
+            builder.Property(x => x.PullRequestNumber).HasColumnName("pull_request_number");
+            builder.Property(x => x.PullRequestUrl).HasColumnName("pull_request_url").HasMaxLength(500);
+            builder.Property(x => x.PullRequestState).HasColumnName("pull_request_state").HasMaxLength(20);
             builder.HasIndex(x => new { x.OwnerId, x.CreatedAt });
         }
 }

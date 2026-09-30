@@ -39,6 +39,9 @@ internal sealed class CoreAgentTools(
     ILoggerFactory loggerFactory,
     CodexExecutable codexExecutable,
     ICodingRunStore codingRuns,
+    ICodingPullRequestService codingPullRequests,
+    INotificationRepository notificationRepository,
+    Jarvis.Application.Diagnostics.IRecentFaultLog? recentFaults = null,
     TimeProvider? timeProvider = null) : IAgentToolContributor
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context)
@@ -97,6 +100,18 @@ internal sealed class CoreAgentTools(
             var codingTools = new CodexCodingTools(configuration, loggerFactory.CreateLogger<CodexCodingTools>(),
                 auditEvents, currentUser, codexProcessLimiter, codexExecutable, codingRuns);
             yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(codingTools.RunCodingTaskAsync));
+
+            // Self-fix is opt-in: one allowlisted repository must be marked as Jarvis's own source.
+            var selfRepository = configuration.GetSection("Coding:Repositories").GetChildren().FirstOrDefault(section =>
+                section.GetValue<bool>("SelfFix") && !string.IsNullOrWhiteSpace(section["GitHubRepository"]) &&
+                !string.IsNullOrWhiteSpace(section["Name"]));
+            if (selfRepository is not null && !context.IsBackgroundTask)
+            {
+                var selfFix = new SelfFixAgentTools(codingTools, codingPullRequests, notificationRepository,
+                    recentFaults, currentUser, selfRepository["Name"]!);
+                yield return AIFunctionFactory.Create(selfFix.GetRecentJarvisFaults);
+                yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(selfFix.ProposeJarvisFixAsync));
+            }
         }
     }
 

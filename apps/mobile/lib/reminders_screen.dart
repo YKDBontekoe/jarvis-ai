@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'ui/phosphor_icons.dart';
 
 import 'approvals_screen.dart';
+import 'features/coding/coding_run_detail_screen.dart';
 import 'daily_briefing_screen.dart';
 import 'notification_details_screen.dart';
 import 'notification_routing.dart';
@@ -262,6 +263,12 @@ class _RemindersScreenState extends State<RemindersScreen>
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) => ApprovalsScreen(http: widget.http),
+        ),
+      );
+    } else if (opensCodingRun(type) && sourceId != null) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => CodingRunDetailScreen(http: widget.http, runId: sourceId),
         ),
       );
     } else if (opensDailyBriefing(type)) {
@@ -605,6 +612,7 @@ class _RemindersScreenState extends State<RemindersScreen>
     'task.completed' => PhosphorIconsRegular.checkCircle,
     'task.failed' => PhosphorIconsRegular.warningCircle,
     'approval.required' => PhosphorIconsRegular.shieldCheck,
+    'coding.pr.ready' || 'coding.run.ready' => PhosphorIconsRegular.code,
     'watch.triggered' || 'watch.failed' => PhosphorIconsRegular.pulse,
     _ => PhosphorIconsRegular.bell,
   };

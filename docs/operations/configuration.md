@@ -42,7 +42,7 @@ Owner overrides via API `/settings/models` (OpenRouter key encrypted).
 
 ## Coding
 
-`Coding__Repositories__*`, `Coding__WorktreeRoot`, `Coding__TimeoutSeconds`.
+`Coding__Repositories__*`, `Coding__WorktreeRoot`, `Coding__TimeoutSeconds`. Per repository, optional `SelfFix`, `GitHubRepository`, `BaseBranch`, and `RemoteUrl` enable pull requests (see [agent-tools.md](../backend/agent-tools.md#self-fix-jarvis-proposes-changes-to-its-own-code)); `Coding__GitHubApiBaseUrl` overrides the API host (GitHub Enterprise or tests).
 
 ## Voice / LiveKit
 

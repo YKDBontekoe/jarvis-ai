@@ -92,6 +92,11 @@ internal static class ApiServiceRegistration
         services.AddJarvisInfrastructure(configuration);
         services.AddJarvisIdentity(accountTokens);
         services.AddJarvisMemory();
+        services.AddSingleton<Jarvis.Application.Diagnostics.RecentFaultLog>();
+        services.AddSingleton<Jarvis.Application.Diagnostics.IRecentFaultLog>(provider =>
+            provider.GetRequiredService<Jarvis.Application.Diagnostics.RecentFaultLog>());
+        services.AddSingleton<ILoggerProvider>(provider =>
+            new RecentFaultLoggerProvider(provider.GetRequiredService<Jarvis.Application.Diagnostics.IRecentFaultLog>()));
         services.AddSingleton<TemporalReminderScheduler>();
         services.AddSingleton<IFileProcessingScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<IConditionWatchScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
