@@ -404,7 +404,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
   }
 }
 
-class _RealtimeRetryPolicy implements RetryPolicy {
+class _RealtimeRetryPolicy implements IRetryPolicy {
   @override
   int? nextRetryDelayInMilliseconds(RetryContext retryContext) =>
       realtimeReconnectDelay(retryContext.previousRetryCount).inMilliseconds;
