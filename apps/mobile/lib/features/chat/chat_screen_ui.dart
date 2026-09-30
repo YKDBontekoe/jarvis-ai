@@ -3,14 +3,48 @@ part of 'chat_screen.dart';
 // ignore_for_file: annotate_overrides
 
 mixin _ChatScreenUi on _ChatScreenController {
-  void _scrollToBottom({bool jump = false, bool force = false}) {
+  Future<String?> _loadMemoryText(String memoryId) async {
+    try {
+      final response = await _http.get<dynamic>('/api/v1/memory/$memoryId');
+      return asJsonString(jsonObject(response.data)?['content']);
+    } on DioException {
+      return null;
+    }
+  }
+
+  /// Leaves the home view for the transcript, landing on the latest message.
+  void _showTranscript() {
+    setState(() => _showHome = false);
+    _scrollToBottom(jump: true, force: true);
+  }
+
+  void _scrollToBottom({bool jump = false, bool force = false}) =>
+      _scrollToBottomStep(jump: jump, force: force, settle: 3);
+
+  void _scrollToBottomStep({
+    required bool jump,
+    required bool force,
+    required int settle,
+  }) {
     // A reader who scrolled up keeps their place while a reply streams in.
     if (!force && !_nearBottom) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scroll.hasClients) return;
+      if (!mounted) return;
+      if (!_scroll.hasClients) {
+        // The transcript list is not built yet (it mounts after the home view).
+        if (jump && settle > 0) {
+          _scrollToBottomStep(jump: true, force: true, settle: settle - 1);
+        }
+        return;
+      }
       final target = _scroll.position.maxScrollExtent;
       if (jump) {
         _scroll.jumpTo(target);
+        // Lazily built items change the extent once they are measured, so
+        // settle on the real bottom over the next frames.
+        if (settle > 0) {
+          _scrollToBottomStep(jump: true, force: true, settle: settle - 1);
+        }
       } else {
         _scroll.animateTo(
           target,
@@ -30,7 +64,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     onHome: () => _fromSidebar(() {
       if (_hasPendingApproval) {
         if (_selectedDestination != 0) _selectDestination(0);
-        setState(() => _showHome = false);
+        _showTranscript();
         return;
       }
       if (_selectedDestination != 0) _selectDestination(0);
@@ -41,7 +75,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     onConversation: (id) => _fromSidebar(() async {
       if (_selectedDestination != 0) _selectDestination(0);
       if (id == _conversationId) {
-        setState(() => _showHome = false);
+        _showTranscript();
         return;
       }
       try {
@@ -395,6 +429,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     ApprovalEntry() => ApprovalCard(
       approval: entry,
       onDecide: (approved) => unawaited(_decide(entry, approved)),
+      loadMemoryText: _loadMemoryText,
     ),
     UiSurfaceEntry() => _surfaceView(entry),
     BrowserSessionEntry() => BrowserTimelineView(session: entry),
@@ -457,9 +492,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     onOpenIntegrations: () => _openUtility('integrations'),
     onOpenCoding: () => _openUtility('coding'),
     refreshRevision: _homeRevision,
-    onContinueConversation: _hasMessages
-        ? () => setState(() => _showHome = false)
-        : null,
+    onContinueConversation: _hasMessages ? _showTranscript : null,
     onSuggestion: _conversationId == null || _busy || _hasPendingApproval
         ? null
         : (text) => unawaited(_send(text)),

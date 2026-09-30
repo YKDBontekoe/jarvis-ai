@@ -240,10 +240,22 @@ class _UsageScreenState extends State<UsageScreen> {
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    _chip('${asJsonInt(persona['activeMemories'])} memories'),
+                    _chip(
+                      _plural(
+                        asJsonInt(persona['activeMemories']),
+                        'memory',
+                        'memories',
+                      ),
+                    ),
                     if (asJsonInt(persona['pinnedMemories']) > 0)
                       _chip('${asJsonInt(persona['pinnedMemories'])} pinned'),
-                    _chip('${asJsonInt(persona['memoryKinds'])} kinds'),
+                    _chip(
+                      _plural(
+                        asJsonInt(persona['memoryKinds']),
+                        'kind',
+                        'kinds',
+                      ),
+                    ),
                     if (asJsonInt(persona['personaTraits']) > 0)
                       _chip('${asJsonInt(persona['personaTraits'])} traits'),
                     if (asJsonBool(persona['hasCustomInstructions']))
@@ -277,6 +289,30 @@ class _UsageScreenState extends State<UsageScreen> {
     final openRouter = _map(_usage?['openRouter']);
     final tokens =
         asJsonInt(codex['totalTokens']) + asJsonInt(openRouter['totalTokens']);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Two tiles per row on any phone width, instead of a fixed 168 that
+        // no longer fits two columns at 360dp.
+        _tileWidth = constraints.maxWidth.isFinite
+            ? ((constraints.maxWidth - 10) / 2).floorToDouble().clamp(0, 240)
+            : 168;
+        return _headlineTiles(activity, persona, codex, openRouter, tokens);
+      },
+    );
+  }
+
+  double _tileWidth = 168;
+
+  String _plural(int count, String one, String many) =>
+      '$count ${count == 1 ? one : many}';
+
+  Widget _headlineTiles(
+    Map<String, dynamic> activity,
+    Map<String, dynamic> persona,
+    Map<String, dynamic> codex,
+    Map<String, dynamic> openRouter,
+    int tokens,
+  ) {
     return Wrap(
       spacing: 10,
       runSpacing: 10,
@@ -331,7 +367,7 @@ class _UsageScreenState extends State<UsageScreen> {
   Widget _stat(String label, String value, String? caption, {Key? key}) =>
       SizedBox(
         key: key,
-        width: 168,
+        width: _tileWidth,
         child: SurfaceCard(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
           child: Column(

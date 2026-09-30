@@ -178,6 +178,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _stopVoice();
 
   void _scrollToBottom({bool jump = false, bool force = false});
+  void _showTranscript();
   // Declared for part implementations; invoked via the hub event wrapper.
   // ignore: unused_element
   void _flushDeltas();

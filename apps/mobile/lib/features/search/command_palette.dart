@@ -161,10 +161,10 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                       controller: _query,
                       focusNode: _focus,
                       autofocus: true,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Search or jump to…',
                         prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass, size: 18),
-                        suffixText: 'Esc',
+                        suffixText: width >= 720 ? 'Esc' : null,
                       ),
                       onChanged: (_) {
                         setState(() {});
