@@ -176,6 +176,8 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                 var threadId = await rpc.StartThreadAsync(scratch, resolvedModel, runToken);
                 var rawResponse = new StringBuilder();
                 StructuredTextStreamDecoder textDecoder = new();
+                void ReportNativeTool(string callId, string phase) =>
+                    updates?.TryWrite(NativeToolProgress.Create(callId, NativeToolProgress.WebSearch, phase));
 
                 using var modelActivity = ActivitySource.StartActivity("jarvis.model.completion");
                 modelActivity?.SetTag("gen_ai.request.model", resolvedModel);
@@ -201,7 +203,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                                 ModelId = resolvedModel
                             });
                         }
-                    }, runToken);
+                    }, runToken, ReportNativeTool);
                     usage = turn.Usage;
                     webSearches += turn.WebSearchActions;
                     modelOutcome = "completed";
@@ -274,7 +276,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                                     Contents = [new TextContent(textDelta)],
                                     ModelId = resolvedModel
                                 });
-                        }, runToken);
+                        }, runToken, ReportNativeTool);
                         usage = AddUsage(usage, retry.Usage);
                         webSearches += retry.WebSearchActions;
                         if (retry.Usage is { } retryUsage)
@@ -477,6 +479,14 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
         return new ChatMessage(ChatRole.Assistant,
             [new FunctionCallContent(Guid.NewGuid().ToString("N"), name, arguments)]);
     }
+
+    private static string? NativeItemId(JsonElement root) =>
+        root.TryGetProperty("params", out var parameters) &&
+        parameters.TryGetProperty("item", out var item) &&
+        item.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String &&
+        id.GetString() is { Length: > 0 and <= 128 } value
+            ? value
+            : null;
 
     internal static string? RetryInstruction(InvalidOperationException exception) => exception switch
     {
@@ -733,7 +743,8 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
         }
 
         public async Task<CodexTurnMetrics> RunTurnAsync(string threadId, PromptPayload prompt, string modelId,
-            string? reasoningEffort, Action<string> onDelta, CancellationToken cancellationToken)
+            string? reasoningEffort, Action<string> onDelta, CancellationToken cancellationToken,
+            Action<string, string>? onNativeTool = null)
         {
             _latestUsage = null;
             var webSearches = 0;
@@ -781,6 +792,9 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                 else if ((methodName == "item/completed" || methodName == "item/started") &&
                          IsNativeWebSearchNotification(methodName, root))
                 {
+                    if (NativeItemId(root) is { } itemId)
+                        onNativeTool?.Invoke("websearch-" + itemId,
+                            methodName == "item/started" ? "started" : "completed");
                     if (methodName == "item/completed")
                     {
                         WebSearchActions.Add(1);

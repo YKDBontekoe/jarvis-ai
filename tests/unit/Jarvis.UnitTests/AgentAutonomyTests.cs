@@ -134,6 +134,54 @@ public sealed class AgentAutonomyTests
         Assert.Contains("Jarvis tool result: \"Other.\"", prompt);
     }
 
+    [Fact]
+    public async Task Native_web_search_progress_reaches_the_stream_without_entering_the_transcript()
+    {
+        var model = new NativeSearchModel();
+        var agent = new ChatClientAgent(model, new ChatClientAgentOptions());
+        var session = await agent.CreateSessionAsync();
+
+        var progress = new List<Jarvis.Application.Conversations.AgentToolProgress>();
+        await foreach (var update in agent.RunStreamingAsync("What is the news?", session))
+            if (NativeToolProgress.Read(update) is { } native) progress.Add(native);
+
+        Assert.Equal(
+            [("websearch-1", "WebSearch", "started"), ("websearch-1", "WebSearch", "completed")],
+            progress.Select(item => (item.ToolCallId, item.ToolName, item.Phase)));
+        var stored = (await agent.SerializeSessionAsync(session)).GetRawText();
+        Assert.Contains("Here is the news.", stored);
+        Assert.DoesNotContain("jarvis.native_tool", stored);
+        Assert.DoesNotContain("WebSearch", stored);
+    }
+
+    [Fact]
+    public void Native_tool_progress_ignores_unknown_phases()
+    {
+        var update = new AgentResponseUpdate(NativeToolProgress.Create("websearch-1", "WebSearch", "leaked query"));
+        Assert.Null(NativeToolProgress.Read(update));
+        Assert.Null(NativeToolProgress.Read(new AgentResponseUpdate(ChatRole.Assistant, "text")));
+    }
+
+    private sealed class NativeSearchModel : IChatClient
+    {
+        public void Dispose() { }
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "Here is the news.")));
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            yield return NativeToolProgress.Create("websearch-1", NativeToolProgress.WebSearch, "started");
+            yield return NativeToolProgress.Create("websearch-1", NativeToolProgress.WebSearch, "completed");
+            yield return new ChatResponseUpdate(ChatRole.Assistant, "Here is the news.");
+        }
+    }
+
     private static ChatClientAgent CreateAgent(IChatClient model, AITool tool)
     {
         var agent = new ChatClientAgent(model, new ChatClientAgentOptions

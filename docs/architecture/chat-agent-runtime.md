@@ -12,7 +12,7 @@ Interactive chat is the primary path: Flutter sends a message, the API runs an a
    - **Context** — `IAgentContextContributor` providers (clock, pinned memory, active tasks, watches, persona, skills, bound profile, graph, surfaces, devices, browser session, remote agents). Profile text is untrusted working notes, not privileged system instructions.
 4. **Codex adapter** — Spawns Codex CLI in a restricted sandbox; streams deltas; Jarvis executes tool calls locally with approval gates. Web search uses Codex `standalone_web_search` when enabled.
 5. **Persistence** — Messages and session state via `IConversationStore` and Agent Framework session store; compaction trims old groups above token budget while keeping recent tool groups intact.
-6. **Realtime** — `JarvisEventsHub` at `/hubs/events` publishes assistant text deltas and `tool.started` / `tool.completed` / `tool.failed` (names only, no args).
+6. **Realtime** — `JarvisEventsHub` at `/hubs/events` publishes assistant text deltas and `tool.started` / `tool.completed` / `tool.failed` (names only, no args). Codex's native web search is reported the same way as a `WebSearch` tool step (`NativeToolProgress`), carried in update metadata so it never enters the stored transcript. While a reply has no text yet, the Flutter typing indicator names the current step (thinking, working, working out the next step) and shows elapsed seconds after 8 s.
 
 ## Tool approval flow
 

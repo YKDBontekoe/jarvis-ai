@@ -129,6 +129,26 @@ void appendAssistantDelta(List<ChatEntry> entries, String delta) {
   entries.add(MessageEntry(role: 'assistant', content: delta, pending: true));
 }
 
+/// What the "Jarvis is working" indicator says while a reply has no text yet.
+/// Built only from tool names Jarvis already shows, never from prompt content.
+String thinkingLabel(List<ChatEntry> entries) {
+  final lastUser = entries.lastIndexWhere(
+    (entry) => entry is MessageEntry && entry.isUser,
+  );
+  final steps = [
+    for (final entry in entries.skip(lastUser + 1))
+      if (entry is ToolRunEntry) ...entry.steps,
+  ];
+  if (steps.isEmpty) return 'Thinking';
+  if (steps.any((step) => step.status == ToolStepStatus.running)) {
+    return 'Working';
+  }
+  final done = steps.length;
+  return done == 1
+      ? 'Working out the next step'
+      : 'Working out the next step · $done steps done';
+}
+
 enum ToolStepStatus { running, completed, failed }
 
 class ToolStep {
