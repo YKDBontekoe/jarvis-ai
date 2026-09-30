@@ -30,7 +30,9 @@ mixin _ChatScreenRealtime on _ChatScreenController {
         // Apply buffered text first so events keep their order.
         if (event != 'message.delta') _flushDeltas();
         handler(arguments);
-      } catch (_) {}
+      } catch (error, stack) {
+        reportError(error, stack, context: 'realtime $event');
+      }
     });
   }
 

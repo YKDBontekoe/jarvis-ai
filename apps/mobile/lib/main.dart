@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'appearance.dart';
+import 'error_reporting.dart';
 import 'features/chat/chat_screen.dart';
 import 'push/firebase_bootstrap.dart';
 import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  installErrorReporting();
   await initializeFirebase();
   final appearance = AppearanceController();
   await appearance.load();

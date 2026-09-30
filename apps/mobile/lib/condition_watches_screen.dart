@@ -173,6 +173,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
       error: _error,
       isEmpty: _watches.isEmpty,
       onRetry: _load,
+      onRefresh: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.pulse,
         title: 'No watches yet',

@@ -192,6 +192,7 @@ class _TasksScreenState extends State<TasksScreen> {
       error: _error,
       isEmpty: _tasks.isEmpty,
       onRetry: _load,
+      onRefresh: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.checkCircle,
         title: 'No tasks yet',

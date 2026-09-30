@@ -19,7 +19,9 @@ mixin _ChatScreenSession on _ChatScreenController {
         return;
       }
       if (stale()) return;
-      await _enablePush();
+      // Push setup can wait on a permission dialog or the network; the chat
+      // must not.
+      unawaited(_enablePush());
       if (stale()) return;
       final list = await _http.get<dynamic>('/api/v1/conversations');
       if (stale()) return;
@@ -72,11 +74,13 @@ mixin _ChatScreenSession on _ChatScreenController {
           _restoringSession = false;
         });
       }
-    } catch (error) {
+    } catch (error, stack) {
+      // Not a sign-in problem (for example a secure-storage hiccup), so keep
+      // the stored session and offer Retry instead of asking for a password.
+      reportError(error, stack, context: 'startup');
       if (mounted && generation == _initGeneration) {
         setState(() {
-          _error = 'Could not connect to Jarvis: $error';
-          _signedOut = true;
+          _error = 'Could not connect to Jarvis. Check your connection and retry.';
           _restoringSession = false;
         });
       }
@@ -94,21 +98,33 @@ mixin _ChatScreenSession on _ChatScreenController {
         openGeneration == _openGeneration &&
         !_signedOut &&
         !_signingOut;
-    final details = await _http.get<dynamic>(
+    // The three reads are independent, so run them side by side.
+    final detailsRequest = _http.get<dynamic>(
       '/api/v1/conversations/$conversationId',
       queryParameters: const {'includeMessages': false},
     );
-    if (!isLatestOpen()) return;
-    final body = jsonObject(details.data);
-    final messagePage = await _http.get<dynamic>(
+    final messagesRequest = _http.get<dynamic>(
       '/api/v1/conversations/$conversationId/messages',
       queryParameters: const {'limit': 50},
     );
+    final approvalsRequest = _loadConversationApprovals(conversationId);
+    final Response<dynamic> details;
+    final Response<dynamic> messagePage;
+    try {
+      details = await detailsRequest;
+      messagePage = await messagesRequest;
+    } catch (_) {
+      // Mark the sibling futures as handled so a second failure is not reported.
+      unawaited(messagesRequest.then<void>((_) {}, onError: (_) {}));
+      unawaited(approvalsRequest.then<void>((_) {}, onError: (_) {}));
+      rethrow;
+    }
     if (!isLatestOpen()) return;
+    final body = jsonObject(details.data);
     final page = jsonObject(messagePage.data);
     final records = jsonMaps(page?['items']);
     final responding = asJsonBool(body?['responding']);
-    final approvals = await _loadConversationApprovals(conversationId);
+    final approvals = await approvalsRequest;
     if (!isLatestOpen()) return;
     final knownApprovals = approvals ?? const <ApprovalEntry>[];
 
