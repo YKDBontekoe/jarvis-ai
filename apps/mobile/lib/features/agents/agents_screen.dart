@@ -216,7 +216,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Agents'),
+      title: const Text('Other agents'),
       actions: [
         HeaderAction(
           label: 'Add',

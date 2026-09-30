@@ -1,74 +1,55 @@
 part of 'integrations_screen.dart';
 
 mixin _IntegrationsPacks on _IntegrationsController {
-  Widget _packCard(Map<String, dynamic> status) {
+  /// Apps Jarvis knows how to set up, each with one plain line and one tap.
+  Widget _suggestions() {
+    final rows = <Widget>[
+      for (final status in _packs) _packRow(status),
+      _featuredRow(
+        provider: 'home-assistant',
+        steps:
+            'Whoever runs your Jarvis server turns on Home Assistant first. '
+            'Then create a long-lived access token in your Home Assistant profile and paste it here.',
+      ),
+      _featuredRow(
+        provider: 'github',
+        steps:
+            'Whoever runs your Jarvis server turns on GitHub first. '
+            'Then create a personal access token on GitHub with only the access Jarvis needs, and paste it here.',
+      ),
+      if (widget.onAskInChat != null)
+        _SuggestionRow(
+          icon: PhosphorIconsRegular.chatCircle,
+          title: 'Something else',
+          subtitle:
+              'Tell Jarvis which app, and it sets it up with you in chat.',
+          trailing: Icon(
+            PhosphorIconsRegular.caretRight,
+            size: 16,
+            color: JarvisColors.of(context).muted,
+          ),
+          onTap: () => _askInChat(mcpSetupPrompt),
+        ),
+    ];
+    return GroupedSection(dividerIndent: 68, children: rows);
+  }
+
+  Widget _packRow(Map<String, dynamic> status) {
     final pack = jsonObject(status['pack']) ?? status;
     final id = asJsonString(pack['id']) ?? '';
-    final name = asJsonString(pack['name']) ?? 'Pack';
+    final info = _appInfo(asJsonString(pack['name']) ?? id);
     final installed = asJsonBool(status['installed']);
-    final description = asJsonString(pack['description']) ?? '';
-    final icon = switch (asJsonString(pack['category'])) {
-      'calendar' => PhosphorIconsRegular.calendarBlank,
-      'mail' => PhosphorIconsRegular.paperPlaneTilt,
-      'contacts' => PhosphorIconsRegular.addressBook,
-      _ => PhosphorIconsRegular.plugsConnected,
-    };
-    return SurfaceCard(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              IconBadge(icon: icon),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  name,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              StatusPill(
-                label: installed ? 'Connected' : 'Not connected',
-                color: installed
-                    ? JarvisColors.of(context).success
-                    : JarvisColors.of(context).muted,
-              ),
-            ],
-          ),
-          if (description.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              description,
-              style: TextStyle(
-                color: JarvisColors.of(context).inkSoft,
-                height: 1.4,
-              ),
+    return _SuggestionRow(
+      key: Key('suggest-$id'),
+      icon: info.icon,
+      title: info.name,
+      subtitle: info.what ?? asJsonString(pack['description']) ?? '',
+      trailing: installed
+          ? const _AddedLabel()
+          : _SetUpButton(
+              onPressed: id.isEmpty ? null : () => _installPack(status),
             ),
-          ],
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 4,
-            children: [
-              TextButton.icon(
-                onPressed: id.isEmpty ? null : () => _installPack(status),
-                icon: const Icon(PhosphorIconsRegular.plugsConnected, size: 18),
-                label: Text(installed ? 'Update pack' : 'Set up'),
-              ),
-              if (asJsonString(pack['authKind']) == 'oauth' ||
-                  asJsonString(status['mcpServerId']) != null)
-                TextButton.icon(
-                  onPressed: () => _connectOAuth(
-                    server: asJsonString(status['mcpServerId']),
-                    endpoint: asJsonString(pack['suggestedEndpoint']),
-                  ),
-                  icon: const Icon(PhosphorIconsRegular.lockSimple, size: 18),
-                  label: const Text('Connect with OAuth'),
-                ),
-            ],
-          ),
-        ],
-      ),
+      onTap: id.isEmpty ? null : () => _installPack(status),
     );
   }
 
@@ -89,7 +70,10 @@ mixin _IntegrationsPacks on _IntegrationsController {
     if (supportsIcs &&
         saved.icsUrl.isNotEmpty &&
         parsePublicHttpsUrl(saved.icsUrl) == null) {
-      setState(() => _error = 'Calendar feeds need a public HTTPS ICS URL.');
+      setState(
+        () => _error =
+            'That calendar link doesn’t work. Use the secret address that starts with https:// and ends in .ics.',
+      );
       return;
     }
     try {
@@ -107,11 +91,16 @@ mixin _IntegrationsPacks on _IntegrationsController {
         setState(
           () => _error =
               firstProblemMessage(error.response?.data) ??
-              'Could not install that pack.',
+              'Could not set that up. Try again, or ask Jarvis in chat.',
         );
       }
     } catch (_) {
-      if (mounted) setState(() => _error = 'Could not install that pack.');
+      if (mounted) {
+        setState(
+          () => _error =
+              'Could not set that up. Try again, or ask Jarvis in chat.',
+        );
+      }
     }
   }
 
@@ -121,7 +110,8 @@ mixin _IntegrationsPacks on _IntegrationsController {
     final url = (endpoint ?? '').trim();
     if (target.isEmpty && url.isEmpty) {
       setState(
-        () => _error = 'OAuth needs an MCP server or a public HTTPS endpoint.',
+        () => _error =
+            'Jarvis doesn’t know where to sign in for this app yet. Ask Jarvis in chat to set it up.',
       );
       return;
     }
@@ -145,13 +135,14 @@ mixin _IntegrationsPacks on _IntegrationsController {
       }
       if (authorize == null) {
         setState(
-          () => _error = 'This server did not return an authorization URL. Store a token instead.',
+          () => _error =
+              'This app has no sign-in page. Use an access key instead.',
         );
         return;
       }
       final opened = await launchHttpUrl(authorize);
       if (!opened && mounted) {
-        setState(() => _error = 'Could not open the authorization page.');
+        setState(() => _error = 'Could not open the sign-in page.');
         return;
       }
       final id = asJsonString(body['id']);
@@ -173,7 +164,9 @@ mixin _IntegrationsPacks on _IntegrationsController {
           if (state == 'completed') {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Authorization finished.')),
+                const SnackBar(
+                  content: Text('Signed in. Jarvis can use it now.'),
+                ),
               );
               await _load();
             }
@@ -181,7 +174,9 @@ mixin _IntegrationsPacks on _IntegrationsController {
           }
           if (state == 'failed') {
             setState(
-              () => _error = asJsonString(session?['error']) ?? 'Authorization did not finish. You can store a token instead.',
+              () => _error =
+                  asJsonString(session?['error']) ??
+                  'Sign-in didn’t finish. You can use an access key instead.',
             );
             return;
           }
@@ -194,11 +189,11 @@ mixin _IntegrationsPacks on _IntegrationsController {
         setState(
           () => _error =
               firstProblemMessage(error.response?.data) ??
-              'Could not start authorization.',
+              'Could not start sign-in.',
         );
       }
     } catch (_) {
-      if (mounted) setState(() => _error = 'Could not start authorization.');
+      if (mounted) setState(() => _error = 'Could not start sign-in.');
     }
   }
 }
@@ -257,8 +252,8 @@ class _PackSetupDialogState extends State<_PackSetupDialog> {
                 controller: _ics,
                 keyboardType: TextInputType.url,
                 decoration: const InputDecoration(
-                  labelText: 'ICS/iCal HTTPS URL',
-                  hintText: 'https://calendar.google.com/.../basic.ics',
+                  labelText: 'Calendar link',
+                  hintText: 'https://…/basic.ics',
                 ),
               ),
               const SizedBox(height: 8),
@@ -266,7 +261,7 @@ class _PackSetupDialogState extends State<_PackSetupDialog> {
                 controller: _token,
                 obscureText: true,
                 decoration: const InputDecoration(
-                  labelText: 'Optional feed token',
+                  labelText: 'Link password (if it has one)',
                 ),
               ),
               const SizedBox(height: 8),
@@ -276,15 +271,15 @@ class _PackSetupDialogState extends State<_PackSetupDialog> {
               keyboardType: TextInputType.url,
               decoration: InputDecoration(
                 labelText: widget.supportsIcs
-                    ? 'Optional MCP HTTPS endpoint'
-                    : 'MCP HTTPS endpoint (or leave empty for stdio)',
+                    ? 'Server address, to add events (optional)'
+                    : 'Server address (optional)',
               ),
             ),
             const SizedBox(height: 12),
             Text(
               widget.supportsIcs
-                  ? 'An ICS URL is enough for today’s events on Home. Add an MCP endpoint only if Jarvis should create events too.'
-                  : 'Jarvis can start the suggested stdio MCP server, or you can paste a public HTTPS MCP endpoint. Authorize with OAuth next — never paste tokens in chat.',
+                  ? 'Find the secret calendar address (it ends in .ics) in your calendar’s settings. That is enough to show today’s events on Home. Only add a server address if Jarvis should also create events.'
+                  : 'Leave the address empty and Jarvis installs the standard connector for you. You sign in next. Never paste passwords into chat.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -306,6 +301,100 @@ class _PackSetupDialogState extends State<_PackSetupDialog> {
           ),
         ),
         child: const Text('Save'),
+      ),
+    ],
+  );
+}
+
+class _SuggestionRow extends StatelessWidget {
+  const _SuggestionRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+    required this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget trailing;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      child: Row(
+        children: [
+          IconBadge(icon: icon, size: 38),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: JarvisColors.of(context).inkSoft,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          trailing,
+        ],
+      ),
+    ),
+  );
+}
+
+class _SetUpButton extends StatelessWidget {
+  const _SetUpButton({required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => FilledButton.tonal(
+    onPressed: onPressed,
+    style: FilledButton.styleFrom(
+      minimumSize: const Size(0, 34),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      backgroundColor: JarvisColors.of(context).surfaceRaised,
+      foregroundColor: JarvisColors.of(context).ink,
+    ),
+    child: const Text('Set up'),
+  );
+}
+
+class _AddedLabel extends StatelessWidget {
+  const _AddedLabel();
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(
+        PhosphorIconsRegular.checkCircle,
+        size: 16,
+        color: JarvisColors.of(context).success,
+      ),
+      const SizedBox(width: 4),
+      Text(
+        'Added',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: JarvisColors.of(context).inkSoft,
+        ),
       ),
     ],
   );

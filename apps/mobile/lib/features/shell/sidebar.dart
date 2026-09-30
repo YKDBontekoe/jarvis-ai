@@ -43,31 +43,12 @@ class JarvisSidebar extends StatefulWidget {
 }
 
 class _JarvisSidebarState extends State<JarvisSidebar> {
-  final _search = TextEditingController();
-  final _searchFocus = FocusNode();
-
-  void _leaveSearch(VoidCallback action) {
-    _searchFocus.unfocus();
-    FocusManager.instance.primaryFocus?.unfocus();
-    action();
-  }
-
-  @override
-  void dispose() {
-    _search.dispose();
-    _searchFocus.dispose();
-    super.dispose();
-  }
-
   List<(String, List<Map<String, dynamic>>)> _groups() {
-    final query = _search.text.trim().toLowerCase();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final buckets = <String, List<Map<String, dynamic>>>{};
     for (final conversation in widget.conversations) {
       if (jsonString(conversation, 'id') == null) continue;
-      final title = (asJsonString(conversation['title']) ?? '').toLowerCase();
-      if (query.isNotEmpty && !title.contains(query)) continue;
       final updated = jsonDate(conversation['updatedAt'], local: true);
       final day = updated == null
           ? null
@@ -101,49 +82,13 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
               child: Row(
                 children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 42,
-                      child: TextField(
-                        controller: _search,
-                        focusNode: _searchFocus,
-                        onChanged: (_) => setState(() {}),
-                        textInputAction: TextInputAction.search,
-                        style: const TextStyle(fontSize: 14.5),
-                        decoration: InputDecoration(
-                          hintText: 'Search',
-                          prefixIcon: Icon(
-                            PhosphorIconsRegular.magnifyingGlass,
-                            size: 18,
-                          ),
-                          fillColor: JarvisColors.of(context).surfaceMuted,
-                          contentPadding: EdgeInsets.zero,
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                            borderSide: BorderSide(
-                              color: JarvisColors.of(context).outline,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  Expanded(child: _SearchPill(onTap: widget.onJarvisSearch)),
                   const SizedBox(width: 10),
-                  CircleIconButton(
-                    icon: PhosphorIconsRegular.magnifyingGlass,
-                    tooltip: 'Search Jarvis',
-                    onPressed: () => _leaveSearch(widget.onJarvisSearch),
-                  ),
-                  const SizedBox(width: 6),
                   CircleIconButton(
                     icon: PhosphorIconsRegular.notePencil,
                     tooltip: 'New chat',
                     size: 42,
-                    onPressed: () => _leaveSearch(widget.onNewChat),
+                    onPressed: widget.onNewChat,
                   ),
                 ],
               ),
@@ -156,50 +101,34 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     leading: const JarvisOrb(size: 22, glow: false),
                     label: 'Jarvis',
                     selected: widget.homeSelected,
-                    onTap: () => _leaveSearch(widget.onHome),
+                    onTap: widget.onHome,
                   ),
                   _NavRow(
                     icon: PhosphorIconsRegular.waveform,
                     label: 'Voice',
-                    onTap: () => _leaveSearch(widget.onVoice),
+                    onTap: widget.onVoice,
                   ),
                   _NavRow(
                     icon: PhosphorIconsRegular.listChecks,
                     label: 'Tasks',
-                    onTap: () => _leaveSearch(() => widget.onUtility('tasks')),
+                    onTap: () => widget.onUtility('tasks'),
                   ),
                   _NavRow(
                     icon: PhosphorIconsRegular.notebook,
                     label: 'Memory',
-                    onTap: () => _leaveSearch(() => widget.onUtility('memory')),
+                    onTap: () => widget.onUtility('memory'),
                   ),
                   _NavRow(
                     icon: PhosphorIconsRegular.pencilSimple,
                     label: 'Journal',
-                    onTap: () => _leaveSearch(() => widget.onUtility('journal')),
+                    onTap: () => widget.onUtility('journal'),
                   ),
                   _NavRow(
                     icon: PhosphorIconsRegular.bell,
                     label: 'Reminders',
-                    onTap: () =>
-                        _leaveSearch(() => widget.onUtility('reminders')),
+                    onTap: () => widget.onUtility('reminders'),
                   ),
-                  _NavRow(
-                    icon: PhosphorIconsRegular.folderSimple,
-                    label: 'Files',
-                    onTap: () => _leaveSearch(() => widget.onUtility('files')),
-                  ),
-                  _NavRow(
-                    icon: PhosphorIconsRegular.chartBar,
-                    label: 'Usage',
-                    onTap: () => _leaveSearch(() => widget.onUtility('usage')),
-                  ),
-                  _NavRow(
-                    icon: PhosphorIconsRegular.code,
-                    label: 'Coding',
-                    onTap: () => _leaveSearch(() => widget.onUtility('coding')),
-                  ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 14),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 0, 0, 2),
                     child: Row(
@@ -215,7 +144,7 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                           ),
                         ),
                         TextButton(
-                          onPressed: () => _leaveSearch(widget.onSeeAll),
+                          onPressed: widget.onSeeAll,
                           style: TextButton.styleFrom(
                             foregroundColor: JarvisColors.of(context).muted,
                             visualDensity: VisualDensity.compact,
@@ -230,9 +159,7 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
                       child: Text(
-                        _search.text.isEmpty
-                            ? 'Your conversations will appear here.'
-                            : 'No conversations match “${_search.text.trim()}”.',
+                        'Your conversations will appear here.',
                         style: TextStyle(
                           fontSize: 13.5,
                           color: JarvisColors.of(context).muted,
@@ -261,7 +188,7 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                         onTap: () {
                           final id = jsonString(conversation, 'id');
                           if (id != null) {
-                            _leaveSearch(() => widget.onConversation(id));
+                            widget.onConversation(id);
                           }
                         },
                       ),
@@ -272,9 +199,59 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
             const Divider(),
             _SettingsRow(
               connected: widget.connected,
-              onTap: () => _leaveSearch(widget.onSettings),
+              onTap: widget.onSettings,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One way in to search: chats, memories, files, and everything else.
+class _SearchPill extends StatelessWidget {
+  const _SearchPill({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Semantics(
+      button: true,
+      label: 'Search Jarvis',
+      excludeSemantics: true,
+      child: Material(
+        color: colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            FocusManager.instance.primaryFocus?.unfocus();
+            onTap();
+          },
+          child: SizedBox(
+            height: 42,
+            child: Row(
+              children: [
+                const SizedBox(width: 12),
+                Icon(
+                  PhosphorIconsRegular.magnifyingGlass,
+                  size: 18,
+                  color: colors.muted,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Search',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 14.5, color: colors.muted),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -308,7 +285,7 @@ class _NavRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           child: Row(
             children: [
               SizedBox.square(

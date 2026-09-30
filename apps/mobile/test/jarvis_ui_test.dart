@@ -190,6 +190,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Your assistant'), findsOneWidget);
     expect(find.text('Appearance'), findsOneWidget);
-    expect(find.text('Integrations'), findsOneWidget);
+    expect(find.text('Connected apps'), findsOneWidget);
   });
 }

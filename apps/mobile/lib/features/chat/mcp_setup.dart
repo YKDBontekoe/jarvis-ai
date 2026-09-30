@@ -1,5 +1,5 @@
 const mcpSetupPrompt =
-    'Help me add or manage an MCP server or integration in this chat. Show the setup card.';
+    'Help me connect an app or manage the ones I have, in this chat. Show the setup card.';
 
 const mcpCalendarPrompt =
-    'Connect my calendar in this chat. Ask me for the ICS feed if you need it.';
+    'Connect my calendar in this chat. Ask me for the calendar link if you need it.';

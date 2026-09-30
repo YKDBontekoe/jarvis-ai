@@ -4,18 +4,18 @@ namespace Jarvis.Application.Integrations;
 public static class McpSetupCatalog
 {
     public const string Prompt =
-        "Help me add or manage an MCP server or integration in this chat. Show the setup card.";
+        "Help me connect an app or manage the ones I have, in this chat. Show the setup card.";
 
     public static readonly IReadOnlyList<McpSetupOption> Options =
     [
-        new("github", "GitHub", "Issues, pull requests, and repositories"),
+        new("github", "GitHub", "Repositories, issues, and pull requests"),
         new("home-assistant", "Home Assistant", "Lights, sensors, and home devices"),
-        new("calendar", "Calendar", "Today’s events from an ICS feed"),
-        new("mail", "Mail", "Search and draft email"),
-        new("contacts", "Contacts", "People you know"),
-        new("https", "Custom HTTPS server", "A public Streamable HTTP MCP endpoint"),
-        new("stdio", "npm or PyPI package", "Install with npx or uvx"),
-        new("manage", "Manage what I have", "Pause, resume, or remove a connection")
+        new("calendar", "Calendar", "See your events, and add new ones"),
+        new("mail", "Mail", "Search your email and draft replies"),
+        new("contacts", "Contacts", "Look up people you know"),
+        new("https", "Another app", "Connect it by its web address"),
+        new("stdio", "Install a connector", "Advanced: from npm or PyPI"),
+        new("manage", "Manage my apps", "Pause, resume, or remove one")
     ];
 }
 

@@ -168,10 +168,8 @@ mixin _ChatScreenUi on _ChatScreenController {
                   leading: const IconBadge(
                     icon: PhosphorIconsRegular.plugsConnected,
                   ),
-                  title: const Text('Connect a tool'),
-                  subtitle: const Text(
-                    'Add GitHub, calendar, or any MCP server in this chat',
-                  ),
+                  title: const Text('Connect an app'),
+                  subtitle: const Text('Calendar, mail, GitHub, and more'),
                   onTap: () {
                     Navigator.pop(context);
                     unawaited(_send(mcpSetupPrompt));
