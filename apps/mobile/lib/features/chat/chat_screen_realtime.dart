@@ -49,7 +49,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
             },
           ),
         )
-        .withAutomaticReconnect()
+        .withAutomaticReconnect(reconnectPolicy: _RealtimeRetryPolicy())
         .build();
     _onHub(hub, 'message.delta', (arguments) {
       final event = _payload(arguments);
@@ -295,17 +295,9 @@ mixin _ChatScreenRealtime on _ChatScreenController {
     });
     hub.onreconnecting(({error}) {
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
-      unawaited(_stopVoice());
-      setState(() {
-        _connected = false;
-        _selectedDestination = _selectedDestination == 2
-            ? 0
-            : _selectedDestination;
-        if (!_remoteQuery) {
-          _removePlaceholder();
-          _settleToolRuns();
-        }
-      });
+      // Keep voice and the streamed text alive through a blip; onclose and
+      // the catch-up after reconnecting clean up if the run really ended.
+      setState(() => _connected = false);
     });
     hub.onreconnected(({connectionId}) {
       if (!_hubIsCurrent(hub, conversationId, expectedGeneration)) return;
@@ -410,4 +402,10 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       }
     }
   }
+}
+
+class _RealtimeRetryPolicy implements IRetryPolicy {
+  @override
+  int? nextRetryDelayInMilliseconds(RetryContext retryContext) =>
+      realtimeReconnectDelay(retryContext.previousRetryCount).inMilliseconds;
 }
