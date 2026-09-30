@@ -408,6 +408,7 @@ class ListScreenBody extends StatelessWidget {
     required this.empty,
     required this.child,
     required this.onRetry,
+    this.onRefresh,
     super.key,
   });
 
@@ -417,6 +418,10 @@ class ListScreenBody extends StatelessWidget {
   final Widget empty;
   final Widget child;
   final VoidCallback onRetry;
+
+  /// Pull-to-refresh; when null the pull triggers [onRetry] and shows the
+  /// indicator briefly.
+  final Future<void> Function()? onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -438,7 +443,23 @@ class ListScreenBody extends StatelessWidget {
               ],
             ),
           ),
-        Expanded(child: child),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh:
+                onRefresh ??
+                () async {
+                  onRetry();
+                  await Future<void>.delayed(const Duration(milliseconds: 700));
+                },
+            // Short lists must still be pullable.
+            child: ScrollConfiguration(
+              behavior: ScrollConfiguration.of(
+                context,
+              ).copyWith(physics: const AlwaysScrollableScrollPhysics()),
+              child: child,
+            ),
+          ),
+        ),
       ],
     );
   }

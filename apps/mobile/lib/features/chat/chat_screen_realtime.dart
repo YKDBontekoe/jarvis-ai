@@ -28,7 +28,9 @@ mixin _ChatScreenRealtime on _ChatScreenController {
     hub.on(event, (arguments) {
       try {
         handler(arguments);
-      } catch (_) {}
+      } catch (error, stack) {
+        reportError(error, stack, context: 'realtime $event');
+      }
     });
   }
 

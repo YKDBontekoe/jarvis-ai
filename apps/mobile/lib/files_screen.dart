@@ -297,6 +297,7 @@ class _FilesScreenState extends State<FilesScreen> {
       error: _error,
       isEmpty: _files.isEmpty && _collections.isEmpty,
       onRetry: _load,
+      onRefresh: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.folderOpen,
         title: 'No files yet',

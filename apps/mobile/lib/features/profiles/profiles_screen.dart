@@ -112,6 +112,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
       error: _error,
       isEmpty: _profiles.isEmpty,
       onRetry: _load,
+      onRefresh: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.userCircle,
         title: 'No profiles yet.',

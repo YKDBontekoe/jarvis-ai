@@ -157,6 +157,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       error: _error,
       isEmpty: _conversations.isEmpty,
       onRetry: _load,
+      onRefresh: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.chatsCircle,
         title: 'No conversations yet.',

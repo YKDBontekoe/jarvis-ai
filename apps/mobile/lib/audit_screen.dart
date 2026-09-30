@@ -76,6 +76,7 @@ class _AuditScreenState extends State<AuditScreen> {
       error: _error,
       isEmpty: _events.isEmpty,
       onRetry: _load,
+      onRefresh: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.listChecks,
         title: 'No audited actions yet.',

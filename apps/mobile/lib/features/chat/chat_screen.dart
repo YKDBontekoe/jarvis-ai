@@ -17,6 +17,7 @@ import '../../api/jarvis_http.dart';
 import '../../auth/auth_session.dart';
 import '../../auth/auth_validation.dart';
 import '../../conversations_screen.dart';
+import '../../error_reporting.dart';
 import '../../json_maps.dart';
 import '../../notification_details_screen.dart';
 import '../coding/coding_run_detail_screen.dart';
