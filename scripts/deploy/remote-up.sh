@@ -64,6 +64,11 @@ printf '  %s\n' "${required_images[@]}"
 docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" pull \
   jarvis-api jarvis-worker garage
 
+# The WhatsApp bridge is built from the checked-out deployment bundle rather
+# than published to GHCR. Build it explicitly before the later --no-build up.
+docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" build \
+  whatsapp-bridge
+
 # Start only migration prerequisites, then migrate with the new API image. A
 # failure exits here, before Compose is allowed to replace healthy app containers.
 docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" up \
