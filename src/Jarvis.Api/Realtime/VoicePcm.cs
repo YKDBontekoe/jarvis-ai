@@ -16,6 +16,17 @@ internal static class VoicePcm
         return samples;
     }
 
+    /// <summary>Removes every whole frame from the front of the buffer; a partial frame waits for more audio.</summary>
+    public static List<short[]> TakeFrames(List<short> buffer, int frameSize)
+    {
+        var count = buffer.Count / frameSize;
+        var frames = new List<short[]>(count);
+        for (var i = 0; i < count; i++)
+            frames.Add(buffer.GetRange(i * frameSize, frameSize).ToArray());
+        if (count > 0) buffer.RemoveRange(0, count * frameSize);
+        return frames;
+    }
+
     public static byte[] ToBytes(ReadOnlySpan<short> samples)
     {
         var bytes = new byte[samples.Length * 2];

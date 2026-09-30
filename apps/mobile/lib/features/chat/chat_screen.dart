@@ -41,6 +41,7 @@ import '../search/search_screen.dart';
 import '../shell/sidebar.dart';
 import '../shell/utility_pages.dart';
 import '../voice/chat_gpt_voices.dart';
+import '../voice/voice_errors.dart';
 import '../voice/voice_stage.dart';
 import 'chat_entries.dart';
 import 'chat_widgets.dart';

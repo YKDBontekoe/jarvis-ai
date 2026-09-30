@@ -27,6 +27,7 @@ mixin _ChatScreenVoice on _ChatScreenController {
     setState(() {
       _voiceStarting = true;
       _voicePhase = 'connecting';
+      _voiceReconnecting = false;
       _voiceCaption = null;
       _voiceCaptionRole = null;
       _selectedDestination = 2;
@@ -94,9 +95,12 @@ mixin _ChatScreenVoice on _ChatScreenController {
     } on DioException catch (error) {
       if (isCurrent()) setState(() => _error = describeApiError(error));
       await _abandonVoiceRoom(room);
-    } catch (error) {
+    } catch (error, stack) {
       await _abandonVoiceRoom(room);
-      if (isCurrent()) setState(() => _error = 'Could not start voice: $error');
+      if (isCurrent()) {
+        reportError(error, stack, context: 'voice start');
+        setState(() => _error = describeVoiceStartError(error));
+      }
     } finally {
       if (mounted && voiceGeneration == _voiceGeneration) {
         setState(() {
@@ -135,18 +139,37 @@ mixin _ChatScreenVoice on _ChatScreenController {
     listener
       ..on<RoomDisconnectedEvent>((event) {
         if (!identical(_voiceRoom, room)) return;
-        final userStop = _voiceUserStop;
-        unawaited(_stopVoice(leave: userStop));
-        if (mounted && !userStop) {
-          setState(
-            () => _error ??=
-                'The voice session ended. Start it again to continue.',
-          );
+        _endVoiceWith(_voiceUserStop ? null : voiceConnectionLost);
+      })
+      // LiveKit retries on its own after a network change; say so instead of
+      // pretending to listen while no audio gets through.
+      ..on<RoomReconnectingEvent>((_) {
+        if (!identical(_voiceRoom, room) || !mounted) return;
+        setState(() => _voiceReconnecting = true);
+      })
+      ..on<RoomReconnectedEvent>((_) {
+        if (!identical(_voiceRoom, room) || !mounted) return;
+        setState(() => _voiceReconnecting = false);
+      })
+      // Without this the screen kept saying "Listening" after Jarvis had
+      // already left the room. A full reconnect also reports every
+      // participant as gone, so ignore departures while reconnecting.
+      ..on<ParticipantDisconnectedEvent>((event) {
+        if (!identical(_voiceRoom, room) ||
+            _voiceReconnecting ||
+            event.participant.identity != jarvisVoiceIdentity) {
+          return;
         }
+        _endVoiceWith(voiceEndedByJarvis);
       })
       ..on<ParticipantAttributesChanged>((event) {
         if (!identical(_voiceRoom, room) || !mounted) return;
-        final next = event.participant.attributes['jarvis.voice.phase'];
+        final attributes = event.participant.attributes;
+        if (attributes['jarvis.voice.status'] == 'unavailable') {
+          _endVoiceWith(voiceEndedByJarvis);
+          return;
+        }
+        final next = attributes['jarvis.voice.phase'];
         if (next == null || next.isEmpty) return;
         setState(() => _voicePhase = next);
       })
@@ -158,6 +181,13 @@ mixin _ChatScreenVoice on _ChatScreenController {
         );
         if (remoteSpeaking) setState(() => _voicePhase = 'speaking');
       });
+  }
+
+  /// Ends the session but keeps the voice page open so [message] stays
+  /// visible next to the start button.
+  void _endVoiceWith(String? message) {
+    unawaited(_stopVoice(leave: message == null));
+    if (mounted && message != null) setState(() => _error ??= message);
   }
 
   Future<void> _toggleVoiceMute() async {
@@ -197,6 +227,7 @@ mixin _ChatScreenVoice on _ChatScreenController {
         _voiceStarting = false;
         _voicePhase = 'idle';
         _voiceMuted = false;
+        _voiceReconnecting = false;
         _voiceCaption = null;
         _voiceCaptionRole = null;
         if (leave && _selectedDestination == 2) _selectedDestination = 0;

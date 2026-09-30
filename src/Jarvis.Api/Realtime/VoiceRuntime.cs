@@ -95,6 +95,7 @@ internal sealed class VoiceRoomSession(
     private readonly Room _room = new();
     private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly List<Task> _audioTasks = [];
+    private readonly HashSet<string> _forwardedTracks = [];
     private AudioSource? _outputSource;
     private OrderedAudioOutput? _audioOut;
     private CodexRealtimeSession? _codex;
@@ -103,6 +104,13 @@ internal sealed class VoiceRoomSession(
     private double? _lastAudioFrameAt;
     private double? _audioEndsAt;
     private double? _assistantResponseDoneAt;
+    private double? _lastOutputFrameSeenAt;
+
+    /// <summary>How long the phone may drop out of the room (network switch, full reconnect) before the session ends.</summary>
+    internal static readonly TimeSpan RejoinGrace = TimeSpan.FromSeconds(20);
+
+    /// <summary>A pause in realtime audio this long means the next frame starts a new reply.</summary>
+    private const double NewReplyGapSeconds = 0.6;
 
     public async Task StartUntilReadyAsync(CancellationToken cancellationToken)
     {
@@ -169,20 +177,39 @@ internal sealed class VoiceRoomSession(
                 roomName, conversationId);
             _codex!.StartNotifications(OnCodexNotificationAsync);
             playbackPhase = MonitorPlaybackPhaseAsync(ct);
-            _room.TrackSubscribed += (_, e) =>
-            {
-                if (e.Track.Kind == TrackKind.KindAudio)
-                    _audioTasks.Add(ForwardAudioAsync(e.Track, ct));
-            };
+            _room.TrackSubscribed += (_, e) => Forward(e.Track, ct);
             var left = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            CancellationTokenSource? rejoin = null;
+            var rejoinGate = new object();
             _room.ParticipantDisconnected += (_, disconnected) =>
             {
-                if (disconnected.Identity == participant.Identity) left.TrySetResult();
+                if (disconnected.Identity != participant.Identity) return;
+                // A phone that switches networks can leave and rejoin with the same identity. Keep Codex
+                // running for a short while instead of ending the conversation on every full reconnect.
+                lock (rejoinGate)
+                {
+                    rejoin?.Cancel();
+                    rejoin = new CancellationTokenSource();
+                    var token = rejoin.Token;
+                    _ = Task.Delay(RejoinGrace, token).ContinueWith(_ => left.TrySetResult(),
+                        CancellationToken.None, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
+                }
+                logger.LogInformation("Voice participant left room {Room}; waiting {Seconds}s for a rejoin.",
+                    roomName, RejoinGrace.TotalSeconds);
+            };
+            _room.ParticipantConnected += (_, joined) =>
+            {
+                if (joined.Identity != participant.Identity) return;
+                lock (rejoinGate)
+                {
+                    rejoin?.Cancel();
+                    rejoin = null;
+                }
             };
             _room.Disconnected += (_, _) => left.TrySetResult();
             foreach (var publication in participant.TrackPublications.Values)
-                if (publication.Track is { Kind: TrackKind.KindAudio } track)
-                    _audioTasks.Add(ForwardAudioAsync(track, ct));
+                if (publication.Track is { } track)
+                    Forward(track, ct);
 
             var exited = _codex.WaitForExitAsync(ct);
             var finished = await Task.WhenAny(exited, left.Task);
@@ -223,6 +250,18 @@ internal sealed class VoiceRoomSession(
         finally
         {
             _room.ParticipantConnected -= OnConnected;
+        }
+    }
+
+    private void Forward(Track track, CancellationToken cancellationToken)
+    {
+        if (track.Kind != TrackKind.KindAudio) return;
+        // The subscribed event and the initial publication scan can both see the same track; forwarding it twice
+        // doubles every microphone sample and garbles what Codex hears.
+        lock (_forwardedTracks)
+        {
+            if (!_forwardedTracks.Add(track.Sid)) return;
+            _audioTasks.Add(ForwardAudioAsync(track, cancellationToken));
         }
     }
 
@@ -331,11 +370,17 @@ internal sealed class VoiceRoomSession(
         _lastAudioFrameAt = null;
         _audioEndsAt = null;
         _barge.Reset();
+        // A new user turn: let the next reply be heard again after an earlier barge-in muted playback.
+        _playback.ResumeForNewReply();
         await SetPhaseAsync("thinking");
     }
 
     private async Task OnOutputAudioAsync(JsonElement parameters, CancellationToken cancellationToken)
     {
+        var seenAt = Now();
+        if (_lastOutputFrameSeenAt is { } previous && seenAt - previous >= NewReplyGapSeconds)
+            _playback.ResumeForNewReply();
+        _lastOutputFrameSeenAt = seenAt;
         var generation = _playback.AcceptFrame();
         if (generation is null) return;
         if (!parameters.TryGetProperty("audio", out var audio) || audio.ValueKind != JsonValueKind.Object) return;
@@ -461,7 +506,9 @@ internal sealed class VoiceRoomSession(
         if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
         Duck(false);
         await _lifetime.CancelAsync();
-        foreach (var task in _audioTasks)
+        Task[] audioTasks;
+        lock (_forwardedTracks) audioTasks = [.. _audioTasks];
+        foreach (var task in audioTasks)
             try { await task.WaitAsync(TimeSpan.FromSeconds(2)); } catch { /* cancelled */ }
         if (_audioOut is not null) await _audioOut.DisposeAsync();
         if (_codex is not null) await _codex.DisposeAsync();

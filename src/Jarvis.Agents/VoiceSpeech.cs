@@ -104,4 +104,15 @@ public sealed class VoicePlaybackGate
     }
 
     public int? AcceptFrame() => OutputAllowed ? Generation : null;
+
+    /// <summary>
+    /// Opens output again after a barge-in once a new reply starts: either the user's turn finished, or the
+    /// realtime audio paused long enough that the next frame belongs to a new response.
+    /// </summary>
+    public bool ResumeForNewReply()
+    {
+        if (OutputAllowed) return false;
+        BeginTurn();
+        return AllowRealtimeOutput();
+    }
 }
