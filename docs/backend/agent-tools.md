@@ -30,6 +30,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Tasks | `TaskAgentTools` list/cancel/create | Create hidden during background task turns |
 | Watches | `ConditionWatchAgentTools` | — |
 | Memory | `MemoryAgentTools` list/search/remember | **Forget** requires approval |
+| Journal | `JournalAgentTools` `SaveJournalEntry` (appends to the day's entry), `ListJournalEntries` | Hidden during background task turns; off when the profile disallows remembering |
 | MCP | `McpServerAgentTools` + `McpSetupAgentTools` | Discover/add/update/invoke/read prompt/resource/remove mostly **approval**; setup and secret cards in chat |
 | Coding | `CodexCodingTools.RunCodingTaskAsync` | **Approval**; only if `Coding:Repositories` configured |
 

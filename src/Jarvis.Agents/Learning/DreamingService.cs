@@ -357,6 +357,9 @@ public sealed class DreamingService(
         return Parse(response.Text);
     }
 
+    /// <summary>Journal memories mirror entries the user wrote; dreaming may read them but never merges or deletes them.</summary>
+    private static bool IsJournal(MemoryRecord memory) => memory.SourceType == "journal";
+
     private async Task<DreamingOutcome> DeepAsync(Guid ownerId, LearningSettings settings,
         IReadOnlyList<DreamCandidate> staged, IReadOnlyList<MemoryRecord> stored, RemResult rem,
         DateTimeOffset now, CancellationToken cancellationToken)
@@ -371,7 +374,7 @@ public sealed class DreamingService(
         {
             foreach (var duplicateId in cluster.DuplicateIds.Take(5))
             {
-                if (!byId.TryGetValue(duplicateId, out var duplicate) || duplicate.IsPinned) continue;
+                if (!byId.TryGetValue(duplicateId, out var duplicate) || duplicate.IsPinned || IsJournal(duplicate)) continue;
                 if (DreamingRanker.Jaccard(cluster.Content, duplicate.Content) < DreamingRanker.DuplicateJaccard)
                     continue;
                 await memories.DeleteAsync(duplicate.Id, ownerId, cancellationToken);
@@ -394,7 +397,7 @@ public sealed class DreamingService(
             if (action is "merge" or "supersede")
             {
                 if (item.TargetMemoryId is not { } targetId || !byId.TryGetValue(targetId, out var target) ||
-                    target.IsPinned || target.Kind != kind)
+                    target.IsPinned || IsJournal(target) || target.Kind != kind)
                     continue;
                 var replacement = await memories.ReplaceAsync(target.Id, ownerId, kind, content, item.Importance,
                     item.Confidence, cancellationToken, sourceType: "conversation", sourceId: target.SourceId);

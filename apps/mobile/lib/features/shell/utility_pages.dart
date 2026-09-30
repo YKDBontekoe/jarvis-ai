@@ -15,6 +15,7 @@ import '../agents/agents_screen.dart';
 import '../channels/channels_screen.dart';
 import '../coding/coding_runs_screen.dart';
 import '../devices/devices_screen.dart';
+import '../journal/journal_screen.dart';
 import '../learning/learning_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
 import '../persona/persona_screen.dart';
@@ -33,6 +34,7 @@ Widget? utilityPageFor(
 }) => switch (destination) {
   'tasks' => TasksScreen(http: http),
   'memory' => MemoryScreen(http: http),
+  'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'approvals' => ApprovalsScreen(http: http),
   'reminders' => RemindersScreen(http: http, onOpenConversation: onOpenConversation),
   'notifications' => RemindersScreen(

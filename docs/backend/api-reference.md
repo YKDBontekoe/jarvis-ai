@@ -52,6 +52,16 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | GET | `/learning/status` |
 | POST | `/learning/run`, `/learning/dream` |
 
+## Journal
+
+| Method | Path |
+|--------|------|
+| GET/POST | `/journal` (`from`, `to`, `limit` query filters on GET) |
+| GET/PUT/DELETE | `/journal/{id}` |
+| GET | `/journal/summary?days=30` (streak, averages, per-day series) |
+
+Body: `entryDate`, `content` (≤ 6,000), `highlights`, `gratitude` (≤ 1,000 each), `rating` 1–10, `mood`/`energy`/`stress` 1–5, `tags` (≤ 10), optional `source` (`written`, `voice`, `chat`). At least text or one rating is required. "Today" uses the owner's daily-briefing time zone (UTC fallback). See [memory-knowledge-learning.md](memory-knowledge-learning.md#journal).
+
 Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints` and `PersonalAssistantEndpoints` (`/graph/...`).
 
 ## Files

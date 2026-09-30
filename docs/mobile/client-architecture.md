@@ -18,6 +18,7 @@ Android emulator: `http://10.0.2.2:5082`. Physical devices need LAN-reachable AP
 | `features/shell/` | Sidebar, wide-layout navigation rail |
 | `features/home/` | Home briefing widgets |
 | `features/memory/` | Memory list/editor, knowledge graph map |
+| `features/journal/` | Journal list + summary, entry editor (text, ratings, tags), "Talk about my day" hand-off to chat |
 | `features/tasks/` | `tasks_screen.dart`, `task_details_screen.dart`, editors |
 | `features/settings/` | Models (Codex/OpenRouter), voice, nested settings hub |
 | `features/skills/`, `persona/`, `profiles/`, `learning/` | Owner tuning surfaces |
