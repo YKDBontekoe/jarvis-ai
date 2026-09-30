@@ -174,6 +174,11 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     onTap: () => _leaveSearch(() => widget.onUtility('memory')),
                   ),
                   _NavRow(
+                    icon: PhosphorIconsRegular.pencilSimple,
+                    label: 'Journal',
+                    onTap: () => _leaveSearch(() => widget.onUtility('journal')),
+                  ),
+                  _NavRow(
                     icon: PhosphorIconsRegular.bell,
                     label: 'Reminders',
                     onTap: () =>

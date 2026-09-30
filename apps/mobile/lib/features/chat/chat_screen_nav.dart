@@ -17,7 +17,7 @@ mixin _ChatScreenNav on _ChatScreenController {
         }
         await _openConversation(id);
       },
-      onAskInChat: destination == 'integrations'
+      onAskInChat: destination == 'integrations' || destination == 'journal'
           ? (prompt) => unawaited(_send(prompt))
           : null,
     );

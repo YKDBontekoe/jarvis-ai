@@ -46,7 +46,7 @@ public interface IConversationMemoryExtractor
 public static class MemoryKinds
 {
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
-        { "preference", "fact", "decision", "project", "event", "relationship", "technical", "routine", "other" };
+        { "preference", "fact", "decision", "project", "event", "relationship", "technical", "routine", "journal", "other" };
 
     public static bool IsValid([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] string? kind) =>
         kind is not null && All.Contains(kind);

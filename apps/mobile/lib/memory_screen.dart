@@ -19,6 +19,7 @@ const _memoryKinds = [
   'relationship',
   'technical',
   'routine',
+  'journal',
   'other',
 ];
 
@@ -461,6 +462,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
     'relationship' => PhosphorIconsRegular.users,
     'technical' => PhosphorIconsRegular.code,
     'routine' => PhosphorIconsRegular.repeat,
+    'journal' => PhosphorIconsRegular.notebook,
     _ => PhosphorIconsRegular.notepad,
   };
 

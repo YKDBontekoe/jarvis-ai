@@ -8,6 +8,7 @@ public static class DependencyInjection
     public static IServiceCollection AddJarvisMemory(this IServiceCollection services)
     {
         services.AddScoped<IMemoryService, MemoryService>();
+        services.AddScoped<Jarvis.Application.Journal.IJournalService, JournalService>();
         return services;
     }
 }

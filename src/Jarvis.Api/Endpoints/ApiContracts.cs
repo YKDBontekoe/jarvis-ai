@@ -66,3 +66,9 @@ public sealed record MemoryRequest(string? Kind, string? Content, float Importan
 public sealed record MemoryDto(Guid Id, string Kind, string Content, float Importance, float Confidence,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, DateTimeOffset? ValidUntil, bool IsPinned, string? SourceType);
 public sealed record MemoryHitDto(MemoryDto Memory, double Score);
+
+public sealed record JournalRequest(DateOnly? EntryDate, string? Content, string? Highlights, string? Gratitude,
+    int? Rating, int? Mood, int? Energy, int? Stress, string[]? Tags, string? Source);
+public sealed record JournalEntryDto(Guid Id, DateOnly EntryDate, string Source, string Content, string? Highlights,
+    string? Gratitude, int? Rating, int? Mood, int? Energy, int? Stress, IReadOnlyList<string> Tags, Guid? MemoryId,
+    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);

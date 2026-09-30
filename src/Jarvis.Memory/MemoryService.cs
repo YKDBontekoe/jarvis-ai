@@ -15,7 +15,7 @@ public sealed class MemoryService(IMemoryRepository repository, IMemoryIndexRepo
         string sourceType = "user", Guid? sourceId = null, Guid? profileId = null)
     {
         Validate(kind, content, importance, confidence);
-        if (sourceType is not ("user" or "conversation") || sourceId == Guid.Empty)
+        if (sourceType is not ("user" or "conversation" or "journal") || sourceId == Guid.Empty)
             throw new ArgumentException("Memory source metadata is invalid.", nameof(sourceType));
         return await repository.CreateAsync(ownerId, kind, content.Trim(), importance, confidence,
             sourceType, sourceId, validUntil, isPinned, cancellationToken, profileId);
@@ -26,7 +26,7 @@ public sealed class MemoryService(IMemoryRepository repository, IMemoryIndexRepo
         string sourceType = "conversation", Guid? sourceId = null)
     {
         Validate(kind, content, importance, confidence);
-        if (sourceType is not ("user" or "conversation") || sourceId == Guid.Empty)
+        if (sourceType is not ("user" or "conversation" or "journal") || sourceId == Guid.Empty)
             throw new ArgumentException("Memory source metadata is invalid.", nameof(sourceType));
         return await repository.ReplaceAsync(existingId, ownerId, kind, content.Trim(), importance, confidence,
             sourceType, sourceId, cancellationToken);
