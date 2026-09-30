@@ -3,6 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/chat/remote_query.dart';
 
 void main() {
+  test('realtime reconnect backs off, caps at 30 s and never gives up', () {
+    expect(realtimeReconnectDelay(0), Duration.zero);
+    expect(realtimeReconnectDelay(3), const Duration(seconds: 5));
+    expect(realtimeReconnectDelay(6), const Duration(seconds: 30));
+    expect(realtimeReconnectDelay(10000), const Duration(seconds: 30));
+  });
+
   DioException error({
     DioExceptionType type = DioExceptionType.connectionError,
     int? status,

@@ -220,10 +220,13 @@ class _ChatScreenState extends _ChatScreenController
       if (_sending || _busy) _remoteQuery = true;
       return;
     }
-    if (state == AppLifecycleState.resumed &&
-        _remoteQuery &&
-        _conversationId != null) {
-      unawaited(_catchUpRemoteQuery(_conversationId!));
+    if (state != AppLifecycleState.resumed || _conversationId == null) return;
+    if (_remoteQuery) unawaited(_catchUpRemoteQuery(_conversationId!));
+    final hub = _hub;
+    if (!_signedOut &&
+        !_signingOut &&
+        (hub == null || hub.state == HubConnectionState.Disconnected)) {
+      unawaited(_retryConnection());
     }
   }
 

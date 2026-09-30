@@ -58,3 +58,12 @@ bool serverStoredReply(
   }
   return false;
 }
+
+/// Backoff for realtime reconnects: starts fast, caps at 30 s and never gives up.
+Duration realtimeReconnectDelay(int previousRetryCount) {
+  const seconds = [0, 1, 2, 5, 10, 20];
+  final base = previousRetryCount < seconds.length
+      ? seconds[previousRetryCount]
+      : 30;
+  return Duration(seconds: base);
+}
