@@ -50,7 +50,7 @@ public sealed class AutomationRuleRepository(JarvisDbContext db) : IAutomationRu
 
     public async Task<IReadOnlyList<AutomationRuleRecord>> ListAsync(Guid ownerId, CancellationToken cancellationToken) =>
         (await db.AutomationRules.AsNoTracking().Where(x => x.OwnerId == ownerId)
-            .OrderByDescending(x => x.UpdatedAt).Take(200).ToListAsync(cancellationToken))
+            .OrderByDescending(x => x.CreatedAt).Take(200).ToListAsync(cancellationToken))
         .Select(x => x.ToRecord()).ToList();
 
     public async Task<AutomationRuleRecord> UpdateDraftAsync(Guid id, Guid ownerId, string name,
@@ -119,9 +119,18 @@ public sealed class AutomationRuleRepository(JarvisDbContext db) : IAutomationRu
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task UpdateNextRunAsync(Guid id, DateTimeOffset? nextRunAt, CancellationToken cancellationToken)
+    {
+        var rule = await db.AutomationRules.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (rule is null) return;
+        rule.RecordNextRun(nextRunAt);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // Runs parked on an approval hold no resources, so they do not count: a few undecided approvals must not
+    // stop every other automation.
     public Task<int> CountActiveRunsAsync(Guid ownerId, CancellationToken cancellationToken) =>
-        db.AutomationRuns.CountAsync(x => x.OwnerId == ownerId &&
-            (x.Status == AutomationRunStatuses.Running || x.Status == AutomationRunStatuses.WaitingApproval),
+        db.AutomationRuns.CountAsync(x => x.OwnerId == ownerId && x.Status == AutomationRunStatuses.Running,
             cancellationToken);
 
     public async Task<Guid> EnsureConversationAsync(Guid id, CancellationToken cancellationToken)
@@ -187,7 +196,7 @@ public sealed class AutomationRunRepository(JarvisDbContext db) : IAutomationRun
     public async Task CompleteAsync(Guid runId, string actionResultsJson, CancellationToken cancellationToken)
     {
         var run = await db.AutomationRuns.SingleOrDefaultAsync(x => x.Id == runId, cancellationToken);
-        if (run is null) return;
+        if (run is null || !run.IsActive) return;
         run.Complete(actionResultsJson);
         db.AuditEvents.Add(new AuditEvent(run.OwnerId, "automations", "run.completed", "low", true,
             metadataJson: JsonSerializer.Serialize(new { resourceId = run.Id, ruleId = run.RuleId })));
@@ -197,12 +206,90 @@ public sealed class AutomationRunRepository(JarvisDbContext db) : IAutomationRun
     public async Task FailAsync(Guid runId, string? summary, string actionResultsJson, CancellationToken cancellationToken)
     {
         var run = await db.AutomationRuns.SingleOrDefaultAsync(x => x.Id == runId, cancellationToken);
-        if (run is null) return;
+        if (run is null || !run.IsActive) return;
         run.Fail(SanitizeReason(summary), actionResultsJson);
         db.AuditEvents.Add(new AuditEvent(run.OwnerId, "automations", "run.failed", "medium", false,
             metadataJson: JsonSerializer.Serialize(new { resourceId = run.Id, ruleId = run.RuleId })));
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task SkipAsync(Guid runId, string reason, string actionResultsJson,
+        CancellationToken cancellationToken)
+    {
+        var run = await db.AutomationRuns.SingleOrDefaultAsync(x => x.Id == runId, cancellationToken);
+        if (run is null || !run.IsActive) return;
+        run.Skip(SanitizeReason(reason), actionResultsJson);
+        db.AuditEvents.Add(new AuditEvent(run.OwnerId, "automations", "run.skipped", "low", true,
+            metadataJson: JsonSerializer.Serialize(new { resourceId = run.Id, ruleId = run.RuleId })));
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<AutomationRunRecord?> GetByApprovalIdAsync(Guid approvalId, Guid ownerId,
+        CancellationToken cancellationToken) =>
+        (await db.AutomationRuns.AsNoTracking().SingleOrDefaultAsync(x =>
+            x.ApprovalId == approvalId && x.OwnerId == ownerId, cancellationToken))?.ToRecord();
+
+    public async Task<IReadOnlyDictionary<Guid, AutomationRunRecord>> LatestPerRuleAsync(Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        var latest = await db.AutomationRuns.AsNoTracking()
+            .Where(x => x.OwnerId == ownerId)
+            .GroupBy(x => x.RuleId)
+            .Select(group => group.OrderByDescending(x => x.StartedAt).First())
+            .ToListAsync(cancellationToken);
+        return latest.ToDictionary(x => x.RuleId, x => x.ToRecord());
+    }
+
+    public async Task<int> ExpireAbandonedAsync(DateTimeOffset utcNow, CancellationToken cancellationToken)
+    {
+        var runningBefore = utcNow - RunningGrace;
+        var waitingBefore = utcNow - AutomationApprovals.DecisionWindow - TimeSpan.FromHours(1);
+        var abandoned = await db.AutomationRuns
+            .Where(x => (x.Status == AutomationRunStatuses.Running && x.StartedAt < runningBefore) ||
+                        (x.Status == AutomationRunStatuses.WaitingApproval && x.StartedAt < waitingBefore))
+            .OrderBy(x => x.StartedAt).Take(200).ToListAsync(cancellationToken);
+        foreach (var run in abandoned)
+            Expire(run, run.Status == AutomationRunStatuses.WaitingApproval
+                ? "Nobody decided on the approval in time."
+                : "The run stopped without finishing.");
+        await WithdrawApprovalsAsync(abandoned, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return abandoned.Count;
+    }
+
+    public async Task ExpireAsync(Guid runId, string reason, CancellationToken cancellationToken)
+    {
+        var run = await db.AutomationRuns.SingleOrDefaultAsync(x => x.Id == runId, cancellationToken);
+        if (run is null || !run.IsActive) return;
+        Expire(run, reason);
+        await WithdrawApprovalsAsync([run], cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private void Expire(AutomationRun run, string reason)
+    {
+        run.Fail(SanitizeReason(reason), run.ActionResultsJson);
+        db.AuditEvents.Add(new AuditEvent(run.OwnerId, "automations", "run.expired", "low", true,
+            metadataJson: JsonSerializer.Serialize(new { resourceId = run.Id, ruleId = run.RuleId })));
+    }
+
+    /// <summary>Takes a closed run's open approval out of the inbox so nobody approves a run that is gone.</summary>
+    private async Task WithdrawApprovalsAsync(IReadOnlyCollection<AutomationRun> closed,
+        CancellationToken cancellationToken)
+    {
+        var approvalIds = closed.Where(x => x.ApprovalId is not null).Select(x => x.ApprovalId!.Value).ToList();
+        if (approvalIds.Count == 0) return;
+        var approvals = await db.ToolApprovals
+            .Where(x => approvalIds.Contains(x.Id) && x.Status == "pending").ToListAsync(cancellationToken);
+        foreach (var approval in approvals) approval.Cancel();
+        await ApprovalInboxCleanup.RemoveAsync(db, approvals.Select(x => x.Id).ToArray(), cancellationToken);
+    }
+
+    /// <summary>
+    /// Longer than the run workflow can keep an activity alive (20 minute start-to-close, five attempts with
+    /// backoff), so a run still marked running after this has no workflow left to finish it.
+    /// </summary>
+    private static readonly TimeSpan RunningGrace = TimeSpan.FromHours(3);
 
     public async Task MarkWaitingApprovalAsync(Guid runId, Guid approvalId, CancellationToken cancellationToken)
     {

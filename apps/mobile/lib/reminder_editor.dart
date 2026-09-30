@@ -17,7 +17,10 @@ class _NewReminder {
 }
 
 class _NewReminderDialog extends StatefulWidget {
-  const _NewReminderDialog();
+  const _NewReminderDialog({required this.timeZone});
+
+  /// Resolves to the zone the reminder will be saved in, shown under the time.
+  final Future<String> timeZone;
 
   @override
   State<_NewReminderDialog> createState() => _NewReminderDialogState();
@@ -101,7 +104,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  for (final day in _weekdayChoices)
+                  for (final day in weekdayNames)
                     FilterChip(
                       key: Key('weekday-${day.$1}'),
                       label: Text(day.$2),
@@ -152,6 +155,20 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
                 );
                 if (value != null && mounted) setState(() => _time = value);
               },
+            ),
+            FutureBuilder<String>(
+              future: widget.timeZone,
+              builder: (context, snapshot) => Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                child: Text(
+                  snapshot.hasData
+                      ? 'Time zone: ${snapshot.data!.replaceAll('_', ' ')}'
+                      : ' ',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: JarvisColors.of(context).muted,
+                  ),
+                ),
+              ),
             ),
           ],
         ),

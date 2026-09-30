@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/reminders_screen.dart';
+import 'package:jarvis_mobile/schedule_format.dart';
 import 'package:jarvis_mobile/theme.dart';
 
 import 'support/fixture_http.dart';
@@ -8,7 +9,10 @@ import 'support/fixture_http.dart';
 void main() {
   late FixtureHttp http;
 
-  setUp(() => http = FixtureHttp());
+  setUp(() {
+    http = FixtureHttp();
+    deviceTimeZoneLookup = () async => null;
+  });
 
   Future<void> show(WidgetTester tester) async {
     tester.view.physicalSize = const Size(900, 1600);
@@ -55,7 +59,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final body =
-        http.sent('POST', '/api/v1/reminders').single.body as Map<String, dynamic>;
+        http.sent('POST', '/api/v1/reminders').single.body
+            as Map<String, dynamic>;
     expect(body['title'], 'Take out the trash');
     expect(body['recurrence'], 'weekdays');
     expect(body['timeZoneId'], 'Europe/Amsterdam');
@@ -69,7 +74,10 @@ void main() {
       {
         'id': 'r1',
         'title': 'Take out the trash',
-        'dueAt': DateTime.now().add(const Duration(days: 1)).toUtc().toIso8601String(),
+        'dueAt': DateTime.now()
+            .add(const Duration(days: 1))
+            .toUtc()
+            .toIso8601String(),
         'status': 'pending',
         'recurrence': 'weekdays',
         'createdAt': DateTime.now().toUtc().toIso8601String(),
@@ -79,7 +87,10 @@ void main() {
     await show(tester);
 
     expect(find.text('Take out the trash'), findsOneWidget);
-    expect(find.textContaining('Weekdays · next'), findsOneWidget);
+    expect(
+      find.textContaining('Every weekday · next Tomorrow'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('open chat uses the linked conversation', (tester) async {
@@ -113,7 +124,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Open chat'));
+    await tester.tap(find.byTooltip('Reminder actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Open chat'));
     await tester.pumpAndSettle();
     expect(opened, 'c1');
   });
@@ -124,9 +137,24 @@ void main() {
     final now = DateTime.now().toUtc();
     String at(Duration offset) => now.add(offset).toIso8601String();
     http.on('GET', '/api/v1/reminders', [
-      {'id': 'a', 'title': 'Late thing', 'dueAt': at(const Duration(hours: -2)), 'status': 'pending'},
-      {'id': 'b', 'title': 'Next week thing', 'dueAt': at(const Duration(days: 8)), 'status': 'pending'},
-      {'id': 'c', 'title': 'Old thing', 'dueAt': at(const Duration(days: -3)), 'status': 'delivered'},
+      {
+        'id': 'a',
+        'title': 'Late thing',
+        'dueAt': at(const Duration(hours: -2)),
+        'status': 'pending',
+      },
+      {
+        'id': 'b',
+        'title': 'Next week thing',
+        'dueAt': at(const Duration(days: 8)),
+        'status': 'pending',
+      },
+      {
+        'id': 'c',
+        'title': 'Old thing',
+        'dueAt': at(const Duration(days: -3)),
+        'status': 'delivered',
+      },
     ]);
     http.on('GET', '/api/v1/notifications', <Object>[]);
     await show(tester);
@@ -150,8 +178,22 @@ void main() {
     final now = DateTime.now().toUtc().toIso8601String();
     http.on('GET', '/api/v1/reminders', <Object>[]);
     http.on('GET', '/api/v1/notifications', [
-      {'id': 'n1', 'type': 'task.completed', 'title': 'Task finished', 'body': 'One', 'createdAt': now, 'readAt': null},
-      {'id': 'n2', 'type': 'task.completed', 'title': 'Another finished', 'body': 'Two', 'createdAt': now, 'readAt': null},
+      {
+        'id': 'n1',
+        'type': 'task.completed',
+        'title': 'Task finished',
+        'body': 'One',
+        'createdAt': now,
+        'readAt': null,
+      },
+      {
+        'id': 'n2',
+        'type': 'task.completed',
+        'title': 'Another finished',
+        'body': 'Two',
+        'createdAt': now,
+        'readAt': null,
+      },
     ]);
     http.on('POST', '/api/v1/notifications/n1/read', <String, Object>{});
     http.on('POST', '/api/v1/notifications/n2/read', <String, Object>{});
@@ -178,16 +220,30 @@ void main() {
     expect(http.sent('POST', '/api/v1/notifications/n2/read'), hasLength(1));
   });
 
-  testWidgets('an approval notification can be approved in place', (tester) async {
+  testWidgets('an approval notification can be approved in place', (
+    tester,
+  ) async {
     final now = DateTime.now().toUtc().toIso8601String();
     http.on('GET', '/api/v1/reminders', <Object>[]);
     http.on('GET', '/api/v1/notifications', [
-      {'id': 'n1', 'type': 'approval.required', 'title': 'Approval needed', 'body': 'Jarvis is waiting for approval to run InvokeMcpTool.', 'sourceId': 'a1', 'createdAt': now, 'readAt': null},
+      {
+        'id': 'n1',
+        'type': 'approval.required',
+        'title': 'Approval needed',
+        'body': 'Jarvis is waiting for approval to run InvokeMcpTool.',
+        'sourceId': 'a1',
+        'createdAt': now,
+        'readAt': null,
+      },
     ]);
     http.on('GET', '/api/v1/approvals', [
       {'id': 'a1', 'toolName': 'InvokeMcpTool', 'status': 'pending'},
     ]);
-    http.on('POST', '/api/v1/approvals/a1/decision', {'id': 'm1', 'role': 'assistant', 'content': 'Done.'});
+    http.on('POST', '/api/v1/approvals/a1/decision', {
+      'id': 'm1',
+      'role': 'assistant',
+      'content': 'Done.',
+    });
     tester.view.physicalSize = const Size(900, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -206,7 +262,156 @@ void main() {
     expect(find.textContaining('Wants to:'), findsOneWidget);
     await tester.tap(find.text('Approve'));
     await tester.pumpAndSettle();
-    final sent = http.sent('POST', '/api/v1/approvals/a1/decision').single.body as Map;
+    final sent =
+        http.sent('POST', '/api/v1/approvals/a1/decision').single.body as Map;
     expect(sent['approved'], true);
+  });
+
+  testWidgets('a delivered reminder says when it fired and can be snoozed', (
+    tester,
+  ) async {
+    final fired = DateTime.now().subtract(const Duration(minutes: 3)).toUtc();
+    http.on('GET', '/api/v1/reminders', [
+      {
+        'id': 'r1',
+        'title': 'Call mom',
+        'dueAt': fired.toIso8601String(),
+        'status': 'completed',
+        'recurrence': 'none',
+        'lastDeliveredAt': fired.toIso8601String(),
+        'completedAt': fired.toIso8601String(),
+      },
+    ]);
+    http.on('GET', '/api/v1/notifications', <Object>[]);
+    http.on('POST', '/api/v1/reminders/r1/snooze', {
+      'id': 'r1',
+      'title': 'Call mom',
+      'status': 'pending',
+      'dueAt': DateTime.now()
+          .add(const Duration(minutes: 10))
+          .toUtc()
+          .toIso8601String(),
+    });
+    await show(tester);
+
+    expect(find.textContaining('Reminded you Today'), findsOneWidget);
+    await tester.tap(find.byTooltip('Reminder actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remind me again in 10 min'));
+    await tester.pumpAndSettle();
+
+    final body =
+        http.sent('POST', '/api/v1/reminders/r1/snooze').single.body as Map;
+    expect(body['minutes'], 10);
+    expect(find.textContaining('Snoozed until Today'), findsOneWidget);
+  });
+
+  testWidgets('an upcoming one-time reminder can be marked done', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/reminders', [
+      {
+        'id': 'r1',
+        'title': 'Pay rent',
+        'dueAt': DateTime.now()
+            .add(const Duration(hours: 3))
+            .toUtc()
+            .toIso8601String(),
+        'status': 'pending',
+        'recurrence': 'none',
+      },
+    ]);
+    http.on('GET', '/api/v1/notifications', <Object>[]);
+    http.on('POST', '/api/v1/reminders/r1/complete', {
+      'id': 'r1',
+      'status': 'completed',
+    });
+    await show(tester);
+
+    expect(find.textContaining('in 3 h'), findsOneWidget);
+    await tester.tap(find.byTooltip('Reminder actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mark as done'));
+    await tester.pumpAndSettle();
+
+    expect(http.sent('POST', '/api/v1/reminders/r1/complete'), hasLength(1));
+  });
+
+  testWidgets('a due reminder notification offers snooze in place', (
+    tester,
+  ) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    http.on('GET', '/api/v1/reminders', <Object>[]);
+    http.on('GET', '/api/v1/notifications', [
+      {
+        'id': 'n1',
+        'type': 'reminder.due',
+        'title': 'Stretch',
+        'body': 'Reminder · due now',
+        'sourceId': 'r1',
+        'createdAt': now,
+        'readAt': null,
+      },
+    ]);
+    http.on('POST', '/api/v1/reminders/r1/snooze', {
+      'id': 'r1',
+      'status': 'pending',
+    });
+    tester.view.physicalSize = const Size(900, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildJarvisTheme(),
+        home: RemindersScreen(
+          http: http.client(),
+          initialTab: RemindersTab.notifications,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('1 hour'));
+    await tester.pumpAndSettle();
+    final body =
+        http.sent('POST', '/api/v1/reminders/r1/snooze').single.body as Map;
+    expect(body['minutes'], 60);
+  });
+
+  testWidgets('new reminders use the device time zone and save it once', (
+    tester,
+  ) async {
+    deviceTimeZoneLookup = () async => 'Europe/Lisbon';
+    http.on('GET', '/api/v1/reminders', <Object>[]);
+    http.on('GET', '/api/v1/notifications', <Object>[]);
+    http.on('GET', '/api/v1/briefings/daily', {
+      'enabled': false,
+      'localTime': '08:00:00',
+      'timeZoneId': 'UTC',
+      'workflowId': '',
+    });
+    http.on('PUT', '/api/v1/briefings/daily', <String, Object>{});
+    http.on('POST', '/api/v1/reminders', {'id': 'r1', 'status': 'pending'});
+    await show(tester);
+
+    await tester.tap(find.text('New'));
+    await tester.pumpAndSettle();
+    expect(find.text('Time zone: Europe/Lisbon'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField), 'Water plants');
+    await tester.tap(find.byKey(const Key('recurrence-daily')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final body =
+        http.sent('POST', '/api/v1/reminders').single.body
+            as Map<String, dynamic>;
+    expect(body['timeZoneId'], 'Europe/Lisbon');
+    final saved =
+        http.sent('PUT', '/api/v1/briefings/daily').single.body
+            as Map<String, dynamic>;
+    expect(saved['timeZoneId'], 'Europe/Lisbon');
+    expect(saved['enabled'], false);
   });
 }

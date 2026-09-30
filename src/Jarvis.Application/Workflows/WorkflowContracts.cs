@@ -24,7 +24,12 @@ public sealed record CreateJarvisTaskRequest(string Title, string Prompt, Guid? 
 
 public sealed record ReminderWorkflowInput(Guid ReminderId, Guid OwnerId, string Title, DateTimeOffset DueAt);
 
-public sealed record ReminderDeliveryResult(bool Continue, DateTimeOffset NextDueAt, string Title);
+/// <param name="Delivered">
+/// True when this occurrence reached the owner, now or on an earlier attempt of the same activity, so follow-up
+/// work such as reminder-triggered automations runs once per occurrence and never for a cancelled reminder.
+/// </param>
+public sealed record ReminderDeliveryResult(bool Continue, DateTimeOffset NextDueAt, string Title,
+    bool Delivered = false);
 
 public sealed record ConditionWatchRecord(Guid Id, Guid OwnerId, string Title, string Url, string JsonPath,
     string Comparison, double Threshold, int IntervalMinutes, string WorkflowId, string Status,
@@ -113,6 +118,10 @@ public interface IReminderRepository
     Task<int> RequeueOverdueDispatchedAsync(DateTimeOffset utcNow, CancellationToken cancellationToken);
     Task MarkReminderScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken);
     Task<ReminderRecord?> CancelAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+    /// <returns>The reminder and the workflow id it had before, or null when it cannot be snoozed.</returns>
+    Task<(ReminderRecord Reminder, string PreviousWorkflowId)?> SnoozeAsync(Guid id, Guid ownerId,
+        DateTimeOffset dueAt, CancellationToken cancellationToken);
+    Task<ReminderRecord?> MarkDoneAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task MarkScheduleFailedAsync(Guid id, CancellationToken cancellationToken);
     Task<ReminderDeliveryResult> CompleteAndNotifyAsync(ReminderWorkflowInput reminder, CancellationToken cancellationToken);
 }
@@ -174,6 +183,12 @@ public interface IReminderService
     Task<ReminderRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ReminderRecord>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<ReminderRecord?> CancelAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+    /// <summary>
+    /// Brings a reminder back at <paramref name="dueAt"/>. A one-time reminder moves; a repeating one keeps its
+    /// schedule and gets a one-time copy.
+    /// </summary>
+    Task<ReminderRecord?> SnoozeAsync(Guid id, Guid ownerId, DateTimeOffset dueAt, CancellationToken cancellationToken);
+    Task<ReminderRecord?> MarkDoneAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
 }
 
 public static class WorkflowRecordMapping

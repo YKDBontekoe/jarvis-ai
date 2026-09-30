@@ -45,6 +45,7 @@ internal static class TemporalWorkerRegistration
         "RunAssistantDreaming",
         "ExecuteAutomationRun",
         "CompleteAutomationRunAfterApproval",
+        "CloseAutomationRun",
         "ResolveAutomationSchedule",
         "FireAutomationSchedule",
         "CheckAutomationPollTrigger",
@@ -92,6 +93,7 @@ internal static class TemporalWorkerRegistration
             .AddActivity(dreaming.RunAsync)
             .AddActivity(automationRuns.ExecuteAsync)
             .AddActivity(automationRuns.CompleteAfterApprovalAsync)
+            .AddActivity(automationRuns.CloseRunAsync)
             .AddActivity(automationSchedules.ResolveNextFireAsync)
             .AddActivity(automationSchedules.FireScheduleAsync)
             .AddActivity(automationPolls.CheckAsync)

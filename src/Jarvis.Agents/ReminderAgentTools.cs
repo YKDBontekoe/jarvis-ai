@@ -99,6 +99,44 @@ internal sealed partial class ReminderAgentTools(
             : $"Cancelled reminder {cancelled.Id}: {cancelled.Title}";
     }
 
+    [Description("Snooze one of the user's reminders so it fires again later. Use when the user says snooze, remind me again later, or not now about a reminder. A repeating reminder keeps its schedule and gets a one-time copy.")]
+    public async Task<string> SnoozeReminderAsync(
+        [Description("The GUID of the reminder to snooze.")] string reminderId,
+        [Description("How many minutes from now it should fire again, for example 10, 60, or 1440 for tomorrow.")] int minutes,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(reminderId, out var id))
+            return "I could not snooze that reminder because its ID was invalid.";
+        if (minutes is < 1 or > 60 * 24 * 366)
+            return "I could not snooze that reminder: choose between 1 minute and a year.";
+
+        try
+        {
+            var snoozed = await reminders.SnoozeAsync(id, currentUser.OwnerId,
+                DateTimeOffset.UtcNow.AddMinutes(minutes), cancellationToken);
+            return snoozed is null
+                ? $"Reminder {id} was not found or can no longer be snoozed."
+                : $"Snoozed until {AgentText.Time(snoozed.DueAt)} (reminder ID {snoozed.Id}): {snoozed.Title}";
+        }
+        catch (ArgumentException exception)
+        {
+            return $"I could not snooze that reminder: {exception.Message}";
+        }
+    }
+
+    [Description("Mark one of the user's upcoming one-time reminders as done so it will not fire. Use when the user says they already did it.")]
+    public async Task<string> CompleteReminderAsync(
+        [Description("The GUID of the reminder to mark done.")] string reminderId,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(reminderId, out var id))
+            return "I could not update that reminder because its ID was invalid.";
+        var done = await reminders.MarkDoneAsync(id, currentUser.OwnerId, cancellationToken);
+        return done is null
+            ? $"Reminder {id} was not found, already finished, or repeats (cancel repeating reminders instead)."
+            : $"Marked done: {done.Title}";
+    }
+
     internal static bool TryParseDueAt(string? value, out DateTimeOffset dueAt, out string problem)
     {
         dueAt = default;

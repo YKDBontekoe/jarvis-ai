@@ -17,9 +17,11 @@ internal sealed class ReminderActivities(IServiceScopeFactory scopeFactory) : Re
         activity.Heartbeat(reminder.ReminderId);
         await using var scope = scopeFactory.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IReminderRepository>();
-        await repository.CompleteAndNotifyAsync(reminder, activity.CancellationToken);
-        await scope.ServiceProvider.GetRequiredService<IAutomationTriggerPublisher>()
-            .PublishReminderDueAsync(reminder.OwnerId, reminder.ReminderId, reminder.Title, activity.CancellationToken);
+        var result = await repository.CompleteAndNotifyAsync(reminder, activity.CancellationToken);
+        if (result.Delivered)
+            await scope.ServiceProvider.GetRequiredService<IAutomationTriggerPublisher>()
+                .PublishReminderDueAsync(reminder.OwnerId, reminder.ReminderId, reminder.Title, reminder.DueAt,
+                    activity.CancellationToken);
     }
 
     [Activity("DeliverReminderOccurrence")]
@@ -32,8 +34,10 @@ internal sealed class ReminderActivities(IServiceScopeFactory scopeFactory) : Re
         await using var scope = scopeFactory.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IReminderRepository>();
         var result = await repository.CompleteAndNotifyAsync(reminder, activity.CancellationToken);
-        await scope.ServiceProvider.GetRequiredService<IAutomationTriggerPublisher>()
-            .PublishReminderDueAsync(reminder.OwnerId, reminder.ReminderId, reminder.Title, activity.CancellationToken);
+        if (result.Delivered)
+            await scope.ServiceProvider.GetRequiredService<IAutomationTriggerPublisher>()
+                .PublishReminderDueAsync(reminder.OwnerId, reminder.ReminderId, reminder.Title, reminder.DueAt,
+                    activity.CancellationToken);
         return result;
     }
 

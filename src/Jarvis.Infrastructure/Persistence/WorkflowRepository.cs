@@ -312,6 +312,40 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         return reminder.ToRecord();
     }
 
+    public async Task<(ReminderRecord Reminder, string PreviousWorkflowId)?> SnoozeAsync(Guid id, Guid ownerId,
+        DateTimeOffset dueAt, CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var reminder = await GetLockedReminderAsync(id, cancellationToken);
+        if (reminder is null || reminder.OwnerId != ownerId || reminder.IsRecurring ||
+            reminder.Status is not ("pending" or "completed")) return null;
+        var previousWorkflowId = reminder.WorkflowId;
+        var zone = LocalClock.TryFind(reminder.TimeZoneId, out var found) ? found : TimeZoneInfo.Utc;
+        var local = TimeZoneInfo.ConvertTime(dueAt, zone);
+        reminder.Snooze(dueAt, TimeOnly.FromTimeSpan(local.TimeOfDay));
+        AddAuditEvent(ownerId, "reminders", "reminder.snoozed", "low", true, reminder.Id);
+        await PostReminderMessageAsync(reminder, LinkedConversationCopy.ReminderSnoozed(reminder.Title,
+            local.ToString("ddd d MMM, HH:mm", System.Globalization.CultureInfo.InvariantCulture)), cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return (reminder.ToRecord(), previousWorkflowId);
+    }
+
+    public async Task<ReminderRecord?> MarkDoneAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var reminder = await GetLockedReminderAsync(id, cancellationToken);
+        if (reminder is null || reminder.OwnerId != ownerId || reminder.IsRecurring || reminder.Status != "pending")
+            return null;
+        reminder.MarkDone();
+        AddAuditEvent(ownerId, "reminders", "reminder.completed", "low", true, reminder.Id);
+        await PostReminderMessageAsync(reminder, LinkedConversationCopy.ReminderMarkedDone(reminder.Title),
+            cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return reminder.ToRecord();
+    }
+
     public async Task MarkScheduleFailedAsync(Guid id, CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -338,13 +372,17 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         var reminder = await GetLockedReminderAsync(input.ReminderId, cancellationToken);
         if (reminder is null || reminder.OwnerId != input.OwnerId)
             return new ReminderDeliveryResult(false, input.DueAt, input.Title);
+        var deliveredEarlier = reminder.LastDeliveredAt is { } lastDelivered &&
+                               lastDelivered >= input.DueAt.AddMinutes(-1);
         if (reminder.Status != "pending")
-            return new ReminderDeliveryResult(false, reminder.DueAt, reminder.Title);
+            return new ReminderDeliveryResult(false, reminder.DueAt, reminder.Title,
+                reminder.Status == "completed" && deliveredEarlier);
         if (reminder.DueAt > input.DueAt.AddMinutes(1))
-            return new ReminderDeliveryResult(reminder.IsRecurring, reminder.DueAt, reminder.Title);
+            return new ReminderDeliveryResult(reminder.IsRecurring, reminder.DueAt, reminder.Title, deliveredEarlier);
 
+        // The title carries what to do, because that is the line a phone shows on the lock screen.
         var notification = new Notification(Guid.CreateVersion7(), input.OwnerId,
-            "reminder.due", "Reminder", input.Title, input.ReminderId);
+            "reminder.due", LimitTitle(reminder.Title), ReminderDueBody(reminder), input.ReminderId);
         db.Notifications.Add(notification);
         await PushDeliveryQueue.QueueAsync(db, notification, cancellationToken);
 
@@ -361,7 +399,7 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new ReminderDeliveryResult(reminder.Status == "pending" && nextDueAt is not null,
-            nextDueAt ?? reminder.DueAt, reminder.Title);
+            nextDueAt ?? reminder.DueAt, reminder.Title, true);
     }
 
     public async Task<IReadOnlyList<NotificationRecord>> ListNotificationsAsync(Guid ownerId, CancellationToken cancellationToken) =>
@@ -389,6 +427,15 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         await db.SaveChangesAsync(cancellationToken);
         return new NotificationRecord(notification.Id, notification.Type, notification.Title, notification.Body,
             notification.SourceId, notification.CreatedAt, notification.ReadAt);
+    }
+
+    private static string LimitTitle(string title) => title.Length <= 300 ? title : title[..299] + "…";
+
+    private static string ReminderDueBody(Reminder reminder)
+    {
+        if (!reminder.IsRecurring) return "Reminder · due now";
+        var rule = ReminderSchedule.Describe(reminder.ToRecord());
+        return string.IsNullOrEmpty(rule) ? "Reminder · due now" : $"Reminder · repeats {rule}";
     }
 
     private Task<JarvisTask?> GetLockedTaskAsync(Guid id, CancellationToken cancellationToken) =>

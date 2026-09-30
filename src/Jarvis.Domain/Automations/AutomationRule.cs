@@ -86,6 +86,8 @@ public sealed class AutomationRule
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 
+    public void RecordNextRun(DateTimeOffset? nextRunAt) => NextRunAt = nextRunAt;
+
     public void ApplyCooldown(int cooldownMinutes)
     {
         if (cooldownMinutes <= 0) return;

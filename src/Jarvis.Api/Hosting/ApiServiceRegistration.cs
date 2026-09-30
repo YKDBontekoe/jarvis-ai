@@ -112,6 +112,7 @@ internal static class ApiServiceRegistration
         services.AddScoped<IConditionWatchService, ConditionWatchService>();
         services.AddScoped<IDailyBriefingService, DailyBriefingService>();
         services.AddScoped<IAutomationRuleService, AutomationRuleService>();
+        services.AddScoped<IAutomationApprovalResolver, AutomationApprovalResolver>();
         services.AddScoped<IAutomationTriggerPublisher, AutomationTriggerPublisher>();
         services.AddSingleton<IAutomationScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddScoped<IJarvisTaskRepository, WorkflowRepository>();

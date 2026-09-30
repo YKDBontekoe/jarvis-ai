@@ -23,6 +23,14 @@ internal sealed class AutomationRunActivities(IServiceScopeFactory scopeFactory)
         return await scope.ServiceProvider.GetRequiredService<IAutomationRunExecutor>()
             .ExecuteRunAsync(input with { AfterApproval = true }, ActivityExecutionContext.Current.CancellationToken);
     }
+
+    [Activity("CloseAutomationRun")]
+    public override async Task CloseRunAsync(AutomationRunCloseInput input)
+    {
+        await using var scope = scopeFactory.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<IAutomationRunRepository>()
+            .ExpireAsync(input.RunId, input.Reason, ActivityExecutionContext.Current.CancellationToken);
+    }
 }
 
 internal sealed class AutomationScheduleActivities(IServiceScopeFactory scopeFactory) :
@@ -38,8 +46,7 @@ internal sealed class AutomationScheduleActivities(IServiceScopeFactory scopeFac
         var definition = AutomationDefinitionJson.Deserialize(rule.DefinitionJson);
         if (definition.Trigger is not ScheduleTriggerDefinition schedule) return null;
         var next = AutomationScheduleClock.GetNextScheduleFireUtc(DateTimeOffset.UtcNow, schedule);
-        if (next is not null)
-            await rules.UpdateScheduleStateAsync(rule.Id, next, null, ActivityExecutionContext.Current.CancellationToken);
+        await rules.UpdateNextRunAsync(rule.Id, next, ActivityExecutionContext.Current.CancellationToken);
         return next;
     }
 

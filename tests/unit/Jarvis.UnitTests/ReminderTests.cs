@@ -53,4 +53,49 @@ public sealed class ReminderTests
         Assert.Equal(conversationId, reminder.ConversationId);
         Assert.Throws<ArgumentException>(() => reminder.AttachConversation(Guid.Empty));
     }
+
+    [Fact]
+    public void Snooze_brings_a_delivered_reminder_back_with_a_fresh_workflow()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var reminder = new Reminder(Guid.CreateVersion7(), "Call mom", now.AddMinutes(-1));
+        reminder.MarkScheduleDispatched();
+        reminder.CompleteOccurrence(now, null);
+        var firstWorkflow = reminder.WorkflowId;
+
+        reminder.Snooze(now.AddMinutes(10), new TimeOnly(12, 10));
+
+        Assert.Equal("pending", reminder.Status);
+        Assert.Null(reminder.CompletedAt);
+        Assert.Null(reminder.ScheduleDispatchedAt);
+        Assert.Equal(now.AddMinutes(10), reminder.DueAt);
+        Assert.NotEqual(firstWorkflow, reminder.WorkflowId);
+        Assert.NotNull(reminder.LastDeliveredAt);
+    }
+
+    [Fact]
+    public void Snooze_and_mark_done_refuse_repeating_or_cancelled_reminders()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var repeating = new Reminder(Guid.CreateVersion7(), "Pills", now.AddHours(1),
+            Reminder.RecurrenceDaily, ReminderWeekdays.All, "UTC", new TimeOnly(8, 0), null);
+        Assert.Throws<InvalidOperationException>(() => repeating.Snooze(now.AddHours(2), new TimeOnly(9, 0)));
+        Assert.Throws<InvalidOperationException>(() => repeating.MarkDone());
+
+        var cancelled = new Reminder(Guid.CreateVersion7(), "Standup", now.AddHours(1));
+        cancelled.Cancel();
+        Assert.Throws<InvalidOperationException>(() => cancelled.Snooze(now.AddHours(2), new TimeOnly(9, 0)));
+    }
+
+    [Fact]
+    public void MarkDone_finishes_an_upcoming_reminder_without_a_delivery()
+    {
+        var reminder = new Reminder(Guid.CreateVersion7(), "Standup", DateTimeOffset.UtcNow.AddHours(1));
+
+        reminder.MarkDone();
+
+        Assert.Equal("completed", reminder.Status);
+        Assert.Null(reminder.LastDeliveredAt);
+        Assert.Throws<InvalidOperationException>(() => reminder.MarkDone());
+    }
 }

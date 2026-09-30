@@ -61,6 +61,35 @@ internal static class AutomationEndpoints
             var reminder = await reminders.CancelAsync(id, currentUser.OwnerId, ct);
             return reminder is null ? Results.NotFound() : Results.Ok(reminder.ToDto());
         }).WithName("CancelReminder");
+
+        api.MapPost("/reminders/{id:guid}/snooze", async (Guid id, SnoozeReminderRequest request,
+            IReminderService reminders, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var until = request.Until ?? (request.Minutes is int minutes and > 0 and <= 60 * 24 * 366
+                ? DateTimeOffset.UtcNow.AddMinutes(minutes)
+                : null);
+            if (until is null) return EndpointHelpers.Invalid("minutes", "Choose how long to snooze, up to a year.");
+            try
+            {
+                var reminder = await reminders.SnoozeAsync(id, currentUser.OwnerId, until.Value, ct);
+                return reminder is null ? Results.NotFound() : Results.Ok(reminder.ToDto());
+            }
+            catch (ArgumentOutOfRangeException exception)
+            {
+                return EndpointHelpers.Invalid("until", exception.Message);
+            }
+            catch (ArgumentException exception)
+            {
+                return EndpointHelpers.Invalid("reminder", exception.Message);
+            }
+        }).WithName("SnoozeReminder");
+
+        api.MapPost("/reminders/{id:guid}/complete", async (Guid id, IReminderService reminders,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var reminder = await reminders.MarkDoneAsync(id, currentUser.OwnerId, ct);
+            return reminder is null ? Results.NotFound() : Results.Ok(reminder.ToDto());
+        }).WithName("CompleteReminder");
     }
 
     private static void MapWatches(RouteGroupBuilder api, ILogger logger)
