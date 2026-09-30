@@ -11,6 +11,13 @@ mixin _IntegrationsMcp on _IntegrationsController {
     final allTools = tools.length == 1 && tools.first == '*';
     final enabled = server['enabled'] != false;
     final hasToken = server['hasToken'] == true;
+    final connection = _connections
+        .where((item) => asJsonString(item['id']) == id)
+        .firstOrNull;
+    final summary = connection == null ? null : _connectionSummary(connection);
+    final unavailable =
+        connection != null &&
+        (asJsonString(connection['state']) ?? 'unavailable') == 'unavailable';
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
@@ -48,6 +55,28 @@ mixin _IntegrationsMcp on _IntegrationsController {
               ),
             ],
           ),
+          if (summary != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                StatusPill(label: summary.$3, color: summary.$4),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    summary.$2,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                if (unavailable)
+                  TextButton.icon(
+                    onPressed: _load,
+                    icon: const Icon(PhosphorIconsRegular.arrowsClockwise, size: 16),
+                    label: const Text('Retry'),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 10),
           SelectableText(
             endpoint,
@@ -185,9 +214,10 @@ mixin _IntegrationsMcp on _IntegrationsController {
     }
   }
 
-  Widget _connectionCard(Map<String, dynamic> connection) {
-    final name = asJsonString(connection['name']) ?? 'MCP server';
-    final id = asJsonString(connection['id']);
+  /// Icon, one-line explanation, pill label and colour for a live MCP connection.
+  (IconData, String, String, Color) _connectionSummary(
+    Map<String, dynamic> connection,
+  ) {
     final state = asJsonString(connection['state']) ?? 'unavailable';
     final toolCount = asJsonInt(connection['toolCount']);
     final issue = asJsonString(connection['issue']);
@@ -230,6 +260,14 @@ mixin _IntegrationsMcp on _IntegrationsController {
         JarvisColors.of(context).danger,
       ),
     };
+    return (icon, detail ?? fallback, label, color);
+  }
+
+  Widget _connectionCard(Map<String, dynamic> connection) {
+    final name = asJsonString(connection['name']) ?? 'MCP server';
+    final id = asJsonString(connection['id']);
+    final state = asJsonString(connection['state']) ?? 'unavailable';
+    final (icon, detail, label, color) = _connectionSummary(connection);
     final hostControlled = id == null || id.isEmpty;
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
@@ -245,7 +283,7 @@ mixin _IntegrationsMcp on _IntegrationsController {
                 Text(name, style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 2),
                 Text(
-                  detail ?? fallback,
+                  detail,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 if (hostControlled && name != '(unnamed)')

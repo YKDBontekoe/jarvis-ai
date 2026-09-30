@@ -149,4 +149,49 @@ void main() {
       {'icsUrl': 'https://calendar.example.com/basic.ics'},
     );
   });
+
+  testWidgets('a registered server shows its own live status and can retry', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    http.on('GET', '/api/v1/integrations/credentials', <Object>[]);
+    http.on('GET', '/api/v1/integrations/connections', [
+      {
+        'id': 'jarvis-mcp-abc',
+        'name': 'Files',
+        'state': 'unavailable',
+        'issue': 'connection_timed_out',
+        'toolCount': 0,
+      },
+    ]);
+    http.on('GET', '/api/v1/mcp-servers', [
+      {
+        'id': 'jarvis-mcp-abc',
+        'name': 'Files',
+        'endpoint': 'npx -y some-package',
+        'allowedTools': ['*'],
+        'hasToken': false,
+        'enabled': true,
+      },
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(home: IntegrationsScreen(http: http.client())),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unavailable'), findsOneWidget);
+    expect(find.textContaining('Did not respond in time'), findsOneWidget);
+    // The status lives on the server's own card, not in a second duplicate card.
+    expect(find.text('Files'), findsOneWidget);
+    final before = http.sent('GET', '/api/v1/integrations/connections').length;
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(
+      http.sent('GET', '/api/v1/integrations/connections').length,
+      greaterThan(before),
+    );
+  });
 }
