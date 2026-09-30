@@ -86,6 +86,17 @@ services:
       - signal-cli-data:/home/.local/share/signal-cli
     networks: [application]
 
+  whatsapp-bridge:
+    profiles: [development]
+    build:
+      context: ../../workers/whatsapp-bridge
+    restart: unless-stopped
+    environment:
+      BRIDGE_TOKEN: ${WHATSAPP_BRIDGE_TOKEN:-}
+    volumes:
+      - whatsapp-bridge-data:/data
+    networks: [application]
+
   jarvis-api:
     profiles: [development]
     build:
@@ -126,6 +137,8 @@ services:
       Push__FirebaseProjectId: ${FIREBASE_PROJECT_ID:-}
       Push__GoogleServiceAccountFile: /run/secrets/firebase-service-account.json
       Channels__Signal__BaseUrl: ${SIGNAL_CLI_REST_URL:-http://signal-cli:8080}
+      Channels__WhatsAppBridge__BaseUrl: ${WHATSAPP_BRIDGE_URL:-http://whatsapp-bridge:3000}
+      Channels__WhatsAppBridge__Token: ${WHATSAPP_BRIDGE_TOKEN:-}
     ports:
       - "${JARVIS_BIND_ADDRESS:-127.0.0.1}:5082:5082"
     volumes:
@@ -146,6 +159,8 @@ services:
         condition: service_healthy
       signal-cli:
         condition: service_started
+      whatsapp-bridge:
+        condition: service_started
     networks: [application, data]
 
   jarvis-worker:
@@ -165,6 +180,8 @@ services:
       DataProtection__KeysDirectory: /var/lib/jarvis-data-protection-keys
       ConnectionStrings__jarvis: Host=postgres;Port=5432;Database=jarvis;Username=jarvis;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       Temporal__Address: temporal-dev:7233
+      Channels__WhatsAppBridge__BaseUrl: ${WHATSAPP_BRIDGE_URL:-http://whatsapp-bridge:3000}
+      Channels__WhatsAppBridge__Token: ${WHATSAPP_BRIDGE_TOKEN:-}
       Codex__ExecutablePath: /usr/local/bin/codex
       Codex__ModelClasses__Fast: ${CODEX_MODEL_FAST:-}
       Codex__ModelClasses__Standard: ${CODEX_MODEL_STANDARD:-}
@@ -206,3 +223,4 @@ volumes:
   data-protection-keys:
   codex-cli:
   signal-cli-data:
+  whatsapp-bridge-data:

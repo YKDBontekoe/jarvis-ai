@@ -4,10 +4,20 @@ namespace Jarvis.Application.Channels;
 
 public static class ChannelKinds
 {
+    /// <summary>WhatsApp Business Cloud API (Meta app, webhook, access token).</summary>
     public const string WhatsApp = "whatsapp";
+    /// <summary>WhatsApp linked as a companion device by scanning a QR code (Baileys bridge).</summary>
+    public const string WhatsAppLinked = "whatsapp_linked";
     public const string Signal = "signal";
 
-    public static bool IsValid(string? kind) => kind is WhatsApp or Signal;
+    public static bool IsValid(string? kind) => kind is WhatsApp or WhatsAppLinked or Signal;
+
+    public static bool IsWhatsApp(string? kind) => kind is WhatsApp or WhatsAppLinked;
+
+    /// <summary>Channels linked by scanning a QR code; they have no credentials and no webhook.</summary>
+    public static bool IsLinkedDevice(string? kind) => kind is WhatsAppLinked or Signal;
+
+    public static string Label(string? kind) => IsWhatsApp(kind) ? "WhatsApp" : "Signal";
 
     /// <summary>Secret names each channel stores in the encrypted credential store.</summary>
     public static IReadOnlyList<string> SecretNames(string kind) => kind switch
@@ -59,7 +69,8 @@ public interface IChannelRepository
     Task<IReadOnlyList<ChannelConnectionRecord>> ListEnabledAsync(string? kind, CancellationToken cancellationToken);
     Task<ChannelConnectionRecord?> GetAsync(Guid ownerId, Guid id, CancellationToken cancellationToken);
     Task<ChannelConnectionRecord?> FindByWebhookKeyAsync(string webhookKey, CancellationToken cancellationToken);
-    Task<ChannelConnectionRecord> CreateAsync(Guid ownerId, SaveChannelRequest request, CancellationToken cancellationToken);
+    Task<ChannelConnectionRecord> CreateAsync(Guid ownerId, SaveChannelRequest request, CancellationToken cancellationToken,
+        Guid? id = null);
     Task<ChannelConnectionRecord?> UpdateAsync(Guid ownerId, Guid id, SaveChannelRequest request,
         CancellationToken cancellationToken);
     Task<bool> DeleteAsync(Guid ownerId, Guid id, CancellationToken cancellationToken);

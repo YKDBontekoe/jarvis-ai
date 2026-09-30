@@ -50,7 +50,7 @@ Owner overrides via API `/settings/models` (OpenRouter key encrypted).
 
 ## Channels
 
-`Channels__PublicBaseUrl`, `Channels__Signal__BaseUrl`, `Channels__WhatsApp__GraphBaseUrl`.
+`Channels__PublicBaseUrl`, `Channels__Signal__BaseUrl`, `Channels__WhatsApp__GraphBaseUrl`, `Channels__WhatsAppBridge__BaseUrl`, `Channels__WhatsAppBridge__Token`.
 
 ## Push
 

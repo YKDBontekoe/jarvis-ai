@@ -76,12 +76,12 @@ public sealed class ChannelRepository(JarvisDbContext db) : IChannelRepository
             cancellationToken))?.ToRecord();
 
     public async Task<ChannelConnectionRecord> CreateAsync(Guid ownerId, SaveChannelRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, Guid? id = null)
     {
         var now = DateTimeOffset.UtcNow;
         var entity = new ChannelConnectionEntity
         {
-            Id = Guid.CreateVersion7(), OwnerId = ownerId, Kind = request.Kind!, CreatedAt = now,
+            Id = id ?? Guid.CreateVersion7(), OwnerId = ownerId, Kind = request.Kind!, CreatedAt = now,
             WebhookKey = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(24)),
             NotificationsForwardedUntil = now
         };

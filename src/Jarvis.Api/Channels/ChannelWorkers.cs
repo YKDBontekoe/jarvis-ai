@@ -103,12 +103,17 @@ public sealed class SignalReceiver(IServiceScopeFactory scopes, IHttpClientFacto
             if (!response.IsSuccessStatusCode) continue;
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-            foreach (var (sender, text, externalId) in ParseEnvelopes(document.RootElement))
+            foreach (var (sender, text, externalId) in ParseEnvelopes(document.RootElement, connection.Account))
                 await repository.EnqueueInboundAsync(connection.Id, sender, text, externalId, cancellationToken);
         }
     }
 
-    internal static IEnumerable<(string Sender, string Text, string ExternalId)> ParseEnvelopes(JsonElement root)
+    /// <summary>
+    /// Reads text messages. With <paramref name="selfAccount"/>, "Note to Self" messages typed on the primary phone
+    /// (delivered to this linked device as sync transcripts) count as messages from the owner.
+    /// </summary>
+    internal static IEnumerable<(string Sender, string Text, string ExternalId)> ParseEnvelopes(JsonElement root,
+        string? selfAccount = null)
     {
         if (root.ValueKind != JsonValueKind.Array) yield break;
         foreach (var item in root.EnumerateArray())
@@ -117,6 +122,18 @@ public sealed class SignalReceiver(IServiceScopeFactory scopes, IHttpClientFacto
             var sender = envelope.TryGetProperty("sourceNumber", out var number) && number.ValueKind == JsonValueKind.String
                 ? number.GetString()
                 : envelope.TryGetProperty("source", out var source) ? source.GetString() : null;
+            if (selfAccount is not null && envelope.TryGetProperty("syncMessage", out var sync) &&
+                sync.TryGetProperty("sentMessage", out var sent) &&
+                sent.TryGetProperty("message", out var selfMessage) && selfMessage.ValueKind == JsonValueKind.String &&
+                !string.IsNullOrWhiteSpace(selfMessage.GetString()) &&
+                (sent.TryGetProperty("destinationNumber", out var destination) ? destination.GetString() : null) is { } to &&
+                ChannelAddresses.Normalize(to) == ChannelAddresses.Normalize(selfAccount))
+            {
+                var sentAt = sent.TryGetProperty("timestamp", out var sentTime) ? sentTime.ToString() : Guid.NewGuid().ToString("N");
+                yield return (ChannelAddresses.Normalize(selfAccount), selfMessage.GetString()!,
+                    $"{ChannelAddresses.Normalize(selfAccount)}:{sentAt}");
+                continue;
+            }
             if (!envelope.TryGetProperty("dataMessage", out var data) ||
                 !data.TryGetProperty("message", out var message) || message.ValueKind != JsonValueKind.String ||
                 string.IsNullOrWhiteSpace(sender))
@@ -186,7 +203,10 @@ public sealed class ChannelNotificationForwarder(IServiceScopeFactory scopes, IL
 
     internal static bool ShouldForward(string type) => type != "approval.required";
 
-    /// <summary>WhatsApp only allows free-form business messages within 24 hours of the user's last message.</summary>
+    /// <summary>
+    /// The WhatsApp Cloud API only allows free-form business messages within 24 hours of the user's last message.
+    /// Linked devices (WhatsApp Web / Signal) have no such window.
+    /// </summary>
     internal static bool CanMessage(ChannelConnectionRecord connection, DateTimeOffset now) =>
         connection.Kind != ChannelKinds.WhatsApp ||
         connection.LastInboundAt is { } lastInbound && now - lastInbound < WhatsAppServiceWindow;

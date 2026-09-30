@@ -124,6 +124,21 @@ services:
     cpus: 1.0
     networks: [application]
 
+  # Links WhatsApp as a companion device (scan a QR code in the app). Built from source on the host;
+  # `pull_policy: build` rebuilds it on every `up`. Not published: only the API and worker reach it.
+  whatsapp-bridge:
+    build:
+      context: ../../workers/whatsapp-bridge
+    pull_policy: build
+    restart: unless-stopped
+    environment:
+      BRIDGE_TOKEN: ${WHATSAPP_BRIDGE_TOKEN:-}
+    volumes:
+      - whatsapp-bridge-data:/data
+    mem_limit: 512m
+    cpus: 0.5
+    networks: [application]
+
   jarvis-api:
     image: ${JARVIS_API_IMAGE:-ghcr.io/ykdbontekoe/jarvis-ai/api:latest}
     build:
@@ -176,6 +191,8 @@ services:
       Jarvis__PublicBaseUrl: ${JARVIS_WEB_ORIGIN:?Set JARVIS_WEB_ORIGIN}
       Channels__PublicBaseUrl: ${JARVIS_WEB_ORIGIN:?Set JARVIS_WEB_ORIGIN}
       Channels__Signal__BaseUrl: ${SIGNAL_CLI_REST_URL:-http://signal-cli:8080}
+      Channels__WhatsAppBridge__BaseUrl: ${WHATSAPP_BRIDGE_URL:-http://whatsapp-bridge:3000}
+      Channels__WhatsAppBridge__Token: ${WHATSAPP_BRIDGE_TOKEN:-}
       Push__FirebaseProjectId: ${FIREBASE_PROJECT_ID:-}
       Push__GoogleServiceAccountFile: /run/secrets/firebase-service-account.json
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
@@ -195,6 +212,8 @@ services:
       livekit:
         condition: service_started
       signal-cli:
+        condition: service_started
+      whatsapp-bridge:
         condition: service_started
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5082/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -255,6 +274,8 @@ services:
       Jarvis__ModelClass: ${JARVIS_MODEL_CLASS:-}
       ConnectionStrings__jarvis: Host=postgres;Port=5432;Database=jarvis;Username=jarvis;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       Temporal__Address: temporal:7233
+      Channels__WhatsAppBridge__BaseUrl: ${WHATSAPP_BRIDGE_URL:-http://whatsapp-bridge:3000}
+      Channels__WhatsAppBridge__Token: ${WHATSAPP_BRIDGE_TOKEN:-}
       ObjectStorage__ServiceUrl: http://garage:3900
       ObjectStorage__AccessKey: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
       ObjectStorage__SecretKey: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
@@ -311,3 +332,4 @@ volumes:
   caddy-data:
   caddy-config:
   signal-cli-data:
+  whatsapp-bridge-data:

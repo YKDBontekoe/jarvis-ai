@@ -124,6 +124,19 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
     }
   }
 
+  Future<void> _relink() async {
+    final linked = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => ChannelLinkSheet(
+        http: widget.http,
+        kind: 'whatsapp_linked',
+        channelId: widget.channelId,
+      ),
+    );
+    if (linked != null && mounted) unawaited(_load());
+  }
+
   Future<void> _disconnect() async {
     final confirmed = await showJarvisConfirm(
       context,
@@ -240,6 +253,22 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                             child: Text(
                               'Forwards notifications to ${asJsonString(channel['notifyRecipient']) ?? 'the first allowed number'}.',
                               style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        if (asJsonString(channel['kind']) == 'whatsapp_linked' &&
+                            asJsonString(channel['lastError']) != null)
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              key: const Key('channel-relink'),
+                              onPressed: _busy
+                                  ? null
+                                  : () => unawaited(_relink()),
+                              icon: const Icon(
+                                PhosphorIconsRegular.link,
+                                size: 16,
+                              ),
+                              label: const Text('Link again'),
                             ),
                           ),
                         if (asJsonString(channel['webhookUrl']) != null) ...[

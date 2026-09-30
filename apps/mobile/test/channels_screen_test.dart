@@ -10,6 +10,7 @@ Map<String, Object?> _channel({
   String kind = 'whatsapp',
   String name = 'Home WhatsApp',
   bool enabled = true,
+  String? lastError,
 }) => {
   'id': id,
   'kind': kind,
@@ -27,7 +28,7 @@ Map<String, Object?> _channel({
       : null,
   'lastInboundAt': '2026-09-27T12:00:00Z',
   'lastOutboundAt': null,
-  'lastError': null,
+  'lastError': lastError,
   'createdAt': '2026-09-27T10:00:00Z',
 };
 
@@ -185,5 +186,103 @@ void main() {
     await tester.tap(find.byKey(const Key('channel-thread-+31612345678')));
     await tester.pumpAndSettle();
     expect(find.text('Hello from WhatsApp'), findsWidgets);
+  });
+
+  const qrPng =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+  testWidgets('links WhatsApp by scanning a QR code', (tester) async {
+    http.on('GET', '/api/v1/channels', <Object>[]);
+    http.on('GET', '/api/v1/channels/providers', {
+      'whatsAppLink': true,
+      'signal': false,
+      'whatsAppCloud': true,
+    });
+    http.on('POST', '/api/v1/channels/link', {
+      'linkId': 'link-1',
+      'kind': 'whatsapp_linked',
+      'state': 'waiting',
+      'qrImage': qrPng,
+    });
+    http.on('GET', '/api/v1/channels/link/link-1', {
+      'linkId': 'link-1',
+      'kind': 'whatsapp_linked',
+      'state': 'waiting',
+      'qrImage': qrPng,
+    });
+    await show(tester, ChannelsScreen(http: http.client()));
+
+    await tester.tap(find.text('Connect a channel'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('connect-whatsapp-qr')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('channel-link-qr')), findsOneWidget);
+    expect(find.textContaining('Linked devices'), findsOneWidget);
+    final started = http.sent('POST', '/api/v1/channels/link').single;
+    expect((started.body as Map)['kind'], 'whatsapp_linked');
+
+    http.on('GET', '/api/v1/channels/link/link-1', {
+      'linkId': 'link-1',
+      'kind': 'whatsapp_linked',
+      'state': 'linked',
+      'phone': '+31612345678',
+      'channelId': '11111111-1111-1111-1111-111111111111',
+    });
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('channel-link-qr')), findsNothing);
+    expect(find.textContaining('linked as +31612345678'), findsOneWidget);
+  });
+
+  testWidgets('a link that cannot start offers a new code', (tester) async {
+    http.on('GET', '/api/v1/channels', <Object>[]);
+    http.on('GET', '/api/v1/channels/providers', {
+      'whatsAppLink': true,
+      'signal': true,
+      'whatsAppCloud': true,
+    });
+    http.on('POST', '/api/v1/channels/link', <String, Object>{}, status: 503);
+    await show(tester, ChannelsScreen(http: http.client()));
+
+    await tester.tap(find.text('Connect a channel'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('connect-signal')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('channel-link-retry')), findsOneWidget);
+    expect(find.byKey(const Key('channel-link-qr')), findsNothing);
+  });
+
+  testWidgets('WhatsApp QR linking is disabled without the bridge', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/channels', <Object>[]);
+    await show(tester, ChannelsScreen(http: http.client()));
+
+    await tester.tap(find.text('Connect a channel'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('connect-whatsapp-qr')));
+    await tester.pumpAndSettle();
+
+    expect(http.sent('POST', '/api/v1/channels/link'), isEmpty);
+    expect(find.textContaining('Needs the WhatsApp bridge'), findsOneWidget);
+  });
+
+  testWidgets('a linked WhatsApp channel with an error can be linked again', (
+    tester,
+  ) async {
+    const id = '11111111-1111-1111-1111-111111111111';
+    http.on('GET', '/api/v1/channels', [
+      _channel(kind: 'whatsapp_linked', lastError: 'Session logged out'),
+    ]);
+    http.on('GET', '/api/v1/channels/$id/messages', <Object>[]);
+    http.on('GET', '/api/v1/channels/$id/threads', <Object>[]);
+    await show(tester, ChannelsScreen(http: http.client()));
+    await tester.tap(find.text('Home WhatsApp'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('channel-relink')), findsOneWidget);
   });
 }

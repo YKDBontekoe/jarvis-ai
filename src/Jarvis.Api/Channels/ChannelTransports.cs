@@ -9,6 +9,8 @@ public sealed class ChannelOptions
 {
     public string WhatsAppGraphBaseUrl { get; init; } = "https://graph.facebook.com/v21.0";
     public string? SignalBaseUrl { get; init; }
+    public string? WhatsAppBridgeUrl { get; init; }
+    public string? WhatsAppBridgeToken { get; init; }
     public string? PublicBaseUrl { get; init; }
 
     public static ChannelOptions From(IConfiguration configuration) => new()
@@ -16,6 +18,8 @@ public sealed class ChannelOptions
         WhatsAppGraphBaseUrl = EmptyToNull(configuration["Channels:WhatsApp:GraphBaseUrl"])
                                ?? "https://graph.facebook.com/v21.0",
         SignalBaseUrl = EmptyToNull(configuration["Channels:Signal:BaseUrl"]),
+        WhatsAppBridgeUrl = EmptyToNull(configuration["Channels:WhatsAppBridge:BaseUrl"]),
+        WhatsAppBridgeToken = EmptyToNull(configuration["Channels:WhatsAppBridge:Token"]),
         PublicBaseUrl = EmptyToNull(configuration["Channels:PublicBaseUrl"])
                         ?? EmptyToNull(configuration["Jarvis:PublicBaseUrl"])
     };
@@ -95,7 +99,7 @@ public static partial class ChannelText
     {
         var text = markdown.Replace("\r\n", "\n").Trim();
         text = Heading().Replace(text, "*$1*");
-        text = Bold().Replace(text, kind == ChannelKinds.WhatsApp ? "*$1*" : "**$1**");
+        text = Bold().Replace(text, ChannelKinds.IsWhatsApp(kind) ? "*$1*" : "**$1**");
         text = Link().Replace(text, "$1 ($2)");
         return text;
     }

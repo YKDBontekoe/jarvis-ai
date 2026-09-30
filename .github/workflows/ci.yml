@@ -85,6 +85,27 @@ jobs:
       - name: Python unit tests
         run: scripts/ci/run-python-unit-tests.sh
 
+  whatsapp-bridge:
+    name: WhatsApp bridge tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workers/whatsapp-bridge
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
   mobile:
     name: Mobile analyze and tests
     runs-on: ubuntu-latest
