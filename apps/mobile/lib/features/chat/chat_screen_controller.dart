@@ -65,6 +65,10 @@ abstract class _ChatScreenController extends State<ChatScreen>
   int _realtimeGeneration = 0;
   final _deltaBuffer = StringBuffer();
   Timer? _deltaTimer;
+
+  /// Bumped when streamed text changes only the transcript, so the list
+  /// rebuilds without rebuilding the whole screen.
+  final _transcriptTick = ValueNotifier<int>(0);
   bool _nearBottom = true;
   int _openGeneration = 0;
   int _recentRevision = 0;

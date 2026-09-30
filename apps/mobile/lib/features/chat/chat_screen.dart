@@ -237,6 +237,7 @@ class _ChatScreenState extends _ChatScreenController
     WidgetsBinding.instance.removeObserver(this);
     _catchUpTimer?.cancel();
     _deltaTimer?.cancel();
+    _transcriptTick.dispose();
     _runCancel?.cancel();
     _catchUpGeneration++;
     _realtimeGeneration++;

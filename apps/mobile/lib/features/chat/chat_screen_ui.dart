@@ -325,19 +325,24 @@ mixin _ChatScreenUi on _ChatScreenController {
                 : Stack(
                     children: [
                       Positioned.fill(
-                        child: ListView.builder(
-                          controller: _scroll,
-                          keyboardDismissBehavior:
-                              ScrollViewKeyboardDismissBehavior.onDrag,
-                          padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
-                          itemCount: _entries.length,
-                          itemBuilder: (context, index) => Align(
-                            alignment: Alignment.topCenter,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 760),
-                              child: SizedBox(
-                                width: double.infinity,
-                                child: _entryView(_entries[index]),
+                        child: ValueListenableBuilder<int>(
+                          valueListenable: _transcriptTick,
+                          builder: (context, _, _) => ListView.builder(
+                            controller: _scroll,
+                            keyboardDismissBehavior:
+                                ScrollViewKeyboardDismissBehavior.onDrag,
+                            padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+                            itemCount: _entries.length,
+                            itemBuilder: (context, index) => Align(
+                              alignment: Alignment.topCenter,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 760,
+                                ),
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: _entryView(_entries[index]),
+                                ),
                               ),
                             ),
                           ),

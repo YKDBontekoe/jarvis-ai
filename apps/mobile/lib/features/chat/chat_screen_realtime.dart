@@ -43,10 +43,17 @@ mixin _ChatScreenRealtime on _ChatScreenController {
     final text = _deltaBuffer.toString();
     _deltaBuffer.clear();
     if (!mounted) return;
-    setState(() {
-      _showHome = false;
+    final last = _entries.isEmpty ? null : _entries.last;
+    if (!_showHome && last is MessageEntry && !last.isUser && last.pending) {
+      // Streaming into the visible reply: rebuild only the transcript.
       _appendDelta(text);
-    });
+      _transcriptTick.value++;
+    } else {
+      setState(() {
+        _showHome = false;
+        _appendDelta(text);
+      });
+    }
     _scrollToBottom(jump: true);
   }
 
