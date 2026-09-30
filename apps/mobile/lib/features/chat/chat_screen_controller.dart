@@ -63,6 +63,9 @@ abstract class _ChatScreenController extends State<ChatScreen>
   bool _openingFromSidebar = false;
   bool _showHome = true;
   int _realtimeGeneration = 0;
+  final _deltaBuffer = StringBuffer();
+  Timer? _deltaTimer;
+  bool _nearBottom = true;
   int _openGeneration = 0;
   int _recentRevision = 0;
   int _initGeneration = 0;
@@ -95,7 +98,10 @@ abstract class _ChatScreenController extends State<ChatScreen>
       );
 
   Future<void> _initialize();
-  Future<void> _openConversation(String conversationId, {bool showHome = false});
+  Future<void> _openConversation(
+    String conversationId, {
+    bool showHome = false,
+  });
   Future<List<ApprovalEntry>?> _loadConversationApprovals(
     String conversationId,
   );
@@ -157,7 +163,11 @@ abstract class _ChatScreenController extends State<ChatScreen>
     Map<Object?, Object?>? event,
   );
   void _appendDelta(String delta);
-  void _completeAssistant(String content, {String? id, List<MessageCitation>? citations});
+  void _completeAssistant(
+    String content, {
+    String? id,
+    List<MessageCitation>? citations,
+  });
   void _toolEvent(String tool, {bool? success});
   void _settleSubmittingApprovals({ApprovalStatus? fallback});
   void _addApprovals(Iterable<ApprovalEntry> approvals);
@@ -167,7 +177,11 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _toggleVoiceMute();
   Future<void> _stopVoice();
 
-  void _scrollToBottom({bool jump = false});
+  void _scrollToBottom({bool jump = false, bool force = false});
+  // Declared for part implementations; invoked via the hub event wrapper.
+  // ignore: unused_element
+  void _flushDeltas();
+  void _discardDeltas();
   void _dismissKeyboard();
   Widget _settingsBody();
 

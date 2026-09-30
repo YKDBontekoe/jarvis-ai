@@ -235,6 +235,7 @@ class _ChatScreenState extends _ChatScreenController
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _catchUpTimer?.cancel();
+    _deltaTimer?.cancel();
     _runCancel?.cancel();
     _catchUpGeneration++;
     _realtimeGeneration++;
@@ -254,8 +255,13 @@ class _ChatScreenState extends _ChatScreenController
   }
 
   void _handleTranscriptScroll() {
-    if (_scroll.hasClients && _scroll.position.pixels <= 160) {
-      unawaited(_loadOlderMessages());
-    }
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    if (position.pixels <= 160) unawaited(_loadOlderMessages());
+    final near = isNearTranscriptBottom(
+      position.pixels,
+      position.maxScrollExtent,
+    );
+    if (near != _nearBottom) setState(() => _nearBottom = near);
   }
 }

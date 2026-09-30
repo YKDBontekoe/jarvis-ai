@@ -31,7 +31,7 @@ mixin _ChatScreenSend on _ChatScreenController {
         const MessageEntry(role: 'assistant', content: '', pending: true),
       );
     });
-    _scrollToBottom();
+    _scrollToBottom(force: true);
     final run = CancelToken();
     _runCancel = run;
     try {
