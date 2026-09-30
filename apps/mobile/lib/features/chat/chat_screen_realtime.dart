@@ -96,7 +96,10 @@ mixin _ChatScreenRealtime on _ChatScreenController {
           !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
-      setState(() => _toolEvent(tool, success: true));
+      setState(() {
+        _toolEvent(tool, success: true);
+        _settleSubmittingApprovals();
+      });
     });
     _onHub(hub, 'tool.failed', (arguments) {
       final tool = asJsonString(_payload(arguments)?['tool']);
@@ -104,7 +107,10 @@ mixin _ChatScreenRealtime on _ChatScreenController {
           !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
-      setState(() => _toolEvent(tool, success: false));
+      setState(() {
+        _toolEvent(tool, success: false);
+        _settleSubmittingApprovals();
+      });
     });
     _onHub(hub, 'tool.approval_required', (arguments) {
       final approval = ApprovalEntry.fromJson(_payload(arguments));
