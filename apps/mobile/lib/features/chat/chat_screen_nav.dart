@@ -72,10 +72,9 @@ mixin _ChatScreenNav on _ChatScreenController {
           _hasPendingApproval ||
           _signedOut ||
           _signingOut ||
-          !_connected ||
           _conversationId == null) {
-        if (!_connected || _conversationId == null) {
-          setState(() => _error = 'Connect to Jarvis before starting voice.');
+        if (_conversationId == null) {
+          setState(() => _error = 'Open a conversation before starting voice.');
         }
         return;
       }

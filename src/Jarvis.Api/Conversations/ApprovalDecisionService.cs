@@ -130,10 +130,11 @@ public sealed class ApprovalDecisionService(
         {
             await approvals.MarkResumeFailedAsync(approvalId, ownerId, CancellationToken.None);
             logger.LogError(exception, "Tool approval {ApprovalId} was decided but its agent resume failed.", approvalId);
-            await EndpointHelpers.PublishAgentFailedAsync(hub, logger, decided.ConversationId,
-                ConversationTurnService.FailureMessage);
-            return new ConversationTurnResult.Failed(
-                "Jarvis could not resume this decided tool call. It can be retried from Tool approvals.");
+            var failure = AgentFailureMessage.For(exception);
+            await EndpointHelpers.PublishAgentFailedAsync(hub, logger, decided.ConversationId, failure);
+            return new ConversationTurnResult.Failed(failure == ConversationTurnService.FailureMessage
+                ? "Jarvis could not resume this decided tool call. It can be retried from Tool approvals."
+                : failure + " Your decision is saved; retry it from Tool approvals.");
         }
         finally
         {

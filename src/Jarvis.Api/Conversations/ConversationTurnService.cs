@@ -90,8 +90,9 @@ public sealed class ConversationTurnService(
         catch (Exception exception)
         {
             logger.LogError(exception, "Agent run failed for conversation {ConversationId}", conversationId);
-            await EndpointHelpers.PublishAgentFailedAsync(hub, logger, conversationId, FailureMessage);
-            return new ConversationTurnResult.Failed(FailureMessage);
+            var failure = AgentFailureMessage.For(exception);
+            await EndpointHelpers.PublishAgentFailedAsync(hub, logger, conversationId, failure);
+            return new ConversationTurnResult.Failed(failure);
         }
     }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../theme.dart';
@@ -77,14 +79,17 @@ class VoiceStage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Text(
-                      _subtitle,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: JarvisColors.of(context).inkSoft,
-                        height: 1.4,
+                    if (phase == 'connecting')
+                      const _ConnectingHint()
+                    else
+                      Text(
+                        _subtitle,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: JarvisColors.of(context).inkSoft,
+                          height: 1.4,
+                        ),
                       ),
-                    ),
                     if (captions && caption != null && caption!.isNotEmpty) ...[
                       const SizedBox(height: 22),
                       _CaptionCard(role: captionRole, text: caption!),
@@ -338,6 +343,55 @@ class _Blob extends StatelessWidget {
     decoration: BoxDecoration(
       shape: BoxShape.circle,
       gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)]),
+    ),
+  );
+}
+
+/// Explains a slow voice start as it drags on, so a wait never looks like a hang.
+class _ConnectingHint extends StatefulWidget {
+  const _ConnectingHint();
+
+  @override
+  State<_ConnectingHint> createState() => _ConnectingHintState();
+}
+
+class _ConnectingHintState extends State<_ConnectingHint> {
+  Timer? _timer;
+  var _seconds = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _seconds++);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String get _message => switch (_seconds) {
+    < 6 => 'Opening a ChatGPT voice session.',
+    < 20 => 'Starting Jarvis voice and loading your memory…',
+    _ =>
+      'Still working. The first connection can take up to a minute — you can '
+          'end this and type instead.',
+  };
+
+  @override
+  Widget build(BuildContext context) => AnimatedSwitcher(
+    duration: const Duration(milliseconds: 300),
+    child: Text(
+      _message,
+      key: ValueKey(_message),
+      textAlign: TextAlign.center,
+      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+        color: JarvisColors.of(context).inkSoft,
+        height: 1.4,
+      ),
     ),
   );
 }

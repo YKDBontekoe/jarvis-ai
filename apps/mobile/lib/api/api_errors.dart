@@ -30,7 +30,14 @@ String describeApiError(DioException error) {
   final problemText = firstProblemMessage(response?.data);
   if (problemText != null && problemText.isNotEmpty) return problemText;
   if (status != null) return 'Jarvis returned HTTP $status.';
-  return 'Could not reach the Jarvis API at $apiBaseUrl.';
+  return switch (error.type) {
+    DioExceptionType.connectionTimeout ||
+    DioExceptionType.sendTimeout ||
+    DioExceptionType.receiveTimeout =>
+      'Jarvis took too long to answer. It may be busy — try again in a moment.',
+    _ => 'Could not reach the Jarvis API at $apiBaseUrl. '
+        'Check that your server is running and this device can reach it.',
+  };
 }
 
 String? _messageForCode(

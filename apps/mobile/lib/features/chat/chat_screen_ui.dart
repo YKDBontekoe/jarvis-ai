@@ -416,7 +416,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     ready: _conversationId != null,
     voiceStarting: _voiceStarting,
     onTalk:
-        _conversationId == null || _busy || _hasPendingApproval || !_connected
+        _conversationId == null || _busy || _hasPendingApproval
         ? null
         : () => _selectDestination(2),
     onOpenTasks: () => _openUtility('tasks'),
