@@ -51,6 +51,16 @@ Compose overlays:
 
 `GET /channels/providers` reports which flows the server supports. For WhatsApp the bridge session id equals the channel connection id; inbound messages are pulled by `WhatsAppLinkedReceiver` (poll + ack, deduped by external id), outbound go through `WhatsAppLinkedTransport`. Deleting the channel logs the device out via the bridge. Signal "Note to Self" sync messages are accepted as owner messages (`SignalReceiver.ParseEnvelopes`).
 
+### Forwarding notifications and approvals
+
+Per channel, `forwardNotifications` turns forwarding on and `notificationCategories` chooses what is sent (`ChannelNotificationCategories`): `reminders`, `tasks`, `briefings`, `watches`, `automations`, `learning`, `check_ins`, `approvals`. A channel with no stored list gets every category **except approvals** (opt-in). Omitting the field on `PUT /channels/{id}` keeps the stored choice. `ChannelNotificationForwarder` sends the notifications; it is best-effort and never blocks the in-app inbox or push.
+
+Things a chat app cannot do are called out in the message itself, pointing the owner to the Jarvis app:
+
+- **Tool approvals** started in the channel's own chat can be answered with YES/NO. Approvals from app chats or tasks, and all automation approvals, are forwarded as "can't be approved from WhatsApp — open the Jarvis app". Approvals already decided elsewhere are not forwarded.
+- `/status` and a bare YES/NO mention approvals waiting only in the app instead of sending the reply to the agent as chat.
+- **WhatsApp Cloud API** only allows free-form messages within 24 h of the owner's last message. When that window is closed the notifications are not sent; the channel records a failed message with an explanation (visible as the channel error) rather than dropping them silently. Linked WhatsApp and Signal have no such window.
+
 Allowlist per channel; replies approval-gated. Thread history in API + Flutter `features/channels/`.
 
 ## Browser (Playwright)

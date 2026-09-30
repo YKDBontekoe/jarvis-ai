@@ -15,7 +15,8 @@ namespace Jarvis.Api.Endpoints;
 public sealed record ChannelDto(Guid Id, string Kind, string DisplayName, string Account, bool Enabled,
     IReadOnlyList<string> AllowedSenders, bool ForwardNotifications, string? NotifyRecipient,
     IReadOnlyList<string> ConfiguredSecrets, string? WebhookUrl, DateTimeOffset? LastInboundAt,
-    DateTimeOffset? LastOutboundAt, string? LastError, DateTimeOffset CreatedAt);
+    DateTimeOffset? LastOutboundAt, string? LastError, DateTimeOffset CreatedAt,
+    IReadOnlyList<string> NotificationCategories);
 public sealed record ChannelTestRequest(string? Recipient);
 public sealed record SignalStatusDto(bool Configured, IReadOnlyList<string> Accounts);
 public sealed record ChannelLinkRequest(string? Kind, Guid? ChannelId);
@@ -254,6 +255,7 @@ internal static class ChannelEndpoints
             connection.Kind == ChannelKinds.WhatsApp
                 ? $"{baseUrl}/api/v1/channels/whatsapp/{connection.WebhookKey}/webhook"
                 : null,
-            connection.LastInboundAt, connection.LastOutboundAt, connection.LastError, connection.CreatedAt);
+            connection.LastInboundAt, connection.LastOutboundAt, connection.LastError, connection.CreatedAt,
+            ChannelNotificationCategories.Effective(connection.NotificationCategories));
     }
 }

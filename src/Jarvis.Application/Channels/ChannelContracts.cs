@@ -43,7 +43,8 @@ public sealed record ChannelConnectionRecord(
     string? LastError,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset NotificationsForwardedUntil);
+    DateTimeOffset NotificationsForwardedUntil,
+    IReadOnlyList<string>? NotificationCategories = null);
 
 public sealed record SaveChannelRequest(
     string? Kind,
@@ -53,7 +54,61 @@ public sealed record SaveChannelRequest(
     IReadOnlyList<string>? AllowedSenders,
     bool ForwardNotifications,
     string? NotifyRecipient,
-    IReadOnlyDictionary<string, string>? Secrets);
+    IReadOnlyDictionary<string, string>? Secrets,
+    IReadOnlyList<string>? NotificationCategories = null);
+
+/// <summary>
+/// What a channel may forward. A connection stores an explicit list (null = <see cref="Default"/>); approvals are
+/// opt-in because most of them can only be decided in the Jarvis app.
+/// </summary>
+public static class ChannelNotificationCategories
+{
+    public const string Reminders = "reminders";
+    public const string Tasks = "tasks";
+    public const string Briefings = "briefings";
+    public const string Watches = "watches";
+    public const string Automations = "automations";
+    public const string Learning = "learning";
+    public const string CheckIns = "check_ins";
+    public const string Approvals = "approvals";
+
+    public static readonly IReadOnlyList<string> All =
+        [Reminders, Tasks, Briefings, Watches, Automations, Learning, CheckIns, Approvals];
+
+    /// <summary>Everything except approvals, matching how forwarding behaved before categories existed.</summary>
+    public static readonly IReadOnlyList<string> Default = All.Where(item => item != Approvals).ToArray();
+
+    /// <summary>The category of a notification type, or null for a type this build does not know.</summary>
+    public static string? For(string type) => type switch
+    {
+        "reminder.due" or "reminder.failed" => Reminders,
+        "task.completed" or "task.failed" => Tasks,
+        "briefing.daily" => Briefings,
+        "watch.triggered" or "watch.failed" => Watches,
+        "automation.notification" => Automations,
+        "skill.learned" or "skill.improved" or "learning.dreamed" or "learning.reflected" => Learning,
+        "heartbeat.checkin" => CheckIns,
+        "approval.required" or "automation.approval" => Approvals,
+        _ => null
+    };
+
+    public static IReadOnlyList<string> Effective(IReadOnlyList<string>? stored) => stored ?? Default;
+
+    /// <summary>Unknown types are forwarded so new notification kinds are not silently lost.</summary>
+    public static bool IsEnabled(IReadOnlyList<string>? stored, string type) =>
+        For(type) is not { } category || Effective(stored).Contains(category);
+
+    /// <summary>Lower-cases and de-duplicates; throws <see cref="ArgumentException"/> for an unknown category.</summary>
+    public static IReadOnlyList<string>? Normalize(IEnumerable<string>? requested)
+    {
+        if (requested is null) return null;
+        var normalized = requested.Select(item => item?.Trim().ToLowerInvariant() ?? string.Empty)
+            .Where(item => item.Length > 0).Distinct().ToArray();
+        if (normalized.FirstOrDefault(item => !All.Contains(item)) is { } unknown)
+            throw new ArgumentException($"{unknown} is not a notification category.");
+        return All.Where(normalized.Contains).ToArray();
+    }
+}
 
 public sealed record ChannelMessageRecord(Guid Id, Guid ConnectionId, string Direction, string Peer, string Text,
     string Status, DateTimeOffset CreatedAt, DateTimeOffset? ProcessedAt, string? Error);

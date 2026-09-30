@@ -17,6 +17,7 @@ internal sealed class ChannelConnectionEntityConfiguration : IEntityTypeConfigur
             builder.Property(x => x.Enabled).HasColumnName("enabled");
             builder.Property(x => x.AllowedSendersJson).HasColumnName("allowed_senders").HasColumnType("jsonb").IsRequired();
             builder.Property(x => x.ForwardNotifications).HasColumnName("forward_notifications");
+            builder.Property(x => x.NotificationCategoriesJson).HasColumnName("notification_categories").HasColumnType("jsonb");
             builder.Property(x => x.NotifyRecipient).HasColumnName("notify_recipient").HasMaxLength(40);
             builder.Property(x => x.WebhookKey).HasColumnName("webhook_key").HasMaxLength(64).IsRequired();
             builder.Property(x => x.LastInboundAt).HasColumnName("last_inbound_at");

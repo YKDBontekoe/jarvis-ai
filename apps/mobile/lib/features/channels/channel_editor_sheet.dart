@@ -20,6 +20,7 @@ class _ChannelEditorSheetState extends State<ChannelEditorSheet> {
   final _verifyToken = TextEditingController();
   var _enabled = true;
   var _forward = true;
+  var _categories = defaultChannelNotificationCategories();
   var _saving = false;
   String? _error;
 
@@ -63,6 +64,7 @@ class _ChannelEditorSheetState extends State<ChannelEditorSheet> {
           'enabled': _enabled,
           'allowedSenders': senders,
           'forwardNotifications': _forward,
+          'notificationCategories': _categories.toList(),
           'notifyRecipient': _notify.text.trim().isEmpty
               ? null
               : _notify.text.trim(),
@@ -166,6 +168,15 @@ class _ChannelEditorSheetState extends State<ChannelEditorSheet> {
               value: _forward,
               onChanged: (value) => setState(() => _forward = value),
             ),
+            if (_forward)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: ChannelNotificationCategoryPicker(
+                  kind: widget.kind,
+                  selected: _categories,
+                  onChanged: (value) => setState(() => _categories = value),
+                ),
+              ),
             if (_whatsapp) ...[
               TextField(
                 key: const Key('channel-access-token'),

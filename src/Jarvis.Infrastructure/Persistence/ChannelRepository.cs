@@ -15,6 +15,8 @@ public sealed class ChannelConnectionEntity
     public bool Enabled { get; set; }
     public string AllowedSendersJson { get; set; } = "[]";
     public bool ForwardNotifications { get; set; }
+    /// <summary>JSON array of <see cref="ChannelNotificationCategories"/>; null means the default set.</summary>
+    public string? NotificationCategoriesJson { get; set; }
     public string? NotifyRecipient { get; set; }
     public string WebhookKey { get; set; } = string.Empty;
     public DateTimeOffset? LastInboundAt { get; set; }
@@ -26,7 +28,8 @@ public sealed class ChannelConnectionEntity
 
     public ChannelConnectionRecord ToRecord() => new(Id, OwnerId, Kind, DisplayName, Account, Enabled,
         JsonSerializer.Deserialize<string[]>(AllowedSendersJson) ?? [], ForwardNotifications, NotifyRecipient,
-        WebhookKey, LastInboundAt, LastOutboundAt, LastError, CreatedAt, UpdatedAt, NotificationsForwardedUntil);
+        WebhookKey, LastInboundAt, LastOutboundAt, LastError, CreatedAt, UpdatedAt, NotificationsForwardedUntil,
+        NotificationCategoriesJson is null ? null : JsonSerializer.Deserialize<string[]>(NotificationCategoriesJson));
 }
 
 public sealed class ChannelMessageEntity
@@ -245,6 +248,9 @@ public sealed class ChannelRepository(JarvisDbContext db) : IChannelRepository
         entity.Enabled = request.Enabled;
         entity.AllowedSendersJson = JsonSerializer.Serialize(request.AllowedSenders ?? []);
         entity.ForwardNotifications = request.ForwardNotifications;
+        // Omitted on partial updates (for example the allowed-senders sheet) keeps what the owner chose.
+        if (request.NotificationCategories is not null)
+            entity.NotificationCategoriesJson = JsonSerializer.Serialize(request.NotificationCategories);
         entity.NotifyRecipient = string.IsNullOrWhiteSpace(request.NotifyRecipient) ? null : request.NotifyRecipient;
         entity.UpdatedAt = now;
     }

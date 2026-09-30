@@ -14,6 +14,7 @@ part 'channel_detail_screen.dart';
 part 'channel_allowed_senders_sheet.dart';
 part 'channel_editor_sheet.dart';
 part 'channel_link_sheet.dart';
+part 'channel_notifications_sheet.dart';
 part 'channel_thread_screen.dart';
 
 ({String label, IconData icon, Color color}) channelKind(String kind) =>
