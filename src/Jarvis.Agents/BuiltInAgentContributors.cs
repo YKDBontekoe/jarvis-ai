@@ -62,6 +62,8 @@ internal sealed class CoreAgentTools(
         yield return AIFunctionFactory.Create(reminderTools.CreateReminderAsync);
         yield return AIFunctionFactory.Create(reminderTools.ListRemindersAsync);
         yield return AIFunctionFactory.Create(reminderTools.CancelReminderAsync);
+        yield return AIFunctionFactory.Create(reminderTools.SnoozeReminderAsync);
+        yield return AIFunctionFactory.Create(reminderTools.CompleteReminderAsync);
         yield return AIFunctionFactory.Create(fileTools.SearchFilesAsync);
         yield return AIFunctionFactory.Create(fileTools.ListFilesAsync);
         yield return AIFunctionFactory.Create(taskTools.ListTasksAsync);

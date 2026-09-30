@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Jarvis.Application.Audit;
+using Jarvis.Application.Approvals;
 using Microsoft.Extensions.Logging;
 using Jarvis.Application.Automations;
 using Jarvis.Application.Conversations;
@@ -13,11 +13,11 @@ public sealed class AutomationRunExecutor(
     IAutomationRuleRepository rules,
     IAutomationRunRepository runs,
     INotificationRepository notifications,
+    IToolApprovalStore approvals,
     IJarvisTaskService tasks,
     IAutomationChannelSender channelSender,
     IConversationStore conversations,
     AutomationConditionEvaluator conditions,
-    IAuditEventStore auditEvents,
     TimeProvider timeProvider,
     ILogger<AutomationRunExecutor> logger) : IAutomationRunExecutor
 {
@@ -26,23 +26,20 @@ public sealed class AutomationRunExecutor(
     {
         var rule = await rules.GetForExecutionAsync(input.RuleId, cancellationToken);
         if (rule is null || rule.OwnerId != input.OwnerId)
-            return Failed("Rule not found.");
+            return await FailAsync(input, "The automation no longer exists.", cancellationToken);
 
         if (!input.AfterApproval && rule.Status != AutomationRuleStatuses.Enabled && !input.TestRun)
-            return Failed("Rule is not enabled.");
+            return await SkipAsync(input, rule, "The automation is switched off.", cancellationToken);
 
         var definition = AutomationDefinitionJson.Parse(rule.DefinitionJson);
-        if (!input.AfterApproval && !input.TestRun && rule.CooldownUntil is not null &&
+        var ownerAsked = input.TestRun || input.TriggerKind == AutomationTriggerKinds.Manual;
+        if (!input.AfterApproval && !ownerAsked && rule.CooldownUntil is not null &&
             rule.CooldownUntil > timeProvider.GetUtcNow())
-            return Failed("Rule is in cooldown.");
+            return await SkipAsync(input, rule, "It already ran moments ago (cooldown).", cancellationToken);
 
         if (!input.AfterApproval &&
             !await conditions.EvaluateAllAsync(input.OwnerId, definition.Conditions, cancellationToken))
-        {
-            var skipped = Serialize([new AutomationActionResult("conditions", "skipped", "Conditions not met.", null)]);
-            await runs.CompleteAsync(input.RunId, skipped, cancellationToken);
-            return new AutomationRunActivityResult(true, skipped, false);
-        }
+            return await SkipAsync(input, rule, "Its conditions were not met.", cancellationToken);
 
         var limits = definition.Limits;
         var maxActions = limits?.MaxActionsPerRun ?? AutomationSchema.DefaultMaxActionsPerRun;
@@ -50,10 +47,13 @@ public sealed class AutomationRunExecutor(
         var deadline = timeProvider.GetUtcNow() + maxDuration;
         var results = new List<AutomationActionResult>();
         var actionIndex = 0;
+        // Actions before the first one that needs approval already ran in the first pass; the approved pass
+        // picks up from that action and runs everything after it too.
+        var resumeFrom = input.AfterApproval ? FirstApprovalIndex(definition.Actions) : 0;
 
-        foreach (var action in definition.Actions)
+        for (var index = resumeFrom; index < definition.Actions.Count; index++)
         {
-            if (input.AfterApproval && !AutomationActionPolicy.RequiresApproval(action)) continue;
+            var action = definition.Actions[index];
             if (actionIndex >= maxActions) break;
             if (timeProvider.GetUtcNow() > deadline)
             {
@@ -63,17 +63,16 @@ public sealed class AutomationRunExecutor(
 
             if (AutomationActionPolicy.RequiresApproval(action) && !input.TestRun && !input.AfterApproval)
             {
-                var approvalId = Guid.CreateVersion7();
-                await runs.MarkWaitingApprovalAsync(input.RunId, approvalId, cancellationToken);
-                await notifications.CreateAsync(input.OwnerId, "automation.approval",
-                    "Automation needs approval", $"Approve action '{action.Kind}' for {rule.Name}.",
-                    input.RunId, cancellationToken);
-                await auditEvents.AppendAsync(input.OwnerId, "automations", "run.waiting_approval", "high", true,
-                    approvalId, JsonSerializer.Serialize(new { runId = input.RunId, action = action.Kind }),
-                    cancellationToken);
-                results.Add(new AutomationActionResult(action.Kind, "waiting_approval", null, approvalId));
-                await PostToLinkedChatAsync(rule, LinkedConversationCopy.AutomationWaitingApproval(rule.Name,
-                    action.Kind), cancellationToken);
+                var approval = await approvals.CreateAsync(input.OwnerId,
+                    rule.ConversationId ?? await rules.EnsureConversationAsync(rule.Id, cancellationToken),
+                    AutomationApprovals.RequestId(input.RunId), $"action-{index}",
+                    AutomationApprovals.ToolName(action), ApprovalArguments(rule, definition.Actions, index),
+                    null, cancellationToken);
+                await runs.MarkWaitingApprovalAsync(input.RunId, approval.Approval.Id, cancellationToken);
+                results.Add(new AutomationActionResult(action.Kind, "waiting_approval", null, approval.Approval.Id));
+                if (approval.Created)
+                    await PostToLinkedChatAsync(rule, LinkedConversationCopy.AutomationWaitingApproval(rule.Name,
+                        Label(action)), cancellationToken);
                 return new AutomationRunActivityResult(false, Serialize(results), true);
             }
 
@@ -93,16 +92,102 @@ public sealed class AutomationRunExecutor(
         }
 
         var json = Serialize(results);
-        await runs.CompleteAsync(input.RunId, json, cancellationToken);
-        var cooldown = limits?.CooldownMinutes ?? AutomationSchema.DefaultCooldownMinutes;
-        DateTimeOffset? next = definition.Trigger is ScheduleTriggerDefinition schedule
-            ? AutomationScheduleClock.GetNextScheduleFireUtc(timeProvider.GetUtcNow(), schedule)
-            : null;
-        await rules.UpdateScheduleStateAsync(input.RuleId, next, cooldown, cancellationToken);
         var failed = results.Any(result => result.Status == "failed");
+        if (failed)
+            await runs.FailAsync(input.RunId, "One or more actions failed.", json, cancellationToken);
+        else
+            await runs.CompleteAsync(input.RunId, json, cancellationToken);
+        if (!input.TestRun)
+        {
+            // Only automatic triggers start a cooldown; a run the owner asked for must not block the next
+            // scheduled one.
+            int? cooldown = ownerAsked ? null : limits?.CooldownMinutes ?? AutomationSchema.DefaultCooldownMinutes;
+            DateTimeOffset? next = definition.Trigger is ScheduleTriggerDefinition schedule && rule.Status ==
+                AutomationRuleStatuses.Enabled
+                ? AutomationScheduleClock.GetNextScheduleFireUtc(timeProvider.GetUtcNow(), schedule)
+                : null;
+            await rules.UpdateScheduleStateAsync(input.RuleId, next, cooldown, cancellationToken);
+        }
         await PostToLinkedChatAsync(rule, LinkedConversationCopy.AutomationRun(rule.Name,
             failed ? "failed" : "completed", input.TriggerReason, json, input.TestRun), cancellationToken);
         return new AutomationRunActivityResult(true, json, false);
+    }
+
+    private static int FirstApprovalIndex(IReadOnlyList<AutomationActionDefinition> actions)
+    {
+        for (var index = 0; index < actions.Count; index++)
+            if (AutomationActionPolicy.RequiresApproval(actions[index])) return index;
+        return actions.Count;
+    }
+
+    /// <summary>
+    /// What the approval card shows: the automation, the exact action waiting for a decision and, in plain words,
+    /// the actions that follow it, because approving releases all of them.
+    /// </summary>
+    private static string ApprovalArguments(AutomationRuleRecord rule,
+        IReadOnlyList<AutomationActionDefinition> actions, int index)
+    {
+        var fields = new Dictionary<string, string> { ["automation"] = rule.Name, ["action"] = Label(actions[index]) };
+        switch (actions[index])
+        {
+            case ChannelMessageActionDefinition channel:
+                fields["recipient"] = channel.Recipient;
+                fields["message"] = Preview(channel.Body);
+                break;
+            case AgentRunActionDefinition agent:
+                fields["title"] = agent.Title;
+                fields["instructions"] = Preview(agent.Prompt);
+                break;
+            case TaskActionDefinition task:
+                fields["title"] = task.Title;
+                fields["instructions"] = Preview(task.Prompt);
+                break;
+            case NotificationActionDefinition notification:
+                fields["title"] = notification.Title;
+                fields["message"] = Preview(notification.Body);
+                break;
+        }
+
+        var afterwards = actions.Skip(index + 1).Select(Summary).ToArray();
+        if (afterwards.Length > 0) fields["afterwards"] = string.Join("; ", afterwards);
+        return JsonSerializer.Serialize(fields);
+    }
+
+    private static string Label(AutomationActionDefinition action) => action switch
+    {
+        ChannelMessageActionDefinition => "Send a message",
+        AgentRunActionDefinition => "Start an agent task",
+        TaskActionDefinition => "Create a task",
+        NotificationActionDefinition => "Notify you",
+        _ => action.Kind
+    };
+
+    private static string Summary(AutomationActionDefinition action) => action switch
+    {
+        ChannelMessageActionDefinition channel => $"Send “{Preview(channel.Body, 80)}” to {channel.Recipient}",
+        AgentRunActionDefinition agent => $"Start an agent task “{agent.Title}”",
+        TaskActionDefinition task => $"Create a task “{task.Title}”",
+        NotificationActionDefinition notification => $"Notify you “{notification.Title}”",
+        _ => action.Kind
+    };
+
+    private async Task<AutomationRunActivityResult> SkipAsync(AutomationRunWorkflowInput input,
+        AutomationRuleRecord rule, string reason, CancellationToken cancellationToken)
+    {
+        var json = Serialize([new AutomationActionResult("run", "skipped", reason, null)]);
+        await runs.SkipAsync(input.RunId, reason, json, cancellationToken);
+        if (input.TestRun || input.TriggerKind == AutomationTriggerKinds.Manual)
+            await PostToLinkedChatAsync(rule, LinkedConversationCopy.AutomationRun(rule.Name, "skipped",
+                input.TriggerReason, json, input.TestRun), cancellationToken);
+        return new AutomationRunActivityResult(true, json, false);
+    }
+
+    private async Task<AutomationRunActivityResult> FailAsync(AutomationRunWorkflowInput input, string summary,
+        CancellationToken cancellationToken)
+    {
+        var json = Serialize([new AutomationActionResult("run", "failed", summary, null)]);
+        await runs.FailAsync(input.RunId, summary, json, cancellationToken);
+        return new AutomationRunActivityResult(false, json, false);
     }
 
     private async Task PostToLinkedChatAsync(AutomationRuleRecord rule, string content,
@@ -160,11 +245,10 @@ public sealed class AutomationRunExecutor(
         }
     }
 
-    private AutomationRunActivityResult Failed(string summary) =>
-        new(false, Serialize([new AutomationActionResult("run", "failed", summary, null)]), false);
-
     private static string Serialize(IReadOnlyList<AutomationActionResult> results) =>
         JsonSerializer.Serialize(results);
+
+    private static string Preview(string text, int max = 600) => text.Length <= max ? text : text[..(max - 1)] + "…";
 
     private static string Sanitize(string message) =>
         message.Length <= 200 ? message : message[..200];

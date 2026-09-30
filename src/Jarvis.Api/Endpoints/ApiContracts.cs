@@ -35,6 +35,9 @@ public sealed record ToolApprovalDto(Guid Id, Guid ConversationId, string ToolNa
     string Status, bool? Approved, string ResumeStatus, DateTimeOffset CreatedAt);
 public sealed record ReminderRequest(string? Title, DateTimeOffset DueAt, string? Recurrence = null,
     int Weekdays = 0, string? TimeZoneId = null, DateOnly? Until = null, TimeOnly? LocalTime = null);
+
+/// <summary>Snooze for a number of minutes from now, or until an exact moment.</summary>
+public sealed record SnoozeReminderRequest(int? Minutes = null, DateTimeOffset? Until = null);
 public sealed record ReminderDto(Guid Id, string Title, DateTimeOffset DueAt, string Status, DateTimeOffset CreatedAt,
     DateTimeOffset? CompletedAt, string Recurrence, int Weekdays, string TimeZoneId, TimeOnly? LocalTime,
     DateOnly? Until, DateTimeOffset? LastDeliveredAt, Guid? ConversationId = null);

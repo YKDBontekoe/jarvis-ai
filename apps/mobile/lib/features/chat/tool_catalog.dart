@@ -34,6 +34,26 @@ const _catalog = <String, ToolDescription>{
     'Cancelled a reminder',
     PhosphorIconsRegular.bellSlash,
   ),
+  'SnoozeReminder': ToolDescription(
+    'Snoozing a reminder',
+    'Snoozed a reminder',
+    PhosphorIconsRegular.clockCounterClockwise,
+  ),
+  'CompleteReminder': ToolDescription(
+    'Marking a reminder done',
+    'Marked a reminder done',
+    PhosphorIconsRegular.checkCircle,
+  ),
+  'automation_channel_message': ToolDescription(
+    'Sending a message for an automation',
+    'Sent a message for an automation',
+    PhosphorIconsRegular.paperPlaneTilt,
+  ),
+  'automation_agent_run': ToolDescription(
+    'Starting an agent task for an automation',
+    'Started an agent task for an automation',
+    PhosphorIconsRegular.lightning,
+  ),
   'SearchMemory': ToolDescription(
     'Searching memory',
     'Searched memory',

@@ -1,4 +1,5 @@
-bool opensApprovalScreen(String? type) => type == 'approval.required';
+bool opensApprovalScreen(String? type) =>
+    type == 'approval.required' || type == 'automation.approval';
 
 bool opensCodingRun(String? type) =>
     type == 'coding.pr.ready' || type == 'coding.run.ready';

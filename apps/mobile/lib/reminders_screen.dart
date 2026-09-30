@@ -10,22 +10,13 @@ import 'features/coding/coding_run_detail_screen.dart';
 import 'daily_briefing_screen.dart';
 import 'notification_details_screen.dart';
 import 'notification_routing.dart';
+import 'schedule_format.dart';
 import 'json_maps.dart';
 import 'task_details_screen.dart';
 import 'theme.dart';
 import 'ui/jarvis_ui.dart';
 
 part 'reminder_editor.dart';
-
-const _weekdayChoices = [
-  (1, 'Mon'),
-  (2, 'Tue'),
-  (4, 'Wed'),
-  (8, 'Thu'),
-  (16, 'Fri'),
-  (32, 'Sat'),
-  (64, 'Sun'),
-];
 
 enum RemindersTab { reminders, notifications }
 
@@ -67,6 +58,9 @@ class _RemindersScreenState extends State<RemindersScreen>
   void initState() {
     super.initState();
     _load();
+    deviceTimeZoneLookup().then((zone) {
+      if (mounted && zone != null) setState(() => _deviceZone = zone);
+    });
   }
 
   Future<void> _load() async {
@@ -137,25 +131,58 @@ class _RemindersScreenState extends State<RemindersScreen>
     }
   }
 
-  Future<void> _createReminder() async {
-    var timeZoneId = 'UTC';
+  /// The zone a new reminder uses: the device's own, else the one from the
+  /// briefing settings. [seedOwnerZone] is set when the owner has no zone on
+  /// file yet, so the first reminder can save it for chat and briefings too.
+  Future<String> _reminderTimeZone() async {
+    final device = await deviceTimeZoneLookup();
     try {
-      final briefing = await widget.http.get<dynamic>(
+      final response = await widget.http.get<dynamic>(
         '/api/v1/briefings/daily',
       );
-      timeZoneId =
-          asJsonString(jsonObject(briefing.data)?['timeZoneId']) ?? 'UTC';
+      _briefing = jsonObject(response.data);
     } on DioException {
-      // Keep UTC when briefing settings are unavailable.
+      _briefing = null;
     } catch (_) {
-      // Keep UTC when briefing settings are malformed.
+      _briefing = null;
     }
-    if (!mounted) return;
+    final saved = asJsonString(_briefing?['timeZoneId']);
+    return device ?? saved ?? 'UTC';
+  }
+
+  Map<String, dynamic>? _briefing;
+
+  /// Saves the device zone as the owner's zone (briefing stays off) when none
+  /// was ever set, so reminders made in chat run on the same clock.
+  Future<void> _seedOwnerZone(String zone) async {
+    final briefing = _briefing;
+    if (briefing == null || zone == 'UTC') return;
+    if ((asJsonString(briefing['workflowId']) ?? '').isNotEmpty) return;
+    try {
+      await widget.http.put<dynamic>(
+        '/api/v1/briefings/daily',
+        data: {
+          'enabled': false,
+          'localTime': asJsonString(briefing['localTime']) ?? '08:00:00',
+          'timeZoneId': zone,
+        },
+      );
+    } on DioException {
+      // The reminder already carries its own zone.
+    } catch (_) {
+      // Same.
+    }
+  }
+
+  Future<void> _createReminder() async {
+    final zoneLookup = _reminderTimeZone();
     final created = await showDialog<_NewReminder>(
       context: context,
-      builder: (_) => const _NewReminderDialog(),
+      builder: (_) => _NewReminderDialog(timeZone: zoneLookup),
     );
     if (created == null || !mounted) return;
+    final timeZoneId = await zoneLookup;
+    if (!mounted) return;
 
     final localDueAt = DateTime(
       created.date.year,
@@ -182,7 +209,9 @@ class _RemindersScreenState extends State<RemindersScreen>
           'localTime': localTime,
         },
       );
+      await _seedOwnerZone(timeZoneId);
       await _load();
+      if (mounted) _showMessage('Reminder set.');
     } on DioException catch (error) {
       if (mounted) {
         final message = error.response?.statusCode == 503
@@ -194,6 +223,52 @@ class _RemindersScreenState extends State<RemindersScreen>
     } catch (_) {
       if (mounted) _showError('Jarvis could not create that reminder.');
     }
+  }
+
+  Future<void> _snooze(String? id, Duration by, {DateTime? until}) async {
+    if (id == null) return;
+    try {
+      final response = await widget.http.post<dynamic>(
+        '/api/v1/reminders/$id/snooze',
+        data: until != null
+            ? {'until': until.toUtc().toIso8601String()}
+            : {'minutes': by.inMinutes},
+      );
+      final dueAt = jsonDate(jsonObject(response.data)?['dueAt'], local: true);
+      await _load();
+      if (mounted && dueAt != null) {
+        _showMessage('Snoozed until ${friendlyWhen(context, dueAt)}.');
+      }
+    } on DioException catch (error) {
+      if (mounted) {
+        _showError(
+          firstProblemMessage(error.response?.data) ??
+              'Jarvis could not snooze that reminder.',
+        );
+      }
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not snooze that reminder.');
+    }
+  }
+
+  Future<void> _markDone(Map<String, dynamic> reminder) async {
+    final id = jsonId(reminder);
+    if (id == null) return;
+    try {
+      await widget.http.post<dynamic>('/api/v1/reminders/$id/complete');
+      await _load();
+      if (mounted) _showMessage('Marked as done.');
+    } on DioException {
+      if (mounted) _showError('Jarvis could not update that reminder.');
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not update that reminder.');
+    }
+  }
+
+  /// Tomorrow at 09:00 local time, the "later" choice in snooze menus.
+  static DateTime _tomorrowMorning() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day + 1, 9);
   }
 
   Future<void> _cancelReminder(Map<String, dynamic> reminder) async {
@@ -228,8 +303,12 @@ class _RemindersScreenState extends State<RemindersScreen>
       final id = jsonId(reminder);
       if (id == null) return;
       try {
-        final response = await widget.http.get<dynamic>('/api/v1/reminders/$id');
-        conversationId = asJsonString(jsonObject(response.data)?['conversationId']);
+        final response = await widget.http.get<dynamic>(
+          '/api/v1/reminders/$id',
+        );
+        conversationId = asJsonString(
+          jsonObject(response.data)?['conversationId'],
+        );
       } on DioException {
         if (mounted) _showError('Jarvis could not open that reminder chat.');
         return;
@@ -326,13 +405,38 @@ class _RemindersScreenState extends State<RemindersScreen>
     );
   }
 
+  Widget _snoozeActions(String? reminderId) => Padding(
+    padding: const EdgeInsets.only(top: 10),
+    child: Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        OutlinedButton.icon(
+          onPressed: () => _snooze(reminderId, const Duration(minutes: 10)),
+          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
+          icon: const Icon(
+            PhosphorIconsRegular.clockCounterClockwise,
+            size: 16,
+          ),
+          label: const Text('Snooze 10 min'),
+        ),
+        OutlinedButton(
+          onPressed: () => _snooze(reminderId, const Duration(hours: 1)),
+          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
+          child: const Text('1 hour'),
+        ),
+      ],
+    ),
+  );
+
   Future<void> _markAllRead() async {
     final unread = _notifications.where((item) => item['readAt'] == null);
     final ids = [for (final item in unread) ?jsonId(item)];
     if (ids.isEmpty) return;
     try {
       await Future.wait([
-        for (final id in ids) widget.http.post('/api/v1/notifications/$id/read'),
+        for (final id in ids)
+          widget.http.post('/api/v1/notifications/$id/read'),
       ]);
     } on DioException {
       if (mounted) _showError('Jarvis could not mark everything as read.');
@@ -356,7 +460,8 @@ class _RemindersScreenState extends State<RemindersScreen>
     } else if (opensCodingRun(type) && sourceId != null) {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
-          builder: (_) => CodingRunDetailScreen(http: widget.http, runId: sourceId),
+          builder: (_) =>
+              CodingRunDetailScreen(http: widget.http, runId: sourceId),
         ),
       );
     } else if (opensDailyBriefing(type)) {
@@ -376,9 +481,12 @@ class _RemindersScreenState extends State<RemindersScreen>
         widget.onOpenConversation != null &&
         sourceId != null) {
       try {
-        final response = await widget.http.get<dynamic>('/api/v1/reminders/$sourceId');
-        final conversationId =
-            asJsonString(jsonObject(response.data)?['conversationId']);
+        final response = await widget.http.get<dynamic>(
+          '/api/v1/reminders/$sourceId',
+        );
+        final conversationId = asJsonString(
+          jsonObject(response.data)?['conversationId'],
+        );
         if (conversationId != null) {
           await widget.onOpenConversation!(conversationId);
         } else if (mounted && opensNotificationDetails(type)) {
@@ -405,6 +513,22 @@ class _RemindersScreenState extends State<RemindersScreen>
           );
         }
       }
+    } else if (type == 'automation.notification' &&
+        widget.onOpenConversation != null &&
+        sourceId != null) {
+      try {
+        final response = await widget.http.get<dynamic>(
+          '/api/v1/automations/$sourceId',
+        );
+        final conversationId = asJsonString(
+          jsonObject(response.data)?['conversationId'],
+        );
+        if (conversationId != null) {
+          await widget.onOpenConversation!(conversationId);
+        }
+      } on DioException {
+        if (mounted) _showError('Jarvis could not open that automation.');
+      }
     } else if (sourceId != null && opensNotificationDetails(type)) {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -422,27 +546,16 @@ class _RemindersScreenState extends State<RemindersScreen>
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
+
+  void _showMessage(String message) => _showError(message);
 
   String _formatDate(dynamic raw) {
     final date = jsonDate(raw, local: true);
-    if (date == null) return '';
-    final dateLabel = MaterialLocalizations.of(context).formatMediumDate(date);
-    final timeLabel = MaterialLocalizations.of(context)
-        .formatTimeOfDay(TimeOfDay.fromDateTime(date));
-    return '$dateLabel · $timeLabel';
-  }
-
-  String _scheduleLabel(Map<String, dynamic> reminder) {
-    final next = _formatDate(reminder['dueAt']);
-    return switch (asJsonString(reminder['recurrence'])) {
-      'daily' => 'Every day · next $next',
-      'weekdays' => 'Weekdays · next $next',
-      'weekly' => 'Weekly · next $next',
-      _ => next,
-    };
+    return date == null ? '' : friendlyWhen(context, date);
   }
 
   @override
@@ -497,32 +610,32 @@ class _RemindersScreenState extends State<RemindersScreen>
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('Notifications'),
-                      if (_unreadCount > 0) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: JarvisColors.of(context).ink,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            '$_unreadCount',
-                            style: TextStyle(
-                              color: JarvisColors.of(context).onInk,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Notifications'),
+                        if (_unreadCount > 0) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: JarvisColors.of(context).ink,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '$_unreadCount',
+                              style: TextStyle(
+                                color: JarvisColors.of(context).onInk,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
-                    ],
-                  ),
+                    ),
                   ),
                 ),
               ],
@@ -567,7 +680,8 @@ class _RemindersScreenState extends State<RemindersScreen>
       });
     for (final reminder in sorted) {
       final due = jsonDate(reminder['dueAt'], local: true);
-      final pending = (asJsonString(reminder['status']) ?? 'pending') == 'pending';
+      final pending =
+          (asJsonString(reminder['status']) ?? 'pending') == 'pending';
       final key = !pending
           ? 'Finished'
           : due == null || !due.isBefore(endOfToday)
@@ -577,6 +691,8 @@ class _RemindersScreenState extends State<RemindersScreen>
           : 'Today';
       buckets[key]!.add(reminder);
     }
+    // Most recent first, so the collapsed list shows what just happened.
+    buckets['Finished'] = buckets['Finished']!.reversed.toList();
     return [
       for (final entry in buckets.entries)
         if (entry.value.isNotEmpty) ...[entry.key, ...entry.value],
@@ -630,78 +746,222 @@ class _RemindersScreenState extends State<RemindersScreen>
         )
       : ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-          itemCount: _reminderRows.length,
+          itemCount: _visibleReminderRows.length,
           itemBuilder: (context, index) {
-            final row = _reminderRows[index];
+            final row = _visibleReminderRows[index];
             if (row is String) return _GroupHeader(row);
+            if (row is _ShowMoreFinished) {
+              return ContentWidth(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () => setState(() => _showAllFinished = true),
+                    child: Text('Show ${row.hidden} older'),
+                  ),
+                ),
+              );
+            }
             final reminder = row as Map<String, dynamic>;
-            final status = asJsonString(reminder['status']) ?? 'pending';
-            final pending = status == 'pending';
-            final style = statusStyle(status);
             return FadeSlideIn(
               index: index,
-              child: ContentWidth(
-              child: SurfaceCard(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.fromLTRB(16, 14, 6, 14),
-                onTap: widget.onOpenConversation == null
-                    ? null
-                    : () => _openChat(reminder),
-                child: Row(
-                  children: [
-                    IconBadge(
-                      icon: pending
-                          ? PhosphorIconsRegular.alarm
-                          : PhosphorIconsRegular.bellSlash,
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            asJsonString(reminder['title']) ?? '',
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(fontSize: 15),
-                          ),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              StatusPill(
-                                label: style.label,
-                                color: style.color,
-                              ),
-                              Text(
-                                _scheduleLabel(reminder),
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (widget.onOpenConversation != null)
-                      IconButton(
-                        tooltip: 'Open chat',
-                        onPressed: () => _openChat(reminder),
-                        icon: const Icon(PhosphorIconsRegular.chatCircle, size: 20),
-                      ),
-                    if (pending)
-                      IconButton(
-                        tooltip: 'Cancel reminder',
-                        onPressed: () => _cancelReminder(reminder),
-                        icon: const Icon(PhosphorIconsRegular.x, size: 20),
-                      ),
-                  ],
-                ),
-              ),
-              ),
+              child: ContentWidth(child: _reminderCard(reminder)),
             );
           },
         );
+
+  bool _showAllFinished = false;
+  String? _deviceZone;
+  static const _finishedPreview = 5;
+
+  /// [_reminderRows] with the finished group trimmed to a few recent items.
+  List<Object> get _visibleReminderRows {
+    final rows = _reminderRows;
+    if (_showAllFinished) return rows;
+    final start = rows.indexOf('Finished');
+    if (start < 0) return rows;
+    final finished = rows.sublist(start + 1);
+    if (finished.length <= _finishedPreview) return rows;
+    return [
+      ...rows.sublist(0, start + 1),
+      ...finished.take(_finishedPreview),
+      _ShowMoreFinished(finished.length - _finishedPreview),
+    ];
+  }
+
+  Widget _reminderCard(Map<String, dynamic> reminder) {
+    final colors = JarvisColors.of(context);
+    final status = asJsonString(reminder['status']) ?? 'pending';
+    final pending = status == 'pending';
+    final repeat = repeatLabel(
+      asJsonString(reminder['recurrence']),
+      reminder['weekdays'] is int ? reminder['weekdays'] as int : 0,
+    );
+    final due = jsonDate(reminder['dueAt'], local: true);
+    final outcome = _outcome(reminder);
+    final zone = asJsonString(reminder['timeZoneId']);
+    final otherZone =
+        pending && zone != null && _deviceZone != null && zone != _deviceZone;
+
+    final String primary;
+    if (pending && due != null) {
+      final when = friendlyWhen(context, due);
+      primary = repeat == null ? when : '$repeat · next $when';
+    } else {
+      primary = outcome.label;
+    }
+    final relative = pending && due != null ? relativeFromNow(due) : null;
+
+    return SurfaceCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(16, 14, 4, 14),
+      onTap: widget.onOpenConversation == null
+          ? null
+          : () => _openChat(reminder),
+      child: Row(
+        children: [
+          IconBadge(
+            icon: pending
+                ? (repeat == null
+                      ? PhosphorIconsRegular.alarm
+                      : PhosphorIconsRegular.repeat)
+                : outcome.icon,
+            color: pending ? null : outcome.color,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  asJsonString(reminder['title']) ?? '',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontSize: 15,
+                    color: pending ? null : colors.inkSoft,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: primary),
+                      if (relative != null)
+                        TextSpan(
+                          text: ' · $relative',
+                          style: TextStyle(color: colors.muted),
+                        ),
+                    ],
+                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: colors.inkSoft),
+                ),
+                if (otherZone)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      'Runs on ${zone.replaceAll('_', ' ')} time',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: colors.inkSoft),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          _reminderMenu(reminder, pending: pending, repeating: repeat != null),
+        ],
+      ),
+    );
+  }
+
+  /// What happened to a reminder that is no longer upcoming.
+  ({String label, IconData icon, Color color}) _outcome(
+    Map<String, dynamic> reminder,
+  ) {
+    final colors = JarvisColors.of(context);
+    final status = asJsonString(reminder['status']) ?? 'pending';
+    final delivered = jsonDate(reminder['lastDeliveredAt'], local: true);
+    final completed = jsonDate(reminder['completedAt'], local: true);
+    return switch (status) {
+      'completed' || 'delivered' when delivered != null => (
+        label: 'Reminded you ${friendlyWhen(context, delivered)}',
+        icon: PhosphorIconsRegular.checkCircle,
+        color: colors.success,
+      ),
+      'completed' || 'delivered' => (
+        label: completed == null
+            ? 'Done'
+            : 'Marked done ${friendlyWhen(context, completed)}',
+        icon: PhosphorIconsRegular.checkCircle,
+        color: colors.success,
+      ),
+      'cancelled' => (
+        label: 'Cancelled',
+        icon: PhosphorIconsRegular.bellSlash,
+        color: colors.muted,
+      ),
+      'failed' => (
+        label: 'Could not be delivered',
+        icon: PhosphorIconsRegular.warningCircle,
+        color: colors.danger,
+      ),
+      _ => (
+        label: statusStyle(status).label,
+        icon: PhosphorIconsRegular.alarm,
+        color: colors.inkSoft,
+      ),
+    };
+  }
+
+  Widget _reminderMenu(
+    Map<String, dynamic> reminder, {
+    required bool pending,
+    required bool repeating,
+  }) {
+    final id = jsonId(reminder);
+    final status = asJsonString(reminder['status']) ?? 'pending';
+    final canSnooze = pending || status == 'completed' || status == 'delivered';
+    return PopupMenuButton<String>(
+      tooltip: 'Reminder actions',
+      icon: const Icon(PhosphorIconsRegular.dotsThree, size: 20),
+      onSelected: (value) => switch (value) {
+        'snooze10' => _snooze(id, const Duration(minutes: 10)),
+        'snooze60' => _snooze(id, const Duration(hours: 1)),
+        'tomorrow' => _snooze(id, Duration.zero, until: _tomorrowMorning()),
+        'done' => _markDone(reminder),
+        'chat' => _openChat(reminder),
+        'cancel' => _cancelReminder(reminder),
+        _ => Future<void>.value(),
+      },
+      itemBuilder: (_) => [
+        if (canSnooze) ...[
+          PopupMenuItem(
+            value: 'snooze10',
+            child: Text(
+              pending ? 'Remind me in 10 min' : 'Remind me again in 10 min',
+            ),
+          ),
+          const PopupMenuItem(value: 'snooze60', child: Text('In 1 hour')),
+          const PopupMenuItem(
+            value: 'tomorrow',
+            child: Text('Tomorrow at 9:00'),
+          ),
+        ],
+        if (pending && !repeating)
+          const PopupMenuItem(value: 'done', child: Text('Mark as done')),
+        if (widget.onOpenConversation != null)
+          const PopupMenuItem(value: 'chat', child: Text('Open chat')),
+        if (pending)
+          PopupMenuItem(
+            value: 'cancel',
+            child: Text(
+              repeating ? 'Stop repeating' : 'Cancel reminder',
+              style: TextStyle(color: JarvisColors.of(context).danger),
+            ),
+          ),
+      ],
+    );
+  }
 
   IconData _notificationIcon(Object? type) => switch (type) {
     'reminder.due' || 'reminder.failed' => PhosphorIconsRegular.alarm,
@@ -736,73 +996,85 @@ class _RemindersScreenState extends State<RemindersScreen>
             return FadeSlideIn(
               index: index,
               child: ContentWidth(
-              child: SurfaceCard(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                color: unread
-                    ? JarvisColors.of(context).surface
-                    : JarvisColors.of(context).canvas,
-                borderColor: JarvisColors.of(context).outline,
-                onTap: () => _openNotification(notification),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    IconBadge(icon: _notificationIcon(notification['type'])),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            asJsonString(notification['title']) ?? '',
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(
-                                  fontSize: 15,
-                                  fontWeight: unread
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                ),
-                          ),
-                          if (body.isNotEmpty) ...[
-                            const SizedBox(height: 4),
+                child: SurfaceCard(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  color: unread
+                      ? JarvisColors.of(context).surface
+                      : JarvisColors.of(context).canvas,
+                  borderColor: JarvisColors.of(context).outline,
+                  onTap: () => _openNotification(notification),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      IconBadge(icon: _notificationIcon(notification['type'])),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              body,
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                height: 1.4,
-                                color: JarvisColors.of(context).inkSoft,
+                              asJsonString(notification['title']) ?? '',
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    fontSize: 15,
+                                    fontWeight: unread
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                  ),
+                            ),
+                            if (body.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                body,
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  height: 1.4,
+                                  color: JarvisColors.of(context).inkSoft,
+                                ),
                               ),
+                            ],
+                            if (asJsonString(notification['type']) ==
+                                    'reminder.due' &&
+                                notification['sourceId'] != null)
+                              _snoozeActions(
+                                asJsonString(notification['sourceId']),
+                              ),
+                            if (asJsonString(notification['type']) ==
+                                    'approval.required' &&
+                                _pendingApprovals[asJsonString(
+                                      notification['sourceId'],
+                                    )] !=
+                                    null)
+                              _approvalActions(
+                                _pendingApprovals[asJsonString(
+                                  notification['sourceId'],
+                                )]!,
+                              ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _formatDate(notification['createdAt']),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: JarvisColors.of(context).muted,
+                                  ),
                             ),
                           ],
-                          if (asJsonString(notification['type']) == 'approval.required' &&
-                              _pendingApprovals[asJsonString(notification['sourceId'])] != null)
-                            _approvalActions(
-                              _pendingApprovals[asJsonString(notification['sourceId'])]!,
-                            ),
-                          const SizedBox(height: 6),
-                          Text(
-                            _formatDate(notification['createdAt']),
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: JarvisColors.of(context).muted,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (unread)
-                      Container(
-                        margin: const EdgeInsets.only(top: 6, left: 8),
-                        width: 9,
-                        height: 9,
-                        decoration: BoxDecoration(
-                          color: JarvisColors.of(context).accent,
-                          shape: BoxShape.circle,
                         ),
                       ),
-                  ],
+                      if (unread)
+                        Container(
+                          margin: const EdgeInsets.only(top: 6, left: 8),
+                          width: 9,
+                          height: 9,
+                          decoration: BoxDecoration(
+                            color: JarvisColors.of(context).accent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
               ),
             );
           },
@@ -822,15 +1094,21 @@ class _GroupHeader extends StatelessWidget {
       child: SizedBox(
         width: double.infinity,
         child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: label == 'Overdue'
-              ? JarvisColors.of(context).danger
-              : JarvisColors.of(context).muted,
-          letterSpacing: .3,
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: label == 'Overdue'
+                ? JarvisColors.of(context).danger
+                : JarvisColors.of(context).muted,
+            letterSpacing: .3,
+          ),
         ),
-      ),
       ),
     ),
   );
+}
+
+class _ShowMoreFinished {
+  const _ShowMoreFinished(this.hidden);
+
+  final int hidden;
 }

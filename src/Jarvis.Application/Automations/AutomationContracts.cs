@@ -57,6 +57,8 @@ public sealed record AutomationActionResult(string Kind, string Status, string? 
 
 public sealed record AutomationRunActivityResult(bool Continue, string ActionResultsJson, bool WaitingApproval);
 
+public sealed record AutomationRunCloseInput(Guid RunId, Guid OwnerId, string Reason);
+
 public sealed record AutomationTriggerFireInput(Guid RuleId, Guid OwnerId, string TriggerKind, string TriggerReason,
     string IdempotencyKey, bool TestRun);
 
@@ -77,8 +79,11 @@ public interface IAutomationRuleRepository
     Task<IReadOnlyList<AutomationRuleRecord>> ListPendingScheduleDispatchAsync(CancellationToken cancellationToken);
     Task<int> RequeueStaleSchedulesAsync(DateTimeOffset utcNow, CancellationToken cancellationToken);
     Task MarkScheduleDispatchedAsync(Guid id, CancellationToken cancellationToken);
+    /// <summary>Records that a run happened: sets the last run time, the next fire and an optional cooldown.</summary>
     Task UpdateScheduleStateAsync(Guid id, DateTimeOffset? nextRunAt, int? cooldownMinutes,
         CancellationToken cancellationToken);
+    /// <summary>Stores the next planned fire without claiming that a run happened.</summary>
+    Task UpdateNextRunAsync(Guid id, DateTimeOffset? nextRunAt, CancellationToken cancellationToken);
     Task<int> CountActiveRunsAsync(Guid ownerId, CancellationToken cancellationToken);
 }
 
@@ -91,7 +96,20 @@ public interface IAutomationRunRepository
         CancellationToken cancellationToken);
     Task CompleteAsync(Guid runId, string actionResultsJson, CancellationToken cancellationToken);
     Task FailAsync(Guid runId, string? summary, string actionResultsJson, CancellationToken cancellationToken);
+    Task SkipAsync(Guid runId, string reason, string actionResultsJson, CancellationToken cancellationToken);
     Task MarkWaitingApprovalAsync(Guid runId, Guid approvalId, CancellationToken cancellationToken);
+    Task<AutomationRunRecord?> GetByApprovalIdAsync(Guid approvalId, Guid ownerId, CancellationToken cancellationToken);
+    /// <summary>The newest run of each of the owner's rules, keyed by rule id.</summary>
+    Task<IReadOnlyDictionary<Guid, AutomationRunRecord>> LatestPerRuleAsync(Guid ownerId,
+        CancellationToken cancellationToken);
+    /// <summary>
+    /// Closes runs whose workflow can no longer finish them: running past every activity timeout, or waiting on an
+    /// approval longer than the workflow waits. Without this they count against the owner's concurrent-run limit
+    /// forever and block every other automation.
+    /// </summary>
+    Task<int> ExpireAbandonedAsync(DateTimeOffset utcNow, CancellationToken cancellationToken);
+    /// <summary>Fails one active run and withdraws its open approval.</summary>
+    Task ExpireAsync(Guid runId, string reason, CancellationToken cancellationToken);
     Task<bool> HasRecentRunAsync(Guid ruleId, string idempotencyKey, CancellationToken cancellationToken);
 }
 
@@ -120,8 +138,33 @@ public interface IAutomationScheduler
 
 public interface IAutomationTriggerPublisher
 {
-    Task PublishReminderDueAsync(Guid ownerId, Guid reminderId, string reminderTitle,
+    /// <param name="dueAt">The occurrence that fired, so each firing of a repeating reminder starts its own run.</param>
+    Task PublishReminderDueAsync(Guid ownerId, Guid reminderId, string reminderTitle, DateTimeOffset dueAt,
         CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Applies an owner's decision from the shared approval inbox to the automation run that asked for it.
+/// </summary>
+public interface IAutomationApprovalResolver
+{
+    /// <returns>The chat line describing the outcome, or null when the run no longer waits on this approval.</returns>
+    Task<string?> ResolveAsync(Guid ownerId, Guid approvalId, bool approved, CancellationToken cancellationToken);
+}
+
+public static class AutomationApprovals
+{
+    public const string RequestPrefix = "automation-run:";
+
+    public static string RequestId(Guid runId) => RequestPrefix + runId.ToString("N");
+
+    public static bool IsAutomationApproval(string requestId) =>
+        requestId.StartsWith(RequestPrefix, StringComparison.Ordinal);
+
+    public static string ToolName(AutomationActionDefinition action) => "automation_" + action.Kind;
+
+    /// <summary>How long a run waits for a decision before it gives up. Mirrors the run workflow timer.</summary>
+    public static readonly TimeSpan DecisionWindow = TimeSpan.FromDays(7);
 }
 
 public interface IAutomationRunExecutor

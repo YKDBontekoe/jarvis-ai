@@ -106,7 +106,15 @@ public sealed class AutomationRuleService(
             reason, idempotencyKey, testRun), cancellationToken);
         if (!created) return run;
 
-        await scheduler.StartRunAsync(run, cancellationToken);
+        try
+        {
+            await scheduler.StartRunAsync(run, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            await runs.FailAsync(run.Id, "Jarvis could not start this run.", "[]", CancellationToken.None);
+            throw;
+        }
         return run;
     }
 }
@@ -117,7 +125,7 @@ public sealed class AutomationTriggerPublisher(
     IAutomationScheduler scheduler) : IAutomationTriggerPublisher
 {
     public async Task PublishReminderDueAsync(Guid ownerId, Guid reminderId, string reminderTitle,
-        CancellationToken cancellationToken)
+        DateTimeOffset dueAt, CancellationToken cancellationToken)
     {
         var all = await rules.ListAsync(ownerId, cancellationToken);
         foreach (var rule in all.Where(x => x.Status == AutomationRuleStatuses.Enabled))
@@ -126,7 +134,7 @@ public sealed class AutomationTriggerPublisher(
             if (definition.Trigger is not ReminderDueTriggerDefinition reminderTrigger) continue;
             if (reminderTrigger.ReminderId is Guid specific && specific != reminderId) continue;
 
-            var idempotencyKey = $"reminder_due:{reminderId:N}";
+            var idempotencyKey = $"reminder_due:{reminderId:N}:{dueAt.ToUniversalTime():yyyyMMddHHmm}";
             var (run, created) = await runs.TryStartAsync(new AutomationTriggerFireInput(rule.Id, ownerId,
                 AutomationTriggerKinds.ReminderDue, $"Reminder due: {reminderTitle}", idempotencyKey, false),
                 cancellationToken);

@@ -318,6 +318,25 @@ public sealed class AgentToolTests
             Items[index] = Items[index] with { Status = "cancelled" };
             return Task.FromResult<ReminderRecord?>(Items[index]);
         }
+
+        public Task<ReminderRecord?> SnoozeAsync(Guid id, Guid ownerId, DateTimeOffset dueAt,
+            CancellationToken cancellationToken)
+        {
+            var index = Items.FindIndex(item => item.Id == id && item.OwnerId == ownerId &&
+                item.Status is "pending" or "completed");
+            if (index < 0) return Task.FromResult<ReminderRecord?>(null);
+            Items[index] = Items[index] with { Status = "pending", DueAt = dueAt };
+            return Task.FromResult<ReminderRecord?>(Items[index]);
+        }
+
+        public Task<ReminderRecord?> MarkDoneAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+        {
+            var index = Items.FindIndex(item => item.Id == id && item.OwnerId == ownerId &&
+                item.Status == "pending" && item.Recurrence == "none");
+            if (index < 0) return Task.FromResult<ReminderRecord?>(null);
+            Items[index] = Items[index] with { Status = "completed" };
+            return Task.FromResult<ReminderRecord?>(Items[index]);
+        }
     }
 
     private sealed class FakeMemoryService : IMemoryService

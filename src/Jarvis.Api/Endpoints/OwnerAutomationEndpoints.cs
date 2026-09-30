@@ -1,5 +1,7 @@
 using System.Text.Json;
+using Jarvis.Api.Conversations;
 using Jarvis.Application.Automations;
+using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
 using Jarvis.Domain.Automations;
 
@@ -11,9 +13,13 @@ internal static class OwnerAutomationEndpoints
     {
         var group = api.MapGroup("/automations").WithTags("Automations");
 
-        group.MapGet("", async (IAutomationRuleService automations, ICurrentUser user, CancellationToken ct) =>
-                Results.Ok((await automations.ListAsync(user.OwnerId, ct)).Select(ToDto)))
-            .WithName("ListAutomations");
+        group.MapGet("", async (IAutomationRuleService automations, IAutomationRunRepository runs,
+            ICurrentUser user, CancellationToken ct) =>
+        {
+            var rules = await automations.ListAsync(user.OwnerId, ct);
+            var latest = await runs.LatestPerRuleAsync(user.OwnerId, ct);
+            return Results.Ok(rules.Select(rule => ToDto(rule, latest.GetValueOrDefault(rule.Id))));
+        }).WithName("ListAutomations");
 
         group.MapGet("/{id:guid}", async (Guid id, IAutomationRuleService automations, ICurrentUser user,
             CancellationToken ct) =>
@@ -134,43 +140,58 @@ internal static class OwnerAutomationEndpoints
             return Results.Ok(history.Select(ToRunDto));
         }).WithName("ListAutomationRuns");
 
-        group.MapPost("/runs/{runId:guid}/approve", async (Guid runId, IAutomationRunRepository runs,
-            IAutomationScheduler scheduler, ICurrentUser user, CancellationToken ct) =>
-        {
-            var run = await runs.GetAsync(runId, user.OwnerId, ct);
-            if (run is null) return Results.NotFound();
-            if (run.Status != AutomationRunStatuses.WaitingApproval) return Results.Conflict();
-            await scheduler.SignalApprovalResolvedAsync(run.WorkflowId, true, ct);
-            return Results.Accepted();
-        }).WithName("ApproveAutomationRun");
+        group.MapPost("/runs/{runId:guid}/approve", (Guid runId, IAutomationRunRepository runs,
+                IAutomationScheduler scheduler, IToolApprovalStore approvals, RemoteQueryExecutor remote, ICurrentUser user,
+                CancellationToken ct) =>
+            DecideRunAsync(runId, true, runs, scheduler, approvals, remote, user, ct))
+            .WithName("ApproveAutomationRun");
 
-        group.MapPost("/runs/{runId:guid}/decline", async (Guid runId, IAutomationRunRepository runs,
-            IAutomationScheduler scheduler, ICurrentUser user, CancellationToken ct) =>
-        {
-            var run = await runs.GetAsync(runId, user.OwnerId, ct);
-            if (run is null) return Results.NotFound();
-            if (run.Status != AutomationRunStatuses.WaitingApproval) return Results.Conflict();
-            await scheduler.SignalApprovalResolvedAsync(run.WorkflowId, false, ct);
-            await runs.FailAsync(runId, "Declined by owner.", "[]", ct);
-            return Results.NoContent();
-        }).WithName("DeclineAutomationRun");
+        group.MapPost("/runs/{runId:guid}/decline", (Guid runId, IAutomationRunRepository runs,
+                IAutomationScheduler scheduler, IToolApprovalStore approvals, RemoteQueryExecutor remote, ICurrentUser user,
+                CancellationToken ct) =>
+            DecideRunAsync(runId, false, runs, scheduler, approvals, remote, user, ct))
+            .WithName("DeclineAutomationRun");
 
         return api;
     }
 
-    private static object ToDto(AutomationRuleRecord rule) => new
+    /// <summary>
+    /// Runs created before automations joined the shared approval inbox have no inbox entry; they keep the direct
+    /// workflow signal. Everything else goes through the same decision path as chat and the approvals screen.
+    /// </summary>
+    private static async Task<IResult> DecideRunAsync(Guid runId, bool approved, IAutomationRunRepository runs,
+        IAutomationScheduler scheduler, IToolApprovalStore approvals, RemoteQueryExecutor remote, ICurrentUser user,
+        CancellationToken ct)
+    {
+        var run = await runs.GetAsync(runId, user.OwnerId, ct);
+        if (run is null) return Results.NotFound();
+        if (run.Status != AutomationRunStatuses.WaitingApproval) return Results.Conflict();
+        if (run.ApprovalId is Guid approvalId &&
+            await approvals.GetActionableAsync(approvalId, user.OwnerId, ct) is not null)
+            return await RemoteQueryResults.ExecuteAsync(() => remote.DecideAsync(user.OwnerId, approvalId, approved));
+
+        await scheduler.SignalApprovalResolvedAsync(run.WorkflowId, approved, ct);
+        if (!approved) await runs.FailAsync(runId, "Declined by owner.", "[]", ct);
+        return approved ? Results.Accepted() : Results.NoContent();
+    }
+
+    private static object ToDto(AutomationRuleRecord rule) => ToDto(rule, null);
+
+    private static object ToDto(AutomationRuleRecord rule, AutomationRunRecord? lastRun) => new
     {
         rule.Id,
         rule.Name,
         rule.SchemaVersion,
-        definition = AutomationDefinitionJson.Deserialize(rule.DefinitionJson),
+        // The stored JSON keeps every trigger and action field; the typed records only expose their kind.
+        definition = JsonDocument.Parse(rule.DefinitionJson).RootElement,
         rule.Status,
         rule.LastRunAt,
         rule.NextRunAt,
         rule.CooldownUntil,
         rule.CreatedAt,
         rule.UpdatedAt,
-        rule.ConversationId
+        rule.ConversationId,
+        lastRun = lastRun is null ? null : ToRunDto(lastRun)
     };
 
     private static object ToRunDto(AutomationRunRecord run) => new
@@ -182,6 +203,8 @@ internal static class OwnerAutomationEndpoints
         run.TestRun,
         run.Status,
         run.ActionResultsJson,
+        actionResults = JsonDocument.Parse(string.IsNullOrWhiteSpace(run.ActionResultsJson)
+            ? "[]" : run.ActionResultsJson).RootElement,
         run.FailureSummary,
         run.StartedAt,
         run.CompletedAt

@@ -128,6 +128,10 @@ internal sealed class TemporalWorkflowReconciler(
                     }, cancellationToken);
 
             var automationRepository = services.GetRequiredService<IAutomationRuleRepository>();
+            var expiredRuns = await services.GetRequiredService<IAutomationRunRepository>()
+                .ExpireAbandonedAsync(DateTimeOffset.UtcNow, cancellationToken);
+            if (expiredRuns > 0)
+                logger.LogInformation("Closed {Count} automation runs that no workflow was finishing.", expiredRuns);
             await automationRepository.RequeueStaleSchedulesAsync(DateTimeOffset.UtcNow, cancellationToken);
             var automations = await automationRepository.ListPendingScheduleDispatchAsync(cancellationToken);
             foreach (var automation in automations)

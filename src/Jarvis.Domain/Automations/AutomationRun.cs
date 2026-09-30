@@ -55,6 +55,17 @@ public sealed class AutomationRun
         CompletedAt = DateTimeOffset.UtcNow;
     }
 
+    /// <summary>The run started but had nothing to do (conditions not met, cooldown, rule switched off).</summary>
+    public void Skip(string reason, string actionResultsJson)
+    {
+        Status = AutomationRunStatuses.Skipped;
+        FailureSummary = reason;
+        ActionResultsJson = actionResultsJson;
+        CompletedAt = DateTimeOffset.UtcNow;
+    }
+
+    public bool IsActive => Status is AutomationRunStatuses.Running or AutomationRunStatuses.WaitingApproval;
+
     public void Cancel()
     {
         Status = AutomationRunStatuses.Cancelled;
@@ -69,4 +80,5 @@ public static class AutomationRunStatuses
     public const string Completed = "completed";
     public const string Failed = "failed";
     public const string Cancelled = "cancelled";
+    public const string Skipped = "skipped";
 }

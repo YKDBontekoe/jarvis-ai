@@ -233,14 +233,20 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
 }
 
 public sealed class ReminderService(IReminderRepository reminders, TemporalReminderScheduler scheduler,
-    ILogger<ReminderService> logger) : IReminderService
+    IDailyBriefingRepository briefings, ILogger<ReminderService> logger) : IReminderService
 {
+    public static readonly TimeSpan MinimumSnooze = TimeSpan.FromSeconds(30);
+
     public async Task<ReminderRecord> CreateAsync(Guid ownerId, CreateReminderRequest request, CancellationToken cancellationToken)
     {
         var title = request.Title?.Trim() ?? string.Empty;
         if (title.Length is < 1 or > 300) throw new ArgumentException("Reminder title must contain 1 to 300 characters.", nameof(request));
 
-        var zoneId = string.IsNullOrWhiteSpace(request.TimeZoneId) ? "UTC" : request.TimeZoneId.Trim();
+        // Without an explicit zone, use the owner's zone from their briefing settings (the same one the assistant's
+        // clock uses) so "every day at 08:00" means their 08:00, not UTC.
+        var zoneId = string.IsNullOrWhiteSpace(request.TimeZoneId)
+            ? (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId ?? "UTC"
+            : request.TimeZoneId.Trim();
         if (!LocalClock.TryFind(zoneId, out var zone))
             throw new ArgumentException("Time zone identifier is not recognized by this server.", nameof(request));
 
@@ -272,10 +278,44 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
 
         var reminder = await reminders.CreateAsync(ownerId, new CreateReminderRequest(title, dueAt, rule.Recurrence,
             rule.Weekdays, rule.TimeZoneId, rule.Until, rule.LocalTime), cancellationToken);
+        await DispatchAsync(reminder, cancellationToken);
+        return reminder;
+    }
+
+    public async Task<ReminderRecord?> SnoozeAsync(Guid id, Guid ownerId, DateTimeOffset dueAt,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        if (dueAt < now + MinimumSnooze || dueAt > now.AddYears(2))
+            throw new ArgumentOutOfRangeException(nameof(dueAt), "Snooze to a moment between a minute and two years from now.");
+
+        var current = await reminders.GetAsync(id, ownerId, cancellationToken);
+        if (current is null || current.Status is not ("pending" or "completed")) return null;
+        if (current.Recurrence != Reminder.RecurrenceNone)
+            return await CreateAsync(ownerId, new CreateReminderRequest(current.Title, dueAt,
+                TimeZoneId: current.TimeZoneId), cancellationToken);
+
+        var snoozed = await reminders.SnoozeAsync(id, ownerId, dueAt, cancellationToken);
+        if (snoozed is not { } result) return null;
+        if (result.PreviousWorkflowId != result.Reminder.WorkflowId)
+            await StopQuietlyAsync(result.PreviousWorkflowId, id, cancellationToken);
+        await DispatchAsync(result.Reminder, cancellationToken);
+        return result.Reminder;
+    }
+
+    public async Task<ReminderRecord?> MarkDoneAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+    {
+        var done = await reminders.MarkDoneAsync(id, ownerId, cancellationToken);
+        if (done is not null) await StopQuietlyAsync(done.WorkflowId, id, cancellationToken);
+        return done;
+    }
+
+    private async Task DispatchAsync(ReminderRecord reminder, CancellationToken cancellationToken)
+    {
         try
         {
-            await scheduler.ScheduleAsync(new ReminderWorkflowInput(reminder.Id, ownerId, reminder.Title, reminder.DueAt),
-                reminder.WorkflowId, cancellationToken);
+            await scheduler.ScheduleAsync(new ReminderWorkflowInput(reminder.Id, reminder.OwnerId, reminder.Title,
+                reminder.DueAt), reminder.WorkflowId, cancellationToken);
             await reminders.MarkReminderScheduleDispatchedAsync(reminder.Id, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -286,7 +326,23 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
         {
             logger.LogWarning(exception, "Reminder {ReminderId} remains pending for Temporal scheduling recovery.", reminder.Id);
         }
-        return reminder;
+    }
+
+    private async Task StopQuietlyAsync(string workflowId, Guid reminderId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await scheduler.CancelAsync(workflowId, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // Usually the workflow already finished. If not, it finds the reminder moved on and does nothing.
+            logger.LogDebug(exception, "Previous workflow for reminder {ReminderId} was not stopped.", reminderId);
+        }
     }
 
     public Task<IReadOnlyList<ReminderRecord>> ListAsync(Guid ownerId, CancellationToken cancellationToken) =>

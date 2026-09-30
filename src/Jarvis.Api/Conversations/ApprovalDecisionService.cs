@@ -2,6 +2,7 @@ using Jarvis.Agents;
 using Jarvis.Api.Endpoints;
 using Jarvis.Api.Realtime;
 using Jarvis.Application.Approvals;
+using Jarvis.Application.Automations;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Workflows;
 using Microsoft.AspNetCore.SignalR;
@@ -24,7 +25,8 @@ public sealed class ApprovalDecisionService(
     ITaskRunAbort taskRunAbort,
     IServiceScopeFactory scopes,
     IHubContext<JarvisEventsHub> hub,
-    VoiceBackendSession voice)
+    VoiceBackendSession voice,
+    IAutomationApprovalResolver automations)
 {
     private const string CancelledMessage = "This task was cancelled.";
 
@@ -79,6 +81,18 @@ public sealed class ApprovalDecisionService(
             if (pending.Status != "pending" &&
                 await TryCompleteAlreadyResumedAsync(ownerId, approvalId, decided, runCt) is { } alreadyResumed)
                 return alreadyResumed;
+
+            if (AutomationApprovals.IsAutomationApproval(decided.RequestId))
+            {
+                var automationOutcome = await automations.ResolveAsync(ownerId, approvalId, approved, runCt);
+                await approvals.MarkResumeCompletedAsync(approvalId, ownerId, CancellationToken.None);
+                if (automationOutcome is null)
+                    return new ConversationTurnResult.Conflict("This automation run is no longer waiting for a decision.");
+                var message = new Jarvis.Domain.Conversations.Message(decided.ConversationId, "assistant",
+                    automationOutcome);
+                await conversations.AddMessageAsync(message, CancellationToken.None);
+                return new ConversationTurnResult.Completed(message);
+            }
 
             if (VoiceTools.IsVoiceApproval(decided.RequestId))
             {

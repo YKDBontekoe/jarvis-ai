@@ -82,6 +82,31 @@ public sealed class Reminder
         CompletedAt = DateTimeOffset.UtcNow;
     }
 
+    /// <summary>The owner finished it before it fired. Only one-time reminders can be marked done.</summary>
+    public void MarkDone()
+    {
+        if (IsRecurring) throw new InvalidOperationException("Repeating reminders cannot be marked done; cancel them instead.");
+        if (Status != "pending") throw new InvalidOperationException("Only upcoming reminders can be marked done.");
+        Complete();
+    }
+
+    /// <summary>
+    /// Moves a one-time reminder to a later moment, either before it fires or after it was delivered. It gets a
+    /// fresh workflow id because the previous workflow may still be closing.
+    /// </summary>
+    public void Snooze(DateTimeOffset dueAt, TimeOnly localTime)
+    {
+        if (IsRecurring) throw new InvalidOperationException("Repeating reminders are snoozed as a one-time copy.");
+        if (Status is not ("pending" or "completed"))
+            throw new InvalidOperationException("Only upcoming or delivered reminders can be snoozed.");
+        Status = "pending";
+        DueAt = dueAt.ToUniversalTime();
+        LocalTime = localTime;
+        CompletedAt = null;
+        ScheduleDispatchedAt = null;
+        WorkflowId = $"jarvis-reminder-{Id:N}-{DueAt:yyyyMMddHHmmss}";
+    }
+
     public void FailScheduling()
     {
         if (Status == "pending") Status = "failed";

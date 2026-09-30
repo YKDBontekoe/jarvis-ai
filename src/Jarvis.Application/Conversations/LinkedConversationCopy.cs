@@ -13,14 +13,20 @@ public static class LinkedConversationCopy
     public static string ReminderDue(string title) =>
         $"Reminder: {Sanitize(title)}\n\nThis is due now. Reply here to snooze, cancel, or talk about it.";
 
+    public static string ReminderSnoozed(string title, string when) =>
+        $"Snoozed “{Sanitize(title)}” until {Sanitize(when)}. I’ll remind you again then.";
+
+    public static string ReminderMarkedDone(string title) =>
+        $"Marked “{Sanitize(title)}” as done. I won’t remind you about it.";
+
     public static string ReminderFailed(string title) =>
         $"I could not deliver your reminder “{Sanitize(title)}”. Reply here if you want me to reschedule it.";
 
     public static string AutomationIntro(string name) =>
         $"This chat is linked to your automation “{Sanitize(name)}”. I’ll post run results here. Reply to enable, disable, or change it.";
 
-    public static string AutomationWaitingApproval(string name, string actionKind) =>
-        $"Automation “{Sanitize(name)}” needs your approval to continue ({Sanitize(actionKind)}). Reply here after you decide, or ask me about the run.";
+    public static string AutomationWaitingApproval(string name, string action) =>
+        $"Automation “{Sanitize(name)}” is waiting for your approval: {Sanitize(action).ToLowerInvariant()}. Approve or decline it below, or ask me about the run.";
 
     public static string AutomationRun(string name, string status, string triggerReason, string? actionResultsJson,
         bool testRun = false)
