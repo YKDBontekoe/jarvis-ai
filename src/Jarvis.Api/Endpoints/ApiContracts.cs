@@ -19,10 +19,12 @@ public sealed record VoiceSessionBootstrapDto(string Instructions, IReadOnlyList
 public sealed record VoiceToolCallResultDto(string Result, bool IsError, bool ApprovalRequired);
 public sealed record SendMessageRequest([Required, StringLength(32_000, MinimumLength = 1)] string? Content);
 public sealed record ConversationDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
-    Guid? ProfileId = null, string? ProfileName = null, int? ProfileVersion = null, bool ProfileDeleted = false);
+    Guid? ProfileId = null, string? ProfileName = null, int? ProfileVersion = null, bool ProfileDeleted = false,
+    bool Pinned = false);
+public sealed record UpdateConversationRequest(string? Title, bool? Pinned);
 public sealed record ConversationDetailsDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     IReadOnlyList<MessageDto> Messages, bool Responding, Guid? ProfileId = null, string? ProfileName = null,
-    int? ProfileVersion = null, bool ProfileDeleted = false);
+    int? ProfileVersion = null, bool ProfileDeleted = false, bool Pinned = false);
 public sealed record MessageDto(Guid Id, string Role, string Content, DateTimeOffset CreatedAt,
     IReadOnlyList<FileCitationDto>? Citations = null);
 public sealed record FileCitationDto(Guid FileId, string DisplayName, Guid ChunkId, int ChunkIndex, string Excerpt,

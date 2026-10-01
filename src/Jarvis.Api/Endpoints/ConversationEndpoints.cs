@@ -55,8 +55,27 @@ internal static class ConversationEndpoints
             return Results.Ok(new ConversationDetailsDto(conversation.Id, conversation.Title, conversation.CreatedAt,
                 conversation.UpdatedAt, messages.Select(message => message.ToDto()).ToArray(),
                 queries.IsResponding(conversationId), conversation.ProfileId, ProfileName(conversation, live),
-                conversation.ProfileVersion, ProfileDeleted(conversation, live)));
+                conversation.ProfileVersion, ProfileDeleted(conversation, live), conversation.PinnedAt is not null));
         }).WithName("GetConversation");
+
+        api.MapPatch("/conversations/{conversationId:guid}", async (Guid conversationId,
+            UpdateConversationRequest request, IConversationStore store, IAssistantProfileService profiles,
+            IJarvisTaskRepository tasks, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            if (request.Title is null && request.Pinned is null)
+                return EndpointHelpers.Invalid("title", "Send a title, pinned, or both.");
+            if (request.Title is not null && string.IsNullOrWhiteSpace(request.Title))
+                return EndpointHelpers.Invalid("title", "Title is required.");
+            if (request.Title is { Length: > Conversation.MaximumTitleLength })
+                return EndpointHelpers.Invalid("title", "Title must be 200 characters or fewer.");
+            if (await tasks.GetTaskByConversationIdAsync(conversationId, currentUser.OwnerId, ct) is not null)
+                return Results.NotFound();
+            var conversation = await store.UpdateAsync(conversationId, currentUser.OwnerId, request.Title,
+                request.Pinned, ct);
+            if (conversation is null) return Results.NotFound();
+            var live = (await profiles.ListAsync(currentUser.OwnerId, ct)).ToDictionary(item => item.Id);
+            return Results.Ok(ToDto(conversation, live));
+        }).WithName("UpdateConversation");
 
         api.MapGet("/conversations/{conversationId:guid}/messages", async (Guid conversationId, int? limit,
             string? cursor, IConversationStore store, IJarvisTaskRepository tasks, ICurrentUser currentUser,
@@ -252,12 +271,12 @@ internal static class ConversationEndpoints
         if (name is null && snapshot is not null) name = snapshot.Name;
         var deleted = profileId is { } missing && !live.ContainsKey(missing);
         return new ConversationDto(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt,
-            profileId, name, conversation.ProfileVersion ?? snapshot?.Version, deleted);
+            profileId, name, conversation.ProfileVersion ?? snapshot?.Version, deleted, conversation.PinnedAt is not null);
     }
 
     private static ConversationDto ToDto(Conversation conversation, string name, bool deleted) =>
         new(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt,
-            conversation.ProfileId, name, conversation.ProfileVersion, deleted);
+            conversation.ProfileId, name, conversation.ProfileVersion, deleted, conversation.PinnedAt is not null);
 
     private static string? ProfileName(Conversation conversation, IReadOnlyDictionary<Guid, AssistantProfileRecord> live) =>
         ToDto(conversation, live).ProfileName;

@@ -45,6 +45,33 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Pinned_conversations_list_first_and_updates_are_scoped_to_the_owner()
+    {
+        var owner = Guid.CreateVersion7();
+        var otherOwner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var store = new ConversationStore(database);
+        var older = await store.CreateAsync(owner, "Older", CancellationToken.None);
+        var newer = await store.CreateAsync(owner, "Newer", CancellationToken.None);
+
+        Assert.Null(await store.UpdateAsync(older.Id, otherOwner, "Hijacked", true, CancellationToken.None));
+        var updated = await store.UpdateAsync(older.Id, owner, "  Trip   plans ", true, CancellationToken.None);
+        database.ChangeTracker.Clear();
+
+        Assert.NotNull(updated);
+        Assert.Equal("Trip plans", updated.Title);
+        var listed = await store.ListAsync(owner, CancellationToken.None);
+        Assert.Equal([older.Id, newer.Id], listed.Select(item => item.Id));
+        Assert.NotNull(listed[0].PinnedAt);
+
+        await store.UpdateAsync(older.Id, owner, null, false, CancellationToken.None);
+        database.ChangeTracker.Clear();
+        listed = await store.ListAsync(owner, CancellationToken.None);
+        Assert.Equal([newer.Id, older.Id], listed.Select(item => item.Id));
+        Assert.Equal("Trip plans", listed[1].Title);
+    }
+
+    [Fact]
     public async Task Message_pages_are_bounded_stable_and_deterministic_for_equal_timestamps()
     {
         var owner = Guid.CreateVersion7();

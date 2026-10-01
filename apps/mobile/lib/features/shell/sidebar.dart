@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../../conversation_groups.dart';
 import '../../theme.dart';
 import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 
 /// Primary navigation: a drawer on phones and a permanent sidebar on wide
-/// screens. Destinations sit on top, recent conversations below, grouped by
-/// day, and settings with connection status at the bottom.
+/// screens. Destinations sit on top, recent conversations below, pinned first
+/// and then grouped by day, and settings with connection status at the bottom.
 class JarvisSidebar extends StatefulWidget {
   const JarvisSidebar({
     required this.conversations,
@@ -43,34 +44,9 @@ class JarvisSidebar extends StatefulWidget {
 }
 
 class _JarvisSidebarState extends State<JarvisSidebar> {
-  List<(String, List<Map<String, dynamic>>)> _groups() {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final buckets = <String, List<Map<String, dynamic>>>{};
-    for (final conversation in widget.conversations) {
-      if (jsonString(conversation, 'id') == null) continue;
-      final updated = jsonDate(conversation['updatedAt'], local: true);
-      final day = updated == null
-          ? null
-          : DateTime(updated.year, updated.month, updated.day);
-      final age = day == null ? 999 : today.difference(day).inDays;
-      final label = switch (age) {
-        <= 0 => 'Today',
-        1 => 'Yesterday',
-        < 7 => 'Previous 7 days',
-        _ => 'Older',
-      };
-      buckets.putIfAbsent(label, () => []).add(conversation);
-    }
-    return [
-      for (final label in ['Today', 'Yesterday', 'Previous 7 days', 'Older'])
-        if (buckets[label] case final items?) (label, items),
-    ];
-  }
-
   @override
   Widget build(BuildContext context) {
-    final groups = _groups();
+    final groups = groupConversations(widget.conversations);
     return ColoredBox(
       color: JarvisColors.of(context).canvas,
       child: SafeArea(
@@ -197,10 +173,7 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
               ),
             ),
             const Divider(),
-            _SettingsRow(
-              connected: widget.connected,
-              onTap: widget.onSettings,
-            ),
+            _SettingsRow(connected: widget.connected, onTap: widget.onSettings),
           ],
         ),
       ),
