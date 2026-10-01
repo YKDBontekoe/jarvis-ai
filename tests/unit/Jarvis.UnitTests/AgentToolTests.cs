@@ -289,6 +289,20 @@ public sealed class AgentToolTests
     }
 
     [Fact]
+    public void Memory_context_query_borrows_the_topic_from_the_previous_message_for_short_follow_ups()
+    {
+        Assert.Equal("We plannen de Japanreis. En wat is het budget?",
+            PersonalMemoryContextProvider.BuildQuery(["We plannen de Japanreis.", "En wat is het budget?"]));
+        Assert.Equal("Wat is het budget voor de Japanreis met het gezin in december?",
+            PersonalMemoryContextProvider.BuildQuery(["Hoi", "Wat is het budget voor de Japanreis met het gezin in december?"]));
+        Assert.Equal("En wanneer?", PersonalMemoryContextProvider.BuildQuery(["En wanneer?"]));
+        Assert.Equal("En wanneer?", PersonalMemoryContextProvider.BuildQuery(["  ", "En wanneer?"]));
+        Assert.Null(PersonalMemoryContextProvider.BuildQuery([]));
+        Assert.Equal(new string('x', 300) + " ja",
+            PersonalMemoryContextProvider.BuildQuery([new string('x', 500), "ja"]));
+    }
+
+    [Fact]
     public void Memory_rerank_keeps_only_the_models_known_choices_in_its_order()
     {
         MemorySearchHit Hit() => new(new MemoryRecord(Guid.NewGuid(), OwnerId, "fact", "x", 0.5f, 0.9f,

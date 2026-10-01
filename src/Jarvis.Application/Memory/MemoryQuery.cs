@@ -50,6 +50,10 @@ public sealed class MemoryQuery
         }
     }
 
+    /// <summary>Number of distinct non-stopword tokens in a message; low counts mark short follow-ups.</summary>
+    public static int ContentTermCount(string? text) =>
+        Tokenize(text ?? string.Empty).Where(token => !Stopwords.Contains(token)).Distinct().Count();
+
     /// <summary>Lower-cased letter/digit runs; diacritics are kept so tsvector lexemes still match.</summary>
     public static IEnumerable<string> Tokenize(string text)
     {
