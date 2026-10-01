@@ -429,6 +429,20 @@ mixin _ChatScreenUi on _ChatScreenController {
           : (rating) => unawaited(_rate(entry, rating)),
       onCitationTap: (citation) => unawaited(_openCitation(citation)),
       photoLoader: _loadPhoto,
+      onCancelQueued: entry.queued
+          ? () => unawaited(_cancelQueued(entry))
+          : null,
+      onRegenerate:
+          !entry.isUser &&
+              !entry.pending &&
+              entry.id != null &&
+              identical(entry, _lastMessageEntry) &&
+              !_busy &&
+              !_hasPendingApproval &&
+              !_voiceActive &&
+              !_voiceStarting
+          ? () => unawaited(_regenerate(entry))
+          : null,
       onEdit: entry.isUser && !_voiceActive && !_voiceStarting
           ? (text) => unawaited(_editAsNewMessage(text))
           : null,

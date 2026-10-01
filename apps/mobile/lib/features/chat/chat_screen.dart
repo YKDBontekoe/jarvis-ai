@@ -47,6 +47,7 @@ import '../voice/voice_stage.dart';
 import 'chat_entries.dart';
 import 'chat_widgets.dart';
 import 'composer_drafts.dart';
+import 'outbox_store.dart';
 import 'generative_ui.dart';
 import 'mcp_setup.dart';
 import 'remote_query.dart';
@@ -61,6 +62,7 @@ part 'chat_screen_catchup.dart';
 part 'chat_screen_transcript.dart';
 part 'chat_screen_voice.dart';
 part 'chat_screen_photos.dart';
+part 'chat_screen_outbox.dart';
 part 'chat_screen_ui.dart';
 part 'chat_screen_auth.dart';
 part 'chat_screen_sources.dart';
@@ -97,7 +99,8 @@ class _ChatScreenState extends _ChatScreenController
         _ChatScreenAuth,
         _ChatScreenSources,
         _ChatScreenSearch,
-        _ChatScreenPhotos {
+        _ChatScreenPhotos,
+        _ChatScreenOutbox {
   /// Outgoing content fades out before incoming content fades in, so the two
   /// never overlap mid-transition.
   static const _fadeThrough = Interval(.5, 1, curve: Curves.easeOutCubic);
@@ -109,6 +112,7 @@ class _ChatScreenState extends _ChatScreenController
     _scroll.addListener(_handleTranscriptScroll);
     _input.addListener(_rememberDraft);
     unawaited(_openDrafts());
+    unawaited(_openOutbox());
     if (widget.skipAuthentication) _restoringSession = false;
     _attachPushListeners();
     attachJarvisAuthInterceptor(
@@ -231,6 +235,7 @@ class _ChatScreenState extends _ChatScreenController
       return;
     }
     if (state != AppLifecycleState.resumed || _conversationId == null) return;
+    unawaited(_flushOutbox());
     if (_remoteQuery) unawaited(_catchUpRemoteQuery(_conversationId!));
     final hub = _hub;
     if (!_signedOut &&
@@ -257,6 +262,7 @@ class _ChatScreenState extends _ChatScreenController
     unawaited(_pushOpenedSubscription?.cancel());
     unawaited(_pushForegroundSubscription?.cancel());
     unawaited(_drafts.flush());
+    _outboxTimer?.cancel();
     _composerFocus.dispose();
     _input.dispose();
     _email.dispose();

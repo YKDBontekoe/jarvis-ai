@@ -83,9 +83,15 @@ mixin _ChatScreenSend on _ChatScreenController {
     _scrollToBottom(force: true);
     final run = CancelToken();
     _runCancel = run;
+    // A request that never left the phone is safe to keep and send later;
+    // one that did may already be running on the server.
+    var requestSent = false;
     try {
       final response = await _http.post<dynamic>(
         '/api/v1/conversations/$conversationId/messages',
+        onSendProgress: (sent, total) {
+          if (total <= 0 || sent >= total) requestSent = true;
+        },
         data: {
           'content': content,
           if (sentPhotos.isNotEmpty)
@@ -107,7 +113,24 @@ mixin _ChatScreenSend on _ChatScreenController {
       if (mounted &&
           _conversationId == conversationId &&
           _realtimeGeneration == generation) {
-        if (queryContinuesRemotely(error, stopRequested: _stopRequested)) {
+        if (!requestSent &&
+            !_stopRequested &&
+            !_hasStreamedReply &&
+            (error.type == DioExceptionType.connectionError ||
+                error.type == DioExceptionType.connectionTimeout)) {
+          _lastSendQueued = true;
+          _pendingQueryText = null;
+          setState(() {
+            _removePlaceholder();
+            _settleToolRuns();
+            _error = null;
+          });
+          await _queueMessage(userMessage, conversationId);
+          if (mounted) setState(() {});
+        } else if (queryContinuesRemotely(
+          error,
+          stopRequested: _stopRequested,
+        )) {
           setState(() {
             _remoteQuery = true;
             _sending = true;
@@ -387,6 +410,110 @@ mixin _ChatScreenSend on _ChatScreenController {
       if (mounted) {
         setState(() => _error = 'Jarvis could not save that rating.');
       }
+    }
+  }
+
+  /// Asks Jarvis to answer the last message again, replacing [reply].
+  Future<void> _regenerate(MessageEntry reply) async {
+    final conversationId = _conversationId;
+    final index = _entries.indexOf(reply);
+    if (conversationId == null ||
+        index < 0 ||
+        _busy ||
+        _hasPendingApproval ||
+        _voiceActive ||
+        _voiceStarting ||
+        _signedOut ||
+        _signingOut) {
+      return;
+    }
+    final generation = _realtimeGeneration;
+    final question = _entries
+        .take(index)
+        .whereType<MessageEntry>()
+        .lastWhere(
+          (entry) => entry.isUser,
+          orElse: () => const MessageEntry(role: 'user', content: ''),
+        );
+    _stopRequested = false;
+    _pendingQueryText = question.content.isEmpty ? null : question.content;
+    const placeholder = MessageEntry(
+      role: 'assistant',
+      content: '',
+      pending: true,
+    );
+    setState(() {
+      _sending = true;
+      _error = null;
+      _entries[index] = placeholder;
+    });
+    _scrollToBottom(force: true);
+    void restore(String? error) {
+      setState(() {
+        final at = _entries.indexWhere(
+          (entry) =>
+              entry is MessageEntry && !entry.isUser && entry.pending,
+        );
+        if (at >= 0) {
+          _entries[at] = reply;
+        } else if (!_entries.contains(reply)) {
+          _entries.add(reply);
+        }
+        _settleToolRuns();
+        _error = error;
+      });
+    }
+
+    final run = CancelToken();
+    _runCancel = run;
+    try {
+      final response = await _http.post<dynamic>(
+        '/api/v1/conversations/$conversationId/regenerate',
+        cancelToken: run,
+        options: longRunningOptions(),
+      );
+      if (!mounted ||
+          _conversationId != conversationId ||
+          _realtimeGeneration != generation) {
+        return;
+      }
+      _finishRemoteQuery();
+      setState(() => _applyRunResult(response));
+    } on DioException catch (error) {
+      if (!mounted ||
+          _conversationId != conversationId ||
+          _realtimeGeneration != generation) {
+        return;
+      }
+      if (error.response?.statusCode != 409 &&
+          queryContinuesRemotely(error, stopRequested: _stopRequested)) {
+        setState(() {
+          _remoteQuery = true;
+          _sending = true;
+          _error = null;
+          _ensurePlaceholder();
+        });
+        unawaited(_catchUpRemoteQuery(conversationId));
+        return;
+      }
+      restore(
+        error.type == DioExceptionType.cancel
+            ? null
+            : describeApiError(error),
+      );
+    } catch (_) {
+      if (mounted && _conversationId == conversationId) {
+        restore('Jarvis could not try that reply again.');
+      }
+    } finally {
+      if (identical(_runCancel, run)) _runCancel = null;
+      if (mounted &&
+          _conversationId == conversationId &&
+          _realtimeGeneration == generation &&
+          !_remoteQuery) {
+        setState(() => _sending = false);
+      }
+      _scrollToBottom();
     }
   }
 

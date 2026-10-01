@@ -8,6 +8,8 @@ class MessageBubble extends StatefulWidget {
     this.onCitationTap,
     this.onEdit,
     this.photoLoader,
+    this.onRegenerate,
+    this.onCancelQueued,
     this.thinkingLabel = 'Thinking',
     super.key,
   });
@@ -28,6 +30,12 @@ class MessageBubble extends StatefulWidget {
 
   /// Fetches photos sent with earlier messages.
   final PhotoLoader? photoLoader;
+
+  /// Answers the last message again; offered on the latest reply only.
+  final VoidCallback? onRegenerate;
+
+  /// Drops a message that is waiting for a connection.
+  final VoidCallback? onCancelQueued;
 
   @override
   State<MessageBubble> createState() => _MessageBubbleState();
@@ -182,6 +190,19 @@ class _MessageBubbleState extends State<MessageBubble> {
                             onPressed: () => widget.onRate!('down'),
                           ),
                         ],
+                        if (widget.onRegenerate != null)
+                          IconButton(
+                            tooltip: 'Try again',
+                            onPressed: widget.onRegenerate,
+                            icon: const Icon(
+                              PhosphorIconsRegular.arrowsClockwise,
+                              size: 17,
+                            ),
+                            style: IconButton.styleFrom(
+                              minimumSize: const Size(36, 36),
+                              foregroundColor: JarvisColors.of(context).muted,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -252,6 +273,42 @@ class _MessageBubbleState extends State<MessageBubble> {
                     ),
                   ),
                 ),
+              ),
+            ),
+          if (message.queued)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    PhosphorIconsRegular.clock,
+                    size: 15,
+                    color: JarvisColors.of(context).muted,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      'Waiting for a connection. Sends by itself.',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: JarvisColors.of(context).muted,
+                      ),
+                    ),
+                  ),
+                  if (widget.onCancelQueued != null)
+                    TextButton(
+                      onPressed: widget.onCancelQueued,
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                ],
               ),
             ),
           if (message.failed)

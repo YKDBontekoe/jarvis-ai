@@ -102,6 +102,7 @@ class MessageEntry extends ChatEntry {
     this.rating,
     this.citations = const [],
     this.photos = const [],
+    this.outboxId,
   });
 
   final String role;
@@ -123,6 +124,11 @@ class MessageEntry extends ChatEntry {
   /// Photos the user sent with this message.
   final List<MessagePhoto> photos;
 
+  /// Set while this message waits on the device for a connection.
+  final String? outboxId;
+
+  bool get queued => outboxId != null;
+
   bool get isUser => role == 'user';
 
   MessageEntry copyWith({
@@ -141,6 +147,7 @@ class MessageEntry extends ChatEntry {
     rating: rating ?? this.rating,
     citations: citations ?? this.citations,
     photos: photos,
+    outboxId: outboxId,
   );
 }
 

@@ -207,6 +207,46 @@ public static class AgentSessionJson
         return TryDropIncompleteTurn(sessionJson, out truncated);
     }
 
+    /// <summary>
+    /// Drops the last user turn and everything after it so that turn can be answered again. Refuses when
+    /// the turn called tools, because answering again would repeat those actions.
+    /// </summary>
+    public static RegenerateTruncation TryDropLastTurnForRegenerate(string sessionJson, out string truncated)
+    {
+        truncated = sessionJson;
+        try
+        {
+            var node = JsonNode.Parse(sessionJson);
+            if (node is null || !TryFindMessagesNode(node, out var messages) || messages.Count == 0)
+                return RegenerateTruncation.NoTurn;
+
+            var lastUser = -1;
+            for (var index = 0; index < messages.Count; index++)
+            {
+                if (messages[index] is not { } item) continue;
+                using var document = JsonDocument.Parse(item.ToJsonString());
+                if (IsRole(document.RootElement, "user") && TryGetPlainText(document.RootElement, out _))
+                    lastUser = index;
+            }
+            if (lastUser < 0) return RegenerateTruncation.NoTurn;
+
+            for (var index = lastUser + 1; index < messages.Count; index++)
+            {
+                if (messages[index] is not { } item) continue;
+                using var document = JsonDocument.Parse(item.ToJsonString());
+                if (HasToolContents(document.RootElement)) return RegenerateTruncation.UsedTools;
+            }
+
+            while (messages.Count > lastUser) messages.RemoveAt(messages.Count - 1);
+            truncated = PrepareForRead(node.ToJsonString());
+            return RegenerateTruncation.Dropped;
+        }
+        catch (JsonException)
+        {
+            return RegenerateTruncation.NoTurn;
+        }
+    }
+
     public static bool TryGetPendingApprovals(string sessionJson,
         out IReadOnlyList<AgentToolApprovalRequest> approvals, out string preface)
     {
@@ -498,4 +538,11 @@ public static class AgentSessionJson
         messages = default;
         return false;
     }
+}
+
+public enum RegenerateTruncation
+{
+    Dropped,
+    NoTurn,
+    UsedTools
 }

@@ -218,9 +218,11 @@ mixin _ChatScreenCatchUp on _ChatScreenController {
                 role: message['role'] as String,
                 content: message['content'] as String,
                 id: asJsonString(message['id']),
+                photos: MessagePhoto.listFromJson(message['attachments']),
               ),
             ),
       );
+    if (_conversationId case final id?) _entries.addAll(_queuedEntries(id));
     _messageCursor = asJsonString(details?['nextCursor']);
     _hasOlderMessages = asJsonBool(details?['hasMore']);
     _addApprovals(knownApprovals);

@@ -142,6 +142,11 @@ internal static class ConversationEndpoints
                 remote.SendAsync(currentUser.OwnerId, conversationId, text, attachments: attachments));
         }).WithName("SendMessage");
 
+        api.MapPost("/conversations/{conversationId:guid}/regenerate", async (Guid conversationId,
+            RemoteQueryExecutor remote, ICurrentUser currentUser) =>
+            await RemoteQueryResults.ExecuteAsync(() => remote.RegenerateAsync(currentUser.OwnerId, conversationId)))
+            .WithName("RegenerateReply");
+
         api.MapPost("/conversations/{conversationId:guid}/cancel", async (Guid conversationId,
             IConversationStore store, ICurrentUser currentUser, RemoteQueryHost queries, CancellationToken ct) =>
         {

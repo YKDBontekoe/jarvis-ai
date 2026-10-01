@@ -250,6 +250,9 @@ mixin _ChatScreenNav on _ChatScreenController {
       await RecentSearchesStore.clearAll();
       await _drafts.clear();
       await ComposerDrafts.clearAll();
+      _outboxTimer?.cancel();
+      await _outbox.clear();
+      await OutboxStore.clearAll();
       await hub?.stop();
     } finally {
       _signingOut = false;

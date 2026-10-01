@@ -23,6 +23,14 @@ public sealed class RemoteQueryExecutor(
             attachments);
     }
 
+    public async Task<ConversationTurnResult> RegenerateAsync(Guid ownerId, Guid conversationId)
+    {
+        using var query = queries.Begin(ownerId, conversationId, lifetime.ApplicationStopping);
+        await using var scope = scopes.CreateOwnerScope(ownerId);
+        var turns = scope.ServiceProvider.GetRequiredService<ConversationTurnService>();
+        return await turns.RegenerateAsync(ownerId, conversationId, query.Token);
+    }
+
     public async Task<ConversationTurnResult> DecideAsync(Guid ownerId, Guid approvalId, bool approved)
     {
         await using var scope = scopes.CreateOwnerScope(ownerId);

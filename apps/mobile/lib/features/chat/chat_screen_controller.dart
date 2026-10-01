@@ -92,6 +92,12 @@ abstract class _ChatScreenController extends State<ChatScreen>
   List<PendingPhoto> _pendingPhotos = [];
   final Map<String, Future<Uint8List?>> _photoBytes = {};
 
+  /// Messages waiting for a connection, and whether the last send joined them.
+  OutboxStore _outbox = OutboxStore.memory();
+  Timer? _outboxTimer;
+  bool _flushingOutbox = false;
+  bool _lastSendQueued = false;
+
   /// Bumped to move keyboard focus into the composer.
   final _composerFocus = ValueNotifier<int>(0);
 
@@ -139,6 +145,22 @@ abstract class _ChatScreenController extends State<ChatScreen>
 
   bool get _hasMessages => _entries.any((entry) => entry is MessageEntry);
 
+  /// True once streamed text for the pending reply has arrived.
+  bool get _hasStreamedReply => _entries.any(
+    (entry) =>
+        entry is MessageEntry &&
+        !entry.isUser &&
+        entry.pending &&
+        entry.content.isNotEmpty,
+  );
+
+  MessageEntry? get _lastMessageEntry {
+    for (var index = _entries.length - 1; index >= 0; index--) {
+      if (_entries[index] case final MessageEntry entry) return entry;
+    }
+    return null;
+  }
+
   UiSurfaceEntry? get _liveSurface => liveSurface(_entries);
 
   bool get _hasPendingApproval => _entries.any(
@@ -180,6 +202,11 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _signIn();
   Future<void> _signOut();
   Future<void> _editAsNewMessage(String text);
+  Future<void> _regenerate(MessageEntry reply);
+  List<MessageEntry> _queuedEntries(String conversationId);
+  Future<void> _queueMessage(MessageEntry message, String conversationId);
+  Future<void> _flushOutbox();
+  Future<void> _cancelQueued(MessageEntry entry);
   void _showPhotoSources();
   void _removePendingPhoto(PendingPhoto photo);
   Future<Uint8List?> _loadPhoto(String fileId);
@@ -195,7 +222,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _openSearch(BuildContext context);
   Future<void> _openSearchRouteFromNotification(Map<String, dynamic> data);
 
-  Future<bool> _send([String? text]);
+  Future<bool> _send([String? text, List<MessagePhoto>? photos]);
   void _upsertSurface(UiSurfaceEntry surface);
   void _upsertBrowserSession(BrowserSessionEntry session);
   void _appendBrowserStep(String sessionId, BrowserStepItem step);

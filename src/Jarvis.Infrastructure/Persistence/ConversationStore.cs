@@ -138,6 +138,11 @@ public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, 
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<bool> DeleteMessageAsync(Guid conversationId, Guid messageId,
+        CancellationToken cancellationToken) =>
+        await db.Messages.Where(x => x.ConversationId == conversationId && x.Id == messageId)
+            .ExecuteDeleteAsync(cancellationToken) > 0;
+
     public async Task<string?> GetAgentSessionAsync(Guid conversationId, CancellationToken cancellationToken)
     {
         var state = await db.AgentSessions.Where(x => x.ConversationId == conversationId)

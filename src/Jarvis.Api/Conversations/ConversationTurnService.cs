@@ -99,4 +99,64 @@ public sealed class ConversationTurnService(
             return new ConversationTurnResult.Failed(failure);
         }
     }
+
+    /// <summary>
+    /// Answers the last user message again: removes the last reply from the transcript and the agent
+    /// history, then runs the turn anew. Refused while approvals are open or when the reply used tools,
+    /// so actions such as reminders or messages are never repeated.
+    /// </summary>
+    public async Task<ConversationTurnResult> RegenerateAsync(Guid ownerId, Guid conversationId,
+        CancellationToken cancellationToken)
+    {
+        var conversation = await store.GetAsync(conversationId, ownerId, cancellationToken);
+        if (conversation is null) return new ConversationTurnResult.NotFound();
+        if (await tasks.GetTaskByConversationIdAsync(conversationId, ownerId, cancellationToken) is not null)
+            return new ConversationTurnResult.Conflict("Long-running task sessions are managed from the Tasks section.");
+
+        await using var runLease = await runLock.AcquireAsync(conversationId, cancellationToken);
+        var messages = await store.GetMessagesAsync(conversationId, cancellationToken);
+        if (messages.Count < 2 || messages[^1] is not { Role: "assistant" } reply ||
+            messages[^2] is not { Role: "user" } userMessage)
+            return new ConversationTurnResult.Conflict("There is no reply to try again.");
+        if ((await approvals.ListActionableForConversationAsync(ownerId, conversationId, cancellationToken))
+            .Count > 0)
+            return new ConversationTurnResult.Conflict("Decide the pending tool call for this conversation first.");
+
+        var session = await store.GetAgentSessionAsync(conversationId, cancellationToken);
+        if (session is not null)
+        {
+            switch (AgentSessionJson.TryDropLastTurnForRegenerate(session, out var truncated))
+            {
+                case RegenerateTruncation.UsedTools:
+                    return new ConversationTurnResult.Conflict(
+                        "This reply used tools, so Jarvis cannot redo it without repeating those actions. Ask again instead.");
+                case RegenerateTruncation.Dropped:
+                    await store.SaveAgentSessionAsync(conversationId, truncated, cancellationToken);
+                    break;
+                default:
+                    return new ConversationTurnResult.Conflict("There is no reply to try again.");
+            }
+        }
+        await store.DeleteMessageAsync(conversationId, reply.Id, cancellationToken);
+
+        try
+        {
+            var outcome = await coordinator.RunAsync(ownerId, conversationId,
+                agent.StreamReplyAsync(conversationId, userMessage, cancellationToken), null, cancellationToken);
+            return outcome.PendingApprovals.Count != 0
+                ? new ConversationTurnResult.AwaitingApproval(outcome.PendingApprovals)
+                : new ConversationTurnResult.Completed(outcome.AssistantMessage!);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Agent regenerate failed for conversation {ConversationId}", conversationId);
+            var failure = AgentFailureMessage.For(exception);
+            await EndpointHelpers.PublishAgentFailedAsync(hub, logger, conversationId, failure);
+            return new ConversationTurnResult.Failed(failure);
+        }
+    }
 }
