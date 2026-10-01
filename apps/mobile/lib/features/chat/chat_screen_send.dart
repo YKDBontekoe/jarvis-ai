@@ -3,6 +3,29 @@ part of 'chat_screen.dart';
 // ignore_for_file: annotate_overrides
 
 mixin _ChatScreenSend on _ChatScreenController {
+  /// Puts an earlier message back in the composer so it can be changed and
+  /// sent again. Asks first when that would replace an unsent draft.
+  @override
+  Future<void> _editAsNewMessage(String text) async {
+    final current = _input.text.trim();
+    if (current.isNotEmpty && current != text.trim()) {
+      final replace = await showJarvisConfirm(
+        context,
+        title: 'Replace your draft?',
+        message: 'The message box already has text you have not sent.',
+        cancelLabel: 'Keep draft',
+        confirmLabel: 'Replace',
+        icon: PhosphorIconsRegular.pencilSimple,
+      );
+      if (!replace || !mounted) return;
+    }
+    _input.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    _composerFocus.value++;
+  }
+
   Future<bool> _send([String? text]) async {
     final content = (text ?? _input.text).trim();
     final conversationId = _conversationId;

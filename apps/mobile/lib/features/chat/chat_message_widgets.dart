@@ -6,6 +6,7 @@ class MessageBubble extends StatefulWidget {
     this.onRetry,
     this.onRate,
     this.onCitationTap,
+    this.onEdit,
     this.thinkingLabel = 'Thinking',
     super.key,
   });
@@ -19,6 +20,10 @@ class MessageBubble extends StatefulWidget {
   /// Rates an assistant reply `up` or `down`; hidden until the reply is stored.
   final ValueChanged<String>? onRate;
   final ValueChanged<MessageCitation>? onCitationTap;
+
+  /// Puts a sent message back in the composer; offered on long-press of the
+  /// user's own messages.
+  final ValueChanged<String>? onEdit;
 
   @override
   State<MessageBubble> createState() => _MessageBubbleState();
@@ -37,6 +42,69 @@ class _MessageBubbleState extends State<MessageBubble> {
     setState(() => _copied = true);
     await Future<void>.delayed(const Duration(seconds: 2));
     if (mounted) setState(() => _copied = false);
+  }
+
+  Future<void> _showUserActions() async {
+    final message = widget.message;
+    unawaited(HapticFeedback.selectionClick());
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(PhosphorIconsRegular.copy),
+              title: const Text('Copy'),
+              onTap: () => Navigator.pop(sheetContext, 'copy'),
+            ),
+            if (widget.onEdit != null)
+              ListTile(
+                leading: const Icon(PhosphorIconsRegular.pencilSimple),
+                title: const Text('Edit as new message'),
+                subtitle: const Text('Puts this text back in the message box'),
+                onTap: () => Navigator.pop(sheetContext, 'edit'),
+              ),
+            ListTile(
+              leading: const Icon(PhosphorIconsRegular.cursor),
+              title: const Text('Select text'),
+              onTap: () => Navigator.pop(sheetContext, 'select'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    switch (action) {
+      case 'copy':
+        try {
+          await Clipboard.setData(ClipboardData(text: message.content));
+        } catch (_) {
+          return;
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.maybeOf(context)
+          ?..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('Message copied')));
+      case 'edit':
+        widget.onEdit?.call(message.content);
+      case 'select':
+        await showModalBottomSheet<void>(
+          context: context,
+          showDragHandle: true,
+          isScrollControlled: true,
+          builder: (sheetContext) => SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: SelectableText(
+                message.content,
+                style: const TextStyle(fontSize: 16, height: 1.5),
+              ),
+            ),
+          ),
+        );
+    }
   }
 
   @override
@@ -128,31 +196,42 @@ class _MessageBubbleState extends State<MessageBubble> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-            decoration: BoxDecoration(
-              color: message.failed
-                  ? JarvisColors.of(context).dangerSoft
-                  : JarvisColors.of(context).surfaceRaised,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
-                bottomLeft: Radius.circular(20),
-                bottomRight: Radius.circular(6),
-              ),
-              border: message.failed
-                  ? Border.all(
-                      color: JarvisColors.of(context).danger
-                          .withValues(alpha: .35),
-                    )
-                  : null,
-            ),
-            child: SelectableText(
-              message.content,
-              style: TextStyle(
-                fontSize: 15.5,
-                height: 1.45,
-                color: JarvisColors.of(context).ink,
+          Semantics(
+            onLongPressHint: 'Message actions',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onLongPress: message.pending ? null : _showUserActions,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 11,
+                ),
+                decoration: BoxDecoration(
+                  color: message.failed
+                      ? JarvisColors.of(context).dangerSoft
+                      : JarvisColors.of(context).surfaceRaised,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                    bottomLeft: Radius.circular(20),
+                    bottomRight: Radius.circular(6),
+                  ),
+                  border: message.failed
+                      ? Border.all(
+                          color: JarvisColors.of(
+                            context,
+                          ).danger.withValues(alpha: .35),
+                        )
+                      : null,
+                ),
+                child: Text(
+                  message.content,
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    height: 1.45,
+                    color: JarvisColors.of(context).ink,
+                  ),
+                ),
               ),
             ),
           ),

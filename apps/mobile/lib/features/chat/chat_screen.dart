@@ -45,6 +45,7 @@ import '../voice/voice_errors.dart';
 import '../voice/voice_stage.dart';
 import 'chat_entries.dart';
 import 'chat_widgets.dart';
+import 'composer_drafts.dart';
 import 'generative_ui.dart';
 import 'mcp_setup.dart';
 import 'remote_query.dart';
@@ -103,6 +104,8 @@ class _ChatScreenState extends _ChatScreenController
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _scroll.addListener(_handleTranscriptScroll);
+    _input.addListener(_rememberDraft);
+    unawaited(_openDrafts());
     if (widget.skipAuthentication) _restoringSession = false;
     _attachPushListeners();
     attachJarvisAuthInterceptor(
@@ -220,6 +223,7 @@ class _ChatScreenState extends _ChatScreenController
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached;
     if (backgrounded) {
+      unawaited(_drafts.flush());
       if (_sending || _busy) _remoteQuery = true;
       return;
     }
@@ -249,6 +253,8 @@ class _ChatScreenState extends _ChatScreenController
     unawaited(_pushTokenSubscription?.cancel());
     unawaited(_pushOpenedSubscription?.cancel());
     unawaited(_pushForegroundSubscription?.cancel());
+    unawaited(_drafts.flush());
+    _composerFocus.dispose();
     _input.dispose();
     _email.dispose();
     _password.dispose();

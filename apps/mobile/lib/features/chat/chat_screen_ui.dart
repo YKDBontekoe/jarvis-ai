@@ -406,6 +406,7 @@ mixin _ChatScreenUi on _ChatScreenController {
                   awaitingApproval: _hasPendingApproval,
                   voiceActive: _voiceActive,
                   voiceStarting: _voiceStarting,
+                  focusRequests: _composerFocus,
                 ),
               ),
             ),
@@ -424,6 +425,9 @@ mixin _ChatScreenUi on _ChatScreenController {
           ? null
           : (rating) => unawaited(_rate(entry, rating)),
       onCitationTap: (citation) => unawaited(_openCitation(citation)),
+      onEdit: entry.isUser && !_voiceActive && !_voiceStarting
+          ? (text) => unawaited(_editAsNewMessage(text))
+          : null,
       thinkingLabel: entry.pending && entry.content.isEmpty
           ? thinkingLabel(_entries)
           : 'Thinking',

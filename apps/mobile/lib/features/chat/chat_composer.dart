@@ -14,6 +14,7 @@ class ChatComposer extends StatefulWidget {
     this.onRemoveSource,
     this.awaitingApproval = false,
     this.hint = 'Ask Jarvis anything',
+    this.focusRequests,
     super.key,
   });
 
@@ -32,6 +33,9 @@ class ChatComposer extends StatefulWidget {
   final ValueChanged<ConversationSourceChip>? onRemoveSource;
   final String hint;
 
+  /// Each notification moves keyboard focus into the text field.
+  final Listenable? focusRequests;
+
   @override
   State<ChatComposer> createState() => _ChatComposerState();
 }
@@ -44,6 +48,7 @@ class _ChatComposerState extends State<ChatComposer> {
   void initState() {
     super.initState();
     widget.controller.addListener(_changed);
+    widget.focusRequests?.addListener(_requestFocus);
   }
 
   @override
@@ -53,7 +58,13 @@ class _ChatComposerState extends State<ChatComposer> {
       oldWidget.controller.removeListener(_changed);
       widget.controller.addListener(_changed);
     }
+    if (oldWidget.focusRequests != widget.focusRequests) {
+      oldWidget.focusRequests?.removeListener(_requestFocus);
+      widget.focusRequests?.addListener(_requestFocus);
+    }
   }
+
+  void _requestFocus() => _focus.requestFocus();
 
   void _changed() => setState(() {});
 
@@ -78,6 +89,7 @@ class _ChatComposerState extends State<ChatComposer> {
   @override
   void dispose() {
     widget.controller.removeListener(_changed);
+    widget.focusRequests?.removeListener(_requestFocus);
     _focus.dispose();
     super.dispose();
   }
