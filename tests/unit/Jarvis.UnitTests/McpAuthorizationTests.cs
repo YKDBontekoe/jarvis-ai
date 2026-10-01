@@ -82,18 +82,17 @@ public sealed class McpAuthorizationTests
 public sealed class CodexWebSearchTests
 {
     [Fact]
-    public void Live_search_config_enables_standalone_search_and_live_mode()
+    public void Live_search_config_uses_hosted_live_search_not_the_experimental_standalone_tool()
     {
         var start = CodexCliChatClient.CreateAppServerStart("codex", Path.GetTempPath(), enableWebSearch: true);
-        Assert.Contains("standalone_web_search", start.ArgumentList);
-        var enableIndex = start.ArgumentList.IndexOf("standalone_web_search") - 1;
-        Assert.Equal("--enable", start.ArgumentList[enableIndex]);
-        foreach (var overridePair in CodexCliChatClient.LiveWebSearchConfigOverrides)
-            Assert.Contains(overridePair, start.ArgumentList);
+        Assert.Equal("--disable", start.ArgumentList[start.ArgumentList.IndexOf("standalone_web_search") - 1]);
+        Assert.Equal("-c", start.ArgumentList[start.ArgumentList.IndexOf("web_search=\"live\"") - 1]);
+        Assert.DoesNotContain(start.ArgumentList, argument => argument.Contains("web_search_request"));
 
         var disabled = CodexCliChatClient.CreateAppServerStart("codex", Path.GetTempPath(), enableWebSearch: false);
         Assert.Equal("--disable", disabled.ArgumentList[disabled.ArgumentList.IndexOf("standalone_web_search") - 1]);
         Assert.DoesNotContain("web_search=\"live\"", disabled.ArgumentList);
+        Assert.Contains("web_search=\"disabled\"", disabled.ArgumentList);
     }
 
     [Fact]
@@ -107,6 +106,7 @@ public sealed class CodexWebSearchTests
         Assert.Contains(today, prompt);
         Assert.Contains("do not return type=tool_call for web_search", prompt);
         Assert.Contains("never invent current facts", prompt);
+        Assert.Contains("earlier replies in this conversation that said search was unavailable do not apply", prompt);
     }
 
     [Theory]
