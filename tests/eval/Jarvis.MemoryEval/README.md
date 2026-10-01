@@ -133,3 +133,21 @@ fewer results trades recall for noise: at most 8 holds recall and halves the noi
 but loses the helpful-but-secondary memories. Skipping the rerank when the top hit clearly wins saved only 11 of 60
 calls and cost noise, so the tool always reranks. Hints and queries are written by the same family of model that
 wrote the memories and questions, which probably flatters these numbers; real usage will show less.
+
+### Follow-up messages and a larger embedding model
+
+24 short follow-ups ("And which school is she at?") whose subject sits in the previous user message (written by Sonnet from
+the original question and its answer memory, same labels), searched with hints on:
+
+| Query sent to search | Retrieval | Recall@8 | Hit@1 | MRR |
+|----------------------|-----------|---------:|------:|----:|
+| Follow-up alone | keyword | 0.30 | 0.17 | 0.29 |
+| Follow-up alone | + MiniLM | 0.40 | 0.25 | 0.38 |
+| Previous message + follow-up | keyword | 0.63 | 0.50 | 0.62 |
+| Previous message + follow-up | + MiniLM | 0.64 | 0.83 | 0.89 |
+
+`PersonalMemoryContextProvider` therefore prepends the previous user message when the latest one has three or fewer content
+words. Not measured: a topic switch right after a short message, where the borrowed context could add noise.
+
+A bigger embedding model helps only a little here: multilingual-e5-base gives recall 0.63 / hit@1 0.65 on raw questions
+(MiniLM 0.59 / 0.58) and 0.77 / 0.70 with agent queries (MiniLM 0.78 / 0.63), at several times the compute.
