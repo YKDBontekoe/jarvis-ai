@@ -29,10 +29,16 @@ public static class MemoryRanking
             records[match.Memory.Id] = match.Memory;
             keyword[match.Memory.Id] = Math.Clamp(match.TextScore + 0.5 * match.FuzzyScore, 0, 1);
         }
+        // Embedding models differ a lot in how similarities are spread (some put unrelated text at 0.8, others at 0.1),
+        // so the absolute mapping is combined with the hit's position between the list's typical and best similarity.
+        var typical = semantic.Count == 0 ? 0 : semantic.Average(hit => hit.Score);
+        var best = semantic.Count == 0 ? 0 : semantic.Max(hit => hit.Score);
         foreach (var hit in semantic)
         {
             records.TryAdd(hit.Memory.Id, hit.Memory);
-            meaning[hit.Memory.Id] = SemanticRelevance(hit.Score);
+            var spread = best - typical;
+            var relative = spread < 0.02 ? 1 : Math.Clamp((hit.Score - typical) / spread, 0, 1);
+            meaning[hit.Memory.Id] = SemanticRelevance(hit.Score) * (0.4 + 0.6 * relative);
         }
 
         var scored = records.Values

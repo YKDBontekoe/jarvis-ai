@@ -122,6 +122,22 @@ public sealed class SemanticMemoryTests
     }
 
     [Fact]
+    public void Ranking_separates_semantic_hits_even_when_the_model_scores_everything_high()
+    {
+        // Some embedding models put unrelated text at 0.8 cosine similarity; the best hit must still stand out.
+        var answer = Memory("Has a border collie named Bram.");
+        var unrelated = Enumerable.Range(0, 6).Select(index => Memory($"Unrelated fact {index} about topic{index}."))
+            .ToArray();
+        var semantic = unrelated.Select(memory => new MemorySearchHit(memory, 0.78))
+            .Prepend(new MemorySearchHit(answer, 0.88)).ToArray();
+
+        var hits = MemoryRanking.Rank([], semantic, Recorded);
+
+        Assert.Equal(answer.Id, hits[0].Memory.Id);
+        Assert.True(hits[0].Score > 1.8 * hits[1].Score);
+    }
+
+    [Fact]
     public void Ranking_rewards_agreement_between_keyword_and_semantic_hits()
     {
         var both = Memory("The user bakes sourdough on Sundays.");
@@ -129,7 +145,7 @@ public sealed class SemanticMemoryTests
         var semanticOnly = Memory("The user enjoys baking bread.");
 
         var hits = MemoryRanking.Rank([new(both, 0.6, 0), new(keywordOnly, 0.6, 0)],
-            [new(both, 0.6), new(semanticOnly, 0.7)], Recorded);
+            [new(both, 0.7), new(semanticOnly, 0.7)], Recorded);
 
         Assert.Equal(both.Id, hits[0].Memory.Id);
         Assert.Equal(3, hits.Count);

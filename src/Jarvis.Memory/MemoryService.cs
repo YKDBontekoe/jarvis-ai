@@ -9,6 +9,9 @@ public sealed class MemoryService(IMemoryRepository repository, IMemoryIndexRepo
     IMemoryEmbedder? embedder = null) : IMemoryService
 {
     internal const double MinimumSemanticSimilarity = 0.3;
+
+    /// <summary>Lets the offline eval sweep the similarity floor; null in production.</summary>
+    public static double? MinimumSemanticSimilarityOverride { get; set; }
     private const int CandidateLimit = 30;
 
     public async Task<MemoryRecord> CreateAsync(Guid ownerId, string kind, string content, float importance,
@@ -132,7 +135,7 @@ public sealed class MemoryService(IMemoryRepository repository, IMemoryIndexRepo
         if (embedding is null) return [];
         try
         {
-            return await index!.SearchSemanticAsync(ownerId, embedding, kind, MinimumSemanticSimilarity,
+            return await index!.SearchSemanticAsync(ownerId, embedding, kind, MinimumSemanticSimilarityOverride ?? MinimumSemanticSimilarity,
                 CandidateLimit, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException ||

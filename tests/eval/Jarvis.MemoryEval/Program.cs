@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
+using Jarvis.Application.Memory;
 using Jarvis.Infrastructure.Persistence;
 using Jarvis.Memory;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,12 @@ var label = args.FirstOrDefault() ?? "run";
 var heldOut = args.Contains("--held-out");
 var updates = args.Contains("--updates");
 // "--scale N" adds N filler memories built from the dataset's own vocabulary to test speed and ranking under load.
+// "--embeddings file.json" (from embed_dataset.py) turns on the semantic path: memories are indexed with those vectors
+// through IMemoryIndexRepository, queries are embedded by a lookup embedder. "--min-sim x" overrides the similarity floor.
+var embeddingsIndex = Array.IndexOf(args, "--embeddings");
+var lookup = embeddingsIndex >= 0 ? EmbeddingLookup.Load(args[embeddingsIndex + 1]) : null;
+var simIndex = Array.IndexOf(args, "--min-sim");
+if (simIndex >= 0) MemoryService.MinimumSemanticSimilarityOverride = double.Parse(args[simIndex + 1], CultureInfo.InvariantCulture);
 var scaleIndex = Array.IndexOf(args, "--scale");
 var fillers = scaleIndex >= 0 && scaleIndex + 1 < args.Length ? int.Parse(args[scaleIndex + 1], CultureInfo.InvariantCulture) : 0;
 const int Runs = 7;
@@ -46,6 +53,9 @@ await using (var seed = CreateDb())
     {
         var record = await service.CreateAsync(owner, memory.Kind, memory.Content, memory.Importance, 0.9f, null,
             memory.Pinned, CancellationToken.None, sourceType: memory.SourceType ?? "conversation");
+        if (lookup is not null)
+            await new MemoryIndexRepository(seed).SetEmbeddingAsync(record.Id, owner,
+                lookup.Embedding(memory.Content), CancellationToken.None);
         idsByKey[memory.Key] = record.Id;
         keysById[record.Id] = memory.Key;
         var at = DateTimeOffset.UtcNow.AddDays(-memory.AgeDays);
@@ -60,8 +70,14 @@ await using (var seed = CreateDb())
                 Enumerable.Range(0, 8 + random.Next(10)).Select(_ => vocabulary[random.Next(vocabulary.Length)])),
             0.3f, 0.9f, null, false, CancellationToken.None);
     foreach (var content in dataset.OtherOwnerMemories)
-        foreignIds.Add((await service.CreateAsync(otherOwner, "fact", content, 0.9f, 0.9f, null, false,
-            CancellationToken.None)).Id);
+    {
+        var foreign = await service.CreateAsync(otherOwner, "fact", content, 0.9f, 0.9f, null, false,
+            CancellationToken.None);
+        foreignIds.Add(foreign.Id);
+        if (lookup is not null)
+            await new MemoryIndexRepository(seed).SetEmbeddingAsync(foreign.Id, otherOwner, lookup.Embedding(content),
+                CancellationToken.None);
+    }
 }
 
 // Autovacuum keeps planner statistics fresh in a running system; do the same so plans are realistic.
@@ -80,7 +96,9 @@ foreach (var query in updates ? dataset.UpdateStatements ?? [] : heldOut ? datas
     {
         // A fresh context per call mirrors a scoped request in the API.
         await using var db = CreateDb();
-        var service = new MemoryService(new MemoryRepository(db));
+        var service = lookup is null
+            ? new MemoryService(new MemoryRepository(db))
+            : new MemoryService(new MemoryRepository(db), new MemoryIndexRepository(db), lookup);
         var started = Stopwatch.GetTimestamp();
         var hits = await service.SearchAsync(owner, query.Text, CancellationToken.None);
         var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
@@ -153,3 +171,24 @@ internal sealed record Query(string Text, Dictionary<string, int> Relevant);
 internal sealed record QueryResult(string Query, double RecallAt3, double RecallAt8, double PrimaryAt1, double Mrr,
     double NdcgAt8, int Returned, int Irrelevant, int ExpiredLeaks, int ForeignLeaks, string[] TopKeys,
     double MedianMs = 0, bool RerankEligible = false, bool RerankAmbiguous = false);
+
+/// <summary>Serves precomputed vectors (zero-padded to the 1536 columns) instead of calling a provider.</summary>
+internal sealed class EmbeddingLookup(string model, Dictionary<string, float[]> vectors) : IMemoryEmbedder
+{
+    public static EmbeddingLookup Load(string path)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        var model = document.RootElement.GetProperty("model").GetString()!;
+        var vectors = document.RootElement.GetProperty("vectors").EnumerateObject().ToDictionary(
+            property => property.Name,
+            property => property.Value.EnumerateArray().Select(value => value.GetSingle())
+                .Concat(Enumerable.Repeat(0f, 1536)).Take(1536).ToArray());
+        return new EmbeddingLookup(model, vectors);
+    }
+
+    public MemoryEmbedding Embedding(string text) => new(model, vectors[text]);
+
+    public Task<IReadOnlyList<MemoryEmbedding>?> EmbedAsync(Guid ownerId, IReadOnlyList<string> texts,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<MemoryEmbedding>?>(texts.Select(Embedding).ToArray());
+}

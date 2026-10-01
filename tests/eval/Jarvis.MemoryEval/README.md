@@ -19,8 +19,41 @@ Metrics: recall@3/@8 over all labelled memories, primary hit@1 and MRR over grad
 returned hits that are irrelevant (noise that ends up in the model context), empty result count, leaks of expired or
 other-owner memories, and search latency (p50/p95 over six timed runs per query after a warm-up run).
 
-The embedding path is not covered: without an embedding provider the eval measures the keyword path, which is also
-the default setup (Codex has no embeddings). Model reranking is not covered either.
+Without `--embeddings` the eval measures the keyword path, which is also the default setup (Codex has no embeddings).
+Model reranking is not covered.
+
+## Semantic path (local open models)
+
+`embed_dataset.py` precomputes vectors for every memory and query with a local `sentence-transformers` model; pass the
+file with `--embeddings`. Memories are indexed through `IMemoryIndexRepository` (zero-padded to the 1536-dimension
+column) and queries are served from the same file, so the real hybrid ranking runs without a paid provider.
+`--min-sim x` overrides the similarity floor.
+
+```sh
+pip install sentence-transformers
+python3 tests/eval/Jarvis.MemoryEval/embed_dataset.py sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 /tmp/emb.json
+dotnet run --project tests/eval/Jarvis.MemoryEval -- hybrid --held-out --embeddings /tmp/emb.json
+```
+
+| Set | Retrieval | Recall@8 | Hit@1 | MRR | Noise |
+|-----|-----------|---------:|------:|----:|------:|
+| Tuning (32) | keyword | 0.78 | 0.66 | 0.76 | 0.46 |
+| Tuning (32) | + MiniLM | 0.82 | 0.78 | 0.85 | 0.46 |
+| Tuning (32) | + e5-small | 0.82 | 0.66 | 0.72 | 0.83 |
+| Held-out (20) | keyword | 0.72 | 0.60 | 0.68 | 0.41 |
+| Held-out (20) | + MiniLM | 0.81 | 0.85 | 0.88 | 0.36 |
+| Held-out (20) | + e5-small | 0.91 | 0.60 | 0.73 | 0.83 |
+| Updates (15) | keyword | 0.93 | 0.60 | 0.74 | 0.59 |
+| Updates (15) | + MiniLM | 0.87 | 0.73 | 0.79 | 0.38 |
+
+Hybrid search costs one embedding call per search (about 8 ms here because the vectors are precomputed; a provider adds
+its network latency, in parallel with the keyword query). Both models are small open models, so a hosted model such as
+text-embedding-3-small should do at least as well.
+
+Models differ in how similarities are spread: multilingual-e5-small scores unrelated text around 0.8 cosine, MiniLM
+around 0.1. With the original fixed mapping e5 dropped recall to 0.57, below keyword-only; `MemoryRanking` now also
+uses each hit's position between the list's typical and best similarity. e5 still returns many weak hits (noise 0.83),
+so for such models the similarity floor needs a higher value.
 
 ## Results (2026-09-30, local PostgreSQL 16)
 
