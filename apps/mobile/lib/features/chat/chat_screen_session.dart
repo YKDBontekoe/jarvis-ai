@@ -180,10 +180,12 @@ mixin _ChatScreenSession on _ChatScreenController {
                   content: message['content'] as String,
                   id: asJsonString(message['id']),
                   citations: parseMessageCitations(message['citations']),
+                  photos: MessagePhoto.listFromJson(message['attachments']),
                 ),
               ),
         )
-        ..addAll(knownApprovals);
+        ..addAll(knownApprovals)
+        ..addAll(_queuedEntries(conversationId));
       if (responding) _ensurePlaceholder();
       _error = null;
     });
@@ -494,6 +496,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       role: message['role'] as String,
       content: message['content'] as String,
       id: asJsonString(message['id']),
+      photos: MessagePhoto.listFromJson(message['attachments']),
     );
   }
 }

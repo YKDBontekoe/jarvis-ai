@@ -28,7 +28,8 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | PATCH | `/conversations/{id}` | Rename (`title`) and/or pin (`pinned`); 404 for task-backed chats |
 | PUT | `/conversations/{id}/profile` | Switch bound profile snapshot (409 if scope changes without `confirm`) |
 | DELETE | `/conversations/{id}` | Delete chat (not task-backed) |
-| POST | `/conversations/{id}/messages` | Send user message (starts agent turn) |
+| POST | `/conversations/{id}/messages` | Send user message (starts agent turn). Optional `imageFileIds` (up to 4 of the owner's JPEG/PNG/WebP files, 8 MB each) are shown to the model in that turn only; stored history keeps a note instead of the image |
+| POST | `/conversations/{id}/regenerate` | Answer the last user message again, replacing the last reply. 409 while approvals are open or when that reply used tools (so actions are never repeated) |
 | POST | `/conversations/{id}/cancel` | Cancel in-flight run |
 | GET | `/approvals` | Pending tool approvals |
 | POST | `/approvals/{id}/decision` | Approve or decline |

@@ -26,11 +26,25 @@ mixin _ChatScreenSend on _ChatScreenController {
     _composerFocus.value++;
   }
 
-  Future<bool> _send([String? text]) async {
+  /// Sends [text], or the composer's text and photos when [text] is null.
+  /// [photos] resends the photos of a message that failed.
+  Future<bool> _send([String? text, List<MessagePhoto>? photos]) async {
     final content = (text ?? _input.text).trim();
     final conversationId = _conversationId;
     final generation = _realtimeGeneration;
-    if (content.isEmpty ||
+    final pending = text == null ? _pendingPhotos : const <PendingPhoto>[];
+    if (pending.any((photo) => photo.fileId == null)) return false;
+    final sentPhotos =
+        photos ??
+        [
+          for (final photo in pending)
+            MessagePhoto(
+              fileId: photo.fileId!,
+              fileName: photo.fileName,
+              bytes: photo.bytes,
+            ),
+        ];
+    if ((content.isEmpty && sentPhotos.isEmpty) ||
         conversationId == null ||
         _busy ||
         _hasPendingApproval ||
@@ -40,10 +54,22 @@ mixin _ChatScreenSend on _ChatScreenController {
         _signingOut) {
       return false;
     }
-    if (text == null) _input.clear();
+    if (text == null) {
+      _input.clear();
+      _pendingPhotos = [];
+    }
     _stopRequested = false;
-    _pendingQueryText = content;
-    final userMessage = MessageEntry(role: 'user', content: content);
+    final shownContent = content.isEmpty
+        ? (sentPhotos.length == 1
+              ? 'Shared a photo.'
+              : 'Shared ${sentPhotos.length} photos.')
+        : content;
+    _pendingQueryText = shownContent;
+    final userMessage = MessageEntry(
+      role: 'user',
+      content: shownContent,
+      photos: sentPhotos,
+    );
     setState(() {
       _sending = true;
       _showHome = false;
@@ -57,10 +83,20 @@ mixin _ChatScreenSend on _ChatScreenController {
     _scrollToBottom(force: true);
     final run = CancelToken();
     _runCancel = run;
+    // A request that never left the phone is safe to keep and send later;
+    // one that did may already be running on the server.
+    var requestSent = false;
     try {
       final response = await _http.post<dynamic>(
         '/api/v1/conversations/$conversationId/messages',
-        data: {'content': content},
+        onSendProgress: (sent, total) {
+          if (total <= 0 || sent >= total) requestSent = true;
+        },
+        data: {
+          'content': content,
+          if (sentPhotos.isNotEmpty)
+            'imageFileIds': [for (final photo in sentPhotos) photo.fileId],
+        },
         cancelToken: run,
         options: longRunningOptions(),
       );
@@ -77,7 +113,24 @@ mixin _ChatScreenSend on _ChatScreenController {
       if (mounted &&
           _conversationId == conversationId &&
           _realtimeGeneration == generation) {
-        if (queryContinuesRemotely(error, stopRequested: _stopRequested)) {
+        if (!requestSent &&
+            !_stopRequested &&
+            !_hasStreamedReply &&
+            (error.type == DioExceptionType.connectionError ||
+                error.type == DioExceptionType.connectionTimeout)) {
+          _lastSendQueued = true;
+          _pendingQueryText = null;
+          setState(() {
+            _removePlaceholder();
+            _settleToolRuns();
+            _error = null;
+          });
+          await _queueMessage(userMessage, conversationId);
+          if (mounted) setState(() {});
+        } else if (queryContinuesRemotely(
+          error,
+          stopRequested: _stopRequested,
+        )) {
           setState(() {
             _remoteQuery = true;
             _sending = true;
@@ -360,6 +413,110 @@ mixin _ChatScreenSend on _ChatScreenController {
     }
   }
 
+  /// Asks Jarvis to answer the last message again, replacing [reply].
+  Future<void> _regenerate(MessageEntry reply) async {
+    final conversationId = _conversationId;
+    final index = _entries.indexOf(reply);
+    if (conversationId == null ||
+        index < 0 ||
+        _busy ||
+        _hasPendingApproval ||
+        _voiceActive ||
+        _voiceStarting ||
+        _signedOut ||
+        _signingOut) {
+      return;
+    }
+    final generation = _realtimeGeneration;
+    final question = _entries
+        .take(index)
+        .whereType<MessageEntry>()
+        .lastWhere(
+          (entry) => entry.isUser,
+          orElse: () => const MessageEntry(role: 'user', content: ''),
+        );
+    _stopRequested = false;
+    _pendingQueryText = question.content.isEmpty ? null : question.content;
+    const placeholder = MessageEntry(
+      role: 'assistant',
+      content: '',
+      pending: true,
+    );
+    setState(() {
+      _sending = true;
+      _error = null;
+      _entries[index] = placeholder;
+    });
+    _scrollToBottom(force: true);
+    void restore(String? error) {
+      setState(() {
+        final at = _entries.indexWhere(
+          (entry) =>
+              entry is MessageEntry && !entry.isUser && entry.pending,
+        );
+        if (at >= 0) {
+          _entries[at] = reply;
+        } else if (!_entries.contains(reply)) {
+          _entries.add(reply);
+        }
+        _settleToolRuns();
+        _error = error;
+      });
+    }
+
+    final run = CancelToken();
+    _runCancel = run;
+    try {
+      final response = await _http.post<dynamic>(
+        '/api/v1/conversations/$conversationId/regenerate',
+        cancelToken: run,
+        options: longRunningOptions(),
+      );
+      if (!mounted ||
+          _conversationId != conversationId ||
+          _realtimeGeneration != generation) {
+        return;
+      }
+      _finishRemoteQuery();
+      setState(() => _applyRunResult(response));
+    } on DioException catch (error) {
+      if (!mounted ||
+          _conversationId != conversationId ||
+          _realtimeGeneration != generation) {
+        return;
+      }
+      if (error.response?.statusCode != 409 &&
+          queryContinuesRemotely(error, stopRequested: _stopRequested)) {
+        setState(() {
+          _remoteQuery = true;
+          _sending = true;
+          _error = null;
+          _ensurePlaceholder();
+        });
+        unawaited(_catchUpRemoteQuery(conversationId));
+        return;
+      }
+      restore(
+        error.type == DioExceptionType.cancel
+            ? null
+            : describeApiError(error),
+      );
+    } catch (_) {
+      if (mounted && _conversationId == conversationId) {
+        restore('Jarvis could not try that reply again.');
+      }
+    } finally {
+      if (identical(_runCancel, run)) _runCancel = null;
+      if (mounted &&
+          _conversationId == conversationId &&
+          _realtimeGeneration == generation &&
+          !_remoteQuery) {
+        setState(() => _sending = false);
+      }
+      _scrollToBottom();
+    }
+  }
+
   Future<void> _retry(MessageEntry message) async {
     if (_busy ||
         _hasPendingApproval ||
@@ -370,7 +527,7 @@ mixin _ChatScreenSend on _ChatScreenController {
       return;
     }
     setState(() => _entries.remove(message));
-    final sent = await _send(message.content);
+    final sent = await _send(message.content, message.photos);
     if (!sent && mounted && !_entries.contains(message)) {
       setState(() => _entries.add(message));
     }

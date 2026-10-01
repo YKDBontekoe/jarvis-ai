@@ -83,6 +83,7 @@ public interface IObjectStorage
 
 public interface IFileService
 {
+    Task<StoredFile?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<StoredFile> UploadAsync(Guid ownerId, string fileName, string contentType, long length,
         Stream content, CancellationToken cancellationToken);
     Task<IReadOnlyList<StoredFile>> ListAsync(Guid ownerId, CancellationToken cancellationToken);

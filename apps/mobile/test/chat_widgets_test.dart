@@ -616,4 +616,35 @@ void main() {
       'Help me connect an app or manage the ones I have, in this chat. Show the setup card.',
     );
   });
+
+  testWidgets('the latest reply offers Try again', (tester) async {
+    var tapped = 0;
+    await tester.pumpWidget(
+      _host(
+        MessageBubble(
+          message: const MessageEntry(
+            role: 'assistant',
+            content: 'Lisbon.',
+            id: 'm1',
+          ),
+          onRegenerate: () => tapped++,
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Try again'));
+    expect(tapped, 1);
+  });
+
+  testWidgets('older replies do not offer Try again', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        const MessageBubble(
+          message: MessageEntry(role: 'assistant', content: 'Lisbon.'),
+        ),
+      ),
+    );
+
+    expect(find.byTooltip('Try again'), findsNothing);
+  });
 }

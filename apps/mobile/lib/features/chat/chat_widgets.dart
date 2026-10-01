@@ -16,3 +16,4 @@ part 'chat_message_widgets.dart';
 part 'chat_tool_run.dart';
 part 'chat_approval_card.dart';
 part 'chat_composer.dart';
+part 'chat_photos.dart';

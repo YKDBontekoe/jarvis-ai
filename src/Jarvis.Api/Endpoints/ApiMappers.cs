@@ -1,5 +1,6 @@
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Audit;
+using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Conversations;
@@ -22,7 +23,12 @@ internal static class ApiMappers
                 citations = parsed.Select(citation => citation.ToDto()).ToArray();
         }
 
-        return new MessageDto(message.Id, message.Role, message.Content, message.CreatedAt, citations);
+        var attachments = MessageAttachments.Parse(message.AttachmentsJson);
+        return new MessageDto(message.Id, message.Role, message.Content, message.CreatedAt, citations,
+            attachments.Count == 0
+                ? null
+                : attachments.Select(item => new MessageAttachmentDto(item.FileId, item.FileName, item.ContentType))
+                    .ToArray());
     }
 
     public static FileCitationDto ToDto(this FileCitation citation) => new(citation.FileId, citation.DisplayName,

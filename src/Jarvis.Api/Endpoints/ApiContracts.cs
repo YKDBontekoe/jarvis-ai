@@ -17,7 +17,9 @@ public sealed record VoiceToolCallRequest(Guid OwnerId, JsonElement? Arguments);
 public sealed record VoiceToolDto(string Name, string Description, JsonElement InputSchema, bool RequiresApproval);
 public sealed record VoiceSessionBootstrapDto(string Instructions, IReadOnlyList<VoiceToolDto> Tools);
 public sealed record VoiceToolCallResultDto(string Result, bool IsError, bool ApprovalRequired);
-public sealed record SendMessageRequest([Required, StringLength(32_000, MinimumLength = 1)] string? Content);
+public sealed record SendMessageRequest([StringLength(32_000)] string? Content,
+    IReadOnlyList<Guid>? ImageFileIds = null);
+public sealed record MessageAttachmentDto(Guid FileId, string FileName, string ContentType);
 public sealed record ConversationDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     Guid? ProfileId = null, string? ProfileName = null, int? ProfileVersion = null, bool ProfileDeleted = false,
     bool Pinned = false);
@@ -26,7 +28,7 @@ public sealed record ConversationDetailsDto(Guid Id, string Title, DateTimeOffse
     IReadOnlyList<MessageDto> Messages, bool Responding, Guid? ProfileId = null, string? ProfileName = null,
     int? ProfileVersion = null, bool ProfileDeleted = false, bool Pinned = false);
 public sealed record MessageDto(Guid Id, string Role, string Content, DateTimeOffset CreatedAt,
-    IReadOnlyList<FileCitationDto>? Citations = null);
+    IReadOnlyList<FileCitationDto>? Citations = null, IReadOnlyList<MessageAttachmentDto>? Attachments = null);
 public sealed record FileCitationDto(Guid FileId, string DisplayName, Guid ChunkId, int ChunkIndex, string Excerpt,
     int? PageNumber, string SourceStatus = "available");
 public sealed record MessagePageDto(IReadOnlyList<MessageDto> Items, string? NextCursor, bool HasMore);

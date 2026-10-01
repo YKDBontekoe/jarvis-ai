@@ -20,6 +20,8 @@ public interface IConversationStore
     Task<MessagePage> GetMessagePageAsync(Guid conversationId, MessageCursor? before, int limit,
         CancellationToken cancellationToken);
     Task AddMessageAsync(Message message, CancellationToken cancellationToken);
+    /// <summary>Removes one message of a conversation, with its feedback; true when it existed.</summary>
+    Task<bool> DeleteMessageAsync(Guid conversationId, Guid messageId, CancellationToken cancellationToken);
     Task<string?> GetAgentSessionAsync(Guid conversationId, CancellationToken cancellationToken);
     Task SaveAgentSessionAsync(Guid conversationId, string state, CancellationToken cancellationToken);
 }

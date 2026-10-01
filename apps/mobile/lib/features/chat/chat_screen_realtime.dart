@@ -377,6 +377,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       }
       if (_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         setState(() => _connected = true);
+        unawaited(_flushOutbox());
       }
     } catch (_) {
       if (identical(_hub, hub)) _hub = null;
@@ -412,6 +413,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
           _connected = true;
           _homeRevision++;
         });
+        unawaited(_flushOutbox());
         if (_remoteQuery) {
           unawaited(_catchUpRemoteQuery(conversationId));
         } else {

@@ -37,6 +37,57 @@ public static class AgentSessionJson
         else element.WriteTo(writer);
     }
 
+    /// <summary>Stands in for a photo once its turn is over, so stored history keeps no image bytes.</summary>
+    public const string RemovedImagePlaceholder =
+        "[The user shared a photo in this message. It was shown to you in that turn and is no longer attached.]";
+
+    /// <summary>
+    /// Replaces inline image data in a serialized session with a short text note. Later turns then do not
+    /// resend old photos (the model accepts only a few images per request) and the database keeps no bytes.
+    /// </summary>
+    public static string StripImageData(string sessionJson)
+    {
+        if (!sessionJson.Contains("data:image/", StringComparison.OrdinalIgnoreCase)) return sessionJson;
+        var root = JsonNode.Parse(sessionJson);
+        if (root is null || !ReplaceImages(root)) return sessionJson;
+        return root.ToJsonString();
+    }
+
+    private static bool ReplaceImages(JsonNode node)
+    {
+        var changed = false;
+        if (node is JsonArray array)
+        {
+            for (var index = 0; index < array.Count; index++)
+            {
+                if (array[index] is not { } item) continue;
+                if (IsImageData(item))
+                {
+                    array[index] = new JsonObject
+                    {
+                        ["$type"] = "text",
+                        ["text"] = RemovedImagePlaceholder
+                    };
+                    changed = true;
+                }
+                else changed |= ReplaceImages(item);
+            }
+        }
+        else if (node is JsonObject obj)
+        {
+            foreach (var property in obj.ToList())
+                if (property.Value is { } child) changed |= ReplaceImages(child);
+        }
+        return changed;
+    }
+
+    private static bool IsImageData(JsonNode node) =>
+        node is JsonObject obj &&
+        obj["$type"]?.GetValueKind() == JsonValueKind.String &&
+        obj["$type"]!.GetValue<string>() == "data" &&
+        obj["uri"]?.GetValueKind() == JsonValueKind.String &&
+        obj["uri"]!.GetValue<string>().StartsWith("data:image/", StringComparison.OrdinalIgnoreCase);
+
     public static bool TryGetCompletedAssistantText(string sessionJson, out string text)
     {
         text = string.Empty;
@@ -154,6 +205,46 @@ public static class AgentSessionJson
             !HasInFlightProgressAfterUser(sessionJson, lastUser))
             return false;
         return TryDropIncompleteTurn(sessionJson, out truncated);
+    }
+
+    /// <summary>
+    /// Drops the last user turn and everything after it so that turn can be answered again. Refuses when
+    /// the turn called tools, because answering again would repeat those actions.
+    /// </summary>
+    public static RegenerateTruncation TryDropLastTurnForRegenerate(string sessionJson, out string truncated)
+    {
+        truncated = sessionJson;
+        try
+        {
+            var node = JsonNode.Parse(sessionJson);
+            if (node is null || !TryFindMessagesNode(node, out var messages) || messages.Count == 0)
+                return RegenerateTruncation.NoTurn;
+
+            var lastUser = -1;
+            for (var index = 0; index < messages.Count; index++)
+            {
+                if (messages[index] is not { } item) continue;
+                using var document = JsonDocument.Parse(item.ToJsonString());
+                if (IsRole(document.RootElement, "user") && TryGetPlainText(document.RootElement, out _))
+                    lastUser = index;
+            }
+            if (lastUser < 0) return RegenerateTruncation.NoTurn;
+
+            for (var index = lastUser + 1; index < messages.Count; index++)
+            {
+                if (messages[index] is not { } item) continue;
+                using var document = JsonDocument.Parse(item.ToJsonString());
+                if (HasToolContents(document.RootElement)) return RegenerateTruncation.UsedTools;
+            }
+
+            while (messages.Count > lastUser) messages.RemoveAt(messages.Count - 1);
+            truncated = PrepareForRead(node.ToJsonString());
+            return RegenerateTruncation.Dropped;
+        }
+        catch (JsonException)
+        {
+            return RegenerateTruncation.NoTurn;
+        }
     }
 
     public static bool TryGetPendingApprovals(string sessionJson,
@@ -447,4 +538,11 @@ public static class AgentSessionJson
         messages = default;
         return false;
     }
+}
+
+public enum RegenerateTruncation
+{
+    Dropped,
+    NoTurn,
+    UsedTools
 }
