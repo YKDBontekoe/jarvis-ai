@@ -22,6 +22,12 @@ var updates = args.Contains("--updates");
 // through IMemoryIndexRepository, queries are embedded by a lookup embedder. "--min-sim x" overrides the similarity floor.
 var embeddingsIndex = Array.IndexOf(args, "--embeddings");
 var lookup = embeddingsIndex >= 0 ? EmbeddingLookup.Load(args[embeddingsIndex + 1]) : null;
+// "--agent-queries file.json" simulates agentic search: instead of the raw user message, the model's own 1-3 search
+// queries per message (one SearchMemory call each) are run and the hits merged by best score, as the agent would see them.
+var agentIndex = Array.IndexOf(args, "--agent-queries");
+var agentQueries = agentIndex >= 0
+    ? JsonSerializer.Deserialize<Dictionary<string, string[]>>(File.ReadAllText(args[agentIndex + 1]))
+    : null;
 var simIndex = Array.IndexOf(args, "--min-sim");
 if (simIndex >= 0) MemoryService.MinimumSemanticSimilarityOverride = double.Parse(args[simIndex + 1], CultureInfo.InvariantCulture);
 var scaleIndex = Array.IndexOf(args, "--scale");
@@ -100,7 +106,16 @@ foreach (var query in updates ? dataset.UpdateStatements ?? [] : heldOut ? datas
             ? new MemoryService(new MemoryRepository(db))
             : new MemoryService(new MemoryRepository(db), new MemoryIndexRepository(db), lookup);
         var started = Stopwatch.GetTimestamp();
-        var hits = await service.SearchAsync(owner, query.Text, CancellationToken.None);
+        IReadOnlyList<Jarvis.Domain.Memory.MemorySearchHit> hits;
+        if (agentQueries is null) hits = await service.SearchAsync(owner, query.Text, CancellationToken.None);
+        else
+        {
+            var merged = new Dictionary<Guid, Jarvis.Domain.Memory.MemorySearchHit>();
+            foreach (var agentQuery in agentQueries[query.Text])
+                foreach (var hit in await service.SearchAsync(owner, agentQuery, CancellationToken.None))
+                    if (!merged.TryGetValue(hit.Memory.Id, out var seen) || hit.Score > seen.Score) merged[hit.Memory.Id] = hit;
+            hits = merged.Values.OrderByDescending(hit => hit.Score).Take(8).ToArray();
+        }
         var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
         if (run > 0) // run 0 warms the connection pool and query plans
         {

@@ -55,6 +55,23 @@ around 0.1. With the original fixed mapping e5 dropped recall to 0.57, below key
 uses each hit's position between the list's typical and best similarity. e5 still returns many weak hits (noise 0.83),
 so for such models the similarity floor needs a higher value.
 
+## Agentic search
+
+`--agent-queries file.json` replaces each user message with the search queries a model wrote for it (a JSON object
+message → 1-3 queries, one `SearchMemory` call each, hits merged by best score). The queries in this comparison came
+from one Sonnet call that saw only the 67 user messages, not the memories or the dataset labels.
+
+| Retrieval | Tuning recall@8 | Held-out recall@8 | Held-out hit@1 | Held-out MRR | Held-out noise |
+|-----------|----------------:|------------------:|---------------:|-------------:|---------------:|
+| Raw message, keyword | 0.78 | 0.72 | 0.60 | 0.68 | 0.41 |
+| Raw message, + MiniLM | 0.82 | 0.81 | 0.85 | 0.88 | 0.36 |
+| Agent queries, keyword | 0.87 | 0.86 | 0.70 | 0.84 | 0.62 |
+| Agent queries, + MiniLM | 0.91 | 0.91 | 0.85 | 0.93 | 0.58 |
+
+Limits: one round (the agent never reads results and searches again), a strong model writing the queries, only 52
+queries, and the merged lists carry more weak hits. An agentic search costs a model round before every search, which
+the automatic per-turn memory context cannot afford; the `SearchMemory` tool can.
+
 ## Results (2026-09-30, local PostgreSQL 16)
 
 | Set | Version | Recall@8 | Hit@1 | MRR | nDCG@8 | Empty | p50 |

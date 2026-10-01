@@ -10,6 +10,8 @@ model = SentenceTransformer(model_name)
 q, p = ("query: ", "passage: ") if "e5" in model_name else ("", "")
 passages = [m["content"] for m in data["memories"]] + data["otherOwnerMemories"]
 queries = [x["text"] for key in ("queries", "heldOutQueries", "updateStatements") for x in data.get(key, [])]
+if len(sys.argv) > 3:
+    queries += sorted({q for v in json.load(open(sys.argv[3])).values() for q in v} - set(queries))
 vectors = {}
 for texts, prefix in ((passages, p), (queries, q)):
     embedded = model.encode([prefix + t for t in texts], normalize_embeddings=True, batch_size=32)
