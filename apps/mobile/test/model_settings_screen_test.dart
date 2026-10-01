@@ -192,6 +192,24 @@ void main() {
     expect(find.textContaining('840 of 900 memories indexed'), findsOneWidget);
   });
 
+  testWidgets('warns when the embedding server does not answer', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/settings/models', _settings());
+    http.on('GET', '/api/v1/settings/models/embedding', {
+      'source': 'local',
+      'model': 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2',
+      'activeMemories': 51,
+      'embeddedMemories': 0,
+      'reachable': false,
+    });
+    await show(tester);
+
+    await tester.ensureVisible(find.byKey(const Key('embedding-status')));
+    expect(find.textContaining('does not answer'), findsOneWidget);
+    expect(find.textContaining('0 of 51 memories indexed'), findsOneWidget);
+  });
+
   testWidgets('warns when no embedding model is active', (tester) async {
     http.on('GET', '/api/v1/settings/models', _settings());
     http.on('GET', '/api/v1/settings/models/embedding', {
