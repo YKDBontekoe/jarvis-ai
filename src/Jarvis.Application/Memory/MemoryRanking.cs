@@ -19,7 +19,7 @@ public static class MemoryRanking
     internal const double DuplicateOverlap = 0.85;
 
     public static IReadOnlyList<MemorySearchHit> Rank(IReadOnlyList<MemoryLexicalMatch> lexical,
-        IReadOnlyList<MemorySearchHit> semantic, DateTimeOffset now)
+        IReadOnlyList<MemorySearchHit> semantic, DateTimeOffset now, int maxHits = MaxHits)
     {
         var records = new Dictionary<Guid, MemoryRecord>();
         var keyword = new Dictionary<Guid, double>();
@@ -58,7 +58,7 @@ public static class MemoryRanking
         var selectedTokens = new List<HashSet<string>>();
         foreach (var item in scored)
         {
-            if (selected.Count >= MaxHits || item.Score < floor) break;
+            if (selected.Count >= maxHits || item.Score < floor) break;
             var tokens = MemoryQuery.Tokenize(item.Memory.Content).ToHashSet(StringComparer.Ordinal);
             if (selectedTokens.Any(other => Overlap(tokens, other) >= DuplicateOverlap)) continue;
             selected.Add(new MemorySearchHit(item.Memory, Math.Round(item.Score, 4)));

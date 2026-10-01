@@ -117,6 +117,39 @@ public sealed class KnowledgeMemoryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Search_hints_make_a_memory_findable_by_other_words_and_reset_when_content_changes()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var memories = new MemoryRepository(database);
+        var index = new MemoryIndexRepository(database);
+        var memory = await memories.CreateAsync(owner, "fact", "Mark rides a cargo bike to the daycare.", 0.5f, 0.9f,
+            "user", null, null, false, CancellationToken.None);
+        await index.SetEmbeddingAsync(memory.Id, owner, new MemoryEmbedding("m1", Vector(1, 0)), CancellationToken.None);
+        Assert.Empty(await memories.SearchLexicalAsync(owner, MemoryQuery.Parse("kinderopvang"), null, 10,
+            CancellationToken.None));
+        Assert.Equal([memory.Id], (await index.ListNeedingHintsAsync(owner, 10, CancellationToken.None)).Select(x => x.Id));
+
+        await index.SetSearchHintsAsync(memory.Id, owner, "Hoe breng ik de kinderen naar de kinderopvang? bakfiets",
+            CancellationToken.None);
+
+        Assert.Empty(await index.ListNeedingHintsAsync(owner, 10, CancellationToken.None));
+        Assert.Equal([memory.Id], (await index.ListNeedingEmbeddingAsync(owner, "m1", 10, CancellationToken.None))
+            .Select(x => x.Id));
+        var found = await memories.SearchLexicalAsync(owner, MemoryQuery.Parse("kinderopvang"), null, 10,
+            CancellationToken.None);
+        Assert.Equal([memory.Id], found.Select(match => match.Memory.Id));
+        Assert.Contains("kinderopvang", MemoryText.ForIndex((await memories.GetAsync(memory.Id, owner,
+            CancellationToken.None))!));
+
+        await memories.UpdateAsync(memory.Id, owner, "fact", "Mark takes the train to work.", 0.5f, 0.9f, null, false,
+            CancellationToken.None);
+
+        Assert.Null((await memories.GetAsync(memory.Id, owner, CancellationToken.None))!.SearchHints);
+        Assert.Single(await index.ListNeedingHintsAsync(owner, 10, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Skills_keep_revisions_and_settings_round_trip_as_json()
     {
         var owner = Guid.CreateVersion7();

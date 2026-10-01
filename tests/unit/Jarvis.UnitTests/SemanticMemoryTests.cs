@@ -81,6 +81,32 @@ public sealed class SemanticMemoryTests
     }
 
     [Fact]
+    public void Search_hint_replies_are_parsed_trimmed_and_bad_entries_skipped()
+    {
+        var parsed = SearchHintGenerator.Parse($$"""
+            Sure: {"hints":[{"memory":0,"text":"  Hoe  heet\nmijn zus?  sister name "},{"memory":"1","text":"x"},
+            {"memory":2,"text":42},{"memory":3,"text":"{{new string('a', 900)}}"}]}
+            """);
+
+        Assert.Equal(2, parsed.Count);
+        Assert.Equal((0, "Hoe heet mijn zus? sister name"), parsed[0]);
+        Assert.Equal(SearchHintGenerator.MaxHintLength, parsed[1].Text.Length);
+        Assert.Empty(SearchHintGenerator.Parse("not json"));
+        Assert.Empty(SearchHintGenerator.Parse(null));
+    }
+
+    [Fact]
+    public void Indexed_text_is_the_content_plus_its_hints()
+    {
+        MemoryRecord Record(string? hints) => new(Guid.NewGuid(), Guid.NewGuid(), "fact", "Has a sister",
+            0.5f, 0.9f, "user", null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, false, SearchHints: hints);
+
+        Assert.Equal("Has a sister", MemoryText.ForIndex(Record(null)));
+        Assert.Equal("Has a sister", MemoryText.ForIndex(Record("  ")));
+        Assert.Equal("Has a sister zus", MemoryText.ForIndex(Record("zus")));
+    }
+
+    [Fact]
     public void Query_terms_are_safe_tsquery_lexemes_for_hostile_input()
     {
         var query = MemoryQuery.Parse("x' | !(y) & z:* <-> 'drop table memories; -- ümlaut café");

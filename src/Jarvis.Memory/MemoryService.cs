@@ -60,7 +60,7 @@ public sealed class MemoryService(IMemoryRepository repository, IMemoryIndexRepo
         repository.DeleteAsync(id, ownerId, cancellationToken);
 
     public async Task<IReadOnlyList<MemorySearchHit>> SearchAsync(Guid ownerId, string query,
-        CancellationToken cancellationToken, string? kind = null)
+        CancellationToken cancellationToken, string? kind = null, int maxHits = MemoryRanking.MaxHits)
     {
         var startedAt = Stopwatch.GetTimestamp();
         var outcome = "completed";
@@ -85,7 +85,7 @@ public sealed class MemoryService(IMemoryRepository repository, IMemoryIndexRepo
             activity?.SetTag("jarvis.memory.semantic_hits", semantic.Count);
             activity?.SetTag("jarvis.memory.lexical_hits", lexical.Count);
 
-            hits = MemoryRanking.Rank(lexical, semantic, DateTimeOffset.UtcNow);
+            hits = MemoryRanking.Rank(lexical, semantic, DateTimeOffset.UtcNow, Math.Clamp(maxHits, 1, CandidateLimit));
             activity?.SetTag("jarvis.memory.hit_count", hits.Count);
             return hits;
         }

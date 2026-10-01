@@ -109,3 +109,27 @@ rebuilds it from per-area files and `embed_dataset.py` takes `DATASET=<file>`.
 
 Much harder than the small set: the questions are indirect, so keyword search alone finds under a third of the labelled
 memories. No expired or other-owner memory was returned.
+
+## Search hints and rerank (1,000-memory set)
+
+`--hints file.json` stores model-written search hints per memory (`hints.json` style `{key: text}`; Sonnet wrote them
+from the memory text only) and embeds content + hints like the background indexer does. `--pool 15 --dump pool.json`
+dumps each query's candidates, and `--rerank file.json` scores the keys a model kept per query (Sonnet, shown only the
+query and the candidate texts, not the labels).
+
+| Retrieval | Recall@8 | Hit@1 | MRR | Noise | p50 |
+|-----------|---------:|------:|----:|------:|----:|
+| Raw message, keyword | 0.29 | 0.27 | 0.33 | 0.91 | 10 ms |
+| Raw message, keyword + hints | 0.51 | 0.48 | 0.56 | 0.85 | 12 ms |
+| Raw message, + MiniLM | 0.45 | 0.33 | 0.46 | 0.85 | 18 ms |
+| Raw message, + MiniLM + hints | 0.59 | 0.58 | 0.66 | 0.81 | 17 ms |
+| Agent queries, + MiniLM | 0.68 | 0.52 | 0.64 | 0.79 | 23 ms |
+| Agent queries, + MiniLM + hints | 0.78 | 0.63 | 0.78 | 0.76 | 17 ms |
+| + rerank, keep at most 8 (pool 15) | 0.79 | 0.87 | 0.93 | 0.51 | |
+| + rerank, keep at most 5 (pool 15) | 0.69 | 0.85 | 0.91 | 0.25 | |
+
+Rerank rows are on top of the agent-queries + MiniLM + hints row and exclude the model call itself (a few seconds). Keeping
+fewer results trades recall for noise: at most 8 holds recall and halves the noise, at most 5 cuts noise to a quarter
+but loses the helpful-but-secondary memories. Skipping the rerank when the top hit clearly wins saved only 11 of 60
+calls and cost noise, so the tool always reranks. Hints and queries are written by the same family of model that
+wrote the memories and questions, which probably flatters these numbers; real usage will show less.

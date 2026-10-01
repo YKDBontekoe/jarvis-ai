@@ -27,8 +27,15 @@ Jarvis combines **structured memory**, **semantic search**, a **temporal knowled
 5. **Recall tracking**: memories that reach the model get `access_count` and `last_accessed_at` updated, which feeds
    ranking and dreaming (also in the worker process).
 6. **Reranking**: chat context (`PersonalMemoryContextProvider`) never waits on a model rerank. The `SearchMemory` tool
-   reranks through the background model (8s timeout) only when the top hit does not clearly win (`MemoryReranker`).
-7. Pinned unexpired memories are always included in the bounded agent context.
+   pulls a wider pool (15 candidates), and the background model (8s timeout, `MemoryReranker`) keeps at most eight that
+   help and orders them best first. An unusable answer falls back to the hybrid order.
+7. **Search hints**: the background indexer (`MemoryIndexer`, `SearchHintGenerator`) asks the background model for three to
+   five questions plus synonyms (Dutch and English) per memory and stores them in `memories.search_hints`. The hints
+   are part of the generated `search_vector` and of the text that gets embedded (`MemoryText.ForIndex`), so a question
+   that shares no words with the memory still finds it. Hints are never shown to the model or the user, memories that
+   look like secrets get none, and editing a memory clears them so they are regenerated. Existing memories are
+   backfilled in the background, newest first; until then they are searched as before.
+8. Pinned unexpired memories are always included in the bounded agent context.
 
 Retrieval quality and speed are measured offline with `tests/eval/Jarvis.MemoryEval` (see its README).
 

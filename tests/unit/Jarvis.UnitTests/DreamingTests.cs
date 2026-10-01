@@ -612,7 +612,7 @@ public sealed class DreamingTests
             CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task<IReadOnlyList<MemorySearchHit>> SearchAsync(Guid ownerId, string query,
-            CancellationToken cancellationToken, string? kind = null) =>
+            CancellationToken cancellationToken, string? kind = null, int maxHits = MemoryRanking.MaxHits) =>
             Task.FromResult<IReadOnlyList<MemorySearchHit>>([]);
     }
 

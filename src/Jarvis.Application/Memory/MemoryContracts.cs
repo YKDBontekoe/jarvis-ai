@@ -39,7 +39,8 @@ public interface IMemoryService
     Task<MemoryRecord?> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance, float confidence,
         DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken);
     Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
-    Task<IReadOnlyList<MemorySearchHit>> SearchAsync(Guid ownerId, string query, CancellationToken cancellationToken, string? kind = null);
+    Task<IReadOnlyList<MemorySearchHit>> SearchAsync(Guid ownerId, string query, CancellationToken cancellationToken, string? kind = null,
+        int maxHits = MemoryRanking.MaxHits);
     Task RecordRecallAsync(Guid ownerId, IReadOnlyCollection<Guid> memoryIds, CancellationToken cancellationToken);
 }
 

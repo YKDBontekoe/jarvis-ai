@@ -35,6 +35,22 @@ var fillers = scaleIndex >= 0 && scaleIndex + 1 < args.Length ? int.Parse(args[s
 const int Runs = 7;
 
 // "--dataset file.json" swaps the built-in mock set (e.g. for the 1,000-memory set from merge_large.py).
+// "--pool N --dump file.json" widens the candidate pool and writes each query's candidates (key, content, score) for a
+// rerank experiment; "--rerank file.json" then scores the order/subset a model chose per query text.
+var poolIndex = Array.IndexOf(args, "--pool");
+var pool = poolIndex >= 0 ? int.Parse(args[poolIndex + 1]) : Jarvis.Application.Memory.MemoryRanking.MaxHits;
+// "--hints file.json" ({key: hints}) stores model-written search hints (IMemoryIndexRepository.SetSearchHintsAsync) and
+// embeds content + hints, like the background indexer does.
+var hintsIndex = Array.IndexOf(args, "--hints");
+var hintsByKey = hintsIndex >= 0
+    ? JsonSerializer.Deserialize<Dictionary<string, string>>(await File.ReadAllTextAsync(args[hintsIndex + 1]))!
+    : new Dictionary<string, string>();
+var dumpIndex = Array.IndexOf(args, "--dump");
+var dump = new Dictionary<string, object>();
+var rerankIndex = Array.IndexOf(args, "--rerank");
+var reranked = rerankIndex >= 0
+    ? JsonSerializer.Deserialize<Dictionary<string, string[]>>(await File.ReadAllTextAsync(args[rerankIndex + 1]))
+    : null;
 var datasetIndex = Array.IndexOf(args, "--dataset");
 var datasetPath = datasetIndex >= 0 ? args[datasetIndex + 1] : Path.Combine(AppContext.BaseDirectory, "dataset.json");
 var dataset = JsonSerializer.Deserialize<Dataset>(
@@ -62,9 +78,12 @@ await using (var seed = CreateDb())
     {
         var record = await service.CreateAsync(owner, memory.Kind, memory.Content, memory.Importance, 0.9f, null,
             memory.Pinned, CancellationToken.None, sourceType: memory.SourceType ?? "conversation");
+        hintsByKey.TryGetValue(memory.Key, out var hints);
+        if (hints is not null)
+            await new MemoryIndexRepository(seed).SetSearchHintsAsync(record.Id, owner, hints, CancellationToken.None);
         if (lookup is not null)
             await new MemoryIndexRepository(seed).SetEmbeddingAsync(record.Id, owner,
-                lookup.Embedding(memory.Content), CancellationToken.None);
+                lookup.Embedding(hints is null ? memory.Content : memory.Content + " " + hints), CancellationToken.None);
         idsByKey[memory.Key] = record.Id;
         keysById[record.Id] = memory.Key;
         var at = DateTimeOffset.UtcNow.AddDays(-memory.AgeDays);
@@ -110,14 +129,14 @@ foreach (var query in updates ? dataset.UpdateStatements ?? [] : heldOut ? datas
             : new MemoryService(new MemoryRepository(db), new MemoryIndexRepository(db), lookup);
         var started = Stopwatch.GetTimestamp();
         IReadOnlyList<Jarvis.Domain.Memory.MemorySearchHit> hits;
-        if (agentQueries is null) hits = await service.SearchAsync(owner, query.Text, CancellationToken.None);
+        if (agentQueries is null) hits = await service.SearchAsync(owner, query.Text, CancellationToken.None, maxHits: pool);
         else
         {
             var merged = new Dictionary<Guid, Jarvis.Domain.Memory.MemorySearchHit>();
             foreach (var agentQuery in agentQueries[query.Text])
-                foreach (var hit in await service.SearchAsync(owner, agentQuery, CancellationToken.None))
+                foreach (var hit in await service.SearchAsync(owner, agentQuery, CancellationToken.None, maxHits: pool))
                     if (!merged.TryGetValue(hit.Memory.Id, out var seen) || hit.Score > seen.Score) merged[hit.Memory.Id] = hit;
-            hits = merged.Values.OrderByDescending(hit => hit.Score).Take(8).ToArray();
+            hits = merged.Values.OrderByDescending(hit => hit.Score).Take(pool).ToArray();
         }
         var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
         if (run > 0) // run 0 warms the connection pool and query plans
@@ -125,6 +144,10 @@ foreach (var query in updates ? dataset.UpdateStatements ?? [] : heldOut ? datas
             latencies.Add(elapsed);
             queryLatencies.Add(elapsed);
         }
+        if (run == 0 && dumpIndex >= 0)
+            dump[query.Text] = hits.Select(hit => new { key = idsByKey.First(x => x.Value == hit.Memory.Id).Key, content = dataset.Memories.First(m => idsByKey[m.Key] == hit.Memory.Id).Content, score = hit.Score }).ToArray();
+        if (reranked is not null)
+            hits = reranked[query.Text].Where(idsByKey.ContainsKey).Select(key => hits.FirstOrDefault(hit => hit.Memory.Id == idsByKey[key])).Where(hit => hit is not null).ToArray()!;
         ranked = hits.Select(hit => hit.Memory.Id).ToArray();
         scores = hits.Select(hit => hit.Score).ToArray();
     }
@@ -137,6 +160,8 @@ foreach (var query in updates ? dataset.UpdateStatements ?? [] : heldOut ? datas
         RerankAmbiguous = scores.Count >= 3 && scores[0] < 1.5 * scores[1]
     });
 }
+
+if (dumpIndex >= 0) await File.WriteAllTextAsync(args[dumpIndex + 1], JsonSerializer.Serialize(dump));
 
 double Mean(Func<QueryResult, double> selector) => results.Average(selector);
 latencies.Sort();

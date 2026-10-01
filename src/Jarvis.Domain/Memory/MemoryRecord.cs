@@ -15,6 +15,7 @@ public sealed record MemoryRecord(
     bool IsPinned,
     Guid? ProfileId = null,
     int AccessCount = 0,
-    DateTimeOffset? LastAccessedAt = null);
+    DateTimeOffset? LastAccessedAt = null,
+    string? SearchHints = null);
 
 public sealed record MemorySearchHit(MemoryRecord Memory, double Score);

@@ -80,6 +80,10 @@ public sealed class MemoryRepository(JarvisDbContext db) : IMemoryRepository
         memory.Confidence = confidence;
         memory.Embedding = null;
         memory.EmbeddingModel = null;
+        memory.SearchHints = null;
+        // Indexing writes these columns with ExecuteUpdate, which bypasses change tracking, so mark them explicitly.
+        foreach (var property in new[] { nameof(MemoryEntity.Embedding), nameof(MemoryEntity.EmbeddingModel), nameof(MemoryEntity.SearchHints) })
+            db.Entry(memory).Property(property).IsModified = true;
         memory.GraphIndexedAt = null;
         memory.ValidUntil = validUntil;
         memory.IsPinned = isPinned;

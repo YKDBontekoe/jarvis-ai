@@ -289,13 +289,29 @@ public sealed class AgentToolTests
     }
 
     [Fact]
-    public void Memory_reranking_is_skipped_when_the_top_hit_clearly_wins()
+    public void Memory_rerank_keeps_only_the_models_known_choices_in_its_order()
     {
-        MemorySearchHit Hit(double score) => new(new MemoryRecord(Guid.NewGuid(), OwnerId, "fact", "x", 0.5f, 0.9f,
-            "user", null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, false), score);
+        MemorySearchHit Hit() => new(new MemoryRecord(Guid.NewGuid(), OwnerId, "fact", "x", 0.5f, 0.9f,
+            "user", null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, false), 0.5);
+        var candidates = Enumerable.Range(0, 5).Select(_ => Hit()).ToArray();
+        var reply = $"Here: [\"{candidates[3].Memory.Id}\", \"{Guid.NewGuid()}\", \"{candidates[1].Memory.Id}\", \"{candidates[3].Memory.Id}\"]";
 
-        Assert.True(MemoryReranker.IsConfident([Hit(0.9), Hit(0.5), Hit(0.4)]));
-        Assert.False(MemoryReranker.IsConfident([Hit(0.9), Hit(0.8), Hit(0.4)]));
+        var chosen = MemoryReranker.Select(candidates, reply);
+
+        Assert.Equal([candidates[3].Memory.Id, candidates[1].Memory.Id], chosen.Select(hit => hit.Memory.Id));
+    }
+
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("not json")]
+    [InlineData(null)]
+    public void Memory_rerank_falls_back_to_the_hybrid_order_when_the_answer_is_unusable(string? reply)
+    {
+        var candidates = Enumerable.Range(0, 6).Select(_ => new MemorySearchHit(new MemoryRecord(Guid.NewGuid(), OwnerId,
+            "fact", "x", 0.5f, 0.9f, "user", null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, false), 0.5)).ToArray();
+
+        Assert.Equal(candidates.Take(3).Select(hit => hit.Memory.Id),
+            MemoryReranker.Select(candidates, reply).Select(hit => hit.Memory.Id));
     }
 
     private static MemoryAgentTools CreateMemoryTools(FakeMemoryService memories, IAuditEventStore audit) =>
@@ -390,7 +406,7 @@ public sealed class AgentToolTests
         }
 
         public Task<IReadOnlyList<MemorySearchHit>> SearchAsync(Guid ownerId, string query,
-            CancellationToken cancellationToken, string? kind = null)
+            CancellationToken cancellationToken, string? kind = null, int maxHits = MemoryRanking.MaxHits)
         {
             SearchQueries.Add(query);
             return Task.FromResult<IReadOnlyList<MemorySearchHit>>(Items
