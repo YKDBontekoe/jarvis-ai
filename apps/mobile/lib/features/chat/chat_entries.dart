@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import '../../json_maps.dart';
 
@@ -60,6 +61,37 @@ class ConversationSourceChip {
   final String kind;
 }
 
+/// A photo sent with a user message. [bytes] is set for photos sent from
+/// this device; older photos are fetched by [fileId] when shown.
+class MessagePhoto {
+  const MessagePhoto({
+    required this.fileId,
+    required this.fileName,
+    this.bytes,
+  });
+
+  final String fileId;
+  final String fileName;
+  final Uint8List? bytes;
+
+  static List<MessagePhoto> listFromJson(Object? value) {
+    if (value is! List) return const [];
+    return [
+      for (final item in value)
+        if (item is Map &&
+            item['fileId'] is String &&
+            (item['contentType'] is! String ||
+                (item['contentType'] as String).startsWith('image/')))
+          MessagePhoto(
+            fileId: item['fileId'] as String,
+            fileName: item['fileName'] is String
+                ? item['fileName'] as String
+                : 'Photo',
+          ),
+    ];
+  }
+}
+
 class MessageEntry extends ChatEntry {
   const MessageEntry({
     required this.role,
@@ -69,6 +101,7 @@ class MessageEntry extends ChatEntry {
     this.id,
     this.rating,
     this.citations = const [],
+    this.photos = const [],
   });
 
   final String role;
@@ -87,6 +120,9 @@ class MessageEntry extends ChatEntry {
   /// A user message whose request did not complete and can be retried.
   final bool failed;
 
+  /// Photos the user sent with this message.
+  final List<MessagePhoto> photos;
+
   bool get isUser => role == 'user';
 
   MessageEntry copyWith({
@@ -104,6 +140,7 @@ class MessageEntry extends ChatEntry {
     id: id ?? this.id,
     rating: rating ?? this.rating,
     citations: citations ?? this.citations,
+    photos: photos,
   );
 }
 
@@ -318,7 +355,10 @@ class UiSurfaceEntry extends ChatEntry {
 
 List<MessageCitation> parseMessageCitations(Object? value) {
   if (value is! List) return const [];
-  return value.map(MessageCitation.fromJson).whereType<MessageCitation>().toList();
+  return value
+      .map(MessageCitation.fromJson)
+      .whereType<MessageCitation>()
+      .toList();
 }
 
 class BrowserStepItem {

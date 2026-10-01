@@ -98,6 +98,12 @@ public sealed class FileService(
     public Task<IReadOnlyList<StoredFile>> ListAsync(Guid ownerId, CancellationToken cancellationToken) =>
         repository.ListAsync(ownerId, cancellationToken);
 
+    public async Task<StoredFile?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+    {
+        var file = await repository.GetAsync(id, ownerId, cancellationToken);
+        return file is null || file.ProcessingStatus == "deleting" ? null : file;
+    }
+
     public async Task<(StoredFile File, Stream Content)?> OpenReadAsync(Guid id, Guid ownerId,
         CancellationToken cancellationToken)
     {

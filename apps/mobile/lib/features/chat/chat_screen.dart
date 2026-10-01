@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:signalr_netcore/iretry_policy.dart';
 import 'package:signalr_netcore/signalr_client.dart';
@@ -59,6 +60,7 @@ part 'chat_screen_send.dart';
 part 'chat_screen_catchup.dart';
 part 'chat_screen_transcript.dart';
 part 'chat_screen_voice.dart';
+part 'chat_screen_photos.dart';
 part 'chat_screen_ui.dart';
 part 'chat_screen_auth.dart';
 part 'chat_screen_sources.dart';
@@ -94,7 +96,8 @@ class _ChatScreenState extends _ChatScreenController
         _ChatScreenUi,
         _ChatScreenAuth,
         _ChatScreenSources,
-        _ChatScreenSearch {
+        _ChatScreenSearch,
+        _ChatScreenPhotos {
   /// Outgoing content fades out before incoming content fades in, so the two
   /// never overlap mid-transition.
   static const _fadeThrough = Interval(.5, 1, curve: Curves.easeOutCubic);

@@ -494,6 +494,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       role: message['role'] as String,
       content: message['content'] as String,
       id: asJsonString(message['id']),
+      photos: MessagePhoto.listFromJson(message['attachments']),
     );
   }
 }

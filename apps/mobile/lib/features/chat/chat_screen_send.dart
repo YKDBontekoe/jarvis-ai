@@ -26,11 +26,25 @@ mixin _ChatScreenSend on _ChatScreenController {
     _composerFocus.value++;
   }
 
-  Future<bool> _send([String? text]) async {
+  /// Sends [text], or the composer's text and photos when [text] is null.
+  /// [photos] resends the photos of a message that failed.
+  Future<bool> _send([String? text, List<MessagePhoto>? photos]) async {
     final content = (text ?? _input.text).trim();
     final conversationId = _conversationId;
     final generation = _realtimeGeneration;
-    if (content.isEmpty ||
+    final pending = text == null ? _pendingPhotos : const <PendingPhoto>[];
+    if (pending.any((photo) => photo.fileId == null)) return false;
+    final sentPhotos =
+        photos ??
+        [
+          for (final photo in pending)
+            MessagePhoto(
+              fileId: photo.fileId!,
+              fileName: photo.fileName,
+              bytes: photo.bytes,
+            ),
+        ];
+    if ((content.isEmpty && sentPhotos.isEmpty) ||
         conversationId == null ||
         _busy ||
         _hasPendingApproval ||
@@ -40,10 +54,22 @@ mixin _ChatScreenSend on _ChatScreenController {
         _signingOut) {
       return false;
     }
-    if (text == null) _input.clear();
+    if (text == null) {
+      _input.clear();
+      _pendingPhotos = [];
+    }
     _stopRequested = false;
-    _pendingQueryText = content;
-    final userMessage = MessageEntry(role: 'user', content: content);
+    final shownContent = content.isEmpty
+        ? (sentPhotos.length == 1
+              ? 'Shared a photo.'
+              : 'Shared ${sentPhotos.length} photos.')
+        : content;
+    _pendingQueryText = shownContent;
+    final userMessage = MessageEntry(
+      role: 'user',
+      content: shownContent,
+      photos: sentPhotos,
+    );
     setState(() {
       _sending = true;
       _showHome = false;
@@ -60,7 +86,11 @@ mixin _ChatScreenSend on _ChatScreenController {
     try {
       final response = await _http.post<dynamic>(
         '/api/v1/conversations/$conversationId/messages',
-        data: {'content': content},
+        data: {
+          'content': content,
+          if (sentPhotos.isNotEmpty)
+            'imageFileIds': [for (final photo in sentPhotos) photo.fileId],
+        },
         cancelToken: run,
         options: longRunningOptions(),
       );
@@ -370,7 +400,7 @@ mixin _ChatScreenSend on _ChatScreenController {
       return;
     }
     setState(() => _entries.remove(message));
-    final sent = await _send(message.content);
+    final sent = await _send(message.content, message.photos);
     if (!sent && mounted && !_entries.contains(message)) {
       setState(() => _entries.add(message));
     }

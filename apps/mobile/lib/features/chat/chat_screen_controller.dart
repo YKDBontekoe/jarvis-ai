@@ -88,6 +88,10 @@ abstract class _ChatScreenController extends State<ChatScreen>
   ComposerDrafts _drafts = ComposerDrafts.memory();
   bool _applyingDraft = false;
 
+  /// Photos picked for the next message, and bytes of photos already shown.
+  List<PendingPhoto> _pendingPhotos = [];
+  final Map<String, Future<Uint8List?>> _photoBytes = {};
+
   /// Bumped to move keyboard focus into the composer.
   final _composerFocus = ValueNotifier<int>(0);
 
@@ -124,6 +128,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   /// before any conversation was open moves along into the new one.
   void _restoreDraft(String? previousId, String conversationId) {
     if (previousId == conversationId) return;
+    if (previousId != null) _pendingPhotos = [];
     final draft = _drafts.read(conversationId);
     if (previousId == null && draft.isEmpty && _input.text.trim().isNotEmpty) {
       _drafts.write(conversationId, _input.text);
@@ -175,6 +180,9 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _signIn();
   Future<void> _signOut();
   Future<void> _editAsNewMessage(String text);
+  void _showPhotoSources();
+  void _removePendingPhoto(PendingPhoto photo);
+  Future<Uint8List?> _loadPhoto(String fileId);
   Future<void> _retryConnection();
   Future<void> _loadRecent();
   void _openSettings();

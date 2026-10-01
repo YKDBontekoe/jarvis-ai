@@ -213,6 +213,8 @@ mixin _ChatScreenNav on _ChatScreenController {
         _recent = [];
         _password.clear();
         _replaceComposerText('');
+        _pendingPhotos = [];
+        _photoBytes.clear();
       });
     }
     try {

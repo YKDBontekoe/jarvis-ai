@@ -111,15 +111,35 @@ internal static class ConversationEndpoints
         }).WithName("DeleteConversation");
 
         api.MapPost("/conversations/{conversationId:guid}/messages", async (Guid conversationId,
-            SendMessageRequest request, RemoteQueryExecutor remote, ICurrentUser currentUser) =>
+            SendMessageRequest request, RemoteQueryExecutor remote, IFileService files, ICurrentUser currentUser,
+            CancellationToken ct) =>
         {
             var content = request.Content?.Trim();
-            if (string.IsNullOrWhiteSpace(content) || content.Length > 32_000)
+            var imageIds = request.ImageFileIds?.Distinct().ToArray() ?? [];
+            if (imageIds.Length > MessageAttachments.MaxPerMessage)
+                return EndpointHelpers.Invalid("imageFileIds",
+                    $"Send at most {MessageAttachments.MaxPerMessage} photos with one message.");
+            if (content is { Length: > 32_000 } || string.IsNullOrWhiteSpace(content) && imageIds.Length == 0)
                 return EndpointHelpers.Invalid("content", "Message content must contain 1 to 32,000 characters.");
+            var attachments = new List<MessageAttachment>(imageIds.Length);
+            foreach (var imageId in imageIds)
+            {
+                var file = await files.GetAsync(imageId, currentUser.OwnerId, ct);
+                if (file is null)
+                    return EndpointHelpers.Invalid("imageFileIds", "A photo could not be found. Upload it again.");
+                if (!MessageAttachments.IsSupportedImage(file.ContentType))
+                    return EndpointHelpers.Invalid("imageFileIds", "Only JPEG, PNG, and WebP photos can be sent.");
+                if (file.SizeBytes > MessageAttachments.MaxImageBytes)
+                    return EndpointHelpers.Invalid("imageFileIds", "A photo is larger than 8 MB.");
+                attachments.Add(new MessageAttachment(file.Id, file.FileName, file.ContentType));
+            }
+            var text = string.IsNullOrWhiteSpace(content)
+                ? MessageAttachments.DefaultContent(attachments.Count)
+                : content;
             // The request abort token is intentionally unused. Closing the phone drops this connection,
             // and the query still runs until it is stored.
             return await RemoteQueryResults.ExecuteAsync(() =>
-                remote.SendAsync(currentUser.OwnerId, conversationId, content));
+                remote.SendAsync(currentUser.OwnerId, conversationId, text, attachments: attachments));
         }).WithName("SendMessage");
 
         api.MapPost("/conversations/{conversationId:guid}/cancel", async (Guid conversationId,

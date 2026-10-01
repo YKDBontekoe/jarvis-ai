@@ -37,6 +37,57 @@ public static class AgentSessionJson
         else element.WriteTo(writer);
     }
 
+    /// <summary>Stands in for a photo once its turn is over, so stored history keeps no image bytes.</summary>
+    public const string RemovedImagePlaceholder =
+        "[The user shared a photo in this message. It was shown to you in that turn and is no longer attached.]";
+
+    /// <summary>
+    /// Replaces inline image data in a serialized session with a short text note. Later turns then do not
+    /// resend old photos (the model accepts only a few images per request) and the database keeps no bytes.
+    /// </summary>
+    public static string StripImageData(string sessionJson)
+    {
+        if (!sessionJson.Contains("data:image/", StringComparison.OrdinalIgnoreCase)) return sessionJson;
+        var root = JsonNode.Parse(sessionJson);
+        if (root is null || !ReplaceImages(root)) return sessionJson;
+        return root.ToJsonString();
+    }
+
+    private static bool ReplaceImages(JsonNode node)
+    {
+        var changed = false;
+        if (node is JsonArray array)
+        {
+            for (var index = 0; index < array.Count; index++)
+            {
+                if (array[index] is not { } item) continue;
+                if (IsImageData(item))
+                {
+                    array[index] = new JsonObject
+                    {
+                        ["$type"] = "text",
+                        ["text"] = RemovedImagePlaceholder
+                    };
+                    changed = true;
+                }
+                else changed |= ReplaceImages(item);
+            }
+        }
+        else if (node is JsonObject obj)
+        {
+            foreach (var property in obj.ToList())
+                if (property.Value is { } child) changed |= ReplaceImages(child);
+        }
+        return changed;
+    }
+
+    private static bool IsImageData(JsonNode node) =>
+        node is JsonObject obj &&
+        obj["$type"]?.GetValueKind() == JsonValueKind.String &&
+        obj["$type"]!.GetValue<string>() == "data" &&
+        obj["uri"]?.GetValueKind() == JsonValueKind.String &&
+        obj["uri"]!.GetValue<string>().StartsWith("data:image/", StringComparison.OrdinalIgnoreCase);
+
     public static bool TryGetCompletedAssistantText(string sessionJson, out string text)
     {
         text = string.Empty;

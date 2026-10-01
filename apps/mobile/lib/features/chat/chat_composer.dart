@@ -15,6 +15,9 @@ class ChatComposer extends StatefulWidget {
     this.awaitingApproval = false,
     this.hint = 'Ask Jarvis anything',
     this.focusRequests,
+    this.photos = const [],
+    this.onRemovePhoto,
+    this.onPhoto,
     super.key,
   });
 
@@ -35,6 +38,13 @@ class ChatComposer extends StatefulWidget {
 
   /// Each notification moves keyboard focus into the text field.
   final Listenable? focusRequests;
+
+  /// Photos picked for the next message.
+  final List<PendingPhoto> photos;
+  final ValueChanged<PendingPhoto>? onRemovePhoto;
+
+  /// Opens the camera or photo library; hidden when null.
+  final VoidCallback? onPhoto;
 
   @override
   State<ChatComposer> createState() => _ChatComposerState();
@@ -80,11 +90,16 @@ class _ChatComposerState extends State<ChatComposer> {
 
   bool get _inputEnabled => !widget.voiceActive && !widget.voiceStarting;
 
+  bool get _photosReady =>
+      widget.photos.isNotEmpty &&
+      widget.photos.every((photo) => photo.fileId != null);
+
   bool get _canSend =>
       _inputEnabled &&
       !widget.sending &&
       !widget.awaitingApproval &&
-      widget.controller.text.trim().isNotEmpty;
+      !widget.photos.any((photo) => photo.uploading) &&
+      (widget.controller.text.trim().isNotEmpty || _photosReady);
 
   @override
   void dispose() {
@@ -97,7 +112,8 @@ class _ChatComposerState extends State<ChatComposer> {
   @override
   Widget build(BuildContext context) {
     final focused = _focus.hasFocus;
-    final hasText = widget.controller.text.trim().isNotEmpty;
+    final hasText =
+        widget.controller.text.trim().isNotEmpty || widget.photos.isNotEmpty;
     final showVoice =
         widget.onVoice != null &&
         !hasText &&
@@ -149,6 +165,14 @@ class _ChatComposerState extends State<ChatComposer> {
                 ),
               ),
             ),
+          if (widget.photos.isNotEmpty)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ComposerPhotoStrip(
+                photos: widget.photos,
+                onRemove: widget.onRemovePhoto ?? (_) {},
+              ),
+            ),
           TextField(
             controller: widget.controller,
             focusNode: _focus,
@@ -184,6 +208,16 @@ class _ChatComposerState extends State<ChatComposer> {
                   tooltip: 'More actions',
                   onPressed: widget.onAttach,
                 ),
+              if (widget.onPhoto != null) ...[
+                const SizedBox(width: 6),
+                _ComposerIconButton(
+                  icon: PhosphorIconsRegular.camera,
+                  tooltip: 'Add a photo',
+                  onPressed: _inputEnabled && !widget.sending
+                      ? widget.onPhoto
+                      : null,
+                ),
+              ],
               const Spacer(),
               if (widget.sending && widget.onCancel != null)
                 _ComposerIconButton(

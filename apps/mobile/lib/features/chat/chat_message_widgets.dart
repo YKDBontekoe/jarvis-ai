@@ -7,6 +7,7 @@ class MessageBubble extends StatefulWidget {
     this.onRate,
     this.onCitationTap,
     this.onEdit,
+    this.photoLoader,
     this.thinkingLabel = 'Thinking',
     super.key,
   });
@@ -24,6 +25,9 @@ class MessageBubble extends StatefulWidget {
   /// Puts a sent message back in the composer; offered on long-press of the
   /// user's own messages.
   final ValueChanged<String>? onEdit;
+
+  /// Fetches photos sent with earlier messages.
+  final PhotoLoader? photoLoader;
 
   @override
   State<MessageBubble> createState() => _MessageBubbleState();
@@ -189,6 +193,12 @@ class _MessageBubbleState extends State<MessageBubble> {
     );
   }
 
+  /// Photo-only messages store a stand-in sentence that is not worth showing.
+  static final _photoOnlyText = RegExp(r'^Shared (a photo|\d+ photos)\.$');
+
+  bool _photoOnly(MessageEntry message) =>
+      message.photos.isNotEmpty && _photoOnlyText.hasMatch(message.content);
+
   Widget _userBubble(BuildContext context, MessageEntry message) => Align(
     alignment: Alignment.centerRight,
     child: Padding(
@@ -196,45 +206,54 @@ class _MessageBubbleState extends State<MessageBubble> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Semantics(
-            onLongPressHint: 'Message actions',
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onLongPress: message.pending ? null : _showUserActions,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 11,
-                ),
-                decoration: BoxDecoration(
-                  color: message.failed
-                      ? JarvisColors.of(context).dangerSoft
-                      : JarvisColors.of(context).surfaceRaised,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(6),
+          if (message.photos.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.only(bottom: _photoOnly(message) ? 0 : 6),
+              child: MessagePhotoGrid(
+                photos: message.photos,
+                loader: widget.photoLoader,
+              ),
+            ),
+          if (!_photoOnly(message))
+            Semantics(
+              onLongPressHint: 'Message actions',
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onLongPress: message.pending ? null : _showUserActions,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 11,
                   ),
-                  border: message.failed
-                      ? Border.all(
-                          color: JarvisColors.of(
-                            context,
-                          ).danger.withValues(alpha: .35),
-                        )
-                      : null,
-                ),
-                child: Text(
-                  message.content,
-                  style: TextStyle(
-                    fontSize: 15.5,
-                    height: 1.45,
-                    color: JarvisColors.of(context).ink,
+                  decoration: BoxDecoration(
+                    color: message.failed
+                        ? JarvisColors.of(context).dangerSoft
+                        : JarvisColors.of(context).surfaceRaised,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                      bottomLeft: Radius.circular(20),
+                      bottomRight: Radius.circular(6),
+                    ),
+                    border: message.failed
+                        ? Border.all(
+                            color: JarvisColors.of(
+                              context,
+                            ).danger.withValues(alpha: .35),
+                          )
+                        : null,
+                  ),
+                  child: Text(
+                    message.content,
+                    style: TextStyle(
+                      fontSize: 15.5,
+                      height: 1.45,
+                      color: JarvisColors.of(context).ink,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
           if (message.failed)
             Padding(
               padding: const EdgeInsets.only(top: 4),

@@ -4,6 +4,10 @@
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Jarvis uses your microphone for voice conversations.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Jarvis uses the camera when you take a photo to show it in a chat.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Jarvis opens your photo library when you choose photos to show it in a chat.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Jarvis uses your location when you ask where you are or when a location watch is on.</string>
 	<key>UIBackgroundModes</key>

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Files;
 using Jarvis.Application.Profiles;
 using Jarvis.Application.Settings;
 using Jarvis.Application.Workflows;
@@ -14,7 +15,7 @@ namespace Jarvis.Agents;
 
 public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientResolver chatClients, McpToolHost mcpToolHost,
     IConversationStore conversations, IJarvisTaskRepository tasks, IAssistantProfileService profiles,
-    IOwnerSettingsStore settings, ICurrentUser currentUser) : IJarvisAgent
+    IOwnerSettingsStore settings, ICurrentUser currentUser, IFileService files) : IJarvisAgent
 {
     private static readonly JsonSerializerOptions ArgumentsJsonOptions = new(JsonSerializerDefaults.Web);
     private AIAgent? _agent;
@@ -26,7 +27,7 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
     {
         var agent = await GetAgentAsync(conversationId, cancellationToken);
         var sessionJson = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
-        ChatMessage[] input = [new ChatMessage(ChatRole.User, currentUserMessage.Content)];
+        ChatMessage[] input = [await BuildUserMessageAsync(currentUserMessage, cancellationToken)];
         if (sessionJson is not null &&
             AgentSessionJson.HasInFlightProgressAfterUser(sessionJson, currentUserMessage.Content))
             input = [];
@@ -65,6 +66,39 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
         var session = await LoadSessionAsync(agent, conversationId, cancellationToken);
         await foreach (var update in RunAndSaveAsync(agent, conversationId, input, session, cancellationToken))
             yield return update;
+    }
+
+    /// <summary>
+    /// The user's text plus any photos they sent, loaded from their own files. A photo that is gone or too
+    /// large becomes a short note so the turn still runs.
+    /// </summary>
+    private async Task<ChatMessage> BuildUserMessageAsync(Message message, CancellationToken cancellationToken)
+    {
+        var attachments = MessageAttachments.Parse(message.AttachmentsJson);
+        if (attachments.Count == 0) return new ChatMessage(ChatRole.User, message.Content);
+
+        List<AIContent> contents = [new TextContent(message.Content)];
+        foreach (var attachment in attachments.Take(MessageAttachments.MaxPerMessage))
+        {
+            var opened = await files.OpenReadAsync(attachment.FileId, currentUser.OwnerId, cancellationToken);
+            if (opened is not { } file || !MessageAttachments.IsSupportedImage(file.File.ContentType) ||
+                file.File.SizeBytes > MessageAttachments.MaxImageBytes)
+            {
+                if (opened is { } unused) await unused.Content.DisposeAsync();
+                contents.Add(new TextContent("[A photo the user attached is no longer available.]"));
+                continue;
+            }
+            await using var stream = file.Content;
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer, cancellationToken);
+            if (buffer.Length > MessageAttachments.MaxImageBytes)
+            {
+                contents.Add(new TextContent("[A photo the user attached is too large to show.]"));
+                continue;
+            }
+            contents.Add(new DataContent(buffer.ToArray(), file.File.ContentType));
+        }
+        return new ChatMessage(ChatRole.User, contents);
     }
 
     private async Task<AIAgent> GetAgentAsync(Guid conversationId, CancellationToken cancellationToken)
@@ -190,7 +224,7 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
         {
             try
             {
-                await SaveSessionAsync(agent, conversationId, session, CancellationToken.None);
+                await SaveSessionAsync(agent, conversationId, session, CancellationToken.None, stripImages: true);
             }
             catch (Exception) when (!streamCompleted)
             {
@@ -198,10 +232,16 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
         }
     }
 
+    /// <param name="stripImages">
+    /// True once the run has ended: photos were seen in their own turn, so the stored history keeps only a
+    /// note in their place. Checkpoints during a run keep them for the rest of that turn.
+    /// </param>
     private async Task SaveSessionAsync(AIAgent agent, Guid conversationId, AgentSession session,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool stripImages = false)
     {
         var serialized = await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken);
-        await conversations.SaveAgentSessionAsync(conversationId, serialized.GetRawText(), cancellationToken);
+        var state = serialized.GetRawText();
+        if (stripImages) state = AgentSessionJson.StripImageData(state);
+        await conversations.SaveAgentSessionAsync(conversationId, state, cancellationToken);
     }
 }

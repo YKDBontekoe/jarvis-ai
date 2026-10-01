@@ -36,7 +36,7 @@ public sealed class ConversationTurnService(
 
     public async Task<ConversationTurnResult> SendAsync(Guid ownerId, Guid conversationId, string content,
         CancellationToken cancellationToken, Func<string, CancellationToken, Task>? onTextDelta = null,
-        Func<CancellationToken, Task>? beforeRun = null)
+        Func<CancellationToken, Task>? beforeRun = null, IReadOnlyList<MessageAttachment>? attachments = null)
     {
         var conversation = await store.GetAsync(conversationId, ownerId, cancellationToken);
         if (conversation is null) return new ConversationTurnResult.NotFound();
@@ -46,7 +46,9 @@ public sealed class ConversationTurnService(
         await using var runLease = await runLock.AcquireAsync(conversationId, cancellationToken);
         var existingMessages = await store.GetMessagesAsync(conversationId, cancellationToken);
         var lastMessage = existingMessages.Count > 0 ? existingMessages[^1] : null;
-        var isSameUserTurn = lastMessage is { Role: "user" } && lastMessage.Content == content;
+        var attachmentsJson = MessageAttachments.Serialize(attachments);
+        var isSameUserTurn = lastMessage is { Role: "user" } && lastMessage.Content == content &&
+                             lastMessage.AttachmentsJson == attachmentsJson;
         var pendingApprovals = await approvals.ListActionableForConversationAsync(ownerId, conversationId,
             cancellationToken);
         if (pendingApprovals.Count > 0)
@@ -59,7 +61,9 @@ public sealed class ConversationTurnService(
         }
 
         if (beforeRun is not null) await beforeRun(cancellationToken);
-        var userMessage = isSameUserTurn ? lastMessage! : new Message(conversationId, "user", content);
+        var userMessage = isSameUserTurn
+            ? lastMessage!
+            : new Message(conversationId, "user", content, attachmentsJson: attachmentsJson);
         if (!isSameUserTurn)
             await store.AddMessageAsync(userMessage, cancellationToken);
         if (ReferenceEquals(userMessage, lastMessage) &&

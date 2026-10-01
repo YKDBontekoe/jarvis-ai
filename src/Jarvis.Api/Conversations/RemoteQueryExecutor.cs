@@ -13,12 +13,14 @@ public sealed class RemoteQueryExecutor(
 {
     public async Task<ConversationTurnResult> SendAsync(Guid ownerId, Guid conversationId, string content,
         Func<string, CancellationToken, Task>? onTextDelta = null,
-        Func<CancellationToken, Task>? beforeRun = null)
+        Func<CancellationToken, Task>? beforeRun = null,
+        IReadOnlyList<Jarvis.Application.Conversations.MessageAttachment>? attachments = null)
     {
         using var query = queries.Begin(ownerId, conversationId, lifetime.ApplicationStopping);
         await using var scope = scopes.CreateOwnerScope(ownerId);
         var turns = scope.ServiceProvider.GetRequiredService<ConversationTurnService>();
-        return await turns.SendAsync(ownerId, conversationId, content, query.Token, onTextDelta, beforeRun);
+        return await turns.SendAsync(ownerId, conversationId, content, query.Token, onTextDelta, beforeRun,
+            attachments);
     }
 
     public async Task<ConversationTurnResult> DecideAsync(Guid ownerId, Guid approvalId, bool approved)
