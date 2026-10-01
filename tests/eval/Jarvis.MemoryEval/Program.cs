@@ -34,8 +34,11 @@ var scaleIndex = Array.IndexOf(args, "--scale");
 var fillers = scaleIndex >= 0 && scaleIndex + 1 < args.Length ? int.Parse(args[scaleIndex + 1], CultureInfo.InvariantCulture) : 0;
 const int Runs = 7;
 
+// "--dataset file.json" swaps the built-in mock set (e.g. for the 1,000-memory set from merge_large.py).
+var datasetIndex = Array.IndexOf(args, "--dataset");
+var datasetPath = datasetIndex >= 0 ? args[datasetIndex + 1] : Path.Combine(AppContext.BaseDirectory, "dataset.json");
 var dataset = JsonSerializer.Deserialize<Dataset>(
-    await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "dataset.json")),
+    await File.ReadAllTextAsync(datasetPath),
     new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
 
 JarvisDbContext CreateDb() => new(new DbContextOptionsBuilder<JarvisDbContext>()

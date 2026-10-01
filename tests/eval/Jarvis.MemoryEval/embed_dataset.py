@@ -1,10 +1,11 @@
 """Precomputes embeddings for the eval dataset with a local open model, so the C# eval can exercise the semantic path
 without a paid provider. Usage: python3 embed_dataset.py <model> <out.json>   (needs sentence-transformers)."""
-import json, sys
+import json, os, sys
 from sentence_transformers import SentenceTransformer
 
 model_name, out = sys.argv[1], sys.argv[2]
-data = json.load(open(__file__.rsplit("/", 1)[0] + "/dataset.json"))
+# DATASET overrides the built-in set (same file you pass to the eval with --dataset).
+data = json.load(open(os.environ.get("DATASET", __file__.rsplit("/", 1)[0] + "/dataset.json")))
 model = SentenceTransformer(model_name)
 # e5 models are trained with these role prefixes; other models ignore them.
 q, p = ("query: ", "passage: ") if "e5" in model_name else ("", "")

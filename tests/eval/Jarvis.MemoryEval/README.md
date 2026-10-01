@@ -90,3 +90,22 @@ itself, so they are a deliberately hostile stress test for speed rather than a r
 
 Chat turns no longer wait on a model rerank; with the new retrieval, 13 of the 32 tuning queries would otherwise have
 triggered one (up to 8 s each). The `SearchMemory` tool still reranks when the top hit does not clearly win (9 of 32).
+
+## Realistic large set (1,000 memories)
+
+`dataset-large.json` holds 1,000 invented memories of one persona (work, family, health, home/money/travel, hobbies and
+assistant preferences, about 60% Dutch, 63 expired or replaced, journal entries) with 60 natural questions. Models wrote
+memories and graded labels (25 of the questions are deliberately vocabulary-gap queries: the question shares few words
+with the answer), so treat the numbers as indicative. Run it with `--dataset dataset-large.json`; `merge_large.py`
+rebuilds it from per-area files and `embed_dataset.py` takes `DATASET=<file>`.
+
+| Retrieval | Recall@8 | Hit@1 | MRR | Noise | p50 / p95 |
+|-----------|---------:|------:|----:|------:|----------:|
+| Raw message, keyword | 0.29 | 0.27 | 0.33 | 0.91 | 9.7 / 16 ms |
+| Raw message, + MiniLM | 0.45 | 0.33 | 0.46 | 0.85 | 18 / 25 ms |
+| Agent queries, keyword | 0.58 | 0.35 | 0.48 | 0.83 | 15 / 19 ms |
+| Agent queries, + MiniLM | 0.68 | 0.52 | 0.64 | 0.79 | 23 / 29 ms |
+| Raw message, keyword, +5,000 fillers | 0.19 | 0.25 | 0.29 | 0.95 | 26 / 40 ms |
+
+Much harder than the small set: the questions are indirect, so keyword search alone finds under a third of the labelled
+memories. No expired or other-owner memory was returned.
