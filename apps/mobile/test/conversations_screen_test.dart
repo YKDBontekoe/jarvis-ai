@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jarvis_mobile/conversation_export.dart';
 import 'package:jarvis_mobile/conversation_groups.dart';
 import 'package:jarvis_mobile/conversations_screen.dart';
 
@@ -171,5 +173,63 @@ void main() {
 
     expect(groups.map((group) => group.$1), ['Pinned', 'Today']);
     expect(groups.first.$2.single['id'], 'b');
+  });
+
+  testWidgets('copy as Markdown copies the whole conversation', (tester) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    http.on('GET', '/api/v1/conversations/c1', {
+      'id': 'c1',
+      'title': 'Trip planning',
+      'messages': [
+        {'role': 'user', 'content': 'Where should we go?'},
+        {'role': 'assistant', 'content': 'Lisbon is lovely in October.'},
+      ],
+    });
+    await show(tester);
+
+    await openMenu(tester, 'Trip planning');
+    await tester.tap(find.text('Copy as Markdown'));
+    await tester.pumpAndSettle();
+
+    expect(copied, contains('# Trip planning'));
+    expect(copied, contains('**You**'));
+    expect(copied, contains('Lisbon is lovely in October.'));
+    expect(find.text('Conversation copied as Markdown'), findsOneWidget);
+  });
+
+  test('conversationMarkdown labels authors and skips empty rows', () {
+    final markdown = conversationMarkdown(
+      title: '  ',
+      messages: [
+        {
+          'role': 'user',
+          'content': ' Hi ',
+          'createdAt': DateTime(2026, 10, 1, 9, 5).toUtc().toIso8601String(),
+        },
+        {'role': 'assistant', 'content': ''},
+        {'role': 'system', 'content': 'hidden'},
+        {'role': 'assistant', 'content': 'Hello!'},
+      ],
+    );
+
+    expect(
+      markdown,
+      '# Conversation\n\n**You** · 2026-10-01 09:05\n\nHi\n\n**Jarvis**\n\nHello!\n',
+    );
   });
 }

@@ -1,8 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'ui/phosphor_icons.dart';
 
+import 'conversation_export.dart';
 import 'conversation_groups.dart';
 import 'theme.dart';
 import 'json_maps.dart';
@@ -127,6 +129,43 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       title: title,
       failure: 'Jarvis could not rename this conversation.',
     );
+  }
+
+  /// Copies the whole conversation as Markdown, fetched fresh so messages
+  /// that are not loaded in the chat are included too.
+  Future<void> _copyAsMarkdown(Map<String, dynamic> conversation) async {
+    final id = jsonString(conversation, 'id');
+    if (id == null || _updating.contains(id)) return;
+    setState(() {
+      _updating.add(id);
+      _error = null;
+    });
+    try {
+      final response = await widget.http.get<dynamic>(
+        '/api/v1/conversations/$id',
+      );
+      final body = jsonObject(response.data);
+      final markdown = conversationMarkdown(
+        title:
+            asJsonString(body?['title']) ??
+            asJsonString(conversation['title']) ??
+            'Conversation',
+        messages: jsonMaps(body?['messages']),
+      );
+      await Clipboard.setData(ClipboardData(text: markdown));
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Conversation copied as Markdown')),
+        );
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Jarvis could not copy this conversation.');
+      }
+    } finally {
+      if (mounted) setState(() => _updating.remove(id));
+    }
   }
 
   Future<void> _togglePin(Map<String, dynamic> conversation) => _update(
@@ -404,6 +443,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                 onSelected: (value) => switch (value) {
                   'rename' => _rename(conversation),
                   'pin' => _togglePin(conversation),
+                  'copy' => _copyAsMarkdown(conversation),
                   'delete' => _deleteConversation(conversation),
                   _ => Future<void>.value(),
                 },
@@ -420,6 +460,13 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                     child: _MenuRow(
                       icon: PhosphorIconsRegular.pushPin,
                       label: pinned ? 'Unpin' : 'Pin to top',
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'copy',
+                    child: _MenuRow(
+                      icon: PhosphorIconsRegular.copy,
+                      label: 'Copy as Markdown',
                     ),
                   ),
                   PopupMenuItem(
