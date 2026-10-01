@@ -176,8 +176,34 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                 var threadId = await rpc.StartThreadAsync(scratch, resolvedModel, runToken);
                 var rawResponse = new StringBuilder();
                 StructuredTextStreamDecoder textDecoder = new();
+                string? agentMessageId = null;
                 void ReportNativeTool(string callId, string phase) =>
                     updates?.TryWrite(NativeToolProgress.Create(callId, NativeToolProgress.WebSearch, phase));
+                // Codex can answer one turn with several agent messages, for example the same structured
+                // response twice or a short one before a hosted web search. Each message is a complete
+                // response on its own, so only the last one is parsed.
+                void OnDelta(string? itemId, string delta)
+                {
+                    if (itemId is not null && agentMessageId is not null && itemId != agentMessageId)
+                    {
+                        rawResponse.Clear();
+                        textDecoder.StartNextMessage();
+                    }
+                    agentMessageId = itemId ?? agentMessageId;
+                    if (rawResponse.Length + delta.Length > MaxOutputLength)
+                        throw new InvalidOperationException("Codex CLI response exceeded the output size limit.");
+                    rawResponse.Append(delta);
+                    var textDelta = textDecoder.Append(delta);
+                    if (!string.IsNullOrEmpty(textDelta))
+                    {
+                        updates?.TryWrite(new ChatResponseUpdate
+                        {
+                            Role = ChatRole.Assistant,
+                            Contents = [new TextContent(textDelta)],
+                            ModelId = resolvedModel
+                        });
+                    }
+                }
 
                 using var modelActivity = ActivitySource.StartActivity("jarvis.model.completion");
                 modelActivity?.SetTag("gen_ai.request.model", resolvedModel);
@@ -188,22 +214,8 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                 var webSearches = 0;
                 try
                 {
-                    var turn = await rpc.RunTurnAsync(threadId, prompt, resolvedModel, reasoningEffort, delta =>
-                    {
-                        if (rawResponse.Length + delta.Length > MaxOutputLength)
-                            throw new InvalidOperationException("Codex CLI response exceeded the output size limit.");
-                        rawResponse.Append(delta);
-                        var textDelta = textDecoder.Append(delta);
-                        if (!string.IsNullOrEmpty(textDelta))
-                        {
-                            updates?.TryWrite(new ChatResponseUpdate
-                            {
-                                Role = ChatRole.Assistant,
-                                Contents = [new TextContent(textDelta)],
-                                ModelId = resolvedModel
-                            });
-                        }
-                    }, runToken, ReportNativeTool);
+                    var turn = await rpc.RunTurnAsync(threadId, prompt, resolvedModel, reasoningEffort, OnDelta,
+                        runToken, ReportNativeTool);
                     usage = turn.Usage;
                     webSearches += turn.WebSearchActions;
                     modelOutcome = "completed";
@@ -244,7 +256,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                 if (rawResponse.Length == 0)
                     throw new InvalidOperationException("Codex CLI completed without an assistant response.");
 
-                using var document = JsonDocument.Parse(rawResponse.ToString());
+                using var document = ParseLastResponse(rawResponse.ToString());
                 ChatMessage assistant;
                 try
                 {
@@ -258,25 +270,14 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                     // response instead of failing the whole turn.
                     rawResponse.Clear();
                     textDecoder = new StructuredTextStreamDecoder();
+                    agentMessageId = null;
                     var retryPrompt = prompt with { Text = prompt.Text + "\n\n" + RetryInstruction(exception) };
                     var retryStarted = Stopwatch.GetTimestamp();
                     var retryOutcome = "failed";
                     try
                     {
-                        var retry = await rpc.RunTurnAsync(threadId, retryPrompt, resolvedModel, reasoningEffort, delta =>
-                        {
-                            if (rawResponse.Length + delta.Length > MaxOutputLength)
-                                throw new InvalidOperationException("Codex CLI response exceeded the output size limit.");
-                            rawResponse.Append(delta);
-                            var textDelta = textDecoder.Append(delta);
-                            if (!string.IsNullOrEmpty(textDelta))
-                                updates?.TryWrite(new ChatResponseUpdate
-                                {
-                                    Role = ChatRole.Assistant,
-                                    Contents = [new TextContent(textDelta)],
-                                    ModelId = resolvedModel
-                                });
-                        }, runToken, ReportNativeTool);
+                        var retry = await rpc.RunTurnAsync(threadId, retryPrompt, resolvedModel, reasoningEffort,
+                            OnDelta, runToken, ReportNativeTool);
                         usage = AddUsage(usage, retry.Usage);
                         webSearches += retry.WebSearchActions;
                         if (retry.Usage is { } retryUsage)
@@ -307,7 +308,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                     }
                     if (rawResponse.Length == 0)
                         throw new InvalidOperationException("Codex CLI retry completed without an assistant response.");
-                    using var retryDocument = JsonDocument.Parse(rawResponse.ToString());
+                    using var retryDocument = ParseLastResponse(rawResponse.ToString());
                     assistant = ParseAssistantMessage(retryDocument.RootElement, toolNames);
                 }
                 if (assistant.Contents.Count == 1 && assistant.Contents[0] is FunctionCallContent functionCall)
@@ -446,6 +447,31 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
             IsNativeWebSearchItem(itemType.GetString()))
             return true;
         return parameters.TryGetProperty("type", out var type) && IsNativeWebSearchItem(type.GetString());
+    }
+
+    /// <summary>
+    /// Parses the structured response. When Codex streamed several agent messages without item ids, the text
+    /// holds several JSON objects back to back; the last one is the answer.
+    /// </summary>
+    internal static JsonDocument ParseLastResponse(string raw)
+    {
+        var bytes = Encoding.UTF8.GetBytes(raw);
+        var reader = new Utf8JsonReader(bytes, new JsonReaderOptions { AllowMultipleValues = true });
+        var lastStart = 0L;
+        while (reader.Read())
+        {
+            if (reader.CurrentDepth != 0) continue;
+            if (reader.TokenType is JsonTokenType.StartObject or JsonTokenType.StartArray)
+            {
+                lastStart = reader.TokenStartIndex;
+                reader.Skip();
+            }
+            else
+            {
+                lastStart = reader.TokenStartIndex;
+            }
+        }
+        return JsonDocument.Parse(bytes.AsMemory((int)lastStart));
     }
 
     internal static ChatMessage ParseAssistantMessage(JsonElement root, IReadOnlySet<string> toolNames)
@@ -742,7 +768,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
         }
 
         public async Task<CodexTurnMetrics> RunTurnAsync(string threadId, PromptPayload prompt, string modelId,
-            string? reasoningEffort, Action<string> onDelta, CancellationToken cancellationToken,
+            string? reasoningEffort, Action<string?, string> onDelta, CancellationToken cancellationToken,
             Action<string, string>? onNativeTool = null)
         {
             _latestUsage = null;
@@ -786,7 +812,10 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                 else if (methodName == "item/agentMessage/delta" && root.TryGetProperty("params", out var parameters) &&
                     parameters.TryGetProperty("delta", out var delta))
                 {
-                    onDelta(delta.GetString() ?? string.Empty);
+                    var itemId = parameters.TryGetProperty("itemId", out var item) && item.ValueKind == JsonValueKind.String
+                        ? item.GetString()
+                        : null;
+                    onDelta(itemId, delta.GetString() ?? string.Empty);
                 }
                 else if ((methodName == "item/completed" || methodName == "item/started") &&
                          IsNativeWebSearchNotification(methodName, root))
@@ -885,7 +914,22 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
     {
         private readonly StringBuilder _raw = new();
         private string _emitted = string.Empty;
+        private string _earlier = string.Empty;
+        private bool _separate;
         private bool _isText;
+
+        /// <summary>
+        /// Starts decoding the next agent message of the same turn. Text already streamed stays shown: a
+        /// message that repeats or extends it only streams what is new, and a different message follows it
+        /// after a blank line.
+        /// </summary>
+        public void StartNextMessage()
+        {
+            _raw.Clear();
+            _isText = false;
+            _earlier = _emitted;
+            _separate = false;
+        }
 
         public string Append(string delta)
         {
@@ -896,20 +940,39 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
 
             content = TryReadRootString("text");
             if (content.Value is null) return string.Empty;
-            if (!content.Value.StartsWith(_emitted, StringComparison.Ordinal))
+            var shown = Shown(content.Value);
+            if (shown is null) return string.Empty;
+            if (!shown.StartsWith(_emitted, StringComparison.Ordinal))
                 throw new InvalidOperationException("Codex CLI streamed a non-prefix assistant response.");
-            var next = content.Value[_emitted.Length..];
-            _emitted = content.Value;
+            var next = shown[_emitted.Length..];
+            _emitted = shown;
             return next;
         }
 
         public string Complete()
         {
+            if (!_isText) return string.Empty;
             var content = TryReadRootString("text");
-            if (content.Value is null || !content.Value.StartsWith(_emitted, StringComparison.Ordinal)) return string.Empty;
-            var next = content.Value[_emitted.Length..];
-            _emitted = content.Value;
+            if (content.Value is null || Shown(content.Value) is not { } shown ||
+                !shown.StartsWith(_emitted, StringComparison.Ordinal))
+                return string.Empty;
+            var next = shown[_emitted.Length..];
+            _emitted = shown;
             return next;
+        }
+
+        /// <summary>The full streamed text once this message reads as <paramref name="text"/>, or null while it
+        /// still only repeats text that was already shown.</summary>
+        private string? Shown(string text)
+        {
+            if (_earlier.Length == 0) return text;
+            if (!_separate)
+            {
+                if (_earlier.StartsWith(text, StringComparison.Ordinal)) return null;
+                if (text.StartsWith(_earlier, StringComparison.Ordinal)) return text;
+                _separate = true;
+            }
+            return _earlier + "\n\n" + text;
         }
 
         private (string? Value, bool IsComplete) TryReadRootString(string propertyName)
