@@ -4,6 +4,7 @@ using Jarvis.Agents.ModelProviders;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Integrations;
+using Jarvis.Application.Memory;
 using Jarvis.Application.Settings;
 
 using Jarvis.Api.Errors;
@@ -12,6 +13,8 @@ namespace Jarvis.Api.Endpoints;
 
 public sealed record ModelSettingsDto(string Provider, string? ChatModel, string? FastModel, string? ReasoningEffort,
     string? EmbeddingModel, bool OpenRouterKeyConfigured, IReadOnlyList<string> Providers);
+/// <summary>Which embedding model serves semantic memory search ("local", "openrouter" or "none") and its indexing progress.</summary>
+public sealed record EmbeddingStatusDto(string Source, string? Model, int ActiveMemories, int EmbeddedMemories);
 public sealed record SaveModelSettingsRequest(string? Provider, string? ChatModel, string? FastModel,
     string? ReasoningEffort, string? EmbeddingModel);
 public sealed record CodexModelDto(string Id, string Model, string DisplayName, string? Description, bool IsDefault,
@@ -31,6 +34,13 @@ internal static class ModelSettingsEndpoints
                 ICurrentUser currentUser, CancellationToken ct) =>
             Results.Ok(await ToDtoAsync(currentUser.OwnerId, settings, credentials, ct)))
             .WithName("GetModelSettings");
+
+        models.MapGet("/embedding", async (IChatClientResolver resolver, IMemoryIndexRepository index,
+                ICurrentUser currentUser, CancellationToken ct) =>
+            {
+                var model = await resolver.GetEmbeddingModelAsync(currentUser.OwnerId, ct);
+                return Results.Ok(ToEmbeddingStatus(model?.Name, await index.GetStatusAsync(currentUser.OwnerId, ct)));
+            }).WithName("GetEmbeddingStatus");
 
         models.MapPut("", async (SaveModelSettingsRequest request, IOwnerSettingsStore settings,
             IIntegrationCredentialStore credentials, IAuditEventStore audit, ICurrentUser currentUser,
@@ -157,6 +167,21 @@ internal static class ModelSettingsEndpoints
         }).WithName("TestModelSettings");
 
         return api;
+    }
+
+    /// <summary>
+    /// "server:" models come from the deployment's own embedding endpoint (the bundled local model), "openrouter:" ones
+    /// from the owner's OpenRouter key; the owner's choice wins over the server default.
+    /// </summary>
+    internal static EmbeddingStatusDto ToEmbeddingStatus(string? modelName, MemoryIndexStatus status)
+    {
+        const string Local = "server:";
+        const string OpenRouter = "openrouter:";
+        if (modelName is null) return new EmbeddingStatusDto("none", null, status.Active, status.Embedded);
+        return modelName.StartsWith(Local, StringComparison.Ordinal)
+            ? new EmbeddingStatusDto("local", modelName[Local.Length..], status.Active, status.Embedded)
+            : new EmbeddingStatusDto("openrouter", modelName.StartsWith(OpenRouter, StringComparison.Ordinal)
+                ? modelName[OpenRouter.Length..] : modelName, status.Active, status.Embedded);
     }
 
     private static async Task<ModelSettingsDto> ToDtoAsync(Guid ownerId, IOwnerSettingsStore settings,

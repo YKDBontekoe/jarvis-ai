@@ -78,7 +78,7 @@ Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints
 
 | Group | Paths |
 |-------|-------|
-| Models | `/settings/models`, `/settings/models/codex`, `/openrouter-key`, `/test`, catalog |
+| Models | `/settings/models`, `/settings/models/codex`, `/settings/models/embedding` (active embedding model and indexing progress), `/openrouter-key`, `/test`, catalog |
 | Voice | `/settings/voice` |
 | Devices | `/settings/devices` |
 | Persona | `/persona` (see `PersonaEndpoints`) |

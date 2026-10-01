@@ -62,7 +62,7 @@ echo "Pulling Jarvis images:"
 printf '  %s\n' "${required_images[@]}"
 
 docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" pull \
-  jarvis-api jarvis-worker garage
+  jarvis-api jarvis-worker garage embeddings
 
 # The WhatsApp bridge is built from the checked-out deployment bundle rather
 # than published to GHCR. Build it explicitly before the later --no-build up.

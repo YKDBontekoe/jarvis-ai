@@ -80,6 +80,20 @@ public sealed class SemanticMemoryTests
         Assert.All(query.Terms, term => Assert.Matches("^[\\p{L}\\p{N}]+(:\\*)?$", term.TsQuery));
     }
 
+    [Theory]
+    [InlineData(null, "none", null)]
+    [InlineData("server:sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", "local",
+        "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")]
+    [InlineData("openrouter:openai/text-embedding-3-small", "openrouter", "openai/text-embedding-3-small")]
+    public void Embedding_status_tells_whether_the_local_or_an_openrouter_model_is_used(string? name, string source,
+        string? model)
+    {
+        var status = Jarvis.Api.Endpoints.ModelSettingsEndpoints.ToEmbeddingStatus(name,
+            new MemoryIndexStatus(10, 7, 3, null));
+
+        Assert.Equal(new Jarvis.Api.Endpoints.EmbeddingStatusDto(source, model, 10, 7), status);
+    }
+
     [Fact]
     public void Search_hint_replies_are_parsed_trimmed_and_bad_entries_skipped()
     {

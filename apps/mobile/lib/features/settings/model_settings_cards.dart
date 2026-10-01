@@ -315,10 +315,39 @@ mixin _ModelSettingsCards on _ModelSettingsController {
           field(
             _embedding,
             'Embedding model (optional)',
-            'Enables semantic memory search through OpenRouter, e.g. openai/text-embedding-3-small.',
+            'Optional. Overrides the local model with OpenRouter, e.g. openai/text-embedding-3-small.',
           ),
+          _embeddingStatusNotice(),
         ],
       ),
+    );
+  }
+
+  /// Says which embedding model memory search uses and how many memories it has indexed so far.
+  Widget _embeddingStatusNotice() {
+    final status = _embeddingStatus;
+    final source = status == null ? null : asJsonString(status['source']);
+    if (status == null || source == null) return const SizedBox.shrink();
+    final model = asJsonString(status['model']);
+    final active = asJsonInt(status['activeMemories']);
+    final embedded = asJsonInt(status['embeddedMemories']);
+    final progress = active > 0
+        ? ' $embedded of $active memories indexed.'
+        : '';
+    final message = switch (source) {
+      'local' =>
+        'Local embedding model active${model == null ? '' : ': $model'}. '
+            'It runs on your Jarvis server and needs no key.$progress',
+      'openrouter' =>
+        'Using the OpenRouter embedding model${model == null ? '' : ' $model'} '
+            'for semantic memory search.$progress',
+      _ => 'No embedding model is active. Memory search uses keywords only.',
+    };
+    return InlineNotice(
+      key: const Key('embedding-status'),
+      margin: const EdgeInsets.only(top: 12),
+      tone: source == 'none' ? NoticeTone.warning : NoticeTone.info,
+      message: message,
     );
   }
 

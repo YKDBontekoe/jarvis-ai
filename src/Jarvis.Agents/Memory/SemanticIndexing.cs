@@ -201,25 +201,36 @@ public sealed class MemoryIndexer(
         }
     }
 
+    private async Task<int> EmbedPendingAsync(Guid ownerId, CancellationToken cancellationToken)
+    {
+        var embedded = 0;
+        var model = await resolver.GetEmbeddingModelAsync(ownerId, cancellationToken);
+        if (model is null) return 0;
+        var pending = await index.ListNeedingEmbeddingAsync(ownerId, model.Name, 32, cancellationToken);
+        if (pending.Count == 0) return 0;
+        var vectors = await embedder.EmbedAsync(ownerId, pending.Select(MemoryText.ForIndex).ToArray(),
+            cancellationToken);
+        for (var position = 0; vectors is not null && position < pending.Count && position < vectors.Count; position++)
+        {
+            await index.SetEmbeddingAsync(pending[position].Id, ownerId, vectors[position], cancellationToken);
+            embedded++;
+        }
+        return embedded;
+    }
+
     public async Task<(int Embedded, int GraphIndexed)> IndexOwnerAsync(Guid ownerId,
         CancellationToken cancellationToken)
     {
         await WriteHintsAsync(ownerId, cancellationToken);
         var embedded = 0;
-        var model = await resolver.GetEmbeddingModelAsync(ownerId, cancellationToken);
-        if (model is not null)
+        try
         {
-            var pending = await index.ListNeedingEmbeddingAsync(ownerId, model.Name, 32, cancellationToken);
-            if (pending.Count > 0)
-            {
-                var vectors = await embedder.EmbedAsync(ownerId, pending.Select(MemoryText.ForIndex).ToArray(),
-                    cancellationToken);
-                for (var position = 0; vectors is not null && position < pending.Count && position < vectors.Count; position++)
-                {
-                    await index.SetEmbeddingAsync(pending[position].Id, ownerId, vectors[position], cancellationToken);
-                    embedded++;
-                }
-            }
+            embedded = await EmbedPendingAsync(ownerId, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // A local embedding server may still be downloading its model; graph indexing must not wait for it.
+            logger.LogWarning(exception, "Could not embed memories for {OwnerId}; they stay queued.", ownerId);
         }
 
         var graphPending = await index.ListNeedingGraphIndexAsync(ownerId, BatchSize, cancellationToken);
