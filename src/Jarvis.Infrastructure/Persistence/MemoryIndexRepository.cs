@@ -11,8 +11,21 @@ public sealed class MemoryIndexRepository(JarvisDbContext db) : IMemoryIndexRepo
     public async Task<IReadOnlyList<Guid>> ListOwnersNeedingIndexAsync(int limit, CancellationToken cancellationToken) =>
         await db.Memories.AsNoTracking()
             .Where(x => (x.ValidUntil == null || x.ValidUntil > DateTimeOffset.UtcNow) &&
-                        (x.GraphIndexedAt == null || x.Embedding == null))
+                        (x.GraphIndexedAt == null || x.Embedding == null || x.SearchHints == null))
             .Select(x => x.OwnerId).Distinct().Take(limit).ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<MemoryRecord>> ListNeedingHintsAsync(Guid ownerId, int limit,
+        CancellationToken cancellationToken) =>
+        (await Active(ownerId).Where(x => x.SearchHints == null)
+            .OrderByDescending(x => x.UpdatedAt).Take(limit).ToListAsync(cancellationToken))
+        .Select(x => x.ToRecord()).ToArray();
+
+    public Task SetSearchHintsAsync(Guid memoryId, Guid ownerId, string hints, CancellationToken cancellationToken) =>
+        db.Memories.Where(x => x.Id == memoryId && x.OwnerId == ownerId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.SearchHints, hints)
+                .SetProperty(x => x.Embedding, (Vector?)null)
+                .SetProperty(x => x.EmbeddingModel, (string?)null), cancellationToken);
 
     public async Task<IReadOnlyList<MemoryRecord>> ListNeedingEmbeddingAsync(Guid ownerId, string model, int limit,
         CancellationToken cancellationToken) =>
@@ -51,7 +64,7 @@ public sealed class MemoryIndexRepository(JarvisDbContext db) : IMemoryIndexRepo
             await active.CountAsync(x => x.GraphIndexedAt != null, cancellationToken), model);
     }
 
-    public async Task<IReadOnlyList<MemoryRecord>> SearchSemanticAsync(Guid ownerId, MemoryEmbedding query,
+    public async Task<IReadOnlyList<MemorySearchHit>> SearchSemanticAsync(Guid ownerId, MemoryEmbedding query,
         string? kind, double minimumSimilarity, int limit, CancellationToken cancellationToken)
     {
         var vector = new Vector(query.Vector);
@@ -61,7 +74,8 @@ public sealed class MemoryIndexRepository(JarvisDbContext db) : IMemoryIndexRepo
             .OrderBy(x => x.Distance)
             .Take(limit)
             .ToListAsync(cancellationToken);
-        return hits.Where(hit => 1 - hit.Distance >= minimumSimilarity).Select(hit => hit.Memory.ToRecord()).ToArray();
+        return hits.Where(hit => 1 - hit.Distance >= minimumSimilarity)
+            .Select(hit => new MemorySearchHit(hit.Memory.ToRecord(), 1 - hit.Distance)).ToArray();
     }
 
     private IQueryable<MemoryEntity> Active(Guid ownerId) =>

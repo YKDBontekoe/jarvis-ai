@@ -8,6 +8,7 @@ File: `infra/compose/docker-compose.production.yml`
 - **Jarvis API + Worker** (GHCR images in CI)
 - **PostgreSQL** (app + Temporal DB)
 - **Garage** S3-compatible storage
+- **embeddings**: a CPU Text Embeddings Inference container with the local embedding model (see [configuration.md](configuration.md#local-embedding-model))
 - **ClamAV**, **LiveKit**, private **signal-cli** and **whatsapp-bridge** (built on the host from `workers/whatsapp-bridge`)
 - Only edge/media ports published; databases stay on private networks
 

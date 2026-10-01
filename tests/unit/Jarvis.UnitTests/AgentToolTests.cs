@@ -273,6 +273,61 @@ public sealed class AgentToolTests
         Assert.Equal(["ListReminders", "CancelReminder"], client.ToolNamesCalled);
     }
 
+    [Fact]
+    public async Task Search_memory_records_recalls_for_ranking_and_dreaming()
+    {
+        var memories = new FakeMemoryService();
+        var commute = await memories.CreateAsync(OwnerId, "routine", "Commutes by train", 0.5f, 0.9f, null, false,
+            default);
+        await memories.CreateAsync(OwnerId, "fact", "Owns a cargo bike", 0.5f, 0.9f, null, false, default);
+
+        var result = await CreateMemoryTools(memories, new FakeAuditStore()).SearchMemoryAsync("how I travel by train",
+            default);
+
+        Assert.Contains("Commutes by train", result);
+        Assert.Equal([commute.Id], memories.Recalled);
+    }
+
+    [Fact]
+    public void Memory_context_query_borrows_the_topic_from_the_previous_message_for_short_follow_ups()
+    {
+        Assert.Equal("We plannen de Japanreis. En wat is het budget?",
+            PersonalMemoryContextProvider.BuildQuery(["We plannen de Japanreis.", "En wat is het budget?"]));
+        Assert.Equal("Wat is het budget voor de Japanreis met het gezin in december?",
+            PersonalMemoryContextProvider.BuildQuery(["Hoi", "Wat is het budget voor de Japanreis met het gezin in december?"]));
+        Assert.Equal("En wanneer?", PersonalMemoryContextProvider.BuildQuery(["En wanneer?"]));
+        Assert.Equal("En wanneer?", PersonalMemoryContextProvider.BuildQuery(["  ", "En wanneer?"]));
+        Assert.Null(PersonalMemoryContextProvider.BuildQuery([]));
+        Assert.Equal(new string('x', 300) + " ja",
+            PersonalMemoryContextProvider.BuildQuery([new string('x', 500), "ja"]));
+    }
+
+    [Fact]
+    public void Memory_rerank_keeps_only_the_models_known_choices_in_its_order()
+    {
+        MemorySearchHit Hit() => new(new MemoryRecord(Guid.NewGuid(), OwnerId, "fact", "x", 0.5f, 0.9f,
+            "user", null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, false), 0.5);
+        var candidates = Enumerable.Range(0, 5).Select(_ => Hit()).ToArray();
+        var reply = $"Here: [\"{candidates[3].Memory.Id}\", \"{Guid.NewGuid()}\", \"{candidates[1].Memory.Id}\", \"{candidates[3].Memory.Id}\"]";
+
+        var chosen = MemoryReranker.Select(candidates, reply);
+
+        Assert.Equal([candidates[3].Memory.Id, candidates[1].Memory.Id], chosen.Select(hit => hit.Memory.Id));
+    }
+
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("not json")]
+    [InlineData(null)]
+    public void Memory_rerank_falls_back_to_the_hybrid_order_when_the_answer_is_unusable(string? reply)
+    {
+        var candidates = Enumerable.Range(0, 6).Select(_ => new MemorySearchHit(new MemoryRecord(Guid.NewGuid(), OwnerId,
+            "fact", "x", 0.5f, 0.9f, "user", null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, false), 0.5)).ToArray();
+
+        Assert.Equal(candidates.Take(3).Select(hit => hit.Memory.Id),
+            MemoryReranker.Select(candidates, reply).Select(hit => hit.Memory.Id));
+    }
+
     private static MemoryAgentTools CreateMemoryTools(FakeMemoryService memories, IAuditEventStore audit) =>
         new(memories, new MemoryReranker(new FixedChatClientResolver(new EchoContextClient()),
                 NullLogger<MemoryReranker>.Instance), audit,
@@ -355,8 +410,17 @@ public sealed class AgentToolTests
 
         public List<string> SearchQueries { get; } = [];
 
+        public List<Guid> Recalled { get; } = [];
+
+        public Task RecordRecallAsync(Guid ownerId, IReadOnlyCollection<Guid> memoryIds,
+            CancellationToken cancellationToken)
+        {
+            Recalled.AddRange(memoryIds);
+            return Task.CompletedTask;
+        }
+
         public Task<IReadOnlyList<MemorySearchHit>> SearchAsync(Guid ownerId, string query,
-            CancellationToken cancellationToken, string? kind = null)
+            CancellationToken cancellationToken, string? kind = null, int maxHits = MemoryRanking.MaxHits)
         {
             SearchQueries.Add(query);
             return Task.FromResult<IReadOnlyList<MemorySearchHit>>(Items

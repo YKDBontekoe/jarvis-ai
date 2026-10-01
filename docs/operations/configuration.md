@@ -23,6 +23,24 @@ Primary file: `src/Jarvis.Api/appsettings.json`. Override with environment varia
 
 Owner overrides via API `/settings/models` (OpenRouter key encrypted).
 
+### Local embedding model
+
+Semantic memory search needs an embedding model. The Compose files include an `embeddings` service
+(Hugging Face Text Embeddings Inference, CPU) that downloads the model on first start into the `embeddings-data`
+volume and serves an OpenAI-compatible `/v1/embeddings`. API and worker use it through these keys, so no key or account is needed:
+
+| Key / env var | Purpose |
+|---------------|---------|
+| `Embeddings__BaseUrl` (`EMBEDDINGS_BASE_URL`) | Endpoint; defaults to `http://embeddings:80/v1`. Set it empty to switch the local model off, or point it at any OpenAI-compatible server |
+| `Embeddings__Model` (`EMBEDDINGS_MODEL`) | Model id; defaults to `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (multilingual, 384 dimensions, zero-padded to the 1536-wide column) |
+| `Embeddings__ApiKey` | Optional bearer key for an external server |
+| `EMBEDDINGS_IMAGE` | Compose image, default `ghcr.io/huggingface/text-embeddings-inference:cpu-1.8` |
+
+An owner's OpenRouter embedding model (Settings → Models) overrides the local one. Changing the model re-embeds all
+memories in the background. The app shows the active model and how many memories are indexed
+(`GET /settings/models/embedding`). The server needs about 2 GB of RAM for the container (measured on 4 CPU threads:
+about 14 ms per query and 8 ms per memory for the default model, in PyTorch; the Text Embeddings Inference speed was not measured).
+
 ## Auth
 
 | Key | Purpose |

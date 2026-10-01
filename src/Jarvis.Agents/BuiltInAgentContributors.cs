@@ -124,7 +124,6 @@ internal sealed class CoreAgentTools(
 internal sealed class CoreAgentContext(
     IDailyBriefingRepository briefings,
     IMemoryService memories,
-    MemoryReranker reranker,
     IJarvisTaskRepository tasks,
     IConditionWatchRepository watches,
     IReminderRepository reminders,
@@ -137,7 +136,7 @@ internal sealed class CoreAgentContext(
     public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
     [
         new ClockContextProvider(briefings, context.OwnerId, timeProvider ?? TimeProvider.System),
-        new PersonalMemoryContextProvider(memories, reranker, context.OwnerId, recalls, context.Profile),
+        new PersonalMemoryContextProvider(memories, context.OwnerId, recalls, context.Profile),
         new ActiveTasksContextProvider(tasks, context.OwnerId, context.ExecutingTaskId),
         new ActiveConditionWatchesContextProvider(watches, context.OwnerId),
         new LinkedConversationContextProvider(reminders, automations, context.OwnerId, context.ConversationId)

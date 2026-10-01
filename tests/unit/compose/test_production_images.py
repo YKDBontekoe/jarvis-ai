@@ -15,6 +15,8 @@ COMPOSE_FILE = REPO_ROOT / "infra" / "compose" / "docker-compose.production.yml"
 IMAGE_DEFAULTS = {
     "JARVIS_API_IMAGE": "ghcr.io/ykdbontekoe/jarvis-ai/api:latest",
     "JARVIS_WORKER_IMAGE": "ghcr.io/ykdbontekoe/jarvis-ai/worker:latest",
+    # Third-party image for the local embedding model; not built or published by this repository.
+    "EMBEDDINGS_IMAGE": "ghcr.io/huggingface/text-embeddings-inference:cpu-1.8",
 }
 
 REQUIRED_ENV = {

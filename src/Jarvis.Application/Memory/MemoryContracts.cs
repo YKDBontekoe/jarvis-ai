@@ -16,9 +16,14 @@ public interface IMemoryRepository
     Task<MemoryRecord?> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance, float confidence,
         DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken);
     Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
-    Task<IReadOnlyList<MemoryRecord>> SearchTextAsync(Guid ownerId, string query, string? kind, CancellationToken cancellationToken);
-    Task<IReadOnlyList<MemoryRecord>> SearchTrigramAsync(Guid ownerId, string query, string? kind, CancellationToken cancellationToken);
+    Task<IReadOnlyList<MemoryLexicalMatch>> SearchLexicalAsync(Guid ownerId, MemoryQuery query, string? kind, int limit,
+        CancellationToken cancellationToken);
+    /// <summary>Counts a recall (the memory reached the model) so ranking and dreaming can favour useful memories.</summary>
+    Task RecordAccessAsync(Guid ownerId, IReadOnlyCollection<Guid> memoryIds, CancellationToken cancellationToken);
 }
+
+/// <summary>A keyword match with normalised keyword (0-1+) and fuzzy scores.</summary>
+public sealed record MemoryLexicalMatch(MemoryRecord Memory, double TextScore, double FuzzyScore);
 
 public interface IMemoryService
 {
@@ -34,7 +39,9 @@ public interface IMemoryService
     Task<MemoryRecord?> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance, float confidence,
         DateTimeOffset? validUntil, bool isPinned, CancellationToken cancellationToken);
     Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
-    Task<IReadOnlyList<MemorySearchHit>> SearchAsync(Guid ownerId, string query, CancellationToken cancellationToken, string? kind = null);
+    Task<IReadOnlyList<MemorySearchHit>> SearchAsync(Guid ownerId, string query, CancellationToken cancellationToken, string? kind = null,
+        int maxHits = MemoryRanking.MaxHits);
+    Task RecordRecallAsync(Guid ownerId, IReadOnlyCollection<Guid> memoryIds, CancellationToken cancellationToken);
 }
 
 public interface IConversationMemoryExtractor

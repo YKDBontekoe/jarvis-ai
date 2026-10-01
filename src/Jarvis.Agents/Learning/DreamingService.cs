@@ -64,9 +64,10 @@ public sealed class DreamingService(
 
         var since = state.LastRunAt ?? now.AddDays(-7);
         var messages = await history.ListRecentMessagesAsync(ownerId, since, MaxMessages, cancellationToken);
+        // Every active memory takes part in duplicate detection; before, only the 80 most recently updated did, so an
+        // older copy of a fact was never merged. The model still reviews a bounded, prioritised subset.
         var stored = (await memories.ListAsync(ownerId, null, cancellationToken))
             .Where(memory => memory.ValidUntil is null || memory.ValidUntil > now)
-            .Take(MaxMemories)
             .ToArray();
         var profile = await persona.GetAsync(ownerId, cancellationToken);
         var recall = MergeRecalls(state.RecallList, recalls.Snapshot(ownerId));
@@ -98,7 +99,8 @@ public sealed class DreamingService(
         RemResult rem = RemResult.Empty;
         try
         {
-            rem = await RemAsync(ownerId, settings, staged, stored, profile, messages, cancellationToken);
+            rem = await RemAsync(ownerId, settings, staged, SelectForReview(staged, stored, since, now), profile,
+                messages, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -220,6 +222,29 @@ public sealed class DreamingService(
         return selected;
     }
 
+    /// <summary>
+    /// Chooses the memories REM reviews: everything written or changed since the last dream first, so new memories
+    /// are checked against what is already known and made atomic, then the strongest staged candidates, then the rest
+    /// by recency. Bounded so the prompt stays small whatever the size of the memory bank.
+    /// </summary>
+    internal static IReadOnlyList<MemoryRecord> SelectForReview(IReadOnlyList<DreamCandidate> staged,
+        IReadOnlyList<MemoryRecord> stored, DateTimeOffset since, DateTimeOffset now, int limit = MaxMemories)
+    {
+        var scoreById = new Dictionary<Guid, double>();
+        foreach (var candidate in staged)
+        {
+            var score = DreamingRanker.Score(candidate, now);
+            foreach (var id in candidate.DuplicateIds.Prepend(candidate.MemoryId ?? Guid.Empty))
+                if (id != Guid.Empty) scoreById[id] = Math.Max(scoreById.GetValueOrDefault(id), score);
+        }
+        var fresh = stored.Where(memory => memory.UpdatedAt >= since)
+            .OrderByDescending(memory => memory.UpdatedAt)
+            .Take(limit / 2);
+        var strongest = stored.OrderByDescending(memory => scoreById.GetValueOrDefault(memory.Id))
+            .ThenByDescending(memory => memory.UpdatedAt);
+        return fresh.Concat(strongest).DistinctBy(memory => memory.Id).Take(limit).ToArray();
+    }
+
     internal static string Describe(DreamingOutcome outcome)
     {
         var parts = new List<string>();
@@ -323,10 +348,11 @@ public sealed class DreamingService(
             {
                 trait.Id, trait.Category, trait.Statement, trait.Pinned, trait.Evidence
             }),
-            ranked = staged.Take(40).Select(item => new
-            {
-                item.Kind, item.Content, item.MemoryId, item.SignalCount, item.UniqueSources, item.IsPinned
-            })
+            ranked = staged.OrderByDescending(item => DreamingRanker.Score(item, _clock.GetUtcNow())).Take(40)
+                .Select(item => new
+                {
+                    item.Kind, item.Content, item.MemoryId, item.SignalCount, item.UniqueSources, item.IsPinned
+                })
         }, JsonOptions);
 
         var client = await chatClients.GetChatClientAsync(ownerId, ModelPurpose.Reasoning, cancellationToken);

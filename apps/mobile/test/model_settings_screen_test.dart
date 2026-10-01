@@ -173,6 +173,49 @@ void main() {
     },
   );
 
+  testWidgets('shows that the local embedding model is active with progress', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/settings/models', _settings());
+    http.on('GET', '/api/v1/settings/models/embedding', {
+      'source': 'local',
+      'model': 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2',
+      'activeMemories': 900,
+      'embeddedMemories': 840,
+    });
+    await show(tester);
+
+    final notice = find.byKey(const Key('embedding-status'));
+    await tester.ensureVisible(notice);
+    expect(notice, findsOneWidget);
+    expect(find.textContaining('Local embedding model active'), findsOneWidget);
+    expect(find.textContaining('840 of 900 memories indexed'), findsOneWidget);
+  });
+
+  testWidgets('warns when no embedding model is active', (tester) async {
+    http.on('GET', '/api/v1/settings/models', _settings());
+    http.on('GET', '/api/v1/settings/models/embedding', {
+      'source': 'none',
+      'model': null,
+      'activeMemories': 3,
+      'embeddedMemories': 0,
+    });
+    await show(tester);
+
+    final notice = find.byKey(const Key('embedding-status'));
+    await tester.ensureVisible(notice);
+    expect(find.textContaining('keywords only'), findsOneWidget);
+  });
+
+  testWidgets('hides the embedding status when the server has no endpoint', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/settings/models', _settings());
+    await show(tester);
+
+    expect(find.byKey(const Key('embedding-status')), findsNothing);
+  });
+
   testWidgets('connection test reports the answering model and latency', (
     tester,
   ) async {

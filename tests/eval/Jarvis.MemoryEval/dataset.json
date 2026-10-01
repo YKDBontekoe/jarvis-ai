@@ -1,0 +1,777 @@
+{
+  "description": "Mock personal memories for one owner plus chat-style queries with graded relevance (2 = answers it, 1 = helps). All names and facts are invented.",
+  "memories": [
+    {
+      "key": "sister",
+      "kind": "relationship",
+      "content": "Youri's sister is called Anna and she lives in Rotterdam.",
+      "ageDays": 120,
+      "importance": 0.8
+    },
+    {
+      "key": "sister-job",
+      "kind": "relationship",
+      "content": "Anna works as a nurse at the Erasmus MC hospital.",
+      "ageDays": 90,
+      "importance": 0.6
+    },
+    {
+      "key": "partner",
+      "kind": "relationship",
+      "content": "De partner van de gebruiker heet Sanne.",
+      "ageDays": 200,
+      "importance": 0.9
+    },
+    {
+      "key": "partner-birthday",
+      "kind": "event",
+      "content": "Sanne is jarig op 14 maart.",
+      "ageDays": 200,
+      "importance": 0.8
+    },
+    {
+      "key": "vegetarian",
+      "kind": "preference",
+      "content": "The user is vegetarian and does not eat fish.",
+      "ageDays": 300,
+      "importance": 0.9
+    },
+    {
+      "key": "coffee",
+      "kind": "preference",
+      "content": "Drinkt het liefst een flat white met havermelk.",
+      "ageDays": 60,
+      "importance": 0.4
+    },
+    {
+      "key": "cuisine",
+      "kind": "preference",
+      "content": "Favourite cuisines are Japanese and Ethiopian food.",
+      "ageDays": 150,
+      "importance": 0.5
+    },
+    {
+      "key": "lives",
+      "kind": "fact",
+      "content": "The user lives in Utrecht, in the Lombok neighbourhood.",
+      "ageDays": 30,
+      "importance": 0.8
+    },
+    {
+      "key": "lives-old",
+      "kind": "fact",
+      "content": "The user lives in Amsterdam.",
+      "ageDays": 400,
+      "importance": 0.8,
+      "expired": true
+    },
+    {
+      "key": "job",
+      "kind": "fact",
+      "content": "Werkt als mobiele ontwikkelaar bij een fintech-startup in Amsterdam.",
+      "ageDays": 45,
+      "importance": 0.8
+    },
+    {
+      "key": "commute",
+      "kind": "routine",
+      "content": "Pendelt op dinsdag en donderdag met de trein naar kantoor.",
+      "ageDays": 45,
+      "importance": 0.5
+    },
+    {
+      "key": "gym",
+      "kind": "routine",
+      "content": "Goes bouldering on Monday and Wednesday evenings at Energiehaven.",
+      "ageDays": 20,
+      "importance": 0.5
+    },
+    {
+      "key": "run",
+      "kind": "routine",
+      "content": "Loopt elke zaterdagochtend 10 kilometer in het Wilhelminapark.",
+      "ageDays": 70,
+      "importance": 0.5
+    },
+    {
+      "key": "marathon",
+      "kind": "project",
+      "content": "Is training for the Rotterdam marathon in April.",
+      "ageDays": 25,
+      "importance": 0.7
+    },
+    {
+      "key": "jarvis-project",
+      "kind": "project",
+      "content": "Building Jarvis, a self-hosted personal assistant with a Flutter app and a .NET backend.",
+      "ageDays": 100,
+      "importance": 0.9
+    },
+    {
+      "key": "flutter-state",
+      "kind": "technical",
+      "content": "Prefers Riverpod over Bloc for Flutter state management.",
+      "ageDays": 80,
+      "importance": 0.5
+    },
+    {
+      "key": "editor",
+      "kind": "technical",
+      "content": "Gebruikt Rider voor C# en VS Code voor Flutter.",
+      "ageDays": 110,
+      "importance": 0.3
+    },
+    {
+      "key": "db-choice",
+      "kind": "decision",
+      "content": "Decided to use PostgreSQL with pgvector instead of a separate vector database.",
+      "ageDays": 95,
+      "importance": 0.7
+    },
+    {
+      "key": "temporal",
+      "kind": "decision",
+      "content": "Koos voor Temporal voor herinneringen en achtergrondtaken.",
+      "ageDays": 95,
+      "importance": 0.6
+    },
+    {
+      "key": "dog",
+      "kind": "relationship",
+      "content": "Has a border collie named Bram.",
+      "ageDays": 250,
+      "importance": 0.7
+    },
+    {
+      "key": "vet",
+      "kind": "event",
+      "content": "Bram moet op 12 oktober naar de dierenarts voor zijn jaarlijkse vaccinatie.",
+      "ageDays": 5,
+      "importance": 0.6
+    },
+    {
+      "key": "allergy-pollen",
+      "kind": "fact",
+      "content": "Heeft last van hooikoorts in het voorjaar.",
+      "ageDays": 180,
+      "importance": 0.4
+    },
+    {
+      "key": "language",
+      "kind": "preference",
+      "content": "Wil antwoorden in het Nederlands, behalve bij code.",
+      "ageDays": 210,
+      "importance": 0.9,
+      "pinned": true
+    },
+    {
+      "key": "short-answers",
+      "kind": "preference",
+      "content": "Prefers short, direct answers without filler.",
+      "ageDays": 210,
+      "importance": 0.8
+    },
+    {
+      "key": "holiday",
+      "kind": "event",
+      "content": "Gaat in december twee weken naar Japan, Tokyo en Kyoto.",
+      "ageDays": 15,
+      "importance": 0.7
+    },
+    {
+      "key": "holiday-budget",
+      "kind": "decision",
+      "content": "Budget voor de Japan-reis is 4000 euro inclusief vluchten.",
+      "ageDays": 14,
+      "importance": 0.5
+    },
+    {
+      "key": "car",
+      "kind": "fact",
+      "content": "Does not own a car; uses a cargo bike and public transport.",
+      "ageDays": 160,
+      "importance": 0.5
+    },
+    {
+      "key": "mother",
+      "kind": "relationship",
+      "content": "Moeder heet Els en woont in Deventer.",
+      "ageDays": 230,
+      "importance": 0.7
+    },
+    {
+      "key": "mother-call",
+      "kind": "routine",
+      "content": "Belt elke zondagavond met zijn moeder.",
+      "ageDays": 60,
+      "importance": 0.5
+    },
+    {
+      "key": "friend",
+      "kind": "relationship",
+      "content": "Best friend Daan lives in Groningen and works as a game designer.",
+      "ageDays": 140,
+      "importance": 0.6
+    },
+    {
+      "key": "book-club",
+      "kind": "routine",
+      "content": "Book club meets the first Thursday of every month.",
+      "ageDays": 50,
+      "importance": 0.4
+    },
+    {
+      "key": "reading",
+      "kind": "preference",
+      "content": "Leest graag sciencefiction, vooral Ursula K. Le Guin en Ted Chiang.",
+      "ageDays": 50,
+      "importance": 0.4
+    },
+    {
+      "key": "music",
+      "kind": "preference",
+      "content": "Luistert tijdens het werken naar lo-fi en jazz.",
+      "ageDays": 130,
+      "importance": 0.3
+    },
+    {
+      "key": "sleep",
+      "kind": "routine",
+      "content": "Tries to be in bed by 23:00 on weekdays.",
+      "ageDays": 40,
+      "importance": 0.4
+    },
+    {
+      "key": "meeting-free",
+      "kind": "preference",
+      "content": "Keeps Friday afternoons free of meetings for deep work.",
+      "ageDays": 35,
+      "importance": 0.6
+    },
+    {
+      "key": "standup",
+      "kind": "routine",
+      "content": "Daily standup with the team is at 9:30.",
+      "ageDays": 35,
+      "importance": 0.5
+    },
+    {
+      "key": "manager",
+      "kind": "relationship",
+      "content": "Manager bij het werk is Priya.",
+      "ageDays": 40,
+      "importance": 0.5
+    },
+    {
+      "key": "salary-review",
+      "kind": "event",
+      "content": "Heeft in november een salarisgesprek met Priya.",
+      "ageDays": 10,
+      "importance": 0.6
+    },
+    {
+      "key": "plants",
+      "kind": "fact",
+      "content": "Has a monstera and a few succulents on the balcony.",
+      "ageDays": 260,
+      "importance": 0.2
+    },
+    {
+      "key": "learning-japanese",
+      "kind": "project",
+      "content": "Is Japans aan het leren met Duolingo, al 200 dagen streak.",
+      "ageDays": 12,
+      "importance": 0.5
+    },
+    {
+      "key": "dutch-dislike-cilantro",
+      "kind": "preference",
+      "content": "Hates cilantro (koriander).",
+      "ageDays": 300,
+      "importance": 0.5
+    },
+    {
+      "key": "home-assistant",
+      "kind": "technical",
+      "content": "Runs Home Assistant on a Raspberry Pi 5 to control lights and heating.",
+      "ageDays": 75,
+      "importance": 0.5
+    },
+    {
+      "key": "thermostat",
+      "kind": "preference",
+      "content": "Wil de verwarming 's avonds op 20 graden.",
+      "ageDays": 75,
+      "importance": 0.3
+    },
+    {
+      "key": "journal-1",
+      "kind": "journal",
+      "content": "Rustige dag. Lang gewandeld met Bram en daarna gekookt met Sanne.",
+      "ageDays": 3,
+      "importance": 0.3,
+      "sourceType": "journal"
+    },
+    {
+      "key": "journal-2",
+      "kind": "journal",
+      "content": "Drukke werkdag, release van de app gehaald. Moe maar tevreden.",
+      "ageDays": 8,
+      "importance": 0.3,
+      "sourceType": "journal"
+    }
+  ],
+  "otherOwnerMemories": [
+    "Other user's sister is called Anna and she lives in Rotterdam.",
+    "The user is vegetarian and eats no fish.",
+    "Has a border collie named Bram."
+  ],
+  "queries": [
+    {
+      "text": "Hoe heet mijn zus ook alweer?",
+      "relevant": {
+        "sister": 2,
+        "sister-job": 1
+      }
+    },
+    {
+      "text": "Where does my sister work?",
+      "relevant": {
+        "sister-job": 2,
+        "sister": 1
+      }
+    },
+    {
+      "text": "Kun je een restaurant voorstellen voor vanavond met Sanne?",
+      "relevant": {
+        "vegetarian": 2,
+        "cuisine": 2,
+        "partner": 1,
+        "dutch-dislike-cilantro": 1,
+        "lives": 1
+      }
+    },
+    {
+      "text": "What should I cook for dinner tonight?",
+      "relevant": {
+        "vegetarian": 2,
+        "cuisine": 1,
+        "dutch-dislike-cilantro": 1
+      }
+    },
+    {
+      "text": "Wanneer is Sanne jarig?",
+      "relevant": {
+        "partner-birthday": 2,
+        "partner": 1
+      }
+    },
+    {
+      "text": "Remind me what I usually drink at a coffee bar",
+      "relevant": {
+        "coffee": 2
+      }
+    },
+    {
+      "text": "Waar woon ik?",
+      "relevant": {
+        "lives": 2
+      }
+    },
+    {
+      "text": "Which city do I live in right now?",
+      "relevant": {
+        "lives": 2
+      }
+    },
+    {
+      "text": "Wat voor werk doe ik?",
+      "relevant": {
+        "job": 2,
+        "manager": 1
+      }
+    },
+    {
+      "text": "Plan my week: when do I train and go to the office?",
+      "relevant": {
+        "gym": 2,
+        "commute": 2,
+        "run": 2,
+        "marathon": 1,
+        "standup": 1,
+        "meeting-free": 1
+      }
+    },
+    {
+      "text": "Hoe gaat het met mijn marathon training?",
+      "relevant": {
+        "marathon": 2,
+        "run": 1
+      }
+    },
+    {
+      "text": "Which state management library should I use in the Flutter app?",
+      "relevant": {
+        "flutter-state": 2,
+        "jarvis-project": 1
+      }
+    },
+    {
+      "text": "Why did we pick Postgres for vectors?",
+      "relevant": {
+        "db-choice": 2
+      }
+    },
+    {
+      "text": "Waarom gebruiken we Temporal?",
+      "relevant": {
+        "temporal": 2
+      }
+    },
+    {
+      "text": "When does my dog need to go to the vet?",
+      "relevant": {
+        "vet": 2,
+        "dog": 1
+      }
+    },
+    {
+      "text": "Hoe heet mijn hond?",
+      "relevant": {
+        "dog": 2
+      }
+    },
+    {
+      "text": "Wat moet ik nog regelen voor de reis naar Japan?",
+      "relevant": {
+        "holiday": 2,
+        "holiday-budget": 2,
+        "learning-japanese": 1
+      }
+    },
+    {
+      "text": "How much can I spend on the trip?",
+      "relevant": {
+        "holiday-budget": 2,
+        "holiday": 1
+      }
+    },
+    {
+      "text": "Can you book a rental car for the weekend?",
+      "relevant": {
+        "car": 2
+      }
+    },
+    {
+      "text": "Wanneer bel ik mijn moeder meestal?",
+      "relevant": {
+        "mother-call": 2,
+        "mother": 1
+      }
+    },
+    {
+      "text": "Where does Daan live?",
+      "relevant": {
+        "friend": 2
+      }
+    },
+    {
+      "text": "Suggest a new book for me to read",
+      "relevant": {
+        "reading": 2,
+        "book-club": 1
+      }
+    },
+    {
+      "text": "Zet wat muziek op om te focussen",
+      "relevant": {
+        "music": 2
+      }
+    },
+    {
+      "text": "Can you schedule a meeting on Friday at 15:00?",
+      "relevant": {
+        "meeting-free": 2
+      }
+    },
+    {
+      "text": "Wanneer is mijn salarisgesprek?",
+      "relevant": {
+        "salary-review": 2,
+        "manager": 1
+      }
+    },
+    {
+      "text": "Zet de verwarming lager vanavond",
+      "relevant": {
+        "thermostat": 2,
+        "home-assistant": 1
+      }
+    },
+    {
+      "text": "How do I control my lights from the Pi?",
+      "relevant": {
+        "home-assistant": 2
+      }
+    },
+    {
+      "text": "Ik heb last van mijn ogen en neus, komt dat door de pollen?",
+      "relevant": {
+        "allergy-pollen": 2
+      }
+    },
+    {
+      "text": "What did I do with Bram and Sanne this week?",
+      "relevant": {
+        "journal-1": 2,
+        "dog": 1,
+        "partner": 1
+      }
+    },
+    {
+      "text": "How far along am I with learning Japanese?",
+      "relevant": {
+        "learning-japanese": 2
+      }
+    },
+    {
+      "text": "Wat zijn mijn vaste afspraken op werk?",
+      "relevant": {
+        "standup": 2,
+        "meeting-free": 1,
+        "commute": 1
+      }
+    },
+    {
+      "text": "What time should I go to bed?",
+      "relevant": {
+        "sleep": 2
+      }
+    }
+  ],
+  "heldOutQueries": [
+    {
+      "text": "Is Anna nog steeds verpleegkundige?",
+      "relevant": {
+        "sister-job": 2,
+        "sister": 1
+      }
+    },
+    {
+      "text": "Wat eet ik niet?",
+      "relevant": {
+        "vegetarian": 2,
+        "dutch-dislike-cilantro": 2
+      }
+    },
+    {
+      "text": "Order some sushi for tonight",
+      "relevant": {
+        "vegetarian": 2,
+        "cuisine": 1
+      }
+    },
+    {
+      "text": "Buy a birthday present for my girlfriend",
+      "relevant": {
+        "partner-birthday": 2,
+        "partner": 2
+      }
+    },
+    {
+      "text": "Hoe kom ik naar mijn werk?",
+      "relevant": {
+        "commute": 2,
+        "car": 1,
+        "job": 1
+      }
+    },
+    {
+      "text": "Book a climbing session this week",
+      "relevant": {
+        "gym": 2
+      }
+    },
+    {
+      "text": "When is the marathon?",
+      "relevant": {
+        "marathon": 2
+      }
+    },
+    {
+      "text": "What IDE do I use for Flutter?",
+      "relevant": {
+        "editor": 2
+      }
+    },
+    {
+      "text": "Welke database gebruikt Jarvis?",
+      "relevant": {
+        "db-choice": 2,
+        "jarvis-project": 1
+      }
+    },
+    {
+      "text": "Vaccinatie van de hond inplannen",
+      "relevant": {
+        "vet": 2,
+        "dog": 1
+      }
+    },
+    {
+      "text": "Tell me about my trip to Kyoto",
+      "relevant": {
+        "holiday": 2,
+        "holiday-budget": 1
+      }
+    },
+    {
+      "text": "Wie is Els?",
+      "relevant": {
+        "mother": 2,
+        "mother-call": 1
+      }
+    },
+    {
+      "text": "What does my best friend do for a living?",
+      "relevant": {
+        "friend": 2
+      }
+    },
+    {
+      "text": "Wanneer is de boekenclub?",
+      "relevant": {
+        "book-club": 2
+      }
+    },
+    {
+      "text": "Who is my boss?",
+      "relevant": {
+        "manager": 2
+      }
+    },
+    {
+      "text": "Hoe laat is de standup?",
+      "relevant": {
+        "standup": 2
+      }
+    },
+    {
+      "text": "Is it too cold in the house? Set the thermostat",
+      "relevant": {
+        "thermostat": 2,
+        "home-assistant": 1
+      }
+    },
+    {
+      "text": "Welke planten heb ik op mijn balkon?",
+      "relevant": {
+        "plants": 2
+      }
+    },
+    {
+      "text": "How was my day when I shipped the release?",
+      "relevant": {
+        "journal-2": 2
+      }
+    },
+    {
+      "text": "Do I have hay fever?",
+      "relevant": {
+        "allergy-pollen": 2
+      }
+    }
+  ],
+  "updateStatements": [
+    {
+      "text": "Ik ben verhuisd, ik woon nu in Amersfoort.",
+      "relevant": {
+        "lives": 2
+      }
+    },
+    {
+      "text": "My sister Anna moved to Delft last month.",
+      "relevant": {
+        "sister": 2
+      }
+    },
+    {
+      "text": "Anna werkt niet meer in het ziekenhuis, ze is nu huisarts.",
+      "relevant": {
+        "sister-job": 2
+      }
+    },
+    {
+      "text": "I switched jobs, I'm now a backend developer at a bank.",
+      "relevant": {
+        "job": 2
+      }
+    },
+    {
+      "text": "Ik drink tegenwoordig mijn flat white met sojamelk.",
+      "relevant": {
+        "coffee": 2
+      }
+    },
+    {
+      "text": "I stopped bouldering, I go to the gym on Mondays now.",
+      "relevant": {
+        "gym": 2
+      }
+    },
+    {
+      "text": "We gebruiken toch Bloc in plaats van Riverpod.",
+      "relevant": {
+        "flutter-state": 2
+      }
+    },
+    {
+      "text": "The Japan trip moved to January.",
+      "relevant": {
+        "holiday": 2
+      }
+    },
+    {
+      "text": "Het budget voor Japan is verhoogd naar 5000 euro.",
+      "relevant": {
+        "holiday-budget": 2
+      }
+    },
+    {
+      "text": "Bram's vet appointment is now on 19 October.",
+      "relevant": {
+        "vet": 2
+      }
+    },
+    {
+      "text": "Mijn manager is niet meer Priya maar Tom.",
+      "relevant": {
+        "manager": 2
+      }
+    },
+    {
+      "text": "I now eat fish again, but still no meat.",
+      "relevant": {
+        "vegetarian": 2
+      }
+    },
+    {
+      "text": "Daan is verhuisd naar Utrecht.",
+      "relevant": {
+        "friend": 2
+      }
+    },
+    {
+      "text": "Book club moved to the last Thursday of the month.",
+      "relevant": {
+        "book-club": 2
+      }
+    },
+    {
+      "text": "I bought a car last week.",
+      "relevant": {
+        "car": 2
+      }
+    }
+  ]
+}

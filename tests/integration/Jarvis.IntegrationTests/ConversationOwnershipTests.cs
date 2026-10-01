@@ -2,6 +2,7 @@ using Jarvis.Infrastructure.Persistence;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
+using Jarvis.Application.Memory;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Approvals;
 using Jarvis.Domain.Conversations;
@@ -118,13 +119,17 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
 
         foreach (var kind in new string?[] { null, "preference" })
         {
-            var text = await memories.SearchTextAsync(owner, "meeting notes", kind, CancellationToken.None);
-            Assert.Equal(current.Id, Assert.Single(text).Id);
-            var fuzzy = await memories.SearchTrigramAsync(owner, content, kind, CancellationToken.None);
-            Assert.Equal(current.Id, Assert.Single(fuzzy).Id);
+            var text = await memories.SearchLexicalAsync(owner, MemoryQuery.Parse("How should my meeting notes look?"),
+                kind, 30, CancellationToken.None);
+            Assert.Equal(current.Id, Assert.Single(text).Memory.Id);
+            var fuzzy = await memories.SearchLexicalAsync(owner, MemoryQuery.Parse("meetting decisons"), kind, 30,
+                CancellationToken.None);
+            var typo = Assert.Single(fuzzy);
+            Assert.Equal(current.Id, typo.Memory.Id);
+            Assert.True(typo.FuzzyScore > 0);
         }
-        Assert.Empty(await memories.SearchTextAsync(owner, "meeting notes", "fact", CancellationToken.None));
-        Assert.Empty(await memories.SearchTrigramAsync(owner, content, "fact", CancellationToken.None));
+        Assert.Empty(await memories.SearchLexicalAsync(owner, MemoryQuery.Parse("meeting notes"), "fact", 30,
+            CancellationToken.None));
     }
 
     [Fact]

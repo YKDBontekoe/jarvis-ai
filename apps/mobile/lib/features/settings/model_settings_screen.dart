@@ -47,6 +47,7 @@ abstract class _ModelSettingsController extends State<ModelSettingsScreen> {
   String? _error;
   String? _notice;
   Map<String, dynamic>? _test;
+  Map<String, dynamic>? _embeddingStatus;
   int _requestRevision = 0;
 
   Future<void> _updateCodex();
@@ -98,6 +99,7 @@ class _ModelSettingsScreenState extends _ModelSettingsController
         _loading = false;
         _error = null;
       });
+      unawaited(_loadEmbeddingStatus());
       await _loadCodex(revision);
       if (_provider == 'openrouter' && _chat.text.trim().isNotEmpty) {
         unawaited(_loadOpenRouterReasoningEfforts(_chat.text.trim(), revision));
@@ -129,6 +131,19 @@ class _ModelSettingsScreenState extends _ModelSettingsController
     _updateBlocked = asJsonString(data['updateBlockedReason']);
     _codexError = asJsonString(data['error']);
     _codexModels = jsonMaps(data['models']);
+  }
+
+  /// Which embedding model serves memory search; best effort, the card just stays hidden on failure.
+  Future<void> _loadEmbeddingStatus() async {
+    try {
+      final response = await widget.http.get<dynamic>(
+        '/api/v1/settings/models/embedding',
+      );
+      if (!mounted) return;
+      setState(() => _embeddingStatus = jsonObject(response.data));
+    } on DioException {
+      // Older servers do not have this endpoint.
+    }
   }
 
   Future<void> _loadCodex([int? revision]) async {
@@ -331,6 +346,7 @@ class _ModelSettingsScreenState extends _ModelSettingsController
         _apply(jsonObject(response.data) ?? const {}, keyOnly: keyOnly);
         _notice = success;
       });
+      if (!keyOnly) unawaited(_loadEmbeddingStatus());
     } on DioException catch (error) {
       if (!mounted) return;
       setState(

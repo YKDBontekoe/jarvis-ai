@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../../src/Jarvis.Application/Jarvis.Application.csproj" />
+    <ProjectReference Include="../../../src/Jarvis.Memory/Jarvis.Memory.csproj" />
+    <ProjectReference Include="../../../src/Jarvis.Infrastructure/Jarvis.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="dataset.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
