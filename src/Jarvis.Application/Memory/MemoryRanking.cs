@@ -67,6 +67,24 @@ public static class MemoryRanking
         return selected;
     }
 
+    /// <summary>
+    /// Merges the hits for a short message searched on its own with the hits for the same message searched together with
+    /// the previous message. Context hits count at <paramref name="contextWeight"/> so that a topic switch (where the
+    /// previous message is unrelated) cannot push out what the message itself finds.
+    /// </summary>
+    public static IReadOnlyList<MemorySearchHit> MergeWithContext(IReadOnlyList<MemorySearchHit> alone,
+        IReadOnlyList<MemorySearchHit> withContext, double contextWeight, int maxHits = MaxHits)
+    {
+        var best = new Dictionary<Guid, MemorySearchHit>();
+        foreach (var hit in alone) best[hit.Memory.Id] = hit;
+        foreach (var hit in withContext)
+        {
+            var weighted = hit with { Score = hit.Score * contextWeight };
+            if (!best.TryGetValue(hit.Memory.Id, out var seen) || weighted.Score > seen.Score) best[hit.Memory.Id] = weighted;
+        }
+        return best.Values.OrderByDescending(hit => hit.Score).Take(maxHits).ToArray();
+    }
+
     /// <summary>Maps cosine similarity (0.3 is the search floor, 0.8 is a near paraphrase) onto 0-1.</summary>
     public static double SemanticRelevance(double similarity) => Math.Clamp((similarity - 0.3) / 0.5, 0, 1);
 

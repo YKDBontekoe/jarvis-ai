@@ -16,13 +16,17 @@ internal sealed class PersonalMemoryContextProvider(
         InvokingContext context,
         CancellationToken cancellationToken = default)
     {
-        var query = BuildQuery(context.RequestMessages?
-            .Where(message => message.Role == ChatRole.User).Select(message => message.Text).ToArray() ?? []);
+        var userMessages = context.RequestMessages?
+            .Where(message => message.Role == ChatRole.User).Select(message => message.Text).ToArray() ?? [];
+        var query = userMessages.Length == 0 ? null : userMessages[^1];
         if (string.IsNullOrWhiteSpace(query)) return [];
 
         // No model reranking here: this runs before every chat turn, every hit goes into the context anyway, and
         // a reranking call would add seconds to the first token. The hybrid ranking already orders and trims hits.
         var hits = await memories.SearchAsync(ownerId, query, cancellationToken);
+        if (FollowUpContextQuery(userMessages) is { } withContext)
+            hits = MemoryRanking.MergeWithContext(hits,
+                await memories.SearchAsync(ownerId, withContext, cancellationToken), FollowUpContextWeight);
         hits = hits.Where(hit => ProfileScope.AllowsMemory(profile, hit.Memory)).ToArray();
         var pinned = (await memories.ListPinnedAsync(ownerId, cancellationToken))
             .Where(memory => ProfileScope.AllowsMemory(profile, memory))
@@ -58,22 +62,27 @@ internal sealed class PersonalMemoryContextProvider(
         return [new ChatMessage(ChatRole.User, content.ToString())];
     }
 
-    /// <summary>Follow-ups with at most this many content words ("and when is that?") take the topic from the previous message.</summary>
+    /// <summary>Follow-ups with at most this many content words ("and when is that?") also search with the previous message.</summary>
     internal const int FollowUpMaxContentTerms = 3;
+    /// <summary>
+    /// Weight of the hits found with the previous message in front. 1.2 recovered most of the follow-up gain on the eval
+    /// (recall 0.40 to 0.59, hit@1 0.25 to 0.63) while a topic switch cost little (recall 0.77 to 0.70); higher weights
+    /// favoured follow-ups but let an unrelated previous message push out the message's own hits.
+    /// </summary>
+    internal const double FollowUpContextWeight = 1.2;
     private const int PreviousMessageMaxCharacters = 300;
 
     /// <summary>
-    /// The user's latest message, with the previous user message in front when the latest one is too short to say what
-    /// it is about. On the 1,000-memory eval this lifted follow-up recall from 0.40 to 0.64 and hit@1 from 0.25 to 0.83.
+    /// For a latest message too short to say what it is about, the previous user message followed by the latest one;
+    /// otherwise null.
     /// </summary>
-    internal static string? BuildQuery(IReadOnlyList<string?> userMessages)
+    internal static string? FollowUpContextQuery(IReadOnlyList<string?> userMessages)
     {
         var latest = userMessages.Count == 0 ? null : userMessages[^1];
         if (string.IsNullOrWhiteSpace(latest) || userMessages.Count < 2 ||
-            MemoryQuery.ContentTermCount(latest) > FollowUpMaxContentTerms) return latest;
-        var previous = userMessages[^2];
-        if (string.IsNullOrWhiteSpace(previous)) return latest;
-        previous = previous.Trim();
+            MemoryQuery.ContentTermCount(latest) > FollowUpMaxContentTerms) return null;
+        var previous = userMessages[^2]?.Trim();
+        if (string.IsNullOrEmpty(previous)) return null;
         if (previous.Length > PreviousMessageMaxCharacters) previous = previous[..PreviousMessageMaxCharacters];
         return previous + " " + latest.Trim();
     }

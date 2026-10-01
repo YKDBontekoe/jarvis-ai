@@ -35,8 +35,10 @@ Jarvis combines **structured memory**, **semantic search**, a **temporal knowled
    that shares no words with the memory still finds it. Hints are never shown to the model or the user, memories that
    look like secrets get none, and editing a memory clears them so they are regenerated. Existing memories are
    backfilled in the background, newest first; until then they are searched as before.
-8. **Follow-ups**: when the latest user message has three or fewer content words, `PersonalMemoryContextProvider` prepends the
-   previous user message to the search query, so "and when is that?" still finds the topic.
+8. **Follow-ups**: when the latest user message has three or fewer content words, `PersonalMemoryContextProvider` also searches
+   with the previous user message in front and merges both result lists (`MemoryRanking.MergeWithContext`, context hits at
+   weight 1.2), so "and when is that?" finds the topic while an unrelated previous message cannot push out the message's
+   own hits.
 9. Pinned unexpired memories are always included in the bounded agent context.
 
 Retrieval quality and speed are measured offline with `tests/eval/Jarvis.MemoryEval` (see its README).
