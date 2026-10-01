@@ -95,6 +95,15 @@ public sealed class SemanticMemoryTests
     }
 
     [Fact]
+    public void Embedding_status_reports_whether_the_embedding_server_answers()
+    {
+        var status = Jarvis.Api.Endpoints.ModelSettingsEndpoints.ToEmbeddingStatus("server:m",
+            new MemoryIndexStatus(51, 0, 0, null), reachable: false);
+
+        Assert.False(status.Reachable);
+    }
+
+    [Fact]
     public void Search_hint_replies_are_parsed_trimmed_and_bad_entries_skipped()
     {
         var parsed = SearchHintGenerator.Parse($$"""

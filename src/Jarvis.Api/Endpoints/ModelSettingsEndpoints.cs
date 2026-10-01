@@ -14,7 +14,8 @@ namespace Jarvis.Api.Endpoints;
 public sealed record ModelSettingsDto(string Provider, string? ChatModel, string? FastModel, string? ReasoningEffort,
     string? EmbeddingModel, bool OpenRouterKeyConfigured, IReadOnlyList<string> Providers);
 /// <summary>Which embedding model serves semantic memory search ("local", "openrouter" or "none") and its indexing progress.</summary>
-public sealed record EmbeddingStatusDto(string Source, string? Model, int ActiveMemories, int EmbeddedMemories);
+public sealed record EmbeddingStatusDto(string Source, string? Model, int ActiveMemories, int EmbeddedMemories,
+    bool? Reachable = null);
 public sealed record SaveModelSettingsRequest(string? Provider, string? ChatModel, string? FastModel,
     string? ReasoningEffort, string? EmbeddingModel);
 public sealed record CodexModelDto(string Id, string Model, string DisplayName, string? Description, bool IsDefault,
@@ -39,7 +40,8 @@ internal static class ModelSettingsEndpoints
                 ICurrentUser currentUser, CancellationToken ct) =>
             {
                 var model = await resolver.GetEmbeddingModelAsync(currentUser.OwnerId, ct);
-                return Results.Ok(ToEmbeddingStatus(model?.Name, await index.GetStatusAsync(currentUser.OwnerId, ct)));
+                return Results.Ok(ToEmbeddingStatus(model?.Name, await index.GetStatusAsync(currentUser.OwnerId, ct),
+                    model is null ? null : await IsReachableAsync(model, ct)));
             }).WithName("GetEmbeddingStatus");
 
         models.MapPut("", async (SaveModelSettingsRequest request, IOwnerSettingsStore settings,
@@ -173,15 +175,32 @@ internal static class ModelSettingsEndpoints
     /// "server:" models come from the deployment's own embedding endpoint (the bundled local model), "openrouter:" ones
     /// from the owner's OpenRouter key; the owner's choice wins over the server default.
     /// </summary>
-    internal static EmbeddingStatusDto ToEmbeddingStatus(string? modelName, MemoryIndexStatus status)
+    internal static EmbeddingStatusDto ToEmbeddingStatus(string? modelName, MemoryIndexStatus status,
+        bool? reachable = null)
     {
         const string Local = "server:";
         const string OpenRouter = "openrouter:";
-        if (modelName is null) return new EmbeddingStatusDto("none", null, status.Active, status.Embedded);
+        if (modelName is null) return new EmbeddingStatusDto("none", null, status.Active, status.Embedded, reachable);
         return modelName.StartsWith(Local, StringComparison.Ordinal)
-            ? new EmbeddingStatusDto("local", modelName[Local.Length..], status.Active, status.Embedded)
+            ? new EmbeddingStatusDto("local", modelName[Local.Length..], status.Active, status.Embedded, reachable)
             : new EmbeddingStatusDto("openrouter", modelName.StartsWith(OpenRouter, StringComparison.Ordinal)
-                ? modelName[OpenRouter.Length..] : modelName, status.Active, status.Embedded);
+                ? modelName[OpenRouter.Length..] : modelName, status.Active, status.Embedded, reachable);
+    }
+
+    /// <summary>Embeds one word so Settings can tell "still indexing" from "the embedding server does not answer".</summary>
+    private static async Task<bool> IsReachableAsync(EmbeddingModel model, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        try
+        {
+            await model.Generator.GenerateAsync(["ping"], cancellationToken: timeout.Token);
+            return true;
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            return false;
+        }
     }
 
     private static async Task<ModelSettingsDto> ToDtoAsync(Guid ownerId, IOwnerSettingsStore settings,

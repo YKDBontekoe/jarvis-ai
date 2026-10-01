@@ -334,19 +334,28 @@ mixin _ModelSettingsCards on _ModelSettingsController {
     final progress = active > 0
         ? ' $embedded of $active memories indexed.'
         : '';
-    final message = switch (source) {
-      'local' =>
-        'Local embedding model active${model == null ? '' : ': $model'}. '
-            'It runs on your Jarvis server and needs no key.$progress',
-      'openrouter' =>
-        'Using the OpenRouter embedding model${model == null ? '' : ' $model'} '
-            'for semantic memory search.$progress',
-      _ => 'No embedding model is active. Memory search uses keywords only.',
-    };
+    final unreachable = status['reachable'] == false && source != 'none';
+    final message = unreachable
+        ? 'The embedding model${model == null ? '' : ' $model'} does not answer, '
+              'so new memories are not indexed yet.$progress '
+              'For the local model, check that the embeddings container is running '
+              'and has finished its first download.'
+        : switch (source) {
+            'local' =>
+              'Local embedding model active${model == null ? '' : ': $model'}. '
+                  'It runs on your Jarvis server and needs no key.$progress',
+            'openrouter' =>
+              'Using the OpenRouter embedding model${model == null ? '' : ' $model'} '
+                  'for semantic memory search.$progress',
+            _ =>
+              'No embedding model is active. Memory search uses keywords only.',
+          };
     return InlineNotice(
       key: const Key('embedding-status'),
       margin: const EdgeInsets.only(top: 12),
-      tone: source == 'none' ? NoticeTone.warning : NoticeTone.info,
+      tone: source == 'none' || unreachable
+          ? NoticeTone.warning
+          : NoticeTone.info,
       message: message,
     );
   }

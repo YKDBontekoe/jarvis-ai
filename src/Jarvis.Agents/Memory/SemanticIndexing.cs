@@ -208,14 +208,47 @@ public sealed class MemoryIndexer(
         if (model is null) return 0;
         var pending = await index.ListNeedingEmbeddingAsync(ownerId, model.Name, 32, cancellationToken);
         if (pending.Count == 0) return 0;
-        var vectors = await embedder.EmbedAsync(ownerId, pending.Select(MemoryText.ForIndex).ToArray(),
-            cancellationToken);
-        for (var position = 0; vectors is not null && position < pending.Count && position < vectors.Count; position++)
+        foreach (var memory in await EmbedBatchAsync(ownerId, pending, cancellationToken))
         {
-            await index.SetEmbeddingAsync(pending[position].Id, ownerId, vectors[position], cancellationToken);
+            await index.SetEmbeddingAsync(memory.Id, ownerId, memory.Embedding, cancellationToken);
             embedded++;
         }
         return embedded;
+    }
+
+    /// <summary>
+    /// Embeds the batch in one call. When the server rejects it, memories are embedded one by one so a single bad
+    /// memory cannot keep the whole queue stuck at the front.
+    /// </summary>
+    private async Task<IReadOnlyList<(Guid Id, MemoryEmbedding Embedding)>> EmbedBatchAsync(Guid ownerId,
+        IReadOnlyList<MemoryRecord> pending, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var vectors = await embedder.EmbedAsync(ownerId, pending.Select(MemoryText.ForIndex).ToArray(),
+                cancellationToken);
+            if (vectors is null) return [];
+            return pending.Zip(vectors, (memory, vector) => (memory.Id, vector)).ToArray();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException && pending.Count > 1)
+        {
+            logger.LogWarning(exception, "Embedding a batch of {Count} memories failed; retrying one by one.",
+                pending.Count);
+        }
+        var results = new List<(Guid, MemoryEmbedding)>();
+        foreach (var memory in pending)
+        {
+            try
+            {
+                var single = await embedder.EmbedAsync(ownerId, [MemoryText.ForIndex(memory)], cancellationToken);
+                if (single is { Count: > 0 }) results.Add((memory.Id, single[0]));
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogWarning(exception, "Could not embed memory {MemoryId}; it stays queued.", memory.Id);
+            }
+        }
+        return results;
     }
 
     public async Task<(int Embedded, int GraphIndexed)> IndexOwnerAsync(Guid ownerId,
