@@ -16,7 +16,7 @@ Primary file: `src/Jarvis.Api/appsettings.json`. Override with environment varia
 |-----|---------|
 | `Codex__ExecutablePath` | CLI binary (default `codex`) |
 | `Codex__ManagedInstallDirectory` | Settings-driven CLI updates |
-| `Codex__EnableWebSearch` | Native standalone web search |
+| `Codex__EnableWebSearch` | Codex hosted live web search for chat turns |
 | `Codex__Model`, `Jarvis__ModelClass` | Default model selection |
 | `Codex__ModelClasses__*` | fast/standard/reasoning/coding/vision/realtime |
 | `Codex__TurnTimeoutSeconds` | 30–1800 |
