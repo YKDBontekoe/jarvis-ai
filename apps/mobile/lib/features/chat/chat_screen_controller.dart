@@ -84,6 +84,54 @@ abstract class _ChatScreenController extends State<ChatScreen>
   final Set<String> _shownPushNotifications = {};
   List<ConversationSourceChip> _attachedSources = [];
 
+  /// Unsent text per conversation; starts in memory until device storage opens.
+  ComposerDrafts _drafts = ComposerDrafts.memory();
+  bool _applyingDraft = false;
+
+  /// Bumped to move keyboard focus into the composer.
+  final _composerFocus = ValueNotifier<int>(0);
+
+  Future<void> _openDrafts() async {
+    final stored = await ComposerDrafts.open();
+    if (!mounted || _signedOut) return;
+    _drafts = stored;
+    final id = _conversationId;
+    if (id != null && _input.text.isEmpty) {
+      _replaceComposerText(_drafts.read(id));
+    }
+  }
+
+  void _rememberDraft() {
+    if (_applyingDraft) return;
+    final id = _conversationId;
+    if (id != null) _drafts.write(id, _input.text);
+  }
+
+  /// Sets the composer without saving it as a draft of the open conversation.
+  void _replaceComposerText(String text) {
+    _applyingDraft = true;
+    try {
+      _input.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    } finally {
+      _applyingDraft = false;
+    }
+  }
+
+  /// Shows the draft of [conversationId] after switching to it. Text typed
+  /// before any conversation was open moves along into the new one.
+  void _restoreDraft(String? previousId, String conversationId) {
+    if (previousId == conversationId) return;
+    final draft = _drafts.read(conversationId);
+    if (previousId == null && draft.isEmpty && _input.text.trim().isNotEmpty) {
+      _drafts.write(conversationId, _input.text);
+      return;
+    }
+    _replaceComposerText(draft);
+  }
+
   bool get _hasMessages => _entries.any((entry) => entry is MessageEntry);
 
   UiSurfaceEntry? get _liveSurface => liveSurface(_entries);
@@ -126,6 +174,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _loadOlderMessages();
   Future<void> _signIn();
   Future<void> _signOut();
+  Future<void> _editAsNewMessage(String text);
   Future<void> _retryConnection();
   Future<void> _loadRecent();
   void _openSettings();

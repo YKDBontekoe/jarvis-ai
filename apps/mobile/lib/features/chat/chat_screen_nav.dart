@@ -212,6 +212,7 @@ mixin _ChatScreenNav on _ChatScreenController {
         _entries.clear();
         _recent = [];
         _password.clear();
+        _replaceComposerText('');
       });
     }
     try {
@@ -245,6 +246,8 @@ mixin _ChatScreenNav on _ChatScreenController {
       }
       await _auth.signOut();
       await RecentSearchesStore.clearAll();
+      await _drafts.clear();
+      await ComposerDrafts.clearAll();
       await hub?.stop();
     } finally {
       _signingOut = false;

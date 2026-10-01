@@ -59,7 +59,20 @@ public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, 
     public async Task<IReadOnlyList<Conversation>> ListAsync(Guid ownerId, CancellationToken cancellationToken) =>
         await db.Conversations.AsNoTracking().Where(x => x.OwnerId == ownerId)
             .Where(x => !db.Tasks.Any(task => task.ConversationId == x.Id))
-            .OrderByDescending(x => x.UpdatedAt).Take(100).ToListAsync(cancellationToken);
+            .OrderByDescending(x => x.PinnedAt != null).ThenByDescending(x => x.PinnedAt)
+            .ThenByDescending(x => x.UpdatedAt).Take(100).ToListAsync(cancellationToken);
+
+    public async Task<Conversation?> UpdateAsync(Guid conversationId, Guid ownerId, string? title, bool? pinned,
+        CancellationToken cancellationToken)
+    {
+        var conversation = await db.Conversations.SingleOrDefaultAsync(
+            x => x.Id == conversationId && x.OwnerId == ownerId, cancellationToken);
+        if (conversation is null) return null;
+        if (title is not null) conversation.Rename(title);
+        if (pinned is { } pin) conversation.SetPinned(pin);
+        await db.SaveChangesAsync(cancellationToken);
+        return conversation;
+    }
 
     public async Task<ConversationDeleteResult> DeleteAsync(Guid conversationId, Guid ownerId,
         CancellationToken cancellationToken)

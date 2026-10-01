@@ -14,6 +14,7 @@ internal sealed class ConversationConfiguration : IEntityTypeConfiguration<Conve
             builder.Property(x => x.Title).HasMaxLength(200).IsRequired();
             builder.Property(x => x.ProfileSnapshotJson).HasColumnType("jsonb");
             builder.HasIndex(x => new { x.OwnerId, x.UpdatedAt });
+            builder.HasIndex(x => new { x.OwnerId, x.PinnedAt });
             builder.HasIndex(x => new { x.OwnerId, x.ProfileId });
             builder.HasMany(x => x.Messages).WithOne().HasForeignKey(x => x.ConversationId)
                 .OnDelete(DeleteBehavior.Cascade);

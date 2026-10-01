@@ -21,6 +21,9 @@ public sealed class Conversation
     public string? ProfileSnapshotJson { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    /// <summary>When the owner pinned this conversation to the top of the list; null when not pinned.</summary>
+    public DateTimeOffset? PinnedAt { get; private set; }
     public List<Message> Messages { get; private set; } = [];
 
     public void Touch() => UpdatedAt = DateTimeOffset.UtcNow;
@@ -32,6 +35,25 @@ public sealed class Conversation
         ProfileVersion = version;
         ProfileSnapshotJson = snapshotJson;
         Touch();
+    }
+
+    public const int MaximumTitleLength = 200;
+
+    /// <summary>Gives the conversation an owner-chosen title. Does not move it in the recent list.</summary>
+    public void Rename(string title)
+    {
+        var normalized = string.Join(' ', (title ?? string.Empty).Trim()
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (normalized.Length == 0) throw new ArgumentException("Title is required.", nameof(title));
+        if (normalized.Length > MaximumTitleLength)
+            throw new ArgumentException($"Title must be {MaximumTitleLength} characters or fewer.", nameof(title));
+        Title = normalized;
+    }
+
+    public void SetPinned(bool pinned)
+    {
+        if (pinned) PinnedAt ??= DateTimeOffset.UtcNow;
+        else PinnedAt = null;
     }
 
     public void SetTitleFromFirstMessage(string content)

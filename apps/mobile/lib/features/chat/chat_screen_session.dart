@@ -145,6 +145,7 @@ mixin _ChatScreenSession on _ChatScreenController {
     _hub = null;
     await previous?.stop();
     if (!isCurrent() || !isLatestOpen()) return;
+    _restoreDraft(_conversationId, conversationId);
     setState(() {
       _conversationId = conversationId;
       _profileId = asJsonString(body?['profileId']);
@@ -283,6 +284,8 @@ mixin _ChatScreenSession on _ChatScreenController {
     _hub = null;
     await previous?.stop();
     if (!mounted || _signedOut || _signingOut) return;
+    if (_conversationId case final deleted?) _drafts.remove(deleted);
+    _replaceComposerText('');
     setState(() {
       _conversationId = null;
       _profileId = null;

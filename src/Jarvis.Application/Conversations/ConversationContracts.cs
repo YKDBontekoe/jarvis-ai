@@ -12,6 +12,9 @@ public interface IConversationStore
         CancellationToken cancellationToken);
     Task<Conversation?> GetAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<Conversation>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
+    /// <summary>Renames and/or pins an owner's conversation. Null arguments leave that field unchanged.</summary>
+    Task<Conversation?> UpdateAsync(Guid conversationId, Guid ownerId, string? title, bool? pinned,
+        CancellationToken cancellationToken);
     Task<ConversationDeleteResult> DeleteAsync(Guid conversationId, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<Message>> GetMessagesAsync(Guid conversationId, CancellationToken cancellationToken);
     Task<MessagePage> GetMessagePageAsync(Guid conversationId, MessageCursor? before, int limit,

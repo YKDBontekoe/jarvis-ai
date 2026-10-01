@@ -23,8 +23,9 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | Method | Path | Purpose |
 |--------|------|---------|
 | POST | `/conversations` | Create conversation (`profileId` optional) |
-| GET | `/conversations` | List (includes bound profile name) |
+| GET | `/conversations` | List, pinned first then most recent (includes bound profile name and `pinned`) |
 | GET | `/conversations/{id}` | Messages + responding flag + profile |
+| PATCH | `/conversations/{id}` | Rename (`title`) and/or pin (`pinned`); 404 for task-backed chats |
 | PUT | `/conversations/{id}/profile` | Switch bound profile snapshot (409 if scope changes without `confirm`) |
 | DELETE | `/conversations/{id}` | Delete chat (not task-backed) |
 | POST | `/conversations/{id}/messages` | Send user message (starts agent turn) |
