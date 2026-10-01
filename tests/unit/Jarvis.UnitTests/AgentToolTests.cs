@@ -289,17 +289,34 @@ public sealed class AgentToolTests
     }
 
     [Fact]
-    public void Memory_context_query_borrows_the_topic_from_the_previous_message_for_short_follow_ups()
+    public void Memory_context_also_searches_with_the_previous_message_for_short_follow_ups()
     {
         Assert.Equal("We plannen de Japanreis. En wat is het budget?",
-            PersonalMemoryContextProvider.BuildQuery(["We plannen de Japanreis.", "En wat is het budget?"]));
-        Assert.Equal("Wat is het budget voor de Japanreis met het gezin in december?",
-            PersonalMemoryContextProvider.BuildQuery(["Hoi", "Wat is het budget voor de Japanreis met het gezin in december?"]));
-        Assert.Equal("En wanneer?", PersonalMemoryContextProvider.BuildQuery(["En wanneer?"]));
-        Assert.Equal("En wanneer?", PersonalMemoryContextProvider.BuildQuery(["  ", "En wanneer?"]));
-        Assert.Null(PersonalMemoryContextProvider.BuildQuery([]));
+            PersonalMemoryContextProvider.FollowUpContextQuery(["We plannen de Japanreis.", "En wat is het budget?"]));
+        Assert.Null(PersonalMemoryContextProvider.FollowUpContextQuery(
+            ["Hoi", "Wat is het budget voor de Japanreis met het gezin in december?"]));
+        Assert.Null(PersonalMemoryContextProvider.FollowUpContextQuery(["En wanneer?"]));
+        Assert.Null(PersonalMemoryContextProvider.FollowUpContextQuery(["  ", "En wanneer?"]));
+        Assert.Null(PersonalMemoryContextProvider.FollowUpContextQuery([]));
         Assert.Equal(new string('x', 300) + " ja",
-            PersonalMemoryContextProvider.BuildQuery([new string('x', 500), "ja"]));
+            PersonalMemoryContextProvider.FollowUpContextQuery([new string('x', 500), "ja"]));
+    }
+
+    [Fact]
+    public void Merging_context_hits_keeps_the_best_weighted_score_per_memory()
+    {
+        MemorySearchHit Hit(Guid id, double score) => new(new MemoryRecord(id, OwnerId, "fact", "x", 0.5f, 0.9f, "user",
+            null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, false), score);
+        var own = Guid.NewGuid();
+        var shared = Guid.NewGuid();
+        var contextOnly = Guid.NewGuid();
+
+        var merged = MemoryRanking.MergeWithContext([Hit(own, 0.5), Hit(shared, 0.4)],
+            [Hit(contextOnly, 0.5), Hit(shared, 0.45)], 1.2, maxHits: 2);
+
+        Assert.Equal([contextOnly, shared], merged.Select(hit => hit.Memory.Id));
+        Assert.Equal(0.6, merged[0].Score, 3);
+        Assert.Equal(0.54, merged[1].Score, 3);
     }
 
     [Fact]

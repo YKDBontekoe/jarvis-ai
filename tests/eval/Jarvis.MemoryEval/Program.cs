@@ -51,6 +51,14 @@ var rerankIndex = Array.IndexOf(args, "--rerank");
 var reranked = rerankIndex >= 0
     ? JsonSerializer.Deserialize<Dictionary<string, string[]>>(await File.ReadAllTextAsync(args[rerankIndex + 1]))
     : null;
+// "--prior file.json" ({message: previous message}) searches each message alone and with its previous message, merged
+// with MemoryRanking.MergeWithContext at weight "--prior-weight w" (default 0.6).
+var priorIndex = Array.IndexOf(args, "--prior");
+var priors = priorIndex >= 0
+    ? JsonSerializer.Deserialize<Dictionary<string, string>>(await File.ReadAllTextAsync(args[priorIndex + 1]))
+    : null;
+var priorWeightIndex = Array.IndexOf(args, "--prior-weight");
+var priorWeight = priorWeightIndex >= 0 ? double.Parse(args[priorWeightIndex + 1], CultureInfo.InvariantCulture) : 0.6;
 var datasetIndex = Array.IndexOf(args, "--dataset");
 var datasetPath = datasetIndex >= 0 ? args[datasetIndex + 1] : Path.Combine(AppContext.BaseDirectory, "dataset.json");
 var dataset = JsonSerializer.Deserialize<Dataset>(
@@ -129,7 +137,14 @@ foreach (var query in updates ? dataset.UpdateStatements ?? [] : heldOut ? datas
             : new MemoryService(new MemoryRepository(db), new MemoryIndexRepository(db), lookup);
         var started = Stopwatch.GetTimestamp();
         IReadOnlyList<Jarvis.Domain.Memory.MemorySearchHit> hits;
-        if (agentQueries is null) hits = await service.SearchAsync(owner, query.Text, CancellationToken.None, maxHits: pool);
+        if (priors is not null)
+        {
+            var alone = await service.SearchAsync(owner, query.Text, CancellationToken.None, maxHits: pool);
+            var withContext = await service.SearchAsync(owner, priors[query.Text] + " " + query.Text,
+                CancellationToken.None, maxHits: pool);
+            hits = Jarvis.Application.Memory.MemoryRanking.MergeWithContext(alone, withContext, priorWeight, pool);
+        }
+        else if (agentQueries is null) hits = await service.SearchAsync(owner, query.Text, CancellationToken.None, maxHits: pool);
         else
         {
             var merged = new Dictionary<Guid, Jarvis.Domain.Memory.MemorySearchHit>();

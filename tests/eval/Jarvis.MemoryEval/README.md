@@ -146,8 +146,31 @@ the original question and its answer memory, same labels), searched with hints o
 | Previous message + follow-up | keyword | 0.63 | 0.50 | 0.62 |
 | Previous message + follow-up | + MiniLM | 0.64 | 0.83 | 0.89 |
 
-`PersonalMemoryContextProvider` therefore prepends the previous user message when the latest one has three or fewer content
-words. Not measured: a topic switch right after a short message, where the borrowed context could add noise.
+Prepending the previous message to every short message turned out to be risky: when the previous message is unrelated
+(10 short standalone questions, each preceded by a random other question) recall fell from 0.77 to 0.57 and hit@1 from 0.70
+to 0. `PersonalMemoryContextProvider` therefore searches both ways and merges (`--prior file.json --prior-weight w`):
+
+| Context weight | Follow-ups recall / hit@1 | Topic switch recall / hit@1 |
+|----------------|--------------------------:|----------------------------:|
+| no context | 0.40 / 0.25 | 0.77 / 0.70 |
+| prepend only | 0.64 / 0.83 | 0.57 / 0.00 |
+| merge 0.6 | 0.50 / 0.38 | 0.77 / 0.70 |
+| merge 1.0 | 0.56 / 0.54 | 0.73 / 0.70 |
+| merge 1.2 (used) | 0.59 / 0.63 | 0.70 / 0.70 |
+| merge 1.5 | 0.59 / 0.75 | 0.70 / 0.30 |
+| merge 2.0 | 0.62 / 0.79 | 0.65 / 0.00 |
+
+Both sets are small (24 and 10 queries) and model-written.
 
 A bigger embedding model helps only a little here: multilingual-e5-base gives recall 0.63 / hit@1 0.65 on raw questions
 (MiniLM 0.59 / 0.58) and 0.77 / 0.70 with agent queries (MiniLM 0.78 / 0.63), at several times the compute.
+
+### Tried without gain
+
+- **Stricter score cut** (`RelativeCutoff` 0.35 to 0.65, `MinimumRelevance` 0.08 to 0.2): noise falls only as fast as recall
+  (raw hybrid: 0.35 gives recall 0.59 and noise 0.81, 0.65 gives 0.46 and 0.69). Scores do not separate helpful from
+  topically similar memories well, so the model rerank in `SearchMemory` stays the noise fix.
+- **Local cross-encoder** (`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`, about 8 ms per query-memory pair on 4 CPU threads)
+  as a per-turn rerank over 11 candidates: hit@1 0.55 against 0.58 for the hybrid order, so no better and slower.
+- **Fusion weights** (semantic x0.7 to x1.4, keyword x0.7 to x1.0): all within about 0.02 recall / 0.05 hit@1, which is
+  within the noise of 60 queries, so the weights stay as they are.
