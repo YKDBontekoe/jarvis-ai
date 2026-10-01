@@ -45,6 +45,8 @@ public static class DependencyInjection
         services.AddScoped<IMemoryIndexRepository, MemoryIndexRepository>();
         services.AddScoped<IKnowledgeGraphRepository, KnowledgeGraphRepository>();
         services.AddScoped<Jarvis.Application.Journal.IJournalRepository, JournalRepository>();
+        services.AddScoped<Jarvis.Application.Lists.IListRepository, ListRepository>();
+        services.AddScoped<Jarvis.Application.Lists.IListService, Jarvis.Application.Lists.ListService>();
         services.AddScoped<Jarvis.Application.Channels.IChannelRepository, ChannelRepository>();
         services.AddScoped<Jarvis.Application.Devices.IDeviceTelemetryStore, DeviceTelemetryStore>();
         services.AddScoped<Jarvis.Application.Integrations.IMcpOAuthSessionStore, McpOAuthSessionStore>();

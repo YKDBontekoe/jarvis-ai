@@ -75,3 +75,10 @@ public sealed record JournalRequest(DateOnly? EntryDate, string? Content, string
 public sealed record JournalEntryDto(Guid Id, DateOnly EntryDate, string Source, string Content, string? Highlights,
     string? Gratitude, int? Rating, int? Mood, int? Energy, int? Stress, IReadOnlyList<string> Tags, Guid? MemoryId,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+public sealed record PersonalListRequest(string? Name, string? Kind, string[]? Items);
+public sealed record ListItemsRequest(string[]? Items);
+public sealed record ListItemUpdateRequest(string? Text, bool? Done);
+public sealed record PersonalListDto(Guid Id, string Name, string Kind, int OpenCount, int DoneCount,
+    IReadOnlyList<ListItemDto> Items, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+public sealed record ListItemDto(Guid Id, Guid ListId, string Text, bool Done, DateTimeOffset? DoneAt,
+    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);

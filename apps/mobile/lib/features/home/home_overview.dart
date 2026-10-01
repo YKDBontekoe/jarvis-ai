@@ -11,6 +11,8 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../chat/chat_widgets.dart';
 import '../chat/mcp_setup.dart';
+import '../lists/list_models.dart';
+import '../lists/lists_home_card.dart';
 import '../usage/usage_screen.dart';
 
 part 'home_overview_widgets.dart';
@@ -31,6 +33,7 @@ class HomeOverview extends StatefulWidget {
     this.onOpenReminders,
     this.onOpenIntegrations,
     this.onOpenCoding,
+    this.onOpenLists,
     super.key,
   });
 
@@ -61,6 +64,9 @@ class HomeOverview extends StatefulWidget {
   /// Opens coding-run review.
   final VoidCallback? onOpenCoding;
 
+  /// Opens personal lists. The lists card is hidden when this is null.
+  final VoidCallback? onOpenLists;
+
   @override
   State<HomeOverview> createState() => _HomeOverviewState();
 }
@@ -70,6 +76,7 @@ class _HomeOverviewState extends State<HomeOverview>
   List<_ActiveTask> _tasks = [];
   Map<String, dynamic>? _usage;
   Map<String, dynamic>? _briefing;
+  List<PersonalListData>? _lists;
   bool _loading = false;
   String? _error;
   int _requestRevision = 0;
@@ -83,6 +90,7 @@ class _HomeOverviewState extends State<HomeOverview>
       unawaited(_load());
       unawaited(_loadUsage());
       unawaited(_loadBriefing());
+      unawaited(_loadLists());
     }
   }
 
@@ -95,6 +103,7 @@ class _HomeOverviewState extends State<HomeOverview>
       _tasks = [];
       _usage = null;
       _briefing = null;
+      _lists = null;
       _loading = false;
       _error = null;
     } else if (!oldWidget.ready ||
@@ -102,6 +111,7 @@ class _HomeOverviewState extends State<HomeOverview>
       unawaited(_load());
       unawaited(_loadUsage());
       unawaited(_loadBriefing());
+      unawaited(_loadLists());
     } else if (oldWidget.onOpenUsage == null && widget.onOpenUsage != null) {
       unawaited(_loadUsage());
     }
@@ -113,11 +123,12 @@ class _HomeOverviewState extends State<HomeOverview>
       unawaited(_load());
       unawaited(_loadUsage());
       unawaited(_loadBriefing());
+      unawaited(_loadLists());
     }
   }
 
   Future<void> _refresh() async {
-    await Future.wait([_load(), _loadUsage(), _loadBriefing()]);
+    await Future.wait([_load(), _loadUsage(), _loadBriefing(), _loadLists()]);
   }
 
   Future<void> _loadBriefing() async {
@@ -130,6 +141,19 @@ class _HomeOverviewState extends State<HomeOverview>
       if (mounted) setState(() => _briefing = null);
     } catch (_) {
       if (mounted) setState(() => _briefing = null);
+    }
+  }
+
+  Future<void> _loadLists() async {
+    if (!widget.ready || widget.onOpenLists == null || !mounted) return;
+    try {
+      final response = await widget.http.get<dynamic>('/api/v1/lists');
+      if (!mounted || !widget.ready) return;
+      setState(() => _lists = PersonalListData.listFromJson(response.data));
+    } on DioException {
+      if (mounted) setState(() => _lists = null);
+    } catch (_) {
+      if (mounted) setState(() => _lists = null);
     }
   }
 
@@ -578,6 +602,14 @@ class _HomeOverviewState extends State<HomeOverview>
                       ],
                       if (_briefing != null) ...[
                         _briefingSections(),
+                        const SizedBox(height: 28),
+                      ],
+                      if (_lists case final lists?
+                          when widget.onOpenLists != null) ...[
+                        ListsHomeCard(
+                          lists: lists,
+                          onOpen: widget.onOpenLists!,
+                        ),
                         const SizedBox(height: 28),
                       ],
                       if (_usage != null && widget.onOpenUsage != null) ...[

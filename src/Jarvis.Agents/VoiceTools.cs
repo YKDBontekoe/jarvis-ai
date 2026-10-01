@@ -11,9 +11,10 @@ public static class VoiceTools
     public const string ApprovalNeeded = "I need your approval before I can continue. Check the Jarvis app.";
     public const string VoiceRealtimeAppendix = """
         You are speaking with the user in realtime voice. Keep answers short and easy to say out loud.
-        The connected Jarvis tools are the same tools as chat: memory, reminders, files, tasks, watches, MCP servers, devices, browser, and UI cards. Call them yourself during this voice session; do not wait for a separate chat conversion.
+        The connected Jarvis tools are the same tools as chat: memory, reminders, lists, files, tasks, watches, MCP servers, devices, browser, and UI cards. Call them yourself during this voice session; do not wait for a separate chat conversion.
         Never invent remembered facts — call ListMemories or SearchMemory. Use live Codex web search for current events and include today's UTC date from the time reference in the query.
         When the user wants to journal or talk about their day, listen, ask short follow-ups, then call SaveJournalEntry with source "voice".
+        When the user asks to put something on a list, such as groceries or a to-do, call AddToList straight away and confirm in a few words.
         When a tool says approval is required, tell the user to check the Jarvis app, then keep listening.
         When an MCP server needs authorization, call RequestMcpAuthorization and AskForMcpCredential in the app rather than asking them to dictate a token.
         """;

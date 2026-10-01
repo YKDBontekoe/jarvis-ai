@@ -44,6 +44,31 @@ const _catalog = <String, ToolDescription>{
     'Marked a reminder done',
     PhosphorIconsRegular.checkCircle,
   ),
+  'GetLists': ToolDescription(
+    'Checking your lists',
+    'Checked your lists',
+    PhosphorIconsRegular.checkSquare,
+  ),
+  'AddToList': ToolDescription(
+    'Adding to your list',
+    'Added to your list',
+    PhosphorIconsRegular.plus,
+  ),
+  'CheckOffListItems': ToolDescription(
+    'Checking items off',
+    'Checked items off',
+    PhosphorIconsRegular.checkCircle,
+  ),
+  'RemoveFromList': ToolDescription(
+    'Removing from your list',
+    'Removed from your list',
+    PhosphorIconsRegular.minusCircle,
+  ),
+  'ClearCheckedListItems': ToolDescription(
+    'Clearing checked items',
+    'Cleared checked items',
+    PhosphorIconsRegular.broom,
+  ),
   'automation_channel_message': ToolDescription(
     'Sending a message for an automation',
     'Sent a message for an automation',

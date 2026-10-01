@@ -31,6 +31,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Watches | `ConditionWatchAgentTools` | — |
 | Memory | `MemoryAgentTools` list/search/remember | **Forget** requires approval |
 | Journal | `JournalAgentTools` `SaveJournalEntry` (appends to the day's entry), `ListJournalEntries` | Hidden during background task turns; off when the profile disallows remembering |
+| Lists | `ListAgentTools` `GetLists`, `AddToList` (creates the list when missing), `CheckOffListItems`, `RemoveFromList`, `ClearCheckedListItems` | No approval: they only change the owner's own lists. Available in every run, including background tasks; `ListContextContributor` adds the list names each turn |
 | MCP | `McpServerAgentTools` + `McpSetupAgentTools` | Discover/add/update/invoke/read prompt/resource/remove mostly **approval**; setup and secret cards in chat |
 | Coding | `CodexCodingTools.RunCodingTaskAsync` | **Approval**; only if `Coding:Repositories` configured |
 

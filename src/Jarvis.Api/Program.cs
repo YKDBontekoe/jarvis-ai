@@ -62,6 +62,7 @@ api.MapVoiceEndpoints(app.Logger);
 api.MapFileEndpoints(app.Logger);
 api.MapMemoryEndpoints(app.Logger);
 api.MapJournalEndpoints(app.Logger);
+api.MapListEndpoints(app.Logger);
 api.MapModelSettingsEndpoints(app.Logger);
 api.MapSkillEndpoints(app.Logger);
 api.MapPersonaEndpoints();

@@ -23,6 +23,7 @@ abstract final class PhosphorIconsRegular {
   static const bookOpen = IconData(0xe0e6, fontFamily: 'PhosphorRegular');
   static const bracketsCurly = IconData(0xe860, fontFamily: 'PhosphorRegular');
   static const brain = IconData(0xe74e, fontFamily: 'PhosphorRegular');
+  static const broom = IconData(0xec54, fontFamily: 'PhosphorRegular');
   static const broadcast = IconData(0xe0f2, fontFamily: 'PhosphorRegular');
   static const browser = IconData(0xe0f4, fontFamily: 'PhosphorRegular');
   static const calendarBlank = IconData(0xe10a, fontFamily: 'PhosphorRegular');
@@ -40,6 +41,7 @@ abstract final class PhosphorIconsRegular {
   static const chatText = IconData(0xe17a, fontFamily: 'PhosphorRegular');
   static const check = IconData(0xe182, fontFamily: 'PhosphorRegular');
   static const checkCircle = IconData(0xe184, fontFamily: 'PhosphorRegular');
+  static const checkSquare = IconData(0xe186, fontFamily: 'PhosphorRegular');
   static const circle = IconData(0xe18a, fontFamily: 'PhosphorRegular');
   static const circleHalf = IconData(0xe18c, fontFamily: 'PhosphorRegular');
   static const clipboardText = IconData(0xe198, fontFamily: 'PhosphorRegular');
@@ -103,6 +105,7 @@ abstract final class PhosphorIconsRegular {
   static const linkBreak = IconData(0xe2e4, fontFamily: 'PhosphorRegular');
   static const linkSimple = IconData(0xe2e6, fontFamily: 'PhosphorRegular');
   static const list = IconData(0xe2f0, fontFamily: 'PhosphorRegular');
+  static const listBullets = IconData(0xe2f2, fontFamily: 'PhosphorRegular');
   static const listChecks = IconData(0xeadc, fontFamily: 'PhosphorRegular');
   static const lockSimple = IconData(0xe308, fontFamily: 'PhosphorRegular');
   static const magicWand = IconData(0xe6b6, fontFamily: 'PhosphorRegular');
@@ -144,6 +147,7 @@ abstract final class PhosphorIconsRegular {
   static const shareNetwork = IconData(0xe408, fontFamily: 'PhosphorRegular');
   static const shieldCheck = IconData(0xe40c, fontFamily: 'PhosphorRegular');
   static const shieldWarning = IconData(0xe412, fontFamily: 'PhosphorRegular');
+  static const shoppingCart = IconData(0xe41e, fontFamily: 'PhosphorRegular');
   static const signIn = IconData(0xe428, fontFamily: 'PhosphorRegular');
   static const signOut = IconData(0xe42a, fontFamily: 'PhosphorRegular');
   static const sliders = IconData(0xe432, fontFamily: 'PhosphorRegular');

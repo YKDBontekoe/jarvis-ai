@@ -498,6 +498,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     onOpenReminders: () => _openUtility('reminders'),
     onOpenIntegrations: () => _openUtility('integrations'),
     onOpenCoding: () => _openUtility('coding'),
+    onOpenLists: () => _openUtility('lists'),
     refreshRevision: _homeRevision,
     onContinueConversation: _hasMessages ? _showTranscript : null,
     onSuggestion: _conversationId == null || _busy || _hasPendingApproval

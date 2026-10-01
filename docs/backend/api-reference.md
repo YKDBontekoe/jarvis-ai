@@ -62,6 +62,18 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 
 Body: `entryDate`, `content` (≤ 6,000), `highlights`, `gratitude` (≤ 1,000 each), `rating` 1–10, `mood`/`energy`/`stress` 1–5, `tags` (≤ 10), optional `source` (`written`, `voice`, `chat`). At least text or one rating is required. "Today" uses the owner's daily-briefing time zone (UTC fallback). See [memory-knowledge-learning.md](memory-knowledge-learning.md#journal).
 
+## Lists
+
+| Method | Path |
+|--------|------|
+| GET/POST | `/lists` (POST body: `name` ≤ 60, `kind` `shopping`/`todo`/`general`, optional `items`) |
+| GET/PUT/DELETE | `/lists/{id}` |
+| POST | `/lists/{id}/items` (`items`: up to 50 strings ≤ 200 each; open duplicates are skipped, checked-off ones reopen) |
+| PATCH/DELETE | `/lists/{id}/items/{itemId}` (PATCH body: `text`, `done`) |
+| POST | `/lists/{id}/clear-checked` |
+
+Owner-scoped personal lists (`personal_lists`, `personal_list_items`). Names are unique per owner ignoring case, accents, and a trailing "list"/"lijst". Audit events (`lists` tool) carry the list id and a count, never list or item text.
+
 Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints` and `PersonalAssistantEndpoints` (`/graph/...`).
 
 ## Files

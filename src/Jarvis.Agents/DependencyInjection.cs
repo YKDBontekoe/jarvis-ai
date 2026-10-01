@@ -51,6 +51,8 @@ public static class DependencyInjection
         services.AddScoped<IAgentContextContributor, Skills.SkillContextContributor>();
         services.AddScoped<IAgentToolContributor, Journal.JournalToolContributor>();
         services.AddScoped<IAgentContextContributor, Journal.JournalContextContributor>();
+        services.AddScoped<IAgentToolContributor, Lists.ListToolContributor>();
+        services.AddScoped<IAgentContextContributor, Lists.ListContextContributor>();
         services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();
         services.AddScoped<IAgentContextContributor, Persona.PersonaContextContributor>();
         services.AddScoped<IAgentContextContributor, Learning.UserSummaryContextContributor>();
