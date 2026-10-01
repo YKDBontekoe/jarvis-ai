@@ -193,6 +193,19 @@ internal sealed class TemporalWorkflowReconciler(
                             () => dreamingScheduler.ScheduleDreamingAsync(ownerId, cancellationToken),
                             cancellationToken);
                 }
+
+                var weeklyReviewScheduler = services.GetRequiredService<Jarvis.Application.Reviews.IWeeklyReviewScheduler>();
+                foreach (var ownerId in await settingsStore.ListOwnersAsync(
+                             Jarvis.Application.Settings.SettingsSections.WeeklyReview, cancellationToken))
+                {
+                    var review = await settingsStore.GetAsync<Jarvis.Application.Reviews.WeeklyReviewSettings>(ownerId,
+                        Jarvis.Application.Settings.SettingsSections.WeeklyReview, cancellationToken);
+                    if (review?.Enabled == true)
+                        await TryScheduleAsync("weekly review", ownerId,
+                            () => weeklyReviewScheduler.ScheduleWeeklyReviewAsync(ownerId, settingsChanged: false,
+                                cancellationToken),
+                            cancellationToken);
+                }
             }
 
             await fileRepository.RequeueStaleQueuedAsync(

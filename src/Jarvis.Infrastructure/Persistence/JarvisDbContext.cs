@@ -42,6 +42,7 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
         Set<ConversationCollectionAttachmentEntity>();
     public DbSet<IntegrationCredential> IntegrationCredentials => Set<IntegrationCredential>();
     public DbSet<DailyBriefingPreference> DailyBriefings => Set<DailyBriefingPreference>();
+    public DbSet<WeeklyReview> WeeklyReviews => Set<WeeklyReview>();
     public DbSet<OwnerSettingEntity> OwnerSettings => Set<OwnerSettingEntity>();
     public DbSet<JournalEntryEntity> JournalEntries => Set<JournalEntryEntity>();
     public DbSet<SkillEntity> Skills => Set<SkillEntity>();

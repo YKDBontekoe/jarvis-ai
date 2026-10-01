@@ -43,6 +43,7 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | Condition watches | `GET/POST /watches`, `GET/DELETE /watches/{id}` |
 | Tasks | `GET/POST /tasks`, `GET /tasks/{id}`, `GET /tasks/{id}/messages`, cancel endpoints |
 | Daily briefing | `GET/PUT /briefings/daily` (see `AutomationEndpoints`) |
+| Weekly review | `GET /reviews/weekly?weeks=8` (settings, mood trend, recent reviews), `GET /reviews/weekly/{id}`, `PUT /reviews/weekly/settings` (`enabled`, `localTime`, `timeZoneId`), `POST /reviews/weekly/generate` (current week, no notification) |
 
 ## Memory and learning
 
