@@ -4,7 +4,7 @@
 
 ## SemVer impact
 
-Jarvis uses [Semantic Versioning 2.0.0](https://semver.org/) for **release tags** (`vMAJOR.MINOR.PATCH`) that trigger the iOS IPA and backend GHCR deploy workflows.
+Jarvis uses [Semantic Versioning 2.0.0](https://semver.org/) for **release tags** (`vMAJOR.MINOR.PATCH`) that start the Release workflow.
 
 | Bump | When to choose it | Example tag |
 |------|-------------------|-------------|
@@ -19,7 +19,7 @@ Jarvis uses [Semantic Versioning 2.0.0](https://semver.org/) for **release tags*
 - [ ] **SemVer bump: none** (merge without creating a release tag)
 - [ ] If mobile changes ship: `apps/mobile/pubspec.yaml` `version:` matches the intended **marketing** SemVer (`X.Y.Z+N`).
 
-Merging to `main` runs [`.github/workflows/create-release-tag.yml`](.github/workflows/create-release-tag.yml), which reads the checked **SemVer bump** above and pushes `vX.Y.Z`. That tag triggers the iOS IPA and backend deploy workflows. Use **none** for refactors and other changes that should not release.
+Merging to `main` runs [`.github/workflows/create-release-tag.yml`](.github/workflows/create-release-tag.yml), which reads the checked **SemVer bump** above and pushes `vX.Y.Z`. That tag starts [`.github/workflows/release.yml`](.github/workflows/release.yml), which checks the backend/web and iOS builds and then requests one production approval. Use **none** for refactors and other changes that should not release.
 
 **Intended release tag (optional):** `v1.2.0` — use when the computed bump would not land on the version you need.
 

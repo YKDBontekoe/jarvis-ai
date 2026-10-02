@@ -55,7 +55,7 @@ Model-agnostic scenarios: `evals/jarvis-core-v1.jsonl` — see [evals/README.md]
 
 ## CI expectations
 
-[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs on every pull request to `main`: backend unit and integration tests, Python release/compose/AltStore tests, Flutter analyze and widget tests, and API/worker image builds (no push). Release tags still trigger `release-ios.yml` and `deploy-backend.yml`.
+[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs on every pull request to `main`: backend unit and integration tests, Python release/compose/AltStore tests, Flutter analyze and widget tests, and API/worker image builds (no push). Release tags start `release.yml`, which checks `deploy-backend.yml` and `release-ios.yml` before the single production approval.
 
 ## Agent guidance
 

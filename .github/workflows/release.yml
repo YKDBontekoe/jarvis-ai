@@ -1,0 +1,106 @@
+name: Release
+
+# One production approval for a version tag. Backend/web and iOS builds run
+# first without deploying. After both succeed, Approve release is the only
+# production environment review, and that job deploys the server and AltStore.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check backend and frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    outputs:
+      backend_run_id: ${{ steps.checks.outputs.backend_run_id }}
+      ios_run_id: ${{ steps.checks.outputs.ios_run_id }}
+      version: ${{ steps.checks.outputs.version }}
+      build: ${{ steps.checks.outputs.build }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Wait for backend and iOS builds
+        id: checks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: >-
+          python3 scripts/release/orchestrate_checks.py
+          --ref "${GITHUB_REF}"
+          --sha "${GITHUB_SHA}"
+          --github-output
+
+  deploy:
+    name: Approve release
+    needs: check
+    runs-on: [self-hosted, linux, x64, jarvis-deploy]
+    environment:
+      name: production
+      url: https://jarvis.ykdbonte.dev
+    steps:
+      - name: Record approved checks
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+          BUILD: ${{ needs.check.outputs.build }}
+          BACKEND_RUN_ID: ${{ needs.check.outputs.backend_run_id }}
+          IOS_RUN_ID: ${{ needs.check.outputs.ios_run_id }}
+        run: |
+          echo "Backend and iOS checks passed for ${GITHUB_REF_NAME} (${VERSION}+${BUILD})."
+          echo "Backend run ${BACKEND_RUN_ID}; iOS run ${IOS_RUN_ID}."
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create deployment source bundle
+        run: git bundle create "${RUNNER_TEMP}/jarvis-source.bundle" HEAD
+
+      - name: Image names
+        id: images
+        run: |
+          prefix="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          echo "api=${prefix}/api:${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "worker=${prefix}/worker:${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+
+      - name: Deploy backend and web
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          GIT_SHA: ${{ github.sha }}
+          SOURCE_BUNDLE: ${{ runner.temp }}/jarvis-source.bundle
+          JARVIS_API_IMAGE: ${{ steps.images.outputs.api }}
+          JARVIS_WORKER_IMAGE: ${{ steps.images.outputs.worker }}
+          DEPLOY_COMPOSE_FILES: ${{ vars.DEPLOY_COMPOSE_FILES }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: bash scripts/deploy/runner_deploy.sh
+
+      - name: Download iOS IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: jarvis-altstore-ipa
+          path: dist
+          run-id: ${{ needs.check.outputs.ios_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Publish iOS source
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+          BUILD_VERSION: ${{ needs.check.outputs.build }}
+          ALTSTORE_CONTENT_DIR: /home/ykdbonte/.jarvis/altstore
+          SOURCE_BASE_URL: https://jarvis.ykdbonte.dev/altstore
+        run: bash scripts/altstore/publish_release.sh

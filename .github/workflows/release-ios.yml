@@ -1,15 +1,20 @@
 name: Release iOS IPA
 
+# Tag releases are started by release.yml with skip_publish so this workflow
+# builds the IPA only. A manual run still publishes after the production approval.
+
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       version:
         description: SemVer marketing version (MAJOR.MINOR.PATCH). Defaults to apps/mobile/pubspec.yaml.
         required: false
         type: string
+      skip_publish:
+        description: Build the IPA and GitHub Release without updating AltStore on the server.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -159,11 +164,31 @@ jobs:
           name: jarvis-altstore-ipa
           path: dist/Jarvis.ipa
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 90
+
+      - name: Record release metadata
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.version.outputs.build }}
+        run: |
+          set -euo pipefail
+          printf '{"version":"%s","build":"%s"}\n' "${VERSION}" "${BUILD}" > dist/release-meta.json
+
+      - name: Upload release metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-release-meta
+          path: dist/release-meta.json
+          if-no-files-found: error
+          retention-days: 90
 
   publish-source:
     needs: release-ipa
-    if: ${{ github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') }}
+    if: >-
+      github.ref_type == 'tag' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      inputs.skip_publish != true &&
+      inputs.skip_publish != 'true'
     runs-on: [self-hosted, linux, x64, jarvis-deploy]
     environment: production
     steps:
@@ -182,25 +207,4 @@ jobs:
           BUILD_VERSION: ${{ needs.release-ipa.outputs.build }}
           ALTSTORE_CONTENT_DIR: /home/ykdbonte/.jarvis/altstore
           SOURCE_BASE_URL: https://jarvis.ykdbonte.dev/altstore
-        run: |
-          set -euo pipefail
-          mkdir -p "${ALTSTORE_CONTENT_DIR}"
-          chmod 0755 "${ALTSTORE_CONTENT_DIR}"
-          IPA_NAME="Jarvis-${VERSION}.ipa"
-          install -m 0644 dist/Jarvis.ipa "${ALTSTORE_CONTENT_DIR}/${IPA_NAME}.tmp"
-          mv "${ALTSTORE_CONTENT_DIR}/${IPA_NAME}.tmp" "${ALTSTORE_CONTENT_DIR}/${IPA_NAME}"
-          install -m 0644 altstore/icon.png "${ALTSTORE_CONTENT_DIR}/icon.png.tmp"
-          mv "${ALTSTORE_CONTENT_DIR}/icon.png.tmp" "${ALTSTORE_CONTENT_DIR}/icon.png"
-          python3 scripts/altstore/generate_source.py \
-            --ipa "${ALTSTORE_CONTENT_DIR}/${IPA_NAME}" \
-            --download-url "${SOURCE_BASE_URL}/${IPA_NAME}" \
-            --icon-url "${SOURCE_BASE_URL}/icon.png" \
-            --website https://jarvis.ykdbonte.dev \
-            --version "${VERSION}" \
-            --build-version "${BUILD_VERSION}" \
-            --changelog "Jarvis ${VERSION}" \
-            --previous-source "${ALTSTORE_CONTENT_DIR}/source.json" \
-            --output "${ALTSTORE_CONTENT_DIR}/source.json.tmp"
-          chmod 0644 "${ALTSTORE_CONTENT_DIR}/source.json.tmp"
-          mv "${ALTSTORE_CONTENT_DIR}/source.json.tmp" "${ALTSTORE_CONTENT_DIR}/source.json"
-          echo "Published ${SOURCE_BASE_URL}/source.json"
+        run: bash scripts/altstore/publish_release.sh
