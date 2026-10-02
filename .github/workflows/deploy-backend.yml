@@ -1,9 +1,9 @@
 name: Deploy Jarvis backend and web
 
+# Tag releases are started by release.yml with skip_deploy so this workflow
+# builds images only. A manual run still deploys after the production approval.
+
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       image_tag:
@@ -52,7 +52,7 @@ jobs:
           name: jarvis-deployment-source
           path: ${{ runner.temp }}/jarvis-source.bundle
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 90
 
   web:
     name: Build hosted web client
@@ -226,12 +226,12 @@ jobs:
   deploy:
     needs: [prepare, build, source, sentry-release]
     if: >-
-      (github.event_name != 'workflow_dispatch' || inputs.skip_deploy != true) &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.skip_deploy != true &&
+      inputs.skip_deploy != 'true' &&
       (
-        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-        (github.event_name == 'workflow_dispatch' &&
-          (github.ref == 'refs/heads/main' ||
-            (github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v'))))
+        github.ref == 'refs/heads/main' ||
+        (github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v'))
       )
     runs-on: [self-hosted, linux, x64, jarvis-deploy]
     environment: production
@@ -252,17 +252,4 @@ jobs:
           JARVIS_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/worker:${{ github.sha }}
           DEPLOY_COMPOSE_FILES: ${{ vars.DEPLOY_COMPOSE_FILES }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-        run: |
-          set -euo pipefail
-          cd "${DEPLOY_PATH}"
-          if [[ ! -d .git ]]; then
-            git init
-          fi
-          git fetch --force "${SOURCE_BUNDLE}" HEAD
-          git checkout --detach --force "${GIT_SHA}"
-          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
-          python3 scripts/deploy/sentry_release_env.py \
-            --env-file "${ENV_FILE:-infra/compose/.env.production}" \
-            --release "${GIT_SHA}"
-          chmod +x scripts/deploy/remote-up.sh
-          scripts/deploy/remote-up.sh
+        run: bash scripts/deploy/runner_deploy.sh

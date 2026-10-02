@@ -34,9 +34,10 @@ database backup separately.
 | Workflow | Purpose |
 |----------|---------|
 | `ci.yml` | PRs to `main`: .NET build/tests, Python checks, Flutter analyze/tests, container image builds |
-| `create-release-tag.yml` | Tag on merge |
-| `release-ios.yml` | Unsigned IPA + AltStore source |
-| `deploy-backend.yml` | Build Flutter web, publish API (including web) and worker to GHCR; deploy together via self-hosted runner |
+| `create-release-tag.yml` | Tag on merge, then start `release.yml` |
+| `release.yml` | Wait for backend/web and iOS builds, then the single production approval deploys both |
+| `release-ios.yml` | Unsigned IPA + AltStore source. Tag releases build only; publishing waits for `release.yml` |
+| `deploy-backend.yml` | Build Flutter web, publish API (including web) and worker to GHCR. Tag releases build only; deploying waits for `release.yml` |
 
 Require the **All checks passed** job from `ci.yml` in branch protection before merging to `main`.
 
@@ -73,10 +74,14 @@ the same account, database and authenticated SignalR hub as the native client.
 The existing Caddy/Cloudflare route to the API also serves web assets; the separate
 `/altstore/*` host route continues to serve the IPA source and downloads.
 
-Release tags and main/tag workflow dispatches build web on a hosted Ubuntu runner.
+Release tags start [release.yml](../../.github/workflows/release.yml). That
+workflow builds the web client inside the backend image and builds the iOS IPA,
+both without publishing. The `production` environment approval on **Approve
+release** is the only review for that tag; approving it deploys the API (including
+web) and publishes the AltStore source. Running **Deploy Jarvis backend and web**
+or **Release iOS IPA** manually still uses `production` for that pipeline alone.
 The web artifact is copied into `wwwroot` in the API image; production API builds
-require that artifact. The existing `production` environment approval gates the
-combined backend/web deployment. After API health passes, the deployment script
+require that artifact. After API health passes, the deployment script
 checks that the homepage and compiled JavaScript bundle are available before it
 prunes older images. Rolling back the API image also rolls back the web client.
 

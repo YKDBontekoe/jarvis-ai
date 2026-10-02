@@ -219,7 +219,7 @@ Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit med
 
 ## GitHub Actions pipelines
 
-Releases use [Semantic Versioning 2.0.0](https://semver.org/): git tags are `vMAJOR.MINOR.PATCH` (for example `v1.2.0`). When a pull request merges to `main`, [`.github/workflows/create-release-tag.yml`](.github/workflows/create-release-tag.yml) reads the **SemVer bump** checkboxes in [`.github/pull_request_template.md`](.github/pull_request_template.md), creates the next `v*` tag on the merge commit, and pushes it. That tag triggers the iOS IPA and backend deploy workflows. You can still run either release workflow manually from **Actions** with `workflow_dispatch`, or push a `v*` tag yourself in an emergency.
+Releases use [Semantic Versioning 2.0.0](https://semver.org/): git tags are `vMAJOR.MINOR.PATCH` (for example `v1.2.0`). When a pull request merges to `main`, [`.github/workflows/create-release-tag.yml`](.github/workflows/create-release-tag.yml) reads the **SemVer bump** checkboxes in [`.github/pull_request_template.md`](.github/pull_request_template.md), creates the next `v*` tag on the merge commit, and pushes it. That tag starts [`.github/workflows/release.yml`](.github/workflows/release.yml). Release builds the backend/web images and the iOS IPA, then **Approve release** is the one production review. Approving it deploys the server and publishes the AltStore source. You can still run the backend or iOS workflow manually from **Actions**; those direct runs keep their own production approval. Push a `v*` tag yourself in an emergency and approve the Release workflow it starts.
 
 | Change | SemVer bump | Example tag |
 |--------|-------------|---------------|
@@ -241,13 +241,13 @@ Local packaging uses the same layout as CI: `flutter build ios --release --no-co
 
 Push notifications and some entitlements may be limited without a normal signed distribution profile; in-app chat, account sign-in, and SignalR still depend on your configured `JARVIS_API_URL`.
 
-The iOS release workflow publishes both the IPA and generated `source.json` to the Jarvis server. It updates automatically for `v*` releases; a manual workflow run also publishes the selected version without creating a GitHub Release. Add `https://jarvis.ykdbonte.dev/altstore/source.json` to AltStore. Each run keeps earlier IPA versions available for existing source entries. The feed and download are public; keep private data out of the IPA and source metadata.
+The Release workflow publishes both the IPA and generated `source.json` to the Jarvis server after the production approval. A manual run of the iOS workflow on a `v*` tag also publishes that source and creates the GitHub Release; a manual run from another branch builds the IPA only. Add `https://jarvis.ykdbonte.dev/altstore/source.json` to AltStore. Each run keeps earlier IPA versions available for existing source entries. The feed and download are public; keep private data out of the IPA and source metadata.
 
 The self-hosted runner serves `/home/ykdbonte/.jarvis/altstore` through the host Caddy route at `/altstore/*`. The public endpoint is independent of GitHub repository visibility, and the workflow updates the source only after the IPA artifact is ready.
 
 ### Backend GHCR images and deployment
 
-[`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) builds `api` and `worker`, pushes them to `ghcr.io/<owner>/jarvis-ai/<name>:<git-sha>` (plus the version tag and `latest` on `v*` tags), then deploys through a self-hosted runner on your server. Garage uses its pinned upstream image. The workflow runs when a `v*` release tag is created (automatically after merge to `main`, or manually), not on every commit to `main`.
+[`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) builds `api` and `worker`, pushes them to `ghcr.io/<owner>/jarvis-ai/<name>:<git-sha>` (plus the version tag and `latest` on `v*` tags). A `v*` tag builds those images from the Release workflow and deploys them only after **Approve release**. A manual run of this workflow can still deploy on its own production approval. Garage uses its pinned upstream image. The workflow does not run on every commit to `main`.
 
 Server bootstrap:
 
