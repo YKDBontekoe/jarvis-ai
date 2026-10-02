@@ -18,4 +18,5 @@ infra/compose/.env
 infra/compose/.env.production
 .aspire/
 artifacts/
+infra/web/dist/
 **/node_modules/

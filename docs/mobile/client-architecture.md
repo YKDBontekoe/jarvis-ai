@@ -5,10 +5,14 @@ App root: **`apps/mobile/`** (package `jarvis_mobile`).
 ## Entry and configuration
 
 - `lib/main.dart` — app bootstrap, routing, theme.
-- `lib/api/api_config.dart` — base URL from `--dart-define=JARVIS_API_URL` (default `http://localhost:5082`).
+- `lib/api/api_config.dart` — base URL from `--dart-define=JARVIS_API_URL`; native builds default to `http://localhost:5082`, browser builds to their current origin.
 - `lib/auth/auth_session.dart` — JWT + refresh in secure storage.
 
 Android emulator: `http://10.0.2.2:5082`. Physical devices need LAN-reachable API and matching CORS.
+
+The same Flutter app is also hosted by the production API at the Jarvis domain
+root. It shares the existing account and owner-scoped data. See
+[hosted web deployment](../operations/deployment-and-ci.md#hosted-web-client).
 
 ## Feature layout
 

@@ -1,4 +1,4 @@
-name: Deploy backend
+name: Deploy Jarvis backend and web
 
 on:
   push:
@@ -54,8 +54,71 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  web:
+    name: Build hosted web client
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.4'
+          channel: stable
+          cache: true
+
+      - name: Build web release
+        env:
+          JARVIS_WEB_API_URL: ${{ vars.JARVIS_WEB_API_URL }}
+          JARVIS_SENTRY_DSN: ${{ secrets.JARVIS_SENTRY_DSN }}
+          SENTRY_RELEASE: jarvis-web@${{ github.sha }}
+        run: bash scripts/ci/build-web.sh
+
+      - name: Detect Sentry credentials
+        id: sentry
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT_MOBILE }}
+        run: |
+          if [[ -n "${SENTRY_AUTH_TOKEN}" && -n "${SENTRY_ORG}" && -n "${SENTRY_PROJECT}" ]]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Upload private web source maps
+        if: steps.sentry.outputs.enabled == 'true'
+        uses: getsentry/action-release@v3
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT_MOBILE }}
+        with:
+          release: jarvis-web@${{ github.sha }}
+          sourcemaps: apps/mobile/build/web
+          url_prefix: '~/'
+          strip_common_prefix: true
+          set_commits: auto
+          ignore_missing: true
+          ignore_empty: true
+
+      - name: Stage public web files
+        run: bash scripts/ci/stage-web.sh
+
+      - name: Upload web distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-web-client
+          path: infra/web/dist/
+          if-no-files-found: error
+          retention-days: 1
+
   build:
-    needs: prepare
+    needs: [prepare, web]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
@@ -74,6 +137,13 @@ jobs:
       - name: Validate release tag uses SemVer
         if: github.ref_type == 'tag'
         run: python3 scripts/release/semver.py --parse-tag "${GITHUB_REF_NAME}"
+
+      - name: Download hosted web client
+        if: matrix.name == 'api'
+        uses: actions/download-artifact@v4
+        with:
+          name: jarvis-web-client
+          path: infra/web/dist
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -107,6 +177,7 @@ jobs:
             SENTRY_ORG=${{ secrets.SENTRY_ORG }}
             SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT_BACKEND }}
             SENTRY_RELEASE=${{ github.sha }}
+            REQUIRE_WEB_CLIENT=${{ matrix.name == 'api' }}
           secrets: |
             sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           tags: ${{ steps.docker-meta.outputs.tags }}
