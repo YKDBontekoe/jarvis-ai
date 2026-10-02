@@ -133,7 +133,7 @@ services:
     restart: unless-stopped
     environment:
       BRIDGE_TOKEN: ${WHATSAPP_BRIDGE_TOKEN:-}
-      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_DSN: ${SENTRY_DSN:-https://8404fd3049a3ad459533f7630bc7be42@o4512185266339840.ingest.de.sentry.io/4512185388302416}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
       SENTRY_RELEASE: ${SENTRY_RELEASE:-}
     volumes:
@@ -217,7 +217,7 @@ services:
       Push__FirebaseProjectId: ${FIREBASE_PROJECT_ID:-}
       Push__GoogleServiceAccountFile: /run/secrets/firebase-service-account.json
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
-      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_DSN: ${SENTRY_DSN:-https://8404fd3049a3ad459533f7630bc7be42@o4512185266339840.ingest.de.sentry.io/4512185388302416}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
       SENTRY_RELEASE: ${SENTRY_RELEASE:-}
       Sentry__TracesSampleRate: ${SENTRY_TRACES_SAMPLE_RATE:-0.2}
@@ -263,7 +263,7 @@ services:
       DOTNET_ENVIRONMENT: Production
       HOME: /tmp
       ConnectionStrings__jarvis: Host=postgres;Port=5432;Database=jarvis;Username=jarvis;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
-      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_DSN: ${SENTRY_DSN:-https://8404fd3049a3ad459533f7630bc7be42@o4512185266339840.ingest.de.sentry.io/4512185388302416}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
       SENTRY_RELEASE: ${SENTRY_RELEASE:-}
     tmpfs:
@@ -314,7 +314,7 @@ services:
       ObjectStorage__Bucket: jarvis-files
       ObjectStorage__Region: us-east-1
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
-      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_DSN: ${SENTRY_DSN:-https://8404fd3049a3ad459533f7630bc7be42@o4512185266339840.ingest.de.sentry.io/4512185388302416}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
       SENTRY_RELEASE: ${SENTRY_RELEASE:-}
       Sentry__TracesSampleRate: ${SENTRY_TRACES_SAMPLE_RATE:-0.2}

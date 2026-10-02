@@ -13,7 +13,15 @@ ErrorSink? errorSink;
 /// True after [SentryFlutter.init] so HTTP clients can attach trace headers.
 bool sentryTracingEnabled = false;
 
-const sentryDsn = String.fromEnvironment('JARVIS_SENTRY_DSN');
+const sentryDsn = String.fromEnvironment(
+  'JARVIS_SENTRY_DSN',
+  defaultValue:
+      'https://0b6943d19bd2891c9bc52565264bc631@o4512185266339840.ingest.de.sentry.io/4512185389482064',
+);
+
+/// Release builds report to Sentry. Debug and tests stay quiet unless
+/// `--dart-define=JARVIS_SENTRY_ENABLE=true` is set.
+const sentryEnabledOverride = bool.fromEnvironment('JARVIS_SENTRY_ENABLE');
 
 /// Logs an unexpected error without its message, which can carry request
 /// details, and hands it to [errorSink] when one is set.

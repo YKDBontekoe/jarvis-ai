@@ -82,11 +82,11 @@ about 14 ms per query and 8 ms per memory for the default model, in PyTorch; the
 
 `OTEL_EXPORTER_OTLP_ENDPOINT` — Aspire dashboard or collector.
 
-Sentry is off until `SENTRY_DSN` is set. The SDK also reads `SENTRY_ENVIRONMENT` and `SENTRY_RELEASE`. Compose maps the extra keys below.
+Development stays off. Production uses the backend project from `appsettings.Production.json` and the Compose default. The SDK also reads `SENTRY_ENVIRONMENT` and `SENTRY_RELEASE`.
 
 | Key / env var | Purpose |
 |---------------|---------|
-| `SENTRY_DSN` | Backend project DSN, shared by the API, worker, migration command, and WhatsApp bridge. Empty disables Sentry |
+| `SENTRY_DSN` | Backend project DSN, shared by the API, worker, migration command, and WhatsApp bridge. Set it to replace the production default |
 | `SENTRY_ENVIRONMENT` | Defaults to `production` in Compose |
 | `SENTRY_RELEASE` | Git SHA of the running image. The deploy workflow sets this to the same SHA whose symbols and source files were uploaded |
 | `Sentry__TracesSampleRate` (`SENTRY_TRACES_SAMPLE_RATE`) | Trace sample rate. Default `1` in Development and `0.2` otherwise |
@@ -95,7 +95,7 @@ Sentry is off until `SENTRY_DSN` is set. The SDK also reads `SENTRY_ENVIRONMENT`
 
 Issues are HTTP 5xx and unhandled exceptions. Warning and error logs are sent as Sentry logs. `/health` and `/alive` are not sampled. Authorization headers, cookies, and connection strings are removed before an event is sent.
 
-The mobile app reads `JARVIS_SENTRY_DSN` from `--dart-define`. Its release name is the SemVer version and build number.
+Release builds of the mobile app report to the mobile Sentry project. Override that DSN with `--dart-define=JARVIS_SENTRY_DSN=...`. Debug builds stay off unless `JARVIS_SENTRY_ENABLE=true` is also set. The release name is the SemVer version and build number.
 
 ## Data protection
 

@@ -11,7 +11,7 @@ import 'push/firebase_bootstrap.dart';
 import 'theme.dart';
 
 Future<void> main() async {
-  if (sentryDsn.isEmpty) {
+  if (sentryDsn.isEmpty || !(kReleaseMode || sentryEnabledOverride)) {
     await startJarvis();
     return;
   }
