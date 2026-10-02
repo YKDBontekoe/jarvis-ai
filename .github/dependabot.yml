@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly}
+    groups: {actions: {patterns: ['*']}}
+  - package-ecosystem: nuget
+    directory: /
+    schedule: {interval: weekly}
+    groups: {dotnet: {patterns: ['*']}}
+  - package-ecosystem: pub
+    directory: /apps/mobile
+    schedule: {interval: weekly}
+  - package-ecosystem: npm
+    directory: /workers/whatsapp-bridge
+    schedule: {interval: weekly}
+  - package-ecosystem: npm
+    directory: /tests/e2e
+    schedule: {interval: weekly}
+  - package-ecosystem: npm
+    directory: /scripts/ci/sentry
+    schedule: {interval: weekly}
+  - package-ecosystem: docker
+    directory: /infra/compose
+    schedule: {interval: weekly}
+  - package-ecosystem: docker
+    directory: /workers/whatsapp-bridge
+    schedule: {interval: weekly}

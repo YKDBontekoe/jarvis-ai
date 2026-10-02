@@ -1,4 +1,3 @@
-infra/compose/docker-compose.coding.yml
 services:
   jarvis-api:
     environment:

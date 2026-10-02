@@ -16,6 +16,7 @@ internal static class TemporalWorkerRegistration
     public static readonly IReadOnlyList<string> WorkflowTypeNames =
     [
         nameof(ReminderWorkflow),
+        nameof(DeploymentProbeWorkflow),
         nameof(FileProcessingWorkflow),
         nameof(JarvisTaskWorkflow),
         nameof(ConditionWatchWorkflow),
@@ -76,6 +77,7 @@ internal static class TemporalWorkerRegistration
 
         return new TemporalWorker(client, new TemporalWorkerOptions(TemporalReminderScheduler.TaskQueue)
             .AddWorkflow<ReminderWorkflow>()
+            .AddWorkflow<DeploymentProbeWorkflow>()
             .AddWorkflow<FileProcessingWorkflow>()
             .AddWorkflow<JarvisTaskWorkflow>()
             .AddWorkflow<ConditionWatchWorkflow>()

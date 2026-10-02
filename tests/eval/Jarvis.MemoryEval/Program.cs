@@ -200,7 +200,34 @@ var summary = new
     p50Ms = Percentile(0.50),
     p95Ms = Percentile(0.95)
 };
-Console.WriteLine(JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true }));
+var summaryJson = JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true });
+Console.WriteLine(summaryJson);
+var reportIndex = Array.IndexOf(args, "--report");
+if (reportIndex >= 0)
+{
+    var report = Path.GetFullPath(args[reportIndex + 1]);
+    Directory.CreateDirectory(Path.GetDirectoryName(report)!);
+    await File.WriteAllTextAsync(report, summaryJson + "\n");
+}
+// Isolation is an invariant, even when no quality baseline was requested.
+if (summary.expiredLeaks != 0 || summary.otherOwnerLeaks != 0) Environment.ExitCode = 1;
+var thresholdsIndex = Array.IndexOf(args, "--thresholds");
+if (thresholdsIndex >= 0)
+{
+    using var thresholds = JsonDocument.Parse(await File.ReadAllTextAsync(args[thresholdsIndex + 1]));
+    using var metrics = JsonDocument.Parse(summaryJson);
+    foreach (var threshold in thresholds.RootElement.EnumerateObject())
+    {
+        var value = metrics.RootElement.GetProperty(threshold.Name).GetDouble();
+        if (!double.IsFinite(value) ||
+            (threshold.Value.TryGetProperty("minimum", out var minimum) && value < minimum.GetDouble()) ||
+            (threshold.Value.TryGetProperty("maximum", out var maximum) && value > maximum.GetDouble()))
+        {
+            Console.Error.WriteLine($"Memory evaluation failed threshold: {threshold.Name}.");
+            Environment.ExitCode = 1;
+        }
+    }
+}
 foreach (var result in results)
     Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
         $"{result.RecallAt8:0.00} {result.Mrr:0.00} {result.MedianMs,6:0.0}ms [{string.Join(", ", result.TopKeys)}]  {result.Query}"));

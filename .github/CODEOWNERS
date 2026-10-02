@@ -1,0 +1,6 @@
+# Pipeline and compatibility changes require the repository owner's review when branch protection enforces CODEOWNERS.
+/.github/ @YKDBontekoe
+/scripts/ci/ @YKDBontekoe
+/scripts/deploy/ @YKDBontekoe
+/tests/contracts/ @YKDBontekoe
+/tests/integration/Jarvis.IntegrationTests/Histories/ @YKDBontekoe

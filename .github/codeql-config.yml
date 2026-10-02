@@ -1,0 +1,6 @@
+name: Jarvis security analysis
+queries:
+  - uses: security-extended
+paths-ignore:
+  - tests
+  - scripts/ci/sentry/node_modules

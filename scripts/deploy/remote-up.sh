@@ -30,15 +30,32 @@ fi
 required_images=(
   "${JARVIS_API_IMAGE:?Set JARVIS_API_IMAGE to the GHCR api image}"
   "${JARVIS_WORKER_IMAGE:?Set JARVIS_WORKER_IMAGE to the GHCR worker image}"
+  "${JARVIS_WHATSAPP_BRIDGE_IMAGE:?Set JARVIS_WHATSAPP_BRIDGE_IMAGE to the GHCR bridge image}"
 )
+
+# All production images must be the exact artifacts verified by CI.
+for image in "${required_images[@]}"; do
+  if [[ ! "$image" =~ @sha256:[a-f0-9]{64}$ ]]; then
+    echo "Deployment requires immutable image digests." >&2
+    exit 1
+  fi
+done
+state_directory="${DEPLOY_STATE_DIRECTORY:-.jarvis/deploy}"
+mkdir -p "$state_directory"
+chmod 0700 "$state_directory"
+if [[ -f "$state_directory/current-compose.private.yml" ]]; then
+  cp "$state_directory/current-compose.private.yml" "$state_directory/previous-compose.private.yml"
+fi
+cp "$ENV_FILE" "$state_directory/previous-env.private"
+chmod 0600 "$state_directory/previous-env.private"
 
 # Tag the currently deployed image IDs before pulling. This preserves the complete
 # previous release for rollback even when the deployment tag is reused (for example,
 # "latest"). The prior rollback tags are removed after the next healthy deployment.
-image_prefix="${required_images[0]%/api:*}"
+image_prefix="${required_images[0]%/api*}"
 previous_images=()
-services=(jarvis-api jarvis-worker)
-service_images=(api worker)
+services=(jarvis-api jarvis-worker whatsapp-bridge)
+service_images=(api worker whatsapp-bridge)
 for index in "${!services[@]}"; do
   service="${services[$index]}"
   image_name="${service_images[$index]}"
@@ -58,16 +75,32 @@ for index in "${!services[@]}"; do
   echo "Preserving ${service}'s previous image as ${rollback_image}."
 done
 
+# Bootstrap a recovery configuration for deployments made before release state was recorded.
+if [[ ! -f "$state_directory/previous-compose.private.yml" && ${#previous_images[@]} -eq 3 ]]; then
+  JARVIS_API_IMAGE="${previous_images[0]}" JARVIS_WORKER_IMAGE="${previous_images[1]}" \
+    JARVIS_WHATSAPP_BRIDGE_IMAGE="${previous_images[2]}" \
+    docker compose --env-file "$ENV_FILE" "${compose_files[@]}" config > "$state_directory/previous-compose.private.yml"
+  chmod 0600 "$state_directory/previous-compose.private.yml"
+fi
+# Preserve a database snapshot before any schema changes; never upload this private artifact.
+backup_directory="${DEPLOY_BACKUP_DIRECTORY:-.jarvis/backups}"
+mkdir -p "$backup_directory"
+chmod 0700 "$backup_directory"
+if [[ -n $(docker compose --env-file "$ENV_FILE" "${compose_files[@]}" ps -q postgres) ]]; then
+  backup="$backup_directory/$(date -u +%Y%m%dT%H%M%SZ).dump"
+  docker compose --env-file "$ENV_FILE" "${compose_files[@]}" exec -T postgres pg_dump -U jarvis -d jarvis -Fc > "$backup"
+  chmod 0600 "$backup"
+  test -s "$backup"
+fi
+if [[ -n "${GIT_SHA:-}" ]]; then
+  python3 scripts/deploy/sentry_release_env.py --env-file "$ENV_FILE" --release "$GIT_SHA"
+fi
+
 echo "Pulling Jarvis images:"
 printf '  %s\n' "${required_images[@]}"
 
 docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" pull \
-  jarvis-api jarvis-worker garage embeddings
-
-# The WhatsApp bridge is built from the checked-out deployment bundle rather
-# than published to GHCR. Build it explicitly before the later --no-build up.
-docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" build \
-  whatsapp-bridge
+  jarvis-api jarvis-worker whatsapp-bridge garage embeddings
 
 # Start only migration prerequisites, then migrate with the new API image. A
 # failure exits here, before Compose is allowed to replace healthy app containers.
@@ -83,7 +116,7 @@ docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" up \
 # worker is running. A failed deployment leaves the previous images available.
 api_container=""
 api_healthy=false
-for attempt in $(seq 1 48); do
+for _ in $(seq 1 48); do
   api_container="$(docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" ps -q jarvis-api | head -n1)"
   if [[ -n "${api_container}" ]]; then
     api_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${api_container}" 2>/dev/null || true)"
@@ -106,7 +139,7 @@ if [[ "${api_healthy}" != true ]]; then
   exit 1
 fi
 
-for service in jarvis-worker; do
+for service in "${services[@]:1}"; do
   container_id="$(docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" ps -q "${service}" | head -n1)"
   state=""
   if [[ -n "${container_id}" ]]; then
@@ -118,12 +151,18 @@ for service in jarvis-worker; do
   fi
 done
 
+# A running process is insufficient: require dependency readiness and actual workflow completion.
+docker compose --env-file "$ENV_FILE" "${compose_files[@]}" exec -T jarvis-api dotnet Jarvis.Api.dll deployment-probe
+docker compose --env-file "$ENV_FILE" "${compose_files[@]}" config > "$state_directory/current-compose.private.yml"
+chmod 0600 "$state_directory/current-compose.private.yml"
+if [[ -n "${RELEASE_MANIFEST:-}" ]]; then cp "$RELEASE_MANIFEST" "$state_directory/current-release.json"; fi
+
 keep_images=("${required_images[@]}" "${previous_images[@]}")
 mapfile -t jarvis_image_tags < <(docker image ls --format '{{.Repository}}:{{.Tag}}' | sort -u)
 for image in "${jarvis_image_tags[@]}"; do
   repository="${image%:*}"
   case "${repository}" in
-    "${image_prefix}/api"|"${image_prefix}/worker"|"${image_prefix}/voice-worker") ;;
+    "${image_prefix}/api"|"${image_prefix}/worker"|"${image_prefix}/whatsapp-bridge"|"${image_prefix}/voice-worker") ;;
     *) continue ;;
   esac
 

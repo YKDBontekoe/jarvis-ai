@@ -1,0 +1,5 @@
+{
+  "JoinConversation": ["System.Guid"],
+  "RegisterDevice": ["System.String", "System.Collections.Generic.IReadOnlyList<System.String>"],
+  "CompleteDeviceInvoke": ["System.Guid", "System.String", "System.String"]
+}

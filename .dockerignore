@@ -14,3 +14,11 @@
 infra/compose/.env
 artifacts
 **/node_modules
+**/.env
+**/.env.production
+**/auth.json
+**/*service-account*.json
+
+.jarvis/
+
+.venv-ci/

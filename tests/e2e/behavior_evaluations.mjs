@@ -10,8 +10,7 @@ const token = process.env.JARVIS_E2E_ACCESS_TOKEN;
 const runId = randomUUID().slice(0, 8);
 const cases = readFileSync('evals/jarvis-core-v1.jsonl', 'utf8').trim().split('\n').map(JSON.parse);
 const reportPath = 'artifacts/verification/behavior-evaluations.json';
-const checks = process.env.JARVIS_EVAL_CASES
-  ? JSON.parse(readFileSync(reportPath, 'utf8')).checks : [];
+const checks = [];
 mkdirSync('artifacts/verification', { recursive: true });
 async function request(method, path, data, statuses = [200]) {
   const response = await fetch(base + '/api/v1' + path, {
@@ -39,13 +38,10 @@ function save() {
   }, null, 2) + '\n');
 }
 function calls() {
-  try {
-    return execFileSync('docker', ['compose', '-p', 'jarvis-verification', '--profile', 'development',
-      '--env-file', 'artifacts/verification/deployment.env', '-f', 'infra/compose/docker-compose.yml',
-      '-f', 'tests/e2e/docker-compose.verification.yml', 'exec', '-T', 'jarvis-api',
-      'node', '-e', "try{process.stdout.write(require('fs').readFileSync('/tmp/jarvis-verification-mcp-calls.jsonl','utf8'))}catch{}"],
-      { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map(JSON.parse);
-  } catch { return []; }
+  const container = process.env.JARVIS_E2E_CONTAINER ?? 'jarvis-ci-jarvis-api-1';
+  return execFileSync('docker', ['exec', container, 'node', '-e',
+    "try{process.stdout.write(require('fs').readFileSync('/tmp/jarvis-verification-mcp-calls.jsonl','utf8'))}catch{}"],
+    {encoding: 'utf8'}).trim().split('\n').filter(Boolean).map(JSON.parse);
 }
 async function wait(path, predicate, seconds = 180) {
   let last;

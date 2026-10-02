@@ -206,8 +206,9 @@ docker compose --env-file infra/compose/.env.production \
 `--build` compiles the API and Temporal worker on the host. After the GitHub Actions deploy pipeline is configured, prefer pulling the prebuilt GHCR images instead:
 
 ```sh
-export JARVIS_API_IMAGE=ghcr.io/<owner>/jarvis-ai/api:<sha>
-export JARVIS_WORKER_IMAGE=ghcr.io/<owner>/jarvis-ai/worker:<sha>
+export JARVIS_API_IMAGE=ghcr.io/<owner>/jarvis-ai/api@sha256:<verified-digest>
+export JARVIS_WORKER_IMAGE=ghcr.io/<owner>/jarvis-ai/worker@sha256:<verified-digest>
+export JARVIS_WHATSAPP_BRIDGE_IMAGE=ghcr.io/<owner>/jarvis-ai/whatsapp-bridge@sha256:<verified-digest>
 scripts/deploy/remote-up.sh
 ```
 
@@ -219,7 +220,9 @@ Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit med
 
 ## GitHub Actions pipelines
 
-Releases use [Semantic Versioning 2.0.0](https://semver.org/): git tags are `vMAJOR.MINOR.PATCH` (for example `v1.2.0`). When a pull request merges to `main`, [`.github/workflows/create-release-tag.yml`](.github/workflows/create-release-tag.yml) reads the **SemVer bump** checkboxes in [`.github/pull_request_template.md`](.github/pull_request_template.md), creates the next `v*` tag on the merge commit, and pushes it. That tag triggers the iOS IPA and backend deploy workflows. You can still run either release workflow manually from **Actions** with `workflow_dispatch`, or push a `v*` tag yourself in an emergency.
+See [the verification and recovery guide](docs/operations/deployment-and-ci.md) for required checks, nightly fault/restore/model evaluations, repository rulesets and rollback.
+
+Releases use [Semantic Versioning 2.0.0](https://semver.org/): git tags are `vMAJOR.MINOR.PATCH` (for example `v1.2.0`). After successful CI for the current `main` merge commit, [`.github/workflows/create-release-tag.yml`](.github/workflows/create-release-tag.yml) reads the **SemVer bump** checkboxes in [`.github/pull_request_template.md`](.github/pull_request_template.md), creates the next `v*` tag on the merge commit, and pushes it. It explicitly dispatches the iOS IPA and backend deploy workflows, which each require the full verification gate. You can still run either release workflow manually from **Actions** with `workflow_dispatch`, or push a `v*` tag yourself in an emergency.
 
 | Change | SemVer bump | Example tag |
 |--------|-------------|---------------|
@@ -231,7 +234,7 @@ Before tagging, align `apps/mobile/pubspec.yaml` with the marketing version (`ve
 
 ### iOS IPA (unsigned, LiveContainer)
 
-[`.github/workflows/release-ios.yml`](.github/workflows/release-ios.yml) builds an **unsigned** release IPA on `macos-latest` and attaches `Jarvis.ipa` to the GitHub Release for the SemVer tag. No Apple signing certificates or provisioning profiles are required.
+[`.github/workflows/release-ios.yml`](.github/workflows/release-ios.yml) builds an **unsigned** release IPA on `macos-15` and attaches `Jarvis.ipa` to the GitHub Release for the SemVer tag. No Apple signing certificates or provisioning profiles are required.
 
 1. Add production Flutter `--dart-define` repository secrets when you need a non-local API at build time: `JARVIS_API_URL` and optional Firebase iOS keys (`JARVIS_FIREBASE_*`).
 2. Tag `vX.Y.Z` or run the workflow manually. Download `Jarvis.ipa` from the release.
@@ -247,19 +250,19 @@ The self-hosted runner serves `/home/ykdbonte/.jarvis/altstore` through the host
 
 ### Backend GHCR images and deployment
 
-[`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) builds `api` and `worker`, pushes them to `ghcr.io/<owner>/jarvis-ai/<name>:<git-sha>` (plus the version tag and `latest` on `v*` tags), then deploys through a self-hosted runner on your server. Garage uses its pinned upstream image. The workflow runs when a `v*` release tag is created (automatically after merge to `main`, or manually), not on every commit to `main`.
+[`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) promotes the tested `api`, `worker` and `whatsapp-bridge` OCI archives to `ghcr.io/<owner>/jarvis-ai/<name>:<git-sha>` (plus the version tag on `v*` tags), then deploys through a self-hosted runner on your server. Garage uses its pinned upstream image. The workflow runs when a `v*` release tag is created (automatically after merge to `main`, or manually), not on every commit to `main`.
 
 Server bootstrap:
 
 1. Clone this repository to a persistent path such as `/opt/jarvis`.
-2. Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, mode `0600`, and fill in real secrets. Set `GARAGE_CONFIG_FILE` to the private Garage config file path. The deploy job supplies the API and worker image names and commit tag.
+2. Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, mode `0600`, and fill in real secrets. Set `GARAGE_CONFIG_FILE` to the private Garage config file path. The deploy job supplies all three application image digests from the verified release manifest.
 3. Install Docker with the Compose plugin. The deploy workflow transfers the checked-out source to the self-hosted runner as a short-lived Git bundle, so the server does not need GitHub repository access. GHCR pulls use the workflow's short-lived `GITHUB_TOKEN`.
 4. Add repository secret `DEPLOY_PATH` for the production checkout path on the server.
 5. Register a persistent Linux x64 self-hosted runner on the production server with the `jarvis-deploy` label. Run it as the account that owns the checkout and production env file, with Docker and Compose access. The build jobs stay on GitHub-hosted runners; only the deploy job runs on the server.
 6. Set repository variable `DEPLOY_COMPOSE_FILES` to `infra/compose/docker-compose.production.tunnel.yml` when using a host-level reverse proxy or Cloudflare Tunnel instead of the bundled public Caddy edge. Optional overlays can be space-separated after it, for example `infra/compose/docker-compose.github.yml infra/compose/docker-compose.home-assistant.yml`.
-7. In GitHub → Packages, link the two application container packages to this repository so `GITHUB_TOKEN` can push and the deploy job can pull. Keep packages private if the repo is private; the runner logs into GHCR with a short-lived token. For later manual pulls, `docker login ghcr.io` on the host with a PAT that has `read:packages`.
+7. In GitHub → Packages, link all three application container packages to this repository so `GITHUB_TOKEN` can push and the deploy job can pull. Keep packages private if the repo is private; the runner logs into GHCR with a short-lived token. For later manual pulls, `docker login ghcr.io` on the host with a PAT that has `read:packages`.
 
-`workflow_dispatch` accepts `skip_deploy` to build/push images without deploying, and an optional extra `image_tag`. Production secrets stay in `.env.production` on the server and are never passed through GitHub Actions. `python3 -m unittest tests/unit/compose/test_production_images.py` checks that Compose interpolates the GHCR image variables.
+`workflow_dispatch` accepts `skip_deploy` to verify/publish images without deploying, and an optional extra `image_tag`. Production secrets stay in `.env.production` on the server and are never passed through GitHub Actions. `python3 -m unittest tests/unit/compose/test_production_images.py` checks that Compose interpolates the GHCR image variables.
 
 Production deployment runs `dotnet Jarvis.Api.dll migrate` as a one-shot task before
 replacing the API or worker containers. The task logs the target EF migration, uses a

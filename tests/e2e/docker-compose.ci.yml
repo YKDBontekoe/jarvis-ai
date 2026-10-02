@@ -1,0 +1,94 @@
+name: jarvis-ci
+services:
+  postgres:
+    image: pgvector/pgvector:pg18@sha256:2358fcba361ed2233a5ed81b5fe4ca779ccb304120ce531a3bf51c0ed7e2bc11
+    environment: {POSTGRES_DB: jarvis, POSTGRES_USER: jarvis, POSTGRES_PASSWORD: jarvis-ci-fixture}
+    volumes: ["../../infra/postgres/init:/docker-entrypoint-initdb.d:ro"]
+    ports: ["127.0.0.1:55432:5432"]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U jarvis -d jarvis"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+  temporal:
+    image: temporalio/temporal:latest@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e
+    command: [server, start-dev, --ip, 0.0.0.0]
+    healthcheck:
+      test: [CMD, temporal, operator, cluster, health]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+  storage:
+    image: chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+    command: [server, -s3, -ip=storage, -dir=/data, -s3.config=/etc/s3.json]
+    volumes: ["./s3.json:/etc/s3.json:ro"]
+  fake-channels:
+    image: node:22-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
+    command: [node, /fixtures/fake_channels.mjs]
+    volumes: [".:/fixtures:ro"]
+    ports: ["127.0.0.1:5198:5198"]
+  clamav:
+    profiles: [full]
+    image: clamav/clamav:stable@sha256:ebec5bc138401b36ae987caa1a3fa3c3b2a21ed3d51f0bfa5852825e663e67b0
+    platform: linux/amd64
+    healthcheck:
+      test: [CMD-SHELL, "clamdscan --ping=3 >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 5m
+  jarvis-api:
+    image: ${CI_API_IMAGE:-jarvis-ci-api:test}
+    environment: &application
+      ASPNETCORE_ENVIRONMENT: ${CI_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://+:5082
+      Database__ApplyMigrationsAtStartup: "false"
+      ConnectionStrings__jarvis: Host=postgres;Database=jarvis;Username=jarvis;Password=jarvis-ci-fixture
+      Temporal__Address: temporal:7233
+      ObjectStorage__ServiceUrl: http://storage:8333
+      ObjectStorage__AccessKey: jarvis-ci-key
+      ObjectStorage__SecretKey: jarvis-ci-secret
+      ObjectStorage__Bucket: jarvis-files
+      DataProtection__KeysDirectory: /keys
+      Codex__ExecutablePath: /fixtures/fake_codex_app_server.mjs
+      Codex__EnableWebSearch: "false"
+      Embeddings__BaseUrl: ""
+      Channels__WhatsApp__GraphBaseUrl: http://fake-channels:5198/v21.0
+      Channels__Signal__BaseUrl: http://fake-channels:5198
+      LiveKit__ApiKey: fixture-key
+      LiveKit__ApiSecret: jarvis-ci-livekit-fixture-secret
+      LiveKit__InternalUrl: http://unavailable-livekit:7880
+      LiveKit__PublicUrl: ws://localhost:7880
+      Voice__WorkerSecret: jarvis-ci-voice-fixture-secret
+      Antivirus__Host: clamav
+      Authentication__Issuer: https://jarvis.local
+      Authentication__Audience: jarvis-api
+      Authentication__SigningKey: verification-signing-key-at-least-32b
+      Authentication__AllowRegistration: "true"
+      Logging__LogLevel__Default: Warning
+    ports: ["127.0.0.1:${CI_API_PORT:-5082}:5082"]
+    volumes: [".:/fixtures:ro", "keys:/keys"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      temporal: {condition: service_healthy}
+      storage: {condition: service_started}
+      fake-channels: {condition: service_started}
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:5082/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 12s
+      retries: 30
+      start_period: 15s
+  jarvis-worker:
+    image: ${CI_WORKER_IMAGE:-jarvis-ci-worker:test}
+    command: [Jarvis.Worker.dll]
+    environment:
+      <<: *application
+      DOTNET_ENVIRONMENT: Development
+    volumes: [".:/fixtures:ro", "keys:/keys"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      temporal: {condition: service_healthy}
+      storage: {condition: service_started}
+volumes:
+  keys:

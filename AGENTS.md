@@ -65,7 +65,9 @@ Do not run Aspire and development Compose on the same ports at once.
 
 ## Cursor Cloud environment
 
-- Install: `.cursor/install.sh` (pinned .NET SDK, Docker, `dotnet build`).
+- Install: `.cursor/install.sh` (pinned .NET SDK, Docker, isolated `.venv-ci` Python tooling, `dotnet build`).
+- Pipeline policy and Python tests: `scripts/ci/run-python-unit-tests.sh` (uses `.venv-ci` when present); see `scripts/ci/requirements.txt`.
+- CI fixture stack: `scripts/ci/run-e2e.sh`; requires built `jarvis-ci-api:test` and `jarvis-ci-worker:test` images. Use `CI_API_PORT` when port 5082 is occupied; never stop another stack to free its ports.
 - Optional terminal: `dockerd` via `.cursor/dockerd.sh` per `.cursor/environment.json`.
 
 When adding cloud-specific setup steps that agents should always follow, extend this section or `.cursor/environment.json` in the same PR as the code that depends on them.

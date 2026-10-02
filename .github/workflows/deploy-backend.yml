@@ -1,129 +1,86 @@
 name: Deploy backend
-
 on:
   push:
-    tags:
-      - "v*"
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       image_tag:
-        description: Optional extra image tag in addition to the git SHA.
+        description: Optional extra tag for the verified images.
         required: false
         type: string
       skip_deploy:
-        description: Build and push images without SSHing to the server.
+        description: Publish verified images without deploying.
         required: false
         type: boolean
         default: false
-
 permissions:
   contents: read
-  packages: write
-  actions: write
-
 concurrency:
   group: deploy-backend
   cancel-in-progress: false
-
 jobs:
-  prepare:
-    runs-on: ubuntu-latest
-    outputs:
-      prefix: ${{ steps.meta.outputs.prefix }}
-    steps:
-      - name: Image prefix
-        id: meta
-        run: echo "prefix=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "${GITHUB_OUTPUT}"
-
+  verify:
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/ci.yml
   source:
+    needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {fetch-depth: 0}
+      - run: git bundle create "$RUNNER_TEMP/jarvis-source.bundle" HEAD
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: {name: jarvis-deployment-source, path: '${{ runner.temp }}/jarvis-source.bundle', if-no-files-found: error, retention-days: 7}
+  publish:
+    name: Promote tested image artifacts
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Validate release identity
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            python3 scripts/release/semver.py --parse-tag "$GITHUB_REF_NAME"
+          elif [[ "$GITHUB_REF" != refs/heads/main ]]; then
+            echo 'Manual releases must use main or a SemVer release tag.' >&2
+            exit 1
+          fi
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {pattern: verified-image-*, path: artifacts/images, merge-multiple: true}
+      - run: sudo apt-get update && sudo apt-get install --yes skopeo
+      - name: Authenticate registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: printf '%s' "$GHCR_TOKEN" | skopeo login ghcr.io --username "$GHCR_USER" --password-stdin
+      - name: Publish by immutable digest
+        env:
+          EXTRA_IMAGE_TAG: ${{ inputs.image_tag }}
+        run: python3 scripts/ci/publish-images.py artifacts/images
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          fetch-depth: 0
-
-      - name: Create deployment source bundle
-        run: git bundle create "${RUNNER_TEMP}/jarvis-source.bundle" HEAD
-
-      - name: Upload deployment source bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: jarvis-deployment-source
-          path: ${{ runner.temp }}/jarvis-source.bundle
+          name: jarvis-release-manifest
+          path: artifacts/images/release-manifest.json
+          retention-days: 90
           if-no-files-found: error
-          retention-days: 1
-
-  build:
-    needs: prepare
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - name: api
-            dockerfile: infra/compose/Dockerfile
-            build-args: PROJECT_PATH=src/Jarvis.Api/Jarvis.Api.csproj
-          - name: worker
-            dockerfile: infra/compose/Dockerfile
-            build-args: PROJECT_PATH=workers/Jarvis.Worker/Jarvis.Worker.csproj
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Validate release tag uses SemVer
-        if: github.ref_type == 'tag'
-        run: python3 scripts/release/semver.py --parse-tag "${GITHUB_REF_NAME}"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Docker metadata
-        id: docker-meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ needs.prepare.outputs.prefix }}/${{ matrix.name }}
-          tags: |
-            type=raw,value=${{ github.sha }}
-            type=raw,value=${{ inputs.image_tag }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.image_tag != '' }}
-            type=ref,event=tag
-            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          push: true
-          build-args: |
-            ${{ matrix.build-args }}
-            SENTRY_ORG=${{ secrets.SENTRY_ORG }}
-            SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT_BACKEND }}
-            SENTRY_RELEASE=${{ github.sha }}
-          secrets: |
-            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
-          tags: ${{ steps.docker-meta.outputs.tags }}
-          labels: ${{ steps.docker-meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
-
   sentry-release:
     name: Associate Sentry release
-    needs: build
+    needs: publish
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {fetch-depth: 0}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {pattern: verified-image-*, path: artifacts/images, merge-multiple: true}
+      - run: sudo apt-get update && sudo apt-get install --yes skopeo
       - name: Detect Sentry credentials
         id: sentry
         env:
@@ -131,16 +88,21 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT_BACKEND }}
         run: |
-          if [[ -n "${SENTRY_AUTH_TOKEN}" && -n "${SENTRY_ORG}" && -n "${SENTRY_PROJECT}" ]]; then
-            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          if [[ -n "$SENTRY_AUTH_TOKEN" && -n "$SENTRY_ORG" && -n "$SENTRY_PROJECT" ]]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
           else
-            echo "enabled=false" >> "${GITHUB_OUTPUT}"
-            echo "Sentry release was not associated; SENTRY_AUTH_TOKEN, SENTRY_ORG, or SENTRY_PROJECT_BACKEND is unset."
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Create release and upload commit mapping
+      - name: Upload symbols from verified image artifacts
         if: steps.sentry.outputs.enabled == 'true'
-        uses: getsentry/action-release@v3
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT_BACKEND }}
+          SENTRY_RELEASE: ${{ github.sha }}
+        run: scripts/ci/upload-sentry-symbols.sh
+      - uses: getsentry/action-release@ff07929a6537bac57790c3451cf4d364aca38528 # v3
+        if: steps.sentry.outputs.enabled == 'true'
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
@@ -151,47 +113,37 @@ jobs:
           set_commits: auto
           ignore_missing: true
           ignore_empty: true
-
   deploy:
-    needs: [prepare, build, source, sentry-release]
+    needs: [verify, publish, source, sentry-release]
     if: >-
       (github.event_name != 'workflow_dispatch' || inputs.skip_deploy != true) &&
-      (
-        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-        (github.event_name == 'workflow_dispatch' &&
-          (github.ref == 'refs/heads/main' ||
-            (github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v'))))
-      )
+      (github.ref == 'refs/heads/main' || (github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v')))
     runs-on: [self-hosted, linux, x64, jarvis-deploy]
+    timeout-minutes: 20
     environment: production
     steps:
-      - name: Download deployment source bundle
-        uses: actions/download-artifact@v4
-        with:
-          name: jarvis-deployment-source
-          path: ${{ runner.temp }}
-
-      - name: Deploy on the server runner
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {name: jarvis-deployment-source, path: '${{ runner.temp }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {name: jarvis-release-manifest, path: '${{ runner.temp }}'}
+      - name: Deploy verified release
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
           GIT_SHA: ${{ github.sha }}
           SOURCE_BUNDLE: ${{ runner.temp }}/jarvis-source.bundle
-          JARVIS_API_IMAGE: ${{ needs.prepare.outputs.prefix }}/api:${{ github.sha }}
-          JARVIS_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/worker:${{ github.sha }}
+          RELEASE_MANIFEST: ${{ runner.temp }}/release-manifest.json
           DEPLOY_COMPOSE_FILES: ${{ vars.DEPLOY_COMPOSE_FILES }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           set -euo pipefail
-          cd "${DEPLOY_PATH}"
-          if [[ ! -d .git ]]; then
-            git init
-          fi
-          git fetch --force "${SOURCE_BUNDLE}" HEAD
-          git checkout --detach --force "${GIT_SHA}"
-          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
-          python3 scripts/deploy/sentry_release_env.py \
-            --env-file "${ENV_FILE:-infra/compose/.env.production}" \
-            --release "${GIT_SHA}"
-          chmod +x scripts/deploy/remote-up.sh
+          cd "$DEPLOY_PATH"
+          if [[ ! -d .git ]]; then git init; fi
+          git fetch --force "$SOURCE_BUNDLE" HEAD
+          git checkout --detach --force "$GIT_SHA"
+          python3 scripts/deploy/manifest-env.py "$RELEASE_MANIFEST" > "$RUNNER_TEMP/jarvis-images.env"
+          set -a
+          source "$RUNNER_TEMP/jarvis-images.env"
+          set +a
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
           scripts/deploy/remote-up.sh

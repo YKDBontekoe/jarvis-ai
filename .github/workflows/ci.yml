@@ -2,191 +2,341 @@ name: CI
 
 on:
   pull_request:
-    branches:
-      - main
+    branches: [main]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
   push:
-    branches:
-      - main
+    branches: [main]
+  merge_group:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  backend:
-    name: Backend build and unit tests
+  policy:
+    name: Pipeline and architecture policy
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: {python-version: '3.12'}
+      - run: pip install -r scripts/ci/requirements.txt
+      - run: python3 scripts/ci/check-policy.py
+      - name: Lint workflows, shell, Dockerfiles and Compose
+        run: scripts/ci/lint.sh
+      - name: Validate PR release selection
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          git tag -l 'v*' > "$RUNNER_TEMP/tags.txt"
+          python3 scripts/release/semver.py --check-pr-release --pr-body-file "$RUNNER_TEMP/pr-body.md" --tag-names-file "$RUNNER_TEMP/tags.txt"
 
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-
-      - name: Restore .NET tools
-        run: dotnet tool restore
-
-      - name: Restore
-        run: dotnet restore Jarvis.sln
-
-      - name: Build
-        run: dotnet build Jarvis.sln --configuration Release --no-restore
-
-      - name: Verify EF migrations match the model
-        run: >-
-          dotnet ef migrations has-pending-model-changes
-          --project src/Jarvis.Infrastructure/Jarvis.Infrastructure.csproj
-          --startup-project src/Jarvis.Api/Jarvis.Api.csproj
-
+  backend:
+    name: Backend build and unit tests (${{ matrix.timezone }})
+    strategy:
+      fail-fast: false
+      matrix:
+        timezone: [UTC, Europe/Amsterdam]
+    env:
+      TZ: ${{ matrix.timezone }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with: {global-json-file: global.json}
+      - run: dotnet tool restore
+      - run: dotnet restore Jarvis.sln
+      - run: dotnet build Jarvis.sln --configuration Release --no-restore
+      - name: Verify migration model
+        run: dotnet ef migrations has-pending-model-changes --project src/Jarvis.Infrastructure --startup-project src/Jarvis.Api --configuration Release --no-build
       - name: Unit tests
-        run: >-
-          dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
-          --configuration Release
-          --no-build
-          --verbosity normal
+        run: dotnet test tests/unit/Jarvis.UnitTests --configuration Release --no-build --collect:"XPlat Code Coverage" --logger trx --results-directory artifacts/unit
+      - run: python3 scripts/ci/check-test-results.py artifacts/unit
+      - name: Check coverage of changed core logic
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: python3 scripts/ci/check-coverage.py artifacts/unit
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: backend-test-results-${{ strategy.job-index }}
+          path: artifacts/unit/
+          retention-days: 14
 
   integration:
-    name: Integration tests
+    name: Database integration and upgrade
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with: {global-json-file: global.json}
+      - name: Identify previous release schema
+        run: python3 scripts/ci/previous-release.py >> "$GITHUB_ENV"
+      - name: Database tests
+        run: dotnet test tests/integration/Jarvis.IntegrationTests --configuration Release --filter 'FullyQualifiedName!~WorkflowReplayTests' --logger trx --results-directory artifacts/integration
+      - run: python3 scripts/ci/check-test-results.py artifacts/integration
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
         with:
-          global-json-file: global.json
-
-      - name: Restore
-        run: dotnet restore Jarvis.sln
-
-      - name: Build
-        run: dotnet build Jarvis.sln --configuration Release --no-restore
-
-      - name: Integration tests
-        run: >-
-          dotnet test tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj
-          --configuration Release
-          --verbosity normal
+          name: integration-test-results
+          path: artifacts/integration/
+          retention-days: 14
 
   python:
     name: Python unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Python unit tests
-        run: scripts/ci/run-python-unit-tests.sh
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: {python-version: '3.12'}
+      - run: pip install -r scripts/ci/requirements.txt
+      - run: scripts/ci/run-python-unit-tests.sh
 
   whatsapp-bridge:
-    name: WhatsApp bridge tests
+    name: WhatsApp bridge tests and dependencies
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
-      run:
-        working-directory: workers/whatsapp-bridge
+      run: {working-directory: workers/whatsapp-bridge}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install
-        run: npm ci
-
-      - name: Test
-        run: npm test
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: {node-version: '22.22.0'}
+      - run: npm ci
+      - run: npm test | tee bridge-tests.tap
+      - run: python3 ../../scripts/ci/check-node-tests.py bridge-tests.tap
+      - run: npm audit --audit-level=high
 
   mobile:
     name: Mobile analyze and tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
-      run:
-        working-directory: apps/mobile
+      run: {working-directory: apps/mobile}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with: {flutter-version: 3.44.4, channel: stable, cache: true}
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter analyze
+      - run: flutter test --coverage --reporter expanded
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
         with:
-          channel: stable
-          cache: true
+          name: mobile-coverage
+          path: apps/mobile/coverage/lcov.info
+          retention-days: 14
 
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Analyze
-        run: flutter analyze
-
-      - name: Test
-        run: flutter test
+  ios:
+    name: Native iOS build and IPA validation
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with: {flutter-version: 3.44.4, channel: stable, cache: true}
+      - run: flutter pub get --enforce-lockfile
+        working-directory: apps/mobile
+      - name: Verify Apple toolchain
+        run: xcodebuild -version && xcrun --sdk iphoneos --show-sdk-version
+      - run: flutter build ios --release --no-codesign
+        working-directory: apps/mobile
+      - run: scripts/ios/package_unsigned_ipa.sh apps/mobile/build/ios/iphoneos/Runner.app "$RUNNER_TEMP/Jarvis.ipa"
+      - run: python3 scripts/ci/check-ipa.py "$RUNNER_TEMP/Jarvis.ipa"
 
   container-images:
-    name: Container image (${{ matrix.name }})
+    name: Tested image (${{ matrix.name }})
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: api
             dockerfile: infra/compose/Dockerfile
+            context: .
             build-args: PROJECT_PATH=src/Jarvis.Api/Jarvis.Api.csproj
           - name: worker
             dockerfile: infra/compose/Dockerfile
+            context: .
             build-args: PROJECT_PATH=workers/Jarvis.Worker/Jarvis.Worker.csproj
+          - name: whatsapp-bridge
+            dockerfile: workers/whatsapp-bridge/Dockerfile
+            context: workers/whatsapp-bridge
+            build-args: ''
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build image
-        uses: docker/build-push-action@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Build OCI artifact with dependency inventory and provenance
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
-          context: .
+          context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
           push: false
-          load: true
+          outputs: type=oci,dest=${{ runner.temp }}/${{ matrix.name }}.oci.tar
           build-args: ${{ matrix.build-args }}
-          tags: jarvis-ci-${{ matrix.name }}:test
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          sbom: true
+          provenance: mode=min
           cache-from: type=gha,scope=ci-${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=ci-${{ matrix.name }}
+      - run: sudo apt-get update && sudo apt-get install --yes skopeo
+      - name: Load and smoke test packaged runtime
+        env:
+          IMAGE_NAME: ${{ matrix.name }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          skopeo copy --override-os linux --override-arch amd64 "oci-archive:$RUNNER_TEMP/$IMAGE_NAME.oci.tar" "docker-daemon:jarvis-ci-$IMAGE_NAME:test"
+          scripts/ci/check-image.sh "$IMAGE_NAME"
+          python3 scripts/ci/image-manifest.py "$IMAGE_NAME" "$IMAGE_DIGEST" "$RUNNER_TEMP"
+      - name: Scan image vulnerabilities
+        env:
+          IMAGE_NAME: ${{ matrix.name }}
+        run: scripts/ci/scan-image.sh "jarvis-ci-$IMAGE_NAME:test" "$RUNNER_TEMP/$IMAGE_NAME.scan.json"
+      - name: Preserve vulnerability diagnostics on failure
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: image-security-${{ matrix.name }}
+          path: ${{ runner.temp }}/${{ matrix.name }}.scan.json
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verified-image-${{ matrix.name }}
+          path: |
+            ${{ runner.temp }}/${{ matrix.name }}.oci.tar
+            ${{ runner.temp }}/${{ matrix.name }}.json
+            ${{ runner.temp }}/${{ matrix.name }}.scan.json
+          if-no-files-found: error
+          retention-days: 7
+
+  e2e:
+    name: Packaged end-to-end and security boundaries
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+    needs: container-images
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with: {global-json-file: global.json}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: {node-version: '22.22.0'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {pattern: verified-image-*, path: artifacts/images, merge-multiple: true}
+      - run: sudo apt-get update && sudo apt-get install --yes skopeo
+      - run: scripts/ci/load-images.sh artifacts/images
+      - run: scripts/ci/run-e2e.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: end-to-end-evidence
+          path: artifacts/ci/
+          retention-days: 14
+          if-no-files-found: error
+
+  replay:
+    name: Temporal replay compatibility
+    needs: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with: {global-json-file: global.json}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {name: end-to-end-evidence, path: artifacts/ci}
+      - name: Replay committed and newly recorded histories
+        run: |
+          dotnet test tests/integration/Jarvis.IntegrationTests --configuration Release --filter FullyQualifiedName~WorkflowReplayTests --logger trx --results-directory artifacts/replay/committed
+          JARVIS_REPLAY_DIRECTORY="$PWD/artifacts/ci/histories" dotnet test tests/integration/Jarvis.IntegrationTests --configuration Release --no-build --filter FullyQualifiedName~WorkflowReplayTests --logger trx --results-directory artifacts/replay/current
+          python3 scripts/ci/check-test-results.py artifacts/replay
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with: {name: replay-test-results, path: artifacts/replay/, retention-days: 14}
+
+  security:
+    name: Secrets and dependency security
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with: {global-json-file: global.json}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: {node-version: '22.22.0'}
+      - run: scripts/ci/security.sh
+
+  codeql:
+    name: Static security analysis (${{ matrix.language }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: csharp
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with: {global-json-file: global.json}
+      - uses: github/codeql-action/init@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          config-file: .github/codeql-config.yml
+      - run: dotnet build Jarvis.sln --configuration Release
+        if: matrix.build-mode == 'manual'
+      - uses: github/codeql-action/analyze@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3
+        with: {category: 'jarvis-static-security-${{ matrix.language }}', output: artifacts/codeql}
+      - run: python3 scripts/ci/check-security-results.py artifacts/codeql
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with: {name: 'static-security-results-${{ matrix.language }}', path: artifacts/codeql/, retention-days: 14}
 
   required:
     name: All checks passed
     runs-on: ubuntu-latest
-    needs:
-      - backend
-      - integration
-      - python
-      - mobile
-      - container-images
+    timeout-minutes: 5
+    needs: [policy, backend, integration, python, whatsapp-bridge, mobile, ios, container-images, e2e, replay, security, codeql]
     if: always()
     steps:
-      - name: Require successful jobs
+      - name: Require every job to succeed
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
         run: |
-          set -euo pipefail
-          check() {
-            local name="$1"
-            local result="$2"
-            if [[ "$result" != "success" ]]; then
-              echo "::error::Job $name finished with $result"
-              exit 1
-            fi
-          }
-          check backend "${{ needs.backend.result }}"
-          check integration "${{ needs.integration.result }}"
-          check python "${{ needs.python.result }}"
-          check mobile "${{ needs.mobile.result }}"
-          check container-images "${{ needs.container-images.result }}"
+          python3 - <<'PY'
+          import json, os
+          failed = [name for name, job in json.loads(os.environ['JOB_RESULTS']).items() if job['result'] != 'success']
+          if failed:
+              raise SystemExit('Required jobs failed, skipped, or cancelled: ' + ', '.join(failed))
+          PY
