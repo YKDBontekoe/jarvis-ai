@@ -156,6 +156,8 @@ Weeks run Monday to Sunday; a weekly habit's streak counts weeks that reached `t
 
 `/channels` — WhatsApp/Signal configuration, threads, test send, QR linking (`POST /channels/link`, `GET /channels/link/{linkId}`, `GET /channels/providers`), Signal status, WhatsApp Cloud webhooks.
 
+`/channels/{id}/chats` — read along on a QR-linked WhatsApp: list phone chats with the owner's choices (`GET`), turn a chat on or off and toggle automatic reminders (`PUT /{chatId}`), messages (`GET /{chatId}/messages`, `DELETE` clears what Jarvis saved), a drafted reply (`POST /{chatId}/suggest`), send after the owner taps Send (`POST /{chatId}/send`), and Ask Jarvis about the chat (`POST /{chatId}/ask`, runs a normal agent turn in a per-chat conversation). Audit entries carry ids only.
+
 ## Voice (user)
 
 `POST /voice/session` — LiveKit token + session metadata.

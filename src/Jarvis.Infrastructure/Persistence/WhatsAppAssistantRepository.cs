@@ -1,0 +1,219 @@
+using Jarvis.Application.Channels;
+using Jarvis.Application.WhatsApp;
+using Microsoft.EntityFrameworkCore;
+
+namespace Jarvis.Infrastructure.Persistence;
+
+public sealed class WhatsAppChatEntity
+{
+    public Guid Id { get; set; }
+    public Guid OwnerId { get; set; }
+    public Guid ConnectionId { get; set; }
+    public string ChatId { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public bool IsGroup { get; set; }
+    public bool ReadAlong { get; set; }
+    public bool AutoReminders { get; set; }
+    /// <summary>When the newest stored message was sent (for sorting and display).</summary>
+    public DateTimeOffset? LastMessageAt { get; set; }
+    /// <summary>When Jarvis last stored a message for this chat; the reminder scan compares against this.</summary>
+    public DateTimeOffset? LastReceivedAt { get; set; }
+    /// <summary>Messages stored after this moment have not been scanned for reminders yet.</summary>
+    public DateTimeOffset? ScannedThrough { get; set; }
+    public DateTimeOffset? ScanLeaseUntil { get; set; }
+    /// <summary>The Jarvis conversation used for "Ask Jarvis" about this chat.</summary>
+    public Guid? AskConversationId { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public WhatsAppChatSettings ToRecord() => new(Id, OwnerId, ConnectionId, ChatId, DisplayName, IsGroup, ReadAlong,
+        AutoReminders, LastMessageAt, CreatedAt, UpdatedAt, AskConversationId);
+}
+
+public sealed class WhatsAppMessageEntity
+{
+    public Guid Id { get; set; }
+    public Guid OwnerId { get; set; }
+    public Guid ConnectionId { get; set; }
+    public string ChatId { get; set; } = string.Empty;
+    public string ExternalId { get; set; } = string.Empty;
+    public bool FromMe { get; set; }
+    public string? Sender { get; set; }
+    public string Text { get; set; } = string.Empty;
+    public DateTimeOffset SentAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public WhatsAppChatMessage ToRecord() => new(Id, ConnectionId, ChatId, ExternalId, FromMe, Sender, Text, SentAt);
+}
+
+public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider? clock = null)
+    : IWhatsAppAssistantRepository
+{
+    private static readonly TimeSpan ScanLease = TimeSpan.FromMinutes(5);
+    private const int MaxNewMessagesPerScan = 40;
+    private readonly TimeProvider time = clock ?? TimeProvider.System;
+
+    public async Task<IReadOnlyList<WhatsAppChatSettings>> ListChatsAsync(Guid ownerId, Guid? connectionId,
+        CancellationToken cancellationToken) =>
+        (await db.WhatsAppChats.AsNoTracking()
+            .Where(x => x.OwnerId == ownerId && (connectionId == null || x.ConnectionId == connectionId))
+            .OrderByDescending(x => x.LastMessageAt).ThenBy(x => x.DisplayName)
+            .ToListAsync(cancellationToken)).Select(x => x.ToRecord()).ToArray();
+
+    public async Task<WhatsAppChatSettings?> GetChatAsync(Guid ownerId, Guid connectionId, string chatId,
+        CancellationToken cancellationToken) =>
+        (await db.WhatsAppChats.AsNoTracking().SingleOrDefaultAsync(
+            x => x.OwnerId == ownerId && x.ConnectionId == connectionId && x.ChatId == chatId,
+            cancellationToken))?.ToRecord();
+
+    public async Task<WhatsAppChatSettings?> SaveChatAsync(Guid ownerId, Guid connectionId, string chatId,
+        string displayName, bool readAlong, bool autoReminders, CancellationToken cancellationToken)
+    {
+        var owned = await db.ChannelConnections.AnyAsync(x => x.Id == connectionId && x.OwnerId == ownerId &&
+                                                               x.Kind == ChannelKinds.WhatsAppLinked,
+            cancellationToken);
+        if (!owned) return null;
+        var now = time.GetUtcNow();
+        var entity = await db.WhatsAppChats.SingleOrDefaultAsync(
+            x => x.OwnerId == ownerId && x.ConnectionId == connectionId && x.ChatId == chatId, cancellationToken);
+        if (entity is null)
+        {
+            entity = new WhatsAppChatEntity
+            {
+                Id = Guid.CreateVersion7(), OwnerId = ownerId, ConnectionId = connectionId, ChatId = chatId,
+                IsGroup = WhatsAppChatIds.IsGroup(chatId), CreatedAt = now
+            };
+            db.WhatsAppChats.Add(entity);
+        }
+        // Turning reading or reminders on starts the scan from now, so old history never produces reminders.
+        if ((readAlong && !entity.ReadAlong) || (autoReminders && !entity.AutoReminders)) entity.ScannedThrough = now;
+        entity.DisplayName = WhatsAppChatIds.CleanName(displayName, chatId);
+        entity.ReadAlong = readAlong;
+        entity.AutoReminders = autoReminders;
+        entity.UpdatedAt = now;
+        await db.SaveChangesAsync(cancellationToken);
+        return entity.ToRecord();
+    }
+
+    public async Task<IReadOnlyList<string>> ListWatchedChatIdsAsync(Guid connectionId,
+        CancellationToken cancellationToken) =>
+        await db.WhatsAppChats.AsNoTracking().Where(x => x.ConnectionId == connectionId && x.ReadAlong)
+            .OrderBy(x => x.ChatId).Select(x => x.ChatId).ToListAsync(cancellationToken);
+
+    public async Task<int> StoreObservedAsync(Guid connectionId, IReadOnlyList<ObservedWhatsAppMessage> messages,
+        CancellationToken cancellationToken)
+    {
+        if (messages.Count == 0) return 0;
+        var chatIds = messages.Select(x => x.ChatId).Distinct().ToArray();
+        var chats = await db.WhatsAppChats
+            .Where(x => x.ConnectionId == connectionId && x.ReadAlong && chatIds.Contains(x.ChatId))
+            .ToDictionaryAsync(x => x.ChatId, cancellationToken);
+        var now = time.GetUtcNow();
+        var inserted = 0;
+        foreach (var message in messages)
+        {
+            if (!chats.TryGetValue(message.ChatId, out var chat)) continue;
+            var text = message.Text.Length <= 8_000 ? message.Text : message.Text[..8_000];
+            var sender = message.Sender is { Length: > 80 } name ? name[..80] : message.Sender;
+            var rows = await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO whatsapp_messages ("Id", owner_id, connection_id, chat_id, external_id, from_me, sender, text, sent_at, created_at)
+                VALUES ({Guid.CreateVersion7()}, {chat.OwnerId}, {connectionId}, {chat.ChatId}, {message.ExternalId}, {message.FromMe}, {sender}, {text}, {message.SentAt}, {now})
+                ON CONFLICT (connection_id, external_id) DO NOTHING
+                """, cancellationToken);
+            if (rows == 0) continue;
+            inserted++;
+            if (chat.LastMessageAt is null || message.SentAt > chat.LastMessageAt) chat.LastMessageAt = message.SentAt;
+            chat.LastReceivedAt = now;
+        }
+        if (inserted > 0) await db.SaveChangesAsync(cancellationToken);
+        return inserted;
+    }
+
+    public async Task<IReadOnlyList<WhatsAppChatMessage>> ListMessagesAsync(Guid ownerId, Guid connectionId,
+        string chatId, int limit, DateTimeOffset? before, CancellationToken cancellationToken) =>
+        (await db.WhatsAppMessages.AsNoTracking()
+            .Where(x => x.OwnerId == ownerId && x.ConnectionId == connectionId && x.ChatId == chatId &&
+                        (before == null || x.SentAt < before))
+            .OrderByDescending(x => x.SentAt).ThenByDescending(x => x.CreatedAt)
+            .Take(Math.Clamp(limit, 1, 200))
+            .ToListAsync(cancellationToken)).Select(x => x.ToRecord()).ToArray();
+
+    public async Task<IReadOnlyList<WhatsAppSearchHit>> SearchAsync(Guid ownerId, string query, Guid? connectionId,
+        string? chatId, int limit, CancellationToken cancellationToken)
+    {
+        var pattern = "%" + query.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+        var hits = await (
+                from message in db.WhatsAppMessages.AsNoTracking()
+                join chat in db.WhatsAppChats.AsNoTracking()
+                    on new { message.ConnectionId, message.ChatId } equals new { chat.ConnectionId, chat.ChatId }
+                where message.OwnerId == ownerId && chat.OwnerId == ownerId &&
+                      (connectionId == null || message.ConnectionId == connectionId) &&
+                      (chatId == null || message.ChatId == chatId) &&
+                      EF.Functions.ILike(message.Text, pattern, "\\")
+                orderby message.SentAt descending
+                select new { chat, message })
+            .Take(Math.Clamp(limit, 1, 100))
+            .ToListAsync(cancellationToken);
+        return hits.Select(x => new WhatsAppSearchHit(x.chat.ToRecord(), x.message.ToRecord())).ToArray();
+    }
+
+    public async Task<int> ClearHistoryAsync(Guid ownerId, Guid connectionId, string chatId,
+        CancellationToken cancellationToken) =>
+        await db.WhatsAppMessages
+            .Where(x => x.OwnerId == ownerId && x.ConnectionId == connectionId && x.ChatId == chatId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+    public async Task SetAskConversationAsync(Guid ownerId, Guid chatSettingsId, Guid conversationId,
+        CancellationToken cancellationToken) =>
+        await db.WhatsAppChats.Where(x => x.Id == chatSettingsId && x.OwnerId == ownerId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.AskConversationId, conversationId),
+                cancellationToken);
+
+    public async Task<IReadOnlyList<WhatsAppScanBatch>> ClaimScanBatchesAsync(TimeSpan quiet, int limit,
+        int contextSize, CancellationToken cancellationToken)
+    {
+        var now = time.GetUtcNow();
+        var settledBefore = now - quiet;
+        var candidates = await db.WhatsAppChats.AsNoTracking()
+            .Where(x => x.ReadAlong && x.AutoReminders && x.LastReceivedAt != null &&
+                        x.LastReceivedAt < settledBefore &&
+                        (x.ScannedThrough == null || x.LastReceivedAt > x.ScannedThrough) &&
+                        (x.ScanLeaseUntil == null || x.ScanLeaseUntil < now))
+            .OrderBy(x => x.LastReceivedAt)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+        var batches = new List<WhatsAppScanBatch>();
+        foreach (var chat in candidates)
+        {
+            // Claim with a conditional update so two API replicas never scan the same chat at once.
+            var claimed = await db.WhatsAppChats
+                .Where(x => x.Id == chat.Id && (x.ScanLeaseUntil == null || x.ScanLeaseUntil < now))
+                .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.ScanLeaseUntil, now + ScanLease),
+                    cancellationToken);
+            if (claimed == 0) continue;
+            var since = chat.ScannedThrough ?? DateTimeOffset.UnixEpoch;
+            var fresh = await db.WhatsAppMessages.AsNoTracking()
+                .Where(x => x.ConnectionId == chat.ConnectionId && x.ChatId == chat.ChatId && x.CreatedAt > since)
+                .OrderBy(x => x.CreatedAt).Take(MaxNewMessagesPerScan)
+                .ToListAsync(cancellationToken);
+            var scannedThrough = fresh.Count == 0 ? now : fresh.Max(x => x.CreatedAt);
+            var firstNew = fresh.Count == 0 ? now : fresh.Min(x => x.SentAt);
+            var context = await db.WhatsAppMessages.AsNoTracking()
+                .Where(x => x.ConnectionId == chat.ConnectionId && x.ChatId == chat.ChatId && x.CreatedAt <= since &&
+                            x.SentAt <= firstNew)
+                .OrderByDescending(x => x.SentAt).Take(contextSize)
+                .ToListAsync(cancellationToken);
+            batches.Add(new WhatsAppScanBatch(chat.ToRecord(),
+                context.OrderBy(x => x.SentAt).Select(x => x.ToRecord()).ToArray(),
+                fresh.OrderBy(x => x.SentAt).Select(x => x.ToRecord()).ToArray(), scannedThrough));
+        }
+        return batches;
+    }
+
+    public async Task CompleteScanAsync(Guid chatSettingsId, DateTimeOffset scannedThrough,
+        CancellationToken cancellationToken) =>
+        await db.WhatsAppChats.Where(x => x.Id == chatSettingsId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.ScannedThrough, scannedThrough)
+                .SetProperty(x => x.ScanLeaseUntil, (DateTimeOffset?)null), cancellationToken);
+}

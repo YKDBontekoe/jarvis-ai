@@ -20,6 +20,7 @@ bool opensSearchRoute(Map<String, dynamic> data) =>
 bool opensNotificationDetails(String? type) =>
     type == 'reminder.due' ||
     type == 'reminder.failed' ||
+    type == 'whatsapp.reminder' ||
     type == 'task.completed' ||
     type == 'task.failed' ||
     type == 'watch.triggered' ||

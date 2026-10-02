@@ -61,6 +61,10 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Expenses.ExpenseToolContributor>();
         services.AddScoped<IAgentContextContributor, Expenses.ExpenseContextContributor>();
         services.AddScoped<Jarvis.Application.Expenses.IReceiptReader, Expenses.ReceiptReader>();
+        services.AddScoped<IAgentToolContributor, WhatsApp.WhatsAppToolContributor>();
+        services.AddScoped<IAgentContextContributor, WhatsApp.WhatsAppContextContributor>();
+        services.AddScoped<Jarvis.Application.WhatsApp.IWhatsAppAssistant, WhatsApp.WhatsAppAssistant>();
+        services.AddSingleton<Jarvis.Application.WhatsApp.IWhatsAppSender, Jarvis.Application.WhatsApp.NoOpWhatsAppSender>();
         services.AddScoped<IAgentToolContributor, Habits.HabitToolContributor>();
         services.AddScoped<IAgentContextContributor, Habits.HabitContextContributor>();
         services.AddScoped<IAgentToolContributor, People.PeopleToolContributor>();

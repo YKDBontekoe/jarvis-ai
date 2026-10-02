@@ -10,11 +10,15 @@ Jarvis owns the UX (`POST /api/v1/channels/link`); this service is internal and 
 | `GET` | `/sessions/{id}` | `state`: `none`, `connecting`, `qr`, `open`, `logged_out`; `qr` is a PNG data URL |
 | `GET` | `/sessions/{id}/messages` | Buffered inbound text messages `{id, from, text, timestamp}` |
 | `POST` | `/sessions/{id}/ack` | `{ids}` — drop delivered messages |
-| `POST` | `/sessions/{id}/send` | `{to, text}` |
+| `POST` | `/sessions/{id}/send` | `{to, text}` or `{chat, text}` (phone, `…@g.us` group or `…@lid`); returns `{id}` |
+| `GET` | `/sessions/{id}/chats` | Chat list for the read-along picker `{id, name, group, lastMessageAt}` (names only, no text) |
+| `GET`/`PUT` | `/sessions/{id}/watch` | `{chats}` — the chats the owner turned on in Jarvis; nothing else is forwarded |
+| `GET` | `/sessions/{id}/observed` | Buffered messages of watched chats `{id, chatId, fromMe, sender, text, timestamp}` (media as `[Photo] caption`) |
+| `POST` | `/sessions/{id}/observed/ack` | `{ids}` — drop stored read-along messages |
 | `DELETE` | `/sessions/{id}` | Log out and delete the stored credentials |
 | `GET` | `/health` | Liveness (no auth) |
 
-Session ids are the Jarvis channel connection ids (UUIDs). Only one-to-one chats are forwarded; groups, status and media are ignored. "Message yourself" is accepted as the owner talking, and messages the bridge itself sent are filtered out so replies never loop.
+Session ids are the Jarvis channel connection ids (UUIDs). For talking to Jarvis only one-to-one chats are forwarded; groups, status and media are ignored. Read along is separate: only chats on the watch list (`jarvis-watch.json` in the session folder) are forwarded, both directions, and the self chat never is. "Message yourself" is accepted as the owner talking, and messages the bridge itself sent are filtered out so replies never loop.
 
 Environment: `PORT` (3000), `DATA_DIR` (`/data`, mount a volume — it holds the WhatsApp credentials), `BRIDGE_TOKEN` (optional bearer token), `LOG_LEVEL`.
 

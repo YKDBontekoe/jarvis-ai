@@ -33,7 +33,8 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
 
   bool get _isReminder =>
       widget.notificationType == 'reminder.due' ||
-      widget.notificationType == 'reminder.failed';
+      widget.notificationType == 'reminder.failed' ||
+      widget.notificationType == 'whatsapp.reminder';
   bool get _isWatch => widget.notificationType.startsWith('watch.');
   bool get _isTask =>
       widget.notificationType == 'task.completed' ||
@@ -50,7 +51,8 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
     try {
       final path = switch (widget.notificationType) {
         'reminder.due' ||
-        'reminder.failed' => '/api/v1/reminders/${widget.sourceId}',
+        'reminder.failed' ||
+        'whatsapp.reminder' => '/api/v1/reminders/${widget.sourceId}',
         'task.completed' || 'task.failed' => '/api/v1/tasks/${widget.sourceId}',
         'watch.triggered' ||
         'watch.failed' => '/api/v1/watches/${widget.sourceId}',
@@ -93,8 +95,9 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
     final date = jsonDate(raw, local: true);
     if (date == null) return '';
     final dateText = MaterialLocalizations.of(context).formatMediumDate(date);
-    final timeText = MaterialLocalizations.of(context)
-        .formatTimeOfDay(TimeOfDay.fromDateTime(date));
+    final timeText = MaterialLocalizations.of(
+      context,
+    ).formatTimeOfDay(TimeOfDay.fromDateTime(date));
     return '$dateText · $timeText';
   }
 
@@ -166,7 +169,9 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
             : 'Task');
     final status = asJsonString(item['status']) ?? '';
     final detail = switch (widget.notificationType) {
-      'reminder.due' || 'reminder.failed' => _date(item['dueAt']),
+      'reminder.due' ||
+      'reminder.failed' ||
+      'whatsapp.reminder' => _date(item['dueAt']),
       'task.completed' || 'task.failed' => asJsonString(item['summary']) ?? '',
       'watch.triggered' || 'watch.failed' => _watchCondition(item),
       _ => '',

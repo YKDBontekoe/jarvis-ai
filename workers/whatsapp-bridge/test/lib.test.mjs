@@ -1,6 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Inbox, RecentIds, inboundFrom, jidFromPhone, phoneFromJid, safeSessionId, textOf } from '../src/lib.mjs';
+import {
+  ChatBook,
+  Inbox,
+  RecentIds,
+  chatIdOf,
+  describeMessage,
+  inboundFrom,
+  isChatId,
+  jidFromChatId,
+  jidFromPhone,
+  normalizeWatchList,
+  observedFrom,
+  phoneFromJid,
+  safeSessionId,
+  textOf,
+} from '../src/lib.mjs';
 
 const self = '+31612345678';
 const entry = (over = {}) => ({
@@ -70,4 +85,72 @@ test('inbox keeps messages until acknowledged and dedupes by id', () => {
 test('session ids are restricted to safe characters', () => {
   assert.equal(safeSessionId('0198c3e0-aaaa-7bbb-8ccc-123456789abc'), '0198c3e0-aaaa-7bbb-8ccc-123456789abc');
   assert.equal(safeSessionId('../etc'), null);
+});
+
+test('chat ids: phones, groups and unresolved lids', () => {
+  assert.equal(chatIdOf('31687654321@s.whatsapp.net'), '+31687654321');
+  assert.equal(chatIdOf('120363025-1@g.us'), '120363025-1@g.us');
+  assert.equal(chatIdOf('99887766:2@lid'), '99887766@lid');
+  assert.equal(chatIdOf('99887766@lid', () => '31687654321@s.whatsapp.net'), '+31687654321');
+  assert.equal(chatIdOf('status@broadcast'), null);
+  assert.equal(chatIdOf('123@newsletter'), null);
+  assert.ok(isChatId('+31687654321'));
+  assert.ok(isChatId('120363025-1@g.us'));
+  assert.ok(!isChatId('31687654321'));
+  assert.ok(!isChatId('../etc'));
+  assert.equal(jidFromChatId('+31687654321'), '31687654321@s.whatsapp.net');
+  assert.equal(jidFromChatId('120363025-1@g.us'), '120363025-1@g.us');
+  assert.throws(() => jidFromChatId('evil@s.whatsapp.net'));
+});
+
+test('describeMessage keeps text and labels media with their caption', () => {
+  assert.equal(describeMessage({ conversation: 'hoi' }), 'hoi');
+  assert.equal(describeMessage({ imageMessage: { caption: 'kijk' } }), '[Photo] kijk');
+  assert.equal(describeMessage({ audioMessage: {} }), '[Voice message]');
+  assert.equal(describeMessage({ protocolMessage: {} }), null);
+  assert.equal(describeMessage({ reactionMessage: { text: '👍' } }), null);
+});
+
+test('observed messages: only watched chats, both directions, never the self chat', () => {
+  const watched = new Set(['+31687654321', '120363025-1@g.us', self]);
+  const opts = { selfPhone: self, watched };
+  assert.deepEqual(observedFrom(entry({ rest: { pushName: 'Piet' } }), opts), {
+    id: 'A1', chatId: '+31687654321', fromMe: false, sender: 'Piet', text: 'hello', timestamp: 1_700_000_000,
+  });
+  const mine = observedFrom(entry({ key: { fromMe: true } }), opts);
+  assert.equal(mine.fromMe, true);
+  assert.equal(mine.sender, null);
+  assert.equal(observedFrom(entry({ key: { remoteJid: '31600000000@s.whatsapp.net' } }), opts), null);
+  assert.equal(observedFrom(entry({ key: { remoteJid: '31612345678@s.whatsapp.net', fromMe: true } }), opts), null);
+  const group = observedFrom(entry({
+    key: { remoteJid: '120363025-1@g.us', participantPn: '31655555555@s.whatsapp.net' },
+  }), opts);
+  assert.equal(group.chatId, '120363025-1@g.us');
+  assert.equal(group.sender, '+31655555555');
+  assert.equal(observedFrom(entry(), { selfPhone: self, watched: new Set() }), null);
+});
+
+test('chat book merges names, tracks activity and sorts newest first', () => {
+  const book = new ChatBook(3);
+  book.name('+31687654321', 'Piet');
+  book.touch('+31687654321', { timestamp: 10 });
+  book.touch('120363025-1@g.us', { timestamp: 20 });
+  book.name('120363025-1@g.us', 'Familie');
+  assert.deepEqual(book.list().map((chat) => [chat.id, chat.name, chat.group]), [
+    ['120363025-1@g.us', 'Familie', true],
+    ['+31687654321', 'Piet', false],
+  ]);
+  book.touch('+31600000001', { timestamp: 30 });
+  book.touch('+31600000002', { timestamp: 40 });
+  assert.equal(book.list().length, 3);
+  assert.ok(!book.list().some((chat) => chat.id === '+31687654321'));
+  const copy = new ChatBook();
+  copy.load(JSON.parse(JSON.stringify(book)));
+  assert.deepEqual(copy.list(), book.list());
+});
+
+test('watch lists keep valid chat ids only', () => {
+  assert.deepEqual([...normalizeWatchList(['+31687654321', 'nope', '120363025-1@g.us', '+31687654321'])],
+    ['+31687654321', '120363025-1@g.us']);
+  assert.equal(normalizeWatchList(null).size, 0);
 });
