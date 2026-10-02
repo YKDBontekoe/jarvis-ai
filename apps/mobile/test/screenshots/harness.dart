@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Answers by "METHOD /path" (exact, then by longest matching prefix) and
 /// logs everything it could not answer so fixtures are easy to fill in.
@@ -150,6 +151,7 @@ Future<void> capture(WidgetTester tester, String name) async {
 }
 
 void mockPlatformChannels() {
+  SharedPreferences.setMockInitialValues({});
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   messenger.setMockMethodCallHandler(

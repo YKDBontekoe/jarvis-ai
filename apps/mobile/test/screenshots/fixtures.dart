@@ -322,6 +322,29 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   'GET /api/v1/reminders': reminders(),
   'GET /api/v1/memory': memories(),
   'GET /api/v1/profiles': <Object>[],
+  'GET /api/v1/search': {
+    'results': [
+      {
+        'kind': 'reminder',
+        'id': 'r3',
+        'title': 'Book Cervejaria Ramiro',
+        'summary': 'Wednesday at 10:00',
+        'route': {'kind': 'reminders'},
+        'relevance': .9,
+      },
+      {
+        'kind': 'conversation',
+        'id': conversationId,
+        'title': 'Weekend in Lisbon',
+        'summary': '…remind you to reserve on Wednesday?',
+        'route': {
+          'kind': 'conversation',
+          'parameters': {'id': conversationId},
+        },
+        'relevance': .7,
+      },
+    ],
+  },
   'PUT /api/v1/push-devices': <String, Object>{},
   'POST /*': <String, Object>{},
 };

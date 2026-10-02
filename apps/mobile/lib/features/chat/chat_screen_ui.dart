@@ -321,6 +321,10 @@ mixin _ChatScreenUi on _ChatScreenController {
         ],
       );
 
+  /// Shown while an approval waits and the transcript is scrolled away from it.
+  bool get _showApprovalDock =>
+      _hasPendingApproval && !_nearBottom && _entries.isNotEmpty;
+
   /// The sidebar's copy of the open conversation's project, if any.
   Map<String, dynamic>? get _openProject {
     final id = _projectId;
@@ -421,9 +425,9 @@ mixin _ChatScreenUi on _ChatScreenController {
                               right: 16,
                               bottom: 8,
                               child: IgnorePointer(
-                                ignoring: _nearBottom,
+                                ignoring: _nearBottom || _showApprovalDock,
                                 child: AnimatedSlide(
-                                  offset: _nearBottom
+                                  offset: _nearBottom || _showApprovalDock
                                       ? const Offset(0, .4)
                                       : Offset.zero,
                                   duration: JarvisMotion.of(
@@ -432,14 +436,17 @@ mixin _ChatScreenUi on _ChatScreenController {
                                   ),
                                   curve: JarvisMotion.standard,
                                   child: AnimatedOpacity(
-                                    opacity: _nearBottom ? 0 : 1,
+                                    opacity: _nearBottom || _showApprovalDock
+                                        ? 0
+                                        : 1,
                                     duration: JarvisMotion.of(
                                       context,
                                       JarvisMotion.base,
                                     ),
                                     curve: JarvisMotion.standard,
                                     child: ExcludeSemantics(
-                                      excluding: _nearBottom,
+                                      excluding:
+                                          _nearBottom || _showApprovalDock,
                                       child: CircleIconButton(
                                         icon: PhosphorIconsRegular.caretDown,
                                         tooltip: 'Jump to latest',
@@ -481,6 +488,26 @@ mixin _ChatScreenUi on _ChatScreenController {
                 ],
               ),
             ),
+          // A waiting approval locks the composer; when its card has
+          // scrolled away, this keeps the way back one tap away.
+          AnimatedSwitcher(
+            duration: JarvisMotion.of(context, JarvisMotion.base),
+            switchInCurve: JarvisMotion.standard,
+            switchOutCurve: JarvisMotion.exit,
+            transitionBuilder: JarvisMotion.fadeRise,
+            child: _showApprovalDock
+                ? Padding(
+                    key: const ValueKey('approval-dock'),
+                    padding: const EdgeInsets.fromLTRB(14, 2, 14, 0),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 760),
+                      child: _ApprovalDock(
+                        onReview: () => _scrollToBottom(force: true),
+                      ),
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
           Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 788),
@@ -708,6 +735,63 @@ class _NotificationBell extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// "Jarvis needs your approval · Review" above the composer. It only points
+/// to the card; the decision itself stays on the card, next to its details.
+class _ApprovalDock extends StatelessWidget {
+  const _ApprovalDock({required this.onReview});
+
+  final VoidCallback onReview;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Material(
+      color: colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colors.warning.withValues(alpha: .35)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onReview,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+          child: Row(
+            children: [
+              Icon(
+                PhosphorIconsRegular.shieldCheck,
+                size: 18,
+                color: colors.warning,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Jarvis needs your approval',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: colors.ink,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onReview,
+                iconAlignment: IconAlignment.end,
+                icon: const Icon(PhosphorIconsRegular.caretDown, size: 15),
+                label: const Text('Review'),
+                style: TextButton.styleFrom(
+                  foregroundColor: colors.accent,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

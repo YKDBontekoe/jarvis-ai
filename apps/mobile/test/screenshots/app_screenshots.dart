@@ -284,6 +284,46 @@ void main() {
     });
   }
 
+  screenshotTest('quick create round trip', (tester) async {
+    usePhone(tester);
+    await start(tester);
+    await openChat(tester);
+    await tester.tap(find.byTooltip('More actions'));
+    await settle(tester);
+    await tester.tap(find.text('Set a reminder'));
+    await settle(tester);
+    await tester.enterText(find.byType(TextFormField).first, 'Book Ramiro');
+    await tester.tap(find.text('Save'));
+    await settle(tester);
+    expect(find.text('Reminder set'), findsOneWidget);
+    expect(find.text('Ask Jarvis anything'), findsOneWidget);
+    await capture(tester, '26-after-quick-create');
+  });
+
+  screenshotTest('approval dock', (tester) async {
+    usePhone(tester);
+    http.routes.addAll(fixtureRoutes());
+    await start(tester);
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 900));
+    await settle(tester);
+    expect(find.text('Review'), findsOneWidget);
+    await capture(tester, '27-approval-dock');
+    await tester.tap(find.text('Review'));
+    await settle(tester);
+    await capture(tester, '28-approval-reviewed');
+  });
+
+  screenshotTest('search', (tester) async {
+    usePhone(tester);
+    await start(tester);
+    await tester.tap(find.byTooltip('Search'));
+    await settle(tester);
+    await capture(tester, '29-search');
+    await tester.enterText(find.byType(TextField).first, 'herin');
+    await settle(tester);
+    await capture(tester, '30-search-typing');
+  });
+
   screenshotTest('sign in', (tester) async {
     usePhone(tester);
     await tester.pumpWidget(

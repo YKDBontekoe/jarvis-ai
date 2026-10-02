@@ -16,6 +16,7 @@ class TasksScreen extends StatefulWidget {
   const TasksScreen({
     required this.http,
     this.startCreating = false,
+    this.onCreateDone,
     super.key,
   });
 
@@ -23,6 +24,10 @@ class TasksScreen extends StatefulWidget {
 
   /// Opens the "new" editor as soon as the page has settled.
   final bool startCreating;
+
+  /// Called after a [startCreating] editor closes: with a confirmation when
+  /// it saved, or null when it was cancelled.
+  final ValueChanged<String?>? onCreateDone;
 
   @override
   State<TasksScreen> createState() => _TasksScreenState();
@@ -39,7 +44,7 @@ class _TasksScreenState extends State<TasksScreen> {
   void initState() {
     super.initState();
     _load();
-    if (widget.startCreating) afterRouteSettles(this, _createTask);
+    if (widget.startCreating) afterRouteSettles(this, _quickCreate);
   }
 
   Future<void> _load() async {
@@ -69,12 +74,19 @@ class _TasksScreenState extends State<TasksScreen> {
     }
   }
 
-  Future<void> _createTask() async {
+  Future<void> _quickCreate() async {
+    final created = await _createTask();
+    if (created == false || !mounted) return;
+    widget.onCreateDone?.call(created == true ? 'Task started' : null);
+  }
+
+  /// True when started, null when cancelled, false when it failed.
+  Future<bool?> _createTask() async {
     final created = await showDialog<_NewTask>(
       context: context,
       builder: (_) => _NewTaskDialog(http: widget.http),
     );
-    if (created == null || !mounted) return;
+    if (created == null || !mounted) return null;
 
     setState(() => _creating = true);
     try {
@@ -87,6 +99,7 @@ class _TasksScreenState extends State<TasksScreen> {
         },
       );
       await _load();
+      return true;
     } on DioException catch (error) {
       if (mounted) {
         final message = error.response?.statusCode == 503
@@ -94,8 +107,10 @@ class _TasksScreenState extends State<TasksScreen> {
             : 'Jarvis could not start that task.';
         _showError(message);
       }
+      return false;
     } catch (_) {
       if (mounted) _showError('Jarvis could not start that task.');
+      return false;
     } finally {
       if (mounted) setState(() => _creating = false);
     }

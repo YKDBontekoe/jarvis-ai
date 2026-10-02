@@ -56,11 +56,16 @@ Widget? utilityPageFor(
   Dio http, {
   Future<void> Function(String conversationId)? onOpenConversation,
   ValueChanged<String>? onAskInChat,
+
+  /// For `…/new` destinations: called when the editor closes, with a
+  /// confirmation when it saved or null when it was cancelled.
+  ValueChanged<String?>? onQuickCreateDone,
 }) => switch (destination) {
   'tasks' => TasksScreen(http: http),
   'tasks$createDestinationSuffix' => TasksScreen(
     http: http,
     startCreating: true,
+    onCreateDone: onQuickCreateDone,
   ),
   'projects' => ProjectsScreen(
     http: http,
@@ -76,6 +81,7 @@ Widget? utilityPageFor(
   'memory$createDestinationSuffix' => MemoryScreen(
     http: http,
     startCreating: true,
+    onCreateDone: onQuickCreateDone,
   ),
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'today' => DayPlannerScreen(http: http, onAskInChat: onAskInChat),
@@ -91,6 +97,7 @@ Widget? utilityPageFor(
     http: http,
     onOpenConversation: onOpenConversation,
     startCreating: true,
+    onCreateDone: onQuickCreateDone,
   ),
   'notifications' => RemindersScreen(
     http: http,

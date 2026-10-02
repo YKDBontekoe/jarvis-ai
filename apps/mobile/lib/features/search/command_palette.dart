@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../api/api_errors.dart';
 import '../../theme.dart';
 import '../../ui/phosphor_icons.dart';
+import 'quick_commands.dart';
 import 'recent_searches_store.dart';
 import 'search_api.dart';
 import 'search_models.dart';
@@ -116,6 +117,11 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
     }
   }
 
+  void _runCommand(QuickCommand command) {
+    Navigator.of(context).pop();
+    widget.onUtility(command.destination);
+  }
+
   Future<void> _openHit(FederatedSearchHit hit) async {
     await widget.recentStore.remember(_query.text.trim());
     if (!mounted) return;
@@ -212,6 +218,14 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                         ? ListView(
                             padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
                             children: [
+                              const QuickCommandHeader('Create'),
+                              for (final command in matchQuickCommands(''))
+                                QuickCommandTile(
+                                  command: command,
+                                  onTap: () => _runCommand(command),
+                                ),
+                              if (widget.recentStore.read().isNotEmpty)
+                                const QuickCommandHeader('Recent'),
                               for (final query in widget.recentStore.read())
                                 ListTile(
                                   leading: const Icon(PhosphorIconsRegular.clockCounterClockwise, size: 18),
@@ -239,10 +253,22 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                               ),
                             ],
                           )
-                        : SearchResultsBody(
-                            loading: _loading,
-                            results: _results,
-                            onOpen: (hit) => unawaited(_openHit(hit)),
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (final command in matchQuickCommands(_query.text))
+                                QuickCommandTile(
+                                  command: command,
+                                  onTap: () => _runCommand(command),
+                                ),
+                              Expanded(
+                                child: SearchResultsBody(
+                                  loading: _loading,
+                                  results: _results,
+                                  onOpen: (hit) => unawaited(_openHit(hit)),
+                                ),
+                              ),
+                            ],
                           ),
                   ),
                 ],
