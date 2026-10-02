@@ -12,7 +12,7 @@ public static class IdentityAuthEndpoints
 
     public static RouteGroupBuilder MapAccountAuth(this RouteGroupBuilder api)
     {
-        var auth = api.MapGroup("/auth");
+        var auth = api.MapGroup("/auth").RequireRateLimiting(ApiRateLimiting.AuthPolicy);
         auth.MapPost("/register", Register).AllowAnonymous();
         auth.MapPost("/login", Login).AllowAnonymous();
         auth.MapPost("/refresh", Refresh).AllowAnonymous();

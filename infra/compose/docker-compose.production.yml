@@ -175,6 +175,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:5082
       HOME: /tmp
+      ReverseProxy__TrustForwardedHeaders: "true"
       DataProtection__KeysDirectory: /var/lib/jarvis-data-protection-keys
       CODEX_HOME: /codex
       Codex__ExecutablePath: /usr/local/bin/codex
