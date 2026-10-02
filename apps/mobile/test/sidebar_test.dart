@@ -12,8 +12,9 @@ void main() {
   testWidgets('sidebar has one search entry and core destinations', (
     tester,
   ) async {
-    var openedTasks = false;
+    var openedToday = false;
     var searched = false;
+    var openedWhatsApp = false;
     await tester.pumpWidget(
       _host(
         JarvisSidebar(
@@ -27,7 +28,8 @@ void main() {
           onConversation: (_) {},
           onSeeAll: () {},
           onUtility: (destination) {
-            if (destination == 'tasks') openedTasks = true;
+            if (destination == 'today') openedToday = true;
+            if (destination == 'whatsapp') openedWhatsApp = true;
           },
           onSettings: () {},
           onJarvisSearch: () => searched = true,
@@ -36,15 +38,29 @@ void main() {
     );
 
     expect(find.byType(TextField), findsNothing);
-    for (final label in ['Files', 'Usage', 'Coding']) {
+    for (final label in [
+      'Files',
+      'Usage',
+      'Coding',
+      'Tasks',
+      'Memory',
+      'Journal',
+      'Expenses',
+      'Habits',
+      'People',
+      'Reminders',
+    ]) {
       expect(find.text(label), findsNothing);
     }
 
-    await tester.tap(find.text('Search'));
+    await tester.tap(find.text('Ask or find'));
     expect(searched, isTrue);
 
-    await tester.tap(find.text('Tasks'));
+    await tester.tap(find.text('Today'));
     await tester.pumpAndSettle();
-    expect(openedTasks, isTrue);
+    expect(openedToday, isTrue);
+    await tester.ensureVisible(find.text('WhatsApp'));
+    await tester.tap(find.text('WhatsApp'));
+    expect(openedWhatsApp, isTrue);
   });
 }

@@ -19,7 +19,7 @@ public sealed record ChannelDto(Guid Id, string Kind, string DisplayName, string
     IReadOnlyList<string> NotificationCategories);
 public sealed record ChannelTestRequest(string? Recipient);
 public sealed record SignalStatusDto(bool Configured, IReadOnlyList<string> Accounts);
-public sealed record ChannelLinkRequest(string? Kind, Guid? ChannelId);
+public sealed record ChannelLinkRequest(string? Kind, Guid? ChannelId, bool ReadAlong = false);
 public sealed record ChannelProvidersDto(bool WhatsAppLink, bool Signal, bool WhatsAppCloud);
 
 internal static class ChannelEndpoints
@@ -105,7 +105,9 @@ internal static class ChannelEndpoints
             if (connection is null) return Results.NotFound();
             var recipient = request.Recipient is { Length: > 0 } requested
                 ? ChannelAddresses.Normalize(requested)
-                : connection.NotifyRecipient ?? connection.AllowedSenders.First();
+                : connection.NotifyRecipient ?? connection.AllowedSenders.FirstOrDefault();
+            if (recipient is null)
+                return EndpointHelpers.Invalid("recipient", "Add an allowed phone number before sending a test.");
             if (!ChannelAddresses.IsAllowed(connection, recipient))
                 return EndpointHelpers.Invalid("recipient", "Send tests only to an allowed phone number.");
             var sent = await messenger.SendAsync(connection, recipient,
@@ -143,12 +145,16 @@ internal static class ChannelEndpoints
                 return EndpointHelpers.Invalid("kind", "Choose whatsapp or signal.");
             try
             {
-                var status = await links.StartAsync(currentUser.OwnerId, kind, request.ChannelId, ct);
+                var status = await links.StartAsync(currentUser.OwnerId, kind, request.ChannelId, ct, request.ReadAlong);
                 return status is null ? Results.NotFound() : Results.Ok(status);
             }
             catch (ChannelLinkUnavailableException exception)
             {
                 return ApiProblemResults.DependencyUnavailable(exception.Message);
+            }
+            catch (ArgumentException exception)
+            {
+                return EndpointHelpers.Invalid("readAlong", exception.Message);
             }
             catch (Exception exception) when (exception is HttpRequestException or JsonException or TaskCanceledException)
             {

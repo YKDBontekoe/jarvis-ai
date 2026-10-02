@@ -256,7 +256,9 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
         actions: [
           IconButton(
             tooltip: 'Send a test message',
-            onPressed: _busy ? null : () => unawaited(_test()),
+            onPressed: _busy || jsonStrings(channel?['allowedSenders']).isEmpty
+                ? null
+                : () => unawaited(_test()),
             icon: const Icon(PhosphorIconsRegular.paperPlaneTilt),
           ),
           IconButton(
@@ -311,7 +313,11 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          jsonStrings(channel['allowedSenders']).join(', '),
+                          jsonStrings(channel['allowedSenders']).isEmpty
+                              ? 'No automatic replies. Jarvis reads only chats you choose.'
+                              : jsonStrings(
+                                  channel['allowedSenders'],
+                                ).join(', '),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         Align(

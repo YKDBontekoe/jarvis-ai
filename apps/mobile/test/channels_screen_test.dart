@@ -119,10 +119,7 @@ void main() {
   testWidgets('settings includes a WhatsApp & Signal destination', (
     tester,
   ) async {
-    await show(
-      tester,
-      SettingsView(connected: true, onOpen: (_) {}),
-    );
+    await show(tester, SettingsView(connected: true, onOpen: (_) {}));
     expect(find.byKey(const Key('settings-channels')), findsOneWidget);
     expect(find.text('WhatsApp & Signal'), findsOneWidget);
   });
@@ -160,10 +157,7 @@ void main() {
       {
         'peer': '+31612345678',
         'messageCount': 1,
-        'lastMessage': {
-          'text': 'Hello from WhatsApp',
-          'direction': 'in',
-        },
+        'lastMessage': {'text': 'Hello from WhatsApp', 'direction': 'in'},
       },
     ]);
     http.on(
@@ -255,6 +249,69 @@ void main() {
     expect(find.byKey(const Key('channel-link-qr')), findsNothing);
   });
 
+  testWidgets(
+    'connects a personal account alongside Jarvis and opens its chat picker',
+    (tester) async {
+      const personal = '22222222-2222-2222-2222-222222222222';
+      http.on('GET', '/api/v1/channels', [
+        _channel(kind: 'whatsapp_linked', name: 'Jarvis account'),
+      ]);
+      http.on('GET', '/api/v1/channels/providers', {'whatsAppLink': true});
+      http.on('POST', '/api/v1/channels/link', {
+        'linkId': 'personal-link',
+        'state': 'waiting',
+        'qrImage': qrPng,
+      });
+      http.on('GET', '/api/v1/channels/link/personal-link', {
+        'linkId': 'personal-link',
+        'state': 'waiting',
+        'qrImage': qrPng,
+      });
+      http.on('GET', '/api/v1/channels/$personal/chats', {
+        'live': true,
+        'chats': <Object>[],
+      });
+      await show(tester, ChannelsScreen(http: http.client()));
+
+      expect(find.text('Jarvis account'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('connect-personal-whatsapp')));
+      await tester.pumpAndSettle();
+      expect(find.text('Connect your WhatsApp'), findsOneWidget);
+      expect(
+        find.textContaining('Use your personal WhatsApp account'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('All chats start off'), findsOneWidget);
+      expect(http.sent('POST', '/api/v1/channels/link').single.body, {
+        'kind': 'whatsapp_linked',
+        'readAlong': true,
+      });
+
+      http.on('GET', '/api/v1/channels/link/personal-link', {
+        'linkId': 'personal-link',
+        'state': 'linked',
+        'phone': '+31699999999',
+        'channelId': personal,
+      });
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      expect(find.text('Read along'), findsOneWidget);
+      expect(
+        http.sent('GET', '/api/v1/channels/$personal/chats'),
+        hasLength(1),
+      );
+      expect(
+        http.sent(
+          'GET',
+          '/api/v1/channels/11111111-1111-1111-1111-111111111111/chats',
+        ),
+        isEmpty,
+      );
+      expect(find.textContaining('Message yourself'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets('WhatsApp QR linking is disabled without the bridge', (
     tester,
   ) async {
@@ -267,7 +324,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(http.sent('POST', '/api/v1/channels/link'), isEmpty);
-    expect(find.textContaining('Needs the WhatsApp bridge'), findsOneWidget);
+    expect(find.textContaining('Needs the WhatsApp bridge'), findsNWidgets(2));
   });
 
   testWidgets('a linked WhatsApp channel with an error can be linked again', (
@@ -284,5 +341,51 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('channel-relink')), findsOneWidget);
+  });
+
+  testWidgets('personal WhatsApp settings preserve an empty sender list', (
+    tester,
+  ) async {
+    const id = '11111111-1111-1111-1111-111111111111';
+    final personal = {
+      ..._channel(kind: 'whatsapp_linked', name: 'My WhatsApp'),
+      'allowedSenders': <String>[],
+      'forwardNotifications': false,
+      'notifyRecipient': null,
+    };
+    http.on('GET', '/api/v1/channels', [personal]);
+    http.on('GET', '/api/v1/channels/$id/messages', <Object>[]);
+    http.on('GET', '/api/v1/channels/$id/threads', <Object>[]);
+    http.on('PUT', '/api/v1/channels/$id', personal);
+    await show(tester, ChannelsScreen(http: http.client()));
+    await tester.tap(find.text('My WhatsApp'));
+    await tester.pumpAndSettle();
+    final testButton = tester.widget<IconButton>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is IconButton && widget.tooltip == 'Send a test message',
+      ),
+    );
+    expect(testButton.onPressed, isNull);
+    await tester.tap(find.byKey(const Key('channel-edit-notifications')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<SwitchListTile>(
+            find.byKey(const Key('channel-forward-switch')),
+          )
+          .onChanged,
+      isNull,
+    );
+    await tester.tap(find.byKey(const Key('channel-notifications-save')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('channel-edit-allowed-senders')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('channel-allowed-senders-save')));
+    await tester.pumpAndSettle();
+    final saved = http.sent('PUT', '/api/v1/channels/$id').last.body as Map;
+    expect(saved['allowedSenders'], isEmpty);
+    expect(saved['forwardNotifications'], isFalse);
+    expect(saved['notifyRecipient'], isNull);
   });
 }

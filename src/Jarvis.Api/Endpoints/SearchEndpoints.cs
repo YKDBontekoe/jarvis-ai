@@ -1,5 +1,6 @@
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Search;
+using Jarvis.Application.Navigation;
 
 namespace Jarvis.Api.Endpoints;
 
@@ -7,6 +8,15 @@ internal static class SearchEndpoints
 {
     public static RouteGroupBuilder MapSearchEndpoints(this RouteGroupBuilder api)
     {
+        api.MapGet("/navigation", async (NavigationService navigation, ICurrentUser user, CancellationToken ct) =>
+            Results.Ok(await navigation.SuggestionsAsync(user.OwnerId, ct))).WithName("NavigationSuggestions");
+        api.MapPost("/navigation/resolve", async (NavigationRequest request, NavigationService navigation,
+            ICurrentUser user, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Request) || request.Request.Trim().Length > 1_000)
+                return EndpointHelpers.Invalid("request", "Use 1 to 1,000 characters.");
+            return Results.Ok(await navigation.ResolveAsync(user.OwnerId, request.Request, ct));
+        }).WithName("ResolveNavigationIntent");
         api.MapGet("/search", async (IFederatedSearchService search, ICurrentUser currentUser, string? query,
                 string? kinds, CancellationToken ct) =>
             {
@@ -44,6 +54,8 @@ internal static class SearchEndpoints
         result.Relevance,
         result.IsPinned);
 }
+
+public sealed record NavigationRequest(string? Request);
 
 public sealed record FederatedSearchResponseDto(
     IReadOnlyList<FederatedSearchResultDto> Results,

@@ -35,6 +35,14 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | GET | `/approvals` | Pending tool approvals |
 | POST | `/approvals/{id}/decision` | Approve or decline |
 
+## Intent navigation and search
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/navigation` | Owner-scoped unread WhatsApp suggestions and the day planner; does not mark anything read |
+| POST | `/navigation/resolve` | `{ request }` (1–1,000 characters). A tool-free call to the owner's background model classifies the goal. Returns `message`, `actions` (`label`, `description`, typed `route`) and `understood`. Routes are constructed from an allowlisted view or actual owner-scoped search/chat results; no model-provided ids or URLs. Resolution has no write/send side effects. Unknown or unavailable inference offers an assistant handoff |
+| GET | `/search?query=…&kinds=…` | Federated saved-record search; independent of model inference |
+
 ## Automation
 
 | Area | Paths |
@@ -157,6 +165,8 @@ Weeks run Monday to Sunday; a weekly habit's streak counts weeks that reached `t
 `/channels` — WhatsApp/Signal configuration, threads, test send, QR linking (`POST /channels/link`, `GET /channels/link/{linkId}`, `GET /channels/providers`), Signal status, WhatsApp Cloud webhooks.
 
 `/channels/{id}/chats` — read along on a QR-linked WhatsApp: list phone chats with the owner's choices (`GET`), turn a chat on or off and toggle automatic reminders (`PUT /{chatId}`), messages (`GET /{chatId}/messages`, `DELETE` clears what Jarvis saved), a drafted reply (`POST /{chatId}/suggest`), send after the owner taps Send (`POST /{chatId}/send`), and Ask Jarvis about the chat (`POST /{chatId}/ask`, runs a normal agent turn in a per-chat conversation). Audit entries carry ids only.
+
+The chat list includes the account, bridge session state, previews from saved read-along messages and Jarvis unread counts. `GET /channels/{id}/chats/status` reports account/state; `POST /channels/{id}/chats/{chatId}/read {messageId}` marks through a loaded message. Message paging accepts `beforeId` for stable ordering even with equal timestamps, or the older `before` timestamp parameter. Unread state is owner-scoped and does not send WhatsApp read receipts.
 
 ## Voice (user)
 

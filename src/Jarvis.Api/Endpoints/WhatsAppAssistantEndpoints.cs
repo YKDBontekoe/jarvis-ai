@@ -10,15 +10,19 @@ using Jarvis.Application.WhatsApp;
 namespace Jarvis.Api.Endpoints;
 
 /// <param name="Live">False when the chat list could not be read from the phone and only saved chats are shown.</param>
-public sealed record WhatsAppChatListDto(bool Live, IReadOnlyList<WhatsAppChatDto> Chats);
+public sealed record WhatsAppChatListDto(bool Live, IReadOnlyList<WhatsAppChatDto> Chats,
+    string Account, string State);
 
 public sealed record WhatsAppChatDto(string ChatId, string Name, bool IsGroup, DateTimeOffset? LastMessageAt,
-    bool ReadAlong, bool AutoReminders);
+    bool ReadAlong, bool AutoReminders, string? Preview = null, bool? PreviewFromMe = null, int UnreadCount = 0);
+
+public sealed record WhatsAppConnectionDto(string Account, string State);
+public sealed record WhatsAppMarkReadRequest(Guid MessageId);
 
 public sealed record SaveWhatsAppChatRequest(string? Name, bool ReadAlong, bool? AutoReminders);
 
 public sealed record WhatsAppMessageDto(Guid Id, string ChatId, bool FromMe, string? Sender, string Text,
-    DateTimeOffset SentAt);
+    DateTimeOffset SentAt, DateTimeOffset? ReceivedAt = null);
 
 public sealed record WhatsAppSuggestRequest(string? Instruction);
 
@@ -37,8 +41,6 @@ public sealed record WhatsAppAskDto(Guid ConversationId, string? Answer, bool Ne
 /// </summary>
 internal static class WhatsAppAssistantEndpoints
 {
-    private const int MaxChatsListed = 300;
-
     public static RouteGroupBuilder MapWhatsAppAssistantEndpoints(this RouteGroupBuilder api, ILogger logger)
     {
         var group = api.MapGroup("/channels/{id:guid}/chats");
@@ -46,25 +48,46 @@ internal static class WhatsAppAssistantEndpoints
         group.MapGet("", async (Guid id, IChannelRepository channels, IWhatsAppAssistantRepository chats,
             WhatsAppBridgeClient bridge, ICurrentUser currentUser, CancellationToken ct) =>
         {
-            if (await LinkedAsync(channels, currentUser.OwnerId, id, ct) is null) return Results.NotFound();
+            var connection = await LinkedAsync(channels, currentUser.OwnerId, id, ct);
+            if (connection is null) return Results.NotFound();
             var saved = (await chats.ListChatsAsync(currentUser.OwnerId, id, ct)).ToDictionary(x => x.ChatId);
             IReadOnlyList<BridgeChat> phone = [];
-            var live = false;
+            var state = await ConnectionStateAsync(connection, bridge, ct);
             if (bridge.Configured)
             {
                 try
                 {
                     phone = await bridge.ListChatsAsync(id, ct);
-                    live = true;
                 }
                 catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException
                                                       or JsonException)
                 {
+                    if (state == "open") state = "unreachable";
                     logger.LogDebug(exception, "Could not read the WhatsApp chat list for {ConnectionId}.", id);
                 }
             }
-            return Results.Ok(new WhatsAppChatListDto(live, Merge(saved, phone)));
+            var activity = (await chats.ListActivityAsync(currentUser.OwnerId, id, ct)).ToDictionary(x => x.ChatId);
+            var merged = Merge(saved, phone).Select(chat => activity.TryGetValue(chat.ChatId, out var item)
+                ? chat with { Preview = item.Preview, PreviewFromMe = item.FromMe, UnreadCount = item.UnreadCount }
+                : chat).ToArray();
+            return Results.Ok(new WhatsAppChatListDto(state == "open", merged, connection.Account, state));
         }).WithName("ListWhatsAppChats");
+
+        group.MapGet("/status", async (Guid id, IChannelRepository channels, WhatsAppBridgeClient bridge,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var connection = await LinkedAsync(channels, currentUser.OwnerId, id, ct);
+            return connection is null ? Results.NotFound() : Results.Ok(new WhatsAppConnectionDto(connection.Account,
+                await ConnectionStateAsync(connection, bridge, ct)));
+        }).WithName("GetWhatsAppConnectionStatus");
+
+        group.MapPost("/{chatId}/read", async (Guid id, string chatId, WhatsAppMarkReadRequest request,
+            IWhatsAppAssistantRepository chats, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var normalized = WhatsAppChatIds.Normalize(chatId);
+            return normalized is not null && await chats.MarkReadAsync(currentUser.OwnerId, id, normalized,
+                request.MessageId, ct) ? Results.NoContent() : Results.NotFound();
+        }).WithName("MarkWhatsAppChatRead");
 
         group.MapPut("/{chatId}", async (Guid id, string chatId, SaveWhatsAppChatRequest request,
             IChannelRepository channels, IWhatsAppAssistantRepository chats, WhatsAppReadAlongReceiver receiver,
@@ -101,13 +124,15 @@ internal static class WhatsAppAssistantEndpoints
             return Results.Ok(ToDto(saved));
         }).WithName("SaveWhatsAppChat");
 
-        group.MapGet("/{chatId}/messages", async (Guid id, string chatId, DateTimeOffset? before, int? limit,
+        group.MapGet("/{chatId}/messages", async (Guid id, string chatId, DateTimeOffset? before, Guid? beforeId, int? limit,
             IWhatsAppAssistantRepository chats, ICurrentUser currentUser, CancellationToken ct) =>
         {
             var chat = await FindAsync(chats, currentUser.OwnerId, id, chatId, ct);
             if (chat is null) return Results.NotFound();
+            if (before is not null && beforeId is not null)
+                return EndpointHelpers.Invalid("beforeId", "Choose one message cursor.");
             var messages = await chats.ListMessagesAsync(currentUser.OwnerId, id, chat.ChatId,
-                Math.Clamp(limit ?? 60, 1, 200), before, ct);
+                Math.Clamp(limit ?? 60, 1, 200), before, ct, beforeId);
             return Results.Ok(messages.Select(ToDto).ToArray());
         }).WithName("ListWhatsAppChatMessages");
 
@@ -246,8 +271,17 @@ internal static class WhatsAppAssistantEndpoints
             .OrderByDescending(x => x.ReadAlong)
             .ThenByDescending(x => x.LastMessageAt ?? DateTimeOffset.MinValue)
             .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
-            .Take(MaxChatsListed)
             .ToArray();
+    }
+
+    private static async Task<string> ConnectionStateAsync(ChannelConnectionRecord connection,
+        WhatsAppBridgeClient bridge, CancellationToken ct)
+    {
+        if (!connection.Enabled) return "paused";
+        if (!bridge.Configured) return "unavailable";
+        try { return (await bridge.GetStatusAsync(connection.Id, ct)).State; }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or JsonException)
+        { return "unreachable"; }
     }
 
     private static async Task<ChannelConnectionRecord?> LinkedAsync(IChannelRepository channels, Guid ownerId,
@@ -266,5 +300,5 @@ internal static class WhatsAppAssistantEndpoints
         new(chat.ChatId, chat.DisplayName, chat.IsGroup, chat.LastMessageAt, chat.ReadAlong, chat.AutoReminders);
 
     private static WhatsAppMessageDto ToDto(WhatsAppChatMessage message) =>
-        new(message.Id, message.ChatId, message.FromMe, message.Sender, message.Text, message.SentAt);
+        new(message.Id, message.ChatId, message.FromMe, message.Sender, message.Text, message.SentAt, message.ReceivedAt);
 }

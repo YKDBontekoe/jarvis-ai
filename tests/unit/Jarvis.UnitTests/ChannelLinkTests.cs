@@ -41,6 +41,57 @@ public sealed class ChannelLinkTests
     }
 
     [Fact]
+    public async Task Read_along_links_a_separate_personal_account_without_automatic_replies_or_forwarding()
+    {
+        var harness = new Harness(whatsApp: true);
+        var jarvisAttempt = await harness.Links.StartAsync(Owner, ChannelKinds.WhatsAppLinked, null, default);
+        harness.Bridge.Status = """{"state":"open","phone":"+31600000000"}""";
+        await harness.Links.GetAsync(Owner, jarvisAttempt!.LinkId, default);
+        var jarvis = Assert.Single(harness.Repository.Created);
+
+        harness.Bridge.Status = """{"state":"qr","qr":"data:image/png;base64,QR2"}""";
+        var personalAttempt = await harness.Links.StartAsync(Owner, ChannelKinds.WhatsAppLinked, null, default,
+            readAlong: true);
+        Assert.NotEqual(jarvis.Id, personalAttempt!.LinkId);
+        harness.Bridge.Status = """{"state":"open","phone":"+31612345678"}""";
+        var linked = await harness.Links.GetAsync(Owner, personalAttempt.LinkId, default);
+
+        Assert.Equal(ChannelLinkStates.Linked, linked!.State);
+        var personal = harness.Repository.Created.Single(x => x.Id == linked.ChannelId);
+        Assert.Equal(Owner, personal.OwnerId);
+        Assert.Equal("My WhatsApp", personal.DisplayName);
+        Assert.Equal("+31612345678", personal.Account);
+        Assert.True(personal.Enabled);
+        Assert.Empty(personal.AllowedSenders);
+        Assert.False(personal.ForwardNotifications);
+        Assert.Null(personal.NotifyRecipient);
+        Assert.False(ChannelAddresses.IsAllowed(personal, personal.Account));
+        Assert.Equal([jarvis.Account], jarvis.AllowedSenders);
+        Assert.True(jarvis.ForwardNotifications);
+
+        // Settings can still be saved while the personal account has no channel senders.
+        var settings = new SaveChannelRequest(personal.Kind, personal.DisplayName, personal.Account,
+            true, [], false, null, null);
+        ChannelValidation.Normalize(settings, creating: false);
+        Assert.Throws<ArgumentException>(() => ChannelValidation.Normalize(
+            settings with { ForwardNotifications = true }, creating: false));
+        await harness.Links.GetAsync(Owner, personalAttempt.LinkId, default);
+        Assert.Equal(2, harness.Repository.Created.Count);
+        Assert.Null(await harness.Links.GetAsync(Guid.NewGuid(), personalAttempt.LinkId, default));
+    }
+
+    [Fact]
+    public async Task Read_along_setup_cannot_repurpose_a_channel_or_link_signal()
+    {
+        var harness = new Harness(whatsApp: true, signal: true);
+        await Assert.ThrowsAsync<ArgumentException>(() => harness.Links.StartAsync(Owner,
+            ChannelKinds.Signal, null, default, readAlong: true));
+        await Assert.ThrowsAsync<ArgumentException>(() => harness.Links.StartAsync(Owner,
+            ChannelKinds.WhatsAppLinked, Guid.NewGuid(), default, readAlong: true));
+        Assert.Empty(harness.Repository.Created);
+    }
+
+    [Fact]
     public async Task Link_attempts_belong_to_their_owner()
     {
         var harness = new Harness(whatsApp: true);

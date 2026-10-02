@@ -11,6 +11,9 @@ class WhatsAppChat {
     required this.readAlong,
     required this.autoReminders,
     this.lastMessageAt,
+    this.preview,
+    this.previewFromMe,
+    this.unreadCount = 0,
   });
 
   final String chatId;
@@ -19,6 +22,9 @@ class WhatsAppChat {
   final bool readAlong;
   final bool autoReminders;
   final DateTime? lastMessageAt;
+  final String? preview;
+  final bool? previewFromMe;
+  final int unreadCount;
 
   static WhatsAppChat? fromJson(Map<String, dynamic>? json) {
     final chatId = asJsonString(json?['chatId']);
@@ -30,6 +36,11 @@ class WhatsAppChat {
       readAlong: asJsonBool(json['readAlong']),
       autoReminders: asJsonBool(json['autoReminders'], true),
       lastMessageAt: jsonDate(json['lastMessageAt'], local: true),
+      preview: asJsonString(json['preview']),
+      previewFromMe: json['previewFromMe'] is bool
+          ? json['previewFromMe'] as bool
+          : null,
+      unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -40,6 +51,9 @@ class WhatsAppChat {
     readAlong: readAlong ?? this.readAlong,
     autoReminders: autoReminders ?? this.autoReminders,
     lastMessageAt: lastMessageAt,
+    preview: preview,
+    previewFromMe: previewFromMe,
+    unreadCount: unreadCount,
   );
 
   /// The phone number for one-to-one chats, shown under a contact name.
@@ -68,6 +82,7 @@ class WhatsAppMessage {
     required this.text,
     required this.sentAt,
     this.sender,
+    this.receivedAt,
   });
 
   final String id;
@@ -75,6 +90,7 @@ class WhatsAppMessage {
   final String? sender;
   final String text;
   final DateTime sentAt;
+  final DateTime? receivedAt;
 
   static WhatsAppMessage? fromJson(Map<String, dynamic>? json) {
     final id = asJsonString(json?['id']);
@@ -86,9 +102,29 @@ class WhatsAppMessage {
       sender: asJsonString(json['sender']),
       text: asJsonString(json['text']) ?? '',
       sentAt: sentAt,
+      receivedAt: jsonDate(json['receivedAt']),
     );
   }
 }
+
+String whatsAppConnectionLabel(String state) => switch (state) {
+  'open' => 'Connected',
+  'connecting' => 'Reconnecting…',
+  'paused' => 'Paused',
+  'none' || 'logged_out' || 'qr' => 'Link your account again',
+  'unavailable' => 'WhatsApp is unavailable on this server',
+  _ => 'Connection unavailable',
+};
+
+String whatsAppConnectionMessage(String state) => switch (state) {
+  'connecting' =>
+    'WhatsApp is reconnecting. Saved messages are still available.',
+  'paused' => 'This account is paused. New messages are not being collected.',
+  'none' || 'logged_out' || 'qr' =>
+    'This account needs to be linked again. Open account settings to reconnect.',
+  _ =>
+    'WhatsApp could not be reached. Showing saved messages; Jarvis will retry automatically.',
+};
 
 String whatsAppChatPath(String channelId, String chatId) =>
     '/api/v1/channels/$channelId/chats/${Uri.encodeComponent(chatId)}';
