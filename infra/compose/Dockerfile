@@ -17,13 +17,16 @@ RUN npm install --global npm@12.2.0 && \
 WORKDIR /
 
 FROM golang:1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS github-mcp-server
-ARG GITHUB_MCP_SERVER_REVISION=85598ba6e1256f7ebf4867b95d63b833c4549264
+ARG GITHUB_MCP_SERVER_VERSION=v1.13.0
+ARG GITHUB_MCP_SERVER_REVISION=85b0399bf214f24f5028d9cedecdd020f646c822
 RUN apk add --no-cache git
 WORKDIR /source
 RUN git init . && \
     git remote add origin https://github.com/github/github-mcp-server.git && \
-    git fetch --depth 1 origin "$GITHUB_MCP_SERVER_REVISION" && \
-    git checkout --detach FETCH_HEAD && \
+    git fetch --depth 1 origin "refs/tags/${GITHUB_MCP_SERVER_VERSION}:refs/tags/${GITHUB_MCP_SERVER_VERSION}" && \
+    test "$(git rev-parse "${GITHUB_MCP_SERVER_VERSION}^{commit}")" = "$GITHUB_MCP_SERVER_REVISION" && \
+    git checkout --detach "$GITHUB_MCP_SERVER_REVISION" && \
+    go get golang.org/x/net@v0.56.0 golang.org/x/text@v0.39.0 && \
     mkdir -p /out && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" \
       -o /out/github-mcp-server ./cmd/github-mcp-server
@@ -57,7 +60,7 @@ RUN --mount=type=secret,id=sentry_auth_token,required=false \
     fi
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:2d584d8147faddb0d678c5748d47953e5b8e18621ed4fb7049a91381d9d7746f AS runtime
-RUN apt-get update && apt-get install --yes --no-install-recommends git \
+RUN apt-get update && apt-get install --yes --no-install-recommends git libssl3t64 openssl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=codex-cli /usr/local /usr/local
