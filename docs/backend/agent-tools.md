@@ -31,6 +31,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Watches | `ConditionWatchAgentTools` | — |
 | Memory | `MemoryAgentTools` list/search/remember | **Forget** requires approval |
 | Journal | `JournalAgentTools` `SaveJournalEntry` (appends to the day's entry), `ListJournalEntries` | Hidden during background task turns; off when the profile disallows remembering |
+| Habits | `HabitAgentTools` `GetHabits`, `CheckInHabits` (by name, optional date up to 7 days back), `CreateHabit` | No approval (owner's own tracking data); hidden during background task turns. Deleting habits is app-only |
 | MCP | `McpServerAgentTools` + `McpSetupAgentTools` | Discover/add/update/invoke/read prompt/resource/remove mostly **approval**; setup and secret cards in chat |
 | Coding | `CodexCodingTools.RunCodingTaskAsync` | **Approval**; only if `Coding:Repositories` configured |
 
