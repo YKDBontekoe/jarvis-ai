@@ -259,6 +259,23 @@ void main() {
     await capture(tester, '22-empty-state');
   });
 
+  for (final (index, action) in [
+    (23, 'Set a reminder'),
+    (24, 'Start a background task'),
+    (25, 'Add a memory'),
+  ]) {
+    screenshotTest('create $action', (tester) async {
+      usePhone(tester);
+      await start(tester);
+      await openChat(tester);
+      await tester.tap(find.byTooltip('More actions'));
+      await settle(tester);
+      await tester.tap(find.text(action));
+      await settle(tester);
+      await capture(tester, '$index-create-${action.split(' ').last}');
+    });
+  }
+
   screenshotTest('sign in', (tester) async {
     usePhone(tester);
     await tester.pumpWidget(

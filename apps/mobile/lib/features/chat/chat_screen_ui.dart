@@ -258,6 +258,7 @@ mixin _ChatScreenUi on _ChatScreenController {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
+                        fontFamily: 'Inter',
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
                         letterSpacing: -.3,

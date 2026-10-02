@@ -645,7 +645,7 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(JarvisRadii.xl),
       ),
-      titleTextStyle: text.titleLarge,
+      titleTextStyle: JarvisType.serif(colors.ink).copyWith(fontSize: 28),
       contentTextStyle: text.bodyMedium?.copyWith(color: colors.inkSoft),
       actionsPadding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
     ),
@@ -702,9 +702,15 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       fillColor: colors.surface,
       hintStyle: text.bodyMedium?.copyWith(color: colors.muted),
       labelStyle: text.bodyMedium?.copyWith(color: colors.inkSoft),
-      floatingLabelStyle: text.bodyMedium?.copyWith(
-        color: colors.ink,
-        fontWeight: FontWeight.w500,
+      floatingLabelStyle: WidgetStateTextStyle.resolveWith(
+        (states) => (text.bodyMedium ?? const TextStyle()).copyWith(
+          color: states.contains(WidgetState.error)
+              ? colors.danger
+              : states.contains(WidgetState.focused)
+              ? colors.accent
+              : colors.inkSoft,
+          fontWeight: FontWeight.w500,
+        ),
       ),
       helperStyle: text.bodySmall,
       prefixIconColor: colors.muted,
@@ -712,8 +718,9 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       border: fieldBorder,
       enabledBorder: fieldBorder,
       disabledBorder: fieldBorder,
+      // Focus reads as the accent, like the chat composer, not a heavy black.
       focusedBorder: fieldBorder.copyWith(
-        borderSide: BorderSide(color: colors.ink, width: 1.2),
+        borderSide: BorderSide(color: colors.accent, width: 1.5),
       ),
       errorBorder: fieldBorder.copyWith(
         borderSide: BorderSide(color: colors.danger),
