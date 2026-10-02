@@ -26,7 +26,7 @@ root. It shares the existing account and owner-scoped data. See
 | `features/memory/` | Memory list/editor, knowledge graph map |
 | `features/journal/` | Journal list + summary, entry editor (text, ratings, tags), "Talk about my day" hand-off to chat |
 | `features/tasks/` | `tasks_screen.dart`, `task_details_screen.dart`, editors |
-| `features/reminders/` | Reminders list (swipe done/snooze) and editor |
+| `features/reminders/` | Reminders: state and actions in `reminders_screen.dart`, list and cards in `reminders_list.dart`, editor in `reminder_editor.dart` |
 | `features/conversations/` | Conversation history, groups, export |
 | `features/files/` | Files, collections, platform download helpers |
 | `features/integrations/` | Integrations hub: apps, packs, MCP servers, credentials |
