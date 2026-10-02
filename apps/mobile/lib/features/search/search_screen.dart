@@ -10,6 +10,7 @@ import '../../ui/phosphor_icons.dart';
 import 'recent_searches_store.dart';
 import 'search_api.dart';
 import 'search_models.dart';
+import 'quick_commands.dart';
 import 'search_navigation.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -117,6 +118,12 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  /// Leaves search and does the command, e.g. opens the new-reminder editor.
+  void _runCommand(QuickCommand command) {
+    Navigator.of(context).pop();
+    widget.onUtility(command.destination);
+  }
+
   Future<void> _openRecent(String query) async {
     _query.text = query;
     await _runSearch();
@@ -186,6 +193,14 @@ class _SearchScreenState extends State<SearchScreen> {
           Expanded(
             child: _query.text.trim().isEmpty
                 ? _RecentList(
+                    leading: [
+                      const QuickCommandHeader('Create'),
+                      for (final command in matchQuickCommands(''))
+                        QuickCommandTile(
+                          command: command,
+                          onTap: () => _runCommand(command),
+                        ),
+                    ],
                     recent: _recent,
                     onOpen: (query) => unawaited(_openRecent(query)),
                     onRemove: (query) async {
@@ -193,10 +208,22 @@ class _SearchScreenState extends State<SearchScreen> {
                       await _loadRecent();
                     },
                   )
-                : SearchResultsBody(
-                    loading: _loading,
-                    results: _results,
-                    onOpen: (hit) => unawaited(_openHit(hit)),
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final command in matchQuickCommands(_query.text))
+                        QuickCommandTile(
+                          command: command,
+                          onTap: () => _runCommand(command),
+                        ),
+                      Expanded(
+                        child: SearchResultsBody(
+                          loading: _loading,
+                          results: _results,
+                          onOpen: (hit) => unawaited(_openHit(hit)),
+                        ),
+                      ),
+                    ],
                   ),
           ),
         ],
@@ -291,35 +318,45 @@ class _RecentList extends StatelessWidget {
     required this.recent,
     required this.onOpen,
     required this.onRemove,
+    this.leading = const [],
   });
 
+  /// Rows shown above the recent searches (the quick commands).
+  final List<Widget> leading;
   final List<String> recent;
   final ValueChanged<String> onOpen;
   final ValueChanged<String> onRemove;
 
   @override
   Widget build(BuildContext context) {
-    if (recent.isEmpty) {
-      return const Center(
-        child: Text('Recent searches appear here on this device only.'),
-      );
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      itemCount: recent.length,
-      separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final query = recent[index];
-        return ListTile(
-          leading: const Icon(PhosphorIconsRegular.clockCounterClockwise, size: 20),
-          title: Text(query),
-          trailing: IconButton(
-            icon: const Icon(PhosphorIconsRegular.x, size: 18),
-            onPressed: () => onRemove(query),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 24),
+      children: [
+        ...leading,
+        const QuickCommandHeader('Recent'),
+        if (recent.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Text(
+              'Recent searches appear here on this device only.',
+              style: TextStyle(color: JarvisColors.of(context).muted),
+            ),
           ),
-          onTap: () => onOpen(query),
-        );
-      },
+        for (final query in recent)
+          ListTile(
+            leading: const Icon(
+              PhosphorIconsRegular.clockCounterClockwise,
+              size: 20,
+            ),
+            title: Text(query),
+            trailing: IconButton(
+              tooltip: 'Remove',
+              icon: const Icon(PhosphorIconsRegular.x, size: 18),
+              onPressed: () => onRemove(query),
+            ),
+            onTap: () => onOpen(query),
+          ),
+      ],
     );
   }
 }

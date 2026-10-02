@@ -222,6 +222,7 @@ mixin _ChatScreenCatchUp on _ChatScreenController {
               ),
             ),
       );
+    _settledEntries = _entries.length;
     if (_conversationId case final id?) _entries.addAll(_queuedEntries(id));
     _messageCursor = asJsonString(details?['nextCursor']);
     _hasOlderMessages = asJsonBool(details?['hasMore']);

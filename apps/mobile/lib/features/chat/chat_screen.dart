@@ -190,19 +190,18 @@ class _ChatScreenState extends _ChatScreenController
                     SizedBox(width: 292, child: sidebar),
                     const VerticalDivider(width: 1),
                     Expanded(
-                      child: _utilityPane == null
-                          ? content
-                          : KeyedSubtree(
-                              key: ValueKey(_paneRevision),
-                              child: Navigator(
-                                onGenerateRoute: (_) => MaterialPageRoute<void>(
-                                  builder: (routeContext) {
-                                    _paneContext = routeContext;
-                                    return _utilityPane!;
-                                  },
-                                ),
-                              ),
-                            ),
+                      child: AnimatedSwitcher(
+                        duration: JarvisMotion.of(context, JarvisMotion.base),
+                        switchInCurve: JarvisMotion.standard,
+                        switchOutCurve: JarvisMotion.exit,
+                        transitionBuilder: JarvisMotion.fadeRise,
+                        child: _utilityPane == null
+                            ? KeyedSubtree(
+                                key: const ValueKey('chat'),
+                                child: content,
+                              )
+                            : _paneNavigator(),
+                      ),
                     ),
                   ],
                 )
@@ -228,6 +227,23 @@ class _ChatScreenState extends _ChatScreenController
           ),
         );
       },
+    );
+  }
+
+  Widget _paneNavigator() {
+    final revision = _paneRevision;
+    final page = _utilityPane!;
+    return KeyedSubtree(
+      key: ValueKey(revision),
+      child: Navigator(
+        onGenerateRoute: (_) => MaterialPageRoute<void>(
+          builder: (routeContext) {
+            // A pane that is fading out must not claim the live context.
+            if (revision == _paneRevision) _paneContext = routeContext;
+            return page;
+          },
+        ),
+      ),
     );
   }
 

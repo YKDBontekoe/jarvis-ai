@@ -11,6 +11,10 @@ abstract class _ChatScreenController extends State<ChatScreen>
   final _password = TextEditingController();
   final _scroll = ScrollController();
   final _entries = <ChatEntry>[];
+
+  /// Entries before this index were loaded as history and appear without the
+  /// arrival animation; anything after it arrived live.
+  int _settledEntries = 0;
   String? _messageCursor;
   bool _hasOlderMessages = false;
   bool _loadingOlderMessages = false;

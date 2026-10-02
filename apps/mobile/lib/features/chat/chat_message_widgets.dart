@@ -149,6 +149,11 @@ class _MessageBubbleState extends State<MessageBubble> {
                   padding: const EdgeInsets.only(top: 3),
                   child: JarvisMarkdown(data: message.content),
                 ),
+                if (message.pending)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 6),
+                    child: StreamingPulse(),
+                  ),
                 if (!message.isUser && message.citations.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -173,7 +178,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                   ),
                 if (!message.pending)
                   Padding(
-                    padding: const EdgeInsets.only(top: 4),
+                    padding: const EdgeInsets.only(top: 6, left: -8 + 8),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -194,14 +199,12 @@ class _MessageBubbleState extends State<MessageBubble> {
                           IconButton(
                             tooltip: 'Try again',
                             onPressed: widget.onRegenerate,
+                            color: JarvisColors.of(context).muted,
                             icon: const Icon(
                               PhosphorIconsRegular.arrowsClockwise,
-                              size: 17,
+                              size: 16,
                             ),
-                            style: IconButton.styleFrom(
-                              minimumSize: const Size(36, 36),
-                              foregroundColor: JarvisColors.of(context).muted,
-                            ),
+                            style: _actionStyle,
                           ),
                       ],
                     ),
@@ -302,6 +305,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                       style: TextButton.styleFrom(
                         visualDensity: VisualDensity.compact,
                         textStyle: const TextStyle(
+                          fontFamily: 'Inter',
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -320,6 +324,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                   foregroundColor: JarvisColors.of(context).danger,
                   visualDensity: VisualDensity.compact,
                   textStyle: const TextStyle(
+                    fontFamily: 'Inter',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -336,6 +341,16 @@ class _MessageBubbleState extends State<MessageBubble> {
     ),
   );
 }
+
+/// Compact square hit area shared by the reply actions so they sit in a
+/// tight, even row under the text.
+final _actionStyle = IconButton.styleFrom(
+  minimumSize: const Size(32, 32),
+  fixedSize: const Size(32, 32),
+  padding: EdgeInsets.zero,
+  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+);
 
 class _RateButton extends StatelessWidget {
   const _RateButton({
@@ -354,8 +369,8 @@ class _RateButton extends StatelessWidget {
     return IconButton(
       tooltip: up ? 'Good reply' : 'Could be better',
       onPressed: onPressed,
-      visualDensity: VisualDensity.compact,
       iconSize: 16,
+      style: _actionStyle,
       color: selected
           ? (up
                 ? JarvisColors.of(context).success
@@ -422,10 +437,15 @@ class _CopyButton extends StatelessWidget {
         foregroundColor: copied
             ? JarvisColors.of(context).success
             : JarvisColors.of(context).muted,
-        visualDensity: VisualDensity.compact,
-        minimumSize: const Size(0, 30),
+        minimumSize: const Size(0, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+        textStyle: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 12.5,
+          fontWeight: FontWeight.w500,
+        ),
       ),
       icon: Icon(
         copied ? PhosphorIconsRegular.check : PhosphorIconsRegular.copySimple,
@@ -653,4 +673,56 @@ class JarvisAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => JarvisOrb(size: size, glow: false);
+}
+
+/// A small accent dot that breathes under a reply while it is still being
+/// written, so a pause in the stream never looks like the end.
+class StreamingPulse extends StatefulWidget {
+  const StreamingPulse({super.key});
+
+  @override
+  State<StreamingPulse> createState() => _StreamingPulseState();
+}
+
+class _StreamingPulseState extends State<StreamingPulse>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final dot = Container(
+      width: 9,
+      height: 9,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: colors.accentGradient,
+      ),
+    );
+    return Semantics(
+      label: 'Jarvis is still writing',
+      child: JarvisMotion.reduced(context)
+          ? dot
+          : FadeTransition(
+              opacity: Tween(begin: .35, end: 1.0).animate(
+                CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+              ),
+              child: ScaleTransition(
+                scale: Tween(begin: .8, end: 1.0).animate(
+                  CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+                ),
+                child: dot,
+              ),
+            ),
+    );
+  }
 }

@@ -1,11 +1,16 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import 'motion.dart';
 import 'phosphor_icons.dart';
 
 import '../theme.dart';
+
+export 'motion.dart';
 
 part 'jarvis_orb.dart';
 
@@ -15,11 +20,16 @@ class FadeSlideIn extends StatefulWidget {
   const FadeSlideIn({
     required this.child,
     this.index = 0,
-    this.offset = 10,
+    this.offset = JarvisMotion.travel,
+    this.animate = true,
     super.key,
   });
 
   final Widget child;
+
+  /// When false the child starts in place; for rows that were already on
+  /// screen before (history, restored state).
+  final bool animate;
 
   /// Position in a list; later rows start later (capped so long lists stay quick).
   final int index;
@@ -34,7 +44,7 @@ class FadeSlideIn extends StatefulWidget {
 class _FadeSlideInState extends State<FadeSlideIn>
     with SingleTickerProviderStateMixin {
   static const _stepMs = 40;
-  static const _travelMs = 320;
+  static final _travelMs = JarvisMotion.slow.inMilliseconds;
 
   late final AnimationController _controller;
   late final Animation<double> _progress;
@@ -52,10 +62,14 @@ class _FadeSlideInState extends State<FadeSlideIn>
       curve: Interval(
         delay / (delay + _travelMs),
         1,
-        curve: Curves.easeOutCubic,
+        curve: JarvisMotion.standard,
       ),
     );
-    _controller.forward();
+    if (widget.animate) {
+      _controller.forward();
+    } else {
+      _controller.value = 1;
+    }
   }
 
   @override
@@ -66,7 +80,7 @@ class _FadeSlideInState extends State<FadeSlideIn>
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+    if (JarvisMotion.reduced(context)) {
       return widget.child;
     }
     return AnimatedBuilder(
@@ -127,9 +141,9 @@ class _SurfaceCardState extends State<SurfaceCard> {
     return Padding(
       padding: widget.margin,
       child: AnimatedScale(
-        scale: _pressed && widget.onTap != null ? .985 : 1,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
+        scale: _pressed && widget.onTap != null ? JarvisMotion.startScale : 1,
+        duration: JarvisMotion.fast,
+        curve: JarvisMotion.standard,
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: widget.gradient == null
@@ -137,9 +151,15 @@ class _SurfaceCardState extends State<SurfaceCard> {
                 : null,
             gradient: widget.gradient,
             borderRadius: shape,
-            border: Border.all(color: widget.borderColor ?? colors.outline),
+            border: Border.all(
+              color:
+                  widget.borderColor ?? colors.outline.withValues(alpha: .75),
+            ),
+            // Every card lifts a hair off the canvas; elevated ones float.
             boxShadow: widget.elevated
                 ? JarvisShadows.soft(colors.brightness)
+                : widget.gradient == null && widget.color == null
+                ? JarvisShadows.hairline(colors.brightness)
                 : null,
           ),
           child: Material(
@@ -427,7 +447,7 @@ class ListScreenBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading && isEmpty) return const LoadingState();
+    if (loading && isEmpty) return const SkeletonList();
     if (error != null && isEmpty) {
       return ErrorState(message: error!, onRetry: onRetry);
     }
@@ -476,7 +496,7 @@ class LoadingState extends StatelessWidget {
     child: TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: const Duration(milliseconds: 500),
-      curve: const Interval(.3, 1, curve: Curves.easeOut),
+      curve: const Interval(.3, 1, curve: JarvisMotion.standard),
       builder: (context, value, child) => Opacity(opacity: value, child: child),
       child: const SizedBox.square(
         dimension: 28,
@@ -484,6 +504,135 @@ class LoadingState extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Placeholder rows shaped like the list that is loading, with a soft shimmer.
+/// Waits a beat before appearing so fast loads never flash placeholders.
+class SkeletonList extends StatefulWidget {
+  const SkeletonList({this.rows = 6, super.key});
+
+  final int rows;
+
+  @override
+  State<SkeletonList> createState() => _SkeletonListState();
+}
+
+class _SkeletonListState extends State<SkeletonList>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shimmer = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _shimmer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final reduced = JarvisMotion.reduced(context);
+    Widget bar(double widthFactor, double height) => FractionallySizedBox(
+      alignment: Alignment.centerLeft,
+      widthFactor: widthFactor,
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          color: colors.surfaceRaised,
+          borderRadius: BorderRadius.circular(height / 2),
+        ),
+      ),
+    );
+    final rows = Column(
+      children: [
+        for (var i = 0; i < widget.rows; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: SurfaceCard(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: colors.surfaceRaised,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Vary the widths so the rows read as content.
+                        bar(.4 + (i * 17 % 30) / 100, 11),
+                        const SizedBox(height: 8),
+                        bar(.6 + (i * 13 % 25) / 100, 9),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+    final shimmering = reduced
+        ? rows
+        : AnimatedBuilder(
+            animation: _shimmer,
+            child: rows,
+            builder: (context, child) => ShaderMask(
+              blendMode: BlendMode.srcATop,
+              shaderCallback: (bounds) {
+                final dx = (_shimmer.value * 2 - .5) * bounds.width;
+                // Fade from a transparent copy of the highlight, never from
+                // transparent black, which would smear grey across the rows.
+                final glow = colors.isDark
+                    ? const Color(0xffffffff)
+                    : colors.surface;
+                return LinearGradient(
+                  colors: [
+                    glow.withValues(alpha: 0),
+                    glow.withValues(alpha: colors.isDark ? .06 : .7),
+                    glow.withValues(alpha: 0),
+                  ],
+                  stops: const [.35, .5, .65],
+                  transform: _SlideGradient(dx),
+                ).createShader(bounds);
+              },
+              child: child,
+            ),
+          );
+    return Semantics(
+      label: 'Loading',
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 450),
+        curve: const Interval(.4, 1, curve: JarvisMotion.standard),
+        builder: (context, value, child) =>
+            Opacity(opacity: value, child: child),
+        child: SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: ContentWidth(child: ExcludeSemantics(child: shimmering)),
+        ),
+      ),
+    );
+  }
+}
+
+class _SlideGradient extends GradientTransform {
+  const _SlideGradient(this.dx);
+
+  final double dx;
+
+  @override
+  Matrix4 transform(Rect bounds, {TextDirection? textDirection}) =>
+      Matrix4.translationValues(dx, 0, 0);
 }
 
 enum NoticeTone { info, warning, danger, success }
@@ -675,7 +824,8 @@ class HeaderAction extends StatelessWidget {
     final bigText = MediaQuery.textScalerOf(context).scale(14) > 14 * 1.3;
     final iconOnly =
         bigText ||
-        (collapsesWhenNarrow && MediaQuery.sizeOf(context).width < _narrowWidth);
+        (collapsesWhenNarrow &&
+            MediaQuery.sizeOf(context).width < _narrowWidth);
     final leading = busy
         ? const SizedBox.square(
             dimension: 14,
@@ -777,13 +927,15 @@ class GroupedSection extends StatelessWidget {
   );
 }
 
-/// Round, softly shadowed icon button used in the top bar.
+/// Round, softly shadowed icon button used in the top bar. [bare] drops the
+/// disc so the button can sit inside a [ToolbarCapsule].
 class CircleIconButton extends StatelessWidget {
   const CircleIconButton({
     required this.icon,
     required this.tooltip,
     required this.onPressed,
-    this.size = 44,
+    this.size = 42,
+    this.bare = false,
     super.key,
   });
 
@@ -791,37 +943,383 @@ class CircleIconButton extends StatelessWidget {
   final String tooltip;
   final VoidCallback? onPressed;
   final double size;
+  final bool bare;
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-    message: tooltip,
-    child: Semantics(
-      button: true,
-      enabled: onPressed != null,
-      label: tooltip,
-      excludeSemantics: true,
-      child: Material(
-        color: JarvisColors.of(context).surface,
-        shape: CircleBorder(
-          side: BorderSide(color: JarvisColors.of(context).outline),
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final button = Material(
+      type: MaterialType.transparency,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: SizedBox.square(
+          dimension: size,
+          child: Icon(
+            icon,
+            size: 19,
+            color: onPressed == null ? colors.muted : colors.ink,
+          ),
         ),
-        shadowColor: const Color(0x14000000),
-        elevation: 1.5,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onPressed,
-          child: SizedBox.square(
-            dimension: size,
-            child: Icon(
-              icon,
-              size: 19,
-              color: onPressed == null
-                  ? JarvisColors.of(context).muted
-                  : JarvisColors.of(context).ink,
+      ),
+    );
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        enabled: onPressed != null,
+        label: tooltip,
+        excludeSemantics: true,
+        child: bare
+            ? button
+            : DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: colors.outline.withValues(alpha: .7),
+                  ),
+                  boxShadow: JarvisShadows.hairline(colors.brightness),
+                ),
+                child: button,
+              ),
+      ),
+    );
+  }
+}
+
+/// A pill that groups a few [CircleIconButton]s (with `bare: true`), like a
+/// toolbar, so the top bar reads as one calm control instead of many discs.
+class ToolbarCapsule extends StatelessWidget {
+  const ToolbarCapsule({required this.children, super.key});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.outline.withValues(alpha: .7)),
+        boxShadow: JarvisShadows.hairline(colors.brightness),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: Row(mainAxisSize: MainAxisSize.min, children: children),
+      ),
+    );
+  }
+}
+
+/// Small rounded status label with an optional action, for quiet states such
+/// as "Offline · Retry" that should not push content down like a banner.
+class StatusChip extends StatelessWidget {
+  const StatusChip({
+    required this.label,
+    required this.color,
+    this.actionLabel,
+    this.onAction,
+    super.key,
+  });
+
+  final String label;
+  final Color color;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Material(
+      color: colors.surface,
+      shape: StadiumBorder(
+        side: BorderSide(color: colors.outline.withValues(alpha: .8)),
+      ),
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onAction,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 6, 12, 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 7),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: colors.inkSoft,
+                ),
+              ),
+              if (actionLabel != null) ...[
+                Text(
+                  '  ·  ',
+                  style: TextStyle(fontSize: 12.5, color: colors.muted),
+                ),
+                Text(
+                  actionLabel!,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: colors.accent,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Runs [action] once [state]'s route has finished animating in, so an editor
+/// opened on arrival does not appear over a page that is still moving.
+void afterRouteSettles(State state, Future<void> Function() action) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!state.mounted) return;
+    final animation = ModalRoute.of(state.context)?.animation;
+    if (animation == null || animation.isCompleted) {
+      action();
+      return;
+    }
+    void listener(AnimationStatus status) {
+      if (!status.isCompleted) return;
+      animation.removeStatusListener(listener);
+      if (state.mounted) action();
+    }
+
+    animation.addStatusListener(listener);
+  });
+}
+
+/// Dissolves scrolling content into the canvas at the top and bottom edges,
+/// so text slides softly under the header and composer instead of being cut.
+class EdgeFade extends StatelessWidget {
+  const EdgeFade({
+    required this.child,
+    this.top = 14,
+    this.bottom = 26,
+    super.key,
+  });
+
+  final Widget child;
+  final double top;
+  final double bottom;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final height = constraints.maxHeight;
+      if (!height.isFinite || height <= top + bottom) return child;
+      return ShaderMask(
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (bounds) => LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: const [
+            Color(0x00000000),
+            Color(0xff000000),
+            Color(0xff000000),
+            Color(0x00000000),
+          ],
+          stops: [0, top / height, 1 - bottom / height, 1],
+        ).createShader(bounds),
+        child: child,
+      );
+    },
+  );
+}
+
+/// One side of [SwipeActions].
+class SwipeAction {
+  const SwipeAction({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTrigger,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Future<void> Function() onTrigger;
+}
+
+/// Swipe a row to act on it: the action shows underneath as the row slides,
+/// fires past the threshold with a tap of haptics, and the row springs back
+/// (the list then reloads into its new state). Menus stay the accessible path.
+class SwipeActions extends StatelessWidget {
+  const SwipeActions({
+    required this.id,
+    required this.child,
+    this.start,
+    this.end,
+    this.radius = JarvisRadii.lg,
+    this.bottomGap = 10,
+    super.key,
+  });
+
+  final Object id;
+  final Widget child;
+
+  /// Revealed when swiping toward the end (right in left-to-right layouts).
+  final SwipeAction? start;
+
+  /// Revealed when swiping toward the start.
+  final SwipeAction? end;
+  final double radius;
+
+  /// Space below the row that the coloured background must not cover.
+  final double bottomGap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (start == null && end == null) return child;
+    final direction = start != null && end != null
+        ? DismissDirection.horizontal
+        : start != null
+        ? DismissDirection.startToEnd
+        : DismissDirection.endToStart;
+    return Dismissible(
+      key: ValueKey(('swipe', id)),
+      direction: direction,
+      dismissThresholds: const {
+        DismissDirection.startToEnd: .32,
+        DismissDirection.endToStart: .32,
+      },
+      movementDuration: JarvisMotion.base,
+      confirmDismiss: (swiped) async {
+        final action = swiped == DismissDirection.startToEnd ? start : end;
+        if (action == null) return false;
+        unawaited(HapticFeedback.mediumImpact());
+        await action.onTrigger();
+        return false;
+      },
+      background: start == null
+          ? const SizedBox.shrink()
+          : _SwipeBackground(
+              action: start!,
+              alignment: Alignment.centerLeft,
+              radius: radius,
+              bottomGap: bottomGap,
             ),
+      secondaryBackground: end == null
+          ? null
+          : _SwipeBackground(
+              action: end!,
+              alignment: Alignment.centerRight,
+              radius: radius,
+              bottomGap: bottomGap,
+            ),
+      child: child,
+    );
+  }
+}
+
+class _SwipeBackground extends StatelessWidget {
+  const _SwipeBackground({
+    required this.action,
+    required this.alignment,
+    required this.radius,
+    required this.bottomGap,
+  });
+
+  final SwipeAction action;
+  final Alignment alignment;
+  final double radius;
+  final double bottomGap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(bottom: bottomGap),
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: action.color,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: Align(
+        alignment: alignment,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(action.icon, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                action.label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
           ),
         ),
       ),
     ),
   );
+}
+
+/// Soft violet and sky light behind a hero (the orb on home), echoing the
+/// sign-in backdrop so the first screen has some atmosphere. Purely visual.
+class HeroGlow extends StatelessWidget {
+  const HeroGlow({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    Widget blob(double size, Color color) => Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)]),
+      ),
+    );
+    final strength = colors.isDark ? 1.4 : 1.0;
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
+      children: [
+        // Blobs start at the top edge so the scroll viewport never slices
+        // through a bright part of the glow.
+        Positioned(
+          top: -10,
+          left: -170,
+          child: IgnorePointer(
+            child: blob(380, colors.violet.withValues(alpha: .13 * strength)),
+          ),
+        ),
+        Positioned(
+          top: 20,
+          right: -190,
+          child: IgnorePointer(
+            child: blob(340, colors.sky.withValues(alpha: .09 * strength)),
+          ),
+        ),
+        Positioned(
+          top: 170,
+          left: -40,
+          child: IgnorePointer(
+            child: blob(220, colors.rose.withValues(alpha: .10 * strength)),
+          ),
+        ),
+        child,
+      ],
+    );
+  }
 }

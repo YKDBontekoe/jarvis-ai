@@ -137,8 +137,10 @@ mixin _ChatScreenUi on _ChatScreenController {
     unawaited(
       showModalBottomSheet<void>(
         context: context,
+        // Seven actions do not fit the default half-height sheet on a phone.
+        isScrollControlled: true,
         builder: (context) => SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -171,19 +173,19 @@ mixin _ChatScreenUi on _ChatScreenController {
                   'Start a background task',
                   'Jarvis works on it and reports back',
                   PhosphorIconsRegular.listChecks,
-                  'tasks',
+                  'tasks$createDestinationSuffix',
                 ),
                 action(
                   'Set a reminder',
                   'Pick a date and time',
                   PhosphorIconsRegular.bell,
-                  'reminders',
+                  'reminders$createDestinationSuffix',
                 ),
                 action(
                   'Add a memory',
                   'Tell Jarvis something to remember',
                   PhosphorIconsRegular.notebook,
-                  'memory',
+                  'memory$createDestinationSuffix',
                 ),
                 ListTile(
                   leading: const IconBadge(
@@ -204,113 +206,124 @@ mixin _ChatScreenUi on _ChatScreenController {
     );
   }
 
-  PreferredSizeWidget _topBar({
-    required bool wide,
-    required bool voice,
-  }) => AppBar(
-    toolbarHeight: 64,
-    backgroundColor: voice ? Colors.transparent : null,
-    automaticallyImplyLeading: false,
-    leadingWidth: 64,
-    leading: voice
-        ? Center(
-            child: CircleIconButton(
-              icon: PhosphorIconsRegular.x,
-              tooltip: 'Close voice',
-              onPressed: () => _selectDestination(0),
-            ),
-          )
-        : wide
-        ? null
-        : Center(
-            child: CircleIconButton(
-              icon: PhosphorIconsRegular.list,
-              tooltip: 'Menu',
-              onPressed: () {
-                _dismissKeyboard();
-                _scaffoldKey.currentState?.openDrawer();
-              },
-            ),
-          ),
-    centerTitle: true,
-    title: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        GestureDetector(
-          onTap: voice || _openProject == null
-              ? null
-              : () => _openUtility('$projectDestinationPrefix$_projectId'),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!voice && _openProject != null) ...[
-                ProjectBadge(
-                  color: asJsonString(_openProject!['color']),
-                  size: 20,
+  PreferredSizeWidget _topBar({required bool wide, required bool voice}) =>
+      AppBar(
+        toolbarHeight: 64,
+        backgroundColor: voice ? Colors.transparent : null,
+        automaticallyImplyLeading: false,
+        leadingWidth: 64,
+        leading: voice
+            ? Center(
+                child: CircleIconButton(
+                  icon: PhosphorIconsRegular.x,
+                  tooltip: 'Close voice',
+                  onPressed: () => _selectDestination(0),
                 ),
-                const SizedBox(width: 7),
-              ],
-              Flexible(
-                child: Text(
-                  voice
-                      ? 'Voice'
-                      : asJsonString(_openProject?['name']) ?? 'Jarvis',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -.3,
+              )
+            : wide
+            ? null
+            : Center(
+                child: CircleIconButton(
+                  icon: PhosphorIconsRegular.list,
+                  tooltip: 'Menu',
+                  onPressed: () {
+                    _dismissKeyboard();
+                    _scaffoldKey.currentState?.openDrawer();
+                  },
+                ),
+              ),
+        centerTitle: true,
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            GestureDetector(
+              onTap: voice || _openProject == null
+                  ? null
+                  : () => _openUtility('$projectDestinationPrefix$_projectId'),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!voice && _openProject != null) ...[
+                    ProjectBadge(
+                      color: asJsonString(_openProject!['color']),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 7),
+                  ],
+                  Flexible(
+                    child: Text(
+                      voice
+                          ? 'Voice'
+                          : asJsonString(_openProject?['name']) ?? 'Jarvis',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -.3,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  _ConnectionDot(connected: _connected),
+                ],
+              ),
+            ),
+            if (!voice && (_profileName != null || _profileDeleted))
+              GestureDetector(
+                onTap: _busy ? null : _switchConversationProfile,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    _profileDeleted
+                        ? '${_profileName ?? 'Profile'} (deleted)'
+                        : _profileName ?? 'Profile',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: JarvisColors.of(context).inkSoft,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 7),
-              _ConnectionDot(connected: _connected),
-            ],
-          ),
+          ],
         ),
-        if (!voice && (_profileName != null || _profileDeleted))
-          GestureDetector(
-            onTap: _busy ? null : _switchConversationProfile,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                _profileDeleted
-                    ? '${_profileName ?? 'Profile'} (deleted)'
-                    : _profileName ?? 'Profile',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: JarvisColors.of(context).inkSoft,
+        actions: [
+          if (!voice)
+            ToolbarCapsule(
+              children: [
+                _NotificationBell(
+                  unread: _unreadNotifications,
+                  onPressed: _signedOut
+                      ? null
+                      : () => _openUtility('notifications'),
                 ),
-              ),
+                CircleIconButton(
+                  bare: true,
+                  icon: PhosphorIconsRegular.magnifyingGlass,
+                  tooltip: 'Search',
+                  onPressed: _signedOut
+                      ? null
+                      : () => unawaited(_openSearch(context)),
+                ),
+                CircleIconButton(
+                  bare: true,
+                  icon: PhosphorIconsRegular.notePencil,
+                  tooltip: 'New chat',
+                  onPressed: _busy ? null : _startNewChat,
+                ),
+              ],
             ),
-          ),
-      ],
-    ),
-    actions: [
-      if (!voice)
-        _NotificationBell(
-          unread: _unreadNotifications,
-          onPressed: _signedOut ? null : () => _openUtility('notifications'),
-        ),
-      if (!voice)
-        CircleIconButton(
-          icon: PhosphorIconsRegular.magnifyingGlass,
-          tooltip: 'Search',
-          onPressed: _signedOut ? null : () => unawaited(_openSearch(context)),
-        ),
-      if (!voice)
-        CircleIconButton(
-          icon: PhosphorIconsRegular.notePencil,
-          tooltip: 'New chat',
-          onPressed: _busy ? null : _startNewChat,
-        ),
-      const SizedBox(width: 12),
-    ],
-  );
+          const SizedBox(width: 14),
+        ],
+      );
+
+  /// Shown while an approval waits and the transcript is scrolled away from it.
+  bool get _showApprovalDock =>
+      _hasPendingApproval && !_nearBottom && _entries.isNotEmpty;
 
   /// The sidebar's copy of the open conversation's project, if any.
   Map<String, dynamic>? get _openProject {
@@ -349,61 +362,108 @@ mixin _ChatScreenUi on _ChatScreenController {
               ),
             )
           else if (!_connected && _conversationId != null)
-            ContentWidth(
-              maxWidth: 808,
-              child: InlineNotice(
-                message: 'Realtime updates are offline.',
-                margin: const EdgeInsets.fromLTRB(14, 4, 14, 8),
-                actions: [
-                  TextButton(
-                    onPressed: _retryConnection,
-                    child: const Text('Retry'),
-                  ),
-                ],
+            Padding(
+              padding: const EdgeInsets.only(top: 2, bottom: 6),
+              child: StatusChip(
+                label: 'Realtime updates are offline',
+                color: JarvisColors.of(context).warning,
+                actionLabel: 'Retry',
+                onAction: _retryConnection,
               ),
             ),
           Expanded(
-            child: (_showHome && !_hasPendingApproval) || _entries.isEmpty
-                ? _welcome()
-                : Stack(
-                    children: [
-                      Positioned.fill(
-                        child: ValueListenableBuilder<int>(
-                          valueListenable: _transcriptTick,
-                          builder: (context, _, _) => ListView.builder(
-                            controller: _scroll,
-                            keyboardDismissBehavior:
-                                ScrollViewKeyboardDismissBehavior.onDrag,
-                            padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
-                            itemCount: _entries.length,
-                            itemBuilder: (context, index) => Align(
-                              alignment: Alignment.topCenter,
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 760,
-                                ),
-                                child: SizedBox(
-                                  width: double.infinity,
-                                  child: _entryView(_entries[index]),
+            // Home and the transcript fade through each other instead of
+            // swapping in one frame.
+            child: EdgeFade(
+              child: AnimatedSwitcher(
+                duration: JarvisMotion.of(context, JarvisMotion.base),
+                switchInCurve: JarvisMotion.standard,
+                switchOutCurve: JarvisMotion.exit,
+                transitionBuilder: JarvisMotion.fadeRise,
+                child: (_showHome && !_hasPendingApproval) || _entries.isEmpty
+                    ? KeyedSubtree(
+                        key: const ValueKey('home'),
+                        child: _welcome(),
+                      )
+                    : KeyedSubtree(
+                        key: const ValueKey('transcript'),
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: ValueListenableBuilder<int>(
+                                valueListenable: _transcriptTick,
+                                builder: (context, _, _) => ListView.builder(
+                                  controller: _scroll,
+                                  keyboardDismissBehavior:
+                                      ScrollViewKeyboardDismissBehavior.onDrag,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    18,
+                                    16,
+                                    18,
+                                    24,
+                                  ),
+                                  itemCount: _entries.length,
+                                  itemBuilder: (context, index) => Align(
+                                    alignment: Alignment.topCenter,
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 760,
+                                      ),
+                                      child: SizedBox(
+                                        width: double.infinity,
+                                        child: FadeSlideIn(
+                                          animate: index >= _settledEntries,
+                                          child: _entryView(_entries[index]),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+                            Positioned(
+                              right: 16,
+                              bottom: 8,
+                              child: IgnorePointer(
+                                ignoring: _nearBottom || _showApprovalDock,
+                                child: AnimatedSlide(
+                                  offset: _nearBottom || _showApprovalDock
+                                      ? const Offset(0, .4)
+                                      : Offset.zero,
+                                  duration: JarvisMotion.of(
+                                    context,
+                                    JarvisMotion.base,
+                                  ),
+                                  curve: JarvisMotion.standard,
+                                  child: AnimatedOpacity(
+                                    opacity: _nearBottom || _showApprovalDock
+                                        ? 0
+                                        : 1,
+                                    duration: JarvisMotion.of(
+                                      context,
+                                      JarvisMotion.base,
+                                    ),
+                                    curve: JarvisMotion.standard,
+                                    child: ExcludeSemantics(
+                                      excluding:
+                                          _nearBottom || _showApprovalDock,
+                                      child: CircleIconButton(
+                                        icon: PhosphorIconsRegular.caretDown,
+                                        tooltip: 'Jump to latest',
+                                        size: 44,
+                                        onPressed: () =>
+                                            _scrollToBottom(force: true),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      if (!_nearBottom)
-                        Positioned(
-                          right: 16,
-                          bottom: 8,
-                          child: CircleIconButton(
-                            icon: PhosphorIconsRegular.caretDown,
-                            tooltip: 'Jump to latest',
-                            size: 44,
-                            onPressed: () => _scrollToBottom(force: true),
-                          ),
-                        ),
-                    ],
-                  ),
+              ),
+            ),
           ),
           if (_liveSurface case final live? when surfaceAwaitsReply(live))
             ConstrainedBox(
@@ -428,6 +488,26 @@ mixin _ChatScreenUi on _ChatScreenController {
                 ],
               ),
             ),
+          // A waiting approval locks the composer; when its card has
+          // scrolled away, this keeps the way back one tap away.
+          AnimatedSwitcher(
+            duration: JarvisMotion.of(context, JarvisMotion.base),
+            switchInCurve: JarvisMotion.standard,
+            switchOutCurve: JarvisMotion.exit,
+            transitionBuilder: JarvisMotion.fadeRise,
+            child: _showApprovalDock
+                ? Padding(
+                    key: const ValueKey('approval-dock'),
+                    padding: const EdgeInsets.fromLTRB(14, 2, 14, 0),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 760),
+                      child: _ApprovalDock(
+                        onReview: () => _scrollToBottom(force: true),
+                      ),
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
           Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 788),
@@ -613,6 +693,7 @@ class _NotificationBell extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         CircleIconButton(
+          bare: true,
           icon: unread > 0
               ? PhosphorIconsRegular.bellRinging
               : PhosphorIconsRegular.bell,
@@ -621,8 +702,8 @@ class _NotificationBell extends StatelessWidget {
         ),
         if (unread > 0)
           Positioned(
-            top: -2,
-            right: -2,
+            top: 3,
+            right: 2,
             child: IgnorePointer(
               child: AnimatedScale(
                 scale: 1,
@@ -637,7 +718,7 @@ class _NotificationBell extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: colors.danger,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: colors.canvas, width: 2),
+                    border: Border.all(color: colors.surface, width: 2),
                   ),
                   child: Text(
                     unread > 99 ? '99+' : '$unread',
@@ -654,6 +735,63 @@ class _NotificationBell extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// "Jarvis needs your approval · Review" above the composer. It only points
+/// to the card; the decision itself stays on the card, next to its details.
+class _ApprovalDock extends StatelessWidget {
+  const _ApprovalDock({required this.onReview});
+
+  final VoidCallback onReview;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Material(
+      color: colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colors.warning.withValues(alpha: .35)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onReview,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+          child: Row(
+            children: [
+              Icon(
+                PhosphorIconsRegular.shieldCheck,
+                size: 18,
+                color: colors.warning,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Jarvis needs your approval',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: colors.ink,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onReview,
+                iconAlignment: IconAlignment.end,
+                icon: const Icon(PhosphorIconsRegular.caretDown, size: 15),
+                label: const Text('Review'),
+                style: TextButton.styleFrom(
+                  foregroundColor: colors.accent,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

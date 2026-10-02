@@ -24,9 +24,21 @@ const _memoryKinds = [
 ];
 
 class MemoryScreen extends StatefulWidget {
-  const MemoryScreen({required this.http, super.key});
+  const MemoryScreen({
+    required this.http,
+    this.startCreating = false,
+    this.onCreateDone,
+    super.key,
+  });
 
   final Dio http;
+
+  /// Opens the "new" editor as soon as the page has settled.
+  final bool startCreating;
+
+  /// Called after a [startCreating] editor closes: with a confirmation when
+  /// it saved, or null when it was cancelled.
+  final ValueChanged<String?>? onCreateDone;
 
   @override
   State<MemoryScreen> createState() => _MemoryScreenState();
@@ -45,6 +57,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
   void initState() {
     super.initState();
     _load();
+    if (widget.startCreating) afterRouteSettles(this, _quickCreate);
   }
 
   Future<void> _load({String? query}) async {
@@ -94,7 +107,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
     } catch (_) {
       if (mounted && revision == _requestRevision) {
         setState(
-          () => _error = 'Jarvis could not load memory. Check the API connection and try again.',
+          () => _error =
+              'Jarvis could not load memory. Check the API connection and try again.',
         );
       }
     } finally {
@@ -104,13 +118,20 @@ class _MemoryScreenState extends State<MemoryScreen> {
     }
   }
 
-  Future<void> _createMemory() async {
+  Future<void> _quickCreate() async {
+    final created = await _createMemory();
+    if (created == false || !mounted) return;
+    widget.onCreateDone?.call(created == true ? 'Memory saved' : null);
+  }
+
+  /// True when saved, null when cancelled, false when it failed.
+  Future<bool?> _createMemory() async {
     final draft = await showDialog<_MemoryDraft>(
       context: context,
       builder: (_) =>
           const _MemoryEditorDialog(title: 'Add a memory', saveLabel: 'Save'),
     );
-    if (draft == null || !mounted) return;
+    if (draft == null || !mounted) return null;
     try {
       await widget.http.post(
         '/api/v1/memory',
@@ -123,10 +144,13 @@ class _MemoryScreenState extends State<MemoryScreen> {
         },
       );
       if (mounted) await _load(query: _searching ? _query.text.trim() : null);
+      return true;
     } on DioException {
       if (mounted) _showError('Jarvis could not save this memory.');
+      return false;
     } catch (_) {
       if (mounted) _showError('Jarvis could not save this memory.');
+      return false;
     }
   }
 
@@ -214,8 +238,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override

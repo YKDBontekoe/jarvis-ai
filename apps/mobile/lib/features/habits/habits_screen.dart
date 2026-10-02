@@ -508,54 +508,60 @@ class HabitWeekStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     final start = habitWeekStart(habit.today);
-    return Row(
-      children: [
-        for (var i = 0; i < 7; i++)
-          Builder(
-            builder: (context) {
-              final day = DateTime(start.year, start.month, start.day + i);
-              final done = habit.doneOn(day);
-              final isToday = day == habit.today;
-              final future = day.isAfter(habit.today);
-              return Padding(
-                padding: const EdgeInsets.only(right: 5),
-                child: Semantics(
-                  label: '${_letters[i]} ${done ? 'done' : 'not done'}',
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 18,
-                    height: 18,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: done
-                          ? colors.success
-                          : future
-                          ? Colors.transparent
-                          : colors.surfaceMuted,
-                      border: Border.all(
-                        color: isToday && !done
-                            ? colors.accent
+    // Narrow phones shrink the strip rather than overflow the card.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < 7; i++)
+            Builder(
+              builder: (context) {
+                final day = DateTime(start.year, start.month, start.day + i);
+                final done = habit.doneOn(day);
+                final isToday = day == habit.today;
+                final future = day.isAfter(habit.today);
+                return Padding(
+                  padding: const EdgeInsets.only(right: 5),
+                  child: Semantics(
+                    label: '${_letters[i]} ${done ? 'done' : 'not done'}',
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 18,
+                      height: 18,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: done
+                            ? colors.success
                             : future
-                            ? colors.outline
-                            : Colors.transparent,
-                        width: 1.4,
+                            ? Colors.transparent
+                            : colors.surfaceMuted,
+                        border: Border.all(
+                          color: isToday && !done
+                              ? colors.accent
+                              : future
+                              ? colors.outline
+                              : Colors.transparent,
+                          width: 1.4,
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      _letters[i],
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: done ? colors.onInk : colors.muted,
+                      child: Text(
+                        _letters[i],
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: done ? Colors.white : colors.muted,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-            },
-          ),
-      ],
+                );
+              },
+            ),
+        ],
+      ),
     );
   }
 }

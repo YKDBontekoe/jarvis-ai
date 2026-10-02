@@ -33,6 +33,8 @@ class RemindersScreen extends StatefulWidget {
     required this.http,
     this.onOpenConversation,
     this.initialTab = RemindersTab.reminders,
+    this.startCreating = false,
+    this.onCreateDone,
     this.locate = readDeviceLocationSnapshot,
     this.locationAccess = _checkLocationAccess,
     this.openLocationSettings = Geolocator.openAppSettings,
@@ -60,6 +62,13 @@ class RemindersScreen extends StatefulWidget {
   Function({bool requestPermission})
   locate;
   final RemindersTab initialTab;
+
+  /// Opens the "new reminder" editor as soon as the page has settled.
+  final bool startCreating;
+
+  /// Called after a [startCreating] editor closes: with a confirmation when
+  /// it saved, or null when it was cancelled.
+  final ValueChanged<String?>? onCreateDone;
   final Future<void> Function(String conversationId)? onOpenConversation;
 
   @override
@@ -88,6 +97,7 @@ class _RemindersScreenState extends State<RemindersScreen>
   void initState() {
     super.initState();
     _load();
+    if (widget.startCreating) afterRouteSettles(this, _quickCreate);
     deviceTimeZoneLookup().then((zone) {
       if (mounted && zone != null) setState(() => _deviceZone = zone);
     });
@@ -211,7 +221,17 @@ class _RemindersScreenState extends State<RemindersScreen>
     }
   }
 
-  Future<void> _createReminder() async {
+  /// The "new reminder" editor opened straight from chat: hands control back
+  /// once it is saved or cancelled, and stays here if saving failed.
+  Future<void> _quickCreate() async {
+    final created = await _createReminder();
+    if (created == false || !mounted) return;
+    widget.onCreateDone?.call(created == true ? 'Reminder set' : null);
+  }
+
+  /// Returns true when saved, null when cancelled, false when it failed
+  /// (the editor's caller stays put so nothing typed is lost).
+  Future<bool?> _createReminder() async {
     final zoneLookup = _reminderTimeZone();
     final created = await showDialog<_NewReminder>(
       context: context,
@@ -221,12 +241,11 @@ class _RemindersScreenState extends State<RemindersScreen>
         locate: () => widget.locate(requestPermission: true),
       ),
     );
-    if (created == null || !mounted) return;
+    if (created == null || !mounted) return null;
     final timeZoneId = await zoneLookup;
-    if (!mounted) return;
+    if (!mounted) return null;
     if (created.place case final place?) {
-      await _createPlaceReminder(created.title, place, timeZoneId);
-      return;
+      return _createPlaceReminder(created.title, place, timeZoneId);
     }
 
     final localDueAt = DateTime(
@@ -238,7 +257,7 @@ class _RemindersScreenState extends State<RemindersScreen>
     );
     if (!localDueAt.isAfter(DateTime.now()) && created.recurrence == 'once') {
       _showError('Choose a time in the future.');
-      return;
+      return false;
     }
     final localTime =
         '${created.time.hour.toString().padLeft(2, '0')}:${created.time.minute.toString().padLeft(2, '0')}:00';
@@ -257,6 +276,7 @@ class _RemindersScreenState extends State<RemindersScreen>
       await _seedOwnerZone(timeZoneId);
       await _load();
       if (mounted) _showMessage('Reminder set.');
+      return true;
     } on DioException catch (error) {
       if (mounted) {
         final message = error.response?.statusCode == 503
@@ -265,12 +285,14 @@ class _RemindersScreenState extends State<RemindersScreen>
                   'Jarvis could not create that reminder.';
         _showError(message);
       }
+      return false;
     } catch (_) {
       if (mounted) _showError('Jarvis could not create that reminder.');
+      return false;
     }
   }
 
-  Future<void> _createPlaceReminder(
+  Future<bool> _createPlaceReminder(
     String title,
     ReminderPlace place,
     String timeZoneId,
@@ -302,12 +324,13 @@ class _RemindersScreenState extends State<RemindersScreen>
         },
       );
       await _load();
-      if (!mounted) return;
+      if (!mounted) return true;
       _showMessage(
         here.latitude == null
             ? 'Reminder set. Allow location for Jarvis so it can fire.'
             : '${place.label}, Jarvis will remind you.',
       );
+      return true;
     } on DioException catch (error) {
       if (mounted) {
         _showError(
@@ -315,8 +338,10 @@ class _RemindersScreenState extends State<RemindersScreen>
               'Jarvis could not create that reminder.',
         );
       }
+      return false;
     } catch (_) {
       if (mounted) _showError('Jarvis could not create that reminder.');
+      return false;
     }
   }
 
@@ -694,7 +719,9 @@ class _RemindersScreenState extends State<RemindersScreen>
         ),
       ],
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(56),
+        // Tab height (46) + track padding (8) + bottom margin (12); asking for
+        // less squeezes the toolbar above it.
+        preferredSize: const Size.fromHeight(66),
         child: ContentWidth(
           child: Container(
             constraints: const BoxConstraints(minHeight: 44),
@@ -884,7 +911,7 @@ class _RemindersScreenState extends State<RemindersScreen>
             final reminder = row as Map<String, dynamic>;
             return FadeSlideIn(
               index: index,
-              child: ContentWidth(child: _reminderCard(reminder)),
+              child: ContentWidth(child: _swipeable(reminder)),
             );
           },
         );
@@ -965,6 +992,39 @@ class _RemindersScreenState extends State<RemindersScreen>
           ),
         ],
       ),
+    );
+  }
+
+  /// Swipe right to finish a one-off reminder, left to snooze it an hour.
+  Widget _swipeable(Map<String, dynamic> reminder) {
+    final colors = JarvisColors.of(context);
+    final id = jsonId(reminder);
+    final pending =
+        (asJsonString(reminder['status']) ?? 'pending') == 'pending';
+    final recurrence = asJsonString(reminder['recurrence']);
+    final repeating =
+        recurrence != null && recurrence != 'once' && recurrence != 'none';
+    final atPlace = reminder['place'] != null;
+    if (id == null || !pending) return _reminderCard(reminder);
+    return SwipeActions(
+      id: id,
+      start: repeating || atPlace
+          ? null
+          : SwipeAction(
+              label: 'Done',
+              icon: PhosphorIconsRegular.check,
+              color: colors.success,
+              onTrigger: () => _markDone(reminder),
+            ),
+      end: atPlace
+          ? null
+          : SwipeAction(
+              label: '1 hour',
+              icon: PhosphorIconsRegular.clock,
+              color: colors.accent,
+              onTrigger: () => _snooze(id, const Duration(hours: 1)),
+            ),
+      child: _reminderCard(reminder),
     );
   }
 

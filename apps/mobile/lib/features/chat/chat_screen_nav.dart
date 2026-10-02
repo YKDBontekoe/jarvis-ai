@@ -20,16 +20,44 @@ mixin _ChatScreenNav on _ChatScreenController {
       onAskInChat: destination == 'integrations' || destination == 'journal'
           ? (prompt) => unawaited(_send(prompt))
           : null,
+      onQuickCreateDone: (message) => _quickCreateDone(destination, message),
     );
+    final base = utilityBaseDestination(destination);
     if (destination == 'sign_out') {
       unawaited(_signOut());
     } else if (page != null) {
       if (_isWide) {
-        _showInPane(destination, page);
+        _showInPane(base, page);
       } else {
-        unawaited(_openUtilityPage(destination, page));
+        unawaited(_openUtilityPage(base, page));
       }
     }
+  }
+
+  /// A quick-create editor (`reminders/new` and friends) closed: go back to
+  /// where the person was, and confirm with a way to see the new item.
+  void _quickCreateDone(String destination, String? message) {
+    if (!mounted) return;
+    if (_isWide) {
+      _closeUtilityPane();
+    } else {
+      unawaited(Navigator.of(context).maybePop());
+    }
+    if (message == null) return;
+    final base = utilityBaseDestination(destination);
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          // Float above the composer instead of covering it.
+          margin: const EdgeInsets.fromLTRB(20, 0, 20, 128),
+          action: SnackBarAction(
+            label: 'View',
+            onPressed: () => _openUtility(base),
+          ),
+        ),
+      );
   }
 
   /// Shows [page] in the wide layout's content area. Opened from the sidebar it
@@ -215,6 +243,7 @@ mixin _ChatScreenNav on _ChatScreenController {
         _conversationId = null;
         _error = null;
         _entries.clear();
+        _settledEntries = 0;
         _recent = [];
         _projects = [];
         _password.clear();

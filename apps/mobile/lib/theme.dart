@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'ui/motion.dart';
 import 'ui/phosphor_icons.dart';
 
 /// Semantic Jarvis palette. Read it from the ambient [Theme] with [JarvisColors.of]
@@ -64,6 +65,18 @@ class JarvisColors extends ThemeExtension<JarvisColors> {
   final Color infoSoft;
 
   bool get isDark => brightness == Brightness.dark;
+
+  /// Soft indigo-to-violet wash for the primary send action and highlights.
+  LinearGradient get accentGradient => LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [accent, violet],
+  );
+
+  /// Dims the screen behind sheets and dialogs without going black.
+  Color get scrim => (isDark ? const Color(0xff000000) : ink).withValues(
+    alpha: isDark ? .5 : .28,
+  );
 
   static JarvisColors of(BuildContext context) =>
       Theme.of(context).extension<JarvisColors>() ?? light;
@@ -215,9 +228,9 @@ class JarvisColors extends ThemeExtension<JarvisColors> {
 
 class JarvisRadii {
   static const sm = 8.0;
-  static const md = 12.0;
-  static const lg = 16.0;
-  static const xl = 22.0;
+  static const md = 14.0;
+  static const lg = 20.0;
+  static const xl = 26.0;
 }
 
 /// Editorial serif for greetings and hero headlines; everything else is Inter.
@@ -258,6 +271,29 @@ class JarvisShadows {
           BoxShadow(
             color: Color(0x0a111113),
             blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ];
+
+  /// Barely-there lift for small controls on the canvas.
+  static List<BoxShadow> hairline([Brightness brightness = Brightness.light]) =>
+      brightness == Brightness.dark
+      ? const [
+          BoxShadow(
+            color: Color(0x40000000),
+            blurRadius: 3,
+            offset: Offset(0, 1),
+          ),
+        ]
+      : const [
+          BoxShadow(
+            color: Color(0x0c111113),
+            blurRadius: 3,
+            offset: Offset(0, 1),
+          ),
+          BoxShadow(
+            color: Color(0x06111113),
+            blurRadius: 10,
             offset: Offset(0, 4),
           ),
         ];
@@ -417,11 +453,13 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
     visualDensity: VisualDensity.standard,
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {
-        TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+        TargetPlatform.android: JarvisPageTransitionsBuilder(),
+        // iOS keeps the native slide so the edge swipe back still works.
         TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
-        TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
+        TargetPlatform.macOS: JarvisPageTransitionsBuilder(),
+        TargetPlatform.linux: JarvisPageTransitionsBuilder(),
+        TargetPlatform.windows: JarvisPageTransitionsBuilder(),
+        TargetPlatform.fuchsia: JarvisPageTransitionsBuilder(),
       },
     ),
     appBarTheme: AppBarTheme(
@@ -435,7 +473,9 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       systemOverlayStyle: overlay,
       iconTheme: IconThemeData(color: colors.ink, size: 20),
       actionsIconTheme: IconThemeData(color: colors.inkSoft, size: 20),
-      titleTextStyle: text.titleLarge,
+      // Page titles use the editorial serif, like the home greeting, so
+      // every screen carries the same voice; dense UI stays in Inter.
+      titleTextStyle: JarvisType.serif(colors.ink).copyWith(fontSize: 27),
     ),
     iconTheme: IconThemeData(color: colors.inkSoft, size: 20),
     iconButtonTheme: IconButtonThemeData(
@@ -599,12 +639,13 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: colors.surface,
+      barrierColor: colors.scrim,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(JarvisRadii.xl),
       ),
-      titleTextStyle: text.titleLarge,
+      titleTextStyle: JarvisType.serif(colors.ink).copyWith(fontSize: 28),
       contentTextStyle: text.bodyMedium?.copyWith(color: colors.inkSoft),
       actionsPadding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
     ),
@@ -613,8 +654,11 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       surfaceTintColor: Colors.transparent,
       showDragHandle: true,
       dragHandleColor: colors.outlineStrong,
+      modalBarrierColor: colors.scrim,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(JarvisRadii.xl),
+        ),
       ),
     ),
     popupMenuTheme: PopupMenuThemeData(
@@ -658,9 +702,15 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       fillColor: colors.surface,
       hintStyle: text.bodyMedium?.copyWith(color: colors.muted),
       labelStyle: text.bodyMedium?.copyWith(color: colors.inkSoft),
-      floatingLabelStyle: text.bodyMedium?.copyWith(
-        color: colors.ink,
-        fontWeight: FontWeight.w500,
+      floatingLabelStyle: WidgetStateTextStyle.resolveWith(
+        (states) => (text.bodyMedium ?? const TextStyle()).copyWith(
+          color: states.contains(WidgetState.error)
+              ? colors.danger
+              : states.contains(WidgetState.focused)
+              ? colors.accent
+              : colors.inkSoft,
+          fontWeight: FontWeight.w500,
+        ),
       ),
       helperStyle: text.bodySmall,
       prefixIconColor: colors.muted,
@@ -668,8 +718,9 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       border: fieldBorder,
       enabledBorder: fieldBorder,
       disabledBorder: fieldBorder,
+      // Focus reads as the accent, like the chat composer, not a heavy black.
       focusedBorder: fieldBorder.copyWith(
-        borderSide: BorderSide(color: colors.ink, width: 1.2),
+        borderSide: BorderSide(color: colors.accent, width: 1.5),
       ),
       errorBorder: fieldBorder.copyWith(
         borderSide: BorderSide(color: colors.danger),

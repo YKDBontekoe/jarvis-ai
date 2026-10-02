@@ -38,6 +38,31 @@ root. It shares the existing account and owner-scoped data. See
 
 Top-level screens outside `features/`: `conversations_screen.dart`, `reminders_screen.dart`, `files_screen.dart`, `integrations_screen.dart`, `approvals_screen.dart`, `audit_screen.dart`, `condition_watches_screen.dart`, `daily_briefing_screen.dart`.
 
+## Motion and visual language
+
+- `lib/ui/motion.dart` — `JarvisMotion` tokens: `fast` 150 ms (presses, icon swaps), `base` 220 ms (content changes), `slow` 320 ms (pages), `standard` ease-out curve, travel 8 px, start scale 0.98. Read timings from here instead of hardcoding durations, and use `JarvisMotion.of(context, …)` so reduced motion turns them off.
+- `JarvisPageTransitionsBuilder` (fade + grow + small rise) is the pushed-page transition everywhere except iOS, which keeps the native slide for the edge swipe back.
+- `lib/ui/jarvis_ui.dart` — `FadeSlideIn` for content that arrives (pass `animate: false` for rows already on screen), `SkeletonList` for loading lists (used by `ListScreenBody`), `afterRouteSettles` to open an editor once a page has finished animating in.
+- Chat: only live entries animate in (`_settledEntries` marks loaded history); home and the transcript, and the wide layout's panes, fade through each other.
+- Chat quick actions, search and the command palette open `tasks/new`, `reminders/new` and `memory/new` (see `createDestinationSuffix` in `utility_pages.dart`) so the editor is already showing. When it closes the screen calls `onCreateDone`: the chat pops the page (or closes the wide pane) and shows "Reminder set · View"; a cancel just goes back; a failed save stays on the page so nothing typed is lost.
+- Search and the palette list quick commands (`features/search/quick_commands.dart`): create commands before anything is typed, and matching "New …" / "Go to …" commands (English and Dutch keywords) above results.
+- While an approval waits and its card has scrolled away, an approval dock above the composer jumps back to it. The decision itself stays on the card.
+- `JarvisColors.accentGradient` (indigo → violet) is reserved for the primary send action and selection accents; `JarvisColors.scrim` dims behind sheets and dialogs.
+- Page and dialog titles use Instrument Serif (from the theme); dense UI stays in Inter. A custom title `TextStyle` without `fontFamily` inherits the serif, so set `fontFamily: 'Inter'` when a title should stay sans (the chat top bar does). Button `textStyle`s replace the theme's, so they need `fontFamily: 'Inter'` too.
+- Other shared pieces in `jarvis_ui.dart`: `ToolbarCapsule` (grouped top-bar buttons), `StatusChip` (quiet states such as offline), `EdgeFade` (content dissolves under header and composer), `HeroGlow` (home backdrop), `SwipeActions` (row swipe with haptics; reminders use it for done/snooze).
+
+## Screenshots and layout audit
+
+`test/screenshots/` renders the real app on fixture data with the bundled fonts and real (blurred) shadows. The files have no `_test` suffix, so `flutter test` and CI skip them; run them explicitly:
+
+```sh
+cd apps/mobile
+flutter test test/screenshots/app_screenshots.dart   # main screens, light + dark → build/screenshots
+flutter test test/screenshots/layout_audit.dart      # every utility page at 393pt and 320pt
+```
+
+The audit fails on layout overflows and on toolbars squeezed below their height. `debugJarvisHttpAdapter` in `lib/api/api_config.dart` is the hook that serves the whole app from `fixtures.dart`; set `SCREENSHOT_DIR` to write elsewhere.
+
 ## API client
 
 - `lib/api/jarvis_http.dart` — authenticated HTTP wrapper.

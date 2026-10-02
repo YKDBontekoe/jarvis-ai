@@ -38,13 +38,35 @@ import '../whatsapp/whatsapp_screen.dart';
 /// Destination of one project's page: the prefix followed by its id.
 const projectDestinationPrefix = 'project:';
 
+/// Appended to a destination to open its page with the "new" editor already
+/// showing, e.g. `reminders/new` from the chat's quick actions.
+const createDestinationSuffix = '/new';
+
+/// [destination] without [createDestinationSuffix].
+String utilityBaseDestination(String destination) =>
+    destination.endsWith(createDestinationSuffix)
+    ? destination.substring(
+        0,
+        destination.length - createDestinationSuffix.length,
+      )
+    : destination;
+
 Widget? utilityPageFor(
   String destination,
   Dio http, {
   Future<void> Function(String conversationId)? onOpenConversation,
   ValueChanged<String>? onAskInChat,
+
+  /// For `…/new` destinations: called when the editor closes, with a
+  /// confirmation when it saved or null when it was cancelled.
+  ValueChanged<String?>? onQuickCreateDone,
 }) => switch (destination) {
   'tasks' => TasksScreen(http: http),
+  'tasks$createDestinationSuffix' => TasksScreen(
+    http: http,
+    startCreating: true,
+    onCreateDone: onQuickCreateDone,
+  ),
   'projects' => ProjectsScreen(
     http: http,
     onOpenConversation: onOpenConversation,
@@ -56,6 +78,11 @@ Widget? utilityPageFor(
       onOpenConversation: onOpenConversation,
     ),
   'memory' => MemoryScreen(http: http),
+  'memory$createDestinationSuffix' => MemoryScreen(
+    http: http,
+    startCreating: true,
+    onCreateDone: onQuickCreateDone,
+  ),
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'today' => DayPlannerScreen(http: http, onAskInChat: onAskInChat),
   'expenses' => ExpensesScreen(http: http),
@@ -65,6 +92,12 @@ Widget? utilityPageFor(
   'reminders' => RemindersScreen(
     http: http,
     onOpenConversation: onOpenConversation,
+  ),
+  'reminders$createDestinationSuffix' => RemindersScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+    startCreating: true,
+    onCreateDone: onQuickCreateDone,
   ),
   'notifications' => RemindersScreen(
     http: http,

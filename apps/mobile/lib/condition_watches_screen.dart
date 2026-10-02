@@ -161,7 +161,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
           icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
         ),
         HeaderAction(
-          label: 'New watch',
+          label: 'New',
           icon: PhosphorIconsRegular.plus,
           onPressed: _createWatch,
           busy: _creating,

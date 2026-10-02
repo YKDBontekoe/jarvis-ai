@@ -11,6 +11,7 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../chat/chat_widgets.dart';
 import '../chat/mcp_setup.dart';
+import '../chat/tool_catalog.dart';
 import '../planner/day_planner_screen.dart';
 import '../habits/habits_home_card.dart';
 import '../usage/usage_screen.dart';
@@ -256,7 +257,7 @@ class _HomeOverviewState extends State<HomeOverview>
                 '${approvals.length} ${approvals.length == 1 ? 'approval' : 'approvals'} waiting',
             subtitle: approvals
                 .take(3)
-                .map((item) => asJsonString(item['toolName']) ?? 'Tool')
+                .map((item) => _toolLabel(asJsonString(item['toolName'])))
                 .join(' · '),
             onTap: widget.onOpenApprovals,
           ),
@@ -529,173 +530,179 @@ class _HomeOverviewState extends State<HomeOverview>
             Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 620),
-                child: _Entrance(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(child: widget.mark),
-                      const SizedBox(height: 22),
-                      Text(
-                        '$_today  ·  $_greeting',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: JarvisColors.of(context).muted,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'What do you need?',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'InstrumentSerif',
-                          fontSize: 40,
-                          height: 1.1,
-                          letterSpacing: -.6,
-                          color: JarvisColors.of(context).ink,
-                        ),
-                      ),
-                      const SizedBox(height: 22),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          FilledButton.icon(
-                            onPressed: widget.onTalk,
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(0, 44),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                              ),
-                              shape: const StadiumBorder(),
-                            ),
-                            icon: widget.voiceStarting
-                                ? const SizedBox.square(
-                                    dimension: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 1.8,
-                                    ),
-                                  )
-                                : const Icon(
-                                    PhosphorIconsRegular.waveform,
-                                    size: 18,
-                                  ),
-                            label: Text(
-                              widget.voiceStarting
-                                  ? 'Connecting…'
-                                  : 'Talk to Jarvis',
-                            ),
+                child: HeroGlow(
+                  child: _Entrance(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(child: widget.mark),
+                        const SizedBox(height: 22),
+                        Text(
+                          '$_today  ·  $_greeting',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: JarvisColors.of(context).muted,
                           ),
-                          if (widget.onContinueConversation != null)
-                            TextButton.icon(
-                              onPressed: widget.onContinueConversation,
-                              style: TextButton.styleFrom(
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'What do you need?',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'InstrumentSerif',
+                            fontSize: 40,
+                            height: 1.1,
+                            letterSpacing: -.6,
+                            color: JarvisColors.of(context).ink,
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            FilledButton.icon(
+                              onPressed: widget.onTalk,
+                              style: FilledButton.styleFrom(
                                 minimumSize: const Size(0, 44),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                ),
                                 shape: const StadiumBorder(),
                               ),
-                              icon: const Icon(
-                                PhosphorIconsRegular.arrowUpRight,
-                                size: 16,
+                              icon: widget.voiceStarting
+                                  ? const SizedBox.square(
+                                      dimension: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 1.8,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      PhosphorIconsRegular.waveform,
+                                      size: 18,
+                                    ),
+                              label: Text(
+                                widget.voiceStarting
+                                    ? 'Connecting…'
+                                    : 'Talk to Jarvis',
                               ),
-                              label: const Text('Continue conversation'),
                             ),
+                            if (widget.onContinueConversation != null)
+                              TextButton.icon(
+                                onPressed: widget.onContinueConversation,
+                                style: TextButton.styleFrom(
+                                  minimumSize: const Size(0, 44),
+                                  shape: const StadiumBorder(),
+                                ),
+                                icon: const Icon(
+                                  PhosphorIconsRegular.arrowUpRight,
+                                  size: 16,
+                                ),
+                                label: const Text('Continue conversation'),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 36),
+                        if (_checklist case final steps?
+                            when steps.isNotEmpty) ...[
+                          _GetStartedCard(steps: steps),
+                          const SizedBox(height: 20),
                         ],
-                      ),
-                      const SizedBox(height: 36),
-                      if (_checklist case final steps?
-                          when steps.isNotEmpty) ...[
-                        _GetStartedCard(steps: steps),
-                        const SizedBox(height: 20),
-                      ],
-                      if (_briefing != null) ...[
-                        _briefingSections(),
-                        const SizedBox(height: 28),
-                      ],
-                      if (widget.onOpenHabits case final openHabits?
-                          when widget.ready)
-                        HabitsHomeCard(
-                          http: widget.http,
-                          onOpen: openHabits,
-                          refreshRevision: widget.refreshRevision,
-                        ),
-                      if (_usage != null && widget.onOpenUsage != null) ...[
-                        _usageCard(),
-                        const SizedBox(height: 28),
-                      ],
-                      if (widget.onSuggestion != null) ...[
-                        Padding(
-                          padding: const EdgeInsets.only(left: 4, bottom: 10),
-                          child: Text(
-                            'Or try one of these:',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: JarvisColors.of(context).muted,
-                            ),
+                        // Sections that load later ease in rather than pop.
+                        if (_briefing != null) ...[
+                          FadeSlideIn(child: _briefingSections()),
+                          const SizedBox(height: 28),
+                        ],
+                        if (widget.onOpenHabits case final openHabits?
+                            when widget.ready)
+                          HabitsHomeCard(
+                            http: widget.http,
+                            onOpen: openHabits,
+                            refreshRevision: widget.refreshRevision,
                           ),
-                        ),
-                        SuggestionChips(onSelected: widget.onSuggestion),
-                        const SizedBox(height: 28),
-                      ],
-                      SectionHeader(
-                        _tasks.isEmpty
-                            ? 'Active tasks'
-                            : 'Active tasks (${_tasks.length})',
-                        padding: const EdgeInsets.only(left: 4, bottom: 6),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            TextButton(
-                              onPressed: widget.onOpenTasks,
-                              child: const Text('View all'),
-                            ),
-                            IconButton(
-                              tooltip: 'Refresh active tasks',
-                              onPressed: widget.ready && !_loading
-                                  ? () => unawaited(_refresh())
-                                  : null,
-                              icon: const Icon(
-                                PhosphorIconsRegular.arrowsClockwise,
-                                size: 18,
+                        if (_usage != null && widget.onOpenUsage != null) ...[
+                          FadeSlideIn(index: 1, child: _usageCard()),
+                          const SizedBox(height: 28),
+                        ],
+                        if (widget.onSuggestion != null) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4, bottom: 10),
+                            child: Text(
+                              'Or try one of these:',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: JarvisColors.of(context).muted,
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      if (_loading)
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 12),
-                          child: LinearProgressIndicator(
-                            minHeight: 2,
-                            semanticsLabel: 'Loading active tasks',
+                          ),
+                          SuggestionChips(onSelected: widget.onSuggestion),
+                          const SizedBox(height: 28),
+                        ],
+                        SectionHeader(
+                          _tasks.isEmpty
+                              ? 'Active tasks'
+                              : 'Active tasks (${_tasks.length})',
+                          padding: const EdgeInsets.only(left: 4, bottom: 6),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextButton(
+                                onPressed: widget.onOpenTasks,
+                                child: const Text('View all'),
+                              ),
+                              IconButton(
+                                tooltip: 'Refresh active tasks',
+                                onPressed: widget.ready && !_loading
+                                    ? () => unawaited(_refresh())
+                                    : null,
+                                icon: const Icon(
+                                  PhosphorIconsRegular.arrowsClockwise,
+                                  size: 18,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      if (_error != null)
-                        InlineNotice(
-                          message: '$_error Pull down to retry.',
-                          tone: NoticeTone.danger,
-                          margin: const EdgeInsets.only(bottom: 12),
-                        ),
-                      if (!widget.ready)
-                        const _TasksPlaceholder(
-                          icon: PhosphorIconsRegular.wifiSlash,
-                          text: 'Connect to Jarvis to see your active tasks.',
-                        )
-                      else if (!_loading && _error == null && _tasks.isEmpty)
-                        const _TasksPlaceholder(
-                          icon: PhosphorIconsRegular.checkCircle,
-                          text: 'No active tasks. Start one from Tasks.',
-                        ),
-                      if (_tasks.isNotEmpty)
-                        GroupedSection(
-                          dividerIndent: 64,
-                          children: [
-                            for (final task in _tasks.take(3))
-                              _TaskRow(
-                                task: task,
-                                onTap: () => unawaited(_openTask(task)),
-                              ),
-                          ],
-                        ),
-                    ],
+                        if (_loading)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 12),
+                            child: LinearProgressIndicator(
+                              minHeight: 2,
+                              semanticsLabel: 'Loading active tasks',
+                            ),
+                          ),
+                        if (_error != null)
+                          InlineNotice(
+                            message: '$_error Pull down to retry.',
+                            tone: NoticeTone.danger,
+                            margin: const EdgeInsets.only(bottom: 12),
+                          ),
+                        if (!widget.ready)
+                          const _TasksPlaceholder(
+                            icon: PhosphorIconsRegular.wifiSlash,
+                            text: 'Connect to Jarvis to see your active tasks.',
+                          )
+                        else if (!_loading && _error == null && _tasks.isEmpty)
+                          const _TasksPlaceholder(
+                            icon: PhosphorIconsRegular.checkCircle,
+                            text: 'No active tasks. Start one from Tasks.',
+                          ),
+                        if (_tasks.isNotEmpty)
+                          FadeSlideIn(
+                            index: 2,
+                            child: GroupedSection(
+                              dividerIndent: 64,
+                              children: [
+                                for (final task in _tasks.take(3))
+                                  _TaskRow(
+                                    task: task,
+                                    onTap: () => unawaited(_openTask(task)),
+                                  ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -823,4 +830,11 @@ class _GetStartedCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "CreateCalendarEvent" → "Create calendar event".
+String _toolLabel(String? tool) {
+  if (tool == null) return 'Tool';
+  final name = humanizeToolName(tool);
+  return name[0].toUpperCase() + name.substring(1);
 }

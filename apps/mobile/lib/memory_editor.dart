@@ -68,7 +68,10 @@ class _MemoryEditorDialogState extends State<_MemoryEditorDialog> {
             decoration: const InputDecoration(labelText: 'Type'),
             items: [
               for (final value in _memoryKinds)
-                DropdownMenuItem(value: value, child: Text(value)),
+                DropdownMenuItem(
+                  value: value,
+                  child: Text(value[0].toUpperCase() + value.substring(1)),
+                ),
             ],
             onChanged: (value) =>
                 setState(() => _kind = value ?? widget.kindFallback),

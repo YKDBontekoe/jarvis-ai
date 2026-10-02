@@ -249,6 +249,88 @@ void main() {
     expect(body['prompt'], 'Get 2% milk');
   });
 
+  testWidgets('tasks opened to create show the editor straight away', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/tasks', <Object>[]);
+    await show(tester, TasksScreen(http: http.client(), startCreating: true));
+
+    expect(find.text('Start task'), findsOneWidget);
+  });
+
+  testWidgets('a quick-created task hands back a confirmation or a cancel', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/tasks', <Object>[]);
+    http.on('POST', '/api/v1/tasks', {'id': 't9'});
+    final results = <String?>[];
+    await show(
+      tester,
+      TasksScreen(
+        http: http.client(),
+        startCreating: true,
+        onCreateDone: results.add,
+      ),
+    );
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(results, [null]);
+    expect(http.sent('POST', '/api/v1/tasks'), isEmpty);
+  });
+
+  testWidgets('a failed quick-create keeps the person on the page', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/tasks', <Object>[]);
+    http.on('POST', '/api/v1/tasks', {'title': 'Down'}, status: 500);
+    final results = <String?>[];
+    await show(
+      tester,
+      TasksScreen(
+        http: http.client(),
+        startCreating: true,
+        onCreateDone: results.add,
+      ),
+    );
+    await tester.enterText(find.byType(TextFormField).at(0), 'Buy milk');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Get 2% milk');
+    await tester.tap(find.text('Start task'));
+    await tester.pumpAndSettle();
+
+    expect(http.sent('POST', '/api/v1/tasks'), hasLength(1));
+    expect(results, isEmpty);
+  });
+
+  testWidgets('a saved quick-create confirms it', (tester) async {
+    http.on('GET', '/api/v1/tasks', <Object>[]);
+    http.on('POST', '/api/v1/tasks', {'id': 't9'});
+    final results = <String?>[];
+    await show(
+      tester,
+      TasksScreen(
+        http: http.client(),
+        startCreating: true,
+        onCreateDone: results.add,
+      ),
+    );
+    await tester.enterText(find.byType(TextFormField).at(0), 'Buy milk');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Get 2% milk');
+    await tester.tap(find.text('Start task'));
+    await tester.pumpAndSettle();
+
+    expect(results, ['Task started']);
+  });
+
+  testWidgets('memory opened to create show the editor straight away', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/memory', <Object>[]);
+    await show(tester, MemoryScreen(http: http.client(), startCreating: true));
+
+    expect(find.text('Add a memory'), findsWidgets);
+  });
+
   testWidgets('watch create rejects non-https URLs and posts a valid watch', (
     tester,
   ) async {
@@ -261,7 +343,7 @@ void main() {
     });
     await show(tester, ConditionWatchesScreen(http: http.client()));
 
-    await tester.tap(find.text('New watch'));
+    await tester.tap(find.text('New'));
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);
