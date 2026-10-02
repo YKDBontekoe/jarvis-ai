@@ -36,7 +36,7 @@ database backup separately.
 | `ci.yml` | PRs to `main`: .NET build/tests, Python checks, Flutter analyze/tests, container image builds |
 | `create-release-tag.yml` | Tag on merge |
 | `release-ios.yml` | Unsigned IPA + AltStore source |
-| `deploy-backend.yml` | Build/push `api` and `worker` to GHCR; deploy via self-hosted runner |
+| `deploy-backend.yml` | Build Flutter web, publish API (including web) and worker to GHCR; deploy together via self-hosted runner |
 
 Require the **All checks passed** job from `ci.yml` in branch protection before merging to `main`.
 
@@ -64,6 +64,50 @@ scripts/deploy/remote-up.sh
 ## iOS distribution
 
 Unsigned IPA for LiveContainer; AltStore feed published from self-hosted path (see root README).
+
+## Hosted web client
+
+The production API serves the Flutter web release at the root of the existing
+Jarvis HTTPS domain (`https://jarvis.ykdbonte.dev/` on the owner's server). It uses
+the same account, database and authenticated SignalR hub as the native client.
+The existing Caddy/Cloudflare route to the API also serves web assets; the separate
+`/altstore/*` host route continues to serve the IPA source and downloads.
+
+Release tags and main/tag workflow dispatches build web on a hosted Ubuntu runner.
+The web artifact is copied into `wwwroot` in the API image; production API builds
+require that artifact. The existing `production` environment approval gates the
+combined backend/web deployment. After API health passes, the deployment script
+checks that the homepage and compiled JavaScript bundle are available before it
+prunes older images. Rolling back the API image also rolls back the web client.
+
+No new secrets or DNS entries are required. Browsers default to their current
+origin for both HTTP and SignalR. An optional repository variable
+`JARVIS_WEB_API_URL` overrides that for separate hosting; when using a different
+origin, configure the API's `Cors:AllowedOrigins` as well. Native builds retain
+their existing `JARVIS_API_URL` configuration.
+
+The web build uses Flutter 3.44.4, packages rendering resources locally, disables
+the generated service worker, and serves assets with `Cache-Control: no-cache`
+so a refreshed browser picks up new releases. It does not cache private API data
+for offline access. Existing browser microphone and file-picker support is reused;
+native push notification registration and device biometric unlock are not provided
+by this web release.
+
+Source maps are uploaded privately to the existing frontend Sentry project when
+the Sentry secrets are configured. Web events use `jarvis-web@<git SHA>` as the
+release. Maps are stripped from the public artifact before it enters the API image.
+
+For a local web distribution:
+
+```sh
+bash scripts/ci/build-web.sh
+bash scripts/ci/stage-web.sh
+```
+
+To serve this build from a local API, copy `infra/web/dist/` into
+`src/Jarvis.Api/wwwroot/` before starting the API. To run Flutter's own development
+web server against a separate local API, continue passing
+`--dart-define=JARVIS_API_URL=http://localhost:5082` explicitly.
 
 ## Production checklist (high level)
 

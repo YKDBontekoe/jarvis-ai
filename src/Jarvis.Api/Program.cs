@@ -47,6 +47,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseExceptionHandler();
 app.UseJarvisApiProblemResponses();
+app.UseJarvisWebClient();
 app.UseCors();
 app.UseAuthentication();
 app.Use(async (context, next) =>
