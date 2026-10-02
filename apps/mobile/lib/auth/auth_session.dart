@@ -11,11 +11,13 @@ class AuthSession {
 
   final bool enabled;
   final _storage = const FlutterSecureStorage();
-  final _authHttp = Dio(
-    BaseOptions(
-      baseUrl: apiBaseUrl,
-      connectTimeout: apiConnectTimeout,
-      receiveTimeout: apiReceiveTimeout,
+  final _authHttp = attachSentryHttp(
+    Dio(
+      BaseOptions(
+        baseUrl: apiBaseUrl,
+        connectTimeout: apiConnectTimeout,
+        receiveTimeout: apiReceiveTimeout,
+      ),
     ),
   );
   Future<String?>? _accessTokenInFlight;
