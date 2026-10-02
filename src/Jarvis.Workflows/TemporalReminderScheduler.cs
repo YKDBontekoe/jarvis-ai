@@ -301,6 +301,15 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
         if (!LocalClock.TryFind(zoneId, out var zone))
             throw new ArgumentException("Time zone identifier is not recognized by this server.", nameof(request));
 
+        if (request.Place is { } place)
+        {
+            var placed = await reminders.CreateAsync(ownerId, new CreateReminderRequest(title, DateTimeOffset.UtcNow,
+                TimeZoneId: zone.Id, Place: place with { Name = place.Name?.Trim() ?? string.Empty }),
+                cancellationToken);
+            // Place reminders have no Temporal workflow: a position the phone reports fires them.
+            return placed;
+        }
+
         var local = TimeZoneInfo.ConvertTime(request.DueAt, zone);
         var localTime = request.LocalTime ?? TimeOnly.FromTimeSpan(local.TimeOfDay);
         ReminderRule rule;
@@ -342,13 +351,13 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
 
         var current = await reminders.GetAsync(id, ownerId, cancellationToken);
         if (current is null || current.Status is not ("pending" or "completed")) return null;
-        if (current.Recurrence != Reminder.RecurrenceNone)
+        if (current.Recurrence != Reminder.RecurrenceNone || current.Place is { Repeats: true })
             return await CreateAsync(ownerId, new CreateReminderRequest(current.Title, dueAt,
                 TimeZoneId: current.TimeZoneId), cancellationToken);
 
         var snoozed = await reminders.SnoozeAsync(id, ownerId, dueAt, cancellationToken);
         if (snoozed is not { } result) return null;
-        if (result.PreviousWorkflowId != result.Reminder.WorkflowId)
+        if (current.Place is null && result.PreviousWorkflowId != result.Reminder.WorkflowId)
             await StopQuietlyAsync(result.PreviousWorkflowId, id, cancellationToken);
         await DispatchAsync(result.Reminder, cancellationToken);
         return result.Reminder;
@@ -357,7 +366,7 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
     public async Task<ReminderRecord?> MarkDoneAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
     {
         var done = await reminders.MarkDoneAsync(id, ownerId, cancellationToken);
-        if (done is not null) await StopQuietlyAsync(done.WorkflowId, id, cancellationToken);
+        if (done is { Place: null }) await StopQuietlyAsync(done.WorkflowId, id, cancellationToken);
         return done;
     }
 
@@ -408,6 +417,7 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
         if (reminder is null || reminder.Status != "pending") return null;
         var cancelled = await reminders.CancelAsync(id, ownerId, cancellationToken);
         if (cancelled is null) return null;
+        if (reminder.Place is not null) return cancelled;
         try
         {
             await scheduler.CancelAsync(reminder.WorkflowId, cancellationToken);
@@ -422,6 +432,36 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
                 "Reminder {ReminderId} was cancelled in storage; Temporal will stop it if the workflow is still running.", id);
         }
         return cancelled;
+    }
+}
+
+/// <summary>Fires place reminders from the positions the phone reports, and starts automations that follow them.</summary>
+public sealed class PlaceReminderService(IReminderRepository reminders, IAutomationTriggerPublisher automations,
+    ILogger<PlaceReminderService> logger) : IPlaceReminderService
+{
+    public async Task<int> ObservePositionAsync(Guid ownerId, double latitude, double longitude,
+        double? accuracyMeters, CancellationToken cancellationToken)
+    {
+        var fired = await reminders.ObservePositionAsync(ownerId, latitude, longitude, accuracyMeters,
+            DateTimeOffset.UtcNow, cancellationToken);
+        foreach (var reminder in fired)
+        {
+            try
+            {
+                await automations.PublishReminderDueAsync(ownerId, reminder.ReminderId, reminder.Title,
+                    reminder.FiredAt, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "Automations after place reminder {ReminderId} did not start.",
+                    reminder.ReminderId);
+            }
+        }
+        return fired.Count;
     }
 }
 

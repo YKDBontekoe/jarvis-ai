@@ -38,7 +38,7 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 
 | Area | Paths |
 |------|-------|
-| Reminders | `GET/POST /reminders`, `GET/DELETE /reminders/{id}`, `POST /reminders/{id}/snooze` (`minutes` or `until`), `POST /reminders/{id}/complete` (`conversationId` on each reminder) |
+| Reminders | `GET/POST /reminders`, `GET/DELETE /reminders/{id}`, `POST /reminders/{id}/snooze` (`minutes` or `until`), `POST /reminders/{id}/complete` (`conversationId` on each reminder). A place reminder posts `place` (`name`, `latitude`, `longitude`, `radiusMeters` 50–5000, `trigger` `arrive`/`leave`, `repeats`) instead of `dueAt` |
 | Owner automations | `GET/POST /automations`, enable/run/history (`conversationId` and `lastRun` on each rule; approvals go through the shared `/approvals` inbox; see [automations.md](../automations.md)) |
 | Condition watches | `GET/POST /watches`, `GET/DELETE /watches/{id}` |
 | Tasks | `GET/POST /tasks`, `GET /tasks/{id}`, `GET /tasks/{id}/messages`, cancel endpoints |
@@ -174,7 +174,7 @@ Internal routes under `/voice/internal/{conversationId}/...` are for the voice r
 | Path | Purpose |
 |------|---------|
 | GET `/home` | Home briefing payload |
-| POST `/devices/telemetry` | Battery/location snapshots |
+| POST `/devices/telemetry` | Battery/location snapshots; a location also checks pending place reminders |
 | POST `/devices/invoke/{id}/result` | Device capability callback |
 | GET `/coding/runs`, `/coding/runs/{id}` | Coding task history |
 
