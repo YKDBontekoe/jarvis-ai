@@ -42,7 +42,8 @@ internal sealed class CoreAgentTools(
     ICodingPullRequestService codingPullRequests,
     INotificationRepository notificationRepository,
     Jarvis.Application.Diagnostics.IRecentFaultLog? recentFaults = null,
-    TimeProvider? timeProvider = null) : IAgentToolContributor
+    TimeProvider? timeProvider = null,
+    Jarvis.Application.Devices.IDeviceTelemetryStore? deviceTelemetry = null) : IAgentToolContributor
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context)
     {
@@ -50,7 +51,7 @@ internal sealed class CoreAgentTools(
         var memoryTools = new MemoryAgentTools(memoryService, reranker, auditEvents, currentUser,
             loggerFactory.CreateLogger<MemoryAgentTools>(), recalls, context.Profile);
         var watchTools = new ConditionWatchAgentTools(watchService, currentUser);
-        var reminderTools = new ReminderAgentTools(reminderService, currentUser, briefings);
+        var reminderTools = new ReminderAgentTools(reminderService, currentUser, briefings, deviceTelemetry);
         var automationTools = new AutomationAgentTools(automationRules, currentUser);
         var fileTools = new FileAgentTools(fileSearch, fileRepository, conversationFileScope, fileCitations, collections,
             currentUser, context.ConversationId, context.Profile);
@@ -60,6 +61,7 @@ internal sealed class CoreAgentTools(
 
         yield return AIFunctionFactory.Create(clockTools.GetCurrentTime);
         yield return AIFunctionFactory.Create(reminderTools.CreateReminderAsync);
+        yield return AIFunctionFactory.Create(reminderTools.CreatePlaceReminderAsync);
         yield return AIFunctionFactory.Create(reminderTools.ListRemindersAsync);
         yield return AIFunctionFactory.Create(reminderTools.CancelReminderAsync);
         yield return AIFunctionFactory.Create(reminderTools.SnoozeReminderAsync);

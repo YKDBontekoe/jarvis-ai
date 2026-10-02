@@ -190,6 +190,7 @@ mixin _ChatScreenNav on _ChatScreenController {
     if (_signingOut) return;
     _signingOut = true;
     _signedOut = true;
+    unawaited(PlaceReminderTracker.instance.detach());
     _initGeneration++;
     _realtimeGeneration++;
     final runningConversation = _conversationId;

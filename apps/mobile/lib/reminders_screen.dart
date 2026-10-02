@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import 'ui/phosphor_icons.dart';
 
@@ -8,6 +12,8 @@ import 'features/chat/tool_catalog.dart';
 import 'api/api_config.dart';
 import 'features/coding/coding_run_detail_screen.dart';
 import 'daily_briefing_screen.dart';
+import 'features/devices/device_sensors.dart';
+import 'features/devices/place_reminder_tracker.dart';
 import 'notification_details_screen.dart';
 import 'notification_routing.dart';
 import 'schedule_format.dart';
@@ -25,10 +31,32 @@ class RemindersScreen extends StatefulWidget {
     required this.http,
     this.onOpenConversation,
     this.initialTab = RemindersTab.reminders,
+    this.locate = readDeviceLocationSnapshot,
+    this.locationAccess = _checkLocationAccess,
+    this.openLocationSettings = Geolocator.openAppSettings,
     super.key,
   });
 
+  static Future<LocationPermission?> _checkLocationAccess() async {
+    if (kIsWeb) return null;
+    try {
+      return await Geolocator.checkPermission();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The phone's location permission, or null where it does not apply.
+  final Future<LocationPermission?> Function() locationAccess;
+
+  final Future<bool> Function() openLocationSettings;
+
   final Dio http;
+
+  /// Reads the phone's position (and asks for permission) for place reminders.
+  final Future<({double? latitude, double? longitude, double? accuracy})>
+  Function({bool requestPermission})
+  locate;
   final RemindersTab initialTab;
   final Future<void> Function(String conversationId)? onOpenConversation;
 
@@ -79,6 +107,13 @@ class _RemindersScreenState extends State<RemindersScreen>
         final reminders = await widget.http.get<dynamic>('/api/v1/reminders');
         if (mounted && revision == _requestRevision) {
           setState(() => _reminders = jsonMaps(reminders.data));
+          unawaited(
+            PlaceReminderTracker.instance.update(_reminders, http: widget.http),
+          );
+          if (hasPendingPlaceReminder(_reminders)) {
+            final access = await widget.locationAccess();
+            if (mounted) setState(() => _locationAccess = access);
+          }
         }
       } on DioException {
         remindersFailed = true;
@@ -178,11 +213,19 @@ class _RemindersScreenState extends State<RemindersScreen>
     final zoneLookup = _reminderTimeZone();
     final created = await showDialog<_NewReminder>(
       context: context,
-      builder: (_) => _NewReminderDialog(timeZone: zoneLookup),
+      builder: (_) => _NewReminderDialog(
+        timeZone: zoneLookup,
+        places: savedPlaces(_reminders),
+        locate: () => widget.locate(requestPermission: true),
+      ),
     );
     if (created == null || !mounted) return;
     final timeZoneId = await zoneLookup;
     if (!mounted) return;
+    if (created.place case final place?) {
+      await _createPlaceReminder(created.title, place, timeZoneId);
+      return;
+    }
 
     final localDueAt = DateTime(
       created.date.year,
@@ -219,6 +262,56 @@ class _RemindersScreenState extends State<RemindersScreen>
             : firstProblemMessage(error.response?.data) ??
                   'Jarvis could not create that reminder.';
         _showError(message);
+      }
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not create that reminder.');
+    }
+  }
+
+  Future<void> _createPlaceReminder(
+    String title,
+    ReminderPlace place,
+    String timeZoneId,
+  ) async {
+    try {
+      // Report where the phone is first, so the server knows whether you are
+      // already there and waits for the next arrival instead of firing now.
+      final here = await widget.locate(requestPermission: true);
+      if (here.latitude != null && here.longitude != null) {
+        try {
+          await widget.http.post<void>(
+            '/api/v1/devices/telemetry',
+            data: {
+              'latitude': here.latitude,
+              'longitude': here.longitude,
+              if (here.accuracy != null) 'accuracyMeters': here.accuracy,
+            },
+          );
+        } catch (_) {
+          // The tracker reports the next position anyway.
+        }
+      }
+      await widget.http.post(
+        '/api/v1/reminders',
+        data: {
+          'title': title,
+          'timeZoneId': timeZoneId,
+          'place': place.toJson(),
+        },
+      );
+      await _load();
+      if (!mounted) return;
+      _showMessage(
+        here.latitude == null
+            ? 'Reminder set. Allow location for Jarvis so it can fire.'
+            : '${place.label}, Jarvis will remind you.',
+      );
+    } on DioException catch (error) {
+      if (mounted) {
+        _showError(
+          firstProblemMessage(error.response?.data) ??
+              'Jarvis could not create that reminder.',
+        );
       }
     } catch (_) {
       if (mounted) _showError('Jarvis could not create that reminder.');
@@ -668,6 +761,7 @@ class _RemindersScreenState extends State<RemindersScreen>
     final buckets = <String, List<Map<String, dynamic>>>{
       'Overdue': [],
       'Today': [],
+      'At a place': [],
       'Upcoming': [],
       'Finished': [],
     };
@@ -684,6 +778,8 @@ class _RemindersScreenState extends State<RemindersScreen>
           (asJsonString(reminder['status']) ?? 'pending') == 'pending';
       final key = !pending
           ? 'Finished'
+          : reminder['place'] != null
+          ? 'At a place'
           : due == null || !due.isBefore(endOfToday)
           ? 'Upcoming'
           : due.isBefore(now)
@@ -693,9 +789,16 @@ class _RemindersScreenState extends State<RemindersScreen>
     }
     // Most recent first, so the collapsed list shows what just happened.
     buckets['Finished'] = buckets['Finished']!.reversed.toList();
+    final access = _locationAccess;
+    final needsAccess = access != null && access != LocationPermission.always;
     return [
       for (final entry in buckets.entries)
-        if (entry.value.isNotEmpty) ...[entry.key, ...entry.value],
+        if (entry.value.isNotEmpty) ...[
+          entry.key,
+          if (entry.key == 'At a place' && needsAccess)
+            _PlaceAccessHint(denied: access != LocationPermission.whileInUse),
+          ...entry.value,
+        ],
     ];
   }
 
@@ -750,6 +853,9 @@ class _RemindersScreenState extends State<RemindersScreen>
           itemBuilder: (context, index) {
             final row = _visibleReminderRows[index];
             if (row is String) return _GroupHeader(row);
+            if (row is _PlaceAccessHint) {
+              return ContentWidth(child: _placeAccessCard(row.denied));
+            }
             if (row is _ShowMoreFinished) {
               return ContentWidth(
                 child: Align(
@@ -770,6 +876,7 @@ class _RemindersScreenState extends State<RemindersScreen>
         );
 
   bool _showAllFinished = false;
+  LocationPermission? _locationAccess;
   String? _deviceZone;
   static const _finishedPreview = 5;
 
@@ -788,6 +895,65 @@ class _RemindersScreenState extends State<RemindersScreen>
     ];
   }
 
+  /// Explains why a place reminder may stay quiet, with a way to fix it.
+  Widget _placeAccessCard(bool denied) {
+    final colors = JarvisColors.of(context);
+    return SurfaceCard(
+      key: const Key('place-access-hint'),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      color: denied ? colors.warningSoft : colors.surfaceMuted,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            PhosphorIconsRegular.mapPin,
+            size: 20,
+            color: denied ? colors.warning : colors.inkSoft,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  denied
+                      ? 'Jarvis can’t see your location'
+                      : 'Only while Jarvis is open',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  denied
+                      ? 'Place reminders need location access. Turn it on in Settings.'
+                      : 'Set location to Always in Settings so place reminders also work when the app is closed.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.inkSoft,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextButton(
+                  onPressed: () => unawaited(widget.openLocationSettings()),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    foregroundColor: colors.ink,
+                    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  child: const Text('Open Settings'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _reminderCard(Map<String, dynamic> reminder) {
     final colors = JarvisColors.of(context);
     final status = asJsonString(reminder['status']) ?? 'pending';
@@ -798,18 +964,27 @@ class _RemindersScreenState extends State<RemindersScreen>
     );
     final due = jsonDate(reminder['dueAt'], local: true);
     final outcome = _outcome(reminder);
+    final place = ReminderPlace.fromJson(reminder['place']);
     final zone = asJsonString(reminder['timeZoneId']);
     final otherZone =
-        pending && zone != null && _deviceZone != null && zone != _deviceZone;
+        place == null &&
+        pending &&
+        zone != null &&
+        _deviceZone != null &&
+        zone != _deviceZone;
 
     final String primary;
-    if (pending && due != null) {
+    if (pending && place != null) {
+      primary = place.repeats ? '${place.label} · every visit' : place.label;
+    } else if (pending && due != null) {
       final when = friendlyWhen(context, due);
       primary = repeat == null ? when : '$repeat · next $when';
     } else {
       primary = outcome.label;
     }
-    final relative = pending && due != null ? relativeFromNow(due) : null;
+    final relative = pending && due != null && place == null
+        ? relativeFromNow(due)
+        : null;
 
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
@@ -821,7 +996,11 @@ class _RemindersScreenState extends State<RemindersScreen>
         children: [
           IconBadge(
             icon: pending
-                ? (repeat == null
+                ? (place != null
+                      ? (place.name.toLowerCase() == 'home'
+                            ? PhosphorIconsRegular.house
+                            : PhosphorIconsRegular.mapPin)
+                      : repeat == null
                       ? PhosphorIconsRegular.alarm
                       : PhosphorIconsRegular.repeat)
                 : outcome.icon,
@@ -868,7 +1047,12 @@ class _RemindersScreenState extends State<RemindersScreen>
               ],
             ),
           ),
-          _reminderMenu(reminder, pending: pending, repeating: repeat != null),
+          _reminderMenu(
+            reminder,
+            pending: pending,
+            repeating: repeat != null || (place?.repeats ?? false),
+            atPlace: place != null,
+          ),
         ],
       ),
     );
@@ -917,10 +1101,14 @@ class _RemindersScreenState extends State<RemindersScreen>
     Map<String, dynamic> reminder, {
     required bool pending,
     required bool repeating,
+    bool atPlace = false,
   }) {
     final id = jsonId(reminder);
     final status = asJsonString(reminder['status']) ?? 'pending';
-    final canSnooze = pending || status == 'completed' || status == 'delivered';
+    // A waiting place reminder fires on arrival; snoozing it would turn it into
+    // a timed one, so that is only offered once it has fired.
+    final canSnooze =
+        (pending && !atPlace) || status == 'completed' || status == 'delivered';
     return PopupMenuButton<String>(
       tooltip: 'Reminder actions',
       icon: const Icon(PhosphorIconsRegular.dotsThree, size: 20),
@@ -1105,6 +1293,12 @@ class _GroupHeader extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _PlaceAccessHint {
+  const _PlaceAccessHint({required this.denied});
+
+  final bool denied;
 }
 
 class _ShowMoreFinished {

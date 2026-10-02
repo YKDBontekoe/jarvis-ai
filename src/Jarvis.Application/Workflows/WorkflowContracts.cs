@@ -6,10 +6,19 @@ namespace Jarvis.Application.Workflows;
 public sealed record ReminderRecord(Guid Id, Guid OwnerId, string Title, DateTimeOffset DueAt,
     string WorkflowId, string Status, DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt,
     string Recurrence = "none", int Weekdays = 0, string TimeZoneId = "UTC", TimeOnly? LocalTime = null,
-    DateOnly? Until = null, DateTimeOffset? LastDeliveredAt = null, Guid? ConversationId = null);
+    DateOnly? Until = null, DateTimeOffset? LastDeliveredAt = null, Guid? ConversationId = null,
+    ReminderPlace? Place = null);
+
+/// <summary>Where a place reminder fires. Trigger is arrive or leave; Repeats keeps it for every visit.</summary>
+public sealed record ReminderPlace(string Name, double Latitude, double Longitude, double RadiusMeters = 150,
+    string Trigger = Reminder.LocationArrive, bool Repeats = false);
 
 public sealed record CreateReminderRequest(string Title, DateTimeOffset DueAt, string? Recurrence = null,
-    int Weekdays = 0, string? TimeZoneId = null, DateOnly? Until = null, TimeOnly? LocalTime = null);
+    int Weekdays = 0, string? TimeZoneId = null, DateOnly? Until = null, TimeOnly? LocalTime = null,
+    ReminderPlace? Place = null);
+
+/// <summary>A place reminder that fired for a position fix.</summary>
+public sealed record FiredPlaceReminder(Guid ReminderId, Guid OwnerId, string Title, DateTimeOffset FiredAt);
 
 public sealed record NotificationRecord(Guid Id, string Type, string Title, string Body,
     Guid? SourceId, DateTimeOffset CreatedAt, DateTimeOffset? ReadAt);
@@ -124,6 +133,20 @@ public interface IReminderRepository
     Task<ReminderRecord?> MarkDoneAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task MarkScheduleFailedAsync(Guid id, CancellationToken cancellationToken);
     Task<ReminderDeliveryResult> CompleteAndNotifyAsync(ReminderWorkflowInput reminder, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Checks the owner's pending place reminders against one position fix and delivers the ones whose edge it
+    /// crosses. Each one fires once per crossing, even when the same fix arrives twice.
+    /// </summary>
+    Task<IReadOnlyList<FiredPlaceReminder>> ObservePositionAsync(Guid ownerId, double latitude, double longitude,
+        double? accuracyMeters, DateTimeOffset observedAt, CancellationToken cancellationToken);
+}
+
+public interface IPlaceReminderService
+{
+    /// <summary>Feeds a position the phone reported. Returns how many place reminders fired.</summary>
+    Task<int> ObservePositionAsync(Guid ownerId, double latitude, double longitude, double? accuracyMeters,
+        CancellationToken cancellationToken);
 }
 
 public interface INotificationRepository
@@ -201,7 +224,12 @@ public static class WorkflowRecordMapping
     public static ReminderRecord ToRecord(this Reminder reminder) => new(reminder.Id, reminder.OwnerId,
         reminder.Title, reminder.DueAt, reminder.WorkflowId, reminder.Status, reminder.CreatedAt, reminder.CompletedAt,
         reminder.Recurrence, reminder.Weekdays, reminder.TimeZoneId, reminder.LocalTime, reminder.Until,
-        reminder.LastDeliveredAt, reminder.ConversationId);
+        reminder.LastDeliveredAt, reminder.ConversationId,
+        reminder.IsLocationBased
+            ? new ReminderPlace(reminder.LocationName ?? "Place", reminder.LocationLatitude!.Value,
+                reminder.LocationLongitude!.Value, reminder.LocationRadiusMeters ?? 150,
+                reminder.LocationTrigger ?? Reminder.LocationArrive, reminder.LocationRepeats)
+            : null);
 
     public static NotificationRecord ToRecord(this Notification notification) => new(notification.Id,
         notification.Type, notification.Title, notification.Body, notification.SourceId,

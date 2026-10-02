@@ -44,6 +44,8 @@ If Temporal is unavailable, reminder creation returns **503** from the API (`Aut
 
 ## Dispatcher recovery
 
+**Place reminders** ("when I arrive at the supermarket") have no workflow. A reminder with `place` (name, lat/lon, radius, `arrive`/`leave`, `repeats`) stays pending until a position posted to `POST /devices/telemetry` crosses its edge; `PlaceReminderService` → `IReminderRepository.ObservePositionAsync` delivers the `reminder.due` notification, posts to the linked chat and starts `reminder_due` automations. The reconciler skips them (`location_latitude IS NULL` filters). The app reports positions through `PlaceReminderTracker` only while a place reminder is pending (background on iOS with "Always" access).
+
 Reminders also have a DB-backed dispatcher recovery path in addition to Temporal (see product README) so missed fires can be reconciled.
 
 ## Testing
