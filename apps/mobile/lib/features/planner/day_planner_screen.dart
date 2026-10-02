@@ -424,7 +424,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
   Widget _composer() {
     final colors = JarvisColors.of(context);
     return SurfaceCard(
-      padding: const EdgeInsets.fromLTRB(14, 6, 6, 10),
+      padding: const EdgeInsets.fromLTRB(16, 10, 12, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
