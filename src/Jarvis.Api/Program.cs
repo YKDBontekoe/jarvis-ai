@@ -63,6 +63,7 @@ api.MapFileEndpoints(app.Logger);
 api.MapMemoryEndpoints(app.Logger);
 api.MapJournalEndpoints(app.Logger);
 api.MapWeeklyReviewEndpoints();
+api.MapHabitEndpoints(app.Logger);
 api.MapModelSettingsEndpoints(app.Logger);
 api.MapSkillEndpoints(app.Logger);
 api.MapPersonaEndpoints();

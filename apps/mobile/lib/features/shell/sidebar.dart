@@ -100,6 +100,11 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     onTap: () => widget.onUtility('journal'),
                   ),
                   _NavRow(
+                    icon: PhosphorIconsRegular.target,
+                    label: 'Habits',
+                    onTap: () => widget.onUtility('habits'),
+                  ),
+                  _NavRow(
                     icon: PhosphorIconsRegular.bell,
                     label: 'Reminders',
                     onTap: () => widget.onUtility('reminders'),

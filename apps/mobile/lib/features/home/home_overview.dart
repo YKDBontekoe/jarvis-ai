@@ -11,6 +11,7 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../chat/chat_widgets.dart';
 import '../chat/mcp_setup.dart';
+import '../habits/habits_home_card.dart';
 import '../usage/usage_screen.dart';
 
 part 'home_overview_widgets.dart';
@@ -31,6 +32,7 @@ class HomeOverview extends StatefulWidget {
     this.onOpenReminders,
     this.onOpenIntegrations,
     this.onOpenCoding,
+    this.onOpenHabits,
     super.key,
   });
 
@@ -60,6 +62,9 @@ class HomeOverview extends StatefulWidget {
 
   /// Opens coding-run review.
   final VoidCallback? onOpenCoding;
+
+  /// Opens habits; today's habits are shown when this is set.
+  final VoidCallback? onOpenHabits;
 
   @override
   State<HomeOverview> createState() => _HomeOverviewState();
@@ -580,6 +585,13 @@ class _HomeOverviewState extends State<HomeOverview>
                         _briefingSections(),
                         const SizedBox(height: 28),
                       ],
+                      if (widget.onOpenHabits case final openHabits?
+                          when widget.ready)
+                        HabitsHomeCard(
+                          http: widget.http,
+                          onOpen: openHabits,
+                          refreshRevision: widget.refreshRevision,
+                        ),
                       if (_usage != null && widget.onOpenUsage != null) ...[
                         _usageCard(),
                         const SizedBox(height: 28),

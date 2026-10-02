@@ -69,6 +69,16 @@ internal static class ApiMappers
         entry.EntryDate, entry.Source, entry.Content, entry.Highlights, entry.Gratitude, entry.Rating, entry.Mood,
         entry.Energy, entry.Stress, entry.Tags, entry.MemoryId, entry.CreatedAt, entry.UpdatedAt);
 
+    public static HabitDto ToDto(this Jarvis.Application.Habits.HabitSummary summary)
+    {
+        var habit = summary.Habit;
+        var stats = summary.Stats;
+        return new HabitDto(habit.Id, habit.Name, habit.Icon, habit.Cadence, habit.TargetPerWeek, habit.IsArchived,
+            habit.ArchivedAt, new HabitStatsDto(stats.Today, stats.CurrentStreak, stats.BestStreak, stats.StreakUnit,
+                stats.DoneToday, stats.ThisWeekCount, stats.TotalCheckIns, summary.IsOpenToday, stats.RecentDates),
+            habit.CreatedAt, habit.UpdatedAt);
+    }
+
     public static IEnumerable<ToolApprovalDto> ToDtos(this IEnumerable<ToolApprovalRecord> approvals) =>
         approvals.Select(ToDto);
 }
