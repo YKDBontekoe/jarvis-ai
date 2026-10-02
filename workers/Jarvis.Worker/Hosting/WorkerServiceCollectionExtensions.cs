@@ -59,6 +59,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton<IAutomationScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<PublicJsonMetricReader>();
         services.AddScoped<ICalendarFeed, CalendarFeed>();
+        services.AddScoped<Jarvis.Application.Planner.IDayPlannerService, Jarvis.Application.Planner.DayPlannerService>();
         services.AddScoped<WatchMetricReader>();
         services.AddJarvisMemory();
         services.AddScoped<McpToolHost>();

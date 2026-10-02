@@ -94,6 +94,7 @@ api.MapDeviceEndpoints();
 api.MapBrowserEndpoints();
 api.MapPersonalAssistantEndpoints();
 api.MapSearchEndpoints();
+api.MapPlannerEndpoints();
 
 app.MapA2AProtocol();
 

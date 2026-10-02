@@ -176,9 +176,16 @@ void main() {
     expect(find.text('Recents'), findsNothing);
     await tester.tap(find.byTooltip('Menu'));
     await tester.pumpAndSettle();
-    for (final label in ['Voice', 'Tasks', 'Memory', 'Recents', 'Settings']) {
+    for (final label in ['Voice', 'Today', 'Tasks', 'Memory', 'Settings']) {
       expect(find.text(label), findsOneWidget);
     }
+    // The destination list scrolls once it outgrows a small window.
+    await tester.dragUntilVisible(
+      find.text('Recents'),
+      find.text('Memory'),
+      const Offset(0, -120),
+    );
+    expect(find.text('Recents'), findsOneWidget);
   });
 
   testWidgets('settings opens from the sidebar', (tester) async {

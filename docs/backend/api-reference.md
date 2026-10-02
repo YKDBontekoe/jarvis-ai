@@ -56,6 +56,18 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | GET | `/learning/status` |
 | POST | `/learning/run`, `/learning/dream` |
 
+## Day planner
+
+| Method | Path |
+|--------|------|
+| GET | `/planner/today` (timeline of calendar events, reminders and focus blocks; to-dos; free slots) |
+| POST | `/planner/today/items` (`title` ≤ 200, `minutes` 5–480, default 30) |
+| PATCH/DELETE | `/planner/today/items/{id}` (PATCH: `title`, `minutes`, `done`) |
+| POST/DELETE | `/planner/today/plan` (place open to-dos in free time / take them off the timeline) |
+| PUT | `/planner/today/hours` (`dayStart`, `dayEnd`, at least one hour apart) |
+
+Every route takes an optional `timeZone` query (the device's IANA zone); it falls back to the zone the app last sent, then the daily-briefing zone, then UTC. The plan is stored in owner settings (`planner.day`), so there is no table or migration. Open to-dos carry over to the next day without their blocks. Placement is deterministic (earliest free gap, 5-minute buffer after events, all-day events do not block). Nothing here writes to the calendar.
+
 ## Journal
 
 | Method | Path |
