@@ -86,12 +86,17 @@ origin for both HTTP and SignalR. An optional repository variable
 origin, configure the API's `Cors:AllowedOrigins` as well. Native builds retain
 their existing `JARVIS_API_URL` configuration.
 
-The web build uses Flutter 3.44.4, packages rendering resources locally, disables
-the generated service worker, and serves assets with `Cache-Control: no-cache`
-so a refreshed browser picks up new releases. It does not cache private API data
-for offline access. Existing browser microphone and file-picker support is reused;
-native push notification registration and device biometric unlock are not provided
-by this web release.
+The web build uses Flutter 3.44.4, packages rendering resources locally, and
+disables the generated service worker. Cloudflare caches `.js` and `.bin`
+responses and tells browsers to keep them for four hours (`max-age=14400`),
+even when the API sends `Cache-Control: no-cache`. A stable `main.dart.js` URL
+therefore kept serving the previous client after a deploy. Each release is
+published under `/r/<git sha>/`. The homepage is not cached and its
+`<base href>` points at that release, so a refresh loads the new client.
+Files under the release path can be cached for a day. The build does not cache
+private API data for offline access. Existing browser microphone and
+file-picker support is reused; native push notification registration and
+device biometric unlock are not provided by this web release.
 
 Source maps are uploaded privately to the existing frontend Sentry project when
 the Sentry secrets are configured. Web events use `jarvis-web@<git SHA>` as the

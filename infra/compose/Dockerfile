@@ -46,8 +46,12 @@ RUN --mount=type=secret,id=sentry_auth_token,required=false \
 # the API serves it; production builds fail closed if the artifact is missing.
 RUN set -eu; if [ "$PROJECT_PATH" = "src/Jarvis.Api/Jarvis.Api.csproj" ]; then \
       if [ "$REQUIRE_WEB_CLIENT" = "true" ]; then \
+        test -s /source/infra/web/dist/index.html || { echo "Missing web artifact: index.html" >&2; exit 1; }; \
+        base=$$(sed -n 's/.*<base href="\(\/r\/[A-Za-z0-9._-]\{7,64\}\/\)".*/\1/p' /source/infra/web/dist/index.html | head -n 1); \
+        test -n "$$base" || { echo "Web entry document is missing its /r/<revision>/ base href" >&2; exit 1; }; \
+        test ! -e /source/infra/web/dist/main.dart.js || { echo "Stable /main.dart.js must not be published" >&2; exit 1; }; \
         for file in index.html main.dart.js flutter_bootstrap.js; do \
-          test -s "/source/infra/web/dist/$file" || { echo "Missing web artifact: $file" >&2; exit 1; }; \
+          test -s "/source/infra/web/dist$${base}$${file}" || { echo "Missing web artifact: $${base}$${file}" >&2; exit 1; }; \
         done; \
       fi; \
       if [ -d /source/infra/web/dist ]; then \

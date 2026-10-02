@@ -106,18 +106,10 @@ if [[ "${api_healthy}" != true ]]; then
   exit 1
 fi
 
-# The web client ships in the API image. Require both the entry document and
-# compiled client before considering the deployment successful.
-docker exec "${api_container}" node -e '
-  Promise.all([
-    fetch("http://127.0.0.1:5082/").then(async r => {
-      if (!r.ok || !(await r.text()).includes("flutter_bootstrap.js")) throw Error("Web entry document is unavailable");
-    }),
-    fetch("http://127.0.0.1:5082/main.dart.js", {method: "HEAD"}).then(r => {
-      if (!r.ok || !r.headers.get("content-type")?.includes("javascript")) throw Error("Web client bundle is unavailable");
-    })
-  ]).catch(e => { console.error(e.message); process.exit(1); });
-'
+# The web client ships in the API image under /r/<revision>/. The homepage must
+# point at that release, and the stable /main.dart.js URL must stay absent so
+# Cloudflare's four-hour JavaScript cache cannot pin the previous client.
+docker exec -i "${api_container}" node - "http://127.0.0.1:5082" < scripts/deploy/check-web-client.mjs
 
 for service in jarvis-worker; do
   container_id="$(docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" ps -q "${service}" | head -n1)"
