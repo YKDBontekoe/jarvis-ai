@@ -14,7 +14,7 @@ REST:
 
 ### Packs and OAuth
 
-- **Packs** — calendar/mail/contacts guided setup (`/integrations/packs`).
+- **Packs** — calendar/mail/contacts guided setup (`/integrations/packs`). Suggested npm MCP packages in `IntegrationPackCatalog` are pinned to exact versions (a unit test enforces it); review a release before bumping. Contacts has no default package and needs an MCP endpoint.
 - **OAuth** — PKCE + dynamic client registration for MCP servers with authorize/token endpoints; paste fallback when not supported.
 
 ## MCP architecture

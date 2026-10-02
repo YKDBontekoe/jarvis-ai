@@ -40,6 +40,11 @@ public interface ICalendarFeed
         CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Built-in integration packs. Suggested stdio commands run third-party npm packages with the owner's
+/// credentials, so each one is pinned to an exact version; bump it deliberately after reviewing the release.
+/// A pack without a suggested command needs an MCP endpoint from the owner.
+/// </summary>
 public static class IntegrationPackCatalog
 {
     public static readonly IReadOnlyList<IntegrationPack> All =
@@ -47,15 +52,14 @@ public static class IntegrationPackCatalog
         new(IntegrationPackIds.Calendar, "Calendar", "calendar",
             "See today’s events from your calendar link, and optionally let Jarvis add new events.",
             "ics", ["calendar_events_list", "calendar_event_create"], "npx",
-            ["-y", "@cocal/google-calendar-mcp"], null, true),
+            ["-y", "@cocal/google-calendar-mcp@2.7.0"], null, true),
         new(IntegrationPackIds.Mail, "Mail", "mail",
             "Let Jarvis search your email and draft replies. You sign in once; never paste passwords into chat.",
             "oauth", ["list_emails", "search_emails", "draft_email"], "npx",
-            ["-y", "@gongrzhe/server-gmail-autoauth-mcp"], null, false),
+            ["-y", "@gongrzhe/server-gmail-autoauth-mcp@1.1.11"], null, false),
         new(IntegrationPackIds.Contacts, "Contacts", "contacts",
             "Let Jarvis look up people you know. You sign in once.",
-            "oauth", ["list_contacts", "search_contacts"], "npx",
-            ["-y", "@modelcontextprotocol/server-google-contacts"], null, false)
+            "oauth", ["list_contacts", "search_contacts"], null, null, null, false)
     ];
 
     public static IntegrationPack? Find(string? id) =>
