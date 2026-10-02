@@ -104,10 +104,12 @@ jobs:
           add_define JARVIS_SENTRY_DSN "${JARVIS_SENTRY_DSN}"
           SYMBOLS=()
           if [[ -n "${SENTRY_AUTH_TOKEN}" && -n "${SENTRY_ORG}" && -n "${SENTRY_PROJECT}" ]]; then
+            # gen_snapshot does not create the map's parent directory; iOS builds do not create build/app.
+            mkdir -p build/app build/symbols
             SYMBOLS=(
-              --split-debug-info=build/symbols
+              "--split-debug-info=${PWD}/build/symbols"
               --obfuscate
-              --extra-gen-snapshot-options=--save-obfuscation-map=build/app/obfuscation.map.json
+              "--extra-gen-snapshot-options=--save-obfuscation-map=${PWD}/build/app/obfuscation.map.json"
             )
           fi
           flutter build ios --release --no-codesign \
