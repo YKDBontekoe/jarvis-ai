@@ -13,7 +13,7 @@ public static class McpSetupCatalog
         new("calendar", "Calendar", "See your events, and add new ones"),
         new("mail", "Mail", "Search your email and draft replies"),
         new("contacts", "Contacts", "Look up people you know"),
-        new("https", "Another app", "Connect it by its web address"),
+        new("https", "Another app", "Search for it by name, or paste its address"),
         new("stdio", "Install a connector", "Advanced: from npm or PyPI"),
         new("manage", "Manage my apps", "Pause, resume, or remove one")
     ];

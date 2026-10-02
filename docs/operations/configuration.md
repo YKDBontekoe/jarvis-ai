@@ -59,6 +59,8 @@ about 14 ms per query and 8 ms per memory for the default model, in PyTorch; the
 
 ## MCP (host-level)
 
+`Mcp__Registry__BaseUrl` — MCP registry for the in-app catalog (default `https://registry.modelcontextprotocol.io`; empty turns the catalog off).
+
 `Mcp__Servers__0__*` — Name, Transport (`stdio` | `streamableHttp`), Command/Endpoint, AllowedTools, AutoApprovedTools, CredentialProvider, CredentialEnvironmentVariables, CredentialHeaders.
 
 ## Coding

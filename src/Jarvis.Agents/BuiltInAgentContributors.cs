@@ -44,7 +44,8 @@ internal sealed class CoreAgentTools(
     Jarvis.Application.Projects.IProjectStore projects,
     Jarvis.Application.Diagnostics.IRecentFaultLog? recentFaults = null,
     TimeProvider? timeProvider = null,
-    Jarvis.Application.Devices.IDeviceTelemetryStore? deviceTelemetry = null) : IAgentToolContributor
+    Jarvis.Application.Devices.IDeviceTelemetryStore? deviceTelemetry = null,
+    IMcpCatalog? mcpCatalog = null) : IAgentToolContributor
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context)
     {
@@ -58,7 +59,7 @@ internal sealed class CoreAgentTools(
             currentUser, context.ConversationId, context.Profile);
         var clockTools = new ClockAgentTools(timeProvider ?? TimeProvider.System);
         var mcpServerTools = new McpServerAgentTools(mcpServers, mcpPolicy, configuration, currentUser, mcpToolHost,
-            mcpOAuth);
+            mcpOAuth, mcpCatalog);
 
         yield return AIFunctionFactory.Create(clockTools.GetCurrentTime);
         yield return AIFunctionFactory.Create(reminderTools.CreateReminderAsync);
@@ -91,6 +92,8 @@ internal sealed class CoreAgentTools(
         yield return AIFunctionFactory.Create(mcpServerTools.ListMcpServerToolsAsync);
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.DiscoverMcpServerToolsAsync));
         yield return AIFunctionFactory.Create(mcpServerTools.RequestMcpAuthorizationAsync);
+        yield return AIFunctionFactory.Create(mcpServerTools.SearchMcpCatalogAsync);
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.InstallMcpFromCatalogAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.AddMcpServerAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.AddMcpStdioServerAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.UpdateMcpServerAsync));

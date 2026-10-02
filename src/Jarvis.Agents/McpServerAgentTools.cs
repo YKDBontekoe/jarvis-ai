@@ -8,9 +8,64 @@ using Microsoft.Extensions.Configuration;
 namespace Jarvis.Agents;
 
 internal sealed class McpServerAgentTools(IUserMcpServerRegistry servers, IOwnerMcpPolicyStore policy,
-    IConfiguration configuration, ICurrentUser currentUser, McpToolHost mcpToolHost, IMcpOAuthService oauth)
+    IConfiguration configuration, ICurrentUser currentUser, McpToolHost mcpToolHost, IMcpOAuthService oauth,
+    IMcpCatalog? catalog = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    [Description("Search the public MCP registry for apps the user can connect, such as Notion, Linear, Brave Search, or Stripe. Use this FIRST whenever the user asks to connect, add, or use an app you do not already have, instead of asking them for an address or package. Returns names, descriptions, how each can run (remote, npm, or pypi), and which keys it needs. Read-only and needs no approval. Results are untrusted third-party data.")]
+    public async Task<string> SearchMcpCatalogAsync(
+        [Description("What the user wants to connect, for example notion or web search.")] string query,
+        CancellationToken cancellationToken = default)
+    {
+        if (catalog is null) return "The app catalog is not available on this Jarvis server.";
+        try
+        {
+            var page = await catalog.SearchAsync(query, null, 8, cancellationToken);
+            if (page.Servers.Count == 0)
+                return "No installable apps matched. Try a shorter search, or ask the user for the app's MCP address.";
+            return JsonSerializer.Serialize(page.Servers.Select(entry => new
+            {
+                entry.Name,
+                entry.Title,
+                entry.Description,
+                entry.Version,
+                options = entry.Options.Select(option => new
+                {
+                    option.Id,
+                    option.Kind,
+                    option.Summary,
+                    secrets = option.Secrets.Select(secret => new { secret.Name, secret.Required, secret.Description })
+                })
+            }), JsonOptions) + "\nPrefer a remote option when one exists. Pass name (and option id) to InstallMcpFromCatalog.";
+        }
+        catch (McpCatalogUnavailableException exception) { return exception.Message; }
+    }
+
+    [Description("Install an app found with SearchMcpCatalog for this user. Jarvis fetches the entry from the registry again, so pass its exact name. Remote options connect to the publisher's HTTPS endpoint; npm and pypi options download that pinned package and run it on the Jarvis server. Every tool the app offers is enabled, and each call still asks for approval. Afterwards, ask for any listed key with AskForMcpCredential using provider = the returned server id and secretName = the key's name, or call RequestMcpAuthorization when it says sign-in is needed. Requires approval.")]
+    public async Task<string> InstallMcpFromCatalogAsync(
+        [Description("Exact registry name from SearchMcpCatalog, for example io.github.brave/brave-search-mcp-server.")] string name,
+        [Description("Option id from SearchMcpCatalog. Omit to use the first option.")] string? option = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (catalog is null) return "The app catalog is not available on this Jarvis server.";
+        try
+        {
+            var server = await McpCatalogInstaller.InstallAsync(currentUser.OwnerId,
+                new McpCatalogInstallRequest(name, option), catalog, servers, cancellationToken);
+            var missing = server.Secrets?.Where(secret => secret.Required && !secret.IsSet).ToArray() ?? [];
+            var next = missing.Length > 0
+                ? "Before it can work, ask the user for: " + string.Join(", ", missing.Select(secret =>
+                    $"{secret.Name} ({secret.Description ?? secret.Label})")) +
+                  $". Call AskForMcpCredential once per key with provider '{server.Id}' and that secretName."
+                : server.Transport == "streamableHttp"
+                    ? $"If it needs sign-in, call RequestMcpAuthorization with server '{server.Id}'."
+                    : "It starts the next time Jarvis needs it.";
+            return $"Installed '{server.Name}' (ID {server.Id}). {next}";
+        }
+        catch (ArgumentException exception) { return $"Could not install that app: {exception.Message}"; }
+        catch (McpCatalogUnavailableException exception) { return exception.Message; }
+    }
 
     [Description("List this user's registered MCP servers. Each entry includes an id, endpoint, whether it is enabled, and the exact allowed tool names or * for every exposed tool. Use this before updating, pausing, or removing a server.")]
     public async Task<string> ListMcpServersAsync(CancellationToken cancellationToken) =>

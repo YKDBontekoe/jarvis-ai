@@ -4,6 +4,9 @@ ARG PROJECT_PATH
 FROM node:22-slim AS codex-cli
 RUN npm install --global @openai/codex@0.145.0
 
+# uv provides uvx, which runs PyPI MCP connectors installed from the app catalog.
+FROM ghcr.io/astral-sh/uv:0.12.22 AS uv
+
 FROM golang:1.27.1-alpine AS github-mcp-server
 ARG GITHUB_MCP_SERVER_VERSION=v1.12.2
 RUN apk add --no-cache git
@@ -61,6 +64,7 @@ RUN apt-get update && apt-get install --yes --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=codex-cli /usr/local /usr/local
+COPY --from=uv /uv /uvx /usr/local/bin/
 COPY --from=github-mcp-server /out/github-mcp-server /usr/local/bin/github-mcp-server
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet"]

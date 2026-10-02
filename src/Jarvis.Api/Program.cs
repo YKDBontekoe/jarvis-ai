@@ -73,6 +73,7 @@ api.MapApprovalEndpoints();
 api.MapAutomationEndpoints(app.Logger);
 api.MapOwnerAutomationEndpoints(app.Logger);
 api.MapIntegrationEndpoints();
+api.MapMcpCatalogEndpoints();
 api.MapNotificationEndpoints();
 api.MapVoiceEndpoints(app.Logger);
 api.MapFileEndpoints(app.Logger);

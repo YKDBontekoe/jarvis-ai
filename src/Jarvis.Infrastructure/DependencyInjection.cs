@@ -75,6 +75,12 @@ public static class DependencyInjection
         services.AddScoped<IFileContentRepository, FileContentRepository>();
         services.AddScoped<IIntegrationCredentialStore, IntegrationCredentialStore>();
         services.AddScoped<IUserMcpServerRegistry, UserMcpServerRegistry>();
+        services.AddHttpClient<IMcpCatalog, Jarvis.Infrastructure.Integrations.OfficialMcpRegistryCatalog>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(12);
+            client.MaxResponseContentBufferSize = 4 * 1024 * 1024;
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("jarvis-mcp-catalog/1.0");
+        });
         services.AddScoped<IOwnerMcpPolicyStore, OwnerMcpPolicyStore>();
         services.AddScoped<IDailyBriefingRepository, DailyBriefingRepository>();
         services.AddScoped<IAutomationRuleRepository, AutomationRuleRepository>();
