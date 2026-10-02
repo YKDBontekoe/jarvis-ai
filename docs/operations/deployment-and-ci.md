@@ -43,6 +43,8 @@ scripts/deploy/remote-up.sh
 
 `remote-up.sh` serializes deployments with a host lock, retains the previous app images/configuration, creates a private PostgreSQL dump before migration, runs the advisory-locked migration command, starts services, checks dependency readiness, and requires a side-effect-free Temporal workflow to complete. `/alive` checks process liveness; `/health` requires PostgreSQL, object storage and recent workflow pollers. Successful deployment is recorded only after the workflow probe passes.
 
+The migration command applies all missing migrations through the latest migration in the image. Migration timestamps can arrive out of order when branches merge; targeting the last pending migration could revert newer migrations already applied. Reapplying a migration cannot recover data removed by an earlier downgrade; restore that data from a database backup separately.
+
 ## Recovery
 
 Private recovery state is stored under `.jarvis/deploy/`; database dumps under `.jarvis/backups/`. Both are excluded from Git, build contexts and CI uploads. Restrict access and arrange off-host backup/retention according to operational needs; a same-host dump alone cannot survive host loss. Failed deployment retains the previous release and does not automatically downgrade a database.
@@ -64,3 +66,5 @@ Rollback restores the previous rendered Compose configuration and env file while
 Optional Sentry secrets: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT_BACKEND`, `SENTRY_PROJECT_MOBILE`, `JARVIS_SENTRY_DSN`. Backend symbol upload extracts portable PDBs with embedded source from the verified images, then associates `github.sha` with commits. This keeps release images identical to the tested images. The server env file still requires `SENTRY_DSN` for event reporting.
 
 The iOS release builds with the pinned Flutter version on `macos-15`, validates the IPA before publishing, uploads optional Dart symbol/source context, and publishes the unsigned IPA and AltStore feed. Production Dart defines are applied during release; PR builds validate the native build without exposing release secrets. See the [README](../../README.md#ios-ipa-unsigned-livecontainer) for distribution setup.
+
+Sentry Logs and Issues are separate: automatic issue creation from logging is disabled (`MinimumEventLevel = None`). The shared agent run coordinator explicitly captures unexpected run exceptions, including chat/channel failures, with conversation ID and run kind but no message content. Expected client errors and requested cancellation are excluded. Inspect the backend project and production environment for these issues.

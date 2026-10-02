@@ -8,6 +8,7 @@ using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Profiles;
+using Jarvis.Api.Errors;
 using Jarvis.Api.Telemetry;
 using Jarvis.Domain.Conversations;
 using Microsoft.AspNetCore.SignalR;
@@ -151,6 +152,15 @@ public sealed class AgentRunCoordinator(
         catch (Exception exception)
         {
             activity?.SetStatus(ActivityStatusCode.Error, exception.GetType().Name);
+            // Callers turn failed runs into chat/channel responses, so these exceptions
+            // do not reach the HTTP exception handler. Error logs alone are not issues.
+            if (JarvisSentryExceptions.ShouldCapture(exception))
+                Sentry.SentrySdk.CaptureException(exception, scope =>
+                {
+                    scope.SetTag("jarvis.run.kind", kind);
+                    scope.SetTag("jarvis.run.outcome", "failed");
+                    scope.SetTag("jarvis.conversation.id", conversationId.ToString("D"));
+                });
             throw;
         }
         finally
