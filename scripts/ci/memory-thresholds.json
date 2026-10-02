@@ -1,0 +1,6 @@
+{
+  "recallAt8": {"minimum": 0.65},
+  "primaryHitAt1": {"minimum": 0.5},
+  "noiseShare": {"maximum": 0.65},
+  "p95Ms": {"maximum": 250}
+}

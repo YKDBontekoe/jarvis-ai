@@ -35,6 +35,9 @@ public static class DependencyInjection
         }
 
         services.AddDbContext<JarvisDbContext>(options => options.UseNpgsql(connectionString, npgsql => npgsql.UseVector()));
+        services.AddHealthChecks()
+            .AddCheck<DatabaseReadinessHealthCheck>("database", tags: ["ready"], timeout: TimeSpan.FromSeconds(5))
+            .AddCheck<ObjectStorageReadinessHealthCheck>("object-storage", tags: ["ready"], timeout: TimeSpan.FromSeconds(5));
         services.AddScoped<ConversationStore>();
         services.AddScoped<IConversationStore>(provider => provider.GetRequiredService<ConversationStore>());
         services.AddScoped<IConversationHistory>(provider => provider.GetRequiredService<ConversationStore>());

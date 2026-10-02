@@ -10,6 +10,12 @@ using Jarvis.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
 using Sentry;
 
+if (args is ["deployment-probe"])
+{
+    Environment.ExitCode = await DeploymentProbeCommand.RunAsync();
+    return;
+}
+
 if (args is ["migrate"])
 {
     Environment.ExitCode = await MigrationCommand.RunAsync(args);
@@ -31,6 +37,9 @@ var accountTokens = AccountTokenOptions.From(builder.Configuration, builder.Envi
 builder.AddServiceDefaults();
 builder.Services.AddJarvisAuthentication(accountTokens, builder.Environment.IsDevelopment());
 builder.Services.AddJarvisApi(builder.Configuration, accountTokens);
+builder.Services.AddSingleton<Jarvis.Workflows.TemporalReadinessHealthCheck>();
+builder.Services.AddHealthChecks().AddCheck<Jarvis.Workflows.TemporalReadinessHealthCheck>(
+    "temporal-worker", tags: ["ready"], timeout: TimeSpan.FromSeconds(8));
 
 var app = builder.Build();
 

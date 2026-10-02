@@ -1,0 +1,6973 @@
+{
+  "components": {
+    "schemas": {
+      "AddPersonaTraitRequest": {
+        "properties": {
+          "category": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "statement": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "category",
+          "statement"
+        ],
+        "type": "object"
+      },
+      "AddUserMcpServerRequest": {
+        "properties": {
+          "allowedTools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "endpoint",
+          "allowedTools"
+        ],
+        "type": "object"
+      },
+      "ApprovalDecisionRequest": {
+        "properties": {
+          "approved": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "approved"
+        ],
+        "type": "object"
+      },
+      "AssignProjectRequest": {
+        "properties": {
+          "projectId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "type": "object"
+      },
+      "AuthCredentialsRequest": {
+        "properties": {
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object"
+      },
+      "ChannelLinkRequest": {
+        "properties": {
+          "channelId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "channelId"
+        ],
+        "type": "object"
+      },
+      "ChannelTestRequest": {
+        "properties": {
+          "recipient": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "recipient"
+        ],
+        "type": "object"
+      },
+      "CreateA2ATokenRequest": {
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "CreateConditionWatchRequest": {
+        "properties": {
+          "comparison": {
+            "type": "string"
+          },
+          "credentialProvider": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "intervalMinutes": {
+            "default": 15,
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "jsonPath": {
+            "type": "string"
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "latitude": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ]
+          },
+          "longitude": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ]
+          },
+          "minutesBefore": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "radiusMeters": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ]
+          },
+          "threshold": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "url",
+          "jsonPath",
+          "comparison",
+          "threshold"
+        ],
+        "type": "object"
+      },
+      "CreateConversationRequest": {
+        "properties": {
+          "profileId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "projectId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "type": "object"
+      },
+      "CreateJarvisTaskRequest": {
+        "properties": {
+          "profileId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "projectId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "prompt"
+        ],
+        "type": "object"
+      },
+      "DeviceInvokeResultRequest": {
+        "properties": {
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "result": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "result",
+          "error"
+        ],
+        "type": "object"
+      },
+      "DeviceSettings": {
+        "properties": {
+          "battery": {
+            "default": true,
+            "type": "boolean"
+          },
+          "clipboard": {
+            "default": false,
+            "type": "boolean"
+          },
+          "location": {
+            "default": false,
+            "type": "boolean"
+          },
+          "notify": {
+            "default": true,
+            "type": "boolean"
+          },
+          "openUrl": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "ExpenseRequest": {
+        "properties": {
+          "amount": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ]
+          },
+          "category": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "currency": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "merchant": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "receiptFileId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "spentOn": {
+            "format": "date",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "amount",
+          "currency",
+          "merchant",
+          "category",
+          "note",
+          "spentOn",
+          "receiptFileId"
+        ],
+        "type": "object"
+      },
+      "HabitArchiveRequest": {
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "archived"
+        ],
+        "type": "object"
+      },
+      "HabitCheckInRequest": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "done": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "required": [
+          "date",
+          "done"
+        ],
+        "type": "object"
+      },
+      "HabitRequest": {
+        "properties": {
+          "cadence": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "icon": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "targetPerWeek": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "timeZoneId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "icon",
+          "cadence",
+          "targetPerWeek",
+          "timeZoneId"
+        ],
+        "type": "object"
+      },
+      "HabitSettings": {
+        "properties": {
+          "checkInTime": {
+            "default": "20:30",
+            "type": "string"
+          },
+          "eveningCheckIn": {
+            "default": true,
+            "type": "boolean"
+          },
+          "localTime": {
+            "format": "time",
+            "type": "string"
+          },
+          "timeZoneId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "IFormFile": {
+        "format": "binary",
+        "type": "string"
+      },
+      "ImportSkillRequest": {
+        "properties": {
+          "markdown": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "markdown"
+        ],
+        "type": "object"
+      },
+      "InstallIntegrationPackRequest": {
+        "properties": {
+          "allowedTools": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "arguments": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "command": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "endpoint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "icsToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "icsUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "icsUrl",
+          "icsToken",
+          "endpoint",
+          "command",
+          "arguments",
+          "allowedTools"
+        ],
+        "type": "object"
+      },
+      "JournalRequest": {
+        "properties": {
+          "content": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "energy": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "entryDate": {
+            "format": "date",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "gratitude": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "highlights": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "mood": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "rating": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "stress": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          }
+        },
+        "required": [
+          "entryDate",
+          "content",
+          "highlights",
+          "gratitude",
+          "rating",
+          "mood",
+          "energy",
+          "stress",
+          "tags",
+          "source"
+        ],
+        "type": "object"
+      },
+      "JsonElement": {},
+      "LearningSettings": {
+        "properties": {
+          "autoActivateSkills": {
+            "default": true,
+            "type": "boolean"
+          },
+          "autoCreateSkills": {
+            "default": true,
+            "type": "boolean"
+          },
+          "dreamingEnabled": {
+            "default": true,
+            "type": "boolean"
+          },
+          "dreamingHour": {
+            "default": 3,
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "heartbeatEnabled": {
+            "default": false,
+            "type": "boolean"
+          },
+          "heartbeatMinutes": {
+            "default": 60,
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "learnPersona": {
+            "default": true,
+            "type": "boolean"
+          },
+          "proactiveCheckIns": {
+            "default": true,
+            "type": "boolean"
+          },
+          "quietHoursEnd": {
+            "default": 7,
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "quietHoursStart": {
+            "default": 22,
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "McpServerStateRequest": {
+        "properties": {
+          "allowedTools": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "enabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "toolMode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "enabled",
+          "toolMode",
+          "allowedTools"
+        ],
+        "type": "object"
+      },
+      "MemoryRequest": {
+        "properties": {
+          "confidence": {
+            "default": 0.8,
+            "format": "float",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ]
+          },
+          "content": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "importance": {
+            "default": 0.5,
+            "format": "float",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ]
+          },
+          "isPinned": {
+            "default": false,
+            "type": "boolean"
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "validUntil": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "content"
+        ],
+        "type": "object"
+      },
+      "MergeGraphEntitiesRequest": {
+        "properties": {
+          "absorbId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "keepId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "keepId",
+          "absorbId"
+        ],
+        "type": "object"
+      },
+      "MessageFeedbackRequest": {
+        "properties": {
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "rating": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "rating",
+          "note"
+        ],
+        "type": "object"
+      },
+      "OpenPullRequestRequest": {
+        "properties": {
+          "body": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ],
+        "type": "object"
+      },
+      "ProjectInput": {
+        "properties": {
+          "color": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instructions": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "instructions",
+          "color"
+        ],
+        "type": "object"
+      },
+      "ProposeGraphFactRequest": {
+        "properties": {
+          "exclusive": {
+            "default": true,
+            "type": "boolean"
+          },
+          "object": {
+            "type": "string"
+          },
+          "objectIsEntity": {
+            "default": false,
+            "type": "boolean"
+          },
+          "objectType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "predicate": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "subjectType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "subject",
+          "subjectType",
+          "predicate",
+          "object",
+          "objectType"
+        ],
+        "type": "object"
+      },
+      "PushDeviceRequest": {
+        "properties": {
+          "platform": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "token",
+          "platform"
+        ],
+        "type": "object"
+      },
+      "ReceiptScanRequest": {
+        "properties": {
+          "fileId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fileId"
+        ],
+        "type": "object"
+      },
+      "RefreshTokenRequest": {
+        "properties": {
+          "refreshToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "refreshToken"
+        ],
+        "type": "object"
+      },
+      "ReminderRequest": {
+        "properties": {
+          "dueAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "localTime": {
+            "format": "time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "recurrence": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "timeZoneId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "until": {
+            "format": "date",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "weekdays": {
+            "default": 0,
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "title",
+          "dueAt"
+        ],
+        "type": "object"
+      },
+      "SaveAssistantProfileRequest": {
+        "properties": {
+          "allowPersonaLearning": {
+            "default": true,
+            "type": "boolean"
+          },
+          "allowRemember": {
+            "default": true,
+            "type": "boolean"
+          },
+          "allowedCollectionIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "chatModel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "contributeToLearning": {
+            "default": true,
+            "type": "boolean"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "enabledSkillIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "fastModel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "includeOwnerPersona": {
+            "default": true,
+            "type": "boolean"
+          },
+          "includePinnedMemories": {
+            "default": true,
+            "type": "boolean"
+          },
+          "isDefault": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "memoryScope": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "modelClass": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "personaInstructions": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "preferredName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reasoningEffort": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "replyLanguage": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "restrictFiles": {
+            "default": false,
+            "type": "boolean"
+          },
+          "restrictSkills": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "personaInstructions",
+          "preferredName",
+          "replyLanguage"
+        ],
+        "type": "object"
+      },
+      "SaveAutomationRuleRequest": {
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "definition"
+        ],
+        "type": "object"
+      },
+      "SaveChannelRequest": {
+        "properties": {
+          "account": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "allowedSenders": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "forwardNotifications": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "notificationCategories": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "notifyRecipient": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secrets": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "object"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "displayName",
+          "account",
+          "enabled",
+          "allowedSenders",
+          "forwardNotifications",
+          "notifyRecipient",
+          "secrets"
+        ],
+        "type": "object"
+      },
+      "SaveDailyBriefingRequest": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "localTime": {
+            "format": "time",
+            "type": "string"
+          },
+          "timeZoneId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "localTime",
+          "timeZoneId"
+        ],
+        "type": "object"
+      },
+      "SaveDeviceTelemetryRequest": {
+        "properties": {
+          "accuracyMeters": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ]
+          },
+          "batteryPercent": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "charging": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "latitude": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ]
+          },
+          "longitude": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude",
+          "accuracyMeters",
+          "batteryPercent",
+          "charging"
+        ],
+        "type": "object"
+      },
+      "SaveDocumentCollectionRequest": {
+        "properties": {
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fileIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "fileIds"
+        ],
+        "type": "object"
+      },
+      "SaveIntegrationCredentialsRequest": {
+        "properties": {
+          "secrets": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "secrets"
+        ],
+        "type": "object"
+      },
+      "SaveIntegrationSecretRequest": {
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "type": "object"
+      },
+      "SaveModelSettingsRequest": {
+        "properties": {
+          "chatModel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "embeddingModel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fastModel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reasoningEffort": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "provider",
+          "chatModel",
+          "fastModel",
+          "reasoningEffort",
+          "embeddingModel"
+        ],
+        "type": "object"
+      },
+      "SavePersonaRequest": {
+        "properties": {
+          "customInstructions": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "preferredName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "replyLanguage": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "customInstructions",
+          "preferredName",
+          "replyLanguage"
+        ],
+        "type": "object"
+      },
+      "SaveRemoteAgentBody": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "url",
+          "enabled",
+          "token"
+        ],
+        "type": "object"
+      },
+      "SaveSkillRequest": {
+        "properties": {
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instructions": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "instructions"
+        ],
+        "type": "object"
+      },
+      "SendMessageRequest": {
+        "properties": {
+          "content": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "imageFileIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "type": "object"
+      },
+      "SkillLockRequest": {
+        "properties": {
+          "locked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "locked"
+        ],
+        "type": "object"
+      },
+      "SkillStatusRequest": {
+        "properties": {
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "SnoozeReminderRequest": {
+        "properties": {
+          "minutes": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "until": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "StartMcpOAuthRequest": {
+        "properties": {
+          "endpoint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "server": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "server",
+          "endpoint"
+        ],
+        "type": "object"
+      },
+      "SwitchConversationProfileRequest": {
+        "properties": {
+          "confirm": {
+            "default": false,
+            "type": "boolean"
+          },
+          "profileId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profileId"
+        ],
+        "type": "object"
+      },
+      "UiSurfaceActionRequest": {
+        "properties": {
+          "actionId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "object"
+            ]
+          }
+        },
+        "required": [
+          "actionId",
+          "values"
+        ],
+        "type": "object"
+      },
+      "UpdateConversationRequest": {
+        "properties": {
+          "pinned": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "title",
+          "pinned"
+        ],
+        "type": "object"
+      },
+      "UpdateGraphEntityRequest": {
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "summary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "summary"
+        ],
+        "type": "object"
+      },
+      "UpdatePersonaTraitRequest": {
+        "properties": {
+          "pinned": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "statement": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "statement",
+          "pinned"
+        ],
+        "type": "object"
+      },
+      "VoiceCaptionRequest": {
+        "properties": {
+          "final": {
+            "type": "boolean"
+          },
+          "ownerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "role": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "ownerId",
+          "role",
+          "text",
+          "final"
+        ],
+        "type": "object"
+      },
+      "VoiceSessionRequest": {
+        "properties": {
+          "conversationId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversationId"
+        ],
+        "type": "object"
+      },
+      "VoiceSettings": {
+        "properties": {
+          "captions": {
+            "default": true,
+            "type": "boolean"
+          },
+          "handsFree": {
+            "default": true,
+            "type": "boolean"
+          },
+          "voice": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "VoiceToolCallRequest": {
+        "properties": {
+          "arguments": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            ]
+          },
+          "ownerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ownerId",
+          "arguments"
+        ],
+        "type": "object"
+      },
+      "VoiceUtteranceRequest": {
+        "properties": {
+          "ownerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "role": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "ownerId",
+          "role",
+          "text"
+        ],
+        "type": "object"
+      },
+      "WeeklyReviewSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "localTime": {
+            "format": "time",
+            "type": "string"
+          },
+          "timeZoneId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "localTime",
+          "timeZoneId"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Jarvis.Api | v1",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.1",
+  "paths": {
+    "/.well-known/agent-card.json": {
+      "get": {
+        "operationId": "GetA2AAgentCard",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/a2a": {
+      "post": {
+        "operationId": "A2AJsonRpc",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/a2a/tokens": {
+      "get": {
+        "operationId": "ListA2ATokens",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateA2AToken",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateA2ATokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/a2a/tokens/{id}": {
+      "delete": {
+        "operationId": "DeleteA2AToken",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/agents": {
+      "get": {
+        "operationId": "ListRemoteAgents",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateRemoteAgent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveRemoteAgentBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/agents/{id}": {
+      "delete": {
+        "operationId": "DeleteRemoteAgent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateRemoteAgent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveRemoteAgentBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/approvals": {
+      "get": {
+        "operationId": "ListPendingApprovals",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/approvals/{approvalId}/decision": {
+      "post": {
+        "operationId": "DecideToolApproval",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "approvalId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/audit": {
+      "get": {
+        "operationId": "ListAuditEvents",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthCredentialsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "IdentityAuthEndpoints"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "IdentityAuthEndpoints"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "IdentityAuthEndpoints"
+        ]
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthCredentialsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "IdentityAuthEndpoints"
+        ]
+      }
+    },
+    "/api/v1/automations": {
+      "get": {
+        "operationId": "ListAutomations",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Automations"
+        ]
+      },
+      "post": {
+        "operationId": "CreateAutomation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAutomationRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Automations"
+        ]
+      }
+    },
+    "/api/v1/automations/runs/{runId}/approve": {
+      "post": {
+        "operationId": "ApproveAutomationRun",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Automations"
+        ]
+      }
+    },
+    "/api/v1/automations/runs/{runId}/decline": {
+      "post": {
+        "operationId": "DeclineAutomationRun",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "runId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Automations"
+        ]
+      }
+    },
+    "/api/v1/automations/validate": {
+      "post": {
+        "operationId": "ValidateAutomation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAutomationRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Automations"
+        ]
+      }
+    },
+    "/api/v1/automations/{id}": {
+      "get": {
+        "operationId": "GetAutomation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Automations"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateAutomation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAutomationRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Automations"
+        ]
+      }
+    },
+    "/api/v1/automations/{id}/disable": {
+      "post": {
+        "operationId": "DisableAutomation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Automations"
+        ]
+      }
+    },
+    "/api/v1/automations/{id}/enable": {
+      "post": {
+        "operationId": "EnableAutomation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Automations"
+        ]
+      }
+    },
+    "/api/v1/automations/{id}/run": {
+      "post": {
+        "operationId": "RunAutomation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Automations"
+        ]
+      }
+    },
+    "/api/v1/automations/{id}/runs": {
+      "get": {
+        "operationId": "ListAutomationRuns",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Automations"
+        ]
+      }
+    },
+    "/api/v1/automations/{id}/test-run": {
+      "post": {
+        "operationId": "TestAutomation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Automations"
+        ]
+      }
+    },
+    "/api/v1/briefings/daily": {
+      "get": {
+        "operationId": "GetDailyBriefing",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "SaveDailyBriefing",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveDailyBriefingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/browser-sessions/{id}": {
+      "get": {
+        "operationId": "GetBrowserSession",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/channels": {
+      "get": {
+        "operationId": "ListChannels",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateChannel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveChannelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/channels/link": {
+      "post": {
+        "operationId": "StartChannelLink",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/channels/link/{linkId}": {
+      "get": {
+        "operationId": "GetChannelLink",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "linkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/channels/providers": {
+      "get": {
+        "operationId": "GetChannelProviders",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/channels/signal/link": {
+      "get": {
+        "operationId": "GetSignalLinkCode",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/channels/signal/status": {
+      "get": {
+        "operationId": "GetSignalStatus",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/channels/whatsapp/{key}/webhook": {
+      "get": {
+        "operationId": "VerifyWhatsAppWebhook",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "ReceiveWhatsAppWebhook",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/channels/{id}": {
+      "delete": {
+        "operationId": "DeleteChannel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateChannel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveChannelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/channels/{id}/messages": {
+      "get": {
+        "operationId": "ListChannelMessages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/channels/{id}/test": {
+      "post": {
+        "operationId": "TestChannel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/channels/{id}/threads": {
+      "get": {
+        "operationId": "ListChannelThreads",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/channels/{id}/threads/{peer}/messages": {
+      "get": {
+        "operationId": "ListChannelThreadMessages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "peer",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/coding/runs": {
+      "get": {
+        "operationId": "ListCodingRuns",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/coding/runs/{id}": {
+      "get": {
+        "operationId": "GetCodingRun",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/coding/runs/{id}/diff": {
+      "get": {
+        "operationId": "GetCodingRunDiff",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/coding/runs/{id}/pull-request": {
+      "get": {
+        "operationId": "GetCodingRunPullRequest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "OpenCodingRunPullRequest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OpenPullRequestRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/coding/runs/{id}/pull-request/close": {
+      "post": {
+        "operationId": "CloseCodingRunPullRequest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/coding/runs/{id}/pull-request/merge": {
+      "post": {
+        "operationId": "MergeCodingRunPullRequest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/collections": {
+      "get": {
+        "operationId": "ListDocumentCollections",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateDocumentCollection",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveDocumentCollectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/collections/{id}": {
+      "delete": {
+        "operationId": "DeleteDocumentCollection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "get": {
+        "operationId": "GetDocumentCollection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateDocumentCollection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveDocumentCollectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/conversations": {
+      "get": {
+        "operationId": "ListConversations",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateConversation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConversationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversationId}": {
+      "delete": {
+        "operationId": "DeleteConversation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "get": {
+        "operationId": "GetConversation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeMessages",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "patch": {
+        "operationId": "UpdateConversation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConversationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversationId}/browser-sessions": {
+      "get": {
+        "operationId": "ListBrowserSessions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversationId}/cancel": {
+      "post": {
+        "operationId": "CancelConversationRun",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversationId}/messages": {
+      "get": {
+        "operationId": "ListConversationMessages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "SendMessage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversationId}/messages/{messageId}/feedback": {
+      "post": {
+        "operationId": "RateMessage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageFeedbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversationId}/profile": {
+      "put": {
+        "operationId": "SwitchConversationProfile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwitchConversationProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversationId}/project": {
+      "put": {
+        "operationId": "MoveConversationToProject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversationId}/regenerate": {
+      "post": {
+        "operationId": "RegenerateReply",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversationId}/sources": {
+      "get": {
+        "operationId": "GetConversationSources",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversationId}/sources/collections/{collectionId}": {
+      "delete": {
+        "operationId": "DetachConversationCollection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "AttachConversationCollection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversationId}/sources/files/{fileId}": {
+      "delete": {
+        "operationId": "DetachConversationFile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "AttachConversationFile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversationId}/surfaces": {
+      "get": {
+        "operationId": "ListConversationSurfaces",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/devices/invoke/{invokeId}/result": {
+      "post": {
+        "operationId": "CompleteDeviceInvoke",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invokeId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceInvokeResultRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/devices/telemetry": {
+      "post": {
+        "operationId": "SaveDeviceTelemetry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveDeviceTelemetryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/expenses": {
+      "get": {
+        "operationId": "ListExpenses",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "month",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateExpense",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/expenses/scan": {
+      "post": {
+        "operationId": "ScanReceipt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptScanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/expenses/{id}": {
+      "delete": {
+        "operationId": "DeleteExpense",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "get": {
+        "operationId": "GetExpense",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateExpense",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/files": {
+      "get": {
+        "operationId": "ListFiles",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "UploadFile",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/files/citations/{chunkId}": {
+      "get": {
+        "operationId": "ResolveFileCitation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chunkId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/files/search": {
+      "get": {
+        "operationId": "SearchFiles",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/files/{fileId}/project": {
+      "put": {
+        "operationId": "MoveFileToProject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/files/{id}": {
+      "delete": {
+        "operationId": "DeleteFile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/files/{id}/content": {
+      "get": {
+        "operationId": "DownloadFile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/files/{id}/reprocess": {
+      "post": {
+        "operationId": "RetryFileIndexing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/graph/entities": {
+      "get": {
+        "operationId": "ListKnowledgeGraphEntities",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/graph/entities/merge": {
+      "post": {
+        "operationId": "MergeKnowledgeGraphEntities",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeGraphEntitiesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/graph/entities/{id}": {
+      "delete": {
+        "operationId": "DeleteKnowledgeGraphEntity",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "get": {
+        "operationId": "GetKnowledgeGraphEntity",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateKnowledgeGraphEntity",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGraphEntityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/graph/facts": {
+      "post": {
+        "operationId": "ProposeKnowledgeGraphFact",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeGraphFactRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/graph/overview": {
+      "get": {
+        "operationId": "GetKnowledgeGraphOverview",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/graph/relations/{id}": {
+      "delete": {
+        "operationId": "CloseKnowledgeGraphRelation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/habits": {
+      "get": {
+        "operationId": "ListHabits",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "includeArchived",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateHabit",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HabitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/habits/settings": {
+      "get": {
+        "operationId": "GetHabitSettings",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "SaveHabitSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HabitSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/habits/{id}": {
+      "delete": {
+        "operationId": "DeleteHabit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "get": {
+        "operationId": "GetHabit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateHabit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HabitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/habits/{id}/archived": {
+      "put": {
+        "operationId": "ArchiveHabit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HabitArchiveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/habits/{id}/check-ins": {
+      "post": {
+        "operationId": "CheckInHabit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HabitCheckInRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/home": {
+      "get": {
+        "operationId": "GetHomeBriefing",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/integrations/connections": {
+      "get": {
+        "operationId": "ListIntegrationConnectionStatuses",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/integrations/credentials": {
+      "get": {
+        "operationId": "ListIntegrationCredentialStatuses",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/integrations/oauth/callback": {
+      "get": {
+        "operationId": "McpOAuthCallback",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/integrations/oauth/sessions": {
+      "post": {
+        "operationId": "StartMcpOAuth",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartMcpOAuthRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/integrations/oauth/sessions/{id}": {
+      "get": {
+        "operationId": "GetMcpOAuthSession",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/integrations/packs": {
+      "get": {
+        "operationId": "ListIntegrationPacks",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/integrations/packs/{id}": {
+      "post": {
+        "operationId": "InstallIntegrationPack",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallIntegrationPackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/integrations/{provider}/credentials": {
+      "delete": {
+        "operationId": "DeleteIntegrationCredentials",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "get": {
+        "operationId": "GetIntegrationCredentialStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "SaveIntegrationCredentials",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveIntegrationCredentialsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/integrations/{provider}/credentials/{secretName}": {
+      "delete": {
+        "operationId": "DeleteIntegrationSecret",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "secretName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "SaveIntegrationSecret",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "secretName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveIntegrationSecretRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/journal": {
+      "get": {
+        "operationId": "ListJournalEntries",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateJournalEntry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JournalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/journal/summary": {
+      "get": {
+        "operationId": "GetJournalSummary",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "schema": {
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/journal/{id}": {
+      "delete": {
+        "operationId": "DeleteJournalEntry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "get": {
+        "operationId": "GetJournalEntry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateJournalEntry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JournalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/learning/dream": {
+      "post": {
+        "operationId": "RunDreamingNow",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/learning/run": {
+      "post": {
+        "operationId": "RunHeartbeatNow",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/learning/status": {
+      "get": {
+        "operationId": "GetLearningStatus",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/mcp-controls/{name}": {
+      "put": {
+        "operationId": "SetHostMcpServerState",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpServerStateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/mcp-servers": {
+      "get": {
+        "operationId": "ListUserMcpServers",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "AddUserMcpServer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddUserMcpServerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/mcp-servers/{id}": {
+      "delete": {
+        "operationId": "RemoveUserMcpServer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateUserMcpServer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddUserMcpServerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/mcp-servers/{id}/state": {
+      "put": {
+        "operationId": "SetUserMcpServerState",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpServerStateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/memory": {
+      "get": {
+        "operationId": "ListMemories",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateMemory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/memory/index-status": {
+      "get": {
+        "operationId": "GetMemoryIndexStatus",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/memory/search": {
+      "get": {
+        "operationId": "SearchMemories",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/memory/{id}": {
+      "delete": {
+        "operationId": "DeleteMemory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "get": {
+        "operationId": "GetMemory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateMemory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "operationId": "ListNotifications",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/notifications/{id}/read": {
+      "post": {
+        "operationId": "MarkNotificationRead",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/persona": {
+      "get": {
+        "operationId": "GetPersona",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "SavePersona",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavePersonaRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/persona/traits": {
+      "post": {
+        "operationId": "AddPersonaTrait",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPersonaTraitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/persona/traits/{id}": {
+      "delete": {
+        "operationId": "RemovePersonaTrait",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "patch": {
+        "operationId": "UpdatePersonaTrait",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePersonaTraitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/profiles": {
+      "get": {
+        "operationId": "ListAssistantProfiles",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateAssistantProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAssistantProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/profiles/{id}": {
+      "delete": {
+        "operationId": "DeleteAssistantProfile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "get": {
+        "operationId": "GetAssistantProfile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateAssistantProfile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAssistantProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/projects": {
+      "get": {
+        "operationId": "ListProjects",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateProject",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}": {
+      "delete": {
+        "operationId": "DeleteProject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "get": {
+        "operationId": "GetProject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateProject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/push-devices": {
+      "delete": {
+        "operationId": "RemovePushDevice",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushDeviceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "RegisterPushDevice",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushDeviceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/reminders": {
+      "get": {
+        "operationId": "ListReminders",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateReminder",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReminderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/reminders/{id}": {
+      "delete": {
+        "operationId": "CancelReminder",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "get": {
+        "operationId": "GetReminder",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/reminders/{id}/complete": {
+      "post": {
+        "operationId": "CompleteReminder",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/reminders/{id}/snooze": {
+      "post": {
+        "operationId": "SnoozeReminder",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnoozeReminderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/reviews/weekly": {
+      "get": {
+        "operationId": "GetWeeklyReviews",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "weeks",
+            "schema": {
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/reviews/weekly/generate": {
+      "post": {
+        "operationId": "GenerateWeeklyReview",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/reviews/weekly/settings": {
+      "put": {
+        "operationId": "SaveWeeklyReviewSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeeklyReviewSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/reviews/weekly/{id}": {
+      "get": {
+        "operationId": "GetWeeklyReview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "operationId": "FederatedSearch",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kinds",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/settings/devices": {
+      "get": {
+        "operationId": "GetDeviceSettings",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "SaveDeviceSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/settings/learning": {
+      "get": {
+        "operationId": "GetLearningSettings",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "SaveLearningSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/settings/models": {
+      "get": {
+        "operationId": "GetModelSettings",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "SaveModelSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveModelSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/settings/models/codex": {
+      "get": {
+        "operationId": "GetCodexInstallation",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/settings/models/codex/update": {
+      "post": {
+        "operationId": "UpdateCodex",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/settings/models/embedding": {
+      "get": {
+        "operationId": "GetEmbeddingStatus",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/settings/models/openrouter-key": {
+      "delete": {
+        "operationId": "DeleteOpenRouterKey",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "SaveOpenRouterKey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveIntegrationSecretRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/settings/models/openrouter/catalog": {
+      "get": {
+        "operationId": "ListOpenRouterModels",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/settings/models/test": {
+      "post": {
+        "operationId": "TestModelSettings",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/settings/voice": {
+      "get": {
+        "operationId": "GetVoiceSettings",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "SaveVoiceSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/skills": {
+      "get": {
+        "operationId": "ListSkills",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateSkill",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSkillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/skills/import": {
+      "post": {
+        "operationId": "ImportSkill",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportSkillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/skills/{id}": {
+      "delete": {
+        "operationId": "DeleteSkill",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "get": {
+        "operationId": "GetSkill",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateSkill",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSkillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/skills/{id}/export": {
+      "get": {
+        "operationId": "ExportSkill",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/skills/{id}/lock": {
+      "post": {
+        "operationId": "SetSkillLock",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillLockRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/skills/{id}/status": {
+      "post": {
+        "operationId": "SetSkillStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/tasks": {
+      "get": {
+        "operationId": "ListTasks",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateTask",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJarvisTaskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/tasks/{id}": {
+      "delete": {
+        "operationId": "CancelTask",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "get": {
+        "operationId": "GetTask",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/tasks/{id}/messages": {
+      "get": {
+        "operationId": "GetTaskMessages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/tasks/{taskId}/project": {
+      "put": {
+        "operationId": "MoveTaskToProject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/ui-surfaces/{id}/actions": {
+      "post": {
+        "operationId": "SubmitUiSurfaceAction",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UiSurfaceActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/usage": {
+      "get": {
+        "operationId": "GetUsageDashboard",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "period",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/voice/internal/{conversationId}/caption": {
+      "post": {
+        "operationId": "PublishVoiceCaption",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceCaptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/voice/internal/{conversationId}/session": {
+      "get": {
+        "operationId": "GetVoiceBackendSession",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ownerId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/voice/internal/{conversationId}/tools/{toolName}": {
+      "post": {
+        "operationId": "InvokeVoiceBackendTool",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "toolName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceToolCallRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/voice/internal/{conversationId}/utterance": {
+      "post": {
+        "operationId": "PersistVoiceUtterance",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceUtteranceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/voice/session": {
+      "post": {
+        "operationId": "CreateVoiceSession",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/watches": {
+      "get": {
+        "operationId": "ListConditionWatches",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "post": {
+        "operationId": "CreateConditionWatch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConditionWatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    },
+    "/api/v1/watches/{id}": {
+      "delete": {
+        "operationId": "CancelConditionWatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      },
+      "get": {
+        "operationId": "GetConditionWatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Jarvis.Api"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:15082/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Jarvis.Api"
+    },
+    {
+      "name": "IdentityAuthEndpoints"
+    },
+    {
+      "name": "Automations"
+    }
+  ]
+}

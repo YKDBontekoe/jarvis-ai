@@ -37,6 +37,14 @@ fi
 sudo groupadd -f docker
 sudo usermod -aG docker "$(id -un)" || true
 
+echo "==> Preparing isolated Python CI tooling"
+if ! python3 -m venv .venv-ci; then
+  sudo apt-get update -qq
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv
+  python3 -m venv .venv-ci
+fi
+.venv-ci/bin/python3 -m pip install -r scripts/ci/requirements.txt
+
 echo "==> Restoring dotnet local tools (dotnet-ef)"
 dotnet tool restore
 

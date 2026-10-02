@@ -3,7 +3,7 @@ services:
   jarvis-api:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      Database__ApplyMigrationsAtStartup: "true"
+      Database__ApplyMigrationsAtStartup: "false"
       Authentication__Issuer: https://jarvis.local
       Authentication__Audience: jarvis-api
       Authentication__SigningKey: verification-signing-key-at-least-32b

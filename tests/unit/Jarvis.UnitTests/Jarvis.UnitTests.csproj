@@ -14,11 +14,15 @@
     <ProjectReference Include="../../../workers/Jarvis.Worker/Jarvis.Worker.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="coverlet.collector" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../contracts/signalr.json" Link="signalr.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

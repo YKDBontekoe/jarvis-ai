@@ -10,6 +10,11 @@ const MODEL = 'jarvis-fixture';
 const STREAM_DELAY_MS = Number(process.env.FAKE_CODEX_DELAY_MS ?? 18);
 const CONTEXT_PREFIXES = [
   'Current time reference:',
+  'Habits:',
+  'Expenses:',
+  'Journal:',
+  'Journaling:',
+  'Active project',
   'Stored personal memory references',
   'Active durable tasks',
   'Active condition watches',
@@ -65,7 +70,7 @@ async function runTurn(params) {
   const prompt = params.input.find(item => item.type === 'text')?.text ?? '';
   const output = JSON.stringify(plan(prompt));
   for (let index = 0; index < output.length;) {
-    const size = 3 + Math.floor(Math.random() * 6);
+    const size = 7;
     send({ method: 'item/agentMessage/delta', params: { delta: output.slice(index, index + size) } });
     index += size;
     if (STREAM_DELAY_MS > 0) await sleep(STREAM_DELAY_MS);
@@ -81,7 +86,15 @@ const call = (name, args) => ({ type: 'tool_call', text: '', name, argumentsJson
 
 function plan(prompt) {
   if (prompt.includes('Extract at most three useful long-term memories')) return text('[]');
-  if (prompt.includes('Reorder saved-memory candidates')) return text('[]');
+  if (prompt.includes('Select the saved-memory candidates')) {
+    const data = JSON.parse(parseConversation(prompt).request);
+    return text(JSON.stringify(data.candidates.slice(0, 5).map(candidate => candidate.id)));
+  }
+  if (prompt.includes('For each memory write search hints')) {
+    const data = JSON.parse(parseConversation(prompt).request);
+    return text(JSON.stringify({hints: data.memories.map(memory => ({memory: memory.index,
+      text: (memory.content ?? memory.Content).slice(0, 350)}))}));
+  }
 
   if (prompt.includes('You write a short morning briefing intro for Jarvis'))
     return text('Here is a calm look at today.');
@@ -151,7 +164,7 @@ function plan(prompt) {
   }
 
   if (/what do you (know|remember) about me/.test(lower) && has('SearchMemory')) {
-    if (results.length === 0) return call('SearchMemory', { query: 'user preferences facts' });
+    if (results.length === 0) return call('SearchMemory', { query: 'oat milk coffee preferences' });
     const items = [...last.matchAll(/\] (.+?)(?:\n|$)/g)].map(match => match[1]);
     return text(items.length ? "Here's what I have saved about you:\n\n" + items.map(item => `- ${item}`).join('\n')
       : "I don't have anything saved about you yet. Tell me what you'd like me to remember!");
@@ -256,14 +269,14 @@ function parseConversation(prompt) {
     messages.push({ role: blocks[index], content: blocks[index + 1].trim() });
   let requestIndex = -1;
   messages.forEach((message, index) => {
-    if (message.role === 'user' && !message.content.startsWith('Jarvis tool result:') &&
+    if (message.role === 'user' && !message.content.startsWith('Jarvis tool result') &&
         !CONTEXT_PREFIXES.some(prefix => message.content.startsWith(prefix)) &&
         !message.content.startsWith('ToolApprovalResponseContent')) requestIndex = index;
   });
   const request = requestIndex >= 0 ? messages[requestIndex].content : '';
   const results = messages.slice(requestIndex + 1)
-    .flatMap(message => message.content.split('\n').filter(line => line.startsWith('Jarvis tool result:')))
-    .map(line => decodeResult(line.slice('Jarvis tool result:'.length).trim()));
+    .flatMap(message => message.content.split('\n').filter(line => /^Jarvis tool result(?: \([^)]+\))?:/.test(line)))
+    .map(line => decodeResult(line.replace(/^Jarvis tool result(?: \([^)]+\))?:/, '').trim()));
   return { request, results, executingTask: prompt.includes('already scheduled background task') };
 }
 

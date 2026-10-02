@@ -152,7 +152,7 @@ def latest_release_version(tag_names: list[str]) -> str | None:
 def parse_intended_release_tag(body: str) -> str | None:
     """Parse an explicit vX.Y.Z from the pull request SemVer section."""
     match = re.search(
-        r"\*\*Intended release tag[^*]*\*\*:\s*`?(v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))`?",
+        r"\*\*Intended release tag[^*]*\*\*:?\s*`?(v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))`?",
         body,
         flags=re.IGNORECASE,
     )
@@ -217,6 +217,11 @@ def plan_next_release_tag(
     """
     if bump == "none":
         return None
+    if intended_tag:
+        intended_version = parse_semver_tag(intended_tag)
+        latest = latest_release_version(tag_names)
+        if latest and parse_semver(intended_version) <= parse_semver(latest):
+            raise SemVerError("Intended release tag must be newer than the latest release.")
     if bump == "explicit":
         if not intended_tag:
             raise SemVerError(
@@ -242,6 +247,18 @@ def plan_next_release_tag(
             f"Release tag '{tag_name}' already exists; choose a higher intended tag."
         )
     return tag_name
+
+
+def validate_pr_release(body: str, tag_names: list[str], pubspec_path: Path) -> str | None:
+    selected = re.findall(r"^\s*-\s*\[[xX]\]\s*\*\*SemVer bump:\s*(major|minor|patch|none)\*\*",
+                          body, re.I | re.M)
+    if len(selected) != 1:
+        raise SemVerError("Select exactly one SemVer bump checkbox.")
+    intended = parse_intended_release_tag(body)
+    if selected[0].lower() == "none" and intended:
+        raise SemVerError("A release tag cannot accompany SemVer bump: none.")
+    return plan_next_release_tag(bump=selected[0].lower(), tag_names=tag_names,
+                                 pubspec_path=pubspec_path, intended_tag=intended)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -282,6 +299,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Plan the next v* tag from PR body and existing tags; writes skip=true when no release",
     )
+    parser.add_argument("--check-pr-release", action="store_true")
     return parser
 
 
@@ -306,7 +324,7 @@ def main(argv: list[str] | None = None) -> int:
             write_pubspec_version(args.pubspec, args.version, args.build)
             return 0
 
-        if args.plan_release:
+        if args.plan_release or args.check_pr_release:
             if args.pr_body_file is None or args.tag_names_file is None:
                 parser.error("--plan-release requires --pr-body-file and --tag-names-file")
             pr_body = args.pr_body_file.read_text(encoding="utf-8")
@@ -315,18 +333,16 @@ def main(argv: list[str] | None = None) -> int:
                 for line in args.tag_names_file.read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
+            validated_tag = validate_pr_release(pr_body, tag_names, args.pubspec)
+            if args.check_pr_release:
+                print(validated_tag or "No release requested")
+                return 0
             bump = parse_pr_semver_bump(pr_body)
             lines: list[str]
             if bump is None:
                 lines = ["skip=true\n", "reason=no_semver_bump_selected\n"]
             else:
-                intended = parse_intended_release_tag(pr_body)
-                tag_name = plan_next_release_tag(
-                    bump=bump,
-                    tag_names=tag_names,
-                    pubspec_path=args.pubspec,
-                    intended_tag=intended,
-                )
+                tag_name = validated_tag
                 if tag_name is None:
                     lines = ["skip=true\n", "reason=semver_bump_none\n"]
                 else:

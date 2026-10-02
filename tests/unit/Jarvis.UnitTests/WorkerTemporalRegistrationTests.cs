@@ -49,6 +49,7 @@ public sealed class WorkerTemporalRegistrationTests
         var workflowTypes = new[]
         {
             typeof(ReminderWorkflow),
+            typeof(DeploymentProbeWorkflow),
             typeof(FileProcessingWorkflow),
             typeof(JarvisTaskWorkflow),
             typeof(ConditionWatchWorkflow),

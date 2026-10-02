@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Public synthetic JWT key used only by disposable authentication fixtures"
+regexTarget = "secret"
+regexes = ['''^verification-signing-key-at-least-32b$''']

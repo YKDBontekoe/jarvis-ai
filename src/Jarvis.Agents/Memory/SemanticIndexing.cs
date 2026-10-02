@@ -85,7 +85,8 @@ public sealed class KnowledgeGraphExtractor(IChatClientResolver resolver, IKnowl
                 .Select(fact => new GraphFact(fact.Subject!, GraphEntityTypes.Normalize(fact.SubjectType),
                     fact.Predicate!, fact.Object!, fact.ObjectIsEntity ? GraphEntityTypes.Normalize(fact.ObjectType) : null,
                     fact.ObjectIsEntity, fact.Exclusive,
-                    DateTimeOffset.TryParse(fact.ValidFrom, out var validFrom) && validFrom <= DateTimeOffset.UtcNow.AddYears(1)
+                    DateTimeOffset.TryParse(fact.ValidFrom, System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.AssumeUniversal, out var validFrom) && validFrom <= DateTimeOffset.UtcNow.AddYears(1)
                         ? validFrom
                         : memory.CreatedAt,
                     memory.Confidence))

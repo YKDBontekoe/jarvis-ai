@@ -21,7 +21,7 @@ Jarvis uses [Semantic Versioning 2.0.0](https://semver.org/) for **release tags*
 
 Merging to `main` runs [`.github/workflows/create-release-tag.yml`](.github/workflows/create-release-tag.yml), which reads the checked **SemVer bump** above and pushes `vX.Y.Z`. That tag triggers the iOS IPA and backend deploy workflows. Use **none** for refactors and other changes that should not release.
 
-**Intended release tag (optional):** `v1.2.0` — use when the computed bump would not land on the version you need.
+<!-- Optional: add **Intended release tag (optional):** `vX.Y.Z` when overriding the computed bump. -->
 
 ## Type of change
 

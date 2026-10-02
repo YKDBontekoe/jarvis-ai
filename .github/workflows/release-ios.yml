@@ -19,14 +19,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/ci.yml
   release-ipa:
-    runs-on: macos-latest
+    needs: verify
+    timeout-minutes: 45
+    runs-on: macos-15
     outputs:
       version: ${{ steps.version.outputs.version }}
       build: ${{ steps.version.outputs.build }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -59,14 +66,15 @@ jobs:
             --build "${BUILD}"
 
       - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
+          flutter-version: 3.44.4
           channel: stable
           cache: true
 
       - name: Install Dart/Flutter dependencies
         working-directory: apps/mobile
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Build unsigned iOS app
         working-directory: apps/mobile
@@ -141,9 +149,12 @@ jobs:
           chmod +x scripts/ios/package_unsigned_ipa.sh
           scripts/ios/package_unsigned_ipa.sh "${APP_PATH}" dist/Jarvis.ipa
 
+      - name: Verify IPA contents
+        run: python3 scripts/ci/check-ipa.py dist/Jarvis.ipa
+
       - name: Create GitHub Release
         if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Jarvis ${{ steps.version.outputs.version }}
@@ -154,7 +165,7 @@ jobs:
           files: dist/Jarvis.ipa
 
       - name: Upload IPA artifact for server publishing
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: jarvis-altstore-ipa
           path: dist/Jarvis.ipa
@@ -162,16 +173,17 @@ jobs:
           retention-days: 1
 
   publish-source:
+    timeout-minutes: 10
     needs: release-ipa
     if: ${{ github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: [self-hosted, linux, x64, jarvis-deploy]
     environment: production
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Download IPA artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: jarvis-altstore-ipa
           path: dist

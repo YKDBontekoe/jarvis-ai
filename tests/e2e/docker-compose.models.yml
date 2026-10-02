@@ -1,0 +1,27 @@
+# Dedicated evaluation credentials are mounted only into the disposable model test stack.
+services:
+  jarvis-api:
+    environment: &model
+      ASPNETCORE_ENVIRONMENT: Production
+      Codex__ExecutablePath: /usr/local/bin/codex
+      Codex__EnableWebSearch: "true"
+      Codex__ModelClasses__Fast: ${CI_CODEX_MODEL:?Set CI_CODEX_MODEL}
+      Codex__ModelClasses__Standard: ${CI_CODEX_MODEL:?Set CI_CODEX_MODEL}
+      Jarvis__ModelClass: Standard
+      CODEX_HOME: /codex
+      Mcp__Servers__0__Name: verification
+      Mcp__Servers__0__Transport: stdio
+      Mcp__Servers__0__Command: /usr/local/bin/node
+      Mcp__Servers__0__Arguments__0: /fixtures/fake_mcp.mjs
+      Mcp__Servers__0__AllowedTools__0: github_create_issue
+      Mcp__Servers__0__AllowedTools__1: search_docs
+      Mcp__Servers__0__AutoApprovedTools__0: search_docs
+      Mcp__Servers__0__CredentialProvider: verification
+      Mcp__Servers__0__CredentialEnvironmentVariables__TEST_TOKEN: token
+    volumes:
+      - ../../artifacts/verification/codex-auth.private.json:/codex/auth.json
+  jarvis-worker:
+    environment:
+      <<: *model
+    volumes:
+      - ../../artifacts/verification/codex-auth.private.json:/codex/auth.json

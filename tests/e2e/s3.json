@@ -1,0 +1,1 @@
+{"identities":[{"name":"jarvis-ci","credentials":[{"accessKey":"jarvis-ci-key","secretKey":"jarvis-ci-secret"}],"actions":["Admin","Read","Write","List","Tagging"]}]}

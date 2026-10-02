@@ -37,7 +37,7 @@ def call(url, method='GET', data=None, token=None, expected=(200,), opener=None)
 
 
 def api(path, method='GET', data=None, token=None, expected=(200,)):
-    return call('http://localhost:5082/api/v1' + path, method, data, token, expected=expected)
+    return call(os.environ.get('JARVIS_API_URL', 'http://localhost:5082') + '/api/v1' + path, method, data, token, expected=expected)
 
 
 def b64(data):
@@ -91,7 +91,7 @@ def boundaries():
     api('/conversations', token=forged, expected=(401,))
     api('/conversations', token=signed_token(payload.get('sub', 'owner'), aud='other-api'), expected=(401,))
     duplicate = api('/auth/register', 'POST', {'email': fixture['email'], 'password': fixture['password']}, expected=(409,))
-    assert 'already exists' in duplicate['message']
+    assert 'already exists' in duplicate['detail']
     return {'unauthenticatedRoutes': 7, 'invalidBearerRejected': True, 'tamperingRejected': True,
             'wrongAudienceRejected': True, 'duplicateRegistrationRejected': True}
 
@@ -119,9 +119,9 @@ def refresh():
     assert api('/conversations', token=refreshed['accessToken']) is not None
     assert refreshed['refreshToken'] != original['refreshToken']
     replay = api('/auth/refresh', 'POST', {'refreshToken': original['refreshToken']}, expected=(401,))
-    assert replay['error'] == 'invalid_grant'
+    assert replay['detail'] == 'invalid_grant'
     revoked = api('/auth/refresh', 'POST', {'refreshToken': refreshed['refreshToken']}, expected=(401,))
-    assert revoked['error'] == 'invalid_grant'
+    assert revoked['detail'] == 'invalid_grant'
     return {'refreshAccepted': True, 'tokenRotated': True, 'replayRejected': True, 'familyRevoked': True}
 
 

@@ -19,3 +19,7 @@ infra/compose/.env.production
 .aspire/
 artifacts/
 **/node_modules/
+
+.jarvis/
+
+.venv-ci/

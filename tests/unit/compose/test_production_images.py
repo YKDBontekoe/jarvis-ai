@@ -15,8 +15,9 @@ COMPOSE_FILE = REPO_ROOT / "infra" / "compose" / "docker-compose.production.yml"
 IMAGE_DEFAULTS = {
     "JARVIS_API_IMAGE": "ghcr.io/ykdbontekoe/jarvis-ai/api:latest",
     "JARVIS_WORKER_IMAGE": "ghcr.io/ykdbontekoe/jarvis-ai/worker:latest",
+    "JARVIS_WHATSAPP_BRIDGE_IMAGE": "ghcr.io/ykdbontekoe/jarvis-ai/whatsapp-bridge:latest",
     # Third-party image for the local embedding model; not built or published by this repository.
-    "EMBEDDINGS_IMAGE": "ghcr.io/huggingface/text-embeddings-inference:cpu-1.8",
+    "EMBEDDINGS_IMAGE": "ghcr.io/huggingface/text-embeddings-inference:cpu-1.8@sha256:8de25e75ce39617f17f2f6c77d60a4f75b65e779ed5005420eb1400072a15c1c",
 }
 
 REQUIRED_ENV = {

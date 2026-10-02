@@ -1,0 +1,73 @@
+name: Extended validation
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: extended-validation
+  cancel-in-progress: false
+jobs:
+  verify:
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/ci.yml
+  resilience:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: {node-version: '22.22.0'}
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with: {global-json-file: global.json}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {pattern: verified-image-*, path: artifacts/images, merge-multiple: true}
+      - run: sudo apt-get update && sudo apt-get install --yes skopeo
+      - run: scripts/ci/load-images.sh artifacts/images
+      - name: Build previous release API for database compatibility
+        run: |
+          python3 scripts/ci/previous-release.py >> "$GITHUB_ENV"
+          previous="$(python3 scripts/ci/previous-release.py | sed -n 's/^JARVIS_PREVIOUS_RELEASE=//p')"
+          mkdir -p "$RUNNER_TEMP/previous-release"
+          git archive "$previous" | tar -x -C "$RUNNER_TEMP/previous-release"
+          docker build --build-arg PROJECT_PATH=src/Jarvis.Api/Jarvis.Api.csproj -f "$RUNNER_TEMP/previous-release/infra/compose/Dockerfile" -t jarvis-ci-previous-api:test "$RUNNER_TEMP/previous-release"
+      - name: Full service, fault and recovery checks
+        env:
+          CI_EXTENDED: 'true'
+          CI_PREVIOUS_API_IMAGE: jarvis-ci-previous-api:test
+        run: scripts/ci/run-e2e.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with: {name: extended-validation-evidence, path: artifacts/ci/, retention-days: 30, if-no-files-found: error}
+  real-model:
+    if: vars.JARVIS_REAL_MODEL_EVALS == 'true'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: model-evaluations
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: {node-version: '22.22.0'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {pattern: verified-image-*, path: artifacts/images, merge-multiple: true}
+      - run: sudo apt-get update && sudo apt-get install --yes skopeo
+      - run: scripts/ci/load-images.sh artifacts/images
+      - name: Real Codex behavior evaluations in disposable services
+        env:
+          CODEX_AUTH_JSON: ${{ secrets.JARVIS_EVAL_CODEX_AUTH_JSON }}
+          CI_CODEX_MODEL: ${{ vars.JARVIS_EVAL_MODEL }}
+        run: scripts/ci/run-model-evals.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: real-model-evaluation-evidence
+          path: |
+            artifacts/ci/*.json
+            artifacts/ci/services.log
+          retention-days: 30

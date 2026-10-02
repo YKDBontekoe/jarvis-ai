@@ -6,7 +6,7 @@
   "description": "Baileys-based WhatsApp Web bridge: link Jarvis to WhatsApp by scanning a QR code.",
   "scripts": {
     "start": "node src/server.mjs",
-    "test": "node --test"
+    "test": "node --test --test-reporter=tap"
   },
   "engines": {
     "node": ">=20"
