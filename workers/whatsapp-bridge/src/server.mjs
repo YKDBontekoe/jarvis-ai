@@ -9,6 +9,7 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
 } from '@whiskeysockets/baileys';
+import * as Sentry from '@sentry/node';
 import pino from 'pino';
 import QRCode from 'qrcode';
 import { Inbox, RecentIds, inboundFrom, jidFromPhone, phoneFromJid, safeSessionId } from './lib.mjs';
@@ -16,6 +17,34 @@ import { Inbox, RecentIds, inboundFrom, jidFromPhone, phoneFromJid, safeSessionI
 const PORT = Number(process.env.PORT ?? 3000);
 const DATA_DIR = process.env.DATA_DIR ?? '/data';
 const TOKEN = process.env.BRIDGE_TOKEN ?? '';
+const SENTRY_DSN = process.env.SENTRY_DSN ?? '';
+
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    environment: process.env.SENTRY_ENVIRONMENT || 'production',
+    release: process.env.SENTRY_RELEASE || undefined,
+    sendDefaultPii: false,
+    tracesSampleRate: 0,
+    enableLogs: true,
+    integrations: [
+      Sentry.pinoIntegration({
+        log: { levels: ['warn', 'error'] },
+        error: { levels: [] },
+      }),
+    ],
+    beforeSend(event) {
+      const headers = event.request?.headers;
+      if (headers) {
+        for (const key of Object.keys(headers)) {
+          if (/^(authorization|cookie|set-cookie|x-api-key)$/i.test(key)) headers[key] = '[redacted]';
+        }
+      }
+      return event;
+    },
+  });
+}
+
 const log = pino({ level: process.env.LOG_LEVEL ?? 'info' });
 
 /** @type {Map<string, Session>} */
@@ -214,6 +243,7 @@ const server = createServer(async (request, response) => {
   } catch (error) {
     if (error instanceof HttpError) return reply(error.status, { error: error.message });
     log.error(error, 'request failed');
+    if (SENTRY_DSN) Sentry.captureException(error);
     reply(500, { error: 'Internal error.' });
   }
 });

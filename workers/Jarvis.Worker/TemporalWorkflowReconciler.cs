@@ -206,6 +206,26 @@ internal sealed class TemporalWorkflowReconciler(
                                 cancellationToken),
                             cancellationToken);
                 }
+
+                var habitScheduler = services.GetRequiredService<Jarvis.Application.Habits.IHabitCheckInScheduler>();
+                foreach (var ownerId in await services.GetRequiredService<Jarvis.Application.Habits.IHabitRepository>()
+                             .ListOwnersWithActiveHabitsAsync(cancellationToken))
+                {
+                    var habitSettings = await settingsStore.GetAsync<Jarvis.Application.Habits.HabitSettings>(ownerId,
+                        Jarvis.Application.Habits.HabitSettingsSections.Settings, cancellationToken)
+                        ?? Jarvis.Application.Habits.HabitSettings.Default;
+                    if (habitSettings.EveningCheckIn)
+                        await TryScheduleAsync("habit check-in", ownerId,
+                            () => habitScheduler.ScheduleHabitCheckInAsync(ownerId, cancellationToken),
+                            cancellationToken);
+                }
+                // Starting an already running check-in is a no-op, so this only revives stopped ones.
+                var peopleScheduler = services.GetRequiredService<Jarvis.Application.People.IPeopleCheckInScheduler>();
+                foreach (var ownerId in await services.GetRequiredService<Jarvis.Application.People.IPeopleRepository>()
+                             .ListOwnersWithCheckInsAsync(cancellationToken))
+                    await TryScheduleAsync("people check-in", ownerId,
+                        () => peopleScheduler.SchedulePeopleCheckInAsync(ownerId, cancellationToken),
+                        cancellationToken);
             }
 
             await fileRepository.RequeueStaleQueuedAsync(

@@ -63,6 +63,45 @@ public sealed class WorkflowSchedulingRecoveryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Place_reminders_fire_from_positions_and_stay_out_of_temporal()
+    {
+        var owner = Guid.CreateVersion7();
+        var other = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var reminders = new WorkflowRepository(database);
+        var place = new ReminderPlace("Supermarket", 52.0907, 5.1214, 150);
+        var milk = await reminders.CreateAsync(owner, new CreateReminderRequest("Buy milk", DateTimeOffset.UtcNow,
+            Place: place), CancellationToken.None);
+        var keys = await reminders.CreateAsync(owner, new CreateReminderRequest("Keys", DateTimeOffset.UtcNow,
+            Place: place with { Trigger = Reminder.LocationLeave, Repeats = true }), CancellationToken.None);
+        var foreign = await reminders.CreateAsync(other, new CreateReminderRequest("Not mine", DateTimeOffset.UtcNow,
+            Place: place), CancellationToken.None);
+
+        Assert.Empty(await reminders.ListPendingForSchedulingAsync(CancellationToken.None));
+
+        var now = DateTimeOffset.UtcNow;
+        Assert.Empty(await reminders.ObservePositionAsync(owner, 52.2, 5.3, 20, now, CancellationToken.None));
+        var arrived = await reminders.ObservePositionAsync(owner, 52.0908, 5.1215, 20, now.AddMinutes(1),
+            CancellationToken.None);
+        Assert.Equal(milk.Id, Assert.Single(arrived).ReminderId);
+        Assert.Empty(await reminders.ObservePositionAsync(owner, 52.0908, 5.1215, 20, now.AddMinutes(2),
+            CancellationToken.None));
+        var left = await reminders.ObservePositionAsync(owner, 52.2, 5.3, 20, now.AddMinutes(3),
+            CancellationToken.None);
+        Assert.Equal(keys.Id, Assert.Single(left).ReminderId);
+
+        database.ChangeTracker.Clear();
+        Assert.Equal("completed", (await reminders.GetAsync(milk.Id, owner, CancellationToken.None))!.Status);
+        Assert.Equal("pending", (await reminders.GetAsync(keys.Id, owner, CancellationToken.None))!.Status);
+        Assert.Equal("pending", (await reminders.GetAsync(foreign.Id, other, CancellationToken.None))!.Status);
+        var notifications = await reminders.ListNotificationsAsync(owner, CancellationToken.None);
+        Assert.Equal(2, notifications.Count(x => x.Type == "reminder.due"));
+        Assert.Empty(await reminders.ListNotificationsAsync(other, CancellationToken.None));
+        Assert.Equal(0, await reminders.RequeueOverdueDispatchedAsync(DateTimeOffset.UtcNow.AddDays(1),
+            CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Stale_queued_tasks_are_requeued_for_temporal_restart()
     {
         var owner = Guid.CreateVersion7();

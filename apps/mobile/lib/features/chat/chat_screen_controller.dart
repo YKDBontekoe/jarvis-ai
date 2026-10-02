@@ -19,6 +19,9 @@ abstract class _ChatScreenController extends State<ChatScreen>
   String? _conversationId;
   String? _profileId;
   String? _profileName;
+
+  /// The project of the open conversation, when it is in one.
+  String? _projectId;
   bool _profileDeleted = false;
   String? _preferredProfileId;
   String? _error;
@@ -77,6 +80,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   EventsListener<RoomEvent>? _voiceEvents;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   List<Map<String, dynamic>> _recent = [];
+  List<Map<String, dynamic>> _projects = [];
   String? _pushToken;
   StreamSubscription<String>? _pushTokenSubscription;
   StreamSubscription<RemoteMessage>? _pushOpenedSubscription;
@@ -214,6 +218,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<Uint8List?> _loadPhoto(String fileId);
   Future<void> _retryConnection();
   Future<void> _loadRecent();
+  Future<void> _createProject();
   void _openSettings();
   void _startNewChat();
 

@@ -41,7 +41,11 @@ internal static class ApiMappers
     public static ReminderDto ToDto(this ReminderRecord reminder) => new(reminder.Id, reminder.Title,
         reminder.DueAt, reminder.Status, reminder.CreatedAt, reminder.CompletedAt, reminder.Recurrence,
         reminder.Weekdays, reminder.TimeZoneId, reminder.LocalTime, reminder.Until, reminder.LastDeliveredAt,
-        reminder.ConversationId);
+        reminder.ConversationId,
+        reminder.Place is { } place
+            ? new ReminderPlaceDto(place.Name, place.Latitude, place.Longitude, place.RadiusMeters, place.Trigger,
+                place.Repeats)
+            : null);
 
     public static ConditionWatchDto ToDto(this ConditionWatchRecord watch) => new(watch.Id, watch.Title,
         watch.Url, watch.JsonPath, watch.Comparison, watch.Threshold, watch.IntervalMinutes, watch.Status,
@@ -68,6 +72,16 @@ internal static class ApiMappers
     public static JournalEntryDto ToDto(this Jarvis.Domain.Journal.JournalEntry entry) => new(entry.Id,
         entry.EntryDate, entry.Source, entry.Content, entry.Highlights, entry.Gratitude, entry.Rating, entry.Mood,
         entry.Energy, entry.Stress, entry.Tags, entry.MemoryId, entry.CreatedAt, entry.UpdatedAt);
+
+    public static HabitDto ToDto(this Jarvis.Application.Habits.HabitSummary summary)
+    {
+        var habit = summary.Habit;
+        var stats = summary.Stats;
+        return new HabitDto(habit.Id, habit.Name, habit.Icon, habit.Cadence, habit.TargetPerWeek, habit.IsArchived,
+            habit.ArchivedAt, new HabitStatsDto(stats.Today, stats.CurrentStreak, stats.BestStreak, stats.StreakUnit,
+                stats.DoneToday, stats.ThisWeekCount, stats.TotalCheckIns, summary.IsOpenToday, stats.RecentDates),
+            habit.CreatedAt, habit.UpdatedAt);
+    }
 
     public static IEnumerable<ToolApprovalDto> ToDtos(this IEnumerable<ToolApprovalRecord> approvals) =>
         approvals.Select(ToDto);

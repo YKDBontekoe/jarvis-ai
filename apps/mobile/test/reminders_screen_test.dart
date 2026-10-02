@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:jarvis_mobile/reminders_screen.dart';
 import 'package:jarvis_mobile/schedule_format.dart';
 import 'package:jarvis_mobile/theme.dart';
@@ -413,5 +414,179 @@ void main() {
             as Map<String, dynamic>;
     expect(saved['timeZoneId'], 'Europe/Lisbon');
     expect(saved['enabled'], false);
+  });
+
+  group('place reminders', () {
+    Future<void> showWithLocation(
+      WidgetTester tester, {
+      LocationPermission access = LocationPermission.always,
+      List<String>? opened,
+    }) async {
+      tester.view.physicalSize = const Size(900, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildJarvisTheme(),
+          home: RemindersScreen(
+            http: http.client(),
+            locate: ({bool requestPermission = true}) async =>
+                (latitude: 52.3702, longitude: 4.8952, accuracy: 30.0),
+            locationAccess: () async => access,
+            openLocationSettings: () async {
+              opened?.add('settings');
+              return true;
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    Map<String, dynamic> placeReminder({
+      String title = 'Buy milk',
+      String status = 'pending',
+      bool repeats = false,
+      String trigger = 'arrive',
+    }) => {
+      'id': 'p-$title',
+      'title': title,
+      'dueAt': '2026-10-01T10:00:00Z',
+      'status': status,
+      'recurrence': 'none',
+      'weekdays': 0,
+      'timeZoneId': 'UTC',
+      'createdAt': '2026-10-01T10:00:00Z',
+      'place': {
+        'name': 'Supermarket',
+        'latitude': 52.1,
+        'longitude': 5.1,
+        'radiusMeters': 300,
+        'trigger': trigger,
+        'repeats': repeats,
+      },
+    };
+
+    testWidgets('a place reminder posts where you are and the place', (
+      tester,
+    ) async {
+      http.on('GET', '/api/v1/reminders', <Object>[]);
+      http.on('GET', '/api/v1/notifications', <Object>[]);
+      http.on('GET', '/api/v1/briefings/daily', {
+        'enabled': false,
+        'localTime': '08:00:00',
+        'timeZoneId': 'Europe/Amsterdam',
+        'workflowId': 'wf',
+      });
+      http.on('POST', '/api/v1/devices/telemetry', <String, Object>{});
+      http.on('POST', '/api/v1/reminders', placeReminder());
+      await showWithLocation(tester);
+
+      await tester.tap(find.text('New'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).first, 'Water plants');
+      await tester.tap(find.text('At a place'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('place-fields')), findsOneWidget);
+
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(find.text('Name the place.'), findsOneWidget);
+      expect(http.sent('POST', '/api/v1/reminders'), isEmpty);
+
+      await tester.enterText(find.byKey(const Key('place-name')), 'Home');
+      await tester.tap(find.byKey(const Key('trigger-leave')));
+      await tester.tap(find.byKey(const Key('use-current-location')));
+      await tester.pumpAndSettle();
+      expect(find.text('Using where you are now'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('every-visit')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final body =
+          http.sent('POST', '/api/v1/reminders').single.body
+              as Map<String, dynamic>;
+      expect(body['title'], 'Water plants');
+      expect(body.containsKey('dueAt'), isFalse);
+      expect(body['place'], {
+        'name': 'Home',
+        'latitude': 52.3702,
+        'longitude': 4.8952,
+        'radiusMeters': 150.0,
+        'trigger': 'leave',
+        'repeats': true,
+      });
+      expect(http.sent('POST', '/api/v1/devices/telemetry'), hasLength(1));
+    });
+
+    testWidgets('earlier places can be picked again', (tester) async {
+      http.on('GET', '/api/v1/reminders', [placeReminder(status: 'completed')]);
+      http.on('GET', '/api/v1/notifications', <Object>[]);
+      http.on('GET', '/api/v1/briefings/daily', <String, Object>{});
+      http.on('POST', '/api/v1/devices/telemetry', <String, Object>{});
+      http.on('POST', '/api/v1/reminders', placeReminder());
+      await showWithLocation(tester);
+
+      await tester.tap(find.text('New'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).first, 'Buy eggs');
+      await tester.tap(find.text('At a place'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('saved-place-Supermarket')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final place =
+          (http.sent('POST', '/api/v1/reminders').single.body
+                  as Map<String, dynamic>)['place']
+              as Map<String, dynamic>;
+      expect(place['name'], 'Supermarket');
+      expect(place['latitude'], 52.1);
+      expect(place['radiusMeters'], 300.0);
+    });
+
+    testWidgets('waiting place reminders group by place without snooze', (
+      tester,
+    ) async {
+      http.on('GET', '/api/v1/reminders', [
+        placeReminder(repeats: true),
+        placeReminder(title: 'Call mum', trigger: 'leave'),
+      ]);
+      http.on('GET', '/api/v1/notifications', <Object>[]);
+      await showWithLocation(tester);
+
+      expect(find.text('At a place'), findsOneWidget);
+      expect(
+        find.text('When you arrive at Supermarket · every visit'),
+        findsOneWidget,
+      );
+      expect(find.text('When you leave Supermarket'), findsOneWidget);
+      expect(find.byKey(const Key('place-access-hint')), findsNothing);
+
+      await tester.tap(find.byTooltip('Reminder actions').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Remind me in 10 min'), findsNothing);
+      expect(find.text('Stop repeating'), findsOneWidget);
+    });
+
+    testWidgets('without Always access the list explains and opens Settings', (
+      tester,
+    ) async {
+      final opened = <String>[];
+      http.on('GET', '/api/v1/reminders', [placeReminder()]);
+      http.on('GET', '/api/v1/notifications', <Object>[]);
+      await showWithLocation(
+        tester,
+        access: LocationPermission.whileInUse,
+        opened: opened,
+      );
+
+      expect(find.text('Only while Jarvis is open'), findsOneWidget);
+      await tester.tap(find.text('Open Settings'));
+      expect(opened, ['settings']);
+    });
   });
 }

@@ -17,13 +17,30 @@ internal static class PersonalAssistantEndpoints
             Results.Ok(await home.GetAsync(currentUser.OwnerId, ct))).WithName("GetHomeBriefing");
 
         api.MapPost("/devices/telemetry", async (SaveDeviceTelemetryRequest request, IDeviceTelemetryStore telemetry,
-            ICurrentUser currentUser, CancellationToken ct) =>
+            IPlaceReminderService places, ICurrentUser currentUser, ILoggerFactory loggers, CancellationToken ct) =>
         {
             if (request.Latitude is < -90 or > 90 || request.Longitude is < -180 or > 180)
                 return EndpointHelpers.Invalid("location", "Latitude and longitude must be valid WGS84 values.");
+            if (request.AccuracyMeters is < 0)
+                return EndpointHelpers.Invalid("location", "Accuracy cannot be negative.");
             if (request.BatteryPercent is < 0 or > 100)
                 return EndpointHelpers.Invalid("battery", "Battery percent must be between 0 and 100.");
-            return Results.Ok(await telemetry.SaveAsync(currentUser.OwnerId, request, ct));
+            var saved = await telemetry.SaveAsync(currentUser.OwnerId, request, ct);
+            if (request is { Latitude: double latitude, Longitude: double longitude })
+            {
+                try
+                {
+                    await places.ObservePositionAsync(currentUser.OwnerId, latitude, longitude,
+                        request.AccuracyMeters, ct);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    // The position is stored either way; the next report checks place reminders again.
+                    loggers.CreateLogger("Jarvis.PlaceReminders").LogWarning(exception,
+                        "Place reminders were not checked for user {OwnerId}.", currentUser.OwnerId);
+                }
+            }
+            return Results.Ok(saved);
         }).WithName("SaveDeviceTelemetry");
 
         api.MapGet("/integrations/packs", async (IIntegrationCredentialStore credentials,

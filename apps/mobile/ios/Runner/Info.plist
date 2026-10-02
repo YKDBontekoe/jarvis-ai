@@ -11,10 +11,13 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Jarvis opens your photo library when you choose photos to show it in a chat.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Jarvis uses your location when you ask where you are or when a location watch is on.</string>
+	<string>Jarvis uses your location when you ask where you are, when a location watch is on, and to remind you when you arrive at or leave a place.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Allow Always so Jarvis can remind you when you arrive at or leave a place, even when the app is closed. Jarvis only follows your location while you have a place reminder.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
+		<string>location</string>
 		<string>remote-notification</string>
 	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>

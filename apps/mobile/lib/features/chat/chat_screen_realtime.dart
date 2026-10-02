@@ -372,6 +372,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
           ],
         );
         unawaited(postDeviceTelemetry(_http));
+        unawaited(PlaceReminderTracker.instance.refresh(_http));
       } catch (_) {
         // Older servers without device nodes still stream chat.
       }
@@ -402,6 +403,7 @@ mixin _ChatScreenRealtime on _ChatScreenController {
           ],
         );
         unawaited(postDeviceTelemetry(_http));
+        unawaited(PlaceReminderTracker.instance.refresh(_http));
       } catch (_) {
         // Older servers without device nodes still stream chat.
       }

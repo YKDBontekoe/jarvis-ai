@@ -13,6 +13,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   geolocator_windows
   livekit_client
   local_auth_windows
+  sentry_flutter
   url_launcher_windows
 )
 

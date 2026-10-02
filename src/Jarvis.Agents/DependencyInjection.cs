@@ -6,6 +6,7 @@ using Jarvis.Application.Conversations;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Workflows;
 using Jarvis.Agents.ModelProviders;
+using Jarvis.Agents.Telemetry;
 
 namespace Jarvis.Agents;
 
@@ -24,10 +25,13 @@ public static class DependencyInjection
             throw new InvalidOperationException("Codex:TurnTimeoutSeconds must be between 30 and 1800.");
         services.AddSingleton(CodexExecutable.From(configuration));
         services.AddSingleton<CodexProcessLimiter>();
-        services.AddSingleton<IChatClient>(serviceProvider => new CodexCliChatClient(
-                serviceProvider.GetRequiredService<CodexExecutable>(), model, visionModel,
-                modelClasses, enableWebSearch, turnTimeoutSeconds,
-                serviceProvider.GetRequiredService<CodexProcessLimiter>())
+        var recordAiContent = configuration.GetValue("Sentry:RecordAiContent", false);
+        services.AddSingleton<IChatClient>(serviceProvider => SentryChatInstrumentation.Instrument(
+                new CodexCliChatClient(
+                    serviceProvider.GetRequiredService<CodexExecutable>(), model, visionModel,
+                    modelClasses, enableWebSearch, turnTimeoutSeconds,
+                    serviceProvider.GetRequiredService<CodexProcessLimiter>()),
+                recordAiContent)
             .AsBuilder()
             .UseOpenTelemetry(
                 serviceProvider.GetRequiredService<ILoggerFactory>(),
@@ -47,10 +51,20 @@ public static class DependencyInjection
         services.AddScoped<IAgentContextContributor, McpContextContributor>();
         services.AddScoped<Jarvis.Application.Integrations.IMcpOAuthService, Jarvis.Mcp.McpOAuthService>();
         services.AddScoped<IAgentContextContributor, Profiles.ProfileContextContributor>();
+        services.AddScoped<IAgentContextContributor, Projects.ProjectContextContributor>();
         services.AddScoped<IAgentToolContributor, Skills.SkillToolContributor>();
         services.AddScoped<IAgentContextContributor, Skills.SkillContextContributor>();
         services.AddScoped<IAgentToolContributor, Journal.JournalToolContributor>();
         services.AddScoped<IAgentContextContributor, Journal.JournalContextContributor>();
+        services.AddScoped<IAgentToolContributor, Planner.PlannerToolContributor>();
+        services.AddScoped<IAgentContextContributor, Planner.PlannerContextContributor>();
+        services.AddScoped<IAgentToolContributor, Expenses.ExpenseToolContributor>();
+        services.AddScoped<IAgentContextContributor, Expenses.ExpenseContextContributor>();
+        services.AddScoped<Jarvis.Application.Expenses.IReceiptReader, Expenses.ReceiptReader>();
+        services.AddScoped<IAgentToolContributor, Habits.HabitToolContributor>();
+        services.AddScoped<IAgentContextContributor, Habits.HabitContextContributor>();
+        services.AddScoped<IAgentToolContributor, People.PeopleToolContributor>();
+        services.AddScoped<IAgentContextContributor, People.PeopleContextContributor>();
         services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();
         services.AddScoped<IAgentContextContributor, Persona.PersonaContextContributor>();
         services.AddScoped<IAgentContextContributor, Learning.UserSummaryContextContributor>();

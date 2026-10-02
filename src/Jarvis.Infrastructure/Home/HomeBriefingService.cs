@@ -25,7 +25,7 @@ public sealed class HomeBriefingService(
         var horizon = now.AddHours(36);
         var reminderList = (await reminders.ListAsync(ownerId, cancellationToken))
             .Where(item => item.Status is "pending" or "scheduled" or "active" || item.DueAt >= now)
-            .Where(item => item.DueAt <= horizon && item.Status != "cancelled")
+            .Where(item => item.DueAt <= horizon && item.Status != "cancelled" && item.Place is null)
             .OrderBy(item => item.DueAt)
             .Take(8)
             .Select(item => new HomeReminderDto(item.Id, item.Title, item.DueAt, item.Status, item.Recurrence,

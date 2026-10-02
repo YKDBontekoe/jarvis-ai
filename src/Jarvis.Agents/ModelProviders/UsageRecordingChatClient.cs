@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Diagnostics;
+using Jarvis.Agents.Telemetry;
 using Jarvis.Application.Usage;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -24,6 +25,8 @@ internal sealed class UsageRecordingChatClient(
         var started = Stopwatch.GetTimestamp();
         var outcome = UsageOutcomes.Completed;
         ChatResponse? response = null;
+        using var activity = GenAiTelemetry.Source.StartActivity("jarvis.model.usage");
+        GenAiTelemetry.TagChat(activity, provider, options?.ModelId);
         try
         {
             response = await inner.GetResponseAsync(messages, options, cancellationToken);
@@ -36,7 +39,7 @@ internal sealed class UsageRecordingChatClient(
         }
         finally
         {
-            await PersistAsync(response?.Usage, response?.ModelId ?? options?.ModelId, outcome, started);
+            await PersistAsync(activity, response?.Usage, response?.ModelId ?? options?.ModelId, outcome, started);
         }
     }
 
@@ -47,6 +50,8 @@ internal sealed class UsageRecordingChatClient(
         var outcome = UsageOutcomes.Completed;
         UsageDetails? usage = null;
         var model = options?.ModelId;
+        using var activity = GenAiTelemetry.Source.StartActivity("jarvis.model.usage");
+        GenAiTelemetry.TagChat(activity, provider, model);
         var enumerator = inner.GetStreamingResponseAsync(messages, options, cancellationToken)
             .GetAsyncEnumerator(cancellationToken);
         try
@@ -75,7 +80,7 @@ internal sealed class UsageRecordingChatClient(
         finally
         {
             await enumerator.DisposeAsync();
-            await PersistAsync(usage, model, outcome, started);
+            await PersistAsync(activity, usage, model, outcome, started);
         }
     }
 
@@ -84,7 +89,7 @@ internal sealed class UsageRecordingChatClient(
 
     public void Dispose() { }
 
-    private async Task PersistAsync(UsageDetails? usage, string? model, string outcome, long started)
+    private async Task PersistAsync(Activity? activity, UsageDetails? usage, string? model, string outcome, long started)
     {
         try
         {
@@ -96,7 +101,11 @@ internal sealed class UsageRecordingChatClient(
                 try
                 {
                     var price = await prices.GetOpenRouterPriceAsync(model, CancellationToken.None);
-                    cost = UsageCost.Estimate(tokens.InputTokens, tokens.OutputTokens, price);
+                    if (UsageCost.Split(tokens.InputTokens, tokens.OutputTokens, price) is { } split)
+                    {
+                        cost = split.Total;
+                        GenAiTelemetry.TagCost(activity, new TokenCost(split.Input, split.Output, split.Total));
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -146,6 +155,8 @@ internal sealed class UsageRecordingEmbeddingGenerator(
         var started = Stopwatch.GetTimestamp();
         var outcome = UsageOutcomes.Completed;
         GeneratedEmbeddings<Embedding<float>>? generated = null;
+        using var activity = GenAiTelemetry.Source.StartActivity("jarvis.embeddings");
+        GenAiTelemetry.TagEmbeddings(activity, model);
         try
         {
             generated = await inner.GenerateAsync(values, options, cancellationToken);
@@ -168,8 +179,12 @@ internal sealed class UsageRecordingEmbeddingGenerator(
             {
                 try
                 {
-                    cost = UsageCost.Estimate(usage.InputTokens, usage.OutputTokens,
-                        await prices.GetOpenRouterPriceAsync(model, CancellationToken.None));
+                    if (UsageCost.Split(usage.InputTokens, usage.OutputTokens,
+                            await prices.GetOpenRouterPriceAsync(model, CancellationToken.None)) is { } split)
+                    {
+                        cost = split.Total;
+                        GenAiTelemetry.TagCost(activity, new TokenCost(split.Input, split.Output, split.Total));
+                    }
                 }
                 catch (Exception exception)
                 {

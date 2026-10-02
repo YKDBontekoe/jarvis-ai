@@ -131,6 +131,20 @@ mixin _ChatScreenPush on _ChatScreenController {
       _openUtility('weekly-review');
       return;
     }
+    if (opensHabits(type)) {
+      _openUtility('habits');
+      return;
+    }
+    if (opensPeople(type)) {
+      if (sourceId == null) {
+        _openUtility('people');
+      } else {
+        unawaited(
+          _openPushedDetail(PeopleScreen(http: _http, openPersonId: sourceId)),
+        );
+      }
+      return;
+    }
     if (opensTaskDetails(type) && sourceId != null) {
       unawaited(
         _openPushedDetail(TaskDetailsScreen(http: _http, taskId: sourceId)),

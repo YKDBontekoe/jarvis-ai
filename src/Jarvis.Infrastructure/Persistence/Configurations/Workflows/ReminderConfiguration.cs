@@ -29,11 +29,22 @@ internal sealed class ReminderConfiguration : IEntityTypeConfiguration<Reminder>
             builder.Property(x => x.Until).HasColumnName("until").HasColumnType("date");
             builder.Property(x => x.LastDeliveredAt).HasColumnName("last_delivered_at");
             builder.Property(x => x.ConversationId).HasColumnName("conversation_id");
+            builder.Property(x => x.LocationName).HasColumnName("location_name")
+                .HasMaxLength(Reminder.MaxLocationNameLength);
+            builder.Property(x => x.LocationLatitude).HasColumnName("location_latitude");
+            builder.Property(x => x.LocationLongitude).HasColumnName("location_longitude");
+            builder.Property(x => x.LocationRadiusMeters).HasColumnName("location_radius_meters");
+            builder.Property(x => x.LocationTrigger).HasColumnName("location_trigger").HasMaxLength(10);
+            builder.Property(x => x.LocationRepeats).HasColumnName("location_repeats").HasDefaultValue(false);
+            builder.Property(x => x.LocationInside).HasColumnName("location_inside");
             builder.HasOne<Conversation>().WithMany().HasForeignKey(x => x.ConversationId)
                 .OnDelete(DeleteBehavior.SetNull);
             builder.HasIndex(x => x.WorkflowId).IsUnique();
             builder.HasIndex(x => x.ConversationId).IsUnique().HasFilter("conversation_id IS NOT NULL");
             builder.HasIndex(x => new { x.OwnerId, x.DueAt });
             builder.HasIndex(x => new { x.Status, x.ScheduleDispatchedAt });
+            builder.HasIndex(x => new { x.OwnerId, x.Status })
+                .HasFilter("location_latitude IS NOT NULL")
+                .HasDatabaseName("IX_reminders_owner_id_Status_place");
         }
 }

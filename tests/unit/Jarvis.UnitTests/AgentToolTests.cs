@@ -2,9 +2,11 @@ using Jarvis.Agents;
 using Jarvis.Agents.Profiles;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Devices;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Memory;
+using Jarvis.Domain.Workflows;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -350,6 +352,82 @@ public sealed class AgentToolTests
                 NullLogger<MemoryReranker>.Instance), audit,
             new FixedUser(), NullLogger<MemoryAgentTools>.Instance);
 
+    [Fact]
+    public async Task Place_reminder_uses_the_phones_recent_position_for_here()
+    {
+        var reminders = new FakeReminderService();
+        var telemetry = new FakeTelemetry(new DeviceTelemetryRecord(OwnerId, 52.37, 4.89, 40, null, null,
+            DateTimeOffset.UtcNow.AddMinutes(-2)));
+        var tools = new ReminderAgentTools(reminders, new FixedUser(), new FakeBriefingRepository(null), telemetry);
+
+        var result = await tools.CreatePlaceReminderAsync("Water the plants", "Home", useCurrentLocation: true,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Contains("Place reminder created", result);
+        var place = Assert.Single(reminders.Items).Place;
+        Assert.NotNull(place);
+        Assert.Equal(52.37, place.Latitude);
+        Assert.Equal(Reminder.LocationArrive, place.Trigger);
+        Assert.Equal(150, place.RadiusMeters);
+    }
+
+    [Fact]
+    public async Task Place_reminder_without_a_recent_position_asks_for_one()
+    {
+        var reminders = new FakeReminderService();
+        var telemetry = new FakeTelemetry(new DeviceTelemetryRecord(OwnerId, 52.37, 4.89, 40, null, null,
+            DateTimeOffset.UtcNow.AddHours(-3)));
+        var tools = new ReminderAgentTools(reminders, new FixedUser(), new FakeBriefingRepository(null), telemetry);
+
+        var result = await tools.CreatePlaceReminderAsync("Water the plants", "Home", useCurrentLocation: true,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Contains("recent position", result);
+        Assert.Empty(reminders.Items);
+    }
+
+    [Fact]
+    public async Task Place_reminder_by_name_reuses_an_earlier_place()
+    {
+        var reminders = new FakeReminderService();
+        var tools = new ReminderAgentTools(reminders, new FixedUser(), new FakeBriefingRepository(null));
+        await tools.CreatePlaceReminderAsync("Buy milk", "Supermarket", latitude: 52.1, longitude: 5.1,
+            radiusMeters: 200, cancellationToken: CancellationToken.None);
+
+        var result = await tools.CreatePlaceReminderAsync("Buy eggs", "supermarket", trigger: "leave",
+            cancellationToken: CancellationToken.None);
+
+        Assert.Contains("when you leave", result);
+        var place = reminders.Items[^1].Place;
+        Assert.NotNull(place);
+        Assert.Equal((52.1, 5.1, 200d), (place.Latitude, place.Longitude, place.RadiusMeters));
+        Assert.Contains("I don't know where", await tools.CreatePlaceReminderAsync("Gym", "Gym",
+            cancellationToken: CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Listing_shows_the_place_instead_of_a_time()
+    {
+        var reminders = new FakeReminderService();
+        var tools = new ReminderAgentTools(reminders, new FixedUser(), new FakeBriefingRepository(null));
+        await tools.CreatePlaceReminderAsync("Buy milk", "Supermarket", latitude: 52.1, longitude: 5.1,
+            everyVisit: true, cancellationToken: CancellationToken.None);
+
+        var list = await tools.ListRemindersAsync(cancellationToken: CancellationToken.None);
+
+        Assert.Contains("when arriving at Supermarket (every visit): Buy milk", list);
+        Assert.DoesNotContain(" due ", list);
+    }
+
+    private sealed class FakeTelemetry(DeviceTelemetryRecord? record) : IDeviceTelemetryStore
+    {
+        public Task<DeviceTelemetryRecord> SaveAsync(Guid ownerId, SaveDeviceTelemetryRequest request,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<DeviceTelemetryRecord?> GetAsync(Guid ownerId, CancellationToken cancellationToken) =>
+            Task.FromResult(record);
+    }
+
     private sealed class FixedUser : ICurrentUser
     {
         public Guid OwnerId => AgentToolTests.OwnerId;
@@ -373,9 +451,14 @@ public sealed class AgentToolTests
             return record;
         }
 
-        public Task<ReminderRecord> CreateAsync(Guid ownerId, CreateReminderRequest request, CancellationToken cancellationToken) =>
-            Task.FromResult(Add(request.Title, request.DueAt, "pending", request.Recurrence ?? "none",
-                request.TimeZoneId ?? "UTC"));
+        public Task<ReminderRecord> CreateAsync(Guid ownerId, CreateReminderRequest request, CancellationToken cancellationToken)
+        {
+            var record = Add(request.Title, request.DueAt, "pending", request.Recurrence ?? "none",
+                request.TimeZoneId ?? "UTC");
+            if (request.Place is null) return Task.FromResult(record);
+            Items[^1] = record with { Place = request.Place };
+            return Task.FromResult(Items[^1]);
+        }
 
         public Task<ReminderRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
             Task.FromResult(Items.FirstOrDefault(item => item.Id == id && item.OwnerId == ownerId));

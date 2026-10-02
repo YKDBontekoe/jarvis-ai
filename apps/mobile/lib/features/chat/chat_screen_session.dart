@@ -151,6 +151,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       _profileId = asJsonString(body?['profileId']);
       _profileName = asJsonString(body?['profileName']);
       _profileDeleted = asJsonBool(body?['profileDeleted']);
+      _projectId = asJsonString(body?['projectId']);
       if (_profileId != null) _preferredProfileId = _profileId;
       _messageCursor = asJsonString(page?['nextCursor']);
       _hasOlderMessages = asJsonBool(page?['hasMore']);
@@ -293,6 +294,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       _profileId = null;
       _profileName = null;
       _profileDeleted = false;
+      _projectId = null;
       _connected = false;
       _sending = false;
       _entries.clear();

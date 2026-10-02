@@ -75,7 +75,7 @@ public sealed class DailyBriefingRepository(JarvisDbContext db, IDailyBriefingNa
         if (!preference.MarkDelivered(input.LocalDate)) return true;
 
         var reminderEntities = await db.Reminders.AsNoTracking()
-            .Where(x => x.OwnerId == input.OwnerId && x.Status == "pending" &&
+            .Where(x => x.OwnerId == input.OwnerId && x.Status == "pending" && x.LocationLatitude == null &&
                 x.DueAt >= input.LocalDayStart && x.DueAt < input.NextLocalDayStart)
             .OrderBy(x => x.DueAt).Take(8).ToListAsync(cancellationToken);
         var activeTasks = await db.Tasks.AsNoTracking()

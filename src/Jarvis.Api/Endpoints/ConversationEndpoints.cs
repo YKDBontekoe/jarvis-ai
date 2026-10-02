@@ -6,6 +6,7 @@ using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
 using Jarvis.Application.Profiles;
+using Jarvis.Application.Projects;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Conversations;
 
@@ -16,14 +17,21 @@ internal static class ConversationEndpoints
     public static RouteGroupBuilder MapConversationEndpoints(this RouteGroupBuilder api)
     {
         api.MapPost("/conversations", async (IConversationStore store, IAssistantProfileService profiles,
-            ICurrentUser currentUser, CreateConversationRequest request, CancellationToken ct) =>
+            IProjectStore projects, ICurrentUser currentUser, CreateConversationRequest request, CancellationToken ct) =>
         {
             var title = string.IsNullOrWhiteSpace(request.Title) ? "New conversation" : request.Title.Trim();
             if (title.Length > 200) return EndpointHelpers.Invalid("title", "Title must be 200 characters or fewer.");
+            if (request.ProjectId is { } projectId && await projects.GetAsync(projectId, currentUser.OwnerId, ct) is null)
+                return EndpointHelpers.Invalid("projectId", "Project was not found.");
             try
             {
                 var binding = await profiles.CaptureBindingAsync(currentUser.OwnerId, request.ProfileId, ct);
                 var conversation = await store.CreateAsync(currentUser.OwnerId, title, ct, binding);
+                if (request.ProjectId is { } project)
+                {
+                    await projects.AssignConversationAsync(conversation.Id, project, currentUser.OwnerId, ct);
+                    conversation.MoveToProject(project);
+                }
                 return Results.Created($"/api/v1/conversations/{conversation.Id}",
                     ToDto(conversation, binding.Name, false));
             }
@@ -56,7 +64,8 @@ internal static class ConversationEndpoints
             return Results.Ok(new ConversationDetailsDto(conversation.Id, conversation.Title, conversation.CreatedAt,
                 conversation.UpdatedAt, messages.Select(message => message.ToDto()).ToArray(),
                 queries.IsResponding(conversationId), conversation.ProfileId, ProfileName(conversation, live),
-                conversation.ProfileVersion, ProfileDeleted(conversation, live), conversation.PinnedAt is not null));
+                conversation.ProfileVersion, ProfileDeleted(conversation, live), conversation.PinnedAt is not null,
+                conversation.ProjectId));
         }).WithName("GetConversation");
 
         api.MapPatch("/conversations/{conversationId:guid}", async (Guid conversationId,
@@ -313,12 +322,14 @@ internal static class ConversationEndpoints
         if (name is null && snapshot is not null) name = snapshot.Name;
         var deleted = profileId is { } missing && !live.ContainsKey(missing);
         return new ConversationDto(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt,
-            profileId, name, conversation.ProfileVersion ?? snapshot?.Version, deleted, conversation.PinnedAt is not null);
+            profileId, name, conversation.ProfileVersion ?? snapshot?.Version, deleted, conversation.PinnedAt is not null,
+            conversation.ProjectId);
     }
 
     private static ConversationDto ToDto(Conversation conversation, string name, bool deleted) =>
         new(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt,
-            conversation.ProfileId, name, conversation.ProfileVersion, deleted, conversation.PinnedAt is not null);
+            conversation.ProfileId, name, conversation.ProfileVersion, deleted, conversation.PinnedAt is not null,
+            conversation.ProjectId);
 
     private static string? ProfileName(Conversation conversation, IReadOnlyDictionary<Guid, AssistantProfileRecord> live) =>
         ToDto(conversation, live).ProfileName;

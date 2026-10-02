@@ -43,8 +43,13 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<IntegrationCredential> IntegrationCredentials => Set<IntegrationCredential>();
     public DbSet<DailyBriefingPreference> DailyBriefings => Set<DailyBriefingPreference>();
     public DbSet<WeeklyReview> WeeklyReviews => Set<WeeklyReview>();
+    public DbSet<Jarvis.Domain.Projects.Project> Projects => Set<Jarvis.Domain.Projects.Project>();
     public DbSet<OwnerSettingEntity> OwnerSettings => Set<OwnerSettingEntity>();
     public DbSet<JournalEntryEntity> JournalEntries => Set<JournalEntryEntity>();
+    public DbSet<ExpenseEntity> Expenses => Set<ExpenseEntity>();
+    public DbSet<HabitEntity> Habits => Set<HabitEntity>();
+    public DbSet<HabitCheckInEntity> HabitCheckIns => Set<HabitCheckInEntity>();
+    public DbSet<PersonEntity> People => Set<PersonEntity>();
     public DbSet<SkillEntity> Skills => Set<SkillEntity>();
     public DbSet<SkillRevisionEntity> SkillRevisions => Set<SkillRevisionEntity>();
     public DbSet<MessageFeedbackEntity> MessageFeedback => Set<MessageFeedbackEntity>();

@@ -26,6 +26,7 @@ internal static class TemporalWorkerRegistration
         nameof(AutomationScheduleWorkflow),
         nameof(AutomationPollWorkflow),
         nameof(WeeklyReviewWorkflow),
+        nameof(HabitCheckInWorkflow),
     ];
 
     public static readonly IReadOnlyList<string> ActivityTypeNames =
@@ -53,6 +54,8 @@ internal static class TemporalWorkerRegistration
         "FireAutomationPoll",
         "ResolveWeeklyReviewSchedule",
         "DeliverWeeklyReview",
+        "ResolveHabitCheckIn",
+        "DeliverHabitCheckIn",
     ];
 
     public static TemporalWorker CreateWorker(TemporalClient client, IServiceProvider services)
@@ -65,10 +68,12 @@ internal static class TemporalWorkerRegistration
         var briefings = services.GetRequiredService<DailyBriefingActivities>();
         var heartbeat = services.GetRequiredService<AssistantHeartbeatActivities>();
         var dreaming = services.GetRequiredService<AssistantDreamingActivities>();
+        var people = services.GetRequiredService<PeopleCheckInActivities>();
         var automationRuns = services.GetRequiredService<AutomationRunActivities>();
         var automationSchedules = services.GetRequiredService<AutomationScheduleActivities>();
         var automationPolls = services.GetRequiredService<AutomationPollActivities>();
         var weeklyReviews = services.GetRequiredService<WeeklyReviewActivities>();
+        var habitCheckIns = services.GetRequiredService<HabitCheckInActivities>();
 
         return new TemporalWorker(client, new TemporalWorkerOptions(TemporalReminderScheduler.TaskQueue)
             .AddWorkflow<ReminderWorkflow>()
@@ -78,10 +83,12 @@ internal static class TemporalWorkerRegistration
             .AddWorkflow<DailyBriefingWorkflow>()
             .AddWorkflow<AssistantHeartbeatWorkflow>()
             .AddWorkflow<AssistantDreamingWorkflow>()
+            .AddWorkflow<PeopleCheckInWorkflow>()
             .AddWorkflow<AutomationRunWorkflow>()
             .AddWorkflow<AutomationScheduleWorkflow>()
             .AddWorkflow<AutomationPollWorkflow>()
             .AddWorkflow<WeeklyReviewWorkflow>()
+            .AddWorkflow<HabitCheckInWorkflow>()
             .AddActivity(reminders.DeliverReminderAsync)
             .AddActivity(reminders.DeliverReminderOccurrenceAsync)
             .AddActivity(reminders.FailReminderAsync)
@@ -96,6 +103,7 @@ internal static class TemporalWorkerRegistration
             .AddActivity(briefings.DeliverAsync)
             .AddActivity(heartbeat.RunAsync)
             .AddActivity(dreaming.RunAsync)
+            .AddActivity(people.RunAsync)
             .AddActivity(automationRuns.ExecuteAsync)
             .AddActivity(automationRuns.CompleteAfterApprovalAsync)
             .AddActivity(automationRuns.CloseRunAsync)
@@ -104,6 +112,8 @@ internal static class TemporalWorkerRegistration
             .AddActivity(automationPolls.CheckAsync)
             .AddActivity(automationPolls.FirePollAsync)
             .AddActivity(weeklyReviews.ResolveScheduleAsync)
-            .AddActivity(weeklyReviews.DeliverAsync));
+            .AddActivity(weeklyReviews.DeliverAsync)
+            .AddActivity(habitCheckIns.ResolveAsync)
+            .AddActivity(habitCheckIns.DeliverAsync));
     }
 }

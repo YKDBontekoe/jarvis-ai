@@ -14,7 +14,8 @@ namespace Jarvis.Workflows;
 public sealed class TemporalReminderScheduler(IConfiguration configuration) : IFileProcessingScheduler,
     IConditionWatchScheduler, IDailyBriefingScheduler, Jarvis.Application.Learning.IHeartbeatScheduler,
     Jarvis.Application.Learning.IDreamingScheduler, IAutomationScheduler,
-    Jarvis.Application.Reviews.IWeeklyReviewScheduler
+    Jarvis.Application.Reviews.IWeeklyReviewScheduler, Jarvis.Application.Habits.IHabitCheckInScheduler,
+    Jarvis.Application.People.IPeopleCheckInScheduler
 {
     public const string TaskQueue = "jarvis-workflows";
     private readonly SemaphoreSlim _clientLock = new(1, 1);
@@ -158,6 +159,37 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
                 new Jarvis.Application.Reviews.WeeklyReviewWorkflowInput(ownerId)), options);
     }
 
+    public async Task ScheduleHabitCheckInAsync(Guid ownerId, CancellationToken cancellationToken)
+    {
+        var client = await GetClientAsync(cancellationToken);
+        await client.StartWorkflowAsync(
+            (HabitCheckInWorkflow workflow) => workflow.RunAsync(
+                new Jarvis.Application.Habits.HabitCheckInWorkflowInput(ownerId)),
+            new WorkflowOptions(id: Jarvis.Application.Habits.HabitCheckInWorkflowIds.For(ownerId), taskQueue: TaskQueue)
+            {
+                IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
+            });
+    }
+
+
+    public async Task SchedulePeopleCheckInAsync(Guid ownerId, CancellationToken cancellationToken)
+    {
+        var client = await GetClientAsync(cancellationToken);
+        await client.StartWorkflowAsync(
+            (PeopleCheckInWorkflow workflow) => workflow.RunAsync(
+                new Jarvis.Application.People.PeopleCheckInInput(ownerId)),
+            new WorkflowOptions(id: Jarvis.Application.People.PeopleCheckInWorkflowIds.For(ownerId), taskQueue: TaskQueue)
+            {
+                IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
+            });
+    }
+
+
+    public Task CancelHabitCheckInAsync(Guid ownerId, CancellationToken cancellationToken) =>
+        CancelAsync(Jarvis.Application.Habits.HabitCheckInWorkflowIds.For(ownerId), cancellationToken);
+
     public async Task ResolveTaskApprovalAsync(string workflowId, string summary, CancellationToken cancellationToken)
     {
         var client = await GetClientAsync(cancellationToken);
@@ -269,6 +301,15 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
         if (!LocalClock.TryFind(zoneId, out var zone))
             throw new ArgumentException("Time zone identifier is not recognized by this server.", nameof(request));
 
+        if (request.Place is { } place)
+        {
+            var placed = await reminders.CreateAsync(ownerId, new CreateReminderRequest(title, DateTimeOffset.UtcNow,
+                TimeZoneId: zone.Id, Place: place with { Name = place.Name?.Trim() ?? string.Empty }),
+                cancellationToken);
+            // Place reminders have no Temporal workflow: a position the phone reports fires them.
+            return placed;
+        }
+
         var local = TimeZoneInfo.ConvertTime(request.DueAt, zone);
         var localTime = request.LocalTime ?? TimeOnly.FromTimeSpan(local.TimeOfDay);
         ReminderRule rule;
@@ -310,13 +351,13 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
 
         var current = await reminders.GetAsync(id, ownerId, cancellationToken);
         if (current is null || current.Status is not ("pending" or "completed")) return null;
-        if (current.Recurrence != Reminder.RecurrenceNone)
+        if (current.Recurrence != Reminder.RecurrenceNone || current.Place is { Repeats: true })
             return await CreateAsync(ownerId, new CreateReminderRequest(current.Title, dueAt,
                 TimeZoneId: current.TimeZoneId), cancellationToken);
 
         var snoozed = await reminders.SnoozeAsync(id, ownerId, dueAt, cancellationToken);
         if (snoozed is not { } result) return null;
-        if (result.PreviousWorkflowId != result.Reminder.WorkflowId)
+        if (current.Place is null && result.PreviousWorkflowId != result.Reminder.WorkflowId)
             await StopQuietlyAsync(result.PreviousWorkflowId, id, cancellationToken);
         await DispatchAsync(result.Reminder, cancellationToken);
         return result.Reminder;
@@ -325,7 +366,7 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
     public async Task<ReminderRecord?> MarkDoneAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
     {
         var done = await reminders.MarkDoneAsync(id, ownerId, cancellationToken);
-        if (done is not null) await StopQuietlyAsync(done.WorkflowId, id, cancellationToken);
+        if (done is { Place: null }) await StopQuietlyAsync(done.WorkflowId, id, cancellationToken);
         return done;
     }
 
@@ -376,6 +417,7 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
         if (reminder is null || reminder.Status != "pending") return null;
         var cancelled = await reminders.CancelAsync(id, ownerId, cancellationToken);
         if (cancelled is null) return null;
+        if (reminder.Place is not null) return cancelled;
         try
         {
             await scheduler.CancelAsync(reminder.WorkflowId, cancellationToken);
@@ -393,6 +435,36 @@ public sealed class ReminderService(IReminderRepository reminders, TemporalRemin
     }
 }
 
+/// <summary>Fires place reminders from the positions the phone reports, and starts automations that follow them.</summary>
+public sealed class PlaceReminderService(IReminderRepository reminders, IAutomationTriggerPublisher automations,
+    ILogger<PlaceReminderService> logger) : IPlaceReminderService
+{
+    public async Task<int> ObservePositionAsync(Guid ownerId, double latitude, double longitude,
+        double? accuracyMeters, CancellationToken cancellationToken)
+    {
+        var fired = await reminders.ObservePositionAsync(ownerId, latitude, longitude, accuracyMeters,
+            DateTimeOffset.UtcNow, cancellationToken);
+        foreach (var reminder in fired)
+        {
+            try
+            {
+                await automations.PublishReminderDueAsync(ownerId, reminder.ReminderId, reminder.Title,
+                    reminder.FiredAt, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "Automations after place reminder {ReminderId} did not start.",
+                    reminder.ReminderId);
+            }
+        }
+        return fired.Count;
+    }
+}
+
 public sealed class JarvisTaskService(
     IJarvisTaskRepository tasks,
     TemporalReminderScheduler scheduler,
@@ -401,7 +473,7 @@ public sealed class JarvisTaskService(
     ILogger<JarvisTaskService> logger) : IJarvisTaskService
 {
     public async Task<JarvisTaskRecord> CreateAsync(Guid ownerId, string title, string prompt, CancellationToken cancellationToken,
-        Guid? profileId = null)
+        Guid? profileId = null, Guid? projectId = null)
     {
         title = title.Trim();
         prompt = prompt.Trim();
@@ -409,7 +481,8 @@ public sealed class JarvisTaskService(
         if (prompt.Length is < 1 or > 32_000) throw new ArgumentException("Task instructions must contain 1 to 32,000 characters.", nameof(prompt));
 
         var binding = await profiles.CaptureBindingAsync(ownerId, profileId, cancellationToken);
-        var task = await tasks.CreateWithConversationAsync(ownerId, title, prompt, cancellationToken, binding);
+        var task = await tasks.CreateWithConversationAsync(ownerId, title, prompt, cancellationToken, binding,
+            projectId);
         try
         {
             await scheduler.ScheduleTaskAsync(task, cancellationToken);

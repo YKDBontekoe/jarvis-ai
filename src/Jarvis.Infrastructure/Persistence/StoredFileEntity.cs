@@ -15,6 +15,9 @@ public sealed class StoredFileEntity
     public DateTimeOffset? ScheduleDispatchedAt { get; set; }
     public string ProcessingStatus { get; set; } = "uploaded";
 
+    /// <summary>The owner's project this file belongs to; null when it is not in a project.</summary>
+    public Guid? ProjectId { get; set; }
+
     public StoredFile ToRecord() => new(Id, OwnerId, ObjectKey, FileName, ContentType,
         SizeBytes, Sha256, CreatedAt, ProcessingStatus);
 }

@@ -81,7 +81,7 @@ public sealed class HeartbeatService(
         var items = new List<CheckInItem>();
         foreach (var reminder in await reminders.ListRemindersAsync(ownerId, cancellationToken))
         {
-            if (reminder.Status != "pending" || reminder.DueAt <= now || reminder.DueAt - now > ReminderHorizon) continue;
+            if (reminder.Status != "pending" || reminder.Place is not null || reminder.DueAt <= now || reminder.DueAt - now > ReminderHorizon) continue;
             var local = TimeZoneInfo.ConvertTime(reminder.DueAt, timeZone);
             items.Add(new CheckInItem($"reminder:{reminder.Id:N}", $"“{reminder.Title}” is due at {local:HH:mm}."));
         }

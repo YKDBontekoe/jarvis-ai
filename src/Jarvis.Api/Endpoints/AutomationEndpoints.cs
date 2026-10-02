@@ -1,6 +1,7 @@
 using Jarvis.Api.Errors;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Workflows;
+using Jarvis.Domain.Workflows;
 
 namespace Jarvis.Api.Endpoints;
 
@@ -33,11 +34,28 @@ internal static class AutomationEndpoints
         {
             if (string.IsNullOrWhiteSpace(request.Title) || request.Title.Length > 300)
                 return EndpointHelpers.Invalid("title", "Title must contain 1 to 300 characters.");
+            ReminderPlace? place = null;
+            if (request.Place is { } placeRequest)
+            {
+                if (placeRequest.Latitude is not double latitude || placeRequest.Longitude is not double longitude)
+                    return EndpointHelpers.Invalid("place", "A place needs a latitude and longitude.");
+                if (string.IsNullOrWhiteSpace(placeRequest.Name))
+                    return EndpointHelpers.Invalid("place", "A place needs a name.");
+                if (request.Recurrence is { } recurrence && recurrence != Reminder.RecurrenceNone)
+                    return EndpointHelpers.Invalid("recurrence", "A place reminder repeats per visit, not on a schedule.");
+                place = new ReminderPlace(placeRequest.Name, latitude, longitude, placeRequest.RadiusMeters ?? 150,
+                    placeRequest.Trigger ?? Reminder.LocationArrive, placeRequest.Repeats);
+            }
+            else if (request.DueAt is null)
+            {
+                return EndpointHelpers.Invalid("dueAt", "A reminder needs a time or a place.");
+            }
+
             try
             {
                 var reminder = await reminders.CreateAsync(currentUser.OwnerId, new CreateReminderRequest(
-                    request.Title ?? string.Empty, request.DueAt, request.Recurrence, request.Weekdays,
-                    request.TimeZoneId, request.Until, request.LocalTime), ct);
+                    request.Title ?? string.Empty, request.DueAt ?? DateTimeOffset.UtcNow, request.Recurrence,
+                    request.Weekdays, request.TimeZoneId, request.Until, request.LocalTime, place), ct);
                 return Results.Created($"/api/v1/reminders/{reminder.Id}", reminder.ToDto());
             }
             catch (ArgumentOutOfRangeException exception)
@@ -46,7 +64,7 @@ internal static class AutomationEndpoints
             }
             catch (ArgumentException exception)
             {
-                return EndpointHelpers.Invalid("recurrence", exception.Message);
+                return EndpointHelpers.Invalid(place is null ? "recurrence" : "place", exception.Message);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -163,12 +181,13 @@ internal static class AutomationEndpoints
             try
             {
                 var task = await tasks.CreateAsync(currentUser.OwnerId, request.Title, request.Prompt, ct,
-                    request.ProfileId);
+                    request.ProfileId, request.ProjectId);
                 return Results.Created($"/api/v1/tasks/{task.Id}", task.ToDto());
             }
             catch (ArgumentException exception)
             {
-                return EndpointHelpers.Invalid("profileId", exception.Message);
+                return EndpointHelpers.Invalid(exception.ParamName == "projectId" ? "projectId" : "profileId",
+                    exception.Message);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {

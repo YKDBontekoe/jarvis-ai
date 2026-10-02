@@ -60,12 +60,18 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
     }
 
     public async Task<JarvisTaskRecord> CreateWithConversationAsync(Guid ownerId, string title, string prompt,
-        CancellationToken cancellationToken, ProfileBinding? profile = null)
+        CancellationToken cancellationToken, ProfileBinding? profile = null, Guid? projectId = null)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var conversation = new Conversation(ownerId, title);
         if (profile is not null)
             conversation.BindProfile(profile.ProfileId, profile.Version, profile.SnapshotJson);
+        if (projectId is { } project)
+        {
+            if (!await db.Projects.AnyAsync(x => x.Id == project && x.OwnerId == ownerId, cancellationToken))
+                throw new ArgumentException("Project was not found.", nameof(projectId));
+            conversation.MoveToProject(project);
+        }
         db.Conversations.Add(conversation);
         var task = new JarvisTask(ownerId, title, prompt);
         task.AttachConversation(conversation.Id);
@@ -247,8 +253,13 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
     public async Task<ReminderRecord> CreateAsync(Guid ownerId, CreateReminderRequest request, CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var reminder = new Reminder(ownerId, request.Title, request.DueAt, request.Recurrence ?? Reminder.RecurrenceNone,
-            request.Weekdays, request.TimeZoneId ?? "UTC", request.LocalTime, request.Until);
+        var reminder = request.Place is { } place
+            ? Reminder.ForPlace(ownerId, request.Title, place.Name, place.Latitude, place.Longitude,
+                place.RadiusMeters, place.Trigger, place.Repeats, request.TimeZoneId ?? "UTC")
+            : new Reminder(ownerId, request.Title, request.DueAt, request.Recurrence ?? Reminder.RecurrenceNone,
+                request.Weekdays, request.TimeZoneId ?? "UTC", request.LocalTime, request.Until);
+        if (reminder.IsLocationBased)
+            await SeedPlaceStateAsync(reminder, cancellationToken);
         var (conversation, intro) = LinkedConversationFactory.Create(ownerId, reminder.Title,
             LinkedConversationCopy.ReminderIntro(reminder.Title));
         reminder.AttachConversation(conversation.Id);
@@ -282,13 +293,14 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
             .ToListAsync(cancellationToken)).Select(x => x.ToRecord()).ToList();
 
     public async Task<IReadOnlyList<ReminderRecord>> ListPendingForSchedulingAsync(CancellationToken cancellationToken) =>
-        (await db.Reminders.AsNoTracking().Where(x => x.Status == "pending" && x.ScheduleDispatchedAt == null)
+        (await db.Reminders.AsNoTracking().Where(x => x.Status == "pending" && x.ScheduleDispatchedAt == null &&
+                x.LocationLatitude == null)
             .OrderBy(x => x.CreatedAt).Take(300).ToListAsync(cancellationToken))
             .Select(x => x.ToRecord()).ToList();
 
     public async Task<int> RequeueOverdueDispatchedAsync(DateTimeOffset utcNow, CancellationToken cancellationToken) =>
         await db.Reminders.Where(x => x.Status == "pending" && x.ScheduleDispatchedAt != null &&
-                x.DueAt < utcNow.AddMinutes(-Reminder.OverdueRescheduleGraceMinutes))
+                x.LocationLatitude == null && x.DueAt < utcNow.AddMinutes(-Reminder.OverdueRescheduleGraceMinutes))
             .ExecuteUpdateAsync(update => update.SetProperty(x => x.ScheduleDispatchedAt, (DateTimeOffset?)null),
                 cancellationToken);
 
@@ -317,7 +329,7 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var reminder = await GetLockedReminderAsync(id, cancellationToken);
-        if (reminder is null || reminder.OwnerId != ownerId || reminder.IsRecurring ||
+        if (reminder is null || reminder.OwnerId != ownerId || reminder.IsRecurring || reminder.LocationRepeats ||
             reminder.Status is not ("pending" or "completed")) return null;
         var previousWorkflowId = reminder.WorkflowId;
         var zone = LocalClock.TryFind(reminder.TimeZoneId, out var found) ? found : TimeZoneInfo.Utc;
@@ -335,7 +347,8 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var reminder = await GetLockedReminderAsync(id, cancellationToken);
-        if (reminder is null || reminder.OwnerId != ownerId || reminder.IsRecurring || reminder.Status != "pending")
+        if (reminder is null || reminder.OwnerId != ownerId || reminder.IsRecurring || reminder.LocationRepeats ||
+            reminder.Status != "pending")
             return null;
         reminder.MarkDone();
         AddAuditEvent(ownerId, "reminders", "reminder.completed", "low", true, reminder.Id);
@@ -370,7 +383,7 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var reminder = await GetLockedReminderAsync(input.ReminderId, cancellationToken);
-        if (reminder is null || reminder.OwnerId != input.OwnerId)
+        if (reminder is null || reminder.OwnerId != input.OwnerId || reminder.IsLocationBased)
             return new ReminderDeliveryResult(false, input.DueAt, input.Title);
         var deliveredEarlier = reminder.LastDeliveredAt is { } lastDelivered &&
                                lastDelivered >= input.DueAt.AddMinutes(-1);
@@ -400,6 +413,42 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         await transaction.CommitAsync(cancellationToken);
         return new ReminderDeliveryResult(reminder.Status == "pending" && nextDueAt is not null,
             nextDueAt ?? reminder.DueAt, reminder.Title, true);
+    }
+
+    public async Task<IReadOnlyList<FiredPlaceReminder>> ObservePositionAsync(Guid ownerId, double latitude,
+        double longitude, double? accuracyMeters, DateTimeOffset observedAt, CancellationToken cancellationToken)
+    {
+        // Cheap unlocked check first: most fixes arrive for owners without any place reminder.
+        var candidateIds = await db.Reminders.AsNoTracking()
+            .Where(x => x.OwnerId == ownerId && x.Status == "pending" && x.LocationLatitude != null)
+            .OrderBy(x => x.CreatedAt).Select(x => x.Id).Take(200).ToListAsync(cancellationToken);
+        if (candidateIds.Count == 0) return [];
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var reminders = await db.Reminders.FromSqlInterpolated(
+                $"SELECT * FROM reminders WHERE \"Id\" = ANY({candidateIds.ToArray()}) ORDER BY \"Id\" FOR UPDATE")
+            .ToListAsync(cancellationToken);
+        var fired = new List<FiredPlaceReminder>();
+        foreach (var reminder in reminders.Where(x => x.OwnerId == ownerId && x.IsLocationBased))
+        {
+            var distance = GeoDistance.Meters(latitude, longitude, reminder.LocationLatitude!.Value,
+                reminder.LocationLongitude!.Value);
+            if (!reminder.ObservePosition(distance, accuracyMeters, observedAt)) continue;
+
+            var notification = new Notification(Guid.CreateVersion7(), ownerId, "reminder.due",
+                LimitTitle(reminder.Title), PlaceReminderBody(reminder), reminder.Id);
+            db.Notifications.Add(notification);
+            await PushDeliveryQueue.QueueAsync(db, notification, cancellationToken);
+            reminder.CompleteLocationOccurrence(observedAt);
+            AddAuditEvent(ownerId, "reminders", "reminder.due", "low", true, reminder.Id);
+            await PostReminderMessageAsync(reminder, LinkedConversationCopy.ReminderAtPlace(reminder.Title,
+                reminder.LocationName ?? "the place", reminder.LocationTrigger == Reminder.LocationLeave),
+                cancellationToken);
+            fired.Add(new FiredPlaceReminder(reminder.Id, ownerId, reminder.Title, observedAt));
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return fired;
     }
 
     public async Task<IReadOnlyList<NotificationRecord>> ListNotificationsAsync(Guid ownerId, CancellationToken cancellationToken) =>
@@ -436,6 +485,24 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         if (!reminder.IsRecurring) return "Reminder · due now";
         var rule = ReminderSchedule.Describe(reminder.ToRecord());
         return string.IsNullOrEmpty(rule) ? "Reminder · due now" : $"Reminder · repeats {rule}";
+    }
+
+    private static string PlaceReminderBody(Reminder reminder)
+    {
+        var place = reminder.LocationName ?? "the place";
+        var edge = reminder.LocationTrigger == Reminder.LocationLeave ? $"You left {place}" : $"You're at {place}";
+        return reminder.LocationRepeats ? $"Reminder · {edge} · every visit" : $"Reminder · {edge}";
+    }
+
+    /// <summary>Uses a fresh phone position, when there is one, so a reminder made at the place does not fire there.</summary>
+    private async Task SeedPlaceStateAsync(Reminder reminder, CancellationToken cancellationToken)
+    {
+        var fix = await db.DeviceTelemetry.AsNoTracking().SingleOrDefaultAsync(x => x.OwnerId == reminder.OwnerId,
+            cancellationToken);
+        if (fix is not { Latitude: double latitude, Longitude: double longitude } ||
+            fix.ReportedAt < DateTimeOffset.UtcNow.AddMinutes(-15)) return;
+        reminder.SeedLocationState(GeoDistance.Meters(latitude, longitude, reminder.LocationLatitude!.Value,
+            reminder.LocationLongitude!.Value), fix.AccuracyMeters);
     }
 
     private Task<JarvisTask?> GetLockedTaskAsync(Guid id, CancellationToken cancellationToken) =>

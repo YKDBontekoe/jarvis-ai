@@ -34,12 +34,16 @@ import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../devices/device_invoke.dart';
 import '../devices/device_telemetry.dart';
+import '../devices/place_reminder_tracker.dart';
 import '../home/home_overview.dart';
+import '../people/people_screen.dart';
 import '../settings/settings_view.dart';
 import '../search/command_palette.dart';
 import '../search/recent_searches_store.dart';
 import '../search/search_navigation.dart';
 import '../search/search_screen.dart';
+import '../projects/project_editor.dart';
+import '../projects/project_style.dart';
 import '../shell/sidebar.dart';
 import '../shell/utility_pages.dart';
 import '../voice/chat_gpt_voices.dart';
@@ -238,6 +242,12 @@ class _ChatScreenState extends _ChatScreenController
       if (_sending || _busy) _remoteQuery = true;
       return;
     }
+    if (state == AppLifecycleState.resumed &&
+        !_signedOut &&
+        !_signingOut &&
+        !_restoringSession) {
+      unawaited(PlaceReminderTracker.instance.refresh(_http));
+    }
     if (state != AppLifecycleState.resumed || _conversationId == null) return;
     unawaited(_flushOutbox());
     if (_remoteQuery) unawaited(_catchUpRemoteQuery(_conversationId!));
@@ -252,6 +262,7 @@ class _ChatScreenState extends _ChatScreenController
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(PlaceReminderTracker.instance.detach());
     _catchUpTimer?.cancel();
     _deltaTimer?.cancel();
     _transcriptTick.dispose();

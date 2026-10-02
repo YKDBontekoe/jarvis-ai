@@ -15,11 +15,17 @@ import '../agents/agents_screen.dart';
 import '../channels/channels_screen.dart';
 import '../coding/coding_runs_screen.dart';
 import '../devices/devices_screen.dart';
+import '../expenses/expenses_screen.dart';
+import '../habits/habits_screen.dart';
 import '../journal/journal_screen.dart';
 import '../learning/learning_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
+import '../people/people_screen.dart';
 import '../persona/persona_screen.dart';
+import '../planner/day_planner_screen.dart';
 import '../profiles/profiles_screen.dart';
+import '../projects/project_screen.dart';
+import '../projects/projects_screen.dart';
 import '../review/weekly_review_screen.dart';
 import '../settings/app_lock_screen.dart';
 import '../settings/appearance_screen.dart';
@@ -28,6 +34,9 @@ import '../settings/voice_settings_screen.dart';
 import '../skills/skills_screen.dart';
 import '../usage/usage_screen.dart';
 
+/// Destination of one project's page: the prefix followed by its id.
+const projectDestinationPrefix = 'project:';
+
 Widget? utilityPageFor(
   String destination,
   Dio http, {
@@ -35,8 +44,22 @@ Widget? utilityPageFor(
   ValueChanged<String>? onAskInChat,
 }) => switch (destination) {
   'tasks' => TasksScreen(http: http),
+  'projects' => ProjectsScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+  ),
+  final project when project.startsWith(projectDestinationPrefix) =>
+    ProjectScreen(
+      http: http,
+      projectId: project.substring(projectDestinationPrefix.length),
+      onOpenConversation: onOpenConversation,
+    ),
   'memory' => MemoryScreen(http: http),
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
+  'today' => DayPlannerScreen(http: http, onAskInChat: onAskInChat),
+  'expenses' => ExpensesScreen(http: http),
+  'habits' => HabitsScreen(http: http),
+  'people' => PeopleScreen(http: http),
   'approvals' => ApprovalsScreen(http: http),
   'reminders' => RemindersScreen(
     http: http,

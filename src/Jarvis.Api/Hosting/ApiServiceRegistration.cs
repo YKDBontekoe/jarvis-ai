@@ -109,7 +109,10 @@ internal static class ApiServiceRegistration
         services.AddSingleton<IDailyBriefingScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<Jarvis.Application.Learning.IHeartbeatScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<Jarvis.Application.Learning.IDreamingScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
+        services.AddSingleton<Jarvis.Application.Habits.IHabitCheckInScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
+        services.AddSingleton<Jarvis.Application.People.IPeopleCheckInScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddScoped<IReminderService, ReminderService>();
+        services.AddScoped<IPlaceReminderService, PlaceReminderService>();
         services.AddScoped<IConditionWatchService, ConditionWatchService>();
         services.AddScoped<IDailyBriefingService, DailyBriefingService>();
         services.AddSingleton<Jarvis.Application.Reviews.IWeeklyReviewScheduler>(provider =>
@@ -124,6 +127,7 @@ internal static class ApiServiceRegistration
         services.AddScoped<IJarvisTaskService, JarvisTaskService>();
         services.AddSingleton<PublicJsonMetricReader>();
         services.AddScoped<ICalendarFeed, CalendarFeed>();
+        services.AddScoped<Jarvis.Application.Planner.IDayPlannerService, Jarvis.Application.Planner.DayPlannerService>();
         services.AddScoped<WatchMetricReader>();
         services.AddScoped<Jarvis.Application.Integrations.IMcpOAuthService, Jarvis.Mcp.McpOAuthService>();
         services.AddSingleton<ITaskRunAbort, TaskRunAbort>();

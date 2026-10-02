@@ -1,8 +1,11 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/error_reporting.dart';
 import 'package:jarvis_mobile/main.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:jarvis_mobile/ui/jarvis_ui.dart';
 
 void main() {
@@ -17,6 +20,7 @@ void main() {
   });
 
   test('reportError reaches the sink and survives a failing sink', () {
+    sentryTracingEnabled = false;
     Object? seen;
     errorSink = (error, stack, context) =>
         seen = '${error.runtimeType}/$context';
@@ -25,6 +29,53 @@ void main() {
 
     errorSink = (_, _, _) => throw StateError('sink broke');
     expect(() => reportError(StateError('x'), null), returnsNormally);
+  });
+
+  test('sentry logs below warning are dropped', () {
+    SentryLog log(SentryLogLevel level) => SentryLog(
+      timestamp: DateTime.utc(2026),
+      level: level,
+      body: 'status',
+      attributes: const {},
+    );
+
+    expect(filterSentryLog(log(SentryLogLevel.info)), isNull);
+    final warning = log(SentryLogLevel.warn);
+    expect(filterSentryLog(warning), same(warning));
+  });
+
+  test('error reporting preserves Sentry platform and framework handlers', () {
+    final dispatcher = PlatformDispatcher.instance;
+    final originalPlatformHandler = dispatcher.onError;
+    final originalFrameworkHandler = FlutterError.onError;
+    final error = StateError('uncaught');
+    final stack = StackTrace.current;
+    final contexts = <String?>[];
+    var platformCaptures = 0;
+    var frameworkCaptures = 0;
+    addTearDown(() {
+      dispatcher.onError = originalPlatformHandler;
+      FlutterError.onError = originalFrameworkHandler;
+    });
+    errorSink = (_, _, context) => contexts.add(context);
+    dispatcher.onError = (exception, trace) {
+      expect(exception, same(error));
+      expect(trace, same(stack));
+      platformCaptures++;
+      return false;
+    };
+    FlutterError.onError = (details) {
+      expect(details.exception, same(error));
+      frameworkCaptures++;
+    };
+
+    installErrorReporting();
+
+    expect(dispatcher.onError!(error, stack), isFalse);
+    FlutterError.onError!(FlutterErrorDetails(exception: error, stack: stack));
+    expect(platformCaptures, 1);
+    expect(frameworkCaptures, 1);
+    expect(contexts, ['platform', 'flutter']);
   });
 
   testWidgets('a storage failure at startup keeps the user signed in', (
