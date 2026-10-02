@@ -20,6 +20,7 @@ import '../learning/learning_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
 import '../persona/persona_screen.dart';
 import '../profiles/profiles_screen.dart';
+import '../settings/app_lock_screen.dart';
 import '../settings/appearance_screen.dart';
 import '../settings/model_settings_screen.dart';
 import '../settings/voice_settings_screen.dart';
@@ -49,6 +50,7 @@ Widget? utilityPageFor(
   'briefing' => DailyBriefingScreen(http: http),
   'integrations' => IntegrationsScreen(http: http, onAskInChat: onAskInChat),
   'appearance' => const AppearanceScreen(),
+  'app-lock' => const AppLockScreen(),
   'models' => ModelSettingsScreen(http: http),
   'skills' => SkillsScreen(http: http),
   'persona' => PersonaScreen(http: http),
