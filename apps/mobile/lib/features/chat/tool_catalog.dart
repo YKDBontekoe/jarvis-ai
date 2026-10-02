@@ -279,6 +279,31 @@ const _catalog = <String, ToolDescription>{
     'Searched the web',
     PhosphorIconsRegular.magnifyingGlass,
   ),
+  'SaveForLater': ToolDescription(
+    'Saving to your reading list',
+    'Saved to your reading list',
+    PhosphorIconsRegular.bookmarkSimple,
+  ),
+  'SaveFoundLinkForLater': ToolDescription(
+    'Saving a link to your reading list',
+    'Saved a link to your reading list',
+    PhosphorIconsRegular.bookmarkSimple,
+  ),
+  'GetReadingList': ToolDescription(
+    'Checking your reading list',
+    'Checked your reading list',
+    PhosphorIconsRegular.bookOpen,
+  ),
+  'MarkReadingItem': ToolDescription(
+    'Updating your reading list',
+    'Updated your reading list',
+    PhosphorIconsRegular.check,
+  ),
+  'RemoveFromReadingList': ToolDescription(
+    'Removing from your reading list',
+    'Removed from your reading list',
+    PhosphorIconsRegular.trash,
+  ),
   'BrowseTheWeb': ToolDescription(
     'Using the isolated browser',
     'Used the isolated browser',

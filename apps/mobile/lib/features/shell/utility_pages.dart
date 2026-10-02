@@ -20,6 +20,7 @@ import '../learning/learning_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
 import '../persona/persona_screen.dart';
 import '../profiles/profiles_screen.dart';
+import '../reading/reading_list_screen.dart';
 import '../settings/appearance_screen.dart';
 import '../settings/model_settings_screen.dart';
 import '../settings/voice_settings_screen.dart';
@@ -35,6 +36,7 @@ Widget? utilityPageFor(
   'tasks' => TasksScreen(http: http),
   'memory' => MemoryScreen(http: http),
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
+  'reading' => ReadingListScreen(http: http, onAskInChat: onAskInChat),
   'approvals' => ApprovalsScreen(http: http),
   'reminders' => RemindersScreen(http: http, onOpenConversation: onOpenConversation),
   'notifications' => RemindersScreen(
