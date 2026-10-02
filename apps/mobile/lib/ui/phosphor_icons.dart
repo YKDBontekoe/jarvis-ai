@@ -8,6 +8,7 @@ abstract final class PhosphorIconsRegular {
   static const airplaneTilt = IconData(0xe5d6, fontFamily: 'PhosphorRegular');
   static const alarm = IconData(0xe006, fontFamily: 'PhosphorRegular');
   static const appWindow = IconData(0xe5da, fontFamily: 'PhosphorRegular');
+  static const archive = IconData(0xe00c, fontFamily: 'PhosphorRegular');
   static const arrowLeft = IconData(0xe058, fontFamily: 'PhosphorRegular');
   static const arrowsClockwise = IconData(
     0xe094,
@@ -27,6 +28,7 @@ abstract final class PhosphorIconsRegular {
   static const broadcast = IconData(0xe0f2, fontFamily: 'PhosphorRegular');
   static const browser = IconData(0xe0f4, fontFamily: 'PhosphorRegular');
   static const calendarBlank = IconData(0xe10a, fontFamily: 'PhosphorRegular');
+  static const calendarCheck = IconData(0xe712, fontFamily: 'PhosphorRegular');
   static const camera = IconData(0xe10e, fontFamily: 'PhosphorRegular');
   static const car = IconData(0xe112, fontFamily: 'PhosphorRegular');
   static const caretDown = IconData(0xe136, fontFamily: 'PhosphorRegular');
@@ -69,6 +71,7 @@ abstract final class PhosphorIconsRegular {
   static const filePdf = IconData(0xe702, fontFamily: 'PhosphorRegular');
   static const fileText = IconData(0xe23a, fontFamily: 'PhosphorRegular');
   static const filmStrip = IconData(0xe792, fontFamily: 'PhosphorRegular');
+  static const fire = IconData(0xe242, fontFamily: 'PhosphorRegular');
   static const fingerprint = IconData(0xe23e, fontFamily: 'PhosphorRegular');
   static const firstAid = IconData(0xe56e, fontFamily: 'PhosphorRegular');
   static const flowArrow = IconData(0xe6ec, fontFamily: 'PhosphorRegular');
@@ -168,7 +171,9 @@ abstract final class PhosphorIconsRegular {
   static const thumbsDown = IconData(0xe48c, fontFamily: 'PhosphorRegular');
   static const thumbsUp = IconData(0xe48e, fontFamily: 'PhosphorRegular');
   static const timer = IconData(0xe492, fontFamily: 'PhosphorRegular');
+  static const target = IconData(0xe47c, fontFamily: 'PhosphorRegular');
   static const trash = IconData(0xe4a6, fontFamily: 'PhosphorRegular');
+  static const trophy = IconData(0xe67e, fontFamily: 'PhosphorRegular');
   static const treeStructure = IconData(0xe67c, fontFamily: 'PhosphorRegular');
   static const trendDown = IconData(0xe4ac, fontFamily: 'PhosphorRegular');
   static const trendUp = IconData(0xe4ae, fontFamily: 'PhosphorRegular');
@@ -190,6 +195,7 @@ abstract final class PhosphorIconsRegular {
 abstract final class PhosphorIconsFill {
   static const brain = IconData(0xe74e, fontFamily: 'PhosphorFill');
   static const chatCircle = IconData(0xe168, fontFamily: 'PhosphorFill');
+  static const fire = IconData(0xe242, fontFamily: 'PhosphorFill');
   static const checkCircle = IconData(0xe184, fontFamily: 'PhosphorFill');
   static const lightning = IconData(0xe2de, fontFamily: 'PhosphorFill');
   static const pushPin = IconData(0xe3e2, fontFamily: 'PhosphorFill');

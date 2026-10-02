@@ -6,6 +6,7 @@ using Jarvis.Application.Conversations;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Workflows;
 using Jarvis.Agents.ModelProviders;
+using Jarvis.Agents.Telemetry;
 
 namespace Jarvis.Agents;
 
@@ -24,10 +25,13 @@ public static class DependencyInjection
             throw new InvalidOperationException("Codex:TurnTimeoutSeconds must be between 30 and 1800.");
         services.AddSingleton(CodexExecutable.From(configuration));
         services.AddSingleton<CodexProcessLimiter>();
-        services.AddSingleton<IChatClient>(serviceProvider => new CodexCliChatClient(
-                serviceProvider.GetRequiredService<CodexExecutable>(), model, visionModel,
-                modelClasses, enableWebSearch, turnTimeoutSeconds,
-                serviceProvider.GetRequiredService<CodexProcessLimiter>())
+        var recordAiContent = configuration.GetValue("Sentry:RecordAiContent", false);
+        services.AddSingleton<IChatClient>(serviceProvider => SentryChatInstrumentation.Instrument(
+                new CodexCliChatClient(
+                    serviceProvider.GetRequiredService<CodexExecutable>(), model, visionModel,
+                    modelClasses, enableWebSearch, turnTimeoutSeconds,
+                    serviceProvider.GetRequiredService<CodexProcessLimiter>()),
+                recordAiContent)
             .AsBuilder()
             .UseOpenTelemetry(
                 serviceProvider.GetRequiredService<ILoggerFactory>(),
@@ -54,6 +58,8 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Expenses.ExpenseToolContributor>();
         services.AddScoped<IAgentContextContributor, Expenses.ExpenseContextContributor>();
         services.AddScoped<Jarvis.Application.Expenses.IReceiptReader, Expenses.ReceiptReader>();
+        services.AddScoped<IAgentToolContributor, Habits.HabitToolContributor>();
+        services.AddScoped<IAgentContextContributor, Habits.HabitContextContributor>();
         services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();
         services.AddScoped<IAgentContextContributor, Persona.PersonaContextContributor>();
         services.AddScoped<IAgentContextContributor, Learning.UserSummaryContextContributor>();

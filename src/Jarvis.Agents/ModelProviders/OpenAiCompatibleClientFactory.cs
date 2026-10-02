@@ -1,5 +1,6 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
+using Jarvis.Agents.Telemetry;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -16,9 +17,9 @@ public sealed class OpenAiCompatibleClientFactory(IConfiguration configuration, 
         (configuration["OpenRouter:BaseUrl"] ?? "https://openrouter.ai/api/v1").TrimEnd('/') + "/");
 
     public IChatClient CreateOpenRouterChatClient(string apiKey, string model) =>
-        CreateOpenRouterClient(apiKey)
-            .GetChatClient(model)
-            .AsIChatClient()
+        SentryChatInstrumentation.Instrument(
+                CreateOpenRouterClient(apiKey).GetChatClient(model).AsIChatClient(),
+                configuration.GetValue("Sentry:RecordAiContent", false))
             .AsBuilder()
             .ConfigureOptions(options => options.ModelId = model)
             .UseOpenTelemetry(loggerFactory, sourceName: "Jarvis.OpenRouterChatClient",

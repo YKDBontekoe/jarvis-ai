@@ -52,6 +52,8 @@ dependencies:
   shared_preferences: ^2.5.3
   flutter_timezone: ^5.1.0
   image_picker: ^1.2.3
+  sentry_flutter: ^9.30.1
+  sentry_dio: ^9.30.1
 
 dev_dependencies:
   flutter_test:
@@ -63,6 +65,17 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  sentry_dart_plugin: ^3.4.0
+
+# Release builds upload debug symbols, Dart symbol maps, and source context.
+# Organization, project, and auth token come from the environment, not this file.
+sentry:
+  upload_debug_symbols: true
+  upload_sources: true
+  upload_source_maps: true
+  dart_symbol_map_path: build/app/obfuscation.map.json
+  commits: auto
+  ignore_missing: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

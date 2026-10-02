@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Jarvis.Agents.Expenses;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
@@ -213,8 +214,11 @@ public sealed class ExpenseTests
         Assert.Contains("Logged €23.40 at Jumbo", reply);
         Assert.Contains("already logged", again);
         Assert.Equal(["expense.logged"], audit.Actions);
-        Assert.DoesNotContain("Jumbo", audit.Metadata[0]);
-        Assert.DoesNotContain("23", audit.Metadata[0]);
+        using var metadata = JsonDocument.Parse(audit.Metadata[0]);
+        Assert.Equal(["resourceId", "source"],
+            metadata.RootElement.EnumerateObject().Select(property => property.Name).ToArray());
+        Assert.Equal(expense.Id, metadata.RootElement.GetProperty("resourceId").GetGuid());
+        Assert.Equal("agent", metadata.RootElement.GetProperty("source").GetString());
     }
 
     [Fact]

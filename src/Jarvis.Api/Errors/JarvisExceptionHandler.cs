@@ -1,5 +1,7 @@
+using Jarvis.ServiceDefaults;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Sentry;
 
 namespace Jarvis.Api.Errors;
 
@@ -13,7 +15,11 @@ internal sealed class JarvisExceptionHandler(
     {
         var mapped = ExceptionProblemMapper.Map(exception, httpContext);
         if (mapped.Status >= StatusCodes.Status500InternalServerError)
+        {
             logger.LogError(exception, "Unhandled API exception mapped to {Code}.", mapped.Code);
+            if (JarvisSentryExceptions.ShouldCapture(exception, httpContext))
+                SentrySdk.CaptureException(exception);
+        }
         else
             logger.LogWarning(exception, "API exception mapped to {Code}.", mapped.Code);
 
@@ -31,4 +37,10 @@ internal sealed class JarvisExceptionHandler(
         httpContext.Response.StatusCode = mapped.Status;
         return await problemDetailsService.TryWriteAsync(context);
     }
+}
+
+internal static class JarvisSentryExceptions
+{
+    public static bool ShouldCapture(Exception exception, HttpContext? httpContext = null) =>
+        JarvisSentry.ShouldCaptureHttpStatus(ExceptionProblemMapper.Map(exception, httpContext).Status);
 }

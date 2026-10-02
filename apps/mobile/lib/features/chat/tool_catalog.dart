@@ -74,6 +74,21 @@ const _catalog = <String, ToolDescription>{
     'Started an agent task for an automation',
     PhosphorIconsRegular.lightning,
   ),
+  'GetHabits': ToolDescription(
+    'Checking your habits',
+    'Checked your habits',
+    PhosphorIconsRegular.target,
+  ),
+  'CheckInHabits': ToolDescription(
+    'Checking off a habit',
+    'Checked off a habit',
+    PhosphorIconsRegular.checkCircle,
+  ),
+  'CreateHabit': ToolDescription(
+    'Starting a habit',
+    'Started a habit',
+    PhosphorIconsRegular.target,
+  ),
   'SearchMemory': ToolDescription(
     'Searching memory',
     'Searched memory',

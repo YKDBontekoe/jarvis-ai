@@ -78,6 +78,20 @@ Owner-scoped (`expenses` table). Categories: groceries, dining, transport, shopp
 
 Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints` and `PersonalAssistantEndpoints` (`/graph/...`).
 
+
+## Habits
+
+| Method | Path |
+|--------|------|
+| GET | `/habits?includeArchived=` (returns `today`, `habits` with streak stats, and `settings`) |
+| POST | `/habits` (`name`, `icon`, `cadence` `daily`/`weekly`, `targetPerWeek` 1–7, optional `timeZoneId`) |
+| GET/PUT/DELETE | `/habits/{id}` |
+| PUT | `/habits/{id}/archived` (`archived`) |
+| POST | `/habits/{id}/check-ins` (`date` optional, up to 7 days back; `done` default true) |
+| GET/PUT | `/habits/settings` (`eveningCheckIn`, `checkInTime` `HH:mm`, `timeZoneId`) |
+
+Weeks run Monday to Sunday; a weekly habit's streak counts weeks that reached `targetPerWeek`. The evening check-in is the per-owner `HabitCheckInWorkflow`, which sends a `habit.checkin` notification (channel category `check_ins`) naming habits still open that day. Audit entries carry ids only.
+
 ## Files
 
 | Method | Path |
