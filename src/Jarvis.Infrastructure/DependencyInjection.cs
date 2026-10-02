@@ -68,6 +68,8 @@ public static class DependencyInjection
         services.AddScoped<IReminderRepository, WorkflowRepository>();
         services.AddScoped<INotificationRepository, WorkflowRepository>();
         services.AddScoped<IPushDeviceRepository, WorkflowRepository>();
+        services.AddScoped<IPushDeliveryQueue, PushDeliveryRepository>();
+        services.AddScoped<INotificationFeed, NotificationFeed>();
         services.AddScoped<IConditionWatchRepository, ConditionWatchRepository>();
         services.AddScoped<IFileRepository, FileRepository>();
         services.AddScoped<IFileContentRepository, FileContentRepository>();

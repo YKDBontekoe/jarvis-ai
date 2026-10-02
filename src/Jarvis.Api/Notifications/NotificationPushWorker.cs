@@ -2,9 +2,6 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Google.Apis.Auth.OAuth2;
 using Jarvis.Application.Workflows;
-using Jarvis.Domain.Workflows;
-using Jarvis.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace Jarvis.Api.Notifications;
 
@@ -15,6 +12,7 @@ public sealed class NotificationPushWorker(
     ILogger<NotificationPushWorker> logger) : BackgroundService
 {
     private const int BatchSize = 40;
+    private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
     private const string MessagingScope = "https://www.googleapis.com/auth/firebase.messaging";
 
@@ -63,101 +61,56 @@ public sealed class NotificationPushWorker(
         CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<JarvisDbContext>();
-        var now = DateTimeOffset.UtcNow;
-        var candidates = await db.PushDeliveries.AsNoTracking()
-            .Where(x => x.DeliveredAt == null && x.Attempts < 10 &&
-                        x.NextAttemptAt <= now && (x.LeaseUntil == null || x.LeaseUntil < now))
-            .OrderBy(x => x.NextAttemptAt)
-            .Select(x => new { x.NotificationId, x.DeviceId })
-            .Take(BatchSize)
-            .ToListAsync(cancellationToken);
+        var queue = scope.ServiceProvider.GetRequiredService<IPushDeliveryQueue>();
+        var candidates = await queue.ListDueAsync(BatchSize, cancellationToken);
 
         var handled = 0;
         foreach (var candidate in candidates)
         {
-            var leaseUntil = DateTimeOffset.UtcNow.AddMinutes(2);
-            var claimed = await db.PushDeliveries
-                .Where(x => x.NotificationId == candidate.NotificationId && x.DeviceId == candidate.DeviceId &&
-                            x.DeliveredAt == null && x.Attempts < 10 && x.NextAttemptAt <= DateTimeOffset.UtcNow &&
-                            (x.LeaseUntil == null || x.LeaseUntil < DateTimeOffset.UtcNow))
-                .ExecuteUpdateAsync(update => update
-                    .SetProperty(x => x.Attempts, x => x.Attempts + 1)
-                    .SetProperty(x => x.LeaseUntil, leaseUntil), cancellationToken);
-            if (claimed == 0) continue;
+            var claim = await queue.TryClaimAsync(candidate, LeaseDuration, cancellationToken);
+            if (!claim.Claimed) continue;
             handled++;
-
-            var delivery = await db.PushDeliveries.AsNoTracking().SingleAsync(x =>
-                x.NotificationId == candidate.NotificationId && x.DeviceId == candidate.DeviceId, cancellationToken);
-            var notification = await db.Notifications.AsNoTracking()
-                .SingleOrDefaultAsync(x => x.Id == candidate.NotificationId, cancellationToken);
-            var device = await db.PushDevices.AsNoTracking()
-                .SingleOrDefaultAsync(x => x.Id == candidate.DeviceId, cancellationToken);
-            if (notification is null || device is null || device.OwnerId != notification.OwnerId)
-            {
-                await db.PushDeliveries.Where(x => x.NotificationId == candidate.NotificationId &&
-                                                   x.DeviceId == candidate.DeviceId)
-                    .ExecuteDeleteAsync(cancellationToken);
-                continue;
-            }
-
-            if (notification.Type == "approval.required" && notification.SourceId is { } approvalId &&
-                !await db.ToolApprovals.AsNoTracking().AnyAsync(
-                    x => x.Id == approvalId && x.Status == "pending", cancellationToken))
-            {
-                await db.PushDeliveries.Where(x => x.NotificationId == candidate.NotificationId &&
-                                                   x.DeviceId == candidate.DeviceId)
-                    .ExecuteDeleteAsync(cancellationToken);
-                continue;
-            }
+            if (claim.Work is not { } work) continue;
 
             try
             {
                 var accessToken = await credential.UnderlyingCredential
                     .GetAccessTokenForRequestAsync(cancellationToken: cancellationToken);
-                using var response = await SendAsync(projectId, device.Token, notification,
-                    await BuildPushDataAsync(db, notification, cancellationToken), accessToken, cancellationToken);
+                using var response = await SendAsync(projectId, work, accessToken, cancellationToken);
                 if (response.IsSuccessStatusCode)
                 {
-                    await db.PushDeliveries.Where(x => x.NotificationId == candidate.NotificationId &&
-                                                       x.DeviceId == candidate.DeviceId)
-                        .ExecuteUpdateAsync(update => update
-                            .SetProperty(x => x.DeliveredAt, DateTimeOffset.UtcNow)
-                            .SetProperty(x => x.LeaseUntil, (DateTimeOffset?)null)
-                            .SetProperty(x => x.LastError, (string?)null), cancellationToken);
+                    await queue.MarkDeliveredAsync(candidate, cancellationToken);
                     continue;
                 }
 
                 var body = await response.Content.ReadAsStringAsync(cancellationToken);
-                var invalidToken = body.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase) ||
-                                   body.Contains("SENDER_ID_MISMATCH", StringComparison.OrdinalIgnoreCase);
-                if (invalidToken)
+                if (IsInvalidTokenResponse(body))
                 {
-                    await db.PushDeliveries.Where(x => x.DeviceId == device.Id)
-                        .ExecuteDeleteAsync(cancellationToken);
-                    await db.PushDevices.Where(x => x.Id == device.Id)
-                        .ExecuteDeleteAsync(cancellationToken);
-                    logger.LogInformation("Removed an expired push token for owner {OwnerId}.", device.OwnerId);
+                    await queue.RemoveDeviceAsync(candidate.DeviceId, cancellationToken);
+                    logger.LogInformation("Removed an expired push token for owner {OwnerId}.", work.OwnerId);
                     continue;
                 }
-                await RecordFailureAsync(db, candidate.NotificationId, candidate.DeviceId,
-                    delivery.Attempts, $"FCM returned {(int)response.StatusCode}.", cancellationToken);
+                await queue.RecordFailureAsync(candidate, work.Attempts,
+                    $"FCM returned {(int)response.StatusCode}.", cancellationToken);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 logger.LogWarning("Push delivery failed for notification {NotificationId}: {ErrorType}.",
                     candidate.NotificationId, exception.GetType().Name);
-                await RecordFailureAsync(db, candidate.NotificationId, candidate.DeviceId,
-                    delivery.Attempts, exception.GetType().Name, cancellationToken);
+                await queue.RecordFailureAsync(candidate, work.Attempts, exception.GetType().Name, cancellationToken);
             }
         }
         return handled;
     }
 
-    private async Task<HttpResponseMessage> SendAsync(string projectId, string token,
-        Notification notification, Dictionary<string, string> data, string accessToken,
+    internal static bool IsInvalidTokenResponse(string body) =>
+        body.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase) ||
+        body.Contains("SENDER_ID_MISMATCH", StringComparison.OrdinalIgnoreCase);
+
+    private async Task<HttpResponseMessage> SendAsync(string projectId, PushDeliveryWork work, string accessToken,
         CancellationToken cancellationToken)
     {
+        var notification = work.Notification;
         var client = httpClientFactory.CreateClient("firebase-messaging");
         using var request = new HttpRequestMessage(HttpMethod.Post,
             $"https://fcm.googleapis.com/v1/projects/{Uri.EscapeDataString(projectId)}/messages:send");
@@ -166,9 +119,9 @@ public sealed class NotificationPushWorker(
         {
             message = new
             {
-                token,
+                token = work.DeviceToken,
                 notification = new { title = notification.Title, body = notification.Body },
-                data,
+                data = work.Data,
                 android = new { priority = "HIGH", notification = new { channel_id = "jarvis_notifications" } },
                 apns = new { headers = new Dictionary<string, string> { ["apns-priority"] = "10" },
                     payload = new { aps = BuildApsPayload(notification.Type) } }
@@ -186,51 +139,5 @@ public sealed class NotificationPushWorker(
         var aps = new Dictionary<string, string> { ["sound"] = "default" };
         if (NotificationQuickActions.CategoryFor(type) is { } category) aps["category"] = category;
         return aps;
-    }
-
-    private static async Task<Dictionary<string, string>> BuildPushDataAsync(JarvisDbContext db,
-        Notification notification, CancellationToken cancellationToken)
-    {
-        var data = new Dictionary<string, string>
-        {
-            ["notificationId"] = notification.Id.ToString("D"),
-            ["type"] = notification.Type,
-            ["sourceId"] = notification.SourceId?.ToString("D") ?? string.Empty
-        };
-        if (notification.SourceId is not Guid sourceId) return data;
-
-        Guid? conversationId = notification.Type switch
-        {
-            "reminder.due" or "reminder.failed" => await db.Reminders.AsNoTracking()
-                .Where(x => x.Id == sourceId && x.OwnerId == notification.OwnerId)
-                .Select(x => x.ConversationId)
-                .FirstOrDefaultAsync(cancellationToken),
-            "automation.notification" => await db.AutomationRules.AsNoTracking()
-                .Where(x => x.Id == sourceId && x.OwnerId == notification.OwnerId)
-                .Select(x => x.ConversationId)
-                .FirstOrDefaultAsync(cancellationToken),
-            "automation.approval" => await (
-                from run in db.AutomationRuns.AsNoTracking()
-                join rule in db.AutomationRules.AsNoTracking() on run.RuleId equals rule.Id
-                where run.Id == sourceId && run.OwnerId == notification.OwnerId
-                select rule.ConversationId).FirstOrDefaultAsync(cancellationToken),
-            _ => null
-        };
-        if (conversationId is Guid id)
-        {
-            data["routeKind"] = "conversation";
-            data["conversationId"] = id.ToString("D");
-        }
-
-        return data;
-    }
-
-    private static async Task RecordFailureAsync(JarvisDbContext db, Guid notificationId, Guid deviceId,
-        int attempts, string error, CancellationToken cancellationToken)
-    {
-        var failed = await db.PushDeliveries.SingleAsync(x =>
-            x.NotificationId == notificationId && x.DeviceId == deviceId, cancellationToken);
-        failed.Fail(DateTimeOffset.UtcNow, error, permanent: attempts >= 10);
-        await db.SaveChangesAsync(cancellationToken);
     }
 }
