@@ -1,4 +1,4 @@
-import 'json_maps.dart';
+import '../../json_maps.dart';
 
 /// Labels for conversation groups, in display order.
 const conversationGroupLabels = [

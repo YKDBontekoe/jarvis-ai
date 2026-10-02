@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import '../../ui/phosphor_icons.dart';
 
 import '../../json_maps.dart';
-import '../../task_details_screen.dart';
+import '../tasks/task_details_screen.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../chat/chat_widgets.dart';

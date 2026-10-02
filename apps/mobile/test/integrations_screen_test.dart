@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jarvis_mobile/integrations_screen.dart';
+import 'package:jarvis_mobile/features/integrations/integrations_screen.dart';
 
 import 'support/fixture_http.dart';
 

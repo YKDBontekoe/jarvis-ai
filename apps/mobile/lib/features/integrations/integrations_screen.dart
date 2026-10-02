@@ -1,13 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import 'ui/phosphor_icons.dart';
+import '../../ui/phosphor_icons.dart';
 
-import 'theme.dart';
-import 'json_maps.dart';
-import 'http_urls.dart';
-import 'ui/jarvis_ui.dart';
-import 'features/chat/mcp_setup.dart';
+import '../../theme.dart';
+import '../../json_maps.dart';
+import '../../http_urls.dart';
+import '../../ui/jarvis_ui.dart';
+import '../chat/mcp_setup.dart';
 
 part 'integrations_apps.dart';
 part 'integrations_credentials.dart';

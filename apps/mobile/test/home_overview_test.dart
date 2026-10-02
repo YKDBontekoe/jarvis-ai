@@ -5,7 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/home/home_overview.dart';
-import 'package:jarvis_mobile/task_details_screen.dart';
+import 'package:jarvis_mobile/features/tasks/task_details_screen.dart';
 
 class _FixtureAdapter implements HttpClientAdapter {
   final Map<String, Object> responses = {};

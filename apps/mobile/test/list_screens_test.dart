@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jarvis_mobile/approvals_screen.dart';
-import 'package:jarvis_mobile/audit_screen.dart';
-import 'package:jarvis_mobile/condition_watches_screen.dart';
-import 'package:jarvis_mobile/conversations_screen.dart';
-import 'package:jarvis_mobile/daily_briefing_screen.dart';
-import 'package:jarvis_mobile/files_screen.dart';
-import 'package:jarvis_mobile/memory_screen.dart';
-import 'package:jarvis_mobile/tasks_screen.dart';
+import 'package:jarvis_mobile/features/approvals/approvals_screen.dart';
+import 'package:jarvis_mobile/features/audit/audit_screen.dart';
+import 'package:jarvis_mobile/features/watches/condition_watches_screen.dart';
+import 'package:jarvis_mobile/features/conversations/conversations_screen.dart';
+import 'package:jarvis_mobile/features/briefing/daily_briefing_screen.dart';
+import 'package:jarvis_mobile/features/files/files_screen.dart';
+import 'package:jarvis_mobile/features/memory/memory_screen.dart';
+import 'package:jarvis_mobile/features/tasks/tasks_screen.dart';
 import 'package:jarvis_mobile/features/profiles/profiles_screen.dart';
 
 import 'support/fixture_http.dart';

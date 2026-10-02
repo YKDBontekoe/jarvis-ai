@@ -1,11 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import '../../automations_screen.dart';
+import '../automations/automations_screen.dart';
 import '../../json_maps.dart';
-import '../../memory_screen.dart';
-import '../../reminders_screen.dart';
-import '../../task_details_screen.dart';
+import '../memory/memory_screen.dart';
+import '../reminders/reminders_screen.dart';
+import '../tasks/task_details_screen.dart';
 import '../channels/channels_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
 import '../skills/skills_screen.dart';

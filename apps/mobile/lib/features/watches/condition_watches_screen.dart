@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import 'ui/phosphor_icons.dart';
+import '../../ui/phosphor_icons.dart';
 
-import 'http_urls.dart';
-import 'theme.dart';
-import 'json_maps.dart';
-import 'ui/jarvis_ui.dart';
+import '../../http_urls.dart';
+import '../../theme.dart';
+import '../../json_maps.dart';
+import '../../ui/jarvis_ui.dart';
 
 part 'watch_editor.dart';
 

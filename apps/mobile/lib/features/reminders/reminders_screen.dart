@@ -5,24 +5,24 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
-import 'ui/phosphor_icons.dart';
+import '../../ui/phosphor_icons.dart';
 
-import 'approvals_screen.dart';
-import 'features/chat/tool_catalog.dart';
-import 'api/api_config.dart';
-import 'features/coding/coding_run_detail_screen.dart';
-import 'features/habits/habits_screen.dart';
-import 'daily_briefing_screen.dart';
-import 'features/devices/device_sensors.dart';
-import 'features/devices/place_reminder_tracker.dart';
-import 'features/review/weekly_review_screen.dart';
-import 'notification_details_screen.dart';
-import 'notification_routing.dart';
-import 'schedule_format.dart';
-import 'json_maps.dart';
-import 'task_details_screen.dart';
-import 'theme.dart';
-import 'ui/jarvis_ui.dart';
+import '../approvals/approvals_screen.dart';
+import '../chat/tool_catalog.dart';
+import '../../api/api_config.dart';
+import '../coding/coding_run_detail_screen.dart';
+import '../habits/habits_screen.dart';
+import '../briefing/daily_briefing_screen.dart';
+import '../devices/device_sensors.dart';
+import '../devices/place_reminder_tracker.dart';
+import '../review/weekly_review_screen.dart';
+import '../notifications/notification_details_screen.dart';
+import '../notifications/notification_routing.dart';
+import '../../schedule_format.dart';
+import '../../json_maps.dart';
+import '../tasks/task_details_screen.dart';
+import '../../theme.dart';
+import '../../ui/jarvis_ui.dart';
 
 part 'reminder_editor.dart';
 

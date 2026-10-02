@@ -1,11 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import 'ui/phosphor_icons.dart';
+import '../../ui/phosphor_icons.dart';
 
-import 'theme.dart';
-import 'json_maps.dart';
-import 'ui/jarvis_ui.dart';
+import '../../theme.dart';
+import '../../json_maps.dart';
+import '../../ui/jarvis_ui.dart';
 
 class DailyBriefingScreen extends StatefulWidget {
   const DailyBriefingScreen({required this.http, super.key});

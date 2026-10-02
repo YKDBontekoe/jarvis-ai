@@ -2,14 +2,14 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'ui/phosphor_icons.dart';
+import '../../ui/phosphor_icons.dart';
 
 import 'conversation_export.dart';
 import 'conversation_groups.dart';
-import 'features/projects/move_to_project.dart';
-import 'theme.dart';
-import 'json_maps.dart';
-import 'ui/jarvis_ui.dart';
+import '../projects/move_to_project.dart';
+import '../../theme.dart';
+import '../../json_maps.dart';
+import '../../ui/jarvis_ui.dart';
 
 typedef ConversationPickerResult = ({
   String? conversationId,

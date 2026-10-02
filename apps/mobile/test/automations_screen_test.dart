@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jarvis_mobile/automations_screen.dart';
+import 'package:jarvis_mobile/features/automations/automations_screen.dart';
 import 'package:jarvis_mobile/schedule_format.dart';
 import 'package:jarvis_mobile/theme.dart';
 

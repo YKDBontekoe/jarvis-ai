@@ -26,6 +26,13 @@ root. It shares the existing account and owner-scoped data. See
 | `features/memory/` | Memory list/editor, knowledge graph map |
 | `features/journal/` | Journal list + summary, entry editor (text, ratings, tags), "Talk about my day" hand-off to chat |
 | `features/tasks/` | `tasks_screen.dart`, `task_details_screen.dart`, editors |
+| `features/reminders/` | Reminders list (swipe done/snooze) and editor |
+| `features/conversations/` | Conversation history, groups, export |
+| `features/files/` | Files, collections, platform download helpers |
+| `features/integrations/` | Integrations hub: apps, packs, MCP servers, credentials |
+| `features/approvals/`, `audit/` | Approval review, audit log |
+| `features/automations/`, `watches/`, `briefing/` | Automations, condition watches, daily briefing |
+| `features/notifications/` | Notification details and deep-link routing |
 | `features/settings/` | Models (Codex/OpenRouter), voice, nested settings hub |
 | `features/skills/`, `persona/`, `profiles/`, `learning/` | Owner tuning surfaces |
 | `features/channels/` | WhatsApp & Signal |
@@ -36,7 +43,7 @@ root. It shares the existing account and owner-scoped data. See
 | `features/usage/` | Usage dashboard |
 | `features/voice/` | LiveKit stage, hands-free |
 
-Top-level screens outside `features/`: `conversations_screen.dart`, `reminders_screen.dart`, `files_screen.dart`, `integrations_screen.dart`, `approvals_screen.dart`, `audit_screen.dart`, `condition_watches_screen.dart`, `daily_briefing_screen.dart`.
+Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide code: `main.dart`, `theme.dart`, `appearance.dart`, `app_lock.dart`, `error_reporting.dart`, and small helpers (`json_maps.dart`, `http_urls.dart`, `schedule_format.dart`), plus `api/`, `auth/`, `push/` and `ui/`. Put new screens in a feature folder.
 
 ## Motion and visual language
 
@@ -96,6 +103,6 @@ Widget tests live alongside features under `test/` (if present).
 1. Match existing patterns in the nearest feature folder (controller + screen split in chat).
 2. Use `jarvis_http` for API calls; do not hardcode owner ids.
 3. For new settings sections, extend `features/settings/settings_view.dart` navigation.
-4. Deep links for notifications: `notification_routing.dart`.
+4. Deep links for notifications: `features/notifications/notification_routing.dart`.
 
 Backend contract: [api-reference.md](../backend/api-reference.md).

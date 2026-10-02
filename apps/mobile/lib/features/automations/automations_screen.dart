@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import 'approvals_screen.dart';
-import 'json_maps.dart';
-import 'schedule_format.dart';
-import 'theme.dart';
-import 'ui/jarvis_ui.dart';
-import 'ui/phosphor_icons.dart';
+import '../approvals/approvals_screen.dart';
+import '../../json_maps.dart';
+import '../../schedule_format.dart';
+import '../../theme.dart';
+import '../../ui/jarvis_ui.dart';
+import '../../ui/phosphor_icons.dart';
 
 class AutomationsScreen extends StatefulWidget {
   const AutomationsScreen({

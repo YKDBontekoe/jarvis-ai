@@ -1,11 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import 'ui/phosphor_icons.dart';
+import '../../ui/phosphor_icons.dart';
 
-import 'theme.dart';
-import 'json_maps.dart';
-import 'ui/jarvis_ui.dart';
+import '../../theme.dart';
+import '../../json_maps.dart';
+import '../../ui/jarvis_ui.dart';
 
 class AuditScreen extends StatefulWidget {
   const AuditScreen({required this.http, super.key});

@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import 'ui/phosphor_icons.dart';
+import '../../ui/phosphor_icons.dart';
 
-import 'features/chat/chat_widgets.dart';
-import 'json_maps.dart';
-import 'theme.dart';
-import 'ui/jarvis_ui.dart';
+import '../chat/chat_widgets.dart';
+import '../../json_maps.dart';
+import '../../theme.dart';
+import '../../ui/jarvis_ui.dart';
 
 class NotificationDetailsScreen extends StatefulWidget {
   const NotificationDetailsScreen({

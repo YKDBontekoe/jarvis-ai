@@ -1,4 +1,4 @@
-import 'json_maps.dart';
+import '../../json_maps.dart';
 
 /// Turns a conversation into Markdown for pasting elsewhere: a title, then
 /// each message with who wrote it and when. Rows that are not user or

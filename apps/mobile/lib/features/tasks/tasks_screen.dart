@@ -1,14 +1,14 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import 'ui/phosphor_icons.dart';
+import '../../ui/phosphor_icons.dart';
 import 'task_details_screen.dart';
-import 'condition_watches_screen.dart';
-import 'approvals_screen.dart';
-import 'theme.dart';
-import 'json_maps.dart';
-import 'ui/jarvis_ui.dart';
-import 'ui/plain_text.dart';
+import '../watches/condition_watches_screen.dart';
+import '../approvals/approvals_screen.dart';
+import '../../theme.dart';
+import '../../json_maps.dart';
+import '../../ui/jarvis_ui.dart';
+import '../../ui/plain_text.dart';
 
 part 'task_editor.dart';
 

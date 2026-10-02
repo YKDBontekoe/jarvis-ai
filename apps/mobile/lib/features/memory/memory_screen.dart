@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import 'ui/phosphor_icons.dart';
+import '../../ui/phosphor_icons.dart';
 
-import 'features/memory/knowledge_graph_screen.dart';
-import 'json_maps.dart';
-import 'theme.dart';
-import 'ui/jarvis_ui.dart';
+import 'knowledge_graph_screen.dart';
+import '../../json_maps.dart';
+import '../../theme.dart';
+import '../../ui/jarvis_ui.dart';
 
 part 'memory_editor.dart';
 

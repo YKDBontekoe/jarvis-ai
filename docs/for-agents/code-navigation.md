@@ -45,6 +45,7 @@ CodexCliChatClient
 apps/mobile/lib/main.dart
 apps/mobile/lib/api/jarvis_http.dart
 apps/mobile/lib/features/chat/     # largest surface
+apps/mobile/lib/features/<area>/   # one folder per product area; every screen lives here
 apps/mobile/lib/features/settings/
 ```
 
