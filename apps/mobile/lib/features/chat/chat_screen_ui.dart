@@ -92,6 +92,15 @@ mixin _ChatScreenUi on _ChatScreenController {
     onUtility: (destination) => _fromSidebar(() => _openUtility(destination)),
     onSettings: () => _fromSidebar(_openSettings),
     onJarvisSearch: () => _fromSidebar(() => unawaited(_openSearch(context))),
+    projects: _projects,
+    selectedProjectId:
+        _paneDestination?.startsWith(projectDestinationPrefix) ?? false
+        ? _paneDestination!.substring(projectDestinationPrefix.length)
+        : null,
+    onProject: (id) =>
+        _fromSidebar(() => _openUtility('$projectDestinationPrefix$id')),
+    onAllProjects: () => _fromSidebar(() => _openUtility('projects')),
+    onNewProject: () => _fromSidebar(() => unawaited(_createProject())),
   );
 
   void _dismissKeyboard() => FocusManager.instance.primaryFocus?.unfocus();
@@ -215,24 +224,38 @@ mixin _ChatScreenUi on _ChatScreenController {
     title: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                voice ? 'Voice' : 'Jarvis',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -.3,
+        GestureDetector(
+          onTap: voice || _openProject == null
+              ? null
+              : () => _openUtility('$projectDestinationPrefix$_projectId'),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!voice && _openProject != null) ...[
+                ProjectBadge(
+                  color: asJsonString(_openProject!['color']),
+                  size: 20,
+                ),
+                const SizedBox(width: 7),
+              ],
+              Flexible(
+                child: Text(
+                  voice
+                      ? 'Voice'
+                      : asJsonString(_openProject?['name']) ?? 'Jarvis',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -.3,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 7),
-            _ConnectionDot(connected: _connected),
-          ],
+              const SizedBox(width: 7),
+              _ConnectionDot(connected: _connected),
+            ],
+          ),
         ),
         if (!voice && (_profileName != null || _profileDeleted))
           GestureDetector(
@@ -276,6 +299,16 @@ mixin _ChatScreenUi on _ChatScreenController {
       const SizedBox(width: 12),
     ],
   );
+
+  /// The sidebar's copy of the open conversation's project, if any.
+  Map<String, dynamic>? get _openProject {
+    final id = _projectId;
+    if (id == null || _showHome) return null;
+    for (final project in _projects) {
+      if (project['id'] == id) return project;
+    }
+    return null;
+  }
 
   Widget _chatBody() => SafeArea(
     child: LayoutBuilder(

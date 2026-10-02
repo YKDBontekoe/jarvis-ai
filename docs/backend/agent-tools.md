@@ -48,6 +48,7 @@ Browser, surface, device, skill, persona, graph, and remote-agent tools are defi
 - Linked reminder or automation for the current conversation
 - Persona, skills, user dream portrait, knowledge graph summaries, device/browser/session state
 - Bound assistant profile (`ProfileContextContributor`) as untrusted working notes
+- The conversation's project (`ProjectContextContributor`): name, description, owner instructions as untrusted working notes, and up to 25 project file names; applies to chats and to tasks in the project. `CreateTask` from a project conversation keeps the new task in that project
 - MCP servers, host connections, and pack status (`McpContextContributor`) so chat can manage them without a Settings detour
 
 Order is controlled by `Order` on each contributor (`CoreAgentContext` uses `Order => 0`).

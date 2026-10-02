@@ -22,12 +22,17 @@ import '../learning/learning_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
 import '../persona/persona_screen.dart';
 import '../profiles/profiles_screen.dart';
+import '../projects/project_screen.dart';
+import '../projects/projects_screen.dart';
 import '../review/weekly_review_screen.dart';
 import '../settings/appearance_screen.dart';
 import '../settings/model_settings_screen.dart';
 import '../settings/voice_settings_screen.dart';
 import '../skills/skills_screen.dart';
 import '../usage/usage_screen.dart';
+
+/// Destination of one project's page: the prefix followed by its id.
+const projectDestinationPrefix = 'project:';
 
 Widget? utilityPageFor(
   String destination,
@@ -36,6 +41,16 @@ Widget? utilityPageFor(
   ValueChanged<String>? onAskInChat,
 }) => switch (destination) {
   'tasks' => TasksScreen(http: http),
+  'projects' => ProjectsScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+  ),
+  final project when project.startsWith(projectDestinationPrefix) =>
+    ProjectScreen(
+      http: http,
+      projectId: project.substring(projectDestinationPrefix.length),
+      onOpenConversation: onOpenConversation,
+    ),
   'memory' => MemoryScreen(http: http),
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'expenses' => ExpensesScreen(http: http),

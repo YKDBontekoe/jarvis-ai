@@ -197,6 +197,7 @@ abstract final class PhosphorIconsFill {
   static const chatCircle = IconData(0xe168, fontFamily: 'PhosphorFill');
   static const fire = IconData(0xe242, fontFamily: 'PhosphorFill');
   static const checkCircle = IconData(0xe184, fontFamily: 'PhosphorFill');
+  static const folderSimple = IconData(0xe25a, fontFamily: 'PhosphorFill');
   static const lightning = IconData(0xe2de, fontFamily: 'PhosphorFill');
   static const pushPin = IconData(0xe3e2, fontFamily: 'PhosphorFill');
   static const shieldCheck = IconData(0xe40c, fontFamily: 'PhosphorFill');
