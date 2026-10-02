@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 ARG PROJECT_PATH
 
 FROM node:22-slim AS codex-cli
@@ -15,9 +16,30 @@ RUN git clone --depth 1 --branch "$GITHUB_MCP_SERVER_VERSION" \
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0.302 AS publish
 ARG PROJECT_PATH
+ARG SENTRY_ORG=
+ARG SENTRY_PROJECT=
+ARG SENTRY_RELEASE=
 WORKDIR /source
 COPY . .
-RUN dotnet publish "$PROJECT_PATH" --configuration Release --output /app/publish /p:UseAppHost=false
+# The auth token is a BuildKit secret. Without it the image still builds and Sentry CLI stays off.
+# With it, this publish uploads PDBs and source files for SENTRY_RELEASE (the git SHA).
+RUN --mount=type=secret,id=sentry_auth_token,required=false \
+    if [ -s /run/secrets/sentry_auth_token ]; then \
+      export SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token)"; \
+      export SENTRY_RELEASE="${SENTRY_RELEASE}"; \
+      dotnet publish "$PROJECT_PATH" --configuration Release --output /app/publish /p:UseAppHost=false \
+        /p:SentryOrg="${SENTRY_ORG}" \
+        /p:SentryProject="${SENTRY_PROJECT}" \
+        /p:SentryCreateRelease=true \
+        /p:SentryUploadSymbols=true \
+        /p:SentryUploadSources=true \
+        /p:DebugType=portable \
+        /p:DebugSymbols=true \
+        /p:ContinuousIntegrationBuild=true; \
+    else \
+      dotnet publish "$PROJECT_PATH" --configuration Release --output /app/publish /p:UseAppHost=false \
+        /p:UseSentryCLI=false; \
+    fi
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 RUN apt-get update && apt-get install --yes --no-install-recommends git \

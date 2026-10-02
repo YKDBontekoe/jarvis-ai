@@ -19,6 +19,26 @@ const _catalog = <String, ToolDescription>{
     'Checked the time',
     PhosphorIconsRegular.clock,
   ),
+  'LogExpense': ToolDescription(
+    'Logging an expense',
+    'Logged an expense',
+    PhosphorIconsRegular.wallet,
+  ),
+  'GetExpenses': ToolDescription(
+    'Checking your spending',
+    'Checked your spending',
+    PhosphorIconsRegular.wallet,
+  ),
+  'UpdateExpense': ToolDescription(
+    'Correcting an expense',
+    'Corrected an expense',
+    PhosphorIconsRegular.pencilSimple,
+  ),
+  'DeleteExpense': ToolDescription(
+    'Deleting an expense',
+    'Deleted an expense',
+    PhosphorIconsRegular.trash,
+  ),
   'CreateReminder': ToolDescription(
     'Scheduling a reminder',
     'Scheduled a reminder',
@@ -73,6 +93,21 @@ const _catalog = <String, ToolDescription>{
     'Starting an agent task for an automation',
     'Started an agent task for an automation',
     PhosphorIconsRegular.lightning,
+  ),
+  'GetHabits': ToolDescription(
+    'Checking your habits',
+    'Checked your habits',
+    PhosphorIconsRegular.target,
+  ),
+  'CheckInHabits': ToolDescription(
+    'Checking off a habit',
+    'Checked off a habit',
+    PhosphorIconsRegular.checkCircle,
+  ),
+  'CreateHabit': ToolDescription(
+    'Starting a habit',
+    'Started a habit',
+    PhosphorIconsRegular.target,
   ),
   'SearchMemory': ToolDescription(
     'Searching memory',

@@ -60,12 +60,18 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
     }
 
     public async Task<JarvisTaskRecord> CreateWithConversationAsync(Guid ownerId, string title, string prompt,
-        CancellationToken cancellationToken, ProfileBinding? profile = null)
+        CancellationToken cancellationToken, ProfileBinding? profile = null, Guid? projectId = null)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var conversation = new Conversation(ownerId, title);
         if (profile is not null)
             conversation.BindProfile(profile.ProfileId, profile.Version, profile.SnapshotJson);
+        if (projectId is { } project)
+        {
+            if (!await db.Projects.AnyAsync(x => x.Id == project && x.OwnerId == ownerId, cancellationToken))
+                throw new ArgumentException("Project was not found.", nameof(projectId));
+            conversation.MoveToProject(project);
+        }
         db.Conversations.Add(conversation);
         var task = new JarvisTask(ownerId, title, prompt);
         task.AttachConversation(conversation.Id);

@@ -5,10 +5,12 @@ import '../../theme.dart';
 import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../projects/project_style.dart';
 
 /// Primary navigation: a drawer on phones and a permanent sidebar on wide
-/// screens. Destinations sit on top, recent conversations below, pinned first
-/// and then grouped by day, and settings with connection status at the bottom.
+/// screens. Destinations sit on top, then the most recently used projects,
+/// recent conversations below, pinned first and then grouped by day, and
+/// settings with connection status at the bottom.
 class JarvisSidebar extends StatefulWidget {
   const JarvisSidebar({
     required this.conversations,
@@ -23,8 +25,16 @@ class JarvisSidebar extends StatefulWidget {
     required this.onUtility,
     required this.onSettings,
     required this.onJarvisSearch,
+    this.projects = const [],
+    this.selectedProjectId,
+    this.onProject,
+    this.onAllProjects,
+    this.onNewProject,
     super.key,
   });
+
+  /// How many projects the sidebar lists before "See all".
+  static const visibleProjects = 5;
 
   final List<Map<String, dynamic>> conversations;
   final String? selectedConversationId;
@@ -38,6 +48,11 @@ class JarvisSidebar extends StatefulWidget {
   final ValueChanged<String> onUtility;
   final VoidCallback onSettings;
   final VoidCallback onJarvisSearch;
+  final List<Map<String, dynamic>> projects;
+  final String? selectedProjectId;
+  final ValueChanged<String>? onProject;
+  final VoidCallback? onAllProjects;
+  final VoidCallback? onNewProject;
 
   @override
   State<JarvisSidebar> createState() => _JarvisSidebarState();
@@ -85,6 +100,11 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     onTap: widget.onVoice,
                   ),
                   _NavRow(
+                    icon: PhosphorIconsRegular.sunHorizon,
+                    label: 'Today',
+                    onTap: () => widget.onUtility('today'),
+                  ),
+                  _NavRow(
                     icon: PhosphorIconsRegular.listChecks,
                     label: 'Tasks',
                     onTap: () => widget.onUtility('tasks'),
@@ -100,6 +120,16 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     onTap: () => widget.onUtility('journal'),
                   ),
                   _NavRow(
+                    icon: PhosphorIconsRegular.wallet,
+                    label: 'Expenses',
+                    onTap: () => widget.onUtility('expenses'),
+                  ),
+                  _NavRow(
+                    icon: PhosphorIconsRegular.target,
+                    label: 'Habits',
+                    onTap: () => widget.onUtility('habits'),
+                  ),
+                  _NavRow(
                     icon: PhosphorIconsRegular.users,
                     label: 'People',
                     onTap: () => widget.onUtility('people'),
@@ -109,6 +139,7 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     label: 'Reminders',
                     onTap: () => widget.onUtility('reminders'),
                   ),
+                  if (widget.onProject != null) ..._projectRows(context),
                   const SizedBox(height: 14),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 0, 0, 2),
@@ -186,6 +217,74 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
   }
 }
 
+extension on _JarvisSidebarState {
+  List<Widget> _projectRows(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final projects = widget.projects
+        .where((item) => jsonString(item, 'id') != null)
+        .take(JarvisSidebar.visibleProjects)
+        .toList();
+    return [
+      const SizedBox(height: 14),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 0, 2),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Projects',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: colors.inkSoft,
+                ),
+              ),
+            ),
+            if (widget.projects.isNotEmpty)
+              TextButton(
+                onPressed: widget.onAllProjects,
+                style: TextButton.styleFrom(
+                  foregroundColor: colors.muted,
+                  visualDensity: VisualDensity.compact,
+                  textStyle: const TextStyle(fontSize: 13),
+                ),
+                child: const Text('See all'),
+              ),
+            if (widget.onNewProject != null)
+              IconButton(
+                tooltip: 'New project',
+                visualDensity: VisualDensity.compact,
+                onPressed: widget.onNewProject,
+                icon: Icon(
+                  PhosphorIconsRegular.plus,
+                  size: 16,
+                  color: colors.muted,
+                ),
+              ),
+          ],
+        ),
+      ),
+      if (projects.isEmpty)
+        _NavRow(
+          icon: PhosphorIconsRegular.folderSimple,
+          label: 'New project',
+          muted: true,
+          onTap: widget.onNewProject ?? widget.onAllProjects ?? () {},
+        ),
+      for (final project in projects)
+        _NavRow(
+          leading: ProjectBadge(
+            color: asJsonString(project['color']),
+            size: 22,
+          ),
+          label: asJsonString(project['name']) ?? 'Untitled project',
+          selected: jsonString(project, 'id') == widget.selectedProjectId,
+          onTap: () => widget.onProject!(jsonString(project, 'id')!),
+        ),
+    ];
+  }
+}
+
 /// One way in to search: chats, memories, files, and everything else.
 class _SearchPill extends StatelessWidget {
   const _SearchPill({required this.onTap});
@@ -243,6 +342,7 @@ class _NavRow extends StatelessWidget {
     this.icon,
     this.leading,
     this.selected = false,
+    this.muted = false,
   });
 
   final String label;
@@ -250,6 +350,9 @@ class _NavRow extends StatelessWidget {
   final IconData? icon;
   final Widget? leading;
   final bool selected;
+
+  /// A quieter row, used for suggestions such as "New project".
+  final bool muted;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -271,17 +374,29 @@ class _NavRow extends StatelessWidget {
                 child: Center(
                   child:
                       leading ??
-                      Icon(icon, size: 20, color: JarvisColors.of(context).ink),
+                      Icon(
+                        icon,
+                        size: 20,
+                        color: muted
+                            ? JarvisColors.of(context).muted
+                            : JarvisColors.of(context).ink,
+                      ),
                 ),
               ),
               const SizedBox(width: 14),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: -.2,
-                  color: JarvisColors.of(context).ink,
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: -.2,
+                    color: muted
+                        ? JarvisColors.of(context).muted
+                        : JarvisColors.of(context).ink,
+                  ),
                 ),
               ),
             ],

@@ -7,6 +7,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../review/weekly_review_screen.dart';
 import 'journal_editor_screen.dart';
 import 'journal_format.dart';
 
@@ -156,6 +157,17 @@ class _JournalScreenState extends State<JournalScreen> {
           ),
           children: [
             ContentWidth(child: _SummaryCard(summary: _summary)),
+            ContentWidth(
+              child: _WeekReviewLink(
+                onTap: () => unawaited(
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => WeeklyReviewScreen(http: widget.http),
+                    ),
+                  ),
+                ),
+              ),
+            ),
             if (widget.onTalkAboutDay != null)
               ContentWidth(
                 child: Padding(
@@ -206,6 +218,46 @@ class _SummaryCard extends StatelessWidget {
             label: 'avg mood /5',
           ),
           _Stat(value: '$total', label: 'entries · $days days'),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeekReviewLink extends StatelessWidget {
+  const _WeekReviewLink({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return SurfaceCard(
+      key: const Key('journal-weekly-review'),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+      onTap: onTap,
+      child: Row(
+        children: [
+          const IconBadge(icon: PhosphorIconsRegular.chartLine),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your week in review',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Mood trends and a short story about your week',
+                  style: TextStyle(fontSize: 13, color: colors.inkSoft),
+                ),
+              ],
+            ),
+          ),
+          Icon(PhosphorIconsRegular.caretRight, size: 16, color: colors.muted),
         ],
       ),
     );

@@ -127,6 +127,14 @@ mixin _ChatScreenPush on _ChatScreenController {
       _openUtility('briefing');
       return;
     }
+    if (opensWeeklyReview(type)) {
+      _openUtility('weekly-review');
+      return;
+    }
+    if (opensHabits(type)) {
+      _openUtility('habits');
+      return;
+    }
     if (opensPeople(type)) {
       if (sourceId == null) {
         _openUtility('people');

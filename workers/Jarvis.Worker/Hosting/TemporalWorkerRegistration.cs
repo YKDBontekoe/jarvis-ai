@@ -25,6 +25,8 @@ internal static class TemporalWorkerRegistration
         nameof(AutomationRunWorkflow),
         nameof(AutomationScheduleWorkflow),
         nameof(AutomationPollWorkflow),
+        nameof(WeeklyReviewWorkflow),
+        nameof(HabitCheckInWorkflow),
     ];
 
     public static readonly IReadOnlyList<string> ActivityTypeNames =
@@ -50,6 +52,10 @@ internal static class TemporalWorkerRegistration
         "FireAutomationSchedule",
         "CheckAutomationPollTrigger",
         "FireAutomationPoll",
+        "ResolveWeeklyReviewSchedule",
+        "DeliverWeeklyReview",
+        "ResolveHabitCheckIn",
+        "DeliverHabitCheckIn",
     ];
 
     public static TemporalWorker CreateWorker(TemporalClient client, IServiceProvider services)
@@ -66,6 +72,8 @@ internal static class TemporalWorkerRegistration
         var automationRuns = services.GetRequiredService<AutomationRunActivities>();
         var automationSchedules = services.GetRequiredService<AutomationScheduleActivities>();
         var automationPolls = services.GetRequiredService<AutomationPollActivities>();
+        var weeklyReviews = services.GetRequiredService<WeeklyReviewActivities>();
+        var habitCheckIns = services.GetRequiredService<HabitCheckInActivities>();
 
         return new TemporalWorker(client, new TemporalWorkerOptions(TemporalReminderScheduler.TaskQueue)
             .AddWorkflow<ReminderWorkflow>()
@@ -79,6 +87,8 @@ internal static class TemporalWorkerRegistration
             .AddWorkflow<AutomationRunWorkflow>()
             .AddWorkflow<AutomationScheduleWorkflow>()
             .AddWorkflow<AutomationPollWorkflow>()
+            .AddWorkflow<WeeklyReviewWorkflow>()
+            .AddWorkflow<HabitCheckInWorkflow>()
             .AddActivity(reminders.DeliverReminderAsync)
             .AddActivity(reminders.DeliverReminderOccurrenceAsync)
             .AddActivity(reminders.FailReminderAsync)
@@ -100,6 +110,10 @@ internal static class TemporalWorkerRegistration
             .AddActivity(automationSchedules.ResolveNextFireAsync)
             .AddActivity(automationSchedules.FireScheduleAsync)
             .AddActivity(automationPolls.CheckAsync)
-            .AddActivity(automationPolls.FirePollAsync));
+            .AddActivity(automationPolls.FirePollAsync)
+            .AddActivity(weeklyReviews.ResolveScheduleAsync)
+            .AddActivity(weeklyReviews.DeliverAsync)
+            .AddActivity(habitCheckIns.ResolveAsync)
+            .AddActivity(habitCheckIns.DeliverAsync));
     }
 }

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Jarvis.Application.Files;
 using Jarvis.Application.Learning;
+using Jarvis.Application.Reviews;
 using Jarvis.Application.Workflows;
 using Xunit;
 
@@ -28,6 +29,9 @@ public sealed class WorkerWorkflowPayloadCompatibilityTests
     [InlineData(typeof(HeartbeatRunResult))]
     [InlineData(typeof(DreamingWorkflowInput))]
     [InlineData(typeof(DreamingRunResult))]
+    [InlineData(typeof(WeeklyReviewWorkflowInput))]
+    [InlineData(typeof(WeeklyReviewSchedule))]
+    [InlineData(typeof(WeeklyReviewActivityInput))]
     public void Representative_workflow_payloads_round_trip(Type payloadType)
     {
         var sample = CreateSample(payloadType);
@@ -73,6 +77,13 @@ public sealed class WorkerWorkflowPayloadCompatibilityTests
             return new DreamingWorkflowInput(Guid.Parse("99999999-9999-9999-9999-999999999999"));
         if (type == typeof(DreamingRunResult))
             return new DreamingRunResult(true, 120);
+        if (type == typeof(WeeklyReviewWorkflowInput))
+            return new WeeklyReviewWorkflowInput(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+        if (type == typeof(WeeklyReviewSchedule))
+            return new WeeklyReviewSchedule(true, DateTimeOffset.Parse("2026-01-04T18:00:00Z"), new DateOnly(2025, 12, 29));
+        if (type == typeof(WeeklyReviewActivityInput))
+            return new WeeklyReviewActivityInput(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                new DateOnly(2025, 12, 29));
         throw new ArgumentOutOfRangeException(nameof(type));
     }
 }
