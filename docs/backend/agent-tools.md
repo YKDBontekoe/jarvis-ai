@@ -31,6 +31,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Watches | `ConditionWatchAgentTools` | — |
 | Memory | `MemoryAgentTools` list/search/remember | **Forget** requires approval |
 | Journal | `JournalAgentTools` `SaveJournalEntry` (appends to the day's entry), `ListJournalEntries` | Hidden during background task turns; off when the profile disallows remembering |
+| Reading list | `ReadingAgentTools` `SaveForLater`, `SaveFoundLinkForLater`, `GetReadingList`, `MarkReadingItem`, `RemoveFromReadingList` | `SaveForLater` only accepts links that appear in the user's own message this turn (`ReadingTurnLinks`); a link Jarvis found itself goes through **approval** via `SaveFoundLinkForLater`. `ReadingContextContributor` adds the unread count |
 | MCP | `McpServerAgentTools` + `McpSetupAgentTools` | Discover/add/update/invoke/read prompt/resource/remove mostly **approval**; setup and secret cards in chat |
 | Coding | `CodexCodingTools.RunCodingTaskAsync` | **Approval**; only if `Coding:Repositories` configured |
 

@@ -42,6 +42,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton<IDreamingScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddHostedService<TemporalWorkflowReconciler>();
         services.AddHostedService<MemoryIndexingWorker>();
+        services.AddHostedService<ReadingListWorker>();
         services.AddHostedService<TemporalWorkerHostedService>();
         services.AddScoped<IReminderService, ReminderService>();
         services.AddScoped<IConditionWatchService, ConditionWatchService>();
@@ -54,6 +55,8 @@ public static class WorkerServiceCollectionExtensions
         services.AddScoped<IAutomationMetrics, AutomationMetrics>();
         services.AddSingleton<IAutomationScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<PublicJsonMetricReader>();
+        services.AddSingleton<Jarvis.Application.Reading.IReadingPageFetcher, Jarvis.Workflows.Reading.ReadingPageFetcher>();
+        services.AddScoped<Jarvis.Application.Reading.ReadingFetchProcessor>();
         services.AddScoped<ICalendarFeed, CalendarFeed>();
         services.AddScoped<WatchMetricReader>();
         services.AddJarvisMemory();

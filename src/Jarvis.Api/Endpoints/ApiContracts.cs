@@ -79,3 +79,9 @@ public sealed record JournalRequest(DateOnly? EntryDate, string? Content, string
 public sealed record JournalEntryDto(Guid Id, DateOnly EntryDate, string Source, string Content, string? Highlights,
     string? Gratitude, int? Rating, int? Mood, int? Energy, int? Stress, IReadOnlyList<string> Tags, Guid? MemoryId,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+public sealed record ReadingItemRequest(string? Url, string? Note);
+public sealed record ReadingItemUpdateRequest(bool? Read, string? Note);
+public sealed record ReadingItemDto(Guid Id, string Url, string Status, string Title, string? SiteName,
+    string? Excerpt, string? Summary, IReadOnlyList<string> KeyPoints, int? WordCount, int? ReadingMinutes,
+    string? Note, string Source, string? FailureReason, bool Read, DateTimeOffset? ReadAt, DateTimeOffset? FetchedAt,
+    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);

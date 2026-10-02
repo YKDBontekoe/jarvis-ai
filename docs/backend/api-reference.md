@@ -64,6 +64,16 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 
 Body: `entryDate`, `content` (≤ 6,000), `highlights`, `gratitude` (≤ 1,000 each), `rating` 1–10, `mood`/`energy`/`stress` 1–5, `tags` (≤ 10), optional `source` (`written`, `voice`, `chat`). At least text or one rating is required. "Today" uses the owner's daily-briefing time zone (UTC fallback). See [memory-knowledge-learning.md](memory-knowledge-learning.md#journal).
 
+## Reading list
+
+| Method | Path |
+|--------|------|
+| GET/POST | `/reading` (POST body: `url` ≤ 2,000, optional `note` ≤ 500; 201 for a new link, 200 with the existing item when the link was already saved) |
+| GET/PATCH/DELETE | `/reading/{id}` (PATCH body: `read`, `note`) |
+| POST | `/reading/{id}/refresh` (fetch and summarize again) |
+
+Owner-scoped (`reading_items`). New links start as `pending`; `ReadingListWorker` in the worker fetches them with `ReadingPageFetcher` (http/https on ports 80/443 only, every redirect re-checked, connects only to public IP addresses, 3 MiB cap, no cookies or credentials) and asks the background model for a summary and key points. The page text itself is not stored. Temporary failures retry after 1 and 10 minutes, then the item becomes `failed`. Audit events (`reading` tool) carry the item id only, never the link or title.
+
 Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints` and `PersonalAssistantEndpoints` (`/graph/...`).
 
 ## Files

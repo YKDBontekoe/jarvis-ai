@@ -69,6 +69,11 @@ internal static class ApiMappers
         entry.EntryDate, entry.Source, entry.Content, entry.Highlights, entry.Gratitude, entry.Rating, entry.Mood,
         entry.Energy, entry.Stress, entry.Tags, entry.MemoryId, entry.CreatedAt, entry.UpdatedAt);
 
+    public static ReadingItemDto ToDto(this Jarvis.Domain.Reading.ReadingItem item) => new(item.Id, item.Url,
+        item.Status, item.DisplayTitle, item.SiteName, item.Excerpt, item.Summary, item.KeyPoints, item.WordCount,
+        item.ReadingMinutes, item.Note, item.Source, item.FailureReason, item.IsRead, item.ReadAt, item.FetchedAt,
+        item.CreatedAt, item.UpdatedAt);
+
     public static IEnumerable<ToolApprovalDto> ToDtos(this IEnumerable<ToolApprovalRecord> approvals) =>
         approvals.Select(ToDto);
 }

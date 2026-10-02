@@ -85,7 +85,7 @@ public sealed class PublicJsonMetricReader
         return bounded;
     }
 
-    private static async ValueTask<Stream> ConnectToPublicAddressAsync(SocketsHttpConnectionContext context,
+    internal static async ValueTask<Stream> ConnectToPublicAddressAsync(SocketsHttpConnectionContext context,
         CancellationToken cancellationToken)
     {
         var host = context.DnsEndPoint.Host;

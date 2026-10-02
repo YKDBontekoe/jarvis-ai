@@ -51,6 +51,10 @@ public static class DependencyInjection
         services.AddScoped<IAgentContextContributor, Skills.SkillContextContributor>();
         services.AddScoped<IAgentToolContributor, Journal.JournalToolContributor>();
         services.AddScoped<IAgentContextContributor, Journal.JournalContextContributor>();
+        services.AddScoped<Reading.ReadingTurnLinks>();
+        services.AddScoped<IAgentToolContributor, Reading.ReadingToolContributor>();
+        services.AddScoped<IAgentContextContributor, Reading.ReadingContextContributor>();
+        services.AddScoped<Jarvis.Application.Reading.IReadingSummarizer, Reading.ReadingSummarizer>();
         services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();
         services.AddScoped<IAgentContextContributor, Persona.PersonaContextContributor>();
         services.AddScoped<IAgentContextContributor, Learning.UserSummaryContextContributor>();
