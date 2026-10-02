@@ -18,6 +18,11 @@ const apiConnectTimeout = Duration(seconds: 10);
 const apiReceiveTimeout = Duration(seconds: 20);
 const longRunningReceiveTimeout = Duration(minutes: 20);
 
+/// Serves the whole app from canned responses in widget tests and the
+/// screenshot harness (`test/screenshots`).
+@visibleForTesting
+HttpClientAdapter? debugJarvisHttpAdapter;
+
 Dio createJarvisHttp() {
   final dio = Dio(
     BaseOptions(
@@ -26,6 +31,9 @@ Dio createJarvisHttp() {
       receiveTimeout: apiReceiveTimeout,
     ),
   );
+  if (debugJarvisHttpAdapter case final adapter?) {
+    dio.httpClientAdapter = adapter;
+  }
   attachSentryHttp(dio);
   return dio;
 }

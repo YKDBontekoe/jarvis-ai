@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'motion.dart';
 import 'phosphor_icons.dart';
@@ -149,9 +151,15 @@ class _SurfaceCardState extends State<SurfaceCard> {
                 : null,
             gradient: widget.gradient,
             borderRadius: shape,
-            border: Border.all(color: widget.borderColor ?? colors.outline),
+            border: Border.all(
+              color:
+                  widget.borderColor ?? colors.outline.withValues(alpha: .75),
+            ),
+            // Every card lifts a hair off the canvas; elevated ones float.
             boxShadow: widget.elevated
                 ? JarvisShadows.soft(colors.brightness)
+                : widget.gradient == null && widget.color == null
+                ? JarvisShadows.hairline(colors.brightness)
                 : null,
           ),
           child: Material(
@@ -581,11 +589,16 @@ class _SkeletonListState extends State<SkeletonList>
               blendMode: BlendMode.srcATop,
               shaderCallback: (bounds) {
                 final dx = (_shimmer.value * 2 - .5) * bounds.width;
+                // Fade from a transparent copy of the highlight, never from
+                // transparent black, which would smear grey across the rows.
+                final glow = colors.isDark
+                    ? const Color(0xffffffff)
+                    : colors.surface;
                 return LinearGradient(
                   colors: [
-                    Colors.transparent,
-                    colors.surface.withValues(alpha: colors.isDark ? .08 : .55),
-                    Colors.transparent,
+                    glow.withValues(alpha: 0),
+                    glow.withValues(alpha: colors.isDark ? .06 : .7),
+                    glow.withValues(alpha: 0),
                   ],
                   stops: const [.35, .5, .65],
                   transform: _SlideGradient(dx),
@@ -811,7 +824,8 @@ class HeaderAction extends StatelessWidget {
     final bigText = MediaQuery.textScalerOf(context).scale(14) > 14 * 1.3;
     final iconOnly =
         bigText ||
-        (collapsesWhenNarrow && MediaQuery.sizeOf(context).width < _narrowWidth);
+        (collapsesWhenNarrow &&
+            MediaQuery.sizeOf(context).width < _narrowWidth);
     final leading = busy
         ? const SizedBox.square(
             dimension: 14,
@@ -913,13 +927,15 @@ class GroupedSection extends StatelessWidget {
   );
 }
 
-/// Round, softly shadowed icon button used in the top bar.
+/// Round, softly shadowed icon button used in the top bar. [bare] drops the
+/// disc so the button can sit inside a [ToolbarCapsule].
 class CircleIconButton extends StatelessWidget {
   const CircleIconButton({
     required this.icon,
     required this.tooltip,
     required this.onPressed,
-    this.size = 44,
+    this.size = 42,
+    this.bare = false,
     super.key,
   });
 
@@ -927,39 +943,143 @@ class CircleIconButton extends StatelessWidget {
   final String tooltip;
   final VoidCallback? onPressed;
   final double size;
+  final bool bare;
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-    message: tooltip,
-    child: Semantics(
-      button: true,
-      enabled: onPressed != null,
-      label: tooltip,
-      excludeSemantics: true,
-      child: Material(
-        color: JarvisColors.of(context).surface,
-        shape: CircleBorder(
-          side: BorderSide(color: JarvisColors.of(context).outline),
-        ),
-        shadowColor: const Color(0x14000000),
-        elevation: 1.5,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onPressed,
-          child: SizedBox.square(
-            dimension: size,
-            child: Icon(
-              icon,
-              size: 19,
-              color: onPressed == null
-                  ? JarvisColors.of(context).muted
-                  : JarvisColors.of(context).ink,
-            ),
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final button = Material(
+      type: MaterialType.transparency,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: SizedBox.square(
+          dimension: size,
+          child: Icon(
+            icon,
+            size: 19,
+            color: onPressed == null ? colors.muted : colors.ink,
           ),
         ),
       ),
-    ),
-  );
+    );
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        enabled: onPressed != null,
+        label: tooltip,
+        excludeSemantics: true,
+        child: bare
+            ? button
+            : DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: colors.outline.withValues(alpha: .7),
+                  ),
+                  boxShadow: JarvisShadows.hairline(colors.brightness),
+                ),
+                child: button,
+              ),
+      ),
+    );
+  }
+}
+
+/// A pill that groups a few [CircleIconButton]s (with `bare: true`), like a
+/// toolbar, so the top bar reads as one calm control instead of many discs.
+class ToolbarCapsule extends StatelessWidget {
+  const ToolbarCapsule({required this.children, super.key});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.outline.withValues(alpha: .7)),
+        boxShadow: JarvisShadows.hairline(colors.brightness),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: Row(mainAxisSize: MainAxisSize.min, children: children),
+      ),
+    );
+  }
+}
+
+/// Small rounded status label with an optional action, for quiet states such
+/// as "Offline · Retry" that should not push content down like a banner.
+class StatusChip extends StatelessWidget {
+  const StatusChip({
+    required this.label,
+    required this.color,
+    this.actionLabel,
+    this.onAction,
+    super.key,
+  });
+
+  final String label;
+  final Color color;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Material(
+      color: colors.surface,
+      shape: StadiumBorder(
+        side: BorderSide(color: colors.outline.withValues(alpha: .8)),
+      ),
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onAction,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 6, 12, 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 7),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: colors.inkSoft,
+                ),
+              ),
+              if (actionLabel != null) ...[
+                Text(
+                  '  ·  ',
+                  style: TextStyle(fontSize: 12.5, color: colors.muted),
+                ),
+                Text(
+                  actionLabel!,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: colors.accent,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Runs [action] once [state]'s route has finished animating in, so an editor
@@ -980,4 +1100,174 @@ void afterRouteSettles(State state, Future<void> Function() action) {
 
     animation.addStatusListener(listener);
   });
+}
+
+/// Dissolves scrolling content into the canvas at the top and bottom edges,
+/// so text slides softly under the header and composer instead of being cut.
+class EdgeFade extends StatelessWidget {
+  const EdgeFade({
+    required this.child,
+    this.top = 14,
+    this.bottom = 26,
+    super.key,
+  });
+
+  final Widget child;
+  final double top;
+  final double bottom;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final height = constraints.maxHeight;
+      if (!height.isFinite || height <= top + bottom) return child;
+      return ShaderMask(
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (bounds) => LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: const [
+            Color(0x00000000),
+            Color(0xff000000),
+            Color(0xff000000),
+            Color(0x00000000),
+          ],
+          stops: [0, top / height, 1 - bottom / height, 1],
+        ).createShader(bounds),
+        child: child,
+      );
+    },
+  );
+}
+
+/// One side of [SwipeActions].
+class SwipeAction {
+  const SwipeAction({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTrigger,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Future<void> Function() onTrigger;
+}
+
+/// Swipe a row to act on it: the action shows underneath as the row slides,
+/// fires past the threshold with a tap of haptics, and the row springs back
+/// (the list then reloads into its new state). Menus stay the accessible path.
+class SwipeActions extends StatelessWidget {
+  const SwipeActions({
+    required this.id,
+    required this.child,
+    this.start,
+    this.end,
+    this.radius = JarvisRadii.lg,
+    this.bottomGap = 10,
+    super.key,
+  });
+
+  final Object id;
+  final Widget child;
+
+  /// Revealed when swiping toward the end (right in left-to-right layouts).
+  final SwipeAction? start;
+
+  /// Revealed when swiping toward the start.
+  final SwipeAction? end;
+  final double radius;
+
+  /// Space below the row that the coloured background must not cover.
+  final double bottomGap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (start == null && end == null) return child;
+    final direction = start != null && end != null
+        ? DismissDirection.horizontal
+        : start != null
+        ? DismissDirection.startToEnd
+        : DismissDirection.endToStart;
+    return Dismissible(
+      key: ValueKey(('swipe', id)),
+      direction: direction,
+      dismissThresholds: const {
+        DismissDirection.startToEnd: .32,
+        DismissDirection.endToStart: .32,
+      },
+      movementDuration: JarvisMotion.base,
+      confirmDismiss: (swiped) async {
+        final action = swiped == DismissDirection.startToEnd ? start : end;
+        if (action == null) return false;
+        unawaited(HapticFeedback.mediumImpact());
+        await action.onTrigger();
+        return false;
+      },
+      background: start == null
+          ? const SizedBox.shrink()
+          : _SwipeBackground(
+              action: start!,
+              alignment: Alignment.centerLeft,
+              radius: radius,
+              bottomGap: bottomGap,
+            ),
+      secondaryBackground: end == null
+          ? null
+          : _SwipeBackground(
+              action: end!,
+              alignment: Alignment.centerRight,
+              radius: radius,
+              bottomGap: bottomGap,
+            ),
+      child: child,
+    );
+  }
+}
+
+class _SwipeBackground extends StatelessWidget {
+  const _SwipeBackground({
+    required this.action,
+    required this.alignment,
+    required this.radius,
+    required this.bottomGap,
+  });
+
+  final SwipeAction action;
+  final Alignment alignment;
+  final double radius;
+  final double bottomGap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(bottom: bottomGap),
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: action.color,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: Align(
+        alignment: alignment,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(action.icon, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                action.label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }

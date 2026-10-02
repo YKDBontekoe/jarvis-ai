@@ -32,197 +32,221 @@ class ApprovalCard extends StatelessWidget {
       _ => JarvisColors.of(context).warning,
     };
     final submitting = approval.status == ApprovalStatus.submitting;
+    final colors = JarvisColors.of(context);
+    final pending = !decided;
+    final eyebrow = switch (approval.status) {
+      ApprovalStatus.approved => 'Approved',
+      ApprovalStatus.denied => 'Declined',
+      _ =>
+        needsRetry
+            ? (approval.decision == false
+                  ? 'Declined, but not finished'
+                  : 'Approved, but not finished')
+            : 'Jarvis needs your approval',
+    };
     return Padding(
       padding: const EdgeInsets.only(left: 40, bottom: 18),
-      child: Container(
+      child: AnimatedContainer(
+        duration: JarvisMotion.of(context, JarvisMotion.base),
+        curve: JarvisMotion.standard,
         decoration: BoxDecoration(
-          color: JarvisColors.of(context).surface,
+          color: colors.surface,
           borderRadius: BorderRadius.circular(JarvisRadii.lg),
-          border: Border.all(color: JarvisColors.of(context).outline),
-          boxShadow: decided ? null : JarvisShadows.soft(),
+          border: Border.all(
+            color: pending
+                ? accent.withValues(alpha: .35)
+                : colors.outline.withValues(alpha: .75),
+          ),
+          boxShadow: pending
+              ? JarvisShadows.soft(colors.brightness)
+              : JarvisShadows.hairline(colors.brightness),
         ),
         clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              decoration: BoxDecoration(
-                color: JarvisColors.of(context).canvas,
-                border: Border(
-                  bottom: BorderSide(color: JarvisColors.of(context).outline),
-                ),
-              ),
-              child: Row(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Icon(
-                    decided
-                        ? (approval.status == ApprovalStatus.approved
-                              ? PhosphorIconsFill.shieldCheck
-                              : PhosphorIconsRegular.prohibit)
-                        : PhosphorIconsRegular.shieldCheck,
-                    color: accent,
-                    size: 19,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      switch (approval.status) {
-                        ApprovalStatus.approved => 'Approved',
-                        ApprovalStatus.denied => 'Declined',
-                        _ =>
-                          needsRetry
-                              ? (approval.decision == false
-                                    ? 'Declined, but not finished'
-                                    : 'Approved, but not finished')
-                              : 'Jarvis needs your approval',
-                      },
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14.5,
-                        color: JarvisColors.of(context).ink,
-                      ),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: colors.isDark ? .18 : .1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      decided
+                          ? (approval.status == ApprovalStatus.approved
+                                ? PhosphorIconsFill.shieldCheck
+                                : PhosphorIconsRegular.prohibit)
+                          : description.icon,
+                      color: accent,
+                      size: 20,
                     ),
                   ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      IconBadge(icon: description.icon, size: 30),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          eyebrow,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12.5,
+                            letterSpacing: .1,
+                            color: accent,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
                           description.active,
                           style: TextStyle(
-                            color: JarvisColors.of(context).ink,
-                            fontWeight: FontWeight.w500,
+                            color: colors.ink,
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -.2,
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (arguments.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: JarvisColors.of(context).canvas,
-                        borderRadius: BorderRadius.circular(JarvisRadii.sm),
-                        border: Border.all(
-                          color: JarvisColors.of(context).outline,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          for (final entry in arguments.take(6))
-                            if (entry.key == 'memoryId' &&
-                                loadMemoryText != null &&
-                                approval.toolName == 'ForgetMemory')
-                              _MemoryPreview(
-                                memoryId: '${entry.value}',
-                                load: loadMemoryText!,
-                              )
-                            else
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 3,
-                                ),
-                                child: Text.rich(
-                                  TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text:
-                                            '${humanizeToolName(entry.key)}  ',
-                                        style: TextStyle(
-                                          color: JarvisColors.of(context).muted,
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text: '${entry.value}',
-                                        style: TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 12.5,
-                                          color: JarvisColors.of(context).ink,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  if (approval.error case final error?) ...[
-                    const SizedBox(height: 12),
-                    InlineNotice(message: error, tone: NoticeTone.danger),
-                  ],
-                  if (!decided) ...[
-                    const SizedBox(height: 14),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        if (!needsRetry)
-                          OutlinedButton(
-                            onPressed: submitting
-                                ? null
-                                : () => onDecide(false),
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(0, 42),
-                            ),
-                            child: const Text('Decline'),
-                          ),
-                        const SizedBox(width: 8),
-                        FilledButton.icon(
-                          onPressed: submitting
-                              ? null
-                              : () => onDecide(
-                                  needsRetry
-                                      ? (approval.decision ?? true)
-                                      : true,
-                                ),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(0, 42),
-                          ),
-                          icon: submitting
-                              ? const SizedBox.square(
-                                  dimension: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Icon(
-                                  needsRetry
-                                      ? PhosphorIconsRegular.arrowsClockwise
-                                      : PhosphorIconsRegular.check,
-                                  size: 18,
-                                ),
-                          label: Text(needsRetry ? 'Retry' : 'Approve'),
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ],
               ),
-            ),
-          ],
+              if (arguments.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(JarvisRadii.md),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final entry in arguments.take(6))
+                        if (entry.key == 'memoryId' &&
+                            loadMemoryText != null &&
+                            approval.toolName == 'ForgetMemory')
+                          _MemoryPreview(
+                            memoryId: '${entry.value}',
+                            load: loadMemoryText!,
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text:
+                                        '${_sentence(humanizeToolName(entry.key))}\n',
+                                    style: TextStyle(
+                                      color: colors.muted,
+                                      fontSize: 12,
+                                      height: 1.5,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: '${entry.value}',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      height: 1.4,
+                                      color: colors.ink,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                    ],
+                  ),
+                ),
+              ],
+              if (approval.error case final error?) ...[
+                const SizedBox(height: 12),
+                InlineNotice(message: error, tone: NoticeTone.danger),
+              ],
+              AnimatedSize(
+                duration: JarvisMotion.of(context, JarvisMotion.base),
+                curve: JarvisMotion.standard,
+                alignment: Alignment.topCenter,
+                child: decided
+                    ? const SizedBox(width: double.infinity)
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Row(
+                          children: [
+                            if (!needsRetry) ...[
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: submitting
+                                      ? null
+                                      : () => onDecide(false),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size(0, 46),
+                                  ),
+                                  child: const Text('Decline'),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                            ],
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: submitting
+                                    ? null
+                                    : () {
+                                        unawaited(
+                                          HapticFeedback.mediumImpact(),
+                                        );
+                                        onDecide(
+                                          needsRetry
+                                              ? (approval.decision ?? true)
+                                              : true,
+                                        );
+                                      },
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size(0, 46),
+                                ),
+                                icon: submitting
+                                    ? SizedBox.square(
+                                        dimension: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: colors.muted,
+                                        ),
+                                      )
+                                    : Icon(
+                                        needsRetry
+                                            ? PhosphorIconsRegular
+                                                  .arrowsClockwise
+                                            : PhosphorIconsRegular.check,
+                                        size: 18,
+                                      ),
+                                label: Text(needsRetry ? 'Retry' : 'Approve'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
+
+/// "start time" → "Start time".
+String _sentence(String text) =>
+    text.isEmpty ? text : text[0].toUpperCase() + text.substring(1);
 
 /// Shows the text of the memory an approval is about, falling back to a
 /// short label while loading or when it cannot be read.

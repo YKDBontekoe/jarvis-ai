@@ -165,7 +165,7 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                           style: TextButton.styleFrom(
                             foregroundColor: JarvisColors.of(context).muted,
                             visualDensity: VisualDensity.compact,
-                            textStyle: const TextStyle(fontSize: 13),
+                            textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13),
                           ),
                           child: const Text('See all'),
                         ),
@@ -251,7 +251,7 @@ extension on _JarvisSidebarState {
                 style: TextButton.styleFrom(
                   foregroundColor: colors.muted,
                   visualDensity: VisualDensity.compact,
-                  textStyle: const TextStyle(fontSize: 13),
+                  textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13),
                 ),
                 child: const Text('See all'),
               ),

@@ -342,16 +342,16 @@ class _ComposerIconButton extends StatelessWidget {
     onPressed: onPressed,
     icon: Icon(icon, size: 19),
     style: IconButton.styleFrom(
-      minimumSize: const Size(44, 44),
+      minimumSize: const Size(40, 40),
+      fixedSize: const Size(40, 40),
       foregroundColor: danger
           ? JarvisColors.of(context).danger
-          : JarvisColors.of(context).ink,
+          : JarvisColors.of(context).inkSoft,
       backgroundColor: danger
           ? JarvisColors.of(context).dangerSoft
-          : Colors.transparent,
-      shape: CircleBorder(
-        side: BorderSide(color: JarvisColors.of(context).outline),
-      ),
+          : JarvisColors.of(context).surfaceMuted,
+      disabledBackgroundColor: JarvisColors.of(context).surfaceMuted,
+      shape: const CircleBorder(),
     ),
   );
 }

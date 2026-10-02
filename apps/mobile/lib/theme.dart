@@ -275,6 +275,29 @@ class JarvisShadows {
           ),
         ];
 
+  /// Barely-there lift for small controls on the canvas.
+  static List<BoxShadow> hairline([Brightness brightness = Brightness.light]) =>
+      brightness == Brightness.dark
+      ? const [
+          BoxShadow(
+            color: Color(0x40000000),
+            blurRadius: 3,
+            offset: Offset(0, 1),
+          ),
+        ]
+      : const [
+          BoxShadow(
+            color: Color(0x0c111113),
+            blurRadius: 3,
+            offset: Offset(0, 1),
+          ),
+          BoxShadow(
+            color: Color(0x06111113),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ];
+
   static List<BoxShadow> floating([Brightness brightness = Brightness.light]) =>
       brightness == Brightness.dark
       ? const [

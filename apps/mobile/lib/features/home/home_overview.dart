@@ -11,6 +11,7 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../chat/chat_widgets.dart';
 import '../chat/mcp_setup.dart';
+import '../chat/tool_catalog.dart';
 import '../planner/day_planner_screen.dart';
 import '../habits/habits_home_card.dart';
 import '../usage/usage_screen.dart';
@@ -256,7 +257,7 @@ class _HomeOverviewState extends State<HomeOverview>
                 '${approvals.length} ${approvals.length == 1 ? 'approval' : 'approvals'} waiting',
             subtitle: approvals
                 .take(3)
-                .map((item) => asJsonString(item['toolName']) ?? 'Tool')
+                .map((item) => _toolLabel(asJsonString(item['toolName'])))
                 .join(' · '),
             onTap: widget.onOpenApprovals,
           ),
@@ -827,4 +828,11 @@ class _GetStartedCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "CreateCalendarEvent" → "Create calendar event".
+String _toolLabel(String? tool) {
+  if (tool == null) return 'Tool';
+  final name = humanizeToolName(tool);
+  return name[0].toUpperCase() + name.substring(1);
 }

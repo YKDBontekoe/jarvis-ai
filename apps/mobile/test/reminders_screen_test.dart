@@ -68,6 +68,47 @@ void main() {
     expect(body['localTime'], '09:00:00');
   });
 
+  testWidgets('swiping a reminder marks it done or snoozes it', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/reminders', [
+      {
+        'id': 'r1',
+        'title': 'Call mum',
+        'dueAt': '2030-01-16T18:00:00Z',
+        'status': 'pending',
+        'createdAt': '2030-01-15T12:00:00Z',
+      },
+    ]);
+    http.on('GET', '/api/v1/notifications', <Object>[]);
+    http.on('POST', '/api/v1/reminders/r1/complete', <String, Object>{});
+    http.on('POST', '/api/v1/reminders/r1/snooze', {
+      'dueAt': '2030-01-16T19:00:00Z',
+    });
+    await show(tester);
+
+    expect(find.byType(Dismissible), findsOneWidget);
+    await tester.timedDrag(
+      find.text('Call mum'),
+      const Offset(500, 0),
+      const Duration(milliseconds: 400),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(http.sent('POST', '/api/v1/reminders/r1/complete'), hasLength(1));
+    expect(find.text('Call mum'), findsOneWidget);
+
+    await tester.timedDrag(
+      find.text('Call mum'),
+      const Offset(-500, 0),
+      const Duration(milliseconds: 400),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    final snooze = http.sent('POST', '/api/v1/reminders/r1/snooze').single;
+    expect((snooze.body as Map)['minutes'], 60);
+  });
+
   testWidgets('list shows the recurrence rule beside the next fire', (
     tester,
   ) async {

@@ -889,7 +889,7 @@ class _RemindersScreenState extends State<RemindersScreen>
             final reminder = row as Map<String, dynamic>;
             return FadeSlideIn(
               index: index,
-              child: ContentWidth(child: _reminderCard(reminder)),
+              child: ContentWidth(child: _swipeable(reminder)),
             );
           },
         );
@@ -970,6 +970,39 @@ class _RemindersScreenState extends State<RemindersScreen>
           ),
         ],
       ),
+    );
+  }
+
+  /// Swipe right to finish a one-off reminder, left to snooze it an hour.
+  Widget _swipeable(Map<String, dynamic> reminder) {
+    final colors = JarvisColors.of(context);
+    final id = jsonId(reminder);
+    final pending =
+        (asJsonString(reminder['status']) ?? 'pending') == 'pending';
+    final recurrence = asJsonString(reminder['recurrence']);
+    final repeating =
+        recurrence != null && recurrence != 'once' && recurrence != 'none';
+    final atPlace = reminder['place'] != null;
+    if (id == null || !pending) return _reminderCard(reminder);
+    return SwipeActions(
+      id: id,
+      start: repeating || atPlace
+          ? null
+          : SwipeAction(
+              label: 'Done',
+              icon: PhosphorIconsRegular.check,
+              color: colors.success,
+              onTrigger: () => _markDone(reminder),
+            ),
+      end: atPlace
+          ? null
+          : SwipeAction(
+              label: '1 hour',
+              icon: PhosphorIconsRegular.clock,
+              color: colors.accent,
+              onTrigger: () => _snooze(id, const Duration(hours: 1)),
+            ),
+      child: _reminderCard(reminder),
     );
   }
 
