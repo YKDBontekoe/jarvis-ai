@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Jarvis.Api.Conversations;
+using Jarvis.Api.Errors;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
@@ -146,6 +147,22 @@ internal static class ConversationEndpoints
             RemoteQueryExecutor remote, ICurrentUser currentUser) =>
             await RemoteQueryResults.ExecuteAsync(() => remote.RegenerateAsync(currentUser.OwnerId, conversationId)))
             .WithName("RegenerateReply");
+
+        api.MapPost("/conversations/{conversationId:guid}/summary", async (Guid conversationId,
+            IConversationStore store, IConversationSummarizer summarizer, ICurrentUser currentUser,
+            CancellationToken ct) =>
+        {
+            if (await store.GetAsync(conversationId, currentUser.OwnerId, ct) is null)
+                return Results.NotFound();
+            var messages = await store.GetMessagesAsync(conversationId, ct);
+            if (ConversationSummaries.CountSpeakerMessages(messages) < ConversationSummaries.MinimumMessages)
+                return ApiProblemResults.Conflict("This conversation is too short to summarize.");
+            var summary = await summarizer.SummarizeAsync(currentUser.OwnerId, messages, ct);
+            return summary is null
+                ? ApiProblemResults.DependencyUnavailable("Jarvis could not summarize this conversation right now.")
+                : Results.Ok(new ConversationSummaryDto(summary.Summary, summary.KeyPoints, summary.ActionItems,
+                    summary.MessageCount));
+        }).WithName("SummarizeConversation");
 
         api.MapPost("/conversations/{conversationId:guid}/cancel", async (Guid conversationId,
             IConversationStore store, ICurrentUser currentUser, RemoteQueryHost queries, CancellationToken ct) =>
