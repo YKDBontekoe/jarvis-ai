@@ -17,7 +17,15 @@ cleanup() {
 }
 trap cleanup EXIT
 "${compose[@]}" up -d --wait --wait-timeout 180 postgres temporal storage fake-channels
-printf 's3.bucket.create -name jarvis-files\n' | "${compose[@]}" exec -T storage weed shell -master=storage:9333
+storage_ready=false
+for _ in $(seq 1 30); do
+  if printf 's3.bucket.create -name jarvis-files\n' | "${compose[@]}" exec -T storage weed shell -master=storage:9333; then
+    storage_ready=true
+    break
+  fi
+  sleep 2
+done
+[[ "$storage_ready" == true ]] || { echo 'Object storage did not become ready.' >&2; exit 1; }
 "${compose[@]}" run --rm --no-deps jarvis-api Jarvis.Api.dll migrate
 "${compose[@]}" up -d --wait --wait-timeout 180 jarvis-worker jarvis-api
 npm ci --prefix tests/e2e

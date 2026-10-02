@@ -2,7 +2,7 @@
 ARG PROJECT_PATH
 
 FROM node:22-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c AS codex-cli
-RUN npm install --global @openai/codex@0.145.0
+RUN npm install --global npm@12.2.0 && npm install --global @openai/codex@0.145.0
 
 FROM golang:1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS github-mcp-server
 ARG GITHUB_MCP_SERVER_REVISION=85598ba6e1256f7ebf4867b95d63b833c4549264
@@ -27,7 +27,8 @@ COPY . .
 # With it, this publish uploads PDBs and source files for SENTRY_RELEASE (the git SHA).
 RUN --mount=type=secret,id=sentry_auth_token,required=false \
     if [ -s /run/secrets/sentry_auth_token ]; then \
-      export SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token)"; \
+      SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token)"; \
+      export SENTRY_AUTH_TOKEN; \
       export SENTRY_RELEASE="${SENTRY_RELEASE}"; \
       dotnet publish "$PROJECT_PATH" --configuration Release --output /app/publish /p:UseAppHost=false /p:EmbedAllSources=true \
         /p:SentryOrg="${SENTRY_ORG}" \
