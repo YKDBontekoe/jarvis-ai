@@ -24,6 +24,7 @@ public sealed class WorkerTemporalRegistrationTests
             typeof(Jarvis.Worker.AutomationRunActivities),
             typeof(Jarvis.Worker.AutomationScheduleActivities),
             typeof(Jarvis.Worker.AutomationPollActivities),
+            typeof(Jarvis.Worker.Activities.WeeklyReviewActivities),
         };
 
         var discovered = implementationTypes
@@ -56,6 +57,7 @@ public sealed class WorkerTemporalRegistrationTests
             typeof(AutomationRunWorkflow),
             typeof(AutomationScheduleWorkflow),
             typeof(AutomationPollWorkflow),
+            typeof(WeeklyReviewWorkflow),
         };
 
         var discovered = workflowTypes

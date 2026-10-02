@@ -20,6 +20,7 @@ import '../learning/learning_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
 import '../persona/persona_screen.dart';
 import '../profiles/profiles_screen.dart';
+import '../review/weekly_review_screen.dart';
 import '../settings/app_lock_screen.dart';
 import '../settings/appearance_screen.dart';
 import '../settings/model_settings_screen.dart';
@@ -37,7 +38,10 @@ Widget? utilityPageFor(
   'memory' => MemoryScreen(http: http),
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'approvals' => ApprovalsScreen(http: http),
-  'reminders' => RemindersScreen(http: http, onOpenConversation: onOpenConversation),
+  'reminders' => RemindersScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+  ),
   'notifications' => RemindersScreen(
     http: http,
     onOpenConversation: onOpenConversation,
@@ -46,8 +50,12 @@ Widget? utilityPageFor(
   'files' => FilesScreen(http: http),
   'audit' => AuditScreen(http: http),
   'watches' => ConditionWatchesScreen(http: http),
-  'automations' => AutomationsScreen(http: http, onOpenConversation: onOpenConversation),
+  'automations' => AutomationsScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+  ),
   'briefing' => DailyBriefingScreen(http: http),
+  'weekly-review' => WeeklyReviewScreen(http: http),
   'integrations' => IntegrationsScreen(http: http, onAskInChat: onAskInChat),
   'appearance' => const AppearanceScreen(),
   'app-lock' => const AppLockScreen(),

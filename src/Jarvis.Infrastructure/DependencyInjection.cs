@@ -71,6 +71,8 @@ public static class DependencyInjection
         services.AddScoped<IAutomationRunRepository, AutomationRunRepository>();
         services.AddScoped<IAutomationChannelSender, Jarvis.Infrastructure.Automations.AutomationChannelSender>();
         services.AddScoped<IDailyBriefingNarrator, NoOpDailyBriefingNarrator>();
+        services.AddScoped<Jarvis.Application.Reviews.IWeeklyReviewRepository, WeeklyReviewRepository>();
+        services.AddScoped<Jarvis.Application.Reviews.IWeeklyReviewNarrator, Jarvis.Application.Reviews.NoOpWeeklyReviewNarrator>();
         services.AddScoped<Jarvis.Application.Settings.IOwnerSettingsStore, OwnerSettingsStore>();
         services.AddScoped<Jarvis.Application.Skills.ISkillRepository, SkillRepository>();
         services.AddScoped<Jarvis.Application.Profiles.IAssistantProfileRepository, AssistantProfileRepository>();

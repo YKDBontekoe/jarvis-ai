@@ -84,6 +84,7 @@ public static class ChannelNotificationCategories
         "reminder.due" or "reminder.failed" => Reminders,
         "task.completed" or "task.failed" => Tasks,
         "briefing.daily" => Briefings,
+        "briefing.weekly" => Briefings,
         "watch.triggered" or "watch.failed" => Watches,
         "automation.notification" => Automations,
         "skill.learned" or "skill.improved" or "learning.dreamed" or "learning.reflected" => Learning,

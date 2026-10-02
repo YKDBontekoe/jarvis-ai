@@ -3,6 +3,7 @@ using System;
 using Jarvis.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using NpgsqlTypes;
@@ -13,9 +14,11 @@ using Pgvector;
 namespace Jarvis.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(JarvisDbContext))]
-    partial class JarvisDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261001194021_AddWeeklyReviews")]
+    partial class AddWeeklyReviews
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -341,9 +344,6 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset?>("PinnedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<Guid?>("ProfileId")
                         .HasColumnType("uuid");
 
@@ -363,8 +363,6 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OwnerId", "PinnedAt");
-
                     b.HasIndex("OwnerId", "ProfileId");
 
                     b.HasIndex("OwnerId", "UpdatedAt");
@@ -376,10 +374,6 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("AttachmentsJson")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("attachments_json");
 
                     b.Property<string>("CitationsJson")
                         .HasColumnType("jsonb")
