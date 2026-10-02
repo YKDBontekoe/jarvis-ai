@@ -151,17 +151,21 @@ internal static class IntegrationEndpoints
 
         api.MapPut("/integrations/{provider}/credentials/{secretName}", async (string provider, string secretName,
             SaveIntegrationSecretRequest request, IIntegrationCredentialStore credentials,
-            ICurrentUser currentUser, CancellationToken ct) =>
+            IUserMcpServerRegistry servers, ICurrentUser currentUser, CancellationToken ct) =>
         {
             if (RejectManagedCredentialRoute(provider, secretName) is { } rejected) return rejected;
             try
             {
-                if (IntegrationCredentialProviders.IsUserMcpManaged(provider) &&
-                    !await UserMcpServerExistsAsync(credentials, currentUser.OwnerId, provider, ct))
-                    return Results.NotFound();
+                var userServer = await FindUserMcpServerAsync(servers, currentUser.OwnerId, provider, ct);
+                if (IntegrationCredentialProviders.IsUserMcpManaged(provider))
+                {
+                    if (userServer is null) return Results.NotFound();
+                    if (!AcceptsSecret(userServer, secretName))
+                        return EndpointHelpers.Invalid("credential", "This server does not use a secret with that name.");
+                }
                 await credentials.SaveSecretAsync(currentUser.OwnerId, provider, secretName, request.Value, ct);
                 return Results.Ok(PublicCredentialStatus(
-                    (await credentials.GetStatusAsync(currentUser.OwnerId, provider, ct))!));
+                    (await credentials.GetStatusAsync(currentUser.OwnerId, provider, ct))!, userServer));
             }
             catch (ArgumentException exception)
             {
@@ -170,13 +174,14 @@ internal static class IntegrationEndpoints
         }).WithName("SaveIntegrationSecret");
 
         api.MapDelete("/integrations/{provider}/credentials/{secretName}", async (string provider, string secretName,
-            IIntegrationCredentialStore credentials, ICurrentUser currentUser, CancellationToken ct) =>
+            IIntegrationCredentialStore credentials, IUserMcpServerRegistry servers, ICurrentUser currentUser,
+            CancellationToken ct) =>
         {
             if (RejectManagedCredentialRoute(provider, secretName) is { } rejected) return rejected;
             try
             {
                 if (IntegrationCredentialProviders.IsUserMcpManaged(provider) &&
-                    !await UserMcpServerExistsAsync(credentials, currentUser.OwnerId, provider, ct))
+                    await FindUserMcpServerAsync(servers, currentUser.OwnerId, provider, ct) is null)
                     return Results.NotFound();
                 return await credentials.DeleteSecretAsync(currentUser.OwnerId, provider, secretName, ct)
                     ? Results.NoContent() : Results.NotFound();
@@ -203,25 +208,31 @@ internal static class IntegrationEndpoints
             return EndpointHelpers.Invalid("provider",
                 "This provider's secrets are managed from its own settings screen, not integration credentials.");
         if (!IntegrationCredentialProviders.IsUserMcpManaged(provider)) return null;
-        if (IntegrationCredentialProviders.IsUserMcpTokenSecret(secretName)) return null;
+        // The token and any secret the server declares are owner-editable; its stored configuration is not.
+        if (secretName is not null && secretName != IntegrationCredentialProviders.UserMcpConfigSecret) return null;
         return EndpointHelpers.Invalid("provider",
             "MCP servers are managed from /api/v1/mcp-servers, not integration credentials.");
     }
 
-    private static async Task<bool> UserMcpServerExistsAsync(IIntegrationCredentialStore credentials, Guid ownerId,
+    private static async Task<UserMcpServer?> FindUserMcpServerAsync(IUserMcpServerRegistry servers, Guid ownerId,
         string provider, CancellationToken cancellationToken)
     {
-        var secrets = await credentials.GetSecretsAsync(ownerId, provider, cancellationToken);
-        return secrets is not null &&
-               secrets.ContainsKey(IntegrationCredentialProviders.UserMcpConfigSecret);
+        if (!IntegrationCredentialProviders.IsUserMcpServerId(provider)) return null;
+        return (await servers.ListAsync(ownerId, cancellationToken))
+            .FirstOrDefault(server => server.Id == provider && server.IsValid);
     }
 
-    private static IntegrationCredentialStatus PublicCredentialStatus(IntegrationCredentialStatus status) =>
+    private static bool AcceptsSecret(UserMcpServer server, string secretName) =>
+        IntegrationCredentialProviders.IsUserMcpTokenSecret(secretName) ||
+        server.Secrets?.Any(secret => secret.Name == secretName) == true;
+
+    private static IntegrationCredentialStatus PublicCredentialStatus(IntegrationCredentialStatus status,
+        UserMcpServer? server) =>
         IntegrationCredentialProviders.IsUserMcpManaged(status.Provider)
             ? status with
             {
                 SecretNames = status.SecretNames
-                    .Where(IntegrationCredentialProviders.IsUserMcpTokenSecret)
+                    .Where(name => server is not null && AcceptsSecret(server, name))
                     .ToArray()
             }
             : status;

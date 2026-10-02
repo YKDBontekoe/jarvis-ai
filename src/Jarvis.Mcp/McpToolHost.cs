@@ -118,7 +118,9 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             IAsyncDisposable? client = null;
             try
             {
-                var credentialResolution = await ResolveCredentialsAsync(server, cancellationToken);
+                var credentialResolution = server.MissingRequiredSecrets
+                    ? (Ready: false, Secrets: null)
+                    : await ResolveCredentialsAsync(server, cancellationToken);
                 if (!credentialResolution.Ready)
                 {
                     statuses.Add(await BuildStatusAsync(server, "needs_credentials", 0, "credentials_required", true,
@@ -243,8 +245,26 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             CredentialProvider = userServer.Id,
             ConnectionTimeoutSeconds = 30
         };
+        foreach (var binding in userServer.SecretBindings ?? [])
+        {
+            if (secrets?.ContainsKey(binding.SecretName) != true)
+            {
+                if (binding.Required) server.MissingRequiredSecrets = true;
+                continue;
+            }
+            if (binding.Target == McpSecretBindings.EnvironmentTarget &&
+                McpSecretBindings.IsAllowedEnvironmentName(binding.Key))
+                server.CredentialEnvironmentVariables[binding.Key] = binding.SecretName;
+            else if (binding.Target == McpSecretBindings.HeaderTarget &&
+                     McpSecretBindings.IsAllowedHeaderName(binding.Key))
+            {
+                server.CredentialHeaders[binding.Key] = binding.SecretName;
+                if (binding.Prefix is { } prefix) server.CredentialHeaderPrefixes[binding.Key] = prefix;
+            }
+        }
+        // An OAuth or pasted access token applies unless a declared secret already fills Authorization.
         if (transport.Equals("streamableHttp", StringComparison.OrdinalIgnoreCase) &&
-            secrets?.ContainsKey("token") == true)
+            secrets?.ContainsKey("token") == true && !server.CredentialHeaders.ContainsKey("Authorization"))
         {
             server.CredentialHeaders["Authorization"] = "token";
             server.CredentialHeaderPrefixes["Authorization"] = "Bearer";
@@ -461,6 +481,9 @@ public sealed class McpServerOptions
     public string[] AllowedTools { get; set; } = [];
     public string[] AutoApprovedTools { get; set; } = [];
     public bool OwnerNarrowed { get; set; }
+
+    /// <summary>A secret the owner's server declares as required has not been provided yet.</summary>
+    public bool MissingRequiredSecrets { get; set; }
     public string? WorkingDirectory { get; set; }
     public int ConnectionTimeoutSeconds { get; set; } = 30;
 }

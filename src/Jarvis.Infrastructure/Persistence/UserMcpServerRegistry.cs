@@ -24,9 +24,7 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
             try
             {
                 var stored = Deserialize(json);
-                result.Add(ToPublic(provider.Provider, stored, provider.UpdatedAt,
-                    provider.SecretNames.Contains(IntegrationCredentialProviders.UserMcpTokenSecret,
-                        StringComparer.Ordinal)));
+                result.Add(ToPublic(provider.Provider, stored, provider.UpdatedAt, provider.SecretNames));
             }
             catch (Exception exception) when (exception is JsonException or InvalidMcpServerConfigurationException)
             {
@@ -44,7 +42,7 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         var stored = await BuildHttpStoredAsync(request, cancellationToken);
         await credentials.SaveSecretAsync(ownerId, id, ConfigSecret,
             JsonSerializer.Serialize(stored, JsonOptions), cancellationToken);
-        return ToPublic(id, stored, DateTimeOffset.UtcNow, false);
+        return ToPublic(id, stored, DateTimeOffset.UtcNow, []);
     }
 
     public async Task<UserMcpServer> AddStdioAsync(Guid ownerId, AddUserMcpStdioServerRequest request,
@@ -54,7 +52,29 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         var stored = BuildStdioStored(request);
         await credentials.SaveSecretAsync(ownerId, id, ConfigSecret,
             JsonSerializer.Serialize(stored, JsonOptions), cancellationToken);
-        return ToPublic(id, stored, DateTimeOffset.UtcNow, false);
+        return ToPublic(id, stored, DateTimeOffset.UtcNow, []);
+    }
+
+    public async Task<UserMcpServer> AddDefinitionAsync(Guid ownerId, McpServerDefinition definition,
+        CancellationToken cancellationToken)
+    {
+        var stored = definition.Transport switch
+        {
+            "stdio" => BuildStdioStored(new AddUserMcpStdioServerRequest(definition.Name, definition.Command ?? "",
+                definition.Arguments ?? [], definition.AllowedTools)),
+            "streamableHttp" => await BuildHttpStoredAsync(new AddUserMcpServerRequest(definition.Name,
+                definition.Endpoint ?? "", definition.AllowedTools), cancellationToken),
+            _ => throw new ArgumentException("Transport must be stdio or streamableHttp.")
+        };
+        stored = stored with
+        {
+            Secrets = McpSecretBindings.Normalize(definition.Secrets, definition.Transport).ToArray(),
+            CatalogName = string.IsNullOrWhiteSpace(definition.CatalogName) ? null : definition.CatalogName.Trim()
+        };
+        var id = ProviderPrefix + Guid.NewGuid().ToString("N");
+        await credentials.SaveSecretAsync(ownerId, id, ConfigSecret,
+            JsonSerializer.Serialize(stored, JsonOptions), cancellationToken);
+        return ToPublic(id, stored, DateTimeOffset.UtcNow, []);
     }
 
     public async Task<bool> RemoveAsync(Guid ownerId, string id, CancellationToken cancellationToken)
@@ -80,12 +100,18 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
             LogInvalidConfiguration(ownerId, id, exception);
         }
         var replacement = await BuildHttpStoredAsync(request, cancellationToken);
-        replacement = replacement with { Enabled = current?.Enabled ?? true };
+        // Header secrets a remote server declared still apply at its new address.
+        var keepSecrets = current is { Transport: null or "streamableHttp" };
+        replacement = replacement with
+        {
+            Enabled = current?.Enabled ?? true,
+            Secrets = keepSecrets ? current!.Secrets : null,
+            CatalogName = keepSecrets ? current!.CatalogName : null
+        };
         await credentials.SaveSecretAsync(ownerId, id, ConfigSecret,
             JsonSerializer.Serialize(replacement, JsonOptions), cancellationToken);
         var status = await credentials.GetStatusAsync(ownerId, id, cancellationToken);
-        return ToPublic(id, replacement, status?.UpdatedAt ?? DateTimeOffset.UtcNow,
-            status?.SecretNames.Contains(IntegrationCredentialProviders.UserMcpTokenSecret, StringComparer.Ordinal) == true);
+        return ToPublic(id, replacement, status?.UpdatedAt ?? DateTimeOffset.UtcNow, status?.SecretNames ?? []);
     }
 
     public async Task<UserMcpServer?> SetEnabledAsync(Guid ownerId, string id, bool enabled,
@@ -96,7 +122,7 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         var updated = stored.Value.Server with { Enabled = enabled };
         await credentials.SaveSecretAsync(ownerId, id, ConfigSecret, JsonSerializer.Serialize(updated, JsonOptions),
             cancellationToken);
-        return ToPublic(id, updated, DateTimeOffset.UtcNow, stored.Value.HasToken);
+        return ToPublic(id, updated, DateTimeOffset.UtcNow, stored.Value.SecretNames);
     }
 
     public async Task<UserMcpServer?> SetToolsAsync(Guid ownerId, string id, string mode, IReadOnlyList<string> allowedTools,
@@ -111,10 +137,10 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         var updated = stored.Value.Server with { AllowedTools = tools, Endpoint = endpoint };
         await credentials.SaveSecretAsync(ownerId, id, ConfigSecret, JsonSerializer.Serialize(updated, JsonOptions),
             cancellationToken);
-        return ToPublic(id, updated, DateTimeOffset.UtcNow, stored.Value.HasToken);
+        return ToPublic(id, updated, DateTimeOffset.UtcNow, stored.Value.SecretNames);
     }
 
-    private async Task<(StoredServer Server, bool HasToken)?> ReadStoredAsync(Guid ownerId, string id,
+    private async Task<(StoredServer Server, IReadOnlyCollection<string> SecretNames)?> ReadStoredAsync(Guid ownerId, string id,
         CancellationToken cancellationToken)
     {
         if (!IsId(id)) return null;
@@ -123,7 +149,7 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         try
         {
             var stored = Deserialize(json);
-            return (stored, secrets.ContainsKey(IntegrationCredentialProviders.UserMcpTokenSecret));
+            return (stored, secrets.Keys.ToArray());
         }
         catch (Exception exception) when (exception is JsonException or InvalidMcpServerConfigurationException)
         {
@@ -180,13 +206,22 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         new(id, "Invalid MCP server", string.Empty, [], updatedAt, false, false,
             IsValid: false, ConfigurationIssue: "invalid_configuration");
 
-    private static UserMcpServer ToPublic(string id, StoredServer stored, DateTimeOffset updatedAt, bool hasToken) =>
-        new(id, stored.Name, stored.Endpoint, stored.AllowedTools, updatedAt, hasToken, stored.Enabled ?? true,
-            stored.Transport ?? "streamableHttp", stored.Command, stored.Arguments);
+    private static UserMcpServer ToPublic(string id, StoredServer stored, DateTimeOffset updatedAt,
+        IReadOnlyCollection<string> secretNames) =>
+        new(id, stored.Name, stored.Endpoint, stored.AllowedTools, updatedAt,
+            secretNames.Contains(IntegrationCredentialProviders.UserMcpTokenSecret), stored.Enabled ?? true,
+            stored.Transport ?? "streamableHttp", stored.Command, stored.Arguments,
+            Secrets: (stored.Secrets ?? []).Select(binding => new McpServerSecret(binding.SecretName, binding.Label,
+                binding.Description, binding.Required, secretNames.Contains(binding.SecretName))).ToArray(),
+            CatalogName: stored.CatalogName)
+        {
+            SecretBindings = stored.Secrets ?? []
+        };
 
     [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9 _-]{0,79}$", RegexOptions.CultureInvariant)]
     private static partial Regex NamePattern();
     private sealed record StoredServer(string Name, string Endpoint, string[] AllowedTools, bool? Enabled,
         string? Transport = null, string? Command = null, string[]? Arguments = null,
-        Dictionary<string, string>? CredentialEnvironmentVariables = null);
+        Dictionary<string, string>? CredentialEnvironmentVariables = null, McpSecretBinding[]? Secrets = null,
+        string? CatalogName = null);
 }
