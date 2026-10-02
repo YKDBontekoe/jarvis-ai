@@ -313,11 +313,11 @@ jobs:
       - run: dotnet build Jarvis.sln --configuration Release
         if: matrix.build-mode == 'manual'
       - uses: github/codeql-action/analyze@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3
-        with: {category: jarvis-static-security-${{ matrix.language }}, output: artifacts/codeql}
+        with: {category: 'jarvis-static-security-${{ matrix.language }}', output: artifacts/codeql}
       - run: python3 scripts/ci/check-security-results.py artifacts/codeql
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
-        with: {name: static-security-results-${{ matrix.language }}, path: artifacts/codeql/, retention-days: 14}
+        with: {name: 'static-security-results-${{ matrix.language }}', path: artifacts/codeql/, retention-days: 14}
 
   required:
     name: All checks passed
