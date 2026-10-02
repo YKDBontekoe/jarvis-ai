@@ -207,6 +207,13 @@ jobs:
         env:
           IMAGE_NAME: ${{ matrix.name }}
         run: scripts/ci/scan-image.sh "jarvis-ci-$IMAGE_NAME:test" "$RUNNER_TEMP/$IMAGE_NAME.scan.json"
+      - name: Preserve vulnerability diagnostics on failure
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: image-security-${{ matrix.name }}
+          path: ${{ runner.temp }}/${{ matrix.name }}.scan.json
+          retention-days: 14
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verified-image-${{ matrix.name }}
@@ -279,7 +286,15 @@ jobs:
       - run: scripts/ci/security.sh
 
   codeql:
-    name: Static security analysis
+    name: Static security analysis (${{ matrix.language }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: csharp
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -292,16 +307,17 @@ jobs:
         with: {global-json-file: global.json}
       - uses: github/codeql-action/init@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3
         with:
-          languages: csharp,javascript-typescript
-          build-mode: manual
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
           config-file: .github/codeql-config.yml
       - run: dotnet build Jarvis.sln --configuration Release
+        if: matrix.build-mode == 'manual'
       - uses: github/codeql-action/analyze@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3
-        with: {category: jarvis-static-security, output: artifacts/codeql}
+        with: {category: jarvis-static-security-${{ matrix.language }}, output: artifacts/codeql}
       - run: python3 scripts/ci/check-security-results.py artifacts/codeql
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
-        with: {name: static-security-results, path: artifacts/codeql/, retention-days: 14}
+        with: {name: static-security-results-${{ matrix.language }}, path: artifacts/codeql/, retention-days: 14}
 
   required:
     name: All checks passed

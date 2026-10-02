@@ -10,6 +10,6 @@ PY
 docker run --rm -v "$PWD:/repo" -w /repo "$(image rhysd/actionlint:1.7.11)" -shellcheck=''
 shellcheck scripts/ci/*.sh scripts/deploy/*.sh scripts/ios/*.sh
 for file in infra/compose/Dockerfile workers/whatsapp-bridge/Dockerfile; do
-  docker run --rm -i "$(image hadolint/hadolint:v2.14.0)" --ignore DL3008 --ignore DL3016 --ignore DL3018 - < "$file"
+  docker run --rm -i --entrypoint /bin/hadolint "$(image hadolint/hadolint:v2.14.0)" --ignore DL3008 --ignore DL3016 --ignore DL3018 - < "$file"
 done
 python3 scripts/ci/check-compose.py
