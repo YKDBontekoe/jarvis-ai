@@ -1,3 +1,4 @@
+using Jarvis.Domain.Projects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -22,5 +23,8 @@ internal sealed class StoredFileEntityConfiguration : IEntityTypeConfiguration<S
             builder.HasIndex(x => new { x.OwnerId, x.CreatedAt });
             builder.HasIndex(x => x.ObjectKey).IsUnique();
             builder.HasIndex(x => new { x.ProcessingStatus, x.ScheduleDispatchedAt });
+            builder.Property(x => x.ProjectId).HasColumnName("project_id");
+            builder.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.SetNull);
+            builder.HasIndex(x => new { x.OwnerId, x.ProjectId });
         }
 }

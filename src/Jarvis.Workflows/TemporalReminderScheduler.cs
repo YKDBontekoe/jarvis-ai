@@ -401,7 +401,7 @@ public sealed class JarvisTaskService(
     ILogger<JarvisTaskService> logger) : IJarvisTaskService
 {
     public async Task<JarvisTaskRecord> CreateAsync(Guid ownerId, string title, string prompt, CancellationToken cancellationToken,
-        Guid? profileId = null)
+        Guid? profileId = null, Guid? projectId = null)
     {
         title = title.Trim();
         prompt = prompt.Trim();
@@ -409,7 +409,8 @@ public sealed class JarvisTaskService(
         if (prompt.Length is < 1 or > 32_000) throw new ArgumentException("Task instructions must contain 1 to 32,000 characters.", nameof(prompt));
 
         var binding = await profiles.CaptureBindingAsync(ownerId, profileId, cancellationToken);
-        var task = await tasks.CreateWithConversationAsync(ownerId, title, prompt, cancellationToken, binding);
+        var task = await tasks.CreateWithConversationAsync(ownerId, title, prompt, cancellationToken, binding,
+            projectId);
         try
         {
             await scheduler.ScheduleTaskAsync(task, cancellationToken);

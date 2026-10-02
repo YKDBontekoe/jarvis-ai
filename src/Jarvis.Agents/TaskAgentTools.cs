@@ -2,12 +2,13 @@ using System.ComponentModel;
 using System.Text;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Profiles;
+using Jarvis.Application.Projects;
 using Jarvis.Application.Workflows;
 
 namespace Jarvis.Agents;
 
 internal sealed class TaskAgentTools(IJarvisTaskService tasks, ICurrentUser currentUser,
-    AssistantProfileSnapshot? profile)
+    AssistantProfileSnapshot? profile, IProjectStore? projects = null, Guid? conversationId = null)
 {
     private const int MaxListedTasks = 15;
 
@@ -24,8 +25,12 @@ internal sealed class TaskAgentTools(IJarvisTaskService tasks, ICurrentUser curr
 
         try
         {
+            // A task started from a project conversation stays in that project, with its instructions and files.
+            var projectId = projects is not null && conversationId is { } id
+                ? (await projects.GetContextForConversationAsync(id, currentUser.OwnerId, cancellationToken))?.Id
+                : null;
             var task = await tasks.CreateAsync(currentUser.OwnerId, title, instructions, cancellationToken,
-                profile?.ProfileId);
+                profile?.ProfileId, projectId);
             return $"Started background task '{task.Title}' (task ID {task.Id}, status {task.Status}). It will continue through Temporal and appear in Tasks.";
         }
         catch (ArgumentException exception)
