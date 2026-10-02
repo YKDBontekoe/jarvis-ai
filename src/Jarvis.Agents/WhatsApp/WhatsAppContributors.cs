@@ -33,9 +33,10 @@ internal sealed class WhatsAppContextContributor : IAgentContextContributor
     public int Order => 48;
 
     public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
-        [new GuidanceProvider()];
+        [new WhatsAppGuidanceProvider()];
 
-    private sealed class GuidanceProvider : MessageAIContextProvider
+    // Agent Framework stores provider state under the concrete type's simple name.
+    private sealed class WhatsAppGuidanceProvider : MessageAIContextProvider
     {
         protected override ValueTask<IEnumerable<ChatMessage>> ProvideMessagesAsync(InvokingContext context,
             CancellationToken cancellationToken = default) =>
