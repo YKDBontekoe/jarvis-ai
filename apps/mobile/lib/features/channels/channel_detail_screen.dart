@@ -91,6 +91,15 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
     if (mounted) unawaited(_load());
   }
 
+  Future<void> _openReadAlong() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ReadAlongScreen(http: widget.http, channelId: widget.channelId),
+      ),
+    );
+  }
+
   Future<void> _test() async {
     setState(() => _busy = true);
     try {
@@ -192,7 +201,8 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
     final confirmed = await showJarvisConfirm(
       context,
       title: 'Disconnect this channel?',
-      message: 'Jarvis will stop reading and sending messages on this number. You can connect it again later.',
+      message:
+          'Jarvis will stop reading and sending messages on this number. You can connect it again later.',
       confirmLabel: 'Disconnect',
       destructive: true,
     );
@@ -231,8 +241,9 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
       return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Webhook URL copied.')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Webhook URL copied.')));
   }
 
   @override
@@ -341,7 +352,8 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ),
-                        if (asJsonString(channel['kind']) == 'whatsapp_linked' &&
+                        if (asJsonString(channel['kind']) ==
+                                'whatsapp_linked' &&
                             asJsonString(channel['lastError']) != null)
                           Align(
                             alignment: Alignment.centerLeft,
@@ -380,6 +392,49 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                       ],
                     ),
                   ),
+                  if (asJsonString(channel['kind']) == 'whatsapp_linked') ...[
+                    const SizedBox(height: 12),
+                    SurfaceCard(
+                      key: const Key('channel-read-along'),
+                      onTap: () => unawaited(_openReadAlong()),
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          IconBadge(
+                            icon: PhosphorIconsRegular.sparkle,
+                            color: JarvisColors.of(context).accentDeep,
+                            size: 40,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Read along',
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Let Jarvis read chats you choose to draft '
+                                  'replies, answer questions and set reminders.',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: JarvisColors.of(context).inkSoft,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            PhosphorIconsRegular.caretRight,
+                            size: 16,
+                            color: JarvisColors.of(context).muted,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 18),
                   if (_threads.isNotEmpty) ...[
                     Text(
@@ -412,9 +467,9 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                                   children: [
                                     Text(
                                       asJsonString(thread['peer']) ?? 'Unknown',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleSmall,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleSmall,
                                     ),
                                     Text(
                                       asJsonString(
@@ -425,9 +480,9 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                                           '${asJsonInt(thread['messageCount'])} messages',
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
                                     ),
                                   ],
                                 ),

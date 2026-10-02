@@ -89,6 +89,7 @@ api.MapUsageEndpoints();
 api.MapKnowledgeGraphEndpoints();
 api.MapPeopleEndpoints(app.Logger);
 api.MapChannelEndpoints(app.Logger);
+api.MapWhatsAppAssistantEndpoints(app.Logger);
 api.MapSurfaceEndpoints();
 api.MapA2AManagementEndpoints();
 api.MapDeviceEndpoints();

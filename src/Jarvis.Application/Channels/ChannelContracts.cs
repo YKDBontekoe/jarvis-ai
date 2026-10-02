@@ -81,7 +81,7 @@ public static class ChannelNotificationCategories
     /// <summary>The category of a notification type, or null for a type this build does not know.</summary>
     public static string? For(string type) => type switch
     {
-        "reminder.due" or "reminder.failed" => Reminders,
+        "reminder.due" or "reminder.failed" or "whatsapp.reminder" => Reminders,
         "task.completed" or "task.failed" => Tasks,
         "briefing.daily" => Briefings,
         "briefing.weekly" => Briefings,

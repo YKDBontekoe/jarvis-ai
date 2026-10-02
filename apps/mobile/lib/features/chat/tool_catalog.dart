@@ -39,6 +39,26 @@ const _catalog = <String, ToolDescription>{
     'Deleted an expense',
     PhosphorIconsRegular.trash,
   ),
+  'ListWhatsAppChats': ToolDescription(
+    'Checking your WhatsApp',
+    'Checked your WhatsApp',
+    PhosphorIconsRegular.whatsappLogo,
+  ),
+  'ReadWhatsAppChat': ToolDescription(
+    'Reading a WhatsApp chat',
+    'Read a WhatsApp chat',
+    PhosphorIconsRegular.whatsappLogo,
+  ),
+  'SearchWhatsAppMessages': ToolDescription(
+    'Searching your WhatsApp',
+    'Searched your WhatsApp',
+    PhosphorIconsRegular.magnifyingGlass,
+  ),
+  'SendWhatsAppMessage': ToolDescription(
+    'Sending a WhatsApp message',
+    'Sent a WhatsApp message',
+    PhosphorIconsRegular.paperPlaneTilt,
+  ),
   'CreateReminder': ToolDescription(
     'Scheduling a reminder',
     'Scheduled a reminder',

@@ -1167,6 +1167,7 @@ class _RemindersScreenState extends State<RemindersScreen>
 
   IconData _notificationIcon(Object? type) => switch (type) {
     'reminder.due' || 'reminder.failed' => PhosphorIconsRegular.alarm,
+    'whatsapp.reminder' => PhosphorIconsRegular.whatsappLogo,
     'task.completed' => PhosphorIconsRegular.checkCircle,
     'task.failed' => PhosphorIconsRegular.warningCircle,
     'approval.required' => PhosphorIconsRegular.shieldCheck,

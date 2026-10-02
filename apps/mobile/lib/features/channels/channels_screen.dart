@@ -9,6 +9,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../whatsapp/read_along_screen.dart';
 
 part 'channel_detail_screen.dart';
 part 'channel_allowed_senders_sheet.dart';

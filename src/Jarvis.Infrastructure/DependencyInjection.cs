@@ -46,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<IKnowledgeGraphRepository, KnowledgeGraphRepository>();
         services.AddScoped<Jarvis.Application.Journal.IJournalRepository, JournalRepository>();
         services.AddScoped<Jarvis.Application.Expenses.IExpenseRepository, ExpenseRepository>();
+        services.AddScoped<Jarvis.Application.WhatsApp.IWhatsAppAssistantRepository, WhatsAppAssistantRepository>();
         services.AddScoped<Jarvis.Application.Expenses.IExpenseService, Jarvis.Application.Expenses.ExpenseService>();
         services.AddScoped<Jarvis.Application.Habits.IHabitRepository, HabitRepository>();
         services.AddScoped<Jarvis.Application.Habits.IHabitService, Jarvis.Application.Habits.HabitService>();
