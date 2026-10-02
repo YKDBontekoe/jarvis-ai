@@ -18,8 +18,6 @@ class WhatsAppChatScreen extends StatefulWidget {
     required this.channelId,
     required this.chat,
     this.account,
-    this.initialWorkflow,
-    this.initialRequest,
     this.pollInterval = const Duration(seconds: 3),
     super.key,
   });
@@ -28,8 +26,6 @@ class WhatsAppChatScreen extends StatefulWidget {
   final String channelId;
   final WhatsAppChat chat;
   final String? account;
-  final String? initialWorkflow;
-  final String? initialRequest;
   final Duration pollInterval;
 
   @override
@@ -56,7 +52,6 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
   DateTime? _lastStatusCheck;
   String? _refreshError;
   String? _markedMessage;
-  bool _initialWorkflowHandled = false;
 
   String get _path => whatsAppChatPath(widget.channelId, _chat.chatId);
 
@@ -134,17 +129,6 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
         });
       }
       unawaited(_markRead());
-      if (!_initialWorkflowHandled && widget.initialWorkflow != null) {
-        _initialWorkflowHandled = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
-          if (widget.initialWorkflow == 'draft') {
-            unawaited(_draft(instruction: widget.initialRequest));
-          } else if (widget.initialWorkflow == 'ask') {
-            unawaited(_ask(question: widget.initialRequest));
-          }
-        });
-      }
     } on DioException catch (error) {
       if (!mounted || revision != _requestRevision) return;
       if (quiet) {
@@ -288,9 +272,9 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     }
   }
 
-  Future<void> _draft({String? instruction}) async {
+  Future<void> _draft() async {
     if (_drafting) return;
-    instruction ??= await showModalBottomSheet<String>(
+    final instruction = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -324,17 +308,12 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     }
   }
 
-  Future<void> _ask({String? question}) async {
+  Future<void> _ask() async {
     final reply = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _AskSheet(
-        http: widget.http,
-        path: _path,
-        chat: _chat,
-        initialQuestion: question,
-      ),
+      builder: (_) => _AskSheet(http: widget.http, path: _path, chat: _chat),
     );
     if (reply == null || !mounted) return;
     _composer.value = TextEditingValue(
@@ -920,24 +899,18 @@ class _DraftSheetState extends State<_DraftSheet> {
 
 /// Ask Jarvis anything about the chat; the answer can become the reply.
 class _AskSheet extends StatefulWidget {
-  const _AskSheet({
-    required this.http,
-    required this.path,
-    required this.chat,
-    this.initialQuestion,
-  });
+  const _AskSheet({required this.http, required this.path, required this.chat});
 
   final Dio http;
   final String path;
   final WhatsAppChat chat;
-  final String? initialQuestion;
 
   @override
   State<_AskSheet> createState() => _AskSheetState();
 }
 
 class _AskSheetState extends State<_AskSheet> {
-  late final _question = TextEditingController(text: widget.initialQuestion);
+  final _question = TextEditingController();
   bool _busy = false;
   String? _answer;
   String? _notice;
@@ -948,17 +921,6 @@ class _AskSheetState extends State<_AskSheet> {
     'Did we agree on a date or time?',
     'Is there anything I still need to do?',
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    final question = widget.initialQuestion;
-    if (question != null && question.trim().isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) unawaited(_ask(question));
-      });
-    }
-  }
 
   @override
   void dispose() {

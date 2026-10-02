@@ -9,7 +9,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:jarvis_mobile/main.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   const secureStorage = MethodChannel(
@@ -17,7 +16,6 @@ void main() {
   );
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(secureStorage, (call) async => null);
   });
@@ -61,26 +59,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Recents'), findsOneWidget);
 
-    await tester.tap(find.text('Ask or find').first);
+    await tester.tap(find.text('Tasks').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Browse tools'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Tasks').last);
-    await tester.tap(find.text('Tasks').last);
-    await tester.pumpAndSettle();
-    expect(
-      find.text('Recents'),
-      findsOneWidget,
-      reason: 'sidebar stays visible',
-    );
+    expect(find.text('Recents'), findsOneWidget, reason: 'sidebar stays visible');
     expect(find.text('New task'), findsOneWidget);
 
-    await tester.tap(find.text('Ask or find').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Browse tools'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Memory').last);
-    await tester.tap(find.text('Memory').last);
+    await tester.tap(find.text('Memory').first);
     await tester.pumpAndSettle();
     expect(find.text('New task'), findsNothing);
     expect(find.text('Recents'), findsOneWidget);

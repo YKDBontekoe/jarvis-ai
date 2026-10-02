@@ -43,8 +43,6 @@ public static class DependencyInjection
         services.AddTransient<Jarvis.Application.Usage.IModelPriceLookup>(provider =>
             provider.GetRequiredService<OpenRouterCatalog>());
         services.AddScoped<IChatClientResolver, ChatClientResolver>();
-        services.AddScoped<Jarvis.Application.Navigation.INavigationIntentInterpreter, Navigation.NavigationIntentInterpreter>();
-        services.AddScoped<Jarvis.Application.Navigation.NavigationService>();
         services.AddScoped<IConversationMemoryExtractor, ConversationMemoryExtractor>();
         services.AddScoped<MemoryReranker>();
         services.AddScoped<IAgentToolContributor, CoreAgentTools>();

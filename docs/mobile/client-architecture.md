@@ -19,8 +19,7 @@ root. It shares the existing account and owner-scoped data. See
 | Path | Screen / concern |
 |------|------------------|
 | `features/chat/` | Chat transcript, composer, SignalR realtime, approvals, generative UI, browser timeline |
-| `features/shell/` | Compact sidebar (Jarvis, Today, WhatsApp), projects and recent chats; “Ask or find” opens intent navigation |
-| `features/search/` | Search as you type; explicit submission interprets a natural-language goal with the owner's background model and offers typed workflow actions. Real unread WhatsApp activity supplies starting suggestions. Browse tools keeps every destination accessible without inference |
+| `features/shell/` | Sidebar, wide-layout navigation rail |
 | `features/home/` | Home briefing widgets |
 | `features/projects/` | Projects list, project page (instructions, chats, files, tasks), editor, and the move-to-project sheet; the sidebar lists recent projects |
 | `features/review/` | Weekly review screen and mood trend chart |
@@ -40,8 +39,6 @@ root. It shares the existing account and owner-scoped data. See
 Top-level screens outside `features/`: `conversations_screen.dart`, `reminders_screen.dart`, `files_screen.dart`, `integrations_screen.dart`, `approvals_screen.dart`, `audit_screen.dart`, `condition_watches_screen.dart`, `daily_briefing_screen.dart`.
 
 ## API client
-
-Intent navigation uses `GET /navigation` for read-only starting suggestions and `POST /navigation/resolve` with `{ request }` for interpretation. The model chooses a workflow; the application resolves actual owner-scoped resources and returns action choices. Ambiguous names/accounts are shown separately. Selecting a WhatsApp reply action opens that conversation and drafts once using the original request; sending still requires tapping Send. Assistant actions hand the original request to chat and retain its normal tool approvals. Editing or closing the input cancels inference and discards stale responses. The native “Browse tools” list also works when inference is unavailable.
 
 - `lib/api/jarvis_http.dart` — authenticated HTTP wrapper.
 - `lib/features/chat/chat_screen_realtime.dart` — SignalR `/hubs/events`.

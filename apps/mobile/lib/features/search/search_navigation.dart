@@ -9,9 +9,6 @@ import '../../task_details_screen.dart';
 import '../channels/channels_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
 import '../skills/skills_screen.dart';
-import '../whatsapp/whatsapp_chat_screen.dart';
-import '../whatsapp/whatsapp_models.dart';
-import 'intent_navigation.dart';
 import 'search_models.dart';
 
 typedef ConversationOpener = Future<void> Function(String conversationId);
@@ -28,19 +25,7 @@ SearchRouteTarget? searchRouteFromNotification(Map<String, dynamic> data) {
       if (value != null) params[entry.key.toString()] = value;
     }
   }
-  for (final key in [
-    'conversationId',
-    'memoryId',
-    'fileId',
-    'taskId',
-    'reminderId',
-    'automationId',
-    'skillId',
-    'entityId',
-    'connectionId',
-    'peer',
-    'runId',
-  ]) {
+  for (final key in ['conversationId', 'memoryId', 'fileId', 'taskId', 'reminderId', 'automationId', 'skillId', 'entityId', 'connectionId', 'peer', 'runId']) {
     final value = asJsonString(data[key]);
     if (value != null) params.putIfAbsent(_routeParamForKey(key), () => value);
   }
@@ -68,68 +53,8 @@ Future<void> navigateSearchRoute(
   required SearchRouteTarget route,
   required ConversationOpener onConversation,
   required UtilityOpener onUtility,
-  Future<void> Function(String prompt)? onAsk,
 }) async {
   switch (route.kind) {
-    case 'utility':
-      final destination = route.parameters['destination'];
-      if (navigationTools.containsKey(destination)) onUtility(destination!);
-      return;
-    case 'assistant':
-      final prompt = route.parameters['prompt'];
-      if (prompt != null && prompt.trim().isNotEmpty && prompt.length <= 1000) {
-        await onAsk?.call(prompt);
-      }
-      return;
-    case 'whatsapp_chat':
-      final connection = route.parameters['connectionId'];
-      final id = route.parameters['chatId'];
-      if (connection == null || id == null) return;
-      try {
-        final response = await http.get<dynamic>(
-          '/api/v1/channels/${Uri.encodeComponent(connection)}/chats',
-        );
-        final data = jsonObject(response.data);
-        final chats = jsonMaps(
-          data?['chats'],
-        ).map(WhatsAppChat.fromJson).whereType<WhatsAppChat>();
-        final chat = chats
-            .where((chat) => chat.chatId == id && chat.readAlong)
-            .firstOrNull;
-        if (!context.mounted) return;
-        if (chat == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'This chat is no longer selected. Choose it in WhatsApp first.',
-              ),
-            ),
-          );
-          return;
-        }
-        final request = route.parameters['request'];
-        await Navigator.of(context).push<void>(
-          MaterialPageRoute(
-            builder: (_) => WhatsAppChatScreen(
-              http: http,
-              channelId: connection,
-              chat: chat,
-              account: asJsonString(data?['account']),
-              initialWorkflow: route.parameters['workflow'],
-              initialRequest: request,
-            ),
-          ),
-        );
-      } catch (_) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not open that WhatsApp chat. Try again.'),
-            ),
-          );
-        }
-      }
-      return;
     case 'conversation':
       final id = route.parameters['conversationId'];
       if (id != null) {
@@ -148,9 +73,7 @@ Future<void> navigateSearchRoute(
       final id = route.parameters['taskId'];
       if (id != null) {
         await Navigator.of(context).push<void>(
-          MaterialPageRoute<void>(
-            builder: (_) => TaskDetailsScreen(http: http, taskId: id),
-          ),
+          MaterialPageRoute<void>(builder: (_) => TaskDetailsScreen(http: http, taskId: id)),
         );
         return;
       }
@@ -162,8 +85,10 @@ Future<void> navigateSearchRoute(
       }
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
-          builder: (_) =>
-              RemindersScreen(http: http, onOpenConversation: onConversation),
+          builder: (_) => RemindersScreen(
+            http: http,
+            onOpenConversation: onConversation,
+          ),
         ),
       );
       return;
@@ -175,8 +100,10 @@ Future<void> navigateSearchRoute(
       }
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
-          builder: (_) =>
-              AutomationsScreen(http: http, onOpenConversation: onConversation),
+          builder: (_) => AutomationsScreen(
+            http: http,
+            onOpenConversation: onConversation,
+          ),
         ),
       );
       return;

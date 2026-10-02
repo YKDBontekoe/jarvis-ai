@@ -95,6 +95,11 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     onTap: widget.onHome,
                   ),
                   _NavRow(
+                    icon: PhosphorIconsRegular.waveform,
+                    label: 'Voice',
+                    onTap: widget.onVoice,
+                  ),
+                  _NavRow(
                     icon: PhosphorIconsRegular.sunHorizon,
                     label: 'Today',
                     onTap: () => widget.onUtility('today'),
@@ -103,6 +108,41 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     icon: PhosphorIconsRegular.whatsappLogo,
                     label: 'WhatsApp',
                     onTap: () => widget.onUtility('whatsapp'),
+                  ),
+                  _NavRow(
+                    icon: PhosphorIconsRegular.listChecks,
+                    label: 'Tasks',
+                    onTap: () => widget.onUtility('tasks'),
+                  ),
+                  _NavRow(
+                    icon: PhosphorIconsRegular.notebook,
+                    label: 'Memory',
+                    onTap: () => widget.onUtility('memory'),
+                  ),
+                  _NavRow(
+                    icon: PhosphorIconsRegular.pencilSimple,
+                    label: 'Journal',
+                    onTap: () => widget.onUtility('journal'),
+                  ),
+                  _NavRow(
+                    icon: PhosphorIconsRegular.wallet,
+                    label: 'Expenses',
+                    onTap: () => widget.onUtility('expenses'),
+                  ),
+                  _NavRow(
+                    icon: PhosphorIconsRegular.target,
+                    label: 'Habits',
+                    onTap: () => widget.onUtility('habits'),
+                  ),
+                  _NavRow(
+                    icon: PhosphorIconsRegular.users,
+                    label: 'People',
+                    onTap: () => widget.onUtility('people'),
+                  ),
+                  _NavRow(
+                    icon: PhosphorIconsRegular.bell,
+                    label: 'Reminders',
+                    onTap: () => widget.onUtility('reminders'),
                   ),
                   if (widget.onProject != null) ..._projectRows(context),
                   const SizedBox(height: 14),
@@ -125,9 +165,7 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                           style: TextButton.styleFrom(
                             foregroundColor: JarvisColors.of(context).muted,
                             visualDensity: VisualDensity.compact,
-                            textStyle: Theme.of(
-                              context,
-                            ).textTheme.labelLarge?.copyWith(fontSize: 13),
+                            textStyle: const TextStyle(fontSize: 13),
                           ),
                           child: const Text('See all'),
                         ),
@@ -213,9 +251,7 @@ extension on _JarvisSidebarState {
                 style: TextButton.styleFrom(
                   foregroundColor: colors.muted,
                   visualDensity: VisualDensity.compact,
-                  textStyle: Theme.of(
-                    context,
-                  ).textTheme.labelLarge?.copyWith(fontSize: 13),
+                  textStyle: const TextStyle(fontSize: 13),
                 ),
                 child: const Text('See all'),
               ),
@@ -265,7 +301,7 @@ class _SearchPill extends StatelessWidget {
     final colors = JarvisColors.of(context);
     return Semantics(
       button: true,
-      label: 'Ask or find with Jarvis',
+      label: 'Search Jarvis',
       excludeSemantics: true,
       child: Material(
         color: colors.surfaceMuted,
@@ -289,7 +325,7 @@ class _SearchPill extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Ask or find',
+                    'Search',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 14.5, color: colors.muted),

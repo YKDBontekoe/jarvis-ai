@@ -299,7 +299,7 @@ mixin _ChatScreenUi on _ChatScreenController {
       if (!voice)
         CircleIconButton(
           icon: PhosphorIconsRegular.magnifyingGlass,
-          tooltip: 'Ask or find',
+          tooltip: 'Search',
           onPressed: _signedOut ? null : () => unawaited(_openSearch(context)),
         ),
       if (!voice)

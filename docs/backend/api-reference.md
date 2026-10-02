@@ -35,14 +35,6 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | GET | `/approvals` | Pending tool approvals |
 | POST | `/approvals/{id}/decision` | Approve or decline |
 
-## Intent navigation and search
-
-| Method | Path | Notes |
-|--------|------|-------|
-| GET | `/navigation` | Owner-scoped unread WhatsApp suggestions and the day planner; does not mark anything read |
-| POST | `/navigation/resolve` | `{ request }` (1–1,000 characters). A tool-free call to the owner's background model classifies the goal. Returns `message`, `actions` (`label`, `description`, typed `route`) and `understood`. Routes are constructed from an allowlisted view or actual owner-scoped search/chat results; no model-provided ids or URLs. Resolution has no write/send side effects. Unknown or unavailable inference offers an assistant handoff |
-| GET | `/search?query=…&kinds=…` | Federated saved-record search; independent of model inference |
-
 ## Automation
 
 | Area | Paths |
