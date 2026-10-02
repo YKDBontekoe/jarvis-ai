@@ -16,6 +16,13 @@ Env template: `infra/compose/.env.production.example` → `.env.production` (mod
 
 Bootstrap and deploy scripts: `scripts/deploy/remote-up.sh`.
 
+The migration command applies all missing migrations through the latest migration in
+the image. Migration timestamps can arrive out of order when feature branches merge;
+the last pending migration must never be used as a target because EF would revert
+newer migrations that were already applied. Reapplying a migration recreates tables,
+but does not restore data removed by an earlier downgrade; recover that data from a
+database backup separately.
+
 ## SemVer releases
 
 - Tags `vMAJOR.MINOR.PATCH` on merge to `main` via [create-release-tag.yml](../../.github/workflows/create-release-tag.yml) and PR template checkboxes.
@@ -36,6 +43,15 @@ Require the **All checks passed** job from `ci.yml` in branch protection before 
 Repository secrets: `DEPLOY_PATH`, optional `DEPLOY_COMPOSE_FILES` for tunnel/proxy overlays.
 
 Sentry release secrets, all optional: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT_BACKEND`, `SENTRY_PROJECT_MOBILE`, and `JARVIS_SENTRY_DSN`. When the token, org, and backend project are set, the API and worker image build uploads portable PDBs and source files for `github.sha`, and a following job associates that release with the git commits. The iOS workflow uploads the Dart symbol map, split debug info, and source context for `version+build`. Image builds stay green when those secrets are absent. The server `.env.production` still needs `SENTRY_DSN` before a running container reports anything. Link the GitHub repository in the Sentry project so stack traces open on the uploaded source.
+
+Sentry **Logs** and **Issues** are separate: error logs are uploaded as logs, while
+automatic issue creation from logging is disabled (`MinimumEventLevel = None`).
+The shared agent run coordinator explicitly captures unexpected run exceptions as
+issues, including failures that chat/channel handlers turn into user-facing error
+messages. Captured events include the conversation ID and run kind, without message
+content. Expected client errors and requested cancellation remain excluded. To inspect
+chat failures, select the backend project and `production` environment; a mobile
+project filter will not include these backend exceptions.
 
 ## GHCR images
 

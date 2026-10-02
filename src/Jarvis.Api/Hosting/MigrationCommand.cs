@@ -39,10 +39,12 @@ internal static class MigrationCommand
                     return 0;
                 }
 
-                logger.LogInformation("Applying {MigrationCount} migration(s); target migration is {TargetMigration}.",
-                    pending.Length, pending[^1]);
-                await database.MigrateAsync(pending[^1], cancellationToken);
-                logger.LogInformation("Database migration completed at {TargetMigration}.", pending[^1]);
+                logger.LogInformation("Applying {MigrationCount} pending migration(s).", pending.Length);
+                // A branch can add a migration older than ones already applied. Using
+                // the last pending ID as a target would revert those newer migrations.
+                // The default target applies missing migrations through the latest ID.
+                await database.MigrateAsync(cancellationToken);
+                logger.LogInformation("Database migration completed; schema is at the latest migration.");
                 return 0;
             }
             finally
