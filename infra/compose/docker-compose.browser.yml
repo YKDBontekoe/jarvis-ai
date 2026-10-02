@@ -30,7 +30,7 @@ services:
 
   playwright-mcp:
     profiles: [browser]
-    image: mcr.microsoft.com/playwright/mcp:latest
+    image: mcr.microsoft.com/playwright/mcp:latest@sha256:77dccc5ce9e94cb8ae7ebea87ddbb6cd54b05760c4d63c54e16accf2726b8734
     restart: unless-stopped
     init: true
     entrypoint: ["node", "/app/cli.js", "--headless", "--browser", "chromium", "--no-sandbox"]
@@ -56,7 +56,7 @@ services:
 
   browser-egress-proxy:
     profiles: [browser]
-    image: ubuntu/squid:latest
+    image: ubuntu/squid:latest@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029
     restart: unless-stopped
     read_only: true
     volumes:
