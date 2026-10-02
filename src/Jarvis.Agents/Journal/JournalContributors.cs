@@ -32,9 +32,9 @@ internal sealed class JournalContextContributor : IAgentContextContributor
     public int Order => 45;
 
     public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
-        context.IsBackgroundTask ? [] : [new StaticGuidanceProvider(Guidance)];
+        context.IsBackgroundTask ? [] : [new JournalGuidanceProvider(Guidance)];
 
-    private sealed class StaticGuidanceProvider(string text) : MessageAIContextProvider
+    private sealed class JournalGuidanceProvider(string text) : MessageAIContextProvider
     {
         protected override ValueTask<IEnumerable<ChatMessage>> ProvideMessagesAsync(InvokingContext context,
             CancellationToken cancellationToken = default) =>
