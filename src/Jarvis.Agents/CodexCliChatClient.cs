@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Channels;
+using Jarvis.Agents.Telemetry;
 using Jarvis.Application.Conversations;
 using Microsoft.Extensions.AI;
 
@@ -206,7 +207,7 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                 }
 
                 using var modelActivity = ActivitySource.StartActivity("jarvis.model.completion");
-                modelActivity?.SetTag("gen_ai.request.model", resolvedModel);
+                GenAiTelemetry.TagChat(modelActivity, "openai", resolvedModel);
                 modelActivity?.SetTag("gen_ai.request.input_images", prompt.Images.Count);
                 var modelCallStarted = Stopwatch.GetTimestamp();
                 var modelOutcome = "failed";
@@ -247,10 +248,8 @@ public sealed class CodexCliChatClient(CodexExecutable executable, string? model
                     OutputTokens.Add(tokenUsage.OutputTokens, tags);
                     CachedInputTokens.Add(tokenUsage.CachedInputTokens, tags);
                     ReasoningOutputTokens.Add(tokenUsage.ReasoningOutputTokens, tags);
-                    modelActivity?.SetTag("gen_ai.usage.input_tokens", tokenUsage.InputTokens);
-                    modelActivity?.SetTag("gen_ai.usage.output_tokens", tokenUsage.OutputTokens);
-                    modelActivity?.SetTag("gen_ai.usage.cached_input_tokens", tokenUsage.CachedInputTokens);
-                    modelActivity?.SetTag("gen_ai.usage.reasoning_output_tokens", tokenUsage.ReasoningOutputTokens);
+                    GenAiTelemetry.TagUsage(modelActivity, tokenUsage.InputTokens, tokenUsage.OutputTokens,
+                        tokenUsage.CachedInputTokens, tokenUsage.ReasoningOutputTokens);
                 }
 
                 if (rawResponse.Length == 0)

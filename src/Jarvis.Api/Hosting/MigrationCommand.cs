@@ -1,5 +1,7 @@
 using Jarvis.Infrastructure.Persistence;
+using Jarvis.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
+using Sentry;
 
 namespace Jarvis.Api.Hosting;
 
@@ -11,6 +13,7 @@ internal static class MigrationCommand
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
     {
         var builder = Host.CreateApplicationBuilder(args);
+        JarvisSentry.Add(builder);
         var connectionString = builder.Configuration.GetConnectionString("jarvis")
             ?? throw new InvalidOperationException("PostgreSQL connection string 'jarvis' is required.");
 
@@ -52,6 +55,8 @@ internal static class MigrationCommand
         catch (Exception exception)
         {
             logger.LogCritical(exception, "Database migration failed; application services were not updated.");
+            SentrySdk.CaptureException(exception);
+            await SentrySdk.FlushAsync(TimeSpan.FromSeconds(2));
             return 1;
         }
     }
