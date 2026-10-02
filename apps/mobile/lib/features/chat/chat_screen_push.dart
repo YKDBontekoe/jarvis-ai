@@ -6,7 +6,7 @@ mixin _ChatScreenPush on _ChatScreenController {
   void _attachPushListeners() {
     if (Firebase.apps.isEmpty) return;
     _pushOpenedSubscription ??= FirebaseMessaging.onMessageOpenedApp.listen(
-      (message) => _handlePushPayload(message.data),
+      _onPushOpened,
     );
     _pushForegroundSubscription ??= FirebaseMessaging.onMessage.listen(
       _onForegroundPush,
@@ -106,6 +106,56 @@ mixin _ChatScreenPush on _ChatScreenController {
           label: 'Open',
           onPressed: () => _handlePushPayload(message.data),
         ),
+      ),
+    );
+  }
+
+  /// A tap on a notification or on one of its buttons. Done and Snooze run in
+  /// place; everything else, including Open on an approval, opens Jarvis.
+  void _onPushOpened(RemoteMessage message) {
+    final action = notificationQuickAction(message.actionIdentifier);
+    if (action == null) {
+      _handlePushPayload(message.data);
+      return;
+    }
+    final notificationId = asJsonString(message.data['notificationId']);
+    if (notificationId == null || notificationId.isEmpty) return;
+    // Firebase can report the same button press as both the launch message
+    // and an opened-app event.
+    if (!_handledPushActions.add('$notificationId:$action')) return;
+    unawaited(_runPushQuickAction(message.data, notificationId, action));
+  }
+
+  Future<void> _runPushQuickAction(
+    Map<String, dynamic> data,
+    String notificationId,
+    String action,
+  ) async {
+    if (_signedOut) return;
+    String message;
+    var failed = false;
+    try {
+      message = await runNotificationQuickAction(
+        _http,
+        notificationId: notificationId,
+        action: action,
+      );
+    } catch (_) {
+      failed = true;
+      message = notificationQuickActionFailure(action);
+    }
+    if (!mounted || _signedOut) return;
+    setState(() => _homeRevision++);
+    unawaited(_refreshUnreadNotifications());
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        action: failed
+            ? SnackBarAction(
+                label: 'Open',
+                onPressed: () => _handlePushPayload(data),
+              )
+            : null,
       ),
     );
   }

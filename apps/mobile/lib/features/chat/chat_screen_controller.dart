@@ -86,6 +86,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   StreamSubscription<RemoteMessage>? _pushOpenedSubscription;
   StreamSubscription<RemoteMessage>? _pushForegroundSubscription;
   final Set<String> _shownPushNotifications = {};
+  final Set<String> _handledPushActions = {};
   List<ConversationSourceChip> _attachedSources = [];
 
   /// Unsent text per conversation; starts in memory until device storage opens.
@@ -225,7 +226,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _connectRealtime([int? generation]);
 
   Future<void> _enablePush();
-  void _handlePushPayload(Map<String, dynamic> data);
+  void _onPushOpened(RemoteMessage message);
   Future<void> _openSearch(BuildContext context);
   Future<void> _openSearchRouteFromNotification(Map<String, dynamic> data);
 

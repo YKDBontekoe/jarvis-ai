@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Google.Apis.Auth.OAuth2;
+using Jarvis.Application.Workflows;
 using Jarvis.Domain.Workflows;
 using Jarvis.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -170,10 +171,21 @@ public sealed class NotificationPushWorker(
                 data,
                 android = new { priority = "HIGH", notification = new { channel_id = "jarvis_notifications" } },
                 apns = new { headers = new Dictionary<string, string> { ["apns-priority"] = "10" },
-                    payload = new { aps = new { sound = "default" } } }
+                    payload = new { aps = BuildApsPayload(notification.Type) } }
             }
         });
         return await client.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// The iOS category picks the buttons the app registered for it: Done and Snooze on reminders, Open on
+    /// approvals. The payload carries ids only, never tokens.
+    /// </summary>
+    internal static Dictionary<string, string> BuildApsPayload(string type)
+    {
+        var aps = new Dictionary<string, string> { ["sound"] = "default" };
+        if (NotificationQuickActions.CategoryFor(type) is { } category) aps["category"] = category;
+        return aps;
     }
 
     private static async Task<Dictionary<string, string>> BuildPushDataAsync(JarvisDbContext db,

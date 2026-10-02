@@ -277,6 +277,9 @@ internal sealed class RecordingNotifications : INotificationRepository
     public Task<IReadOnlyList<NotificationRecord>> ListNotificationsAsync(Guid ownerId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<NotificationRecord>>(Created);
 
+    public Task<NotificationRecord?> GetNotificationAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
+        Task.FromResult(Created.FirstOrDefault(x => x.Id == id));
+
     public Task<bool> MarkReadAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(true);
 
     public Task<NotificationRecord> CreateAsync(Guid ownerId, string type, string title, string body, Guid? sourceId,

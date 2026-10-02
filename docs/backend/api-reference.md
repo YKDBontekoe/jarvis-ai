@@ -185,6 +185,7 @@ Internal routes under `/voice/internal/{conversationId}/...` are for the voice r
 |------|---------|
 | GET `/notifications` | In-app notifications |
 | POST `/notifications/{id}/read` | |
+| POST `/notifications/{id}/actions` | Notification buttons on `reminder.due`: `{"action":"done"}` or `{"action":"snooze","minutes":10}` (1 to 1440). Other types, approvals included, return 400: approvals are decided in the app only |
 | PUT/DELETE `/push-devices` | FCM registration |
 | GET `/audit` | Append-only audit events |
 

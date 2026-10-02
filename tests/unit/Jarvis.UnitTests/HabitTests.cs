@@ -285,6 +285,9 @@ public sealed class HabitTests
         public Task<IReadOnlyList<NotificationRecord>> ListNotificationsAsync(Guid ownerId,
             CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<NotificationRecord>>(Sent);
 
+        public Task<NotificationRecord?> GetNotificationAsync(Guid id, Guid ownerId,
+            CancellationToken cancellationToken) => Task.FromResult(Sent.FirstOrDefault(x => x.Id == id));
+
         public Task<bool> MarkReadAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
             Task.FromResult(true);
 

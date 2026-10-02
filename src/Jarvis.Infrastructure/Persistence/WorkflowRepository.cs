@@ -456,6 +456,10 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
             .OrderByDescending(x => x.CreatedAt).Take(100).ToListAsync(cancellationToken))
             .Select(x => x.ToRecord()).ToList();
 
+    public async Task<NotificationRecord?> GetNotificationAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
+        (await db.Notifications.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId, cancellationToken))?.ToRecord();
+
     public async Task<bool> MarkReadAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
     {
         var notification = await db.Notifications.SingleOrDefaultAsync(

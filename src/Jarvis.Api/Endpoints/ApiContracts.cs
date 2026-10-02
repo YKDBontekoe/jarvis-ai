@@ -46,6 +46,8 @@ public sealed record ReminderPlaceDto(string? Name, double? Latitude, double? Lo
 
 /// <summary>Snooze for a number of minutes from now, or until an exact moment.</summary>
 public sealed record SnoozeReminderRequest(int? Minutes = null, DateTimeOffset? Until = null);
+public sealed record NotificationActionRequest(string? Action, int? Minutes = null);
+public sealed record NotificationActionResponse(string Action, ReminderDto? Reminder);
 public sealed record ReminderDto(Guid Id, string Title, DateTimeOffset DueAt, string Status, DateTimeOffset CreatedAt,
     DateTimeOffset? CompletedAt, string Recurrence, int Weekdays, string TimeZoneId, TimeOnly? LocalTime,
     DateOnly? Until, DateTimeOffset? LastDeliveredAt, Guid? ConversationId = null, ReminderPlaceDto? Place = null);
