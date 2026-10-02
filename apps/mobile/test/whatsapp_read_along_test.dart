@@ -104,8 +104,180 @@ void main() {
       ReadAlongScreen(http: http.client(), channelId: _channel),
     );
 
-    expect(find.textContaining('Your phone did not answer'), findsOneWidget);
-    expect(find.text('No chats yet'), findsOneWidget);
+    expect(
+      find.textContaining('WhatsApp could not be reached'),
+      findsOneWidget,
+    );
+    expect(find.text('No saved chats'), findsOneWidget);
+    await close(tester);
+  });
+
+  testWidgets(
+    'loads older messages, retains them after polling and marks only loaded messages read',
+    (tester) async {
+      final sent = DateTime.utc(2026, 10, 2, 12);
+      Map<String, Object?> message(int index) => {
+        'id': '00000000-0000-0000-0000-${index.toString().padLeft(12, '0')}',
+        'fromMe': false,
+        'sender': 'Piet',
+        'text': 'Saved message $index',
+        'sentAt': sent.toIso8601String(),
+        'receivedAt': sent.add(Duration(seconds: index)).toIso8601String(),
+      };
+      final initial = [for (var i = 60; i >= 1; i--) message(i)];
+      final oldest = message(1)['id'];
+      http.on('GET', '$_piet/messages', initial);
+      http.on('GET', '$_piet/messages?beforeId=$oldest', [message(0)]);
+      http.on('POST', '$_piet/read', {}, status: 204);
+      await show(
+        tester,
+        WhatsAppChatScreen(
+          http: http.client(),
+          channelId: _channel,
+          chat: _pietChat,
+        ),
+      );
+      expect(
+        (http.sent('POST', '$_piet/read').single.body as Map)['messageId'],
+        message(60)['id'],
+      );
+
+      await tester.drag(
+        find.byKey(const Key('whatsapp-messages')),
+        const Offset(0, 12000),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('whatsapp-load-older')));
+      await tester.tap(find.byKey(const Key('whatsapp-load-older')));
+      await tester.pumpAndSettle();
+      expect(
+        http.sent('GET', '$_piet/messages').last.query['beforeId'],
+        oldest,
+      );
+      expect(find.text('Saved message 0'), findsOneWidget);
+      expect(find.byKey(const Key('whatsapp-load-older')), findsNothing);
+      http.on('GET', '$_piet/messages', [message(61), ...initial.take(59)]);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      expect(find.text('Saved message 0'), findsOneWidget);
+      expect(
+        (http.sent('POST', '$_piet/read').last.body as Map)['messageId'],
+        message(61)['id'],
+      );
+      expect(tester.takeException(), isNull);
+      await close(tester);
+    },
+  );
+
+  testWidgets(
+    'keeps messages visible and reports background refresh failures',
+    (tester) async {
+      http.on('GET', '$_piet/messages', [
+        {
+          'id': 'm1',
+          'text': 'Still saved',
+          'sentAt': DateTime.now().toUtc().toIso8601String(),
+        },
+      ]);
+      http.on('GET', '$_chats/status', {
+        'account': '+31612345678',
+        'state': 'open',
+      });
+      await show(
+        tester,
+        WhatsAppChatScreen(
+          http: http.client(),
+          channelId: _channel,
+          chat: _pietChat,
+        ),
+      );
+      http.on('GET', '$_piet/messages', {}, status: 503);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      expect(find.text('Still saved'), findsOneWidget);
+      expect(find.textContaining('Could not refresh messages'), findsOneWidget);
+      expect(find.textContaining('+31612345678'), findsOneWidget);
+      await close(tester);
+    },
+  );
+
+  testWidgets('disconnected accounts keep saved messages and disable sending', (
+    tester,
+  ) async {
+    http.on('GET', '$_piet/messages', [
+      {
+        'id': 'm1',
+        'text': 'Still saved',
+        'sentAt': DateTime.now().toUtc().toIso8601String(),
+      },
+    ]);
+    http.on('GET', '$_chats/status', {
+      'account': '+31612345678',
+      'state': 'logged_out',
+    });
+    await show(
+      tester,
+      WhatsAppChatScreen(
+        http: http.client(),
+        channelId: _channel,
+        chat: _pietChat,
+      ),
+    );
+    await tester.enterText(
+      find.byKey(const Key('whatsapp-composer')),
+      'My reply',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<IconButton>(find.byKey(const Key('whatsapp-send')))
+          .onPressed,
+      isNull,
+    );
+    expect(find.text('Still saved'), findsOneWidget);
+    expect(find.textContaining('needs to be linked again'), findsOneWidget);
+    await close(tester);
+  });
+
+  testWidgets('catches up across more than one page of new messages', (
+    tester,
+  ) async {
+    final sent = DateTime.utc(2026, 10, 2, 12);
+    Map<String, Object?> message(int index) => {
+      'id': '00000000-0000-0000-0000-${index.toString().padLeft(12, '0')}',
+      'text': 'Catch up $index',
+      'sentAt': sent.add(Duration(seconds: index)).toIso8601String(),
+    };
+    http.on('GET', '$_piet/messages', [message(0)]);
+    await show(
+      tester,
+      WhatsAppChatScreen(
+        http: http.client(),
+        channelId: _channel,
+        chat: _pietChat,
+      ),
+    );
+    http.on('GET', '$_piet/messages', [
+      for (var i = 100; i >= 41; i--) message(i),
+    ]);
+    http.on('GET', '$_piet/messages?beforeId=${message(41)['id']}', [
+      for (var i = 40; i >= 0; i--) message(i),
+    ]);
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+    expect(
+      http
+          .sent('GET', '$_piet/messages')
+          .where((request) => request.query['beforeId'] == message(41)['id']),
+      hasLength(1),
+    );
+    await tester.drag(
+      find.byKey(const Key('whatsapp-messages')),
+      const Offset(0, 10000),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Catch up 0'), findsOneWidget);
+    expect(find.textContaining('Could not refresh'), findsNothing);
     await close(tester);
   });
 
@@ -157,7 +329,7 @@ void main() {
       'Say yes',
     );
     expect(find.text('Top, ik ben er om 7!'), findsOneWidget);
-    expect(find.textContaining('Sends from your own WhatsApp'), findsOneWidget);
+    expect(find.byTooltip('Send from your WhatsApp'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('whatsapp-send')));
     await tester.pumpAndSettle();

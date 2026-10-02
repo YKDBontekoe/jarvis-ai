@@ -17,6 +17,7 @@ class WhatsAppChatScreen extends StatefulWidget {
     required this.http,
     required this.channelId,
     required this.chat,
+    this.account,
     this.pollInterval = const Duration(seconds: 3),
     super.key,
   });
@@ -24,6 +25,7 @@ class WhatsAppChatScreen extends StatefulWidget {
   final Dio http;
   final String channelId;
   final WhatsAppChat chat;
+  final String? account;
   final Duration pollInterval;
 
   @override
@@ -40,6 +42,16 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
   String? _error;
   Timer? _poll;
   int _requestRevision = 0;
+  final _scroll = ScrollController();
+  bool _fetching = false;
+  bool _loadingOlder = false;
+  bool _hasOlder = false;
+  bool _checkingStatus = false;
+  String? _connectionState;
+  String? _account;
+  DateTime? _lastStatusCheck;
+  String? _refreshError;
+  String? _markedMessage;
 
   String get _path => whatsAppChatPath(widget.channelId, _chat.chatId);
 
@@ -47,8 +59,16 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
   void initState() {
     super.initState();
     unawaited(_load());
+    unawaited(_loadStatus());
     _poll = Timer.periodic(widget.pollInterval, (_) {
-      if (mounted) unawaited(_load(quiet: true));
+      if (mounted && ModalRoute.of(context)?.isCurrent != false) {
+        unawaited(_load(quiet: true));
+        if (_lastStatusCheck == null ||
+            DateTime.now().difference(_lastStatusCheck!) >
+                const Duration(seconds: 15)) {
+          unawaited(_loadStatus());
+        }
+      }
     });
     _composer.addListener(() => setState(() {}));
   }
@@ -57,25 +77,67 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
   void dispose() {
     _poll?.cancel();
     _composer.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
   Future<void> _load({bool quiet = false}) async {
+    if (_fetching || _loadingOlder) return;
+    _fetching = true;
     final revision = ++_requestRevision;
     try {
-      final response = await widget.http.get<dynamic>('$_path/messages');
+      final messages = await _fetchPage();
       if (!mounted || revision != _requestRevision) return;
-      final messages = [
-        for (final item in jsonMaps(response.data))
-          ?WhatsAppMessage.fromJson(item),
-      ]..sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      // Catch up across a long disconnect rather than leaving a gap between saved and recent pages.
+      final known = _messages.map((m) => m.id).toSet();
+      var page = messages.toList();
+      while (known.isNotEmpty &&
+          page.length == 60 &&
+          !page.any((m) => known.contains(m.id))) {
+        page = await _fetchPage(beforeId: page.last.id);
+        if (!mounted || revision != _requestRevision) return;
+        final seen = messages.map((m) => m.id).toSet();
+        if (page.isNotEmpty && page.every((m) => seen.contains(m.id))) {
+          throw const FormatException('Message cursor did not advance');
+        }
+        messages.addAll(page);
+      }
+      final firstLoad = _loading || _messages.isEmpty;
+      final anchor = _scroll.hasClients && _scroll.offset > 80;
+      final extent = _scroll.hasClients
+          ? _scroll.position.maxScrollExtent
+          : 0.0;
       setState(() {
-        _messages = messages;
+        _messages = _merge(messages);
+        if (firstLoad) _hasOlder = messages.length == 60;
         _loading = false;
         _error = null;
+        _refreshError = null;
       });
+      if (anchor) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_scroll.hasClients) return;
+          final delta = _scroll.position.maxScrollExtent - extent;
+          if (delta > 0) {
+            _scroll.jumpTo(
+              (_scroll.offset + delta).clamp(
+                0.0,
+                _scroll.position.maxScrollExtent,
+              ),
+            );
+          }
+        });
+      }
+      unawaited(_markRead());
     } on DioException catch (error) {
-      if (!mounted || revision != _requestRevision || quiet) return;
+      if (!mounted || revision != _requestRevision) return;
+      if (quiet) {
+        setState(
+          () => _refreshError =
+              'Could not refresh messages. Showing saved messages; retrying automatically.',
+        );
+        return;
+      }
       setState(() {
         _loading = false;
         _error =
@@ -83,11 +145,107 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
             'Could not load this chat.';
       });
     } catch (_) {
-      if (!mounted || revision != _requestRevision || quiet) return;
+      if (!mounted || revision != _requestRevision) return;
+      if (quiet) {
+        setState(
+          () => _refreshError =
+              'Could not refresh messages. Retrying automatically.',
+        );
+        return;
+      }
       setState(() {
         _loading = false;
         _error = 'Could not load this chat.';
       });
+    } finally {
+      _fetching = false;
+    }
+  }
+
+  List<WhatsAppMessage> _merge(List<WhatsAppMessage> incoming) =>
+      {
+        ...{for (final message in _messages) message.id: message},
+        ...{for (final message in incoming) message.id: message},
+      }.values.toList()..sort((a, b) {
+        final time = a.sentAt.compareTo(b.sentAt);
+        return time == 0 ? a.id.compareTo(b.id) : time;
+      });
+
+  Future<List<WhatsAppMessage>> _fetchPage({String? beforeId}) async {
+    final response = await widget.http.get<dynamic>(
+      '$_path/messages',
+      queryParameters: beforeId == null ? null : {'beforeId': beforeId},
+    );
+    if (response.data is! List) {
+      throw const FormatException('Invalid message list');
+    }
+    return [
+      for (final item in jsonMaps(response.data))
+        ?WhatsAppMessage.fromJson(item),
+    ]..sort((a, b) {
+      final time = b.sentAt.compareTo(a.sentAt);
+      return time == 0 ? b.id.compareTo(a.id) : time;
+    });
+  }
+
+  Future<void> _loadOlder() async {
+    if (_loadingOlder || _fetching || _messages.isEmpty) return;
+    setState(() => _loadingOlder = true);
+    final revision = _requestRevision;
+    try {
+      final older = await _fetchPage(beforeId: _messages.first.id);
+      if (!mounted || revision != _requestRevision) return;
+      setState(() {
+        _messages = _merge(older);
+        _hasOlder = older.length == 60;
+      });
+    } catch (_) {
+      if (mounted) _snack('Could not load older messages. Try again.');
+    } finally {
+      if (mounted) setState(() => _loadingOlder = false);
+    }
+  }
+
+  Future<void> _markRead() async {
+    if (_messages.isEmpty || ModalRoute.of(context)?.isCurrent == false) return;
+    final newestReceived = _messages.reduce(
+      (a, b) =>
+          (a.receivedAt ?? a.sentAt).isAfter(b.receivedAt ?? b.sentAt) ? a : b,
+    );
+    if (_markedMessage == newestReceived.id) return;
+    try {
+      await widget.http.post<dynamic>(
+        '$_path/read',
+        data: {'messageId': newestReceived.id},
+      );
+      _markedMessage = newestReceived.id;
+    } catch (_) {
+      // Keep the badge unread and retry on the next successful message refresh.
+    }
+  }
+
+  Future<void> _loadStatus() async {
+    if (_checkingStatus) return;
+    _checkingStatus = true;
+    _lastStatusCheck = DateTime.now();
+    try {
+      final response = await widget.http.get<dynamic>(
+        '/api/v1/channels/${widget.channelId}/chats/status',
+      );
+      if (!mounted) return;
+      final body = jsonObject(response.data);
+      setState(() {
+        _connectionState = asJsonString(body?['state']);
+        _account = asJsonString(body?['account']) ?? widget.account;
+      });
+    } on DioException catch (error) {
+      if (mounted && error.response?.statusCode != 404) {
+        setState(() => _connectionState = 'unreachable');
+      }
+    } catch (_) {
+      if (mounted) setState(() => _connectionState = 'unreachable');
+    } finally {
+      _checkingStatus = false;
     }
   }
 
@@ -210,8 +368,16 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     );
     if (confirmed != true || !mounted) return;
     try {
+      ++_requestRevision;
       await widget.http.delete<void>('$_path/messages');
-      if (mounted) setState(() => _messages = const []);
+      ++_requestRevision;
+      if (mounted) {
+        setState(() {
+          _messages = const [];
+          _hasOlder = false;
+          _markedMessage = null;
+        });
+      }
     } catch (_) {
       if (mounted) _snack('Could not clear this chat.');
     }
@@ -239,10 +405,11 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     final colors = JarvisColors.of(context);
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: 68,
         titleSpacing: 0,
         title: Row(
           children: [
-            ChatAvatar(chat: _chat, size: 34),
+            ChatAvatar(chat: _chat, size: 40),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -255,9 +422,12 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
                     style: theme.textTheme.titleMedium,
                   ),
                   Text(
-                    _chat.autoReminders
-                        ? 'Jarvis reads along · auto reminders'
-                        : 'Jarvis reads along',
+                    [
+                      ?(_account ?? widget.account),
+                      _connectionState != null && _connectionState != 'open'
+                          ? whatsAppConnectionLabel(_connectionState!)
+                          : 'Read along',
+                    ].join(' · '),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelSmall?.copyWith(
@@ -270,11 +440,12 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
           ],
         ),
         actions: [
-          IconButton(
+          HeaderAction(
             key: const Key('whatsapp-ask-jarvis'),
-            tooltip: 'Ask Jarvis about this chat',
+            label: 'Ask Jarvis',
+            collapsesWhenNarrow: true,
             onPressed: () => unawaited(_ask()),
-            icon: const Icon(PhosphorIconsRegular.sparkle),
+            icon: PhosphorIconsRegular.sparkle,
           ),
           PopupMenuButton<String>(
             key: const Key('whatsapp-chat-menu'),
@@ -305,6 +476,9 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
       ),
       body: Column(
         children: [
+          if (_connectionState != null && _connectionState != 'open')
+            InlineNotice(message: whatsAppConnectionMessage(_connectionState!)),
+          if (_refreshError != null) InlineNotice(message: _refreshError!),
           Expanded(
             child: _loading
                 ? const LoadingState()
@@ -321,7 +495,16 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
                         'Jarvis sees new messages in this chat from the moment '
                         'you turned it on. They show up here as they arrive.',
                   )
-                : _MessageList(messages: _messages, isGroup: _chat.isGroup),
+                : ContentWidth(
+                    child: _MessageList(
+                      messages: _messages,
+                      isGroup: _chat.isGroup,
+                      controller: _scroll,
+                      hasOlder: _hasOlder,
+                      loadingOlder: _loadingOlder,
+                      onLoadOlder: () => unawaited(_loadOlder()),
+                    ),
+                  ),
           ),
           _Composer(
             controller: _composer,
@@ -329,6 +512,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
             drafting: _drafting,
             onDraft: () => unawaited(_draft()),
             onSend: () => unawaited(_send()),
+            canSend: _connectionState == null || _connectionState == 'open',
           ),
         ],
       ),
@@ -337,10 +521,21 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
 }
 
 class _MessageList extends StatelessWidget {
-  const _MessageList({required this.messages, required this.isGroup});
+  const _MessageList({
+    required this.messages,
+    required this.isGroup,
+    required this.controller,
+    required this.hasOlder,
+    required this.loadingOlder,
+    required this.onLoadOlder,
+  });
 
   final List<WhatsAppMessage> messages;
   final bool isGroup;
+  final ScrollController controller;
+  final bool hasOlder;
+  final bool loadingOlder;
+  final VoidCallback onLoadOlder;
 
   @override
   Widget build(BuildContext context) {
@@ -357,6 +552,7 @@ class _MessageList extends StatelessWidget {
           next.sentAt.difference(message.sentAt).inMinutes < 5;
       items.add(
         _Bubble(
+          key: ValueKey(message.id),
           message: message,
           showSender:
               isGroup &&
@@ -371,9 +567,21 @@ class _MessageList extends StatelessWidget {
         items.add(_DaySeparator(time: message.sentAt));
       }
     }
+    if (hasOlder) {
+      items.add(
+        Center(
+          child: TextButton(
+            key: const Key('whatsapp-load-older'),
+            onPressed: loadingOlder ? null : onLoadOlder,
+            child: Text(loadingOlder ? 'Loading…' : 'Load older messages'),
+          ),
+        ),
+      );
+    }
     return ListView(
       key: const Key('whatsapp-messages'),
       reverse: true,
+      controller: controller,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
       children: items,
     );
@@ -417,6 +625,7 @@ class _Bubble extends StatelessWidget {
     required this.message,
     required this.showSender,
     required this.tight,
+    super.key,
   });
 
   final WhatsAppMessage message;
@@ -428,18 +637,18 @@ class _Bubble extends StatelessWidget {
     final colors = JarvisColors.of(context);
     final theme = Theme.of(context);
     final mine = message.fromMe;
-    final background = mine ? colors.accentSoft : colors.surface;
-    final radius = Radius.circular(JarvisRadii.lg);
+    final background = mine ? colors.surfaceRaised : colors.surface;
+    const radius = Radius.circular(20);
     return Padding(
       padding: EdgeInsets.only(top: tight ? 2 : 8),
       child: Align(
         alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: MediaQuery.sizeOf(context).width * .78,
+            maxWidth: (MediaQuery.sizeOf(context).width * .78).clamp(0, 560),
           ),
           child: Container(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+            padding: const EdgeInsets.fromLTRB(16, 11, 16, 8),
             decoration: BoxDecoration(
               color: background,
               border: mine ? null : Border.all(color: colors.outline),
@@ -466,7 +675,10 @@ class _Bubble extends StatelessWidget {
                   ),
                 SelectableText(
                   message.text,
-                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 15.5,
+                    height: 1.45,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Align(
@@ -495,6 +707,7 @@ class _Composer extends StatelessWidget {
     required this.drafting,
     required this.onDraft,
     required this.onSend,
+    required this.canSend,
   });
 
   final TextEditingController controller;
@@ -502,98 +715,90 @@ class _Composer extends StatelessWidget {
   final bool drafting;
   final VoidCallback onDraft;
   final VoidCallback onSend;
+  final bool canSend;
 
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     final hasText = controller.text.trim().isNotEmpty;
-    return Material(
-      color: colors.surface,
-      child: SafeArea(
-        top: false,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: colors.outline)),
-          ),
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (hasText)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
-                  child: Row(
-                    children: [
-                      Icon(
-                        PhosphorIconsRegular.whatsappLogo,
-                        size: 13,
-                        color: colors.muted,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'Sends from your own WhatsApp when you tap Send.',
-                          style: Theme.of(
-                            context,
-                          ).textTheme.labelSmall?.copyWith(color: colors.muted),
-                        ),
-                      ),
-                    ],
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: ContentWidth(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(6, 4, 8, 8),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              border: Border.all(color: colors.outline),
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: JarvisShadows.floating(Theme.of(context).brightness),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  key: const Key('whatsapp-composer'),
+                  controller: controller,
+                  minLines: 1,
+                  maxLines: 6,
+                  maxLength: 4000,
+                  textCapitalization: TextCapitalization.sentences,
+                  style: const TextStyle(fontSize: 16, height: 1.4),
+                  decoration: const InputDecoration(
+                    hintText: 'Write a reply…',
+                    counterText: '',
+                    filled: false,
+                    contentPadding: EdgeInsets.fromLTRB(12, 12, 8, 8),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
                   ),
                 ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  IconButton(
-                    key: const Key('whatsapp-draft'),
-                    tooltip: 'Draft a reply with Jarvis',
-                    onPressed: drafting ? null : onDraft,
-                    icon: drafting
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(
-                            PhosphorIconsRegular.magicWand,
-                            color: colors.accentDeep,
-                          ),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      key: const Key('whatsapp-composer'),
-                      controller: controller,
-                      minLines: 1,
-                      maxLines: 6,
-                      maxLength: 4000,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
-                        hintText: 'Message',
-                        counterText: '',
-                        isDense: true,
+                Row(
+                  children: [
+                    TextButton.icon(
+                      key: const Key('whatsapp-draft'),
+                      onPressed: drafting ? null : onDraft,
+                      icon: drafting
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(
+                              PhosphorIconsRegular.magicWand,
+                              size: 17,
+                            ),
+                      label: const Text('Draft a reply'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: colors.inkSoft,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  IconButton.filled(
-                    key: const Key('whatsapp-send'),
-                    tooltip: 'Send',
-                    style: IconButton.styleFrom(
-                      backgroundColor: colors.accent,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: colors.surfaceMuted,
-                      disabledForegroundColor: colors.muted,
+                    const Spacer(),
+                    IconButton.filled(
+                      key: const Key('whatsapp-send'),
+                      tooltip: 'Send from your WhatsApp',
+                      style: IconButton.styleFrom(
+                        backgroundColor: colors.ink,
+                        foregroundColor: colors.onInk,
+                        disabledBackgroundColor: colors.surfaceMuted,
+                        disabledForegroundColor: colors.muted,
+                      ),
+                      onPressed: hasText && !sending && canSend ? onSend : null,
+                      icon: sending
+                          ? SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: colors.onInk,
+                              ),
+                            )
+                          : const Icon(PhosphorIconsBold.arrowUp, size: 20),
                     ),
-                    onPressed: hasText && !sending ? onSend : null,
-                    icon: sending
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(PhosphorIconsRegular.paperPlaneTilt),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

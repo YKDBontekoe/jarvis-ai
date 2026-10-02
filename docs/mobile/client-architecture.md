@@ -29,6 +29,7 @@ root. It shares the existing account and owner-scoped data. See
 | `features/settings/` | Models (Codex/OpenRouter), voice, nested settings hub |
 | `features/skills/`, `persona/`, `profiles/`, `learning/` | Owner tuning surfaces |
 | `features/channels/` | WhatsApp & Signal |
+| `features/whatsapp/` | Sidebar WhatsApp inbox with account switching in the header and All/Unread/Groups filters; separate Choose chats screen for read-along selection; saved previews, unread counts, paginated conversations, reply drafts and Ask Jarvis |
 | `features/devices/` | This-device capabilities and telemetry |
 | `features/agents/` | Remote agent registry |
 | `features/coding/` | Coding runs list |

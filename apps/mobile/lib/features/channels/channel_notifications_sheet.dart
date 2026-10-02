@@ -64,9 +64,9 @@ class ChannelNotificationCategoryPicker extends StatelessWidget {
               'Approvals from app chats, tasks, and automations can only be decided in the Jarvis app; '
               'Jarvis says so in the $label message.',
               key: const Key('channel-approvals-note'),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: muted,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: muted),
             ),
           ),
       ],
@@ -167,10 +167,16 @@ class _ChannelNotificationsSheetState extends State<ChannelNotificationsSheet> {
               contentPadding: EdgeInsets.zero,
               title: const Text('Forward Jarvis notifications'),
               value: _forward,
-              onChanged: _saving
+              onChanged:
+                  _saving ||
+                      jsonStrings(widget.channel['allowedSenders']).isEmpty
                   ? null
                   : (value) => setState(() => _forward = value),
             ),
+            if (jsonStrings(widget.channel['allowedSenders']).isEmpty)
+              const Text(
+                'Add an allowed phone number before forwarding notifications.',
+              ),
             if (_forward)
               ChannelNotificationCategoryPicker(
                 kind: kind,

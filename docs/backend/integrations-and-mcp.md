@@ -51,6 +51,18 @@ Compose overlays:
 
 `GET /channels/providers` reports which flows the server supports. For WhatsApp the bridge session id equals the channel connection id; inbound messages are pulled by `WhatsAppLinkedReceiver` (poll + ack, deduped by external id), outbound go through `WhatsAppLinkedTransport`. Deleting the channel logs the device out via the bridge. Signal "Note to Self" sync messages are accepted as owner messages (`SignalReceiver.ParseEnvelopes`).
 
+### Personal WhatsApp for read along
+
+Settings → WhatsApp & Signal → **Your WhatsApp · Read along** connects the owner's personal account alongside an existing Jarvis WhatsApp channel. Scan the code from the personal account's Linked devices settings. After linking, the app opens that account's chat picker; every chat starts with read along off.
+
+The sidebar/drawer also has a **WhatsApp** destination for everyday use. It opens the personal account by default and offers an account picker when several accounts are linked. The account number and actual bridge connection state appear above the searchable chat list. Selected chats show previews of messages saved by Jarvis and unread counts; these counts are shared across Jarvis clients and do not change WhatsApp read receipts. Chats that have not been enabled expose names and activity only, without message previews.
+
+Chat views can load older saved messages, retain loaded history during polling, and catch up across reconnects. Previous WhatsApp history is not imported; the picker and empty conversation state explain that collection begins after enabling read along. Attachments remain text descriptions rather than downloaded media. Cached chats and messages remain visible while reconnecting, with a warning instead of a false connected indicator.
+
+The chat-list response includes `account`, `state`, `preview`, `previewFromMe`, and `unreadCount`; `live` is true only for an open bridge session. `GET /channels/{id}/chats/status` returns the account and state without QR codes or credentials. `POST /channels/{id}/chats/{chatId}/read {messageId}` advances the owner-scoped read watermark through a message the client loaded, keeping later arrivals unread. `GET /channels/{id}/chats/{chatId}/messages?beforeId={messageId}` pages by timestamp and message id together so equal timestamps do not skip messages. The existing timestamp-only `before` parameter remains supported; choose one cursor per request.
+
+`POST /channels/link {kind: "whatsapp_linked", readAlong: true}` creates a new bridge session and owner-scoped connection named **My WhatsApp**, with no allowed channel senders and notification forwarding off. It does not change the existing Jarvis connection. The flag is only valid for a new WhatsApp connection; re-linking uses `channelId` without it and preserves settings. The usual link flow keeps its existing self-chat and notification defaults. Personal accounts can be paused, re-linked, or disconnected from their connection detail screen. Read-along replies still require tapping Send or approving an agent action.
+
 ### Forwarding notifications and approvals
 
 Per channel, `forwardNotifications` turns forwarding on and `notificationCategories` chooses what is sent (`ChannelNotificationCategories`): `reminders`, `tasks`, `briefings`, `watches`, `automations`, `learning`, `check_ins`, `approvals`. A channel with no stored list gets every category **except approvals** (opt-in). Omitting the field on `PUT /channels/{id}` keeps the stored choice. `ChannelNotificationForwarder` sends the notifications; it is best-effort and never blocks the in-app inbox or push.

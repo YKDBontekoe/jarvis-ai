@@ -216,6 +216,11 @@ public sealed class WhatsAppReadAlongTests
             CancellationToken cancellationToken) =>
             Task.FromResult(Chats.SingleOrDefault(x => x.OwnerId == ownerId && x.ChatId == chatId));
 
+        public Task<IReadOnlyList<WhatsAppChatActivity>> ListActivityAsync(Guid ownerId, Guid connectionId,
+            CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<WhatsAppChatActivity>>([]);
+        public Task<bool> MarkReadAsync(Guid ownerId, Guid connectionId, string chatId, Guid messageId,
+            CancellationToken cancellationToken) => Task.FromResult(false);
+
         public Task<WhatsAppChatSettings?> SaveChatAsync(Guid ownerId, Guid connectionId, string chatId,
             string displayName, bool readAlong, bool autoReminders, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
@@ -228,7 +233,7 @@ public sealed class WhatsAppReadAlongTests
             CancellationToken cancellationToken) => Task.FromResult(0);
 
         public Task<IReadOnlyList<WhatsAppChatMessage>> ListMessagesAsync(Guid ownerId, Guid connectionId,
-            string chatId, int limit, DateTimeOffset? before, CancellationToken cancellationToken) =>
+            string chatId, int limit, DateTimeOffset? before, CancellationToken cancellationToken, Guid? beforeId = null) =>
             Task.FromResult<IReadOnlyList<WhatsAppChatMessage>>(Messages.Where(x => x.ChatId == chatId)
                 .OrderByDescending(x => x.SentAt).Take(limit).ToArray());
 

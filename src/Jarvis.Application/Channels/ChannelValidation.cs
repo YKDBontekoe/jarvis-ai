@@ -28,8 +28,11 @@ public static class ChannelValidation
 
         var senders = (request.AllowedSenders ?? []).Select(ChannelAddresses.Normalize)
             .Where(value => value.Length > 0).Distinct().ToArray();
-        if (senders.Length == 0)
+        // A personal WhatsApp connection can read selected chats without answering any inbound channel messages.
+        if (senders.Length == 0 && kind != ChannelKinds.WhatsAppLinked)
             throw new ArgumentException("Add at least one phone number that may talk to Jarvis.");
+        if (senders.Length == 0 && request.ForwardNotifications)
+            throw new ArgumentException("Add an allowed phone number before forwarding notifications.");
         if (senders.Length > MaxAllowedSenders)
             throw new ArgumentException($"Allow at most {MaxAllowedSenders} phone numbers.");
         if (senders.FirstOrDefault(sender => !ChannelAddresses.IsPhoneNumber(sender)) is { } invalid)

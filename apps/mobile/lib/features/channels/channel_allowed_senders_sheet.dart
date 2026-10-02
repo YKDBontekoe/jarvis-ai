@@ -53,7 +53,8 @@ class _ChannelAllowedSendersSheetState
       if (seen.add(identity)) senders.add(value);
     }
 
-    if (senders.isEmpty) {
+    if (senders.isEmpty &&
+        asJsonString(widget.channel['kind']) != 'whatsapp_linked') {
       setState(() => _error = 'Keep at least one allowed phone number.');
       return;
     }
@@ -75,6 +76,9 @@ class _ChannelAllowedSendersSheetState
             )
         ? currentRecipient
         : null;
+    final forward =
+        senders.isNotEmpty &&
+        asJsonBool(widget.channel['forwardNotifications']);
 
     try {
       final response = await widget.http.put<dynamic>(
@@ -85,9 +89,7 @@ class _ChannelAllowedSendersSheetState
           'account': asJsonString(widget.channel['account']),
           'enabled': asJsonBool(widget.channel['enabled'], true),
           'allowedSenders': senders,
-          'forwardNotifications': asJsonBool(
-            widget.channel['forwardNotifications'],
-          ),
+          'forwardNotifications': forward,
           'notifyRecipient': notifyRecipient,
           if (widget.channel['notificationCategories'] != null)
             'notificationCategories': jsonStrings(
@@ -103,6 +105,7 @@ class _ChannelAllowedSendersSheetState
               ...widget.channel,
               'allowedSenders': senders,
               'notifyRecipient': notifyRecipient,
+              'forwardNotifications': forward,
             },
       );
     } on DioException catch (error) {
@@ -138,7 +141,7 @@ class _ChannelAllowedSendersSheetState
             ),
             const SizedBox(height: 6),
             Text(
-              'Add one international phone number per line. Only these numbers can message Jarvis. You can allow up to 20.',
+              'Add one international phone number per line. Only these numbers can message Jarvis. You can allow up to 20.${asJsonString(widget.channel['kind']) == 'whatsapp_linked' ? ' Leave this empty to use only read along, without automatic replies.' : ''}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: JarvisColors.of(context).inkSoft,
               ),

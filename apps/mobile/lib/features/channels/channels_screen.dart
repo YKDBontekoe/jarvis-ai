@@ -134,15 +134,35 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
     if (created == true && mounted) unawaited(_load());
   }
 
-  Future<void> _link(String kind, {String? channelId}) async {
+  Future<void> _link(
+    String kind, {
+    String? channelId,
+    bool readAlong = false,
+  }) async {
     final linked = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
-      builder: (_) =>
-          ChannelLinkSheet(http: widget.http, kind: kind, channelId: channelId),
+      builder: (_) => ChannelLinkSheet(
+        http: widget.http,
+        kind: kind,
+        channelId: channelId,
+        readAlong: readAlong,
+      ),
     );
     if (linked == null || !mounted) return;
     unawaited(_load());
+    if (readAlong) {
+      final id = asJsonString(linked['channelId']);
+      if (id != null) {
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => ReadAlongScreen(http: widget.http, channelId: id),
+          ),
+        );
+        if (mounted) unawaited(_load());
+      }
+      return;
+    }
     final label = channelKind(kind).label;
     final phone = asJsonString(linked['phone']);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -172,22 +192,43 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
       body: ListScreenBody(
         loading: _loading,
         error: _error,
-        isEmpty: _channels.isEmpty,
+        isEmpty: false,
         onRetry: () => unawaited(_load()),
-        empty: EmptyState(
-          icon: PhosphorIconsRegular.whatsappLogo,
-          title: 'No messaging channels yet',
-          message:
-              'Link WhatsApp or Signal by scanning a QR code so you can talk to Jarvis from your phone. Only numbers you allow can send messages.',
-          action: FilledButton.icon(
-            onPressed: () => unawaited(_pickKind()),
-            icon: const Icon(PhosphorIconsRegular.plus),
-            label: const Text('Connect a channel'),
-          ),
-        ),
+        empty: const SizedBox.shrink(),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
+            ContentWidth(
+              child: SurfaceCard(
+                child: ListTile(
+                  key: const Key('connect-personal-whatsapp'),
+                  leading: const Icon(PhosphorIconsRegular.whatsappLogo),
+                  title: const Text('Your WhatsApp · Read along'),
+                  subtitle: Text(
+                    asJsonBool(_providers['whatsAppLink'])
+                        ? 'Connect your own account alongside Jarvis. Choose chats for reply drafts, questions and reminders.'
+                        : 'Connecting your own account needs the WhatsApp bridge on the server.',
+                  ),
+                  enabled: asJsonBool(_providers['whatsAppLink']),
+                  trailing: const Icon(PhosphorIconsRegular.plus),
+                  onTap: () =>
+                      unawaited(_link('whatsapp_linked', readAlong: true)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (_channels.isEmpty)
+              EmptyState(
+                icon: PhosphorIconsRegular.chatsCircle,
+                title: 'No messaging channels yet',
+                message:
+                    'Connect a channel to talk to Jarvis from WhatsApp or Signal.',
+                action: FilledButton.icon(
+                  onPressed: () => unawaited(_pickKind()),
+                  icon: const Icon(PhosphorIconsRegular.plus),
+                  label: const Text('Connect a channel'),
+                ),
+              ),
             if (!signalReady)
               ContentWidth(
                 child: InlineNotice(
@@ -227,6 +268,9 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
         subtitle: Text(
           [
             kind.label,
+            if (asJsonString(channel['kind']) == 'whatsapp_linked' &&
+                senders.isEmpty)
+              'Read along',
             asJsonString(channel['account']) ?? '',
             if (senders.isNotEmpty)
               '${senders.length} allowed number${senders.length == 1 ? '' : 's'}',
@@ -257,13 +301,25 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
+                key: const Key('connect-whatsapp-read-along'),
+                enabled: whatsappLink,
+                leading: const Icon(PhosphorIconsRegular.whatsappLogo),
+                title: const Text('Your WhatsApp · Read along'),
+                subtitle: Text(
+                  whatsappLink
+                      ? 'Connect your own account and choose chats Jarvis may read'
+                      : 'Needs the WhatsApp bridge on the server',
+                ),
+                onTap: () => Navigator.pop(context, 'whatsapp_read_along'),
+              ),
+              ListTile(
                 key: const Key('connect-whatsapp-qr'),
                 enabled: whatsappLink,
                 leading: IconBadge(
                   icon: PhosphorIconsRegular.whatsappLogo,
                   color: const Color(0xff16a34a),
                 ),
-                title: const Text('WhatsApp'),
+                title: const Text('Jarvis WhatsApp channel'),
                 subtitle: Text(
                   whatsappLink
                       ? 'Scan a QR code — no Meta account needed'
@@ -302,7 +358,9 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
       ),
     );
     if (choice == null || !mounted) return;
-    if (choice == 'whatsapp') {
+    if (choice == 'whatsapp_read_along') {
+      unawaited(_link('whatsapp_linked', readAlong: true));
+    } else if (choice == 'whatsapp') {
       unawaited(_create(choice));
     } else {
       unawaited(_link(choice));

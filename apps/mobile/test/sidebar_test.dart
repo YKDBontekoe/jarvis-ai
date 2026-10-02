@@ -13,6 +13,7 @@ void main() {
     tester,
   ) async {
     var openedTasks = false;
+    var openedWhatsApp = false;
     var searched = false;
     await tester.pumpWidget(
       _host(
@@ -28,6 +29,7 @@ void main() {
           onSeeAll: () {},
           onUtility: (destination) {
             if (destination == 'tasks') openedTasks = true;
+            if (destination == 'whatsapp') openedWhatsApp = true;
           },
           onSettings: () {},
           onJarvisSearch: () => searched = true,
@@ -40,11 +42,30 @@ void main() {
       expect(find.text(label), findsNothing);
     }
 
+    for (final label in [
+      'Voice',
+      'Today',
+      'Tasks',
+      'Memory',
+      'Journal',
+      'Expenses',
+      'Habits',
+      'People',
+      'Reminders',
+      'WhatsApp',
+    ]) {
+      expect(find.text(label), findsOneWidget);
+    }
+    expect(find.text('Ask or find'), findsNothing);
+
     await tester.tap(find.text('Search'));
     expect(searched, isTrue);
 
     await tester.tap(find.text('Tasks'));
     await tester.pumpAndSettle();
     expect(openedTasks, isTrue);
+    await tester.tap(find.text('WhatsApp'));
+    await tester.pumpAndSettle();
+    expect(openedWhatsApp, isTrue);
   });
 }

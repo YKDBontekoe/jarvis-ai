@@ -29,7 +29,7 @@ public sealed record WhatsAppChatMessage(
     bool FromMe,
     string? Sender,
     string Text,
-    DateTimeOffset SentAt);
+    DateTimeOffset SentAt, DateTimeOffset? ReceivedAt = null);
 
 /// <summary>A message the bridge forwarded for a chat on the owner's watch list.</summary>
 public sealed record ObservedWhatsAppMessage(string ExternalId, string ChatId, bool FromMe, string? Sender,
@@ -44,11 +44,19 @@ public sealed record WhatsAppScanBatch(WhatsAppChatSettings Chat, IReadOnlyList<
 
 public sealed record WhatsAppSearchHit(WhatsAppChatSettings Chat, WhatsAppChatMessage Message);
 
+/// <summary>Activity already saved in Jarvis; unread counts do not change WhatsApp read receipts.</summary>
+public sealed record WhatsAppChatActivity(string ChatId, string? Preview, bool? FromMe, int UnreadCount);
+
 public interface IWhatsAppAssistantRepository
 {
     Task<IReadOnlyList<WhatsAppChatSettings>> ListChatsAsync(Guid ownerId, Guid? connectionId,
         CancellationToken cancellationToken);
     Task<WhatsAppChatSettings?> GetChatAsync(Guid ownerId, Guid connectionId, string chatId,
+        CancellationToken cancellationToken);
+    Task<IReadOnlyList<WhatsAppChatActivity>> ListActivityAsync(Guid ownerId, Guid connectionId,
+        CancellationToken cancellationToken);
+    /// <summary>Marks through a message the client actually loaded, without marking later arrivals as read.</summary>
+    Task<bool> MarkReadAsync(Guid ownerId, Guid connectionId, string chatId, Guid messageId,
         CancellationToken cancellationToken);
 
     /// <summary>
@@ -70,7 +78,7 @@ public interface IWhatsAppAssistantRepository
 
     /// <summary>Newest first, up to <paramref name="limit"/>, optionally before a point in time.</summary>
     Task<IReadOnlyList<WhatsAppChatMessage>> ListMessagesAsync(Guid ownerId, Guid connectionId, string chatId,
-        int limit, DateTimeOffset? before, CancellationToken cancellationToken);
+        int limit, DateTimeOffset? before, CancellationToken cancellationToken, Guid? beforeId = null);
     Task<IReadOnlyList<WhatsAppSearchHit>> SearchAsync(Guid ownerId, string query, Guid? connectionId,
         string? chatId, int limit, CancellationToken cancellationToken);
     Task<int> ClearHistoryAsync(Guid ownerId, Guid connectionId, string chatId, CancellationToken cancellationToken);

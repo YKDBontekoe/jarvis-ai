@@ -7,6 +7,7 @@ class ChannelLinkSheet extends StatefulWidget {
     required this.http,
     required this.kind,
     this.channelId,
+    this.readAlong = false,
     this.pollInterval = const Duration(seconds: 2),
     super.key,
   });
@@ -18,6 +19,7 @@ class ChannelLinkSheet extends StatefulWidget {
 
   /// Set to re-link an existing channel instead of creating a new one.
   final String? channelId;
+  final bool readAlong;
   final Duration pollInterval;
 
   @override
@@ -63,6 +65,7 @@ class _ChannelLinkSheetState extends State<ChannelLinkSheet> {
         '/api/v1/channels/link',
         data: {
           'kind': widget.kind,
+          if (widget.readAlong) 'readAlong': true,
           if (widget.channelId != null) 'channelId': widget.channelId,
         },
       );
@@ -158,13 +161,13 @@ class _ChannelLinkSheetState extends State<ChannelLinkSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Link ${kind.label}',
+              widget.readAlong ? 'Connect your WhatsApp' : 'Link ${kind.label}',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 6),
             Text(
               _whatsapp
-                  ? 'Open WhatsApp → Settings → Linked devices → Link a device, then scan this code.'
+                  ? '${widget.readAlong ? 'Use your personal WhatsApp account. ' : ''}Open WhatsApp → Settings → Linked devices → Link a device, then scan this code.'
                   : 'Open Signal → Settings → Linked devices → Link new device, then scan this code.',
               style: Theme.of(
                 context,
@@ -199,7 +202,9 @@ class _ChannelLinkSheetState extends State<ChannelLinkSheet> {
               ),
             const SizedBox(height: 12),
             Text(
-              widget.channelId == null
+              widget.readAlong
+                  ? 'After linking, choose the chats Jarvis may read. All chats start off. Replies are sent only when you tap Send or approve them.'
+                  : widget.channelId == null
                   ? 'Your own number is allowed automatically, so you can message yourself to talk to Jarvis.'
                   : 'Scan with the same phone number to reconnect.',
               textAlign: TextAlign.center,

@@ -3,7 +3,12 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
-typedef RecordedRequest = ({String method, String path, Object? body});
+typedef RecordedRequest = ({
+  String method,
+  String path,
+  Object? body,
+  Map<String, dynamic> query,
+});
 
 /// Serves canned JSON by "METHOD /path" and records every request with its decoded body.
 class FixtureHttp implements HttpClientAdapter {
@@ -31,8 +36,15 @@ class FixtureHttp implements HttpClientAdapter {
   ) async {
     Object? body = options.data;
     if (body is String && body.isNotEmpty) body = jsonDecode(body);
-    requests.add((method: options.method, path: options.path, body: body));
-    final key = '${options.method} ${options.path}';
+    requests.add((
+      method: options.method,
+      path: options.path,
+      body: body,
+      query: Map.of(options.queryParameters),
+    ));
+    final baseKey = '${options.method} ${options.path}';
+    final queryKey = '$baseKey?${options.uri.query}';
+    final key = responses.containsKey(queryKey) ? queryKey : baseKey;
     final status = statuses[key] ?? (responses.containsKey(key) ? 200 : 404);
     return ResponseBody.fromString(
       jsonEncode(responses[key] ?? const <String, Object>{}),

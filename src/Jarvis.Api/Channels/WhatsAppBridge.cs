@@ -146,8 +146,9 @@ public sealed class WhatsAppLinkedReceiver(IServiceScopeFactory scopes, WhatsApp
             if (messages.Count == 0) continue;
             // Enqueue is idempotent per external id, so a failed ack only means a harmless re-delivery.
             foreach (var message in messages)
-                await repository.EnqueueInboundAsync(connection.Id, message.From, message.Text, $"wa:{message.Id}",
-                    cancellationToken);
+                if (ChannelAddresses.IsAllowed(connection, message.From))
+                    await repository.EnqueueInboundAsync(connection.Id, message.From, message.Text, $"wa:{message.Id}",
+                        cancellationToken);
             await bridge.AckAsync(connection.Id, messages.Select(message => message.Id), cancellationToken);
         }
     }

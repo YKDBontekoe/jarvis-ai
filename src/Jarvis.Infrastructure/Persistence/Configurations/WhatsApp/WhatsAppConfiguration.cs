@@ -19,6 +19,7 @@ internal sealed class WhatsAppChatConfiguration : IEntityTypeConfiguration<Whats
         builder.Property(x => x.AutoReminders).HasColumnName("auto_reminders");
         builder.Property(x => x.LastMessageAt).HasColumnName("last_message_at");
         builder.Property(x => x.LastReceivedAt).HasColumnName("last_received_at");
+        builder.Property(x => x.ReadThrough).HasColumnName("read_through");
         builder.Property(x => x.ScannedThrough).HasColumnName("scanned_through");
         builder.Property(x => x.ScanLeaseUntil).HasColumnName("scan_lease_until");
         builder.Property(x => x.AskConversationId).HasColumnName("ask_conversation_id");

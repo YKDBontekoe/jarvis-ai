@@ -33,7 +33,7 @@ public sealed class ChannelLinkService(WhatsAppBridgeClient bridge, ChannelOptio
     private readonly ConcurrentDictionary<Guid, Attempt> attempts = new();
 
     private sealed class Attempt(Guid id, Guid ownerId, string kind, Guid? existingChannelId,
-        IReadOnlySet<string> baselineAccounts, string? signalQr)
+        IReadOnlySet<string> baselineAccounts, string? signalQr, bool readAlong)
     {
         public Guid Id { get; } = id;
         public Guid OwnerId { get; } = ownerId;
@@ -41,6 +41,7 @@ public sealed class ChannelLinkService(WhatsAppBridgeClient bridge, ChannelOptio
         public Guid? ExistingChannelId { get; } = existingChannelId;
         public IReadOnlySet<string> BaselineAccounts { get; } = baselineAccounts;
         public string? SignalQr { get; } = signalQr;
+        public bool ReadAlong { get; } = readAlong;
         public DateTimeOffset StartedAt { get; } = DateTimeOffset.UtcNow;
         public SemaphoreSlim Gate { get; } = new(1, 1);
         public ChannelLinkStatus? Final { get; set; }
@@ -51,10 +52,12 @@ public sealed class ChannelLinkService(WhatsAppBridgeClient bridge, ChannelOptio
 
     /// <summary>Starts linking. Pass <paramref name="channelId"/> to re-link an existing channel.</summary>
     public async Task<ChannelLinkStatus?> StartAsync(Guid ownerId, string kind, Guid? channelId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool readAlong = false)
     {
         if (kind is not (ChannelKinds.WhatsAppLinked or ChannelKinds.Signal))
             throw new ArgumentException("Only WhatsApp and Signal can be linked with a QR code.");
+        if (readAlong && (kind != ChannelKinds.WhatsAppLinked || channelId is not null))
+            throw new ArgumentException("Read along setup needs a new linked WhatsApp account.");
         Purge();
 
         Guid linkId;
@@ -85,7 +88,7 @@ public sealed class ChannelLinkService(WhatsAppBridgeClient bridge, ChannelOptio
             signalQr = await CreateSignalQrAsync(cancellationToken);
         }
 
-        attempts[linkId] = new Attempt(linkId, ownerId, kind, channelId, baseline, signalQr);
+        attempts[linkId] = new Attempt(linkId, ownerId, kind, channelId, baseline, signalQr, readAlong);
         return await GetAsync(ownerId, linkId, cancellationToken);
     }
 
@@ -148,8 +151,10 @@ public sealed class ChannelLinkService(WhatsAppBridgeClient bridge, ChannelOptio
             return await FinishAsync(attempt, ChannelLinkStates.Linked, phone, existingId, null, null,
                 cleanup: false, cancellationToken);
 
-        var request = new SaveChannelRequest(attempt.Kind, ChannelKinds.Label(attempt.Kind), phone, true, [phone],
-            true, phone, null);
+        var request = attempt.ReadAlong
+            ? new SaveChannelRequest(attempt.Kind, "My WhatsApp", phone, true, [], false, null, null)
+            : new SaveChannelRequest(attempt.Kind, ChannelKinds.Label(attempt.Kind), phone, true, [phone],
+                true, phone, null);
         try
         {
             // The bridge session id doubles as the connection id, so sending and receiving need no extra mapping.

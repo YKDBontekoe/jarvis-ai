@@ -33,6 +33,7 @@ import '../settings/model_settings_screen.dart';
 import '../settings/voice_settings_screen.dart';
 import '../skills/skills_screen.dart';
 import '../usage/usage_screen.dart';
+import '../whatsapp/whatsapp_screen.dart';
 
 /// Destination of one project's page: the prefix followed by its id.
 const projectDestinationPrefix = 'project:';
@@ -89,6 +90,7 @@ Widget? utilityPageFor(
   'learning' => LearningScreen(http: http),
   'graph' => KnowledgeGraphScreen(http: http),
   'channels' => ChannelsScreen(http: http),
+  'whatsapp' => WhatsAppScreen(http: http),
   'coding' => CodingRunsScreen(http: http),
   'agents' => AgentsScreen(http: http),
   'devices' => DevicesScreen(http: http),

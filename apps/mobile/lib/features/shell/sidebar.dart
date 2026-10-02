@@ -105,6 +105,11 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     onTap: () => widget.onUtility('today'),
                   ),
                   _NavRow(
+                    icon: PhosphorIconsRegular.whatsappLogo,
+                    label: 'WhatsApp',
+                    onTap: () => widget.onUtility('whatsapp'),
+                  ),
+                  _NavRow(
                     icon: PhosphorIconsRegular.listChecks,
                     label: 'Tasks',
                     onTap: () => widget.onUtility('tasks'),
