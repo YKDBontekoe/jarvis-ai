@@ -37,6 +37,7 @@ Top-level screens outside `features/`: `conversations_screen.dart`, `reminders_s
 - `lib/api/jarvis_http.dart` — authenticated HTTP wrapper.
 - `lib/features/chat/chat_screen_realtime.dart` — SignalR `/hubs/events`.
 - `lib/push/firebase_bootstrap.dart` — FCM registration (`PUT /push-devices`).
+- `lib/push/notification_actions.dart` — iOS notification buttons. The server sets `aps.category` (`jarvis.reminder`: Done, Snooze 10 min; `jarvis.approval`: Open). `ios/Runner/AppDelegate.swift` registers the categories and keeps the app awake briefly for background buttons; Dart receives the button id through `onMessageOpenedApp` and calls `POST /notifications/{id}/actions`. Android shows no buttons.
 
 ## Generative UI
 

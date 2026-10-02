@@ -129,6 +129,7 @@ public interface IReminderRepository
 public interface INotificationRepository
 {
     Task<IReadOnlyList<NotificationRecord>> ListNotificationsAsync(Guid ownerId, CancellationToken cancellationToken);
+    Task<NotificationRecord?> GetNotificationAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<bool> MarkReadAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
 
     /// <summary>Stores an in-app notification and queues push delivery to the owner's devices.</summary>

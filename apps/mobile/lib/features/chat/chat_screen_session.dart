@@ -47,7 +47,7 @@ mixin _ChatScreenSession on _ChatScreenController {
         final initialPush = await FirebaseMessaging.instance
             .getInitialMessage();
         if (initialPush != null && !stale()) {
-          _handlePushPayload(initialPush.data);
+          _onPushOpened(initialPush);
         }
       }
       if (mounted && generation == _initGeneration) {
