@@ -65,9 +65,10 @@ void installErrorReporting() {
     );
     previous?.call(details);
   };
+  final previousPlatformError = PlatformDispatcher.instance.onError;
   PlatformDispatcher.instance.onError = (error, stack) {
     reportError(error, stack, context: 'platform', capture: false);
-    return true;
+    return previousPlatformError?.call(error, stack) ?? true;
   };
 }
 

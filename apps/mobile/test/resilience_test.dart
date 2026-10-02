@@ -1,3 +1,5 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,6 +42,40 @@ void main() {
     expect(filterSentryLog(log(SentryLogLevel.info)), isNull);
     final warning = log(SentryLogLevel.warn);
     expect(filterSentryLog(warning), same(warning));
+  });
+
+  test('error reporting preserves Sentry platform and framework handlers', () {
+    final dispatcher = PlatformDispatcher.instance;
+    final originalPlatformHandler = dispatcher.onError;
+    final originalFrameworkHandler = FlutterError.onError;
+    final error = StateError('uncaught');
+    final stack = StackTrace.current;
+    final contexts = <String?>[];
+    var platformCaptures = 0;
+    var frameworkCaptures = 0;
+    addTearDown(() {
+      dispatcher.onError = originalPlatformHandler;
+      FlutterError.onError = originalFrameworkHandler;
+    });
+    errorSink = (_, _, context) => contexts.add(context);
+    dispatcher.onError = (exception, trace) {
+      expect(exception, same(error));
+      expect(trace, same(stack));
+      platformCaptures++;
+      return false;
+    };
+    FlutterError.onError = (details) {
+      expect(details.exception, same(error));
+      frameworkCaptures++;
+    };
+
+    installErrorReporting();
+
+    expect(dispatcher.onError!(error, stack), isFalse);
+    FlutterError.onError!(FlutterErrorDetails(exception: error, stack: stack));
+    expect(platformCaptures, 1);
+    expect(frameworkCaptures, 1);
+    expect(contexts, ['platform', 'flutter']);
   });
 
   testWidgets('a storage failure at startup keeps the user signed in', (
