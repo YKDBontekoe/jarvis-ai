@@ -38,9 +38,10 @@ internal sealed class ExpenseContextContributor : IAgentContextContributor
     public int Order => 47;
 
     public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
-        [new GuidanceProvider()];
+        [new ExpenseGuidanceProvider()];
 
-    private sealed class GuidanceProvider : MessageAIContextProvider
+    // Agent Framework stores provider state under the concrete type's simple name.
+    private sealed class ExpenseGuidanceProvider : MessageAIContextProvider
     {
         protected override ValueTask<IEnumerable<ChatMessage>> ProvideMessagesAsync(InvokingContext context,
             CancellationToken cancellationToken = default) =>
