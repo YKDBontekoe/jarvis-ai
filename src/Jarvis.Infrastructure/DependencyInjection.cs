@@ -49,6 +49,9 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Expenses.IExpenseService, Jarvis.Application.Expenses.ExpenseService>();
         services.AddScoped<Jarvis.Application.Habits.IHabitRepository, HabitRepository>();
         services.AddScoped<Jarvis.Application.Habits.IHabitService, Jarvis.Application.Habits.HabitService>();
+        services.AddScoped<Jarvis.Application.People.IPeopleRepository, PeopleRepository>();
+        services.AddScoped<Jarvis.Application.People.IPeopleService, Jarvis.Application.People.PeopleService>();
+        services.AddScoped<Jarvis.Application.People.IPeopleCheckInService, Jarvis.Application.People.PeopleCheckInService>();
         services.AddScoped<Jarvis.Application.Channels.IChannelRepository, ChannelRepository>();
         services.AddScoped<Jarvis.Application.Devices.IDeviceTelemetryStore, DeviceTelemetryStore>();
         services.AddScoped<Jarvis.Application.Integrations.IMcpOAuthSessionStore, McpOAuthSessionStore>();

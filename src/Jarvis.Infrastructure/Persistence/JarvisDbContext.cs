@@ -49,6 +49,7 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<ExpenseEntity> Expenses => Set<ExpenseEntity>();
     public DbSet<HabitEntity> Habits => Set<HabitEntity>();
     public DbSet<HabitCheckInEntity> HabitCheckIns => Set<HabitCheckInEntity>();
+    public DbSet<PersonEntity> People => Set<PersonEntity>();
     public DbSet<SkillEntity> Skills => Set<SkillEntity>();
     public DbSet<SkillRevisionEntity> SkillRevisions => Set<SkillRevisionEntity>();
     public DbSet<MessageFeedbackEntity> MessageFeedback => Set<MessageFeedbackEntity>();

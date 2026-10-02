@@ -34,6 +34,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Day planner | `PlannerAgentTools` `GetTodayPlan`, `AddToDayPlan`, `PlanMyDay`, `CompleteDayPlanItem`, `RemoveDayPlanItem` | No approval: they only change the owner's day plan in Jarvis. Calendar writes go through `InvokeMcpTool` (approval) per the planner guidance |
 | Expenses | `ExpenseAgentTools` `LogExpense` (skips an identical expense on the same day; `fromPhoto` keeps the latest chat photo as the receipt), `GetExpenses` (month summary and list), `UpdateExpense` | **DeleteExpense** requires approval. The rest only change the owner's own log. `ExpenseContextContributor` adds when-to-log guidance each turn |
 | Habits | `HabitAgentTools` `GetHabits`, `CheckInHabits` (by name, optional date up to 7 days back), `CreateHabit` | No approval (owner's own tracking data); hidden during background task turns. Deleting habits is app-only |
+| People | `PeopleAgentTools` `GetPeople`, `SavePerson` (creates or updates; only passed fields change), `LogContact`, `RemovePerson` | `RemovePerson` requires **approval**; the rest need none (owner's own data). Save/log are off when the profile disallows remembering. `PeopleContextContributor` adds names, birthdays in the next 14 days and due check-ins each turn |
 | MCP | `McpServerAgentTools` + `McpSetupAgentTools` | Discover/add/update/invoke/read prompt/resource/remove mostly **approval**; setup and secret cards in chat |
 | Coding | `CodexCodingTools.RunCodingTaskAsync` | **Approval**; only if `Coding:Repositories` configured |
 

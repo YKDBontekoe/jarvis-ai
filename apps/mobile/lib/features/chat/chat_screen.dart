@@ -34,6 +34,7 @@ import '../../ui/phosphor_icons.dart';
 import '../devices/device_invoke.dart';
 import '../devices/device_telemetry.dart';
 import '../home/home_overview.dart';
+import '../people/people_screen.dart';
 import '../settings/settings_view.dart';
 import '../search/command_palette.dart';
 import '../search/recent_searches_store.dart';

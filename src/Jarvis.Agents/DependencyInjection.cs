@@ -63,6 +63,8 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Expenses.IReceiptReader, Expenses.ReceiptReader>();
         services.AddScoped<IAgentToolContributor, Habits.HabitToolContributor>();
         services.AddScoped<IAgentContextContributor, Habits.HabitContextContributor>();
+        services.AddScoped<IAgentToolContributor, People.PeopleToolContributor>();
+        services.AddScoped<IAgentContextContributor, People.PeopleContextContributor>();
         services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();
         services.AddScoped<IAgentContextContributor, Persona.PersonaContextContributor>();
         services.AddScoped<IAgentContextContributor, Learning.UserSummaryContextContributor>();

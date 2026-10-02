@@ -89,6 +89,17 @@ Body: `entryDate`, `content` (≤ 6,000), `highlights`, `gratitude` (≤ 1,000 e
 
 Owner-scoped (`expenses` table). Categories: groceries, dining, transport, shopping, housing, bills, health, entertainment, travel, subscriptions, other; missing ones are guessed from the merchant and note. A missing currency reuses the owner's last one (EUR at first); "today" uses the daily-briefing time zone. Amounts in other currencies are listed separately, never converted. Audit events (`expenses` tool) carry the expense id only.
 
+## People
+
+| Method | Path |
+|--------|------|
+| GET/POST | `/people` (body: `name` ≤ 80, `relationship` ≤ 40, `birthdayMonth`/`birthdayDay`/`birthYear` (year optional), `notes` ≤ 2,000, `contactEveryDays` 1–365, optional `graphEntityId`) |
+| GET | `/people/suggestions` (knowledge-graph people not on the list yet, with relationship and birthday when known) |
+| GET/PUT/DELETE | `/people/{id}` (GET returns `person` plus current graph `facts` when linked) |
+| POST | `/people/{id}/contact` (optional `at`; records "last talked") |
+
+Owner-scoped (`people` table). Names are unique per owner ignoring case and accents. `daysUntilBirthday`, `daysSinceContact` and `contactDue` use the daily-briefing time zone (UTC fallback). A new person links to the graph entity of the same name. Audit events (`people` tool) carry the person id only.
+
 Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints` and `PersonalAssistantEndpoints` (`/graph/...`).
 
 

@@ -68,6 +68,7 @@ internal static class TemporalWorkerRegistration
         var briefings = services.GetRequiredService<DailyBriefingActivities>();
         var heartbeat = services.GetRequiredService<AssistantHeartbeatActivities>();
         var dreaming = services.GetRequiredService<AssistantDreamingActivities>();
+        var people = services.GetRequiredService<PeopleCheckInActivities>();
         var automationRuns = services.GetRequiredService<AutomationRunActivities>();
         var automationSchedules = services.GetRequiredService<AutomationScheduleActivities>();
         var automationPolls = services.GetRequiredService<AutomationPollActivities>();
@@ -82,6 +83,7 @@ internal static class TemporalWorkerRegistration
             .AddWorkflow<DailyBriefingWorkflow>()
             .AddWorkflow<AssistantHeartbeatWorkflow>()
             .AddWorkflow<AssistantDreamingWorkflow>()
+            .AddWorkflow<PeopleCheckInWorkflow>()
             .AddWorkflow<AutomationRunWorkflow>()
             .AddWorkflow<AutomationScheduleWorkflow>()
             .AddWorkflow<AutomationPollWorkflow>()
@@ -101,6 +103,7 @@ internal static class TemporalWorkerRegistration
             .AddActivity(briefings.DeliverAsync)
             .AddActivity(heartbeat.RunAsync)
             .AddActivity(dreaming.RunAsync)
+            .AddActivity(people.RunAsync)
             .AddActivity(automationRuns.ExecuteAsync)
             .AddActivity(automationRuns.CompleteAfterApprovalAsync)
             .AddActivity(automationRuns.CloseRunAsync)

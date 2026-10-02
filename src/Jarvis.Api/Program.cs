@@ -87,6 +87,7 @@ api.MapCollectionEndpoints();
 api.MapLearningEndpoints(app.Logger);
 api.MapUsageEndpoints();
 api.MapKnowledgeGraphEndpoints();
+api.MapPeopleEndpoints(app.Logger);
 api.MapChannelEndpoints(app.Logger);
 api.MapSurfaceEndpoints();
 api.MapA2AManagementEndpoints();
