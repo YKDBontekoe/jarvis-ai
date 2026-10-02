@@ -12,6 +12,8 @@ if [[ "$name" == whatsapp-bridge ]]; then
   exit 1
 fi
 docker run --rm --entrypoint node "$image" --version
+docker run --rm --entrypoint npm "$image" --version
+docker run --rm --entrypoint codex "$image" --version
 docker run --rm --entrypoint github-mcp-server "$image" --version
 if [[ "$name" == api ]]; then assembly=Jarvis.Api; else assembly=Jarvis.Worker; fi
 docker run --rm --entrypoint sh "$image" -c "test -s /app/${assembly}.dll"
