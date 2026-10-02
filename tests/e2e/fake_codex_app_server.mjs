@@ -23,6 +23,8 @@ const CONTEXT_PREFIXES = [
   'Browser agent',
   'Active assistant profile',
   'MCP and integrations',
+  'Journaling:',
+  'Day planner:',
 ];
 
 const send = message => process.stdout.write(JSON.stringify(message) + '\n');

@@ -85,6 +85,11 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     onTap: widget.onVoice,
                   ),
                   _NavRow(
+                    icon: PhosphorIconsRegular.sunHorizon,
+                    label: 'Today',
+                    onTap: () => widget.onUtility('today'),
+                  ),
+                  _NavRow(
                     icon: PhosphorIconsRegular.listChecks,
                     label: 'Tasks',
                     onTap: () => widget.onUtility('tasks'),
