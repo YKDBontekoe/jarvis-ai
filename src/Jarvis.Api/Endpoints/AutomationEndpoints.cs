@@ -181,12 +181,13 @@ internal static class AutomationEndpoints
             try
             {
                 var task = await tasks.CreateAsync(currentUser.OwnerId, request.Title, request.Prompt, ct,
-                    request.ProfileId);
+                    request.ProfileId, request.ProjectId);
                 return Results.Created($"/api/v1/tasks/{task.Id}", task.ToDto());
             }
             catch (ArgumentException exception)
             {
-                return EndpointHelpers.Invalid("profileId", exception.Message);
+                return EndpointHelpers.Invalid(exception.ParamName == "projectId" ? "projectId" : "profileId",
+                    exception.Message);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {

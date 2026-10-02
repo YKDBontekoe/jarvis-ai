@@ -34,6 +34,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         icon: PhosphorIconsRegular.sunHorizon,
         destination: 'briefing',
       ),
+      (
+        title: 'Weekly review',
+        subtitle: 'A Sunday look back at your week, with trends',
+        icon: PhosphorIconsRegular.chartLine,
+        destination: 'weekly-review',
+      ),
     ],
   ),
   (

@@ -41,13 +41,14 @@ internal sealed class CoreAgentTools(
     ICodingRunStore codingRuns,
     ICodingPullRequestService codingPullRequests,
     INotificationRepository notificationRepository,
+    Jarvis.Application.Projects.IProjectStore projects,
     Jarvis.Application.Diagnostics.IRecentFaultLog? recentFaults = null,
     TimeProvider? timeProvider = null,
     Jarvis.Application.Devices.IDeviceTelemetryStore? deviceTelemetry = null) : IAgentToolContributor
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context)
     {
-        var taskTools = new TaskAgentTools(taskService, currentUser, context.Profile);
+        var taskTools = new TaskAgentTools(taskService, currentUser, context.Profile, projects, context.ConversationId);
         var memoryTools = new MemoryAgentTools(memoryService, reranker, auditEvents, currentUser,
             loggerFactory.CreateLogger<MemoryAgentTools>(), recalls, context.Profile);
         var watchTools = new ConditionWatchAgentTools(watchService, currentUser);

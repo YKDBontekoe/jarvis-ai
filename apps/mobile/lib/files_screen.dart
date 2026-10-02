@@ -13,7 +13,7 @@ import 'theme.dart';
 import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
 
-const _allowedExtensions = [
+const uploadableFileExtensions = [
   'pdf',
   'txt',
   'log',
@@ -26,7 +26,7 @@ const _allowedExtensions = [
   'png',
   'webp',
 ];
-const _maxFileBytes = 20 * 1024 * 1024;
+const maxUploadBytes = 20 * 1024 * 1024;
 
 class FilesScreen extends StatefulWidget {
   const FilesScreen({required this.http, super.key});
@@ -93,12 +93,12 @@ class _FilesScreenState extends State<FilesScreen> {
   Future<void> _upload() async {
     final file = await FilePicker.pickFile(
       type: FileType.custom,
-      allowedExtensions: _allowedExtensions,
+      allowedExtensions: uploadableFileExtensions,
     );
     if (file == null) return;
     final bytes = await file.readAsBytes();
     if (!mounted) return;
-    if (bytes.isEmpty || bytes.length > _maxFileBytes) {
+    if (bytes.isEmpty || bytes.length > maxUploadBytes) {
       _showError('Choose a non-empty file up to 20 MB.');
       return;
     }
@@ -109,7 +109,7 @@ class _FilesScreenState extends State<FilesScreen> {
         'file': MultipartFile.fromBytes(
           bytes,
           filename: file.name,
-          contentType: DioMediaType.parse(_contentTypeFor(file.name)),
+          contentType: DioMediaType.parse(uploadContentTypeFor(file.name)),
         ),
       });
       await widget.http.post(
@@ -455,7 +455,7 @@ class _FilesScreenState extends State<FilesScreen> {
       };
 }
 
-String _contentTypeFor(String fileName) {
+String uploadContentTypeFor(String fileName) {
   final extension = fileName.split('.').last.toLowerCase();
   return switch (extension) {
     'pdf' => 'application/pdf',

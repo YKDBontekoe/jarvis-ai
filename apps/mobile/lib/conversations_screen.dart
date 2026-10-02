@@ -6,6 +6,7 @@ import 'ui/phosphor_icons.dart';
 
 import 'conversation_export.dart';
 import 'conversation_groups.dart';
+import 'features/projects/move_to_project.dart';
 import 'theme.dart';
 import 'json_maps.dart';
 import 'ui/jarvis_ui.dart';
@@ -166,6 +167,19 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     } finally {
       if (mounted) setState(() => _updating.remove(id));
     }
+  }
+
+  Future<void> _moveToProject(Map<String, dynamic> conversation) async {
+    final id = jsonString(conversation, 'id');
+    if (id == null || _updating.contains(id)) return;
+    final moved = await showMoveToProjectSheet(
+      context,
+      http: widget.http,
+      kind: 'conversations',
+      id: id,
+      currentProjectId: asJsonString(conversation['projectId']),
+    );
+    if (moved && mounted) await _load();
   }
 
   Future<void> _togglePin(Map<String, dynamic> conversation) => _update(
@@ -443,6 +457,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                 onSelected: (value) => switch (value) {
                   'rename' => _rename(conversation),
                   'pin' => _togglePin(conversation),
+                  'project' => _moveToProject(conversation),
                   'copy' => _copyAsMarkdown(conversation),
                   'delete' => _deleteConversation(conversation),
                   _ => Future<void>.value(),
@@ -460,6 +475,15 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                     child: _MenuRow(
                       icon: PhosphorIconsRegular.pushPin,
                       label: pinned ? 'Unpin' : 'Pin to top',
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'project',
+                    child: _MenuRow(
+                      icon: PhosphorIconsRegular.folderSimple,
+                      label: conversation['projectId'] is String
+                          ? 'Move to another project'
+                          : 'Move to project',
                     ),
                   ),
                   const PopupMenuItem(

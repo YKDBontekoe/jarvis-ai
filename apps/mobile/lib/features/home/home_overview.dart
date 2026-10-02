@@ -11,6 +11,8 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../chat/chat_widgets.dart';
 import '../chat/mcp_setup.dart';
+import '../planner/day_planner_screen.dart';
+import '../habits/habits_home_card.dart';
 import '../usage/usage_screen.dart';
 
 part 'home_overview_widgets.dart';
@@ -31,6 +33,7 @@ class HomeOverview extends StatefulWidget {
     this.onOpenReminders,
     this.onOpenIntegrations,
     this.onOpenCoding,
+    this.onOpenHabits,
     super.key,
   });
 
@@ -60,6 +63,9 @@ class HomeOverview extends StatefulWidget {
 
   /// Opens coding-run review.
   final VoidCallback? onOpenCoding;
+
+  /// Opens habits; today's habits are shown when this is set.
+  final VoidCallback? onOpenHabits;
 
   @override
   State<HomeOverview> createState() => _HomeOverviewState();
@@ -165,10 +171,9 @@ class _HomeOverviewState extends State<HomeOverview>
         cancelToken: request,
       );
       final tasks =
-          jsonMaps(response.data)
-              .map(_ActiveTask.fromJson)
-              .whereType<_ActiveTask>()
-              .toList()
+          jsonMaps(
+              response.data,
+            ).map(_ActiveTask.fromJson).whereType<_ActiveTask>().toList()
             ..sort((a, b) {
               final priority = a.priority.compareTo(b.priority);
               return priority != 0
@@ -202,6 +207,16 @@ class _HomeOverviewState extends State<HomeOverview>
       ),
     );
     if (mounted) await _load();
+  }
+
+  Future<void> _openToday() async {
+    final ask = widget.onSuggestion;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => DayPlannerScreen(http: widget.http, onAskInChat: ask),
+      ),
+    );
+    if (mounted) unawaited(_loadBriefing());
   }
 
   Widget _briefingSections() {
@@ -270,7 +285,7 @@ class _HomeOverviewState extends State<HomeOverview>
           const SizedBox(height: 12),
           _BriefingListCard(
             key: const Key('home-calendar'),
-            icon: PhosphorIconsRegular.calendarBlank,
+            icon: PhosphorIconsRegular.sunHorizon,
             title: asJsonBool(calendar['connected'])
                 ? 'Today’s calendar'
                 : 'Upcoming events',
@@ -284,18 +299,31 @@ class _HomeOverviewState extends State<HomeOverview>
                       : '$title · ${_shortWhen(start)}';
                 })
                 .join('\n'),
-            onTap: widget.onOpenIntegrations,
+            onTap: _openToday,
           ),
         ] else if (asJsonBool(calendar['connected']) == false &&
-            (widget.onSuggestion != null || widget.onOpenIntegrations != null)) ...[
+            (widget.onSuggestion != null ||
+                widget.onOpenIntegrations != null)) ...[
           const SizedBox(height: 12),
           _BriefingListCard(
             icon: PhosphorIconsRegular.calendarBlank,
             title: 'Connect a calendar',
-            subtitle: 'Ask Jarvis to add your calendar so today’s events show up here.',
+            subtitle:
+                'Ask Jarvis to add your calendar so today’s events show up here.',
             onTap: widget.onSuggestion == null
                 ? widget.onOpenIntegrations
                 : () => widget.onSuggestion!(mcpCalendarPrompt),
+          ),
+        ],
+        if (events.isEmpty) ...[
+          const SizedBox(height: 12),
+          _BriefingListCard(
+            key: const Key('home-today'),
+            icon: PhosphorIconsRegular.sunHorizon,
+            title: 'Plan your day',
+            subtitle:
+                'Add what you want to get done and Jarvis fits it into your free time.',
+            onTap: _openToday,
           ),
         ],
         if (device != null) ...[
@@ -312,7 +340,8 @@ class _HomeOverviewState extends State<HomeOverview>
           ),
         ],
         if (missingPacks.isNotEmpty &&
-            (widget.onSuggestion != null || widget.onOpenIntegrations != null)) ...[
+            (widget.onSuggestion != null ||
+                widget.onOpenIntegrations != null)) ...[
           const SizedBox(height: 12),
           _BriefingListCard(
             icon: PhosphorIconsRegular.plugsConnected,
@@ -370,7 +399,8 @@ class _HomeOverviewState extends State<HomeOverview>
         label: 'Say hello',
         hint: 'Ask what Jarvis can do',
         done: sent > 0,
-        onTap: () => widget.onSuggestion!('Hi Jarvis! What can you help me with?'),
+        onTap: () =>
+            widget.onSuggestion!('Hi Jarvis! What can you help me with?'),
       ),
       _StartStep(
         label: 'Connect an app',
@@ -572,7 +602,8 @@ class _HomeOverviewState extends State<HomeOverview>
                         ],
                       ),
                       const SizedBox(height: 36),
-                      if (_checklist case final steps? when steps.isNotEmpty) ...[
+                      if (_checklist case final steps?
+                          when steps.isNotEmpty) ...[
                         _GetStartedCard(steps: steps),
                         const SizedBox(height: 20),
                       ],
@@ -580,6 +611,13 @@ class _HomeOverviewState extends State<HomeOverview>
                         _briefingSections(),
                         const SizedBox(height: 28),
                       ],
+                      if (widget.onOpenHabits case final openHabits?
+                          when widget.ready)
+                        HabitsHomeCard(
+                          http: widget.http,
+                          onOpen: openHabits,
+                          refreshRevision: widget.refreshRevision,
+                        ),
                       if (_usage != null && widget.onOpenUsage != null) ...[
                         _usageCard(),
                         const SizedBox(height: 28),

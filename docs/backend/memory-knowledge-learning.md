@@ -19,8 +19,10 @@ Jarvis combines **structured memory**, **semantic search**, a **temporal knowled
    document frequency within the owner's active memories and by memory length (BM25-style), normalised so 1 means all
    original terms matched. Terms the keyword match missed get a pg_trgm word-similarity score, which catches typos and
    Dutch compounds (`gesprek` in `salarisgesprek`). Each term is looked up through the GIN indexes.
-3. **Semantic retrieval** (when an embedding model is configured): the embedding request runs while the keyword query
-   runs; pgvector returns cosine similarities.
+3. **Semantic retrieval** (when an embedding model is configured): after lexical retrieval completes, the embedding
+   model is resolved and the query is embedded, then pgvector returns cosine similarities. These operations are awaited
+   sequentially because model settings, embedding usage recording, and memory repositories share a scoped database
+   context. If the embedding provider is unavailable, keyword results still answer.
 4. **Hybrid ranking** (`MemoryRanking`): keyword and semantic relevance are fused as a probabilistic OR, then scaled by
    importance, a recency curve (90-day half-life) that recall refreshes, and a log-scaled recall count. A
    score-adaptive cut drops hits below 35% of the best one, near duplicates are skipped, and at most eight remain.

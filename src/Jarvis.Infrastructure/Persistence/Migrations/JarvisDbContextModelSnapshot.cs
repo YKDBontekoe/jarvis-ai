@@ -353,6 +353,10 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.Property<int?>("ProfileVersion")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -363,11 +367,15 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ProjectId");
+
                     b.HasIndex("OwnerId", "PinnedAt");
 
                     b.HasIndex("OwnerId", "ProfileId");
 
                     b.HasIndex("OwnerId", "UpdatedAt");
+
+                    b.HasIndex("OwnerId", "ProjectId", "UpdatedAt");
 
                     b.ToTable("conversations", (string)null);
                 });
@@ -734,6 +742,53 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.HasIndex("OwnerId", "UpdatedAt");
 
                     b.ToTable("assistant_profiles", (string)null);
+                });
+
+            modelBuilder.Entity("Jarvis.Domain.Projects.Project", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("color");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Instructions")
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)")
+                        .HasColumnName("instructions");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "UpdatedAt");
+
+                    b.ToTable("projects", (string)null);
                 });
 
             modelBuilder.Entity("Jarvis.Domain.Workflows.CodingRun", b =>
@@ -1308,6 +1363,61 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.ToTable("reminders", (string)null);
                 });
 
+            modelBuilder.Entity("Jarvis.Domain.Workflows.WeeklyReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("Narrated")
+                        .HasColumnType("boolean")
+                        .HasColumnName("narrated");
+
+                    b.Property<DateTimeOffset?>("NotifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("notified_at");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("StatsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("stats");
+
+                    b.Property<string>("Story")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("story");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("time_zone_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateOnly>("WeekStart")
+                        .HasColumnType("date")
+                        .HasColumnName("week_start");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "WeekStart")
+                        .IsUnique();
+
+                    b.ToTable("weekly_reviews", (string)null);
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Identity.AuthRefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1790,6 +1900,78 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.ToTable("document_collection_files", (string)null);
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.ExpenseEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<string>("Merchant")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("merchant");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<Guid?>("ReceiptFileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("receipt_file_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source");
+
+                    b.Property<DateOnly>("SpentOn")
+                        .HasColumnType("date")
+                        .HasColumnName("spent_on");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "SpentOn");
+
+                    b.ToTable("expenses", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_expenses_amount_positive", "amount > 0");
+
+                            t.HasCheckConstraint("ck_expenses_category", "category IN ('groceries', 'dining', 'transport', 'shopping', 'housing', 'bills', 'health', 'entertainment', 'travel', 'subscriptions', 'other')");
+
+                            t.HasCheckConstraint("ck_expenses_source", "source IN ('chat', 'receipt', 'app')");
+                        });
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.FileContentChunkEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1971,6 +2153,97 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.HasIndex("OwnerId", "SubjectId", "Predicate", "ValidTo");
 
                     b.ToTable("graph_relations", (string)null);
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.HabitCheckInEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("check_in_date");
+
+                    b.Property<Guid>("HabitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("habit_id");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("source");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HabitId", "Date")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "Date");
+
+                    b.ToTable("habit_check_ins", (string)null);
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.HabitEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<string>("Cadence")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("cadence");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("icon");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<int>("TargetPerWeek")
+                        .HasColumnType("integer")
+                        .HasColumnName("target_per_week");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "ArchivedAt");
+
+                    b.ToTable("habits", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_habits_cadence", "cadence IN ('daily', 'weekly')");
+
+                            t.HasCheckConstraint("ck_habits_target_per_week", "target_per_week BETWEEN 1 AND 7");
+                        });
                 });
 
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.JournalEntryEntity", b =>
@@ -2312,6 +2585,94 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.ToTable("owner_settings", (string)null);
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.PersonEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("BirthYear")
+                        .HasColumnType("integer")
+                        .HasColumnName("birth_year");
+
+                    b.Property<int?>("BirthdayDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("birthday_day");
+
+                    b.Property<int?>("BirthdayMonth")
+                        .HasColumnType("integer")
+                        .HasColumnName("birthday_month");
+
+                    b.Property<int?>("BirthdayNotifiedYear")
+                        .HasColumnType("integer")
+                        .HasColumnName("birthday_notified_year");
+
+                    b.Property<DateTimeOffset?>("CheckInNudgedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("check_in_nudged_at");
+
+                    b.Property<int?>("ContactEveryDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("contact_every_days");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("GraphEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("graph_entity_id");
+
+                    b.Property<DateTimeOffset?>("LastContactedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_contacted_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NameKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name_key");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("Relationship")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("relationship");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GraphEntityId");
+
+                    b.HasIndex("OwnerId", "NameKey")
+                        .IsUnique();
+
+                    b.ToTable("people", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_people_birthday_day", "birthday_day IS NULL OR birthday_day BETWEEN 1 AND 31");
+
+                            t.HasCheckConstraint("ck_people_birthday_month", "birthday_month IS NULL OR birthday_month BETWEEN 1 AND 12");
+
+                            t.HasCheckConstraint("ck_people_contact_every_days", "contact_every_days IS NULL OR contact_every_days BETWEEN 1 AND 365");
+                        });
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.RemoteAgentEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2518,6 +2879,10 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("processing_status");
 
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
                     b.Property<DateTimeOffset?>("ScheduleDispatchedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("schedule_dispatched_at");
@@ -2537,7 +2902,11 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.HasIndex("ObjectKey")
                         .IsUnique();
 
+                    b.HasIndex("ProjectId");
+
                     b.HasIndex("OwnerId", "CreatedAt");
+
+                    b.HasIndex("OwnerId", "ProjectId");
 
                     b.HasIndex("ProcessingStatus", "ScheduleDispatchedAt");
 
@@ -2767,6 +3136,14 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Jarvis.Domain.Conversations.Conversation", b =>
+                {
+                    b.HasOne("Jarvis.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("Jarvis.Domain.Conversations.Message", b =>
                 {
                     b.HasOne("Jarvis.Domain.Conversations.Conversation", null)
@@ -2932,6 +3309,15 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.HabitCheckInEntity", b =>
+                {
+                    b.HasOne("Jarvis.Infrastructure.Persistence.HabitEntity", null)
+                        .WithMany("CheckIns")
+                        .HasForeignKey("HabitId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.MessageFeedbackEntity", b =>
                 {
                     b.HasOne("Jarvis.Domain.Conversations.Message", null)
@@ -2941,6 +3327,14 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.PersonEntity", b =>
+                {
+                    b.HasOne("Jarvis.Infrastructure.Persistence.GraphEntityEntity", null)
+                        .WithMany()
+                        .HasForeignKey("GraphEntityId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.SkillRevisionEntity", b =>
                 {
                     b.HasOne("Jarvis.Infrastructure.Persistence.SkillEntity", null)
@@ -2948,6 +3342,14 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasForeignKey("SkillId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.StoredFileEntity", b =>
+                {
+                    b.HasOne("Jarvis.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.UiSurfaceEntity", b =>
@@ -3018,6 +3420,11 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.BrowserSessionEntity", b =>
                 {
                     b.Navigation("Steps");
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.HabitEntity", b =>
+                {
+                    b.Navigation("CheckIns");
                 });
 #pragma warning restore 612, 618
         }
