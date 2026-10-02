@@ -211,4 +211,62 @@ void main() {
       greaterThan(before),
     );
   });
+
+  testWidgets('Add opens the app catalog first', (tester) async {
+    await show(tester);
+
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('add-browse')), findsOneWidget);
+    expect(find.byKey(const Key('add-address')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('add-browse')));
+    await tester.pumpAndSettle();
+    expect(find.text('Browse apps'), findsOneWidget);
+    expect(find.text('Notion'), findsOneWidget);
+  });
+
+  testWidgets('a server missing its key asks for that key, not a sign-in', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    http.on('GET', '/api/v1/integrations/credentials', <Object>[]);
+    http.on('GET', '/api/v1/integrations/connections', [
+      {
+        'id': 'jarvis-mcp-brave',
+        'name': 'Brave Search',
+        'state': 'needs_credentials',
+        'issue': 'credentials_required',
+        'toolCount': 0,
+      },
+    ]);
+    http.on('GET', '/api/v1/mcp-servers', [
+      {
+        'id': 'jarvis-mcp-brave',
+        'name': 'Brave Search',
+        'endpoint': '',
+        'allowedTools': ['*'],
+        'hasToken': false,
+        'enabled': true,
+        'secrets': [
+          {
+            'name': 'brave_api_key',
+            'label': 'BRAVE_API_KEY',
+            'required': true,
+            'isSet': false,
+          },
+        ],
+      },
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(home: IntegrationsScreen(http: http.client())),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add BRAVE_API_KEY'), findsOneWidget);
+    expect(find.text('Sign in'), findsNothing);
+  });
 }

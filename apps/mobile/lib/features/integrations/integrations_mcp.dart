@@ -108,6 +108,10 @@ mixin _IntegrationsMcp on _IntegrationsController {
     final allTools = tools.length == 1 && tools.first == '*';
     final enabled = server['enabled'] != false;
     final hasToken = server['hasToken'] == true;
+    final secrets = jsonMaps(server['secrets']);
+    final missingKeys = secrets
+        .where((s) => s['required'] == true && s['isSet'] != true)
+        .toList();
     final health = _health(_connectionFor(id), enabled: enabled);
     return _AppCard(
       key: Key('app-$id'),
@@ -116,7 +120,19 @@ mixin _IntegrationsMcp on _IntegrationsController {
       enabled: enabled,
       onEnabled: id.isEmpty ? null : (value) => _setManagedEnabled(id, value),
       fixes: [
-        if (health.fix == _Fix.signIn) ...[
+        // A missing key is the real problem; signing in would not help.
+        if (enabled && missingKeys.isNotEmpty)
+          for (final key in missingKeys)
+            FilledButton(
+              onPressed: () => _editSecret(
+                provider: id,
+                secretName: asJsonString(key['name']),
+              ),
+              child: Text(
+                'Add ${asJsonString(key['label']) ?? asJsonString(key['name'])}',
+              ),
+            )
+        else if (health.fix == _Fix.signIn) ...[
           FilledButton(
             onPressed: () => _connectOAuth(server: id, endpoint: endpoint),
             child: const Text('Sign in'),
@@ -140,6 +156,34 @@ mixin _IntegrationsMcp on _IntegrationsController {
                   children: [for (final tool in tools) _ToolChip(tool)],
                 ),
         ),
+        if (secrets.isNotEmpty)
+          _DetailRow(
+            label: 'Keys',
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final key in secrets)
+                  ActionChip(
+                    avatar: Icon(
+                      key['isSet'] == true
+                          ? PhosphorIconsRegular.checkCircle
+                          : PhosphorIconsRegular.key,
+                      size: 16,
+                    ),
+                    label: Text(
+                      asJsonString(key['label']) ??
+                          asJsonString(key['name']) ??
+                          'Key',
+                    ),
+                    onPressed: () => _editSecret(
+                      provider: id,
+                      secretName: asJsonString(key['name']),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         if (endpoint.isNotEmpty)
           _DetailRow(
             label: 'Address',

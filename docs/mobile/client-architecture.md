@@ -29,7 +29,7 @@ root. It shares the existing account and owner-scoped data. See
 | `features/reminders/` | Reminders: state and actions in `reminders_screen.dart`, list and cards in `reminders_list.dart`, editor in `reminder_editor.dart` |
 | `features/conversations/` | Conversation history, groups, export |
 | `features/files/` | Files, collections, platform download helpers |
-| `features/integrations/` | Integrations hub: apps, packs, MCP servers, credentials |
+| `features/integrations/` | Integrations hub: apps, packs, MCP servers, credentials. `app_catalog_screen.dart` searches the app directory, installs in one tap, takes a pasted address, and asks for every key an app needs (`AppKeysDialog`) |
 | `features/approvals/`, `audit/` | Approval review, audit log |
 | `features/automations/`, `watches/`, `briefing/` | Automations, condition watches, daily briefing |
 | `features/notifications/` | Notification details and deep-link routing |

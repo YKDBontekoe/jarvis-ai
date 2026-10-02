@@ -8,6 +8,7 @@ import '../../json_maps.dart';
 import '../../http_urls.dart';
 import '../../ui/jarvis_ui.dart';
 import '../chat/mcp_setup.dart';
+import 'app_catalog_screen.dart';
 
 part 'integrations_apps.dart';
 part 'integrations_credentials.dart';
@@ -158,15 +159,17 @@ class _IntegrationsScreenState extends _IntegrationsController
           ),
   );
 
-  /// One place to start anything new: chat for guided setup, or a key for
-  /// an app the server already knows about.
+  /// One place to start anything new: find an app by name, paste its
+  /// address, let Jarvis guide it in chat, or add a key for an app the server
+  /// already knows about.
   Future<void> _showAddSheet() async {
     final ask = widget.onAskInChat;
     final choice = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -179,6 +182,24 @@ class _IntegrationsScreenState extends _IntegrationsController
                   style: Theme.of(sheetContext).textTheme.titleLarge,
                 ),
               ),
+              ListTile(
+                key: const Key('add-browse'),
+                leading: const IconBadge(
+                  icon: PhosphorIconsRegular.magnifyingGlass,
+                ),
+                title: const Text('Browse apps'),
+                subtitle: const Text(
+                  'Search by name, like Notion or web search, and connect in one tap',
+                ),
+                onTap: () => Navigator.pop(sheetContext, 'browse'),
+              ),
+              ListTile(
+                key: const Key('add-address'),
+                leading: const IconBadge(icon: PhosphorIconsRegular.linkSimple),
+                title: const Text('Paste an address'),
+                subtitle: const Text('When the app gave you a link to use'),
+                onTap: () => Navigator.pop(sheetContext, 'address'),
+              ),
               if (ask != null)
                 ListTile(
                   leading: const IconBadge(
@@ -186,7 +207,7 @@ class _IntegrationsScreenState extends _IntegrationsController
                   ),
                   title: const Text('Ask Jarvis to set it up'),
                   subtitle: const Text(
-                    'Jarvis walks you through it in chat. Easiest.',
+                    'Describe what you want and Jarvis finds the right app in chat',
                   ),
                   onTap: () => Navigator.pop(sheetContext, 'chat'),
                 ),
@@ -205,10 +226,37 @@ class _IntegrationsScreenState extends _IntegrationsController
     );
     if (!mounted) return;
     switch (choice) {
+      case 'browse':
+        await _openCatalog();
+      case 'address':
+        await _openCatalog(address: true);
       case 'chat':
         _askInChat(mcpSetupPrompt);
       case 'key':
         await _editSecret();
+    }
+  }
+
+  Future<void> _openCatalog({bool address = false}) async {
+    final outcome = await Navigator.of(context).push<AppInstallOutcome>(
+      MaterialPageRoute(
+        builder: (_) =>
+            AppCatalogScreen(http: widget.http, startWithAddress: address),
+      ),
+    );
+    if (outcome == null || !mounted) return;
+    await _load();
+    if (!mounted) return;
+    final message = switch (outcome.nextStep) {
+      'sign_in' => 'Added ${outcome.name}. Sign in to finish.',
+      'secrets' => 'Added ${outcome.name}. Add its key to finish.',
+      _ => '${outcome.name} is connected.',
+    };
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+    if (outcome.nextStep == 'sign_in') {
+      await _connectOAuth(server: outcome.serverId, endpoint: outcome.endpoint);
     }
   }
 
