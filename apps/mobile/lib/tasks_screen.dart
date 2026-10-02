@@ -13,9 +13,16 @@ import 'ui/plain_text.dart';
 part 'task_editor.dart';
 
 class TasksScreen extends StatefulWidget {
-  const TasksScreen({required this.http, super.key});
+  const TasksScreen({
+    required this.http,
+    this.startCreating = false,
+    super.key,
+  });
 
   final Dio http;
+
+  /// Opens the "new" editor as soon as the page has settled.
+  final bool startCreating;
 
   @override
   State<TasksScreen> createState() => _TasksScreenState();
@@ -32,6 +39,7 @@ class _TasksScreenState extends State<TasksScreen> {
   void initState() {
     super.initState();
     _load();
+    if (widget.startCreating) afterRouteSettles(this, _createTask);
   }
 
   Future<void> _load() async {
@@ -138,8 +146,9 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _date(dynamic value) {
@@ -291,8 +300,9 @@ class _TasksScreenState extends State<TasksScreen> {
               children: [
                 Text(
                   asJsonString(task['title']) ?? 'Task',
-                  style: Theme.of(context).textTheme.titleSmall
-                      ?.copyWith(fontSize: 15),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontSize: 15),
                 ),
                 const SizedBox(height: 8),
                 Wrap(

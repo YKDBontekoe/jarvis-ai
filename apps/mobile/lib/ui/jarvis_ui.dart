@@ -3,9 +3,12 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import 'motion.dart';
 import 'phosphor_icons.dart';
 
 import '../theme.dart';
+
+export 'motion.dart';
 
 part 'jarvis_orb.dart';
 
@@ -15,11 +18,16 @@ class FadeSlideIn extends StatefulWidget {
   const FadeSlideIn({
     required this.child,
     this.index = 0,
-    this.offset = 10,
+    this.offset = JarvisMotion.travel,
+    this.animate = true,
     super.key,
   });
 
   final Widget child;
+
+  /// When false the child starts in place; for rows that were already on
+  /// screen before (history, restored state).
+  final bool animate;
 
   /// Position in a list; later rows start later (capped so long lists stay quick).
   final int index;
@@ -34,7 +42,7 @@ class FadeSlideIn extends StatefulWidget {
 class _FadeSlideInState extends State<FadeSlideIn>
     with SingleTickerProviderStateMixin {
   static const _stepMs = 40;
-  static const _travelMs = 320;
+  static final _travelMs = JarvisMotion.slow.inMilliseconds;
 
   late final AnimationController _controller;
   late final Animation<double> _progress;
@@ -52,10 +60,14 @@ class _FadeSlideInState extends State<FadeSlideIn>
       curve: Interval(
         delay / (delay + _travelMs),
         1,
-        curve: Curves.easeOutCubic,
+        curve: JarvisMotion.standard,
       ),
     );
-    _controller.forward();
+    if (widget.animate) {
+      _controller.forward();
+    } else {
+      _controller.value = 1;
+    }
   }
 
   @override
@@ -66,7 +78,7 @@ class _FadeSlideInState extends State<FadeSlideIn>
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+    if (JarvisMotion.reduced(context)) {
       return widget.child;
     }
     return AnimatedBuilder(
@@ -127,9 +139,9 @@ class _SurfaceCardState extends State<SurfaceCard> {
     return Padding(
       padding: widget.margin,
       child: AnimatedScale(
-        scale: _pressed && widget.onTap != null ? .985 : 1,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
+        scale: _pressed && widget.onTap != null ? JarvisMotion.startScale : 1,
+        duration: JarvisMotion.fast,
+        curve: JarvisMotion.standard,
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: widget.gradient == null
@@ -427,7 +439,7 @@ class ListScreenBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading && isEmpty) return const LoadingState();
+    if (loading && isEmpty) return const SkeletonList();
     if (error != null && isEmpty) {
       return ErrorState(message: error!, onRetry: onRetry);
     }
@@ -476,7 +488,7 @@ class LoadingState extends StatelessWidget {
     child: TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: const Duration(milliseconds: 500),
-      curve: const Interval(.3, 1, curve: Curves.easeOut),
+      curve: const Interval(.3, 1, curve: JarvisMotion.standard),
       builder: (context, value, child) => Opacity(opacity: value, child: child),
       child: const SizedBox.square(
         dimension: 28,
@@ -484,6 +496,130 @@ class LoadingState extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Placeholder rows shaped like the list that is loading, with a soft shimmer.
+/// Waits a beat before appearing so fast loads never flash placeholders.
+class SkeletonList extends StatefulWidget {
+  const SkeletonList({this.rows = 6, super.key});
+
+  final int rows;
+
+  @override
+  State<SkeletonList> createState() => _SkeletonListState();
+}
+
+class _SkeletonListState extends State<SkeletonList>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shimmer = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _shimmer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final reduced = JarvisMotion.reduced(context);
+    Widget bar(double widthFactor, double height) => FractionallySizedBox(
+      alignment: Alignment.centerLeft,
+      widthFactor: widthFactor,
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          color: colors.surfaceRaised,
+          borderRadius: BorderRadius.circular(height / 2),
+        ),
+      ),
+    );
+    final rows = Column(
+      children: [
+        for (var i = 0; i < widget.rows; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: SurfaceCard(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: colors.surfaceRaised,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Vary the widths so the rows read as content.
+                        bar(.4 + (i * 17 % 30) / 100, 11),
+                        const SizedBox(height: 8),
+                        bar(.6 + (i * 13 % 25) / 100, 9),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+    final shimmering = reduced
+        ? rows
+        : AnimatedBuilder(
+            animation: _shimmer,
+            child: rows,
+            builder: (context, child) => ShaderMask(
+              blendMode: BlendMode.srcATop,
+              shaderCallback: (bounds) {
+                final dx = (_shimmer.value * 2 - .5) * bounds.width;
+                return LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    colors.surface.withValues(alpha: colors.isDark ? .08 : .55),
+                    Colors.transparent,
+                  ],
+                  stops: const [.35, .5, .65],
+                  transform: _SlideGradient(dx),
+                ).createShader(bounds);
+              },
+              child: child,
+            ),
+          );
+    return Semantics(
+      label: 'Loading',
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 450),
+        curve: const Interval(.4, 1, curve: JarvisMotion.standard),
+        builder: (context, value, child) =>
+            Opacity(opacity: value, child: child),
+        child: SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: ContentWidth(child: ExcludeSemantics(child: shimmering)),
+        ),
+      ),
+    );
+  }
+}
+
+class _SlideGradient extends GradientTransform {
+  const _SlideGradient(this.dx);
+
+  final double dx;
+
+  @override
+  Matrix4 transform(Rect bounds, {TextDirection? textDirection}) =>
+      Matrix4.translationValues(dx, 0, 0);
 }
 
 enum NoticeTone { info, warning, danger, success }
@@ -824,4 +960,24 @@ class CircleIconButton extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Runs [action] once [state]'s route has finished animating in, so an editor
+/// opened on arrival does not appear over a page that is still moving.
+void afterRouteSettles(State state, Future<void> Function() action) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!state.mounted) return;
+    final animation = ModalRoute.of(state.context)?.animation;
+    if (animation == null || animation.isCompleted) {
+      action();
+      return;
+    }
+    void listener(AnimationStatus status) {
+      if (!status.isCompleted) return;
+      animation.removeStatusListener(listener);
+      if (state.mounted) action();
+    }
+
+    animation.addStatusListener(listener);
+  });
 }

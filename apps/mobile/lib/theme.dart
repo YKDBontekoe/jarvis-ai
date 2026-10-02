@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'ui/motion.dart';
 import 'ui/phosphor_icons.dart';
 
 /// Semantic Jarvis palette. Read it from the ambient [Theme] with [JarvisColors.of]
@@ -64,6 +65,18 @@ class JarvisColors extends ThemeExtension<JarvisColors> {
   final Color infoSoft;
 
   bool get isDark => brightness == Brightness.dark;
+
+  /// Soft indigo-to-violet wash for the primary send action and highlights.
+  LinearGradient get accentGradient => LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [accent, violet],
+  );
+
+  /// Dims the screen behind sheets and dialogs without going black.
+  Color get scrim => (isDark ? const Color(0xff000000) : ink).withValues(
+    alpha: isDark ? .5 : .28,
+  );
 
   static JarvisColors of(BuildContext context) =>
       Theme.of(context).extension<JarvisColors>() ?? light;
@@ -215,9 +228,9 @@ class JarvisColors extends ThemeExtension<JarvisColors> {
 
 class JarvisRadii {
   static const sm = 8.0;
-  static const md = 12.0;
-  static const lg = 16.0;
-  static const xl = 22.0;
+  static const md = 14.0;
+  static const lg = 20.0;
+  static const xl = 26.0;
 }
 
 /// Editorial serif for greetings and hero headlines; everything else is Inter.
@@ -417,11 +430,13 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
     visualDensity: VisualDensity.standard,
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {
-        TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+        TargetPlatform.android: JarvisPageTransitionsBuilder(),
+        // iOS keeps the native slide so the edge swipe back still works.
         TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
-        TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
+        TargetPlatform.macOS: JarvisPageTransitionsBuilder(),
+        TargetPlatform.linux: JarvisPageTransitionsBuilder(),
+        TargetPlatform.windows: JarvisPageTransitionsBuilder(),
+        TargetPlatform.fuchsia: JarvisPageTransitionsBuilder(),
       },
     ),
     appBarTheme: AppBarTheme(
@@ -599,6 +614,7 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: colors.surface,
+      barrierColor: colors.scrim,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -613,8 +629,11 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       surfaceTintColor: Colors.transparent,
       showDragHandle: true,
       dragHandleColor: colors.outlineStrong,
+      modalBarrierColor: colors.scrim,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(JarvisRadii.xl),
+        ),
       ),
     ),
     popupMenuTheme: PopupMenuThemeData(

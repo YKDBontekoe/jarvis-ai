@@ -38,6 +38,19 @@ import '../whatsapp/whatsapp_screen.dart';
 /// Destination of one project's page: the prefix followed by its id.
 const projectDestinationPrefix = 'project:';
 
+/// Appended to a destination to open its page with the "new" editor already
+/// showing, e.g. `reminders/new` from the chat's quick actions.
+const createDestinationSuffix = '/new';
+
+/// [destination] without [createDestinationSuffix].
+String utilityBaseDestination(String destination) =>
+    destination.endsWith(createDestinationSuffix)
+    ? destination.substring(
+        0,
+        destination.length - createDestinationSuffix.length,
+      )
+    : destination;
+
 Widget? utilityPageFor(
   String destination,
   Dio http, {
@@ -45,6 +58,10 @@ Widget? utilityPageFor(
   ValueChanged<String>? onAskInChat,
 }) => switch (destination) {
   'tasks' => TasksScreen(http: http),
+  'tasks$createDestinationSuffix' => TasksScreen(
+    http: http,
+    startCreating: true,
+  ),
   'projects' => ProjectsScreen(
     http: http,
     onOpenConversation: onOpenConversation,
@@ -56,6 +73,10 @@ Widget? utilityPageFor(
       onOpenConversation: onOpenConversation,
     ),
   'memory' => MemoryScreen(http: http),
+  'memory$createDestinationSuffix' => MemoryScreen(
+    http: http,
+    startCreating: true,
+  ),
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'today' => DayPlannerScreen(http: http, onAskInChat: onAskInChat),
   'expenses' => ExpensesScreen(http: http),
@@ -65,6 +86,11 @@ Widget? utilityPageFor(
   'reminders' => RemindersScreen(
     http: http,
     onOpenConversation: onOpenConversation,
+  ),
+  'reminders$createDestinationSuffix' => RemindersScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+    startCreating: true,
   ),
   'notifications' => RemindersScreen(
     http: http,

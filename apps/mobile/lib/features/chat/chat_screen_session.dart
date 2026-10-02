@@ -298,6 +298,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       _connected = false;
       _sending = false;
       _entries.clear();
+      _settledEntries = 0;
       _attachedSources = [];
       _error = null;
     });
@@ -396,6 +397,7 @@ mixin _ChatScreenSession on _ChatScreenController {
           : 0.0;
       setState(() {
         _entries.insertAll(0, messages);
+        _settledEntries += messages.length;
         _messageCursor = asJsonString(page?['nextCursor']);
         _hasOlderMessages = asJsonBool(page?['hasMore']);
       });

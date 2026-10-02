@@ -33,6 +33,7 @@ class RemindersScreen extends StatefulWidget {
     required this.http,
     this.onOpenConversation,
     this.initialTab = RemindersTab.reminders,
+    this.startCreating = false,
     this.locate = readDeviceLocationSnapshot,
     this.locationAccess = _checkLocationAccess,
     this.openLocationSettings = Geolocator.openAppSettings,
@@ -60,6 +61,9 @@ class RemindersScreen extends StatefulWidget {
   Function({bool requestPermission})
   locate;
   final RemindersTab initialTab;
+
+  /// Opens the "new reminder" editor as soon as the page has settled.
+  final bool startCreating;
   final Future<void> Function(String conversationId)? onOpenConversation;
 
   @override
@@ -88,6 +92,7 @@ class _RemindersScreenState extends State<RemindersScreen>
   void initState() {
     super.initState();
     _load();
+    if (widget.startCreating) afterRouteSettles(this, _createReminder);
     deviceTimeZoneLookup().then((zone) {
       if (mounted && zone != null) setState(() => _deviceZone = zone);
     });

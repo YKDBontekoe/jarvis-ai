@@ -38,6 +38,15 @@ root. It shares the existing account and owner-scoped data. See
 
 Top-level screens outside `features/`: `conversations_screen.dart`, `reminders_screen.dart`, `files_screen.dart`, `integrations_screen.dart`, `approvals_screen.dart`, `audit_screen.dart`, `condition_watches_screen.dart`, `daily_briefing_screen.dart`.
 
+## Motion and visual language
+
+- `lib/ui/motion.dart` — `JarvisMotion` tokens: `fast` 150 ms (presses, icon swaps), `base` 220 ms (content changes), `slow` 320 ms (pages), `standard` ease-out curve, travel 8 px, start scale 0.98. Read timings from here instead of hardcoding durations, and use `JarvisMotion.of(context, …)` so reduced motion turns them off.
+- `JarvisPageTransitionsBuilder` (fade + grow + small rise) is the pushed-page transition everywhere except iOS, which keeps the native slide for the edge swipe back.
+- `lib/ui/jarvis_ui.dart` — `FadeSlideIn` for content that arrives (pass `animate: false` for rows already on screen), `SkeletonList` for loading lists (used by `ListScreenBody`), `afterRouteSettles` to open an editor once a page has finished animating in.
+- Chat: only live entries animate in (`_settledEntries` marks loaded history); home and the transcript, and the wide layout's panes, fade through each other.
+- Chat quick actions open `tasks/new`, `reminders/new` and `memory/new` (see `createDestinationSuffix` in `utility_pages.dart`) so the editor is already showing.
+- `JarvisColors.accentGradient` (indigo → violet) is reserved for the primary send action and selection accents; `JarvisColors.scrim` dims behind sheets and dialogs.
+
 ## API client
 
 - `lib/api/jarvis_http.dart` — authenticated HTTP wrapper.

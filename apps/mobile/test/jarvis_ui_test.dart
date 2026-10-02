@@ -46,6 +46,65 @@ void main() {
     expect(find.text('row'), findsOneWidget);
   });
 
+  testWidgets('FadeSlideIn starts in place for rows already on screen', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(const FadeSlideIn(animate: false, child: Text('row'))),
+    );
+    expect(tester.widget<Opacity>(find.byType(Opacity)).opacity, 1);
+  });
+
+  testWidgets('loading lists show placeholder rows instead of a spinner', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        ListScreenBody(
+          loading: true,
+          error: null,
+          isEmpty: true,
+          empty: const Text('empty'),
+          onRetry: () {},
+          child: const SizedBox(),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(SkeletonList), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.bySemanticsLabel('Loading'), findsOneWidget);
+  });
+
+  testWidgets('pushed pages fade and grow in with the shared motion', (
+    tester,
+  ) async {
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        theme: buildJarvisTheme().copyWith(platform: TargetPlatform.android),
+        home: const Text('first'),
+      ),
+    );
+    navigator.currentState!.push(
+      MaterialPageRoute<void>(builder: (_) => const Text('second')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    final scale = tester.widget<ScaleTransition>(
+      find
+          .ancestor(
+            of: find.text('second'),
+            matching: find.byType(ScaleTransition),
+          )
+          .first,
+    );
+    expect(scale.scale.value, inExclusiveRange(JarvisMotion.startScale, 1));
+    await tester.pumpAndSettle();
+    expect(find.text('second'), findsOneWidget);
+  });
+
   testWidgets('header actions drop their label on narrow screens', (
     tester,
   ) async {

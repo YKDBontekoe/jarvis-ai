@@ -24,9 +24,16 @@ const _memoryKinds = [
 ];
 
 class MemoryScreen extends StatefulWidget {
-  const MemoryScreen({required this.http, super.key});
+  const MemoryScreen({
+    required this.http,
+    this.startCreating = false,
+    super.key,
+  });
 
   final Dio http;
+
+  /// Opens the "new" editor as soon as the page has settled.
+  final bool startCreating;
 
   @override
   State<MemoryScreen> createState() => _MemoryScreenState();
@@ -45,6 +52,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
   void initState() {
     super.initState();
     _load();
+    if (widget.startCreating) afterRouteSettles(this, _createMemory);
   }
 
   Future<void> _load({String? query}) async {
@@ -94,7 +102,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
     } catch (_) {
       if (mounted && revision == _requestRevision) {
         setState(
-          () => _error = 'Jarvis could not load memory. Check the API connection and try again.',
+          () => _error =
+              'Jarvis could not load memory. Check the API connection and try again.',
         );
       }
     } finally {
@@ -214,8 +223,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override

@@ -249,6 +249,24 @@ void main() {
     expect(body['prompt'], 'Get 2% milk');
   });
 
+  testWidgets('tasks opened to create show the editor straight away', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/tasks', <Object>[]);
+    await show(tester, TasksScreen(http: http.client(), startCreating: true));
+
+    expect(find.text('Start task'), findsOneWidget);
+  });
+
+  testWidgets('memory opened to create show the editor straight away', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/memory', <Object>[]);
+    await show(tester, MemoryScreen(http: http.client(), startCreating: true));
+
+    expect(find.text('Add a memory'), findsWidgets);
+  });
+
   testWidgets('watch create rejects non-https URLs and posts a valid watch', (
     tester,
   ) async {

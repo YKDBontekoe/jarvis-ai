@@ -21,13 +21,14 @@ mixin _ChatScreenNav on _ChatScreenController {
           ? (prompt) => unawaited(_send(prompt))
           : null,
     );
+    final base = utilityBaseDestination(destination);
     if (destination == 'sign_out') {
       unawaited(_signOut());
     } else if (page != null) {
       if (_isWide) {
-        _showInPane(destination, page);
+        _showInPane(base, page);
       } else {
-        unawaited(_openUtilityPage(destination, page));
+        unawaited(_openUtilityPage(base, page));
       }
     }
   }
@@ -215,6 +216,7 @@ mixin _ChatScreenNav on _ChatScreenController {
         _conversationId = null;
         _error = null;
         _entries.clear();
+        _settledEntries = 0;
         _recent = [];
         _projects = [];
         _password.clear();

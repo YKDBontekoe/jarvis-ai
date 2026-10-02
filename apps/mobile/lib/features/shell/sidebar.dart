@@ -362,11 +362,9 @@ class _NavRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 1),
-    child: Material(
-      color: selected
-          ? JarvisColors.of(context).surfaceRaised
-          : Colors.transparent,
-      borderRadius: BorderRadius.circular(12),
+    child: _SelectableSurface(
+      selected: selected,
+      radius: 12,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
@@ -424,11 +422,9 @@ class _ConversationRow extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: selected
-        ? JarvisColors.of(context).surfaceRaised
-        : Colors.transparent,
-    borderRadius: BorderRadius.circular(10),
+  Widget build(BuildContext context) => _SelectableSurface(
+    selected: selected,
+    radius: 10,
     child: InkWell(
       borderRadius: BorderRadius.circular(10),
       onTap: onTap,
@@ -450,6 +446,58 @@ class _ConversationRow extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Row background that eases in when selected, with a short accent bar at the
+/// leading edge so the current place reads at a glance.
+class _SelectableSurface extends StatelessWidget {
+  const _SelectableSurface({
+    required this.selected,
+    required this.radius,
+    required this.child,
+  });
+
+  final bool selected;
+  final double radius;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final duration = JarvisMotion.of(context, JarvisMotion.base);
+    return AnimatedContainer(
+      duration: duration,
+      curve: JarvisMotion.standard,
+      decoration: BoxDecoration(
+        color: selected
+            ? colors.surfaceRaised
+            : colors.surfaceRaised.withValues(alpha: 0),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: Stack(
+        alignment: Alignment.centerLeft,
+        children: [
+          Material(
+            type: MaterialType.transparency,
+            borderRadius: BorderRadius.circular(radius),
+            child: child,
+          ),
+          IgnorePointer(
+            child: AnimatedContainer(
+              duration: duration,
+              curve: JarvisMotion.standard,
+              width: 3,
+              height: selected ? 16 : 0,
+              decoration: BoxDecoration(
+                gradient: colors.accentGradient,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SettingsRow extends StatelessWidget {

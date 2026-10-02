@@ -607,8 +607,9 @@ class _HomeOverviewState extends State<HomeOverview>
                         _GetStartedCard(steps: steps),
                         const SizedBox(height: 20),
                       ],
+                      // Sections that load later ease in rather than pop.
                       if (_briefing != null) ...[
-                        _briefingSections(),
+                        FadeSlideIn(child: _briefingSections()),
                         const SizedBox(height: 28),
                       ],
                       if (widget.onOpenHabits case final openHabits?
@@ -619,7 +620,7 @@ class _HomeOverviewState extends State<HomeOverview>
                           refreshRevision: widget.refreshRevision,
                         ),
                       if (_usage != null && widget.onOpenUsage != null) ...[
-                        _usageCard(),
+                        FadeSlideIn(index: 1, child: _usageCard()),
                         const SizedBox(height: 28),
                       ],
                       if (widget.onSuggestion != null) ...[
@@ -685,15 +686,18 @@ class _HomeOverviewState extends State<HomeOverview>
                           text: 'No active tasks. Start one from Tasks.',
                         ),
                       if (_tasks.isNotEmpty)
-                        GroupedSection(
-                          dividerIndent: 64,
-                          children: [
-                            for (final task in _tasks.take(3))
-                              _TaskRow(
-                                task: task,
-                                onTap: () => unawaited(_openTask(task)),
-                              ),
-                          ],
+                        FadeSlideIn(
+                          index: 2,
+                          child: GroupedSection(
+                            dividerIndent: 64,
+                            children: [
+                              for (final task in _tasks.take(3))
+                                _TaskRow(
+                                  task: task,
+                                  onTap: () => unawaited(_openTask(task)),
+                                ),
+                            ],
+                          ),
                         ),
                     ],
                   ),

@@ -82,7 +82,7 @@ class _ChatComposerState extends State<ChatComposer> {
     if (event is KeyDownEvent &&
         event.logicalKey == LogicalKeyboardKey.enter &&
         !HardwareKeyboard.instance.isShiftPressed) {
-      if (_canSend) widget.onSend();
+      if (_canSend) _send();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -109,6 +109,85 @@ class _ChatComposerState extends State<ChatComposer> {
     super.dispose();
   }
 
+  /// Send, voice, or stop: one slot, so the button morphs instead of jumping.
+  Widget _trailingAction(BuildContext context, bool showVoice) {
+    final colors = JarvisColors.of(context);
+    if (widget.sending && widget.onCancel != null) {
+      return _ComposerIconButton(
+        key: const ValueKey('stop'),
+        icon: PhosphorIconsRegular.stop,
+        tooltip: 'Stop',
+        danger: true,
+        onPressed: widget.onCancel,
+      );
+    }
+    if (widget.voiceActive || widget.voiceStarting) {
+      return _ComposerIconButton(
+        key: const ValueKey('stop-voice'),
+        icon: PhosphorIconsRegular.stop,
+        tooltip: 'Stop voice',
+        danger: true,
+        onPressed: widget.onVoice,
+      );
+    }
+    if (showVoice) {
+      return IconButton.filled(
+        key: const ValueKey('voice'),
+        tooltip: 'Voice mode',
+        onPressed: widget.onVoice,
+        icon: const Icon(PhosphorIconsBold.waveform, size: 18),
+        style: IconButton.styleFrom(
+          minimumSize: const Size(44, 44),
+          backgroundColor: colors.ink,
+          foregroundColor: colors.onInk,
+        ),
+      );
+    }
+    final enabled = _canSend || widget.sending;
+    return AnimatedContainer(
+      key: const ValueKey('send'),
+      duration: JarvisMotion.of(context, JarvisMotion.base),
+      curve: JarvisMotion.standard,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: enabled ? colors.accentGradient : null,
+        color: enabled ? null : colors.surfaceRaised,
+        boxShadow: enabled
+            ? [
+                BoxShadow(
+                  color: colors.accent.withValues(alpha: .28),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: IconButton(
+        tooltip: 'Send',
+        onPressed: _canSend ? _send : null,
+        icon: widget.sending
+            ? const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(PhosphorIconsBold.arrowUp, size: 18),
+        style: IconButton.styleFrom(
+          minimumSize: const Size(44, 44),
+          foregroundColor: Colors.white,
+          disabledForegroundColor: widget.sending ? Colors.white : colors.muted,
+        ),
+      ),
+    );
+  }
+
+  void _send() {
+    unawaited(HapticFeedback.lightImpact());
+    widget.onSend();
+  }
+
   @override
   Widget build(BuildContext context) {
     final focused = _focus.hasFocus;
@@ -121,17 +200,26 @@ class _ChatComposerState extends State<ChatComposer> {
         !widget.awaitingApproval &&
         !widget.voiceActive;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
+      duration: JarvisMotion.of(context, JarvisMotion.base),
+      curve: JarvisMotion.standard,
       padding: const EdgeInsets.fromLTRB(6, 4, 8, 8),
       decoration: BoxDecoration(
         color: JarvisColors.of(context).surface,
         borderRadius: BorderRadius.circular(26),
         border: Border.all(
           color: focused
-              ? JarvisColors.of(context).outlineStrong
+              ? JarvisColors.of(context).accent.withValues(alpha: .45)
               : JarvisColors.of(context).outline,
         ),
-        boxShadow: JarvisShadows.floating(),
+        boxShadow: [
+          ...JarvisShadows.floating(JarvisColors.of(context).brightness),
+          if (focused)
+            BoxShadow(
+              color: JarvisColors.of(context).accent.withValues(alpha: .10),
+              blurRadius: 0,
+              spreadRadius: 3,
+            ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -219,66 +307,13 @@ class _ChatComposerState extends State<ChatComposer> {
                 ),
               ],
               const Spacer(),
-              if (widget.sending && widget.onCancel != null)
-                _ComposerIconButton(
-                  icon: PhosphorIconsRegular.stop,
-                  tooltip: 'Stop',
-                  danger: true,
-                  onPressed: widget.onCancel,
-                )
-              else if (widget.voiceActive || widget.voiceStarting)
-                _ComposerIconButton(
-                  icon: PhosphorIconsRegular.stop,
-                  tooltip: 'Stop voice',
-                  danger: true,
-                  onPressed: widget.onVoice,
-                )
-              else
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  transitionBuilder: (child, animation) =>
-                      ScaleTransition(scale: animation, child: child),
-                  child: showVoice
-                      ? IconButton.filled(
-                          key: const ValueKey('voice'),
-                          tooltip: 'Voice mode',
-                          onPressed: widget.onVoice,
-                          icon: const Icon(
-                            PhosphorIconsBold.waveform,
-                            size: 18,
-                          ),
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size(44, 44),
-                            backgroundColor: JarvisColors.of(context).ink,
-                            foregroundColor: JarvisColors.of(context).onInk,
-                          ),
-                        )
-                      : IconButton.filled(
-                          key: const ValueKey('send'),
-                          tooltip: 'Send',
-                          onPressed: _canSend ? widget.onSend : null,
-                          icon: widget.sending
-                              ? SizedBox.square(
-                                  dimension: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: JarvisColors.of(context).onInk,
-                                  ),
-                                )
-                              : const Icon(PhosphorIconsBold.arrowUp, size: 18),
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size(44, 44),
-                            backgroundColor: JarvisColors.of(context).ink,
-                            foregroundColor: JarvisColors.of(context).onInk,
-                            disabledBackgroundColor: widget.sending
-                                ? JarvisColors.of(context).ink
-                                : JarvisColors.of(context).surfaceRaised,
-                            disabledForegroundColor: widget.sending
-                                ? JarvisColors.of(context).onInk
-                                : JarvisColors.of(context).muted,
-                          ),
-                        ),
-                ),
+              AnimatedSwitcher(
+                duration: JarvisMotion.of(context, JarvisMotion.fast),
+                switchInCurve: JarvisMotion.standard,
+                switchOutCurve: JarvisMotion.exit,
+                transitionBuilder: JarvisMotion.fadeScale,
+                child: _trailingAction(context, showVoice),
+              ),
             ],
           ),
         ],
@@ -290,6 +325,7 @@ class _ChatComposerState extends State<ChatComposer> {
 class _ComposerIconButton extends StatelessWidget {
   const _ComposerIconButton({
     required this.icon,
+    super.key,
     required this.tooltip,
     required this.onPressed,
     this.danger = false,

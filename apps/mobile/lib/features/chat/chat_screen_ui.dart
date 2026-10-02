@@ -171,19 +171,19 @@ mixin _ChatScreenUi on _ChatScreenController {
                   'Start a background task',
                   'Jarvis works on it and reports back',
                   PhosphorIconsRegular.listChecks,
-                  'tasks',
+                  'tasks$createDestinationSuffix',
                 ),
                 action(
                   'Set a reminder',
                   'Pick a date and time',
                   PhosphorIconsRegular.bell,
-                  'reminders',
+                  'reminders$createDestinationSuffix',
                 ),
                 action(
                   'Add a memory',
                   'Tell Jarvis something to remember',
                   PhosphorIconsRegular.notebook,
-                  'memory',
+                  'memory$createDestinationSuffix',
                 ),
                 ListTile(
                   leading: const IconBadge(
@@ -363,47 +363,90 @@ mixin _ChatScreenUi on _ChatScreenController {
               ),
             ),
           Expanded(
-            child: (_showHome && !_hasPendingApproval) || _entries.isEmpty
-                ? _welcome()
-                : Stack(
-                    children: [
-                      Positioned.fill(
-                        child: ValueListenableBuilder<int>(
-                          valueListenable: _transcriptTick,
-                          builder: (context, _, _) => ListView.builder(
-                            controller: _scroll,
-                            keyboardDismissBehavior:
-                                ScrollViewKeyboardDismissBehavior.onDrag,
-                            padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
-                            itemCount: _entries.length,
-                            itemBuilder: (context, index) => Align(
-                              alignment: Alignment.topCenter,
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 760,
+            // Home and the transcript fade through each other instead of
+            // swapping in one frame.
+            child: AnimatedSwitcher(
+              duration: JarvisMotion.of(context, JarvisMotion.base),
+              switchInCurve: JarvisMotion.standard,
+              switchOutCurve: JarvisMotion.exit,
+              transitionBuilder: JarvisMotion.fadeRise,
+              child: (_showHome && !_hasPendingApproval) || _entries.isEmpty
+                  ? KeyedSubtree(key: const ValueKey('home'), child: _welcome())
+                  : KeyedSubtree(
+                      key: const ValueKey('transcript'),
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: ValueListenableBuilder<int>(
+                              valueListenable: _transcriptTick,
+                              builder: (context, _, _) => ListView.builder(
+                                controller: _scroll,
+                                keyboardDismissBehavior:
+                                    ScrollViewKeyboardDismissBehavior.onDrag,
+                                padding: const EdgeInsets.fromLTRB(
+                                  18,
+                                  16,
+                                  18,
+                                  24,
                                 ),
-                                child: SizedBox(
-                                  width: double.infinity,
-                                  child: _entryView(_entries[index]),
+                                itemCount: _entries.length,
+                                itemBuilder: (context, index) => Align(
+                                  alignment: Alignment.topCenter,
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 760,
+                                    ),
+                                    child: SizedBox(
+                                      width: double.infinity,
+                                      child: FadeSlideIn(
+                                        animate: index >= _settledEntries,
+                                        child: _entryView(_entries[index]),
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                      if (!_nearBottom)
-                        Positioned(
-                          right: 16,
-                          bottom: 8,
-                          child: CircleIconButton(
-                            icon: PhosphorIconsRegular.caretDown,
-                            tooltip: 'Jump to latest',
-                            size: 44,
-                            onPressed: () => _scrollToBottom(force: true),
+                          Positioned(
+                            right: 16,
+                            bottom: 8,
+                            child: IgnorePointer(
+                              ignoring: _nearBottom,
+                              child: AnimatedSlide(
+                                offset: _nearBottom
+                                    ? const Offset(0, .4)
+                                    : Offset.zero,
+                                duration: JarvisMotion.of(
+                                  context,
+                                  JarvisMotion.base,
+                                ),
+                                curve: JarvisMotion.standard,
+                                child: AnimatedOpacity(
+                                  opacity: _nearBottom ? 0 : 1,
+                                  duration: JarvisMotion.of(
+                                    context,
+                                    JarvisMotion.base,
+                                  ),
+                                  curve: JarvisMotion.standard,
+                                  child: ExcludeSemantics(
+                                    excluding: _nearBottom,
+                                    child: CircleIconButton(
+                                      icon: PhosphorIconsRegular.caretDown,
+                                      tooltip: 'Jump to latest',
+                                      size: 44,
+                                      onPressed: () =>
+                                          _scrollToBottom(force: true),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                    ],
-                  ),
+                        ],
+                      ),
+                    ),
+            ),
           ),
           if (_liveSurface case final live? when surfaceAwaitsReply(live))
             ConstrainedBox(
