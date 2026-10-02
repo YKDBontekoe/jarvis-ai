@@ -19,6 +19,7 @@ ARG PROJECT_PATH
 ARG SENTRY_ORG=
 ARG SENTRY_PROJECT=
 ARG SENTRY_RELEASE=
+ARG REQUIRE_WEB_CLIENT=false
 WORKDIR /source
 COPY . .
 # The auth token is a BuildKit secret. Without it the image still builds and Sentry CLI stays off.
@@ -39,6 +40,20 @@ RUN --mount=type=secret,id=sentry_auth_token,required=false \
     else \
       dotnet publish "$PROJECT_PATH" --configuration Release --output /app/publish /p:UseAppHost=false \
         /p:UseSentryCLI=false; \
+    fi
+
+# CI stages the web artifact outside Flutter's ignored build directory. Only
+# the API serves it; production builds fail closed if the artifact is missing.
+RUN set -eu; if [ "$PROJECT_PATH" = "src/Jarvis.Api/Jarvis.Api.csproj" ]; then \
+      if [ "$REQUIRE_WEB_CLIENT" = "true" ]; then \
+        for file in index.html main.dart.js flutter_bootstrap.js; do \
+          test -s "/source/infra/web/dist/$file" || { echo "Missing web artifact: $file" >&2; exit 1; }; \
+        done; \
+      fi; \
+      if [ -d /source/infra/web/dist ]; then \
+        mkdir -p /app/publish/wwwroot && \
+        cp -R /source/infra/web/dist/. /app/publish/wwwroot/; \
+      fi; \
     fi
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime

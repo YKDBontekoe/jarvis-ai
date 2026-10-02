@@ -12,5 +12,7 @@
 **/__pycache__
 **/*.pyc
 infra/compose/.env
+infra/compose/.env.production
+infra/compose/.env.production.*
 artifacts
 **/node_modules
