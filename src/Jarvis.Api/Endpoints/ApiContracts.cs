@@ -85,6 +85,12 @@ public sealed record JournalRequest(DateOnly? EntryDate, string? Content, string
 public sealed record JournalEntryDto(Guid Id, DateOnly EntryDate, string Source, string Content, string? Highlights,
     string? Gratitude, int? Rating, int? Mood, int? Energy, int? Stress, IReadOnlyList<string> Tags, Guid? MemoryId,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+
+public sealed record ConversationSummaryDto(
+    string Summary,
+    IReadOnlyList<string> KeyPoints,
+    IReadOnlyList<string> ActionItems,
+    int MessageCount);
 public sealed record HabitRequest(string? Name, string? Icon, string? Cadence, int? TargetPerWeek, string? TimeZoneId);
 public sealed record HabitArchiveRequest(bool Archived);
 public sealed record HabitCheckInRequest(DateOnly? Date, bool? Done);

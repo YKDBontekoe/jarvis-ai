@@ -27,6 +27,7 @@ import '../profiles/profiles_screen.dart';
 import '../projects/project_screen.dart';
 import '../projects/projects_screen.dart';
 import '../review/weekly_review_screen.dart';
+import '../settings/app_lock_screen.dart';
 import '../settings/appearance_screen.dart';
 import '../settings/model_settings_screen.dart';
 import '../settings/voice_settings_screen.dart';
@@ -80,6 +81,7 @@ Widget? utilityPageFor(
   'weekly-review' => WeeklyReviewScreen(http: http),
   'integrations' => IntegrationsScreen(http: http, onAskInChat: onAskInChat),
   'appearance' => const AppearanceScreen(),
+  'app-lock' => const AppLockScreen(),
   'models' => ModelSettingsScreen(http: http),
   'skills' => SkillsScreen(http: http),
   'persona' => PersonaScreen(http: http),

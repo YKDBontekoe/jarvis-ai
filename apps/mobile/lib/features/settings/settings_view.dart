@@ -23,6 +23,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         destination: 'appearance',
       ),
       (
+        title: 'Face ID lock',
+        subtitle: 'Lock Jarvis when you leave the app',
+        icon: PhosphorIconsRegular.lockSimple,
+        destination: 'app-lock',
+      ),
+      (
         title: 'Voice',
         subtitle: 'The voice Jarvis speaks with, and hands-free listening',
         icon: PhosphorIconsRegular.microphone,

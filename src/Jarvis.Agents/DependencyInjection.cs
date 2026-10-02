@@ -90,6 +90,7 @@ public static class DependencyInjection
         services.AddScoped<Learning.HeartbeatService>();
         services.AddScoped<Learning.DreamingService>();
         services.AddScoped<IDailyBriefingNarrator, DailyBriefingNarrator>();
+        services.AddScoped<IConversationSummarizer, ConversationSummarizer>();
         services.AddScoped<Jarvis.Application.Reviews.IWeeklyReviewNarrator, WeeklyReviewNarrator>();
         services.AddScoped<JarvisAgentFactory>();
         services.AddScoped<VoiceSessionContext>();

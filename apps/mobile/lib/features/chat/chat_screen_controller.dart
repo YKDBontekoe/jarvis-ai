@@ -213,6 +213,8 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _flushOutbox();
   Future<void> _cancelQueued(MessageEntry entry);
   void _showPhotoSources();
+  bool get _canSummarize;
+  void _showConversationSummary();
   void _removePendingPhoto(PendingPhoto photo);
   Future<Uint8List?> _loadPhoto(String fileId);
   Future<void> _retryConnection();
