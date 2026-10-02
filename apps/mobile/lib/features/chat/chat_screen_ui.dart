@@ -551,6 +551,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     onOpenUsage: () => _openUtility('usage'),
     onOpenApprovals: () => _openUtility('approvals'),
     onOpenReminders: () => _openUtility('reminders'),
+    onOpenHabits: () => _openUtility('habits'),
     onOpenIntegrations: () => _openUtility('integrations'),
     onOpenCoding: () => _openUtility('coding'),
     refreshRevision: _homeRevision,

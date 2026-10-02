@@ -1864,6 +1864,78 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.ToTable("document_collection_files", (string)null);
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.ExpenseEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<string>("Merchant")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("merchant");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<Guid?>("ReceiptFileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("receipt_file_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source");
+
+                    b.Property<DateOnly>("SpentOn")
+                        .HasColumnType("date")
+                        .HasColumnName("spent_on");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "SpentOn");
+
+                    b.ToTable("expenses", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_expenses_amount_positive", "amount > 0");
+
+                            t.HasCheckConstraint("ck_expenses_category", "category IN ('groceries', 'dining', 'transport', 'shopping', 'housing', 'bills', 'health', 'entertainment', 'travel', 'subscriptions', 'other')");
+
+                            t.HasCheckConstraint("ck_expenses_source", "source IN ('chat', 'receipt', 'app')");
+                        });
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.FileContentChunkEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2045,6 +2117,97 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.HasIndex("OwnerId", "SubjectId", "Predicate", "ValidTo");
 
                     b.ToTable("graph_relations", (string)null);
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.HabitCheckInEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("check_in_date");
+
+                    b.Property<Guid>("HabitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("habit_id");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("source");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HabitId", "Date")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "Date");
+
+                    b.ToTable("habit_check_ins", (string)null);
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.HabitEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<string>("Cadence")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("cadence");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("icon");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<int>("TargetPerWeek")
+                        .HasColumnType("integer")
+                        .HasColumnName("target_per_week");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "ArchivedAt");
+
+                    b.ToTable("habits", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_habits_cadence", "cadence IN ('daily', 'weekly')");
+
+                            t.HasCheckConstraint("ck_habits_target_per_week", "target_per_week BETWEEN 1 AND 7");
+                        });
                 });
 
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.JournalEntryEntity", b =>
@@ -3022,6 +3185,15 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.HabitCheckInEntity", b =>
+                {
+                    b.HasOne("Jarvis.Infrastructure.Persistence.HabitEntity", null)
+                        .WithMany("CheckIns")
+                        .HasForeignKey("HabitId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.MessageFeedbackEntity", b =>
                 {
                     b.HasOne("Jarvis.Domain.Conversations.Message", null)
@@ -3116,6 +3288,11 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.BrowserSessionEntity", b =>
                 {
                     b.Navigation("Steps");
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.HabitEntity", b =>
+                {
+                    b.Navigation("CheckIns");
                 });
 #pragma warning restore 612, 618
         }

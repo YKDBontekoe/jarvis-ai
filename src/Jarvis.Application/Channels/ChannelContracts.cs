@@ -88,7 +88,7 @@ public static class ChannelNotificationCategories
         "watch.triggered" or "watch.failed" => Watches,
         "automation.notification" => Automations,
         "skill.learned" or "skill.improved" or "learning.dreamed" or "learning.reflected" => Learning,
-        "heartbeat.checkin" => CheckIns,
+        "heartbeat.checkin" or "habit.checkin" => CheckIns,
         "approval.required" or "automation.approval" => Approvals,
         _ => null
     };

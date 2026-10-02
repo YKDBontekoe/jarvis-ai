@@ -102,14 +102,58 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
-          build-args: ${{ matrix.build-args }}
+          build-args: |
+            ${{ matrix.build-args }}
+            SENTRY_ORG=${{ secrets.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT_BACKEND }}
+            SENTRY_RELEASE=${{ github.sha }}
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           tags: ${{ steps.docker-meta.outputs.tags }}
           labels: ${{ steps.docker-meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
+  sentry-release:
+    name: Associate Sentry release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect Sentry credentials
+        id: sentry
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT_BACKEND }}
+        run: |
+          if [[ -n "${SENTRY_AUTH_TOKEN}" && -n "${SENTRY_ORG}" && -n "${SENTRY_PROJECT}" ]]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "Sentry release was not associated; SENTRY_AUTH_TOKEN, SENTRY_ORG, or SENTRY_PROJECT_BACKEND is unset."
+          fi
+
+      - name: Create release and upload commit mapping
+        if: steps.sentry.outputs.enabled == 'true'
+        uses: getsentry/action-release@v3
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT_BACKEND }}
+        with:
+          environment: production
+          release: ${{ github.sha }}
+          set_commits: auto
+          ignore_missing: true
+          ignore_empty: true
+
   deploy:
-    needs: [prepare, build, source]
+    needs: [prepare, build, source, sentry-release]
     if: >-
       (github.event_name != 'workflow_dispatch' || inputs.skip_deploy != true) &&
       (
@@ -146,5 +190,8 @@ jobs:
           git fetch --force "${SOURCE_BUNDLE}" HEAD
           git checkout --detach --force "${GIT_SHA}"
           echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+          python3 scripts/deploy/sentry_release_env.py \
+            --env-file "${ENV_FILE:-infra/compose/.env.production}" \
+            --release "${GIT_SHA}"
           chmod +x scripts/deploy/remote-up.sh
           scripts/deploy/remote-up.sh

@@ -15,6 +15,8 @@ import '../agents/agents_screen.dart';
 import '../channels/channels_screen.dart';
 import '../coding/coding_runs_screen.dart';
 import '../devices/devices_screen.dart';
+import '../expenses/expenses_screen.dart';
+import '../habits/habits_screen.dart';
 import '../journal/journal_screen.dart';
 import '../learning/learning_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
@@ -51,6 +53,8 @@ Widget? utilityPageFor(
     ),
   'memory' => MemoryScreen(http: http),
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
+  'expenses' => ExpensesScreen(http: http),
+  'habits' => HabitsScreen(http: http),
   'approvals' => ApprovalsScreen(http: http),
   'reminders' => RemindersScreen(
     http: http,

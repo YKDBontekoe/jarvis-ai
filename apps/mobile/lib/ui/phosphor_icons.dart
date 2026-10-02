@@ -5,8 +5,10 @@ import 'package:flutter/widgets.dart';
 
 abstract final class PhosphorIconsRegular {
   static const addressBook = IconData(0xe6f8, fontFamily: 'PhosphorRegular');
+  static const airplaneTilt = IconData(0xe5d6, fontFamily: 'PhosphorRegular');
   static const alarm = IconData(0xe006, fontFamily: 'PhosphorRegular');
   static const appWindow = IconData(0xe5da, fontFamily: 'PhosphorRegular');
+  static const archive = IconData(0xe00c, fontFamily: 'PhosphorRegular');
   static const arrowLeft = IconData(0xe058, fontFamily: 'PhosphorRegular');
   static const arrowsClockwise = IconData(
     0xe094,
@@ -26,8 +28,11 @@ abstract final class PhosphorIconsRegular {
   static const broadcast = IconData(0xe0f2, fontFamily: 'PhosphorRegular');
   static const browser = IconData(0xe0f4, fontFamily: 'PhosphorRegular');
   static const calendarBlank = IconData(0xe10a, fontFamily: 'PhosphorRegular');
+  static const calendarCheck = IconData(0xe712, fontFamily: 'PhosphorRegular');
   static const camera = IconData(0xe10e, fontFamily: 'PhosphorRegular');
+  static const car = IconData(0xe112, fontFamily: 'PhosphorRegular');
   static const caretDown = IconData(0xe136, fontFamily: 'PhosphorRegular');
+  static const caretLeft = IconData(0xe138, fontFamily: 'PhosphorRegular');
   static const caretRight = IconData(0xe13a, fontFamily: 'PhosphorRegular');
   static const chartBar = IconData(0xe150, fontFamily: 'PhosphorRegular');
   static const chartLine = IconData(0xe154, fontFamily: 'PhosphorRegular');
@@ -65,11 +70,15 @@ abstract final class PhosphorIconsRegular {
   static const fileImage = IconData(0xea24, fontFamily: 'PhosphorRegular');
   static const filePdf = IconData(0xe702, fontFamily: 'PhosphorRegular');
   static const fileText = IconData(0xe23a, fontFamily: 'PhosphorRegular');
+  static const filmStrip = IconData(0xe792, fontFamily: 'PhosphorRegular');
+  static const fire = IconData(0xe242, fontFamily: 'PhosphorRegular');
   static const fingerprint = IconData(0xe23e, fontFamily: 'PhosphorRegular');
+  static const firstAid = IconData(0xe56e, fontFamily: 'PhosphorRegular');
   static const flowArrow = IconData(0xe6ec, fontFamily: 'PhosphorRegular');
   static const folderOpen = IconData(0xe256, fontFamily: 'PhosphorRegular');
   static const folderSimple = IconData(0xe25a, fontFamily: 'PhosphorRegular');
   static const folders = IconData(0xe25c, fontFamily: 'PhosphorRegular');
+  static const forkKnife = IconData(0xe262, fontFamily: 'PhosphorRegular');
   static const gavel = IconData(0xea32, fontFamily: 'PhosphorRegular');
   static const gearSix = IconData(0xe272, fontFamily: 'PhosphorRegular');
   static const globe = IconData(0xe288, fontFamily: 'PhosphorRegular');
@@ -136,14 +145,18 @@ abstract final class PhosphorIconsRegular {
   static const pulse = IconData(0xe000, fontFamily: 'PhosphorRegular');
   static const pushPin = IconData(0xe3e2, fontFamily: 'PhosphorRegular');
   static const puzzlePiece = IconData(0xe596, fontFamily: 'PhosphorRegular');
+  static const receipt = IconData(0xe3ec, fontFamily: 'PhosphorRegular');
   static const repeat = IconData(0xe3f6, fontFamily: 'PhosphorRegular');
   static const robot = IconData(0xe762, fontFamily: 'PhosphorRegular');
   static const rocketLaunch = IconData(0xe3fe, fontFamily: 'PhosphorRegular');
+  static const scan = IconData(0xebb6, fontFamily: 'PhosphorRegular');
   static const scroll = IconData(0xeb7a, fontFamily: 'PhosphorRegular');
   static const sealCheck = IconData(0xe606, fontFamily: 'PhosphorRegular');
   static const shareNetwork = IconData(0xe408, fontFamily: 'PhosphorRegular');
   static const shieldCheck = IconData(0xe40c, fontFamily: 'PhosphorRegular');
   static const shieldWarning = IconData(0xe412, fontFamily: 'PhosphorRegular');
+  static const shoppingBag = IconData(0xe416, fontFamily: 'PhosphorRegular');
+  static const shoppingCart = IconData(0xe41e, fontFamily: 'PhosphorRegular');
   static const signIn = IconData(0xe428, fontFamily: 'PhosphorRegular');
   static const signOut = IconData(0xe42a, fontFamily: 'PhosphorRegular');
   static const sliders = IconData(0xe432, fontFamily: 'PhosphorRegular');
@@ -158,13 +171,18 @@ abstract final class PhosphorIconsRegular {
   static const thumbsDown = IconData(0xe48c, fontFamily: 'PhosphorRegular');
   static const thumbsUp = IconData(0xe48e, fontFamily: 'PhosphorRegular');
   static const timer = IconData(0xe492, fontFamily: 'PhosphorRegular');
+  static const target = IconData(0xe47c, fontFamily: 'PhosphorRegular');
   static const trash = IconData(0xe4a6, fontFamily: 'PhosphorRegular');
+  static const trophy = IconData(0xe67e, fontFamily: 'PhosphorRegular');
   static const treeStructure = IconData(0xe67c, fontFamily: 'PhosphorRegular');
+  static const trendDown = IconData(0xe4ac, fontFamily: 'PhosphorRegular');
+  static const trendUp = IconData(0xe4ae, fontFamily: 'PhosphorRegular');
   static const uploadSimple = IconData(0xe4c0, fontFamily: 'PhosphorRegular');
   static const user = IconData(0xe4c2, fontFamily: 'PhosphorRegular');
   static const userCircle = IconData(0xe4c4, fontFamily: 'PhosphorRegular');
   static const users = IconData(0xe4d6, fontFamily: 'PhosphorRegular');
   static const vibrate = IconData(0xe4d8, fontFamily: 'PhosphorRegular');
+  static const wallet = IconData(0xe68a, fontFamily: 'PhosphorRegular');
   static const warningCircle = IconData(0xe4e2, fontFamily: 'PhosphorRegular');
   static const waveform = IconData(0xe802, fontFamily: 'PhosphorRegular');
   static const webhooksLogo = IconData(0xecae, fontFamily: 'PhosphorRegular');
@@ -177,6 +195,7 @@ abstract final class PhosphorIconsRegular {
 abstract final class PhosphorIconsFill {
   static const brain = IconData(0xe74e, fontFamily: 'PhosphorFill');
   static const chatCircle = IconData(0xe168, fontFamily: 'PhosphorFill');
+  static const fire = IconData(0xe242, fontFamily: 'PhosphorFill');
   static const checkCircle = IconData(0xe184, fontFamily: 'PhosphorFill');
   static const folderSimple = IconData(0xe25a, fontFamily: 'PhosphorFill');
   static const lightning = IconData(0xe2de, fontFamily: 'PhosphorFill');

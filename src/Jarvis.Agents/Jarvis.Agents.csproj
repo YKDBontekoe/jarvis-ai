@@ -6,6 +6,7 @@
     <PackageReference Include="Microsoft.Agents.AI" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
     <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Sentry.Extensions.AI" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Jarvis.UnitTests" />

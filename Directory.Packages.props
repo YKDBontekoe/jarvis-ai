@@ -34,6 +34,10 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.19.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.19.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.19.0" />
+    <PackageVersion Include="Sentry.AspNetCore" Version="6.12.0" />
+    <PackageVersion Include="Sentry.Extensions.AI" Version="6.12.0" />
+    <PackageVersion Include="Sentry.OpenTelemetry" Version="6.12.0" />
+    <PackageVersion Include="Sentry.Profiling" Version="6.12.0" />
     <PackageVersion Include="Livekit.Rtc.Dotnet" Version="0.1.4" />
     <PackageVersion Include="SIPSorcery" Version="10.0.16" />
   </ItemGroup>

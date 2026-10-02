@@ -42,6 +42,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton<IDreamingScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<Jarvis.Application.Reviews.IWeeklyReviewScheduler>(sp =>
             sp.GetRequiredService<TemporalReminderScheduler>());
+        services.AddSingleton<Jarvis.Application.Habits.IHabitCheckInScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddHostedService<TemporalWorkflowReconciler>();
         services.AddHostedService<MemoryIndexingWorker>();
         services.AddHostedService<TemporalWorkerHostedService>();
@@ -76,6 +77,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton<AutomationScheduleActivities>();
         services.AddSingleton<AutomationPollActivities>();
         services.AddSingleton<WeeklyReviewActivities>();
+        services.AddSingleton<HabitCheckInActivities>();
 
         return services;
     }

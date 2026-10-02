@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Validate release tag uses SemVer
         if: github.ref_type == 'tag'
@@ -76,6 +78,10 @@ jobs:
           JARVIS_FIREBASE_IOS_APP_ID: ${{ secrets.JARVIS_FIREBASE_IOS_APP_ID }}
           JARVIS_FIREBASE_IOS_BUNDLE_ID: ${{ secrets.JARVIS_FIREBASE_IOS_BUNDLE_ID }}
           JARVIS_FIREBASE_STORAGE_BUCKET: ${{ secrets.JARVIS_FIREBASE_STORAGE_BUCKET }}
+          JARVIS_SENTRY_DSN: ${{ secrets.JARVIS_SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT_MOBILE }}
           VERSION: ${{ steps.version.outputs.version }}
           BUILD: ${{ steps.version.outputs.build }}
         run: |
@@ -95,10 +101,33 @@ jobs:
           add_define JARVIS_FIREBASE_IOS_APP_ID "${JARVIS_FIREBASE_IOS_APP_ID}"
           add_define JARVIS_FIREBASE_IOS_BUNDLE_ID "${JARVIS_FIREBASE_IOS_BUNDLE_ID}"
           add_define JARVIS_FIREBASE_STORAGE_BUCKET "${JARVIS_FIREBASE_STORAGE_BUCKET}"
+          add_define JARVIS_SENTRY_DSN "${JARVIS_SENTRY_DSN}"
+          SYMBOLS=()
+          if [[ -n "${SENTRY_AUTH_TOKEN}" && -n "${SENTRY_ORG}" && -n "${SENTRY_PROJECT}" ]]; then
+            # gen_snapshot does not create the map's parent directory; iOS builds do not create build/app.
+            mkdir -p build/app build/symbols
+            SYMBOLS=(
+              "--split-debug-info=${PWD}/build/symbols"
+              --obfuscate
+              "--extra-gen-snapshot-options=--save-obfuscation-map=${PWD}/build/app/obfuscation.map.json"
+            )
+          fi
           flutter build ios --release --no-codesign \
             --build-name="${VERSION}" \
             --build-number="${BUILD}" \
+            ${SYMBOLS[@]+"${SYMBOLS[@]}"} \
             ${DEFINES[@]+"${DEFINES[@]}"}
+          if [[ ${#SYMBOLS[@]} -gt 0 ]]; then
+            export SENTRY_RELEASE="${VERSION}+${BUILD}"
+            export SENTRY_DIST="${BUILD}"
+            dart run sentry_dart_plugin \
+              --sentry-define=release="${SENTRY_RELEASE}" \
+              --sentry-define=dist="${SENTRY_DIST}" \
+              --sentry-define=commits=auto \
+              --sentry-define=ignore_missing=true
+          else
+            echo "Sentry symbols were not uploaded; SENTRY_AUTH_TOKEN, SENTRY_ORG, or SENTRY_PROJECT_MOBILE is unset."
+          fi
 
       - name: Package unsigned IPA
         run: |

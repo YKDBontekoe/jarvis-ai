@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Text;
 using System.Text.Json;
+using Jarvis.Agents.Telemetry;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
@@ -132,6 +133,8 @@ public sealed class AgentRunCoordinator(
         var outcome = "failed";
         using var activity = JarvisDiagnostics.ActivitySource.StartActivity("jarvis.agent.run");
         activity?.SetTag("jarvis.run.kind", kind);
+        GenAiTelemetry.TagInvokeAgent(activity, conversationId);
+        Sentry.SentrySdk.ConfigureScope(scope => scope.User.Id = ownerId.ToString("D"));
 
         try
         {
@@ -198,6 +201,8 @@ public sealed class AgentRunCoordinator(
                     {
                         var toolSpan = JarvisDiagnostics.ActivitySource.StartActivity("jarvis.agent.tool");
                         toolSpan?.SetTag("tool.name", toolProgress.ToolName);
+                        GenAiTelemetry.TagTool(toolSpan, toolProgress.ToolName);
+                        toolSpan?.SetTag(GenAiTelemetry.ConversationId, conversationId.ToString("D"));
                         activeToolSpans.TryAdd(toolProgress.ToolCallId, (toolSpan, Stopwatch.GetTimestamp()));
                     }
                     else if (toolProgress.Phase is "completed" or "failed")

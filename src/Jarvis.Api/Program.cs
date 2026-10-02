@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Jarvis.Api.Endpoints;
 using Jarvis.Api.Errors;
 using Jarvis.Api.Hosting;
@@ -5,7 +6,9 @@ using Jarvis.Api.Realtime;
 using Jarvis.Api.Security;
 using Jarvis.Infrastructure.Identity;
 using Jarvis.Infrastructure.Persistence;
+using Jarvis.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
+using Sentry;
 
 if (args is ["migrate"])
 {
@@ -18,6 +21,8 @@ if (args is ["voice-mcp"])
     await Jarvis.Api.Realtime.VoiceMcpStdio.RunAsync();
     return;
 }
+
+JarvisSentry.ShouldCaptureException = exception => JarvisSentryExceptions.ShouldCapture(exception);
 
 var builder = WebApplication.CreateBuilder(args);
 builder.ValidateProductionConfiguration();
@@ -44,6 +49,14 @@ app.UseExceptionHandler();
 app.UseJarvisApiProblemResponses();
 app.UseCors();
 app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    var subject = context.User.FindFirstValue("sub")
+        ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (Guid.TryParse(subject, out var ownerId))
+        SentrySdk.ConfigureScope(scope => scope.User.Id = ownerId.ToString("D"));
+    await next(context);
+});
 app.UseAuthorization();
 app.MapDefaultEndpoints();
 var hub = app.MapHub<JarvisEventsHub>("/hubs/events");
@@ -64,6 +77,8 @@ api.MapMemoryEndpoints(app.Logger);
 api.MapJournalEndpoints(app.Logger);
 api.MapWeeklyReviewEndpoints();
 api.MapProjectEndpoints();
+api.MapExpenseEndpoints(app.Logger);
+api.MapHabitEndpoints(app.Logger);
 api.MapModelSettingsEndpoints(app.Logger);
 api.MapSkillEndpoints(app.Logger);
 api.MapPersonaEndpoints();
