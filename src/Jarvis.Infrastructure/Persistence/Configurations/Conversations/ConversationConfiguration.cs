@@ -1,4 +1,5 @@
 using Jarvis.Domain.Conversations;
+using Jarvis.Domain.Projects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -16,6 +17,9 @@ internal sealed class ConversationConfiguration : IEntityTypeConfiguration<Conve
             builder.HasIndex(x => new { x.OwnerId, x.UpdatedAt });
             builder.HasIndex(x => new { x.OwnerId, x.PinnedAt });
             builder.HasIndex(x => new { x.OwnerId, x.ProfileId });
+            builder.Property(x => x.ProjectId).HasColumnName("project_id");
+            builder.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.SetNull);
+            builder.HasIndex(x => new { x.OwnerId, x.ProjectId, x.UpdatedAt });
             builder.HasMany(x => x.Messages).WithOne().HasForeignKey(x => x.ConversationId)
                 .OnDelete(DeleteBehavior.Cascade);
         }

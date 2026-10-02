@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'appearance.dart';
 import 'error_reporting.dart';
@@ -9,12 +11,35 @@ import 'push/firebase_bootstrap.dart';
 import 'theme.dart';
 
 Future<void> main() async {
+  if (sentryDsn.isEmpty || !(kReleaseMode || sentryEnabledOverride)) {
+    await startJarvis();
+    return;
+  }
+
+  await SentryFlutter.init((options) {
+    options.dsn = sentryDsn;
+    options.sendDefaultPii = false;
+    options.tracesSampleRate = kReleaseMode ? 0.2 : 1.0;
+    options.enableLogs = true;
+    options.attachScreenshot = false;
+    // attachViewHierarchy stays at the SDK default (off). A view dump would include chat text.
+    options.replay.sessionSampleRate = 0;
+    options.replay.onErrorSampleRate = 1;
+    options.privacy.maskAllText = true;
+    options.privacy.maskAllImages = true;
+    options.beforeSendLog = filterSentryLog;
+  }, appRunner: () => startJarvis(wrapWithSentry: true));
+}
+
+Future<void> startJarvis({bool wrapWithSentry = false}) async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (wrapWithSentry) sentryTracingEnabled = true;
   installErrorReporting();
   await initializeFirebase();
   final appearance = AppearanceController();
   await appearance.load();
-  runApp(JarvisApp(appearance: appearance));
+  final app = JarvisApp(appearance: appearance);
+  runApp(wrapWithSentry ? SentryWidget(child: app) : app);
 }
 
 class JarvisApp extends StatefulWidget {

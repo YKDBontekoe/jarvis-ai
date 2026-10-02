@@ -94,6 +94,10 @@ mixin _ChatScreenNav on _ChatScreenController {
   Future<void> _afterUtility(String destination) async {
     if (!mounted || _signedOut || _signingOut) return;
     unawaited(_refreshUnreadNotifications());
+    if (destination == 'projects' ||
+        destination.startsWith(projectDestinationPrefix)) {
+      unawaited(_loadRecent());
+    }
     if (destination == 'approvals') {
       await _syncConversationApprovals();
     }
@@ -190,6 +194,7 @@ mixin _ChatScreenNav on _ChatScreenController {
     if (_signingOut) return;
     _signingOut = true;
     _signedOut = true;
+    unawaited(PlaceReminderTracker.instance.detach());
     _initGeneration++;
     _realtimeGeneration++;
     final runningConversation = _conversationId;
@@ -211,6 +216,7 @@ mixin _ChatScreenNav on _ChatScreenController {
         _error = null;
         _entries.clear();
         _recent = [];
+        _projects = [];
         _password.clear();
         _replaceComposerText('');
         _pendingPhotos = [];
@@ -317,6 +323,38 @@ mixin _ChatScreenNav on _ChatScreenController {
     } catch (_) {
       // The sidebar keeps its last known list when the payload is malformed.
     }
+    await _loadProjects(revision);
+  }
+
+  Future<void> _loadProjects(int revision) async {
+    try {
+      final response = await _http.get<dynamic>('/api/v1/projects');
+      if (!mounted ||
+          _signedOut ||
+          _signingOut ||
+          revision != _recentRevision) {
+        return;
+      }
+      setState(
+        () => _projects = jsonMaps(
+          response.data,
+        ).where((item) => item['id'] is String).toList(),
+      );
+    } catch (_) {
+      // Projects are a shortcut in the sidebar; keep the last known list.
+    }
+  }
+
+  /// Opens the editor for a new project, then the project itself.
+  Future<void> _createProject() async {
+    _dismissKeyboard();
+    final created = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(builder: (_) => ProjectEditorScreen(http: _http)),
+    );
+    if (!mounted) return;
+    unawaited(_loadRecent());
+    final id = jsonId(created);
+    if (id != null) _openUtility('$projectDestinationPrefix$id');
   }
 
   void _openSettings() {

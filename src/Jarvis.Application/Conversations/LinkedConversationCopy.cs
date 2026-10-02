@@ -13,6 +13,10 @@ public static class LinkedConversationCopy
     public static string ReminderDue(string title) =>
         $"Reminder: {Sanitize(title)}\n\nThis is due now. Reply here to snooze, cancel, or talk about it.";
 
+    /// <param name="left">True when the owner left the place, false when they arrived.</param>
+    public static string ReminderAtPlace(string title, string place, bool left) =>
+        $"Reminder: {Sanitize(title)}\n\n{(left ? "You just left" : "You’re at")} {Sanitize(place)}. Reply here to snooze, cancel, or talk about it.";
+
     public static string ReminderSnoozed(string title, string when) =>
         $"Snoozed “{Sanitize(title)}” until {Sanitize(when)}. I’ll remind you again then.";
 

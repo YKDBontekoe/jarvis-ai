@@ -142,7 +142,7 @@ public sealed class ReminderSearchProvider(IReminderRepository reminders) : IFed
         {
             if (!SearchRanking.MatchesQuery(reminder.Title, normalized)) continue;
             hits.Add(new FederatedSearchResult(SearchResultKinds.Reminder, reminder.Id.ToString(), reminder.Title,
-                $"Due {reminder.DueAt:u}", reminder.DueAt, SearchRoutes.Reminder(reminder.Id, reminder.ConversationId),
+                reminder.Place is { } place ? $"At {place.Name}" : $"Due {reminder.DueAt:u}", reminder.DueAt, SearchRoutes.Reminder(reminder.Id, reminder.ConversationId),
                 SearchRanking.TextRelevance(reminder.Title, normalized), false));
             if (hits.Count >= limit) break;
         }

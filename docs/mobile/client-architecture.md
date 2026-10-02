@@ -17,6 +17,7 @@ Android emulator: `http://10.0.2.2:5082`. Physical devices need LAN-reachable AP
 | `features/chat/` | Chat transcript, composer, SignalR realtime, approvals, generative UI, browser timeline |
 | `features/shell/` | Sidebar, wide-layout navigation rail |
 | `features/home/` | Home briefing widgets |
+| `features/projects/` | Projects list, project page (instructions, chats, files, tasks), editor, and the move-to-project sheet; the sidebar lists recent projects |
 | `features/review/` | Weekly review screen and mood trend chart |
 | `features/memory/` | Memory list/editor, knowledge graph map |
 | `features/journal/` | Journal list + summary, entry editor (text, ratings, tags), "Talk about my day" hand-off to chat |

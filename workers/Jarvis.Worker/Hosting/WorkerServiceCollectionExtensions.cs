@@ -42,6 +42,8 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton<IDreamingScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<Jarvis.Application.Reviews.IWeeklyReviewScheduler>(sp =>
             sp.GetRequiredService<TemporalReminderScheduler>());
+        services.AddSingleton<Jarvis.Application.Habits.IHabitCheckInScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
+        services.AddSingleton<Jarvis.Application.People.IPeopleCheckInScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddHostedService<TemporalWorkflowReconciler>();
         services.AddHostedService<MemoryIndexingWorker>();
         services.AddHostedService<TemporalWorkerHostedService>();
@@ -58,6 +60,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton<IAutomationScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<PublicJsonMetricReader>();
         services.AddScoped<ICalendarFeed, CalendarFeed>();
+        services.AddScoped<Jarvis.Application.Planner.IDayPlannerService, Jarvis.Application.Planner.DayPlannerService>();
         services.AddScoped<WatchMetricReader>();
         services.AddJarvisMemory();
         services.AddScoped<McpToolHost>();
@@ -72,10 +75,12 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton<DailyBriefingActivities>();
         services.AddSingleton<AssistantHeartbeatActivities>();
         services.AddSingleton<AssistantDreamingActivities>();
+        services.AddSingleton<PeopleCheckInActivities>();
         services.AddSingleton<AutomationRunActivities>();
         services.AddSingleton<AutomationScheduleActivities>();
         services.AddSingleton<AutomationPollActivities>();
         services.AddSingleton<WeeklyReviewActivities>();
+        services.AddSingleton<HabitCheckInActivities>();
 
         return services;
     }

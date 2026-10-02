@@ -24,7 +24,13 @@ public sealed class Conversation
 
     /// <summary>When the owner pinned this conversation to the top of the list; null when not pinned.</summary>
     public DateTimeOffset? PinnedAt { get; private set; }
+
+    /// <summary>The owner's project this conversation belongs to; null when it stands alone.</summary>
+    public Guid? ProjectId { get; private set; }
     public List<Message> Messages { get; private set; } = [];
+
+    /// <summary>Moves the conversation into a project, or out of one with null. Does not move it in the recent list.</summary>
+    public void MoveToProject(Guid? projectId) => ProjectId = projectId;
 
     public void Touch() => UpdatedAt = DateTimeOffset.UtcNow;
 
