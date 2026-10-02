@@ -30,7 +30,9 @@ class ScreenshotHttp implements HttpClientAdapter {
       found = true;
     } else {
       final prefixes = routes.keys.where(
-        (route) => route.endsWith('*') && key.startsWith(route.substring(0, route.length - 1)),
+        (route) =>
+            route.endsWith('*') &&
+            key.startsWith(route.substring(0, route.length - 1)),
       );
       if (prefixes.isNotEmpty) {
         final best = prefixes.reduce((a, b) => a.length >= b.length ? a : b);
@@ -40,7 +42,9 @@ class ScreenshotHttp implements HttpClientAdapter {
     }
     if (!found) missing.add(key);
     return ResponseBody.fromString(
-      jsonEncode(body ?? (options.method == 'GET' ? <Object>[] : <String, Object>{})),
+      jsonEncode(
+        body ?? (options.method == 'GET' ? <Object>[] : <String, Object>{}),
+      ),
       found ? 200 : (options.method == 'GET' ? 404 : 200),
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
@@ -73,7 +77,9 @@ Future<void> loadAppFonts() async {
       loader.addFont(Future.value(ByteData.view(bytes.buffer)));
     }
     if (family == 'Inter' && emojiFile.existsSync()) {
-      loader.addFont(Future.value(ByteData.view(emojiFile.readAsBytesSync().buffer)));
+      loader.addFont(
+        Future.value(ByteData.view(emojiFile.readAsBytesSync().buffer)),
+      );
     }
     await loader.load();
   }
@@ -90,7 +96,9 @@ Future<void> loadAppFonts() async {
     await loader.load();
   }
   final material = Platform.environment['FLUTTER_ROOT'] ?? '/root/flutter';
-  final icons = File('$material/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf');
+  final icons = File(
+    '$material/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+  );
   if (icons.existsSync()) {
     final loader = FontLoader('MaterialIcons')
       ..addFont(Future.value(ByteData.view(icons.readAsBytesSync().buffer)));
@@ -100,7 +108,9 @@ Future<void> loadAppFonts() async {
   final roboto = FontLoader('Roboto');
   roboto.addFont(
     Future.value(
-      ByteData.view(File('assets/fonts/Inter-Regular.ttf').readAsBytesSync().buffer),
+      ByteData.view(
+        File('assets/fonts/Inter-Regular.ttf').readAsBytesSync().buffer,
+      ),
     ),
   );
   await roboto.load();
@@ -124,19 +134,24 @@ void useDesktop(WidgetTester tester, {Size size = const Size(1440, 900)}) {
 }
 
 Future<void> capture(WidgetTester tester, String name) async {
-  final dir = Directory(Platform.environment['SCREENSHOT_DIR'] ?? 'build/screenshots')
-    ..createSync(recursive: true);
+  final dir = Directory(
+    Platform.environment['SCREENSHOT_DIR'] ?? 'build/screenshots',
+  )..createSync(recursive: true);
   await tester.runAsync(() async {
     final boundary =
-        screenshotKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-    final image = await boundary.toImage(pixelRatio: tester.view.devicePixelRatio);
+        screenshotKey.currentContext!.findRenderObject()!
+            as RenderRepaintBoundary;
+    final image = await boundary.toImage(
+      pixelRatio: tester.view.devicePixelRatio,
+    );
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     File('${dir.path}/$name.png').writeAsBytesSync(data!.buffer.asUint8List());
   });
 }
 
 void mockPlatformChannels() {
-  final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   messenger.setMockMethodCallHandler(
     const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'),
     (call) async => null,
@@ -145,7 +160,10 @@ void mockPlatformChannels() {
 
 /// A widget test that paints real (blurred) shadows, as devices do; flutter_test
 /// otherwise draws them hard-edged.
-void screenshotTest(String description, Future<void> Function(WidgetTester) body) {
+void screenshotTest(
+  String description,
+  Future<void> Function(WidgetTester) body,
+) {
   testWidgets(description, (tester) async {
     debugDisableShadows = false;
     try {

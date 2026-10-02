@@ -699,7 +699,9 @@ class _RemindersScreenState extends State<RemindersScreen>
         ),
       ],
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(56),
+        // Tab height (46) + track padding (8) + bottom margin (12); asking for
+        // less squeezes the toolbar above it.
+        preferredSize: const Size.fromHeight(66),
         child: ContentWidth(
           child: Container(
             constraints: const BoxConstraints(minHeight: 44),

@@ -45,7 +45,8 @@ List<Map<String, Object?>> messages() => [
   {
     'id': 'm1',
     'role': 'user',
-    'content': 'Can you plan a relaxed weekend in Lisbon for two? We land Friday at 18:40.',
+    'content':
+        'Can you plan a relaxed weekend in Lisbon for two? We land Friday at 18:40.',
   },
   {
     'id': 'm2',
@@ -199,7 +200,14 @@ Map<String, Object?> _habit(
 Map<String, Object?> habits() => {
   'habits': [
     _habit('h1', 'Morning run', '🏃', streak: 12, doneToday: true, thisWeek: 5),
-    _habit('h2', 'Read 20 pages', '📚', streak: 4, doneToday: false, thisWeek: 3),
+    _habit(
+      'h2',
+      'Read 20 pages',
+      '📚',
+      streak: 4,
+      doneToday: false,
+      thisWeek: 3,
+    ),
     _habit('h3', 'Drink water', '💧', streak: 21, doneToday: true, thisWeek: 5),
   ],
   'settings': {'eveningCheckIn': true, 'checkInTime': '20:30'},

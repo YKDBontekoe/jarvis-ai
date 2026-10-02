@@ -1271,3 +1271,55 @@ class _SwipeBackground extends StatelessWidget {
     ),
   );
 }
+
+/// Soft violet and sky light behind a hero (the orb on home), echoing the
+/// sign-in backdrop so the first screen has some atmosphere. Purely visual.
+class HeroGlow extends StatelessWidget {
+  const HeroGlow({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    Widget blob(double size, Color color) => Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)]),
+      ),
+    );
+    final strength = colors.isDark ? 1.4 : 1.0;
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
+      children: [
+        // Blobs start at the top edge so the scroll viewport never slices
+        // through a bright part of the glow.
+        Positioned(
+          top: -10,
+          left: -170,
+          child: IgnorePointer(
+            child: blob(380, colors.violet.withValues(alpha: .13 * strength)),
+          ),
+        ),
+        Positioned(
+          top: 20,
+          right: -190,
+          child: IgnorePointer(
+            child: blob(340, colors.sky.withValues(alpha: .09 * strength)),
+          ),
+        ),
+        Positioned(
+          top: 170,
+          left: -40,
+          child: IgnorePointer(
+            child: blob(220, colors.rose.withValues(alpha: .10 * strength)),
+          ),
+        ),
+        child,
+      ],
+    );
+  }
+}

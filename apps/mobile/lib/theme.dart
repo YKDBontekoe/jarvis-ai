@@ -473,7 +473,9 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       systemOverlayStyle: overlay,
       iconTheme: IconThemeData(color: colors.ink, size: 20),
       actionsIconTheme: IconThemeData(color: colors.inkSoft, size: 20),
-      titleTextStyle: text.titleLarge,
+      // Page titles use the editorial serif, like the home greeting, so
+      // every screen carries the same voice; dense UI stays in Inter.
+      titleTextStyle: JarvisType.serif(colors.ink).copyWith(fontSize: 27),
     ),
     iconTheme: IconThemeData(color: colors.inkSoft, size: 20),
     iconButtonTheme: IconButtonThemeData(

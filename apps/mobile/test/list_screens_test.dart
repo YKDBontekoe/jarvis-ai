@@ -279,7 +279,7 @@ void main() {
     });
     await show(tester, ConditionWatchesScreen(http: http.client()));
 
-    await tester.tap(find.text('New watch'));
+    await tester.tap(find.text('New'));
     await tester.pumpAndSettle();
 
     final fields = find.byType(TextFormField);

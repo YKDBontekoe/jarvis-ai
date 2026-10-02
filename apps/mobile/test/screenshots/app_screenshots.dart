@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/api/api_config.dart';
+import 'package:jarvis_mobile/features/chat/chat_entries.dart';
+import 'package:jarvis_mobile/features/chat/chat_widgets.dart';
+import 'package:jarvis_mobile/theme.dart';
+import 'package:jarvis_mobile/ui/jarvis_ui.dart';
+import 'package:jarvis_mobile/ui/phosphor_icons.dart';
 import 'package:jarvis_mobile/main.dart';
 
 import 'fixtures.dart';
@@ -74,7 +79,10 @@ void main() {
       await start(tester, dark: dark);
       await openChat(tester);
       await capture(tester, '03-chat-$mode');
-      await tester.enterText(find.byType(TextField).last, 'Also find a good fado bar');
+      await tester.enterText(
+        find.byType(TextField).last,
+        'Also find a good fado bar',
+      );
       await settle(tester);
       await capture(tester, '04-chat-typing-$mode');
     });
@@ -118,7 +126,10 @@ void main() {
       usePhone(tester);
       await start(tester);
       await openFromMenu(tester, label);
-      await capture(tester, '${index.toString().padLeft(2, '0')}-${label.toLowerCase()}');
+      await capture(
+        tester,
+        '${index.toString().padLeft(2, '0')}-${label.toLowerCase()}',
+      );
     });
   }
 
@@ -136,6 +147,116 @@ void main() {
     await capture(tester, '19-reminder-swipe');
     await gesture.up();
     await settle(tester);
+  });
+
+  for (final dark in [false, true]) {
+    screenshotTest('components ${dark ? 'dark' : 'light'}', (tester) async {
+      usePhone(tester);
+      final input = TextEditingController(text: 'Find a quiet fado bar near Alfama');
+      addTearDown(input.dispose);
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: screenshotKey,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: buildJarvisTheme(
+              brightness: dark ? Brightness.dark : Brightness.light,
+            ),
+            home: Scaffold(
+              body: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const MessageBubble(
+                        message: MessageEntry(
+                          role: 'user',
+                          content: 'Find a quiet fado bar near Alfama for Saturday.',
+                        ),
+                      ),
+                      ToolRunView(
+                        run: const ToolRunEntry([
+                          ToolStep('SearchMemory', ToolStepStatus.completed),
+                          ToolStep('WebSearch', ToolStepStatus.running),
+                        ]),
+                        onOpenTasks: () {},
+                      ),
+                      const MessageBubble(
+                        message: MessageEntry(
+                          role: 'assistant',
+                          content: '',
+                          pending: true,
+                        ),
+                        thinkingLabel: 'Looking around Alfama',
+                      ),
+                      const SizedBox(height: 8),
+                      const StatusChip(
+                        label: 'Realtime updates are offline',
+                        color: Color(0xffd97706),
+                        actionLabel: 'Retry',
+                      ),
+                      const Spacer(),
+                      ChatComposer(
+                        controller: input,
+                        onSend: () {},
+                        onCancel: () {},
+                        onVoice: () {},
+                        onAttach: () {},
+                        onPhoto: () {},
+                        sending: true,
+                        voiceActive: false,
+                        voiceStarting: false,
+                      ),
+                      const SizedBox(height: 12),
+                      ChatComposer(
+                        controller: TextEditingController(text: 'Book it for 21:00'),
+                        onSend: () {},
+                        onVoice: () {},
+                        onAttach: () {},
+                        sending: false,
+                        voiceActive: false,
+                        voiceStarting: false,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      for (var i = 0; i < 8; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await capture(tester, '21-components-${dark ? 'dark' : 'light'}');
+    });
+  }
+
+  screenshotTest('empty state', (tester) async {
+    usePhone(tester);
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: screenshotKey,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: buildJarvisTheme(),
+          home: Scaffold(
+            appBar: AppBar(title: const Text('Journal')),
+            body: EmptyState(
+              icon: PhosphorIconsRegular.notebook,
+              title: 'Nothing written yet',
+              message: 'Tell Jarvis about your day and it keeps the notes here.',
+              action: FilledButton(onPressed: () {}, child: const Text('Write today')),
+            ),
+          ),
+        ),
+      ),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await capture(tester, '22-empty-state');
   });
 
   screenshotTest('sign in', (tester) async {
