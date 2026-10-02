@@ -193,6 +193,32 @@ internal sealed class TemporalWorkflowReconciler(
                             () => dreamingScheduler.ScheduleDreamingAsync(ownerId, cancellationToken),
                             cancellationToken);
                 }
+
+                var weeklyReviewScheduler = services.GetRequiredService<Jarvis.Application.Reviews.IWeeklyReviewScheduler>();
+                foreach (var ownerId in await settingsStore.ListOwnersAsync(
+                             Jarvis.Application.Settings.SettingsSections.WeeklyReview, cancellationToken))
+                {
+                    var review = await settingsStore.GetAsync<Jarvis.Application.Reviews.WeeklyReviewSettings>(ownerId,
+                        Jarvis.Application.Settings.SettingsSections.WeeklyReview, cancellationToken);
+                    if (review?.Enabled == true)
+                        await TryScheduleAsync("weekly review", ownerId,
+                            () => weeklyReviewScheduler.ScheduleWeeklyReviewAsync(ownerId, settingsChanged: false,
+                                cancellationToken),
+                            cancellationToken);
+                }
+
+                var habitScheduler = services.GetRequiredService<Jarvis.Application.Habits.IHabitCheckInScheduler>();
+                foreach (var ownerId in await services.GetRequiredService<Jarvis.Application.Habits.IHabitRepository>()
+                             .ListOwnersWithActiveHabitsAsync(cancellationToken))
+                {
+                    var habitSettings = await settingsStore.GetAsync<Jarvis.Application.Habits.HabitSettings>(ownerId,
+                        Jarvis.Application.Habits.HabitSettingsSections.Settings, cancellationToken)
+                        ?? Jarvis.Application.Habits.HabitSettings.Default;
+                    if (habitSettings.EveningCheckIn)
+                        await TryScheduleAsync("habit check-in", ownerId,
+                            () => habitScheduler.ScheduleHabitCheckInAsync(ownerId, cancellationToken),
+                            cancellationToken);
+                }
             }
 
             await fileRepository.RequeueStaleQueuedAsync(

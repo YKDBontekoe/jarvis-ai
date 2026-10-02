@@ -32,6 +32,8 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Memory | `MemoryAgentTools` list/search/remember | **Forget** requires approval |
 | Journal | `JournalAgentTools` `SaveJournalEntry` (appends to the day's entry), `ListJournalEntries` | Hidden during background task turns; off when the profile disallows remembering |
 | Day planner | `PlannerAgentTools` `GetTodayPlan`, `AddToDayPlan`, `PlanMyDay`, `CompleteDayPlanItem`, `RemoveDayPlanItem` | No approval: they only change the owner's day plan in Jarvis. Calendar writes go through `InvokeMcpTool` (approval) per the planner guidance |
+| Expenses | `ExpenseAgentTools` `LogExpense` (skips an identical expense on the same day; `fromPhoto` keeps the latest chat photo as the receipt), `GetExpenses` (month summary and list), `UpdateExpense` | **DeleteExpense** requires approval. The rest only change the owner's own log. `ExpenseContextContributor` adds when-to-log guidance each turn |
+| Habits | `HabitAgentTools` `GetHabits`, `CheckInHabits` (by name, optional date up to 7 days back), `CreateHabit` | No approval (owner's own tracking data); hidden during background task turns. Deleting habits is app-only |
 | MCP | `McpServerAgentTools` + `McpSetupAgentTools` | Discover/add/update/invoke/read prompt/resource/remove mostly **approval**; setup and secret cards in chat |
 | Coding | `CodexCodingTools.RunCodingTaskAsync` | **Approval**; only if `Coding:Repositories` configured |
 
@@ -47,6 +49,7 @@ Browser, surface, device, skill, persona, graph, and remote-agent tools are defi
 - Linked reminder or automation for the current conversation
 - Persona, skills, user dream portrait, knowledge graph summaries, device/browser/session state
 - Bound assistant profile (`ProfileContextContributor`) as untrusted working notes
+- The conversation's project (`ProjectContextContributor`): name, description, owner instructions as untrusted working notes, and up to 25 project file names; applies to chats and to tasks in the project. `CreateTask` from a project conversation keeps the new task in that project
 - MCP servers, host connections, and pack status (`McpContextContributor`) so chat can manage them without a Settings detour
 
 Order is controlled by `Order` on each contributor (`CoreAgentContext` uses `Order => 0`).

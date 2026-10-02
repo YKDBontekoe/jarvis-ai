@@ -7,7 +7,9 @@ import 'approvals_screen.dart';
 import 'features/chat/tool_catalog.dart';
 import 'api/api_config.dart';
 import 'features/coding/coding_run_detail_screen.dart';
+import 'features/habits/habits_screen.dart';
 import 'daily_briefing_screen.dart';
+import 'features/review/weekly_review_screen.dart';
 import 'notification_details_screen.dart';
 import 'notification_routing.dart';
 import 'schedule_format.dart';
@@ -468,6 +470,18 @@ class _RemindersScreenState extends State<RemindersScreen>
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) => DailyBriefingScreen(http: widget.http),
+        ),
+      );
+    } else if (opensWeeklyReview(type)) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => WeeklyReviewScreen(http: widget.http),
+        ),
+      );
+    } else if (opensHabits(type)) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => HabitsScreen(http: widget.http),
         ),
       );
     } else if (opensTaskDetails(type) && sourceId != null) {

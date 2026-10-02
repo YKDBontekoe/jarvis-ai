@@ -1,3 +1,4 @@
+using Jarvis.Agents.Telemetry;
 using Jarvis.Application.Conversations;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Compaction;
@@ -52,13 +53,13 @@ public sealed class JarvisAgentFactory(
             Id = "jarvis-root",
             Name = "Jarvis",
             Description = "Personal assistant root agent",
-            ChatOptions = new ChatOptions
+            ChatOptions = SentryChatInstrumentation.InstrumentTools(new ChatOptions
             {
                 Instructions = BuildInstructions(configuration["Jarvis:Instructions"], context.IsBackgroundTask),
                 ModelId = modelClass,
                 Tools = tools,
                 AllowMultipleToolCalls = false
-            },
+            }),
             AIContextProviders = contextProviders
         }, loggerFactory, services);
         ToolFailureFeedback.Configure(agent.ChatClient.GetService<FunctionInvokingChatClient>());

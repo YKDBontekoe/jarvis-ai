@@ -17,6 +17,7 @@ using Jarvis.Mcp;
 using Jarvis.Memory;
 using Jarvis.Workflows;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Jarvis.Api.Hosting;
 
@@ -108,9 +109,14 @@ internal static class ApiServiceRegistration
         services.AddSingleton<IDailyBriefingScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<Jarvis.Application.Learning.IHeartbeatScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<Jarvis.Application.Learning.IDreamingScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
+        services.AddSingleton<Jarvis.Application.Habits.IHabitCheckInScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddScoped<IReminderService, ReminderService>();
         services.AddScoped<IConditionWatchService, ConditionWatchService>();
         services.AddScoped<IDailyBriefingService, DailyBriefingService>();
+        services.AddSingleton<Jarvis.Application.Reviews.IWeeklyReviewScheduler>(provider =>
+            provider.GetRequiredService<TemporalReminderScheduler>());
+        services.AddScoped<Jarvis.Application.Reviews.IWeeklyReviewService, WeeklyReviewService>();
+        services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IAutomationRuleService, AutomationRuleService>();
         services.AddScoped<IAutomationApprovalResolver, AutomationApprovalResolver>();
         services.AddScoped<IAutomationTriggerPublisher, AutomationTriggerPublisher>();

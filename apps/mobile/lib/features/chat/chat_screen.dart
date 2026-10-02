@@ -39,6 +39,8 @@ import '../search/command_palette.dart';
 import '../search/recent_searches_store.dart';
 import '../search/search_navigation.dart';
 import '../search/search_screen.dart';
+import '../projects/project_editor.dart';
+import '../projects/project_style.dart';
 import '../shell/sidebar.dart';
 import '../shell/utility_pages.dart';
 import '../voice/chat_gpt_voices.dart';

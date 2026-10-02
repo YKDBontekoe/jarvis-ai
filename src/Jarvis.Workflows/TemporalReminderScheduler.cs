@@ -13,7 +13,8 @@ namespace Jarvis.Workflows;
 
 public sealed class TemporalReminderScheduler(IConfiguration configuration) : IFileProcessingScheduler,
     IConditionWatchScheduler, IDailyBriefingScheduler, Jarvis.Application.Learning.IHeartbeatScheduler,
-    Jarvis.Application.Learning.IDreamingScheduler, IAutomationScheduler
+    Jarvis.Application.Learning.IDreamingScheduler, IAutomationScheduler,
+    Jarvis.Application.Reviews.IWeeklyReviewScheduler, Jarvis.Application.Habits.IHabitCheckInScheduler
 {
     public const string TaskQueue = "jarvis-workflows";
     private readonly SemaphoreSlim _clientLock = new(1, 1);
@@ -138,6 +139,40 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
 
     public Task CancelDreamingAsync(Guid ownerId, CancellationToken cancellationToken) =>
         CancelAsync(Jarvis.Application.Learning.DreamingWorkflowIds.For(ownerId), cancellationToken);
+
+    public async Task ScheduleWeeklyReviewAsync(Guid ownerId, bool settingsChanged,
+        CancellationToken cancellationToken)
+    {
+        var client = await GetClientAsync(cancellationToken);
+        var options = new WorkflowOptions(id: Jarvis.Application.Reviews.WeeklyReviewWorkflowIds.For(ownerId),
+            taskQueue: TaskQueue)
+        {
+            IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
+        };
+        if (settingsChanged)
+            options.SignalWithStart((WeeklyReviewWorkflow workflow) => workflow.SettingsChangedAsync());
+        else
+            options.IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting;
+        await client.StartWorkflowAsync(
+            (WeeklyReviewWorkflow workflow) => workflow.RunAsync(
+                new Jarvis.Application.Reviews.WeeklyReviewWorkflowInput(ownerId)), options);
+    }
+
+    public async Task ScheduleHabitCheckInAsync(Guid ownerId, CancellationToken cancellationToken)
+    {
+        var client = await GetClientAsync(cancellationToken);
+        await client.StartWorkflowAsync(
+            (HabitCheckInWorkflow workflow) => workflow.RunAsync(
+                new Jarvis.Application.Habits.HabitCheckInWorkflowInput(ownerId)),
+            new WorkflowOptions(id: Jarvis.Application.Habits.HabitCheckInWorkflowIds.For(ownerId), taskQueue: TaskQueue)
+            {
+                IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting,
+                IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
+            });
+    }
+
+    public Task CancelHabitCheckInAsync(Guid ownerId, CancellationToken cancellationToken) =>
+        CancelAsync(Jarvis.Application.Habits.HabitCheckInWorkflowIds.For(ownerId), cancellationToken);
 
     public async Task ResolveTaskApprovalAsync(string workflowId, string summary, CancellationToken cancellationToken)
     {
@@ -382,7 +417,7 @@ public sealed class JarvisTaskService(
     ILogger<JarvisTaskService> logger) : IJarvisTaskService
 {
     public async Task<JarvisTaskRecord> CreateAsync(Guid ownerId, string title, string prompt, CancellationToken cancellationToken,
-        Guid? profileId = null)
+        Guid? profileId = null, Guid? projectId = null)
     {
         title = title.Trim();
         prompt = prompt.Trim();
@@ -390,7 +425,8 @@ public sealed class JarvisTaskService(
         if (prompt.Length is < 1 or > 32_000) throw new ArgumentException("Task instructions must contain 1 to 32,000 characters.", nameof(prompt));
 
         var binding = await profiles.CaptureBindingAsync(ownerId, profileId, cancellationToken);
-        var task = await tasks.CreateWithConversationAsync(ownerId, title, prompt, cancellationToken, binding);
+        var task = await tasks.CreateWithConversationAsync(ownerId, title, prompt, cancellationToken, binding,
+            projectId);
         try
         {
             await scheduler.ScheduleTaskAsync(task, cancellationToken);

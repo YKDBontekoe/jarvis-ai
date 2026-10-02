@@ -40,6 +40,9 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton<IDailyBriefingScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<IHeartbeatScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<IDreamingScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
+        services.AddSingleton<Jarvis.Application.Reviews.IWeeklyReviewScheduler>(sp =>
+            sp.GetRequiredService<TemporalReminderScheduler>());
+        services.AddSingleton<Jarvis.Application.Habits.IHabitCheckInScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddHostedService<TemporalWorkflowReconciler>();
         services.AddHostedService<MemoryIndexingWorker>();
         services.AddHostedService<TemporalWorkerHostedService>();
@@ -47,6 +50,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddScoped<IConditionWatchService, ConditionWatchService>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<IDailyBriefingService, DailyBriefingService>();
+        services.AddScoped<Jarvis.Application.Reviews.IWeeklyReviewService, WeeklyReviewService>();
         services.AddScoped<IAutomationRuleService, AutomationRuleService>();
         services.AddScoped<IAutomationTriggerPublisher, AutomationTriggerPublisher>();
         services.AddScoped<IAutomationRunExecutor, AutomationRunExecutor>();
@@ -73,6 +77,8 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton<AutomationRunActivities>();
         services.AddSingleton<AutomationScheduleActivities>();
         services.AddSingleton<AutomationPollActivities>();
+        services.AddSingleton<WeeklyReviewActivities>();
+        services.AddSingleton<HabitCheckInActivities>();
 
         return services;
     }

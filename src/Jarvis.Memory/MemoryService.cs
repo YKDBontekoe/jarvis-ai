@@ -75,13 +75,12 @@ public sealed class MemoryService(IMemoryRepository repository, IMemoryIndexRepo
             var semanticEnabled = index is not null && embedder is not null &&
                                   await repository.HasActiveMemoriesAsync(ownerId, cancellationToken);
 
-            // The embedding request goes over the network while the keyword query runs in PostgreSQL.
-            var embedding = semanticEnabled ? EmbedQueryAsync(ownerId, query, cancellationToken) : null;
             var lexical = await repository.SearchLexicalAsync(ownerId, MemoryQuery.Parse(query), kind,
                 CandidateLimit, cancellationToken);
-            var semantic = embedding is null
-                ? []
-                : await SearchSemanticAsync(ownerId, await embedding, kind, cancellationToken);
+            // Embedding model resolution and usage recording access the same scoped DbContext as the repositories.
+            // Await the entire embedding operation after lexical retrieval so their database operations cannot overlap.
+            var embedding = semanticEnabled ? await EmbedQueryAsync(ownerId, query, cancellationToken) : null;
+            var semantic = await SearchSemanticAsync(ownerId, embedding, kind, cancellationToken);
             activity?.SetTag("jarvis.memory.semantic_hits", semantic.Count);
             activity?.SetTag("jarvis.memory.lexical_hits", lexical.Count);
 

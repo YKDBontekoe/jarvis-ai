@@ -43,6 +43,8 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | Condition watches | `GET/POST /watches`, `GET/DELETE /watches/{id}` |
 | Tasks | `GET/POST /tasks`, `GET /tasks/{id}`, `GET /tasks/{id}/messages`, cancel endpoints |
 | Daily briefing | `GET/PUT /briefings/daily` (see `AutomationEndpoints`) |
+| Projects | `GET/POST /projects`, `GET/PUT/DELETE /projects/{id}` (details include its chats, files and tasks; delete keeps them and only clears the project), `PUT /conversations/{id}/project`, `PUT /files/{id}/project`, `PUT /tasks/{id}/project` (`{ projectId }`, null takes it out). `POST /conversations` and `POST /tasks` accept `projectId`; conversation DTOs carry `projectId`. A task belongs to a project through its own conversation |
+| Weekly review | `GET /reviews/weekly?weeks=8` (settings, mood trend, recent reviews), `GET /reviews/weekly/{id}`, `PUT /reviews/weekly/settings` (`enabled`, `localTime`, `timeZoneId`), `POST /reviews/weekly/generate` (current week, no notification) |
 
 ## Memory and learning
 
@@ -76,7 +78,32 @@ Every route takes an optional `timeZone` query (the device's IANA zone); it fall
 
 Body: `entryDate`, `content` (≤ 6,000), `highlights`, `gratitude` (≤ 1,000 each), `rating` 1–10, `mood`/`energy`/`stress` 1–5, `tags` (≤ 10), optional `source` (`written`, `voice`, `chat`). At least text or one rating is required. "Today" uses the owner's daily-briefing time zone (UTC fallback). See [memory-knowledge-learning.md](memory-knowledge-learning.md#journal).
 
+## Expenses
+
+| Method | Path |
+|--------|------|
+| GET | `/expenses?month=YYYY-MM&category=` (month summary in the main currency: total, previous month, per category, per day, top merchants, other currencies, plus the expenses) |
+| POST | `/expenses` (body: `amount` > 0, optional `currency` ISO 4217, `merchant` ≤ 80, `category`, `note` ≤ 200, `spentOn`, `receiptFileId`) |
+| GET/PUT/DELETE | `/expenses/{id}` |
+| POST | `/expenses/scan` (`fileId` of an uploaded JPEG/PNG/WebP ≤ 8 MB; returns a draft read by the Vision model, saves nothing) |
+
+Owner-scoped (`expenses` table). Categories: groceries, dining, transport, shopping, housing, bills, health, entertainment, travel, subscriptions, other; missing ones are guessed from the merchant and note. A missing currency reuses the owner's last one (EUR at first); "today" uses the daily-briefing time zone. Amounts in other currencies are listed separately, never converted. Audit events (`expenses` tool) carry the expense id only.
+
 Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints` and `PersonalAssistantEndpoints` (`/graph/...`).
+
+
+## Habits
+
+| Method | Path |
+|--------|------|
+| GET | `/habits?includeArchived=` (returns `today`, `habits` with streak stats, and `settings`) |
+| POST | `/habits` (`name`, `icon`, `cadence` `daily`/`weekly`, `targetPerWeek` 1–7, optional `timeZoneId`) |
+| GET/PUT/DELETE | `/habits/{id}` |
+| PUT | `/habits/{id}/archived` (`archived`) |
+| POST | `/habits/{id}/check-ins` (`date` optional, up to 7 days back; `done` default true) |
+| GET/PUT | `/habits/settings` (`eveningCheckIn`, `checkInTime` `HH:mm`, `timeZoneId`) |
+
+Weeks run Monday to Sunday; a weekly habit's streak counts weeks that reached `targetPerWeek`. The evening check-in is the per-owner `HabitCheckInWorkflow`, which sends a `habit.checkin` notification (channel category `check_ins`) naming habits still open that day. Audit entries carry ids only.
 
 ## Files
 
