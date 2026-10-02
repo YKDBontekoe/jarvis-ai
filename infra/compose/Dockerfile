@@ -2,7 +2,19 @@
 ARG PROJECT_PATH
 
 FROM node:22-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c AS codex-cli
-RUN npm install --global npm@12.2.0 && npm install --global @openai/codex@0.145.0
+WORKDIR /tmp/npm-patches
+# npm 12.2.0 still bundles vulnerable patch versions; retain npm for CLI/MCP installs.
+RUN npm install --global npm@12.2.0 && \
+    npm pack brace-expansion@5.0.11 undici@6.28.1 && \
+    rm -rf /usr/local/lib/node_modules/npm/node_modules/brace-expansion \
+      /usr/local/lib/node_modules/npm/node_modules/undici && \
+    mkdir -p /usr/local/lib/node_modules/npm/node_modules/brace-expansion \
+      /usr/local/lib/node_modules/npm/node_modules/undici && \
+    tar -xzf brace-expansion-5.0.11.tgz --strip-components=1 -C /usr/local/lib/node_modules/npm/node_modules/brace-expansion && \
+    tar -xzf undici-6.28.1.tgz --strip-components=1 -C /usr/local/lib/node_modules/npm/node_modules/undici && \
+    npm install --global @openai/codex@0.145.0 && \
+    rm -f brace-expansion-5.0.11.tgz undici-6.28.1.tgz
+WORKDIR /
 
 FROM golang:1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS github-mcp-server
 ARG GITHUB_MCP_SERVER_REVISION=85598ba6e1256f7ebf4867b95d63b833c4549264

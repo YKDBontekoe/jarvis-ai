@@ -79,7 +79,7 @@ def restore():
             finally:
                 query('postgres', 'DROP DATABASE jarvis_restore')
     finally:
-        run('start', 'jarvis-worker', 'jarvis-api')
+        run('up', '-d', '--wait', '--wait-timeout', '180', 'jarvis-worker', 'jarvis-api')
     return {'tablesVerified': tables, 'dataAndOwnerScopePreserved': True}
 
 def performance():

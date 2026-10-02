@@ -1,5 +1,5 @@
-import os
 """Verify unavailable Codex audio does not produce a falsely usable voice session."""
+import os
 import json
 import time
 import urllib.error
@@ -39,10 +39,11 @@ try:
     duration = round(time.monotonic() - started, 3)
     assert code == 503, (code, 'Unexpected voice availability response')
     assert 'token' not in body
-    assert body['detail'] == 'Voice service is temporarily unavailable.'
+    assert body['code'] == 'dependency_unavailable'
+    assert body['detail'] == 'An unexpected error occurred.'  # Production redacts 5xx details.
     report = {'voiceFunctionalStatus': 'unavailable', 'readinessFailureHandling': 'passed',
         'httpStatus': code, 'sessionTokenIssued': False, 'durationSeconds': duration,
-        'reason': 'Codex CLI OAuth realtime compatibility failure; see voice-protocol.log'}
+        'reason': 'Synthetic voice dependency outage; no usable session issued'}
     Path('artifacts/verification/voice-readiness.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report))
 finally:

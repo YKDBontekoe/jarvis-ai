@@ -36,7 +36,8 @@ node tests/e2e/automations_flow.mjs
 curl --fail --silent "$JARVIS_API_URL/openapi/v1.json" > artifacts/ci/openapi.json
 python3 scripts/ci/check-contracts.py tests/contracts/openapi.json artifacts/ci/openapi.json
 # Production startup requires explicit migrations; do not turn on development-only startup migrations.
-CI_ENVIRONMENT=Production "${compose[@]}" up -d --wait --wait-timeout 180 jarvis-api
+export CI_ENVIRONMENT=Production
+"${compose[@]}" up -d --wait --wait-timeout 180 jarvis-api
 python3 tests/e2e/create_identity_fixture.py
 python3 tests/e2e/authentication_flow.py
 node tests/e2e/security_flow.mjs
@@ -51,8 +52,9 @@ if [[ "${CI_EXTENDED:-false}" == true ]]; then
   export JARVIS_E2E_ACCESS_TOKEN
   JARVIS_E2E_ACCESS_TOKEN="$(cat artifacts/verification/access-token.txt)"
   python3 tests/e2e/deployed_flow.py --url "$JARVIS_API_URL" --report artifacts/ci/deployed-flow.json
-  unset JARVIS_E2E_ACCESS_TOKEN
   if [[ -n "${CI_PREVIOUS_API_IMAGE:-}" ]]; then python3 scripts/ci/check-previous-app.py; fi
   python3 tests/e2e/resilience_flow.py
+  unset JARVIS_E2E_ACCESS_TOKEN
 fi
 cp artifacts/verification/authentication-flow.json artifacts/ci/
+cp artifacts/verification/voice-readiness.json artifacts/ci/

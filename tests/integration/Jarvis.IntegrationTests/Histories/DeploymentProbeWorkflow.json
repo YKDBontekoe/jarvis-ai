@@ -1,0 +1,114 @@
+{
+  "events": [
+    {
+      "eventId": "1",
+      "eventTime": "2026-10-02T10:13:32.882689797Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_STARTED",
+      "taskId": "1048762",
+      "workflowExecutionStartedEventAttributes": {
+        "workflowType": {
+          "name": "DeploymentProbeWorkflow"
+        },
+        "taskQueue": {
+          "name": "jarvis-workflows",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "Ijc0NWZiODkwNDI0YzQ2MmFiMWY1MGNmNmU1MTJkYzZhIg=="
+            }
+          ]
+        },
+        "workflowExecutionTimeout": "30s",
+        "workflowRunTimeout": "30s",
+        "workflowTaskTimeout": "10s",
+        "originalExecutionRunId": "01a0fc1a-d852-7a7b-89ce-b9b694bf92da",
+        "identity": "206@69ac20a2b43a",
+        "firstExecutionRunId": "01a0fc1a-d852-7a7b-89ce-b9b694bf92da",
+        "attempt": 1,
+        "workflowExecutionExpirationTime": "2026-10-02T10:14:02.876Z",
+        "firstWorkflowTaskBackoff": "0s",
+        "workflowId": "jarvis:deployment-probe:745fb890424c462ab1f50cf6e512dc6a"
+      }
+    },
+    {
+      "eventId": "2",
+      "eventTime": "2026-10-02T10:13:32.887179647Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "taskId": "1048763",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "jarvis-workflows",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "3",
+      "eventTime": "2026-10-02T10:13:32.926950332Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "taskId": "1048769",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "2",
+        "identity": "1@dbcf2dc1ff97",
+        "requestId": "31dc01cd-66f6-45bf-abf3-bd2ad26fc403",
+        "historySizeBytes": "382",
+        "workerVersion": {
+          "buildId": "53fd9c94-a8e4-450d-8046-5c1669142e5d"
+        }
+      }
+    },
+    {
+      "eventId": "4",
+      "eventTime": "2026-10-02T10:13:33.002093020Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "taskId": "1048773",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "2",
+        "startedEventId": "3",
+        "identity": "1@dbcf2dc1ff97",
+        "workerVersion": {
+          "buildId": "53fd9c94-a8e4-450d-8046-5c1669142e5d"
+        },
+        "sdkMetadata": {
+          "coreUsedFlags": [
+            1,
+            2,
+            3
+          ],
+          "langUsedFlags": [
+            2
+          ],
+          "sdkName": "temporal-dotnet",
+          "sdkVersion": "1.19.0.0"
+        },
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "5",
+      "eventTime": "2026-10-02T10:13:33.003455442Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED",
+      "taskId": "1048774",
+      "workflowExecutionCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "Ijc0NWZiODkwNDI0YzQ2MmFiMWY1MGNmNmU1MTJkYzZhIg=="
+            }
+          ]
+        },
+        "workflowTaskCompletedEventId": "4"
+      }
+    }
+  ]
+}
