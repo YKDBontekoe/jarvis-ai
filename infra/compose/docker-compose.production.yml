@@ -35,6 +35,30 @@ services:
       retries: 20
     networks: [temporal-data]
 
+  backup:
+    # Nightly pg_dump of both databases plus the data protection key ring. See docs/operations/backup-and-restore.md.
+    image: pgvector/pgvector:pg18
+    restart: unless-stopped
+    user: "${JARVIS_UID:?Set JARVIS_UID}:${JARVIS_GID:?Set JARVIS_GID}"
+    read_only: true
+    entrypoint: ["/usr/local/bin/jarvis-backup"]
+    environment:
+      BACKUP_HOUR_UTC: ${BACKUP_HOUR_UTC:-3}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
+      JARVIS_DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      TEMPORAL_DB_PASSWORD: ${TEMPORAL_PASSWORD:?Set TEMPORAL_PASSWORD}
+    volumes:
+      - ../backup/backup.sh:/usr/local/bin/jarvis-backup:ro
+      - ${JARVIS_BACKUP_DIR:?Set JARVIS_BACKUP_DIR}:/backups:rw
+      - ${JARVIS_DATA_PROTECTION_KEYS_DIR:?Set JARVIS_DATA_PROTECTION_KEYS_DIR}:/data-protection-keys:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal-postgres:
+        condition: service_healthy
+    networks: [data, temporal-data]
+
   temporal:
     image: temporalio/auto-setup:latest
     restart: unless-stopped

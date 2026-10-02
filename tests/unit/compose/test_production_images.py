@@ -30,6 +30,7 @@ REQUIRED_ENV = {
     "CODEX_AUTH_FILE": "/tmp/codex-auth.json",
     "CODEX_HOME_DIR": "/tmp/codex-home",
     "JARVIS_DATA_PROTECTION_KEYS_DIR": "/tmp/jarvis-data-protection-keys",
+    "JARVIS_BACKUP_DIR": "/tmp/jarvis-backups",
     "AUTH_ISSUER": "https://jarvis.example.com",
     "AUTH_AUDIENCE": "jarvis-api",
     "AUTH_SIGNING_KEY": "production-test-signing-key-32bytes!",
@@ -124,6 +125,17 @@ class ProductionComposeImageTests(unittest.TestCase):
 
 
 class SignalCliComposeTests(unittest.TestCase):
+    def test_backup_service_reaches_only_the_databases_and_reads_keys(self) -> None:
+        text = COMPOSE_FILE.read_text(encoding="utf-8")
+        service = text.split("\n  backup:\n", 1)[1].split("\n  temporal:\n", 1)[0]
+        self.assertIn("networks: [data, temporal-data]", service)
+        self.assertIn("read_only: true", service)
+        self.assertIn('user: "${JARVIS_UID:?Set JARVIS_UID}:${JARVIS_GID:?Set JARVIS_GID}"', service)
+        self.assertIn(":/data-protection-keys:ro", service)
+        self.assertIn("${JARVIS_BACKUP_DIR:?Set JARVIS_BACKUP_DIR}:/backups:rw", service)
+        self.assertNotIn("ports:", service)
+        self.assertTrue(os.access(REPO_ROOT / "infra" / "backup" / "backup.sh", os.X_OK))
+
     def test_production_defaults_signal_base_url_to_internal_service(self) -> None:
         text = COMPOSE_FILE.read_text(encoding="utf-8")
         self.assertIn("bbernhard/signal-cli-rest-api:latest", text)

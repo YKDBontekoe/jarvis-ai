@@ -27,6 +27,7 @@ Full index: **[docs/README.md](docs/README.md)**.
 | Run locally / test | [docs/operations/local-development.md](docs/operations/local-development.md), [docs/operations/testing.md](docs/operations/testing.md) |
 | Config keys | [docs/operations/configuration.md](docs/operations/configuration.md) |
 | Deploy / CI | [docs/operations/deployment-and-ci.md](docs/operations/deployment-and-ci.md) |
+| Backups / restore | [docs/operations/backup-and-restore.md](docs/operations/backup-and-restore.md) |
 | Security / owner scope | [docs/architecture/security-and-ownership.md](docs/architecture/security-and-ownership.md) |
 
 Operator runbook (Compose commands, feature list): **[README.md](README.md)** — prefer `docs/` for architecture and navigation.

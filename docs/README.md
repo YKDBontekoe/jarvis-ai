@@ -32,6 +32,7 @@ This folder is the canonical reference for humans and coding agents working in t
 | Local dev (Aspire, Compose, Codex) | [operations/local-development.md](operations/local-development.md) |
 | Tests and evals | [operations/testing.md](operations/testing.md) |
 | Production, CI, releases | [operations/deployment-and-ci.md](operations/deployment-and-ci.md) |
+| Backups and restore | [operations/backup-and-restore.md](operations/backup-and-restore.md) |
 | Configuration keys | [operations/configuration.md](operations/configuration.md) |
 
 ## Repository map (top level)

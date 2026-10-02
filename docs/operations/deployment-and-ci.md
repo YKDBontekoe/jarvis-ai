@@ -23,6 +23,11 @@ newer migrations that were already applied. Reapplying a migration recreates tab
 but does not restore data removed by an earlier downgrade; recover that data from a
 database backup separately.
 
+## Backups
+
+The `backup` service takes a nightly `pg_dump` of both databases plus the data protection key ring into
+`JARVIS_BACKUP_DIR`. `scripts/backup/restore.sh` restores one. See [backup-and-restore.md](backup-and-restore.md).
+
 ## SemVer releases
 
 - Tags `vMAJOR.MINOR.PATCH` on merge to `main` via [create-release-tag.yml](../../.github/workflows/create-release-tag.yml) and PR template checkboxes.

@@ -196,6 +196,8 @@ The bundled Temporal server uses its development mode and SQLite persistence. A 
 
 Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, set its mode to `0600`, and replace every placeholder. Set `JARVIS_UID`/`JARVIS_GID` to the account that owns `CODEX_HOME_DIR`, configure the account issuer, audience, signing key, and DNS names, and sign the Codex CLI in with ChatGPT OAuth using `CODEX_HOME="$CODEX_HOME_DIR" codex login`. Use a dedicated persistent directory for `CODEX_HOME_DIR`, owned by that numeric account with mode `0700`; it stores `auth.json`, writable Codex app-server state, and Settings-driven CLI updates under `cli/`. Those updates survive container recreation because the containers' root filesystems are read-only. The API and Temporal worker mount this directory and run as that unprivileged user. Development Compose shares the same `cli/` directory through the `codex-cli` volume.
 
+Create `JARVIS_BACKUP_DIR` owned by that same account (mode `0700`). The `backup` service writes a nightly database and key ring backup there; see [docs/operations/backup-and-restore.md](docs/operations/backup-and-restore.md) for encryption, off-host copies, and `scripts/backup/restore.sh`.
+
 With DNS for `JARVIS_DOMAIN` and `LIVEKIT_DOMAIN` pointing at the host, start the stack with:
 
 ```sh
