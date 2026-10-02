@@ -6,6 +6,9 @@ bool opensCodingRun(String? type) =>
 
 bool opensDailyBriefing(String? type) => type == 'briefing.daily';
 
+bool opensPeople(String? type) =>
+    type == 'people.birthday' || type == 'people.checkin';
+
 bool opensTaskDetails(String? type) =>
     type == 'task.completed' || type == 'task.failed';
 

@@ -25,6 +25,7 @@ abstract final class PhosphorIconsRegular {
   static const brain = IconData(0xe74e, fontFamily: 'PhosphorRegular');
   static const broadcast = IconData(0xe0f2, fontFamily: 'PhosphorRegular');
   static const browser = IconData(0xe0f4, fontFamily: 'PhosphorRegular');
+  static const cake = IconData(0xe780, fontFamily: 'PhosphorRegular');
   static const calendarBlank = IconData(0xe10a, fontFamily: 'PhosphorRegular');
   static const camera = IconData(0xe10e, fontFamily: 'PhosphorRegular');
   static const caretDown = IconData(0xe136, fontFamily: 'PhosphorRegular');
@@ -72,6 +73,7 @@ abstract final class PhosphorIconsRegular {
   static const folders = IconData(0xe25c, fontFamily: 'PhosphorRegular');
   static const gavel = IconData(0xea32, fontFamily: 'PhosphorRegular');
   static const gearSix = IconData(0xe272, fontFamily: 'PhosphorRegular');
+  static const gift = IconData(0xe276, fontFamily: 'PhosphorRegular');
   static const globe = IconData(0xe288, fontFamily: 'PhosphorRegular');
   static const globeSimple = IconData(0xe28e, fontFamily: 'PhosphorRegular');
   static const graduationCap = IconData(0xe62c, fontFamily: 'PhosphorRegular');
@@ -79,6 +81,7 @@ abstract final class PhosphorIconsRegular {
   static const hand = IconData(0xe298, fontFamily: 'PhosphorRegular');
   static const handPointing = IconData(0xe29a, fontFamily: 'PhosphorRegular');
   static const handTap = IconData(0xec90, fontFamily: 'PhosphorRegular');
+  static const handWaving = IconData(0xe580, fontFamily: 'PhosphorRegular');
   static const heart = IconData(0xe2a8, fontFamily: 'PhosphorRegular');
   static const hourglassMedium = IconData(
     0xe2b8,
@@ -128,6 +131,7 @@ abstract final class PhosphorIconsRegular {
   static const pauseCircle = IconData(0xe3a0, fontFamily: 'PhosphorRegular');
   static const pencilSimple = IconData(0xe3b4, fontFamily: 'PhosphorRegular');
   static const phone = IconData(0xe3b8, fontFamily: 'PhosphorRegular');
+  static const phoneCall = IconData(0xe3ba, fontFamily: 'PhosphorRegular');
   static const play = IconData(0xe3d0, fontFamily: 'PhosphorRegular');
   static const plugs = IconData(0xeb56, fontFamily: 'PhosphorRegular');
   static const plugsConnected = IconData(0xeb5a, fontFamily: 'PhosphorRegular');
@@ -163,6 +167,7 @@ abstract final class PhosphorIconsRegular {
   static const uploadSimple = IconData(0xe4c0, fontFamily: 'PhosphorRegular');
   static const user = IconData(0xe4c2, fontFamily: 'PhosphorRegular');
   static const userCircle = IconData(0xe4c4, fontFamily: 'PhosphorRegular');
+  static const userPlus = IconData(0xe4d0, fontFamily: 'PhosphorRegular');
   static const users = IconData(0xe4d6, fontFamily: 'PhosphorRegular');
   static const vibrate = IconData(0xe4d8, fontFamily: 'PhosphorRegular');
   static const warningCircle = IconData(0xe4e2, fontFamily: 'PhosphorRegular');

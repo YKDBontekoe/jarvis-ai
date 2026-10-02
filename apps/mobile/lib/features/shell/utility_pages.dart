@@ -18,6 +18,7 @@ import '../devices/devices_screen.dart';
 import '../journal/journal_screen.dart';
 import '../learning/learning_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
+import '../people/people_screen.dart';
 import '../persona/persona_screen.dart';
 import '../profiles/profiles_screen.dart';
 import '../settings/appearance_screen.dart';
@@ -35,6 +36,7 @@ Widget? utilityPageFor(
   'tasks' => TasksScreen(http: http),
   'memory' => MemoryScreen(http: http),
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
+  'people' => PeopleScreen(http: http),
   'approvals' => ApprovalsScreen(http: http),
   'reminders' => RemindersScreen(http: http, onOpenConversation: onOpenConversation),
   'notifications' => RemindersScreen(

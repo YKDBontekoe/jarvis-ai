@@ -64,6 +64,17 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 
 Body: `entryDate`, `content` (≤ 6,000), `highlights`, `gratitude` (≤ 1,000 each), `rating` 1–10, `mood`/`energy`/`stress` 1–5, `tags` (≤ 10), optional `source` (`written`, `voice`, `chat`). At least text or one rating is required. "Today" uses the owner's daily-briefing time zone (UTC fallback). See [memory-knowledge-learning.md](memory-knowledge-learning.md#journal).
 
+## People
+
+| Method | Path |
+|--------|------|
+| GET/POST | `/people` (body: `name` ≤ 80, `relationship` ≤ 40, `birthdayMonth`/`birthdayDay`/`birthYear` (year optional), `notes` ≤ 2,000, `contactEveryDays` 1–365, optional `graphEntityId`) |
+| GET | `/people/suggestions` (knowledge-graph people not on the list yet, with relationship and birthday when known) |
+| GET/PUT/DELETE | `/people/{id}` (GET returns `person` plus current graph `facts` when linked) |
+| POST | `/people/{id}/contact` (optional `at`; records "last talked") |
+
+Owner-scoped (`people` table). Names are unique per owner ignoring case and accents. `daysUntilBirthday`, `daysSinceContact` and `contactDue` use the daily-briefing time zone (UTC fallback). A new person links to the graph entity of the same name. Audit events (`people` tool) carry the person id only.
+
 Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints` and `PersonalAssistantEndpoints` (`/graph/...`).
 
 ## Files

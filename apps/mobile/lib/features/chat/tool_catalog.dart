@@ -44,6 +44,26 @@ const _catalog = <String, ToolDescription>{
     'Marked a reminder done',
     PhosphorIconsRegular.checkCircle,
   ),
+  'GetPeople': ToolDescription(
+    'Looking up your people',
+    'Looked up your people',
+    PhosphorIconsRegular.users,
+  ),
+  'SavePerson': ToolDescription(
+    'Saving to your people',
+    'Saved to your people',
+    PhosphorIconsRegular.userPlus,
+  ),
+  'LogContact': ToolDescription(
+    'Noting that you talked',
+    'Noted that you talked',
+    PhosphorIconsRegular.handWaving,
+  ),
+  'RemovePerson': ToolDescription(
+    'Removing a person',
+    'Removed a person',
+    PhosphorIconsRegular.trash,
+  ),
   'automation_channel_message': ToolDescription(
     'Sending a message for an automation',
     'Sent a message for an automation',

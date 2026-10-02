@@ -21,6 +21,7 @@ Defined in `src/Jarvis.Workflows/`:
 | `JarvisTaskWorkflow` | Background agent tasks with approval linkage |
 | `FileProcessingWorkflow` | Extract/index uploaded documents |
 | `DailyBriefingWorkflow` | Scheduled morning briefing notification |
+| `PeopleCheckInWorkflow` | Daily at 09:00 local: birthday notifications (`people.birthday`, once a year per person) and one keep-in-touch nudge (`people.checkin`, repeats weekly until contact is logged). Ends when nobody has a birthday or cadence; the reconciler restarts it |
 | `AssistantHeartbeatWorkflow` | Periodic reflection → memories/persona/skills |
 | `AssistantDreamingWorkflow` | Nightly dream phases → memory/persona promotion |
 

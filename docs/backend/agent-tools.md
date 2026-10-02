@@ -31,6 +31,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Watches | `ConditionWatchAgentTools` | — |
 | Memory | `MemoryAgentTools` list/search/remember | **Forget** requires approval |
 | Journal | `JournalAgentTools` `SaveJournalEntry` (appends to the day's entry), `ListJournalEntries` | Hidden during background task turns; off when the profile disallows remembering |
+| People | `PeopleAgentTools` `GetPeople`, `SavePerson` (creates or updates; only passed fields change), `LogContact`, `RemovePerson` | `RemovePerson` requires **approval**; the rest need none (owner's own data). Save/log are off when the profile disallows remembering. `PeopleContextContributor` adds names, birthdays in the next 14 days and due check-ins each turn |
 | MCP | `McpServerAgentTools` + `McpSetupAgentTools` | Discover/add/update/invoke/read prompt/resource/remove mostly **approval**; setup and secret cards in chat |
 | Coding | `CodexCodingTools.RunCodingTaskAsync` | **Approval**; only if `Coding:Repositories` configured |
 
