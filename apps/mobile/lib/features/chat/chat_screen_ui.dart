@@ -143,6 +143,18 @@ mixin _ChatScreenUi on _ChatScreenController {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (_canSummarize)
+                  ListTile(
+                    leading: const IconBadge(
+                      icon: PhosphorIconsRegular.sparkle,
+                    ),
+                    title: const Text('Summarize this chat'),
+                    subtitle: const Text('Key points and what is left to do'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showConversationSummary();
+                    },
+                  ),
                 action(
                   'Attach chat sources',
                   'Limit file search to selected documents',

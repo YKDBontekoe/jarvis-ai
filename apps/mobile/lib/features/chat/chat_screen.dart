@@ -23,6 +23,7 @@ import '../../json_maps.dart';
 import '../../notification_details_screen.dart';
 import '../coding/coding_run_detail_screen.dart';
 import '../../notification_routing.dart';
+import '../../schedule_format.dart';
 import '../../file_download_stub.dart'
     if (dart.library.io) '../../file_download_io.dart'
     if (dart.library.js_interop) '../../file_download_web.dart'
@@ -51,6 +52,7 @@ import '../voice/voice_stage.dart';
 import 'chat_entries.dart';
 import 'chat_widgets.dart';
 import 'composer_drafts.dart';
+import 'conversation_summary.dart';
 import 'outbox_store.dart';
 import 'generative_ui.dart';
 import 'mcp_setup.dart';
@@ -67,6 +69,7 @@ part 'chat_screen_transcript.dart';
 part 'chat_screen_voice.dart';
 part 'chat_screen_photos.dart';
 part 'chat_screen_outbox.dart';
+part 'chat_screen_summary.dart';
 part 'chat_screen_ui.dart';
 part 'chat_screen_auth.dart';
 part 'chat_screen_sources.dart';
@@ -104,7 +107,8 @@ class _ChatScreenState extends _ChatScreenController
         _ChatScreenSources,
         _ChatScreenSearch,
         _ChatScreenPhotos,
-        _ChatScreenOutbox {
+        _ChatScreenOutbox,
+        _ChatScreenSummary {
   /// Outgoing content fades out before incoming content fades in, so the two
   /// never overlap mid-transition.
   static const _fadeThrough = Interval(.5, 1, curve: Curves.easeOutCubic);
