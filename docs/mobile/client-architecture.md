@@ -46,6 +46,20 @@ Top-level screens outside `features/`: `conversations_screen.dart`, `reminders_s
 - Chat: only live entries animate in (`_settledEntries` marks loaded history); home and the transcript, and the wide layout's panes, fade through each other.
 - Chat quick actions open `tasks/new`, `reminders/new` and `memory/new` (see `createDestinationSuffix` in `utility_pages.dart`) so the editor is already showing.
 - `JarvisColors.accentGradient` (indigo → violet) is reserved for the primary send action and selection accents; `JarvisColors.scrim` dims behind sheets and dialogs.
+- Page and dialog titles use Instrument Serif (from the theme); dense UI stays in Inter. A custom title `TextStyle` without `fontFamily` inherits the serif, so set `fontFamily: 'Inter'` when a title should stay sans (the chat top bar does). Button `textStyle`s replace the theme's, so they need `fontFamily: 'Inter'` too.
+- Other shared pieces in `jarvis_ui.dart`: `ToolbarCapsule` (grouped top-bar buttons), `StatusChip` (quiet states such as offline), `EdgeFade` (content dissolves under header and composer), `HeroGlow` (home backdrop), `SwipeActions` (row swipe with haptics; reminders use it for done/snooze).
+
+## Screenshots and layout audit
+
+`test/screenshots/` renders the real app on fixture data with the bundled fonts and real (blurred) shadows. The files have no `_test` suffix, so `flutter test` and CI skip them; run them explicitly:
+
+```sh
+cd apps/mobile
+flutter test test/screenshots/app_screenshots.dart   # main screens, light + dark → build/screenshots
+flutter test test/screenshots/layout_audit.dart      # every utility page at 393pt and 320pt
+```
+
+The audit fails on layout overflows and on toolbars squeezed below their height. `debugJarvisHttpAdapter` in `lib/api/api_config.dart` is the hook that serves the whole app from `fixtures.dart`; set `SCREENSHOT_DIR` to write elsewhere.
 
 ## API client
 

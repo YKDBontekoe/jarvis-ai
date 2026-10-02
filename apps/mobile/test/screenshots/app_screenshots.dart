@@ -190,6 +190,14 @@ void main() {
                         ),
                         thinkingLabel: 'Looking around Alfama',
                       ),
+                      const MessageBubble(
+                        message: MessageEntry(
+                          role: 'assistant',
+                          content:
+                              '**Tasca do Chico** in Bairro Alto keeps fado vadio nights — small, candle-lit',
+                          pending: true,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       const StatusChip(
                         label: 'Realtime updates are offline',

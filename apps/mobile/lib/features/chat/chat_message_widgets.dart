@@ -149,6 +149,11 @@ class _MessageBubbleState extends State<MessageBubble> {
                   padding: const EdgeInsets.only(top: 3),
                   child: JarvisMarkdown(data: message.content),
                 ),
+                if (message.pending)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 6),
+                    child: StreamingPulse(),
+                  ),
                 if (!message.isUser && message.citations.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -668,4 +673,56 @@ class JarvisAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => JarvisOrb(size: size, glow: false);
+}
+
+/// A small accent dot that breathes under a reply while it is still being
+/// written, so a pause in the stream never looks like the end.
+class StreamingPulse extends StatefulWidget {
+  const StreamingPulse({super.key});
+
+  @override
+  State<StreamingPulse> createState() => _StreamingPulseState();
+}
+
+class _StreamingPulseState extends State<StreamingPulse>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final dot = Container(
+      width: 9,
+      height: 9,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: colors.accentGradient,
+      ),
+    );
+    return Semantics(
+      label: 'Jarvis is still writing',
+      child: JarvisMotion.reduced(context)
+          ? dot
+          : FadeTransition(
+              opacity: Tween(begin: .35, end: 1.0).animate(
+                CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+              ),
+              child: ScaleTransition(
+                scale: Tween(begin: .8, end: 1.0).animate(
+                  CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+                ),
+                child: dot,
+              ),
+            ),
+    );
+  }
 }
