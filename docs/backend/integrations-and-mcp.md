@@ -14,8 +14,58 @@ REST:
 
 ### Packs and OAuth
 
-- **Packs** — calendar/mail/contacts guided setup (`/integrations/packs`).
+- **Packs** — calendar/mail/contacts guided setup (`/integrations/packs`). Suggested npm MCP packages in `IntegrationPackCatalog` are pinned to exact versions (a unit test enforces it); review a release before bumping. Contacts has no default package and needs an MCP endpoint.
 - **OAuth** — PKCE + dynamic client registration for MCP servers with authorize/token endpoints; paste fallback when not supported.
+
+## Adding an MCP server
+
+Owners do not need to know an address or package first:
+
+1. **App catalog** — Settings → Integrations → Add → **Browse apps** searches the official MCP registry
+   (`registry.modelcontextprotocol.io`) through `GET /api/v1/mcp-catalog?search=`. Only entries Jarvis can run
+   are listed: `streamable-http` remotes and npm / PyPI packages with a pinned version. A publisher's own server
+   ranks first. Install is `POST /api/v1/mcp-catalog/install {name, option}`; the server fetches the entry again
+   by name, so a client cannot substitute its own endpoint or package.
+2. **Paste an address** — `POST /api/v1/mcp-servers/connect {endpoint}` names the server after its host.
+3. **Chat** — "connect Notion" makes the agent call `SearchMcpCatalog` and `InstallMcpFromCatalog` (approval
+   required), then ask for keys with `AskForMcpCredential` or start OAuth.
+
+Install and connect return `{server, nextStep}` where `nextStep` is `ready`, `secrets` (the server lists required
+keys in `server.secrets`) or `sign_in` (OAuth metadata was found). Every tool the server offers is enabled (`*`, up
+to 80) and each call still asks for approval.
+
+### Secrets for owner-added servers
+
+A server definition can declare up to 10 secrets. Each binds an owner secret to an environment variable (stdio)
+or an HTTP header (remote, optional prefix such as `Bearer`). Registry `environmentVariables` and header templates
+like `Bearer {api_key}` become these bindings, with secret names derived from the variable (`BRAVE_API_KEY` →
+`brave_api_key`). Values are saved with `PUT /integrations/{serverId}/credentials/{secretName}`, kept encrypted,
+injected only when the server starts, and redacted from tool output. Variables and headers that change how code
+loads or how requests route (`PATH`, `NODE_OPTIONS`, `LD_*`, `PYTHON*`, proxies, `Host`, `Cookie`, …) are refused.
+A server missing a required secret reports `needs_credentials`.
+
+Catalog npm packages run with `npx -y pkg@version`; PyPI packages run with `uvx pkg@version` (the API image ships
+uv). Set `Mcp__Registry__BaseUrl` to an empty value to turn the catalog off, or to a mirror.
+
+### MCP runner
+
+Owner-installed npm and PyPI connectors do not run inside the API or worker when `McpRunner:Url` is set. The
+`mcp-runner` service (the API image started as `Jarvis.Api.dll mcp-runner`) accepts one authenticated WebSocket
+per connection (`Authorization: Bearer <McpRunner:Token>`). The first text message is the launch spec
+`{command, arguments, environment}`. The runner validates it again (`npx`/`uvx` only, pinned package rules,
+the secret variable blocklist) and starts the package with a fresh temporary home and a clean environment that
+holds only that server's keys. MCP traffic then flows over the socket as it would over stdin/stdout. When the
+socket closes, or after `McpRunner:MaxSessionMinutes`, the whole process tree is killed and the home deleted.
+Connector stderr is discarded because packages may print their own keys.
+
+`McpRunnerClientTransport` (`Jarvis.Mcp`) is the API side; `McpRunnerHost` (`Jarvis.Api/McpRunner`) is the
+runner. Operator host binaries such as `github-mcp-server` still run in the API image.
+
+In the production deployment the runner has no database networks and no Docker socket. It runs as `JARVIS_UID` on a
+read-only root with dropped capabilities, a PID and memory limit, and tmpfs for work and package caches. It
+reaches the internet through `mcp-egress`, and the API and worker reach it through the internal `mcp` network.
+Aspire starts the same runner as the `mcp-runner` resource. Without `McpRunner:Url`, connectors run in-process
+as before (tests).
 
 ## MCP architecture
 
@@ -30,10 +80,10 @@ Transports: **stdio** and **streamableHttp**. Allowlists are explicit tool names
 
 Agent management tools: list/discover/add/update/invoke plus chat setup (`OfferMcpSetup`, `AskForMcpCredential`, `InstallIntegrationPack`) — see [agent-tools.md](agent-tools.md).
 
-Compose overlays:
+AppHost features (`JARVIS_FEATURES`, see `src/Jarvis.AppHost/JarvisFeatures.cs`):
 
-- `docker-compose.github.yml` — official GitHub MCP server in API image
-- `docker-compose.home-assistant.yml` — Streamable HTTP to HA `/api/mcp`
+- `github` — official GitHub MCP server in the API image
+- `home-assistant` — Streamable HTTP to HA `/api/mcp` (`HOME_ASSISTANT_MCP_URL`)
 
 ## Channels
 
@@ -77,7 +127,7 @@ Allowlist per channel; replies approval-gated. Thread history in API + Flutter `
 
 ## Browser (Playwright)
 
-Opt-in Compose profile `docker-compose.browser.yml`:
+Opt-in AppHost feature `browser`:
 
 - Isolated MCP browser container, no Docker socket, Squid egress filtering.
 - `BrowseTheWeb` starts session; navigation/interaction approval-gated; read-only tools allowlisted.

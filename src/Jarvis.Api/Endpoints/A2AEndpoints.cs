@@ -19,7 +19,8 @@ internal static class A2AEndpoints
     public static IEndpointRouteBuilder MapA2AProtocol(this IEndpointRouteBuilder app)
     {
         app.MapGet("/.well-known/agent-card.json", (IConfiguration configuration, HttpRequest request) =>
-            Results.Json(AgentCard(configuration, request))).WithName("GetA2AAgentCard").AllowAnonymous();
+            Results.Json(AgentCard(configuration, request))).WithName("GetA2AAgentCard").AllowAnonymous()
+            .RequireRateLimiting(ApiRateLimiting.PublicPolicy);
 
         app.MapPost("/a2a", async (HttpRequest request, JsonElement body, IA2ATokenRepository tokens,
             IServiceScopeFactory scopes, CancellationToken ct) =>
@@ -52,7 +53,8 @@ internal static class A2AEndpoints
             if (method is "agent/authenticatedExtendedCard" or "agent/getAuthenticatedExtendedCard")
                 return JsonRpcResult(id, AgentCard(request.HttpContext.RequestServices.GetRequiredService<IConfiguration>(), request), default);
             return JsonRpcError(body, -32601, $"Unsupported method '{method}'.");
-        }).WithName("A2AJsonRpc").AllowAnonymous().DisableAntiforgery();
+        }).WithName("A2AJsonRpc").AllowAnonymous().DisableAntiforgery()
+            .RequireRateLimiting(ApiRateLimiting.PublicPolicy);
 
         return app;
     }

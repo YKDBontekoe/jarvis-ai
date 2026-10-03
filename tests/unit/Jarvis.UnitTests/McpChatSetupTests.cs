@@ -130,6 +130,8 @@ public sealed class McpChatSetupTests
             Task.FromException<UserMcpServer>(new InvalidOperationException());
         public Task<UserMcpServer> AddStdioAsync(Guid ownerId, AddUserMcpStdioServerRequest request, CancellationToken cancellationToken) =>
             Task.FromException<UserMcpServer>(new InvalidOperationException());
+        public Task<UserMcpServer> AddDefinitionAsync(Guid ownerId, McpServerDefinition definition, CancellationToken cancellationToken) =>
+            Task.FromException<UserMcpServer>(new InvalidOperationException());
         public Task<UserMcpServer?> UpdateAsync(Guid ownerId, string id, AddUserMcpServerRequest request, CancellationToken cancellationToken) =>
             Task.FromResult<UserMcpServer?>(null);
         public Task<UserMcpServer?> SetEnabledAsync(Guid ownerId, string id, bool enabled, CancellationToken cancellationToken) =>

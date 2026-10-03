@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import '../../ui/phosphor_icons.dart';
 
 import '../../json_maps.dart';
-import '../../task_details_screen.dart';
+import '../tasks/task_details_screen.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../chat/chat_widgets.dart';
@@ -15,6 +15,7 @@ import '../chat/tool_catalog.dart';
 import '../planner/day_planner_screen.dart';
 import '../habits/habits_home_card.dart';
 import '../usage/usage_screen.dart';
+import '../settings/codex_sign_in_card.dart';
 
 part 'home_overview_widgets.dart';
 
@@ -237,6 +238,7 @@ class _HomeOverviewState extends State<HomeOverview>
       key: const Key('home-briefing'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        CodexSignInCard(http: widget.http),
         if (portrait != null && portrait.isNotEmpty) ...[
           SurfaceCard(
             child: Text(

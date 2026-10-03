@@ -1,4 +1,5 @@
 using System.Net;
+using Jarvis.Api.Security;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Devices;
 using Jarvis.Application.Home;
@@ -93,7 +94,8 @@ internal static class PersonalAssistantEndpoints
                 return Results.BadRequest("Missing OAuth state.");
             var html = await oauth.CompleteAsync(state, code, error, ct);
             return Results.Content(html, "text/html; charset=utf-8");
-        }).WithName("McpOAuthCallback").AllowAnonymous();
+        }).WithName("McpOAuthCallback").AllowAnonymous()
+            .RequireRateLimiting(ApiRateLimiting.AuthPolicy);
 
         api.MapGet("/coding/runs", async (ICodingRunStore runs, ICurrentUser currentUser, CancellationToken ct) =>
             Results.Ok(await runs.ListAsync(currentUser.OwnerId, ct))).WithName("ListCodingRuns");

@@ -25,7 +25,7 @@ Owner overrides via API `/settings/models` (OpenRouter key encrypted).
 
 ### Local embedding model
 
-Semantic memory search needs an embedding model. The Compose files include an `embeddings` service
+Semantic memory search needs an embedding model. The production deployment includes an `embeddings` service
 (Hugging Face Text Embeddings Inference, CPU) that downloads the model on first start into the `embeddings-data`
 volume and serves an OpenAI-compatible `/v1/embeddings`. API and worker use it through these keys, so no key or account is needed:
 
@@ -34,7 +34,7 @@ volume and serves an OpenAI-compatible `/v1/embeddings`. API and worker use it t
 | `Embeddings__BaseUrl` (`EMBEDDINGS_BASE_URL`) | Endpoint; defaults to `http://embeddings:80/v1`. Set it empty to switch the local model off, or point it at any OpenAI-compatible server |
 | `Embeddings__Model` (`EMBEDDINGS_MODEL`) | Model id; defaults to `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (multilingual, 384 dimensions, zero-padded to the 1536-wide column) |
 | `Embeddings__ApiKey` | Optional bearer key for an external server |
-| `EMBEDDINGS_IMAGE` | Compose image, default `ghcr.io/huggingface/text-embeddings-inference:cpu-1.8` |
+| `EMBEDDINGS_IMAGE` | Production image, default `ghcr.io/huggingface/text-embeddings-inference:cpu-1.8` |
 
 An owner's OpenRouter embedding model (Settings → Models) overrides the local one. Changing the model re-embeds all
 memories in the background. The app shows the active model and how many memories are indexed
@@ -48,6 +48,9 @@ about 14 ms per query and 8 ms per memory for the default model, in PyTorch; the
 | `Authentication__Issuer`, `__Audience`, `__SigningKey` | Required outside Development |
 | `Authentication__AllowRegistration` | Default true |
 | `Authentication__AccessTokenMinutes`, `__RefreshTokenDays` | Token lifetimes |
+| `RateLimiting__AuthPermitsPerMinute` | Requests per client IP per minute to `/api/v1/auth/*` and the MCP OAuth callback (default 10) |
+| `RateLimiting__PublicPermitsPerMinute` | Requests per client IP per minute to `/a2a`, the agent card, and WhatsApp webhooks (default 120) |
+| `ReverseProxy__TrustForwardedHeaders` | Use the last `X-Forwarded-For` hop as the client IP (default false). The production deployment sets it because the API is only reachable through Caddy; leave it off when the API is exposed directly |
 | `Cors:AllowedOrigins` | Flutter web origins |
 
 ## Temporal
@@ -55,6 +58,12 @@ about 14 ms per query and 8 ms per memory for the default model, in PyTorch; the
 `Temporal__Address` — default `localhost:7233`.
 
 ## MCP (host-level)
+
+`McpRunner__Url` / `McpRunner__Token` — where the API and worker start owner-installed npm/PyPI connectors (`ws://mcp-runner:8090/run` in production; token at least 32 characters, `MCP_RUNNER_TOKEN`). Unset runs them in-process.
+
+Runner side: `McpRunner__ListenUrl`, `McpRunner__MaxProcesses` (default 16), `McpRunner__MaxSessionMinutes` (default 120), `McpRunner__WorkRoot`, `McpRunner__CacheRoot`, and `McpRunner__PassEnvironment` (comma-separated variables copied from the runner's own environment into connectors, for an egress proxy or CA bundle).
+
+`Mcp__Registry__BaseUrl` — MCP registry for the in-app catalog (default `https://registry.modelcontextprotocol.io`; empty turns the catalog off).
 
 `Mcp__Servers__0__*` — Name, Transport (`stdio` | `streamableHttp`), Command/Endpoint, AllowedTools, AutoApprovedTools, CredentialProvider, CredentialEnvironmentVariables, CredentialHeaders.
 
@@ -82,12 +91,12 @@ about 14 ms per query and 8 ms per memory for the default model, in PyTorch; the
 
 `OTEL_EXPORTER_OTLP_ENDPOINT` — Aspire dashboard or collector.
 
-Development stays off. Production uses the backend project from `appsettings.Production.json` and the Compose default. The SDK also reads `SENTRY_ENVIRONMENT` and `SENTRY_RELEASE`.
+Development stays off. Production uses the backend project from `appsettings.Production.json` and the deployment default. The SDK also reads `SENTRY_ENVIRONMENT` and `SENTRY_RELEASE`.
 
 | Key / env var | Purpose |
 |---------------|---------|
 | `SENTRY_DSN` | Backend project DSN, shared by the API, worker, migration command, and WhatsApp bridge. Set it to replace the production default |
-| `SENTRY_ENVIRONMENT` | Defaults to `production` in Compose |
+| `SENTRY_ENVIRONMENT` | Defaults to `production` in the production deployment |
 | `SENTRY_RELEASE` | Git SHA of the running image. The deploy workflow sets this to the same SHA whose symbols and source files were uploaded |
 | `Sentry__TracesSampleRate` (`SENTRY_TRACES_SAMPLE_RATE`) | Trace sample rate. Default `1` in Development and `0.2` otherwise |
 | `Sentry__ProfilesSampleRate` (`SENTRY_PROFILES_SAMPLE_RATE`) | Profiling sample rate. Default `0`. The profiler starts only when this is above zero |
@@ -105,4 +114,4 @@ Release builds of the mobile app report to the mobile Sentry project. Override t
 
 `Jarvis__PublicBaseUrl` or `Channels__PublicBaseUrl` — webhooks and agent card.
 
-For narrative and Compose-specific variables, see root [README.md](../../README.md#configuration).
+For narrative and deployment-specific variables, see root [README.md](../../README.md#configuration).

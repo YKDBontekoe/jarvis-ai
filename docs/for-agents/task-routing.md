@@ -19,7 +19,7 @@ Use this table to jump to the right doc and code **before** broad repo search.
 | Voice / LiveKit | [api-reference.md](../backend/api-reference.md), README voice section | `Jarvis.Api/Realtime/` |
 | Auth / JWT / owner mix-up | [security-and-ownership.md](../architecture/security-and-ownership.md) | `Jarvis.Infrastructure/Identity/` |
 | File upload / virus scan | [security-and-ownership.md](../architecture/security-and-ownership.md) | `Jarvis.Application/Files/` |
-| Deploy / Compose / GHCR | [deployment-and-ci.md](../operations/deployment-and-ci.md) | `infra/compose/` |
+| Deploy / GHCR / production stack | [deployment-and-ci.md](../operations/deployment-and-ci.md) | `src/Jarvis.AppHost/ProductionDeployment.cs`, `scripts/deploy/` |
 | Local repro / tests | [testing.md](../operations/testing.md), [local-development.md](../operations/local-development.md) | `tests/` |
 | Config key meaning | [configuration.md](../operations/configuration.md) | `appsettings.json` |
 

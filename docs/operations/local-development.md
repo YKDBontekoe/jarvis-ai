@@ -3,45 +3,33 @@
 ## Prerequisites
 
 - **.NET SDK** 10.x (see `global.json` / `.cursor/install.sh` pin `10.0.302`)
-- **Codex CLI** signed in (`codex login status`) for real model calls
-- **Docker** — Aspire dependencies, Testcontainers, optional Compose
+- **Codex CLI** installed; sign it in from the app (Home → Sign Jarvis in to ChatGPT) or with `codex login`
+- **Docker** (or Podman) — Aspire container dependencies and Testcontainers
 - **Flutter** — for mobile/web client work
 
 Cloud agents: run `bash .cursor/install.sh` from repo root; optional `dockerd` terminal per `.cursor/environment.json`.
 
-## Environment file
+## Environment file (optional)
 
-```sh
-cp .env.example infra/compose/.env
-```
-
-Edit secrets for Postgres and S3-compatible storage before Compose or sourcing for Aspire.
+The AppHost has development defaults for everything, so `dotnet run --project src/Jarvis.AppHost` works without
+one. To override a default (LAN listen URL, features), `cp .env.example infra/compose/.env`, edit it, and source it.
+If the local Codex CLI is not signed in, the app's Home screen offers **Sign Jarvis in to ChatGPT**.
 
 ## Aspire (recommended)
 
-From repo root after sourcing env:
+From repo root:
 
 ```sh
-set -a && source infra/compose/.env && set +a
 dotnet run --project src/Jarvis.AppHost
 ```
 
-Starts API (default `http://localhost:5082`), PostgreSQL (pgvector), Temporal (7233/8233), SeaweedFS, ClamAV, LiveKit, optional signal-cli and the WhatsApp bridge. Migrations apply automatically in Development.
+Starts the API (default `http://localhost:5082`), worker, MCP runner, PostgreSQL (pgvector), Temporal (7233/8233), SeaweedFS, ClamAV, LiveKit, optional signal-cli and the WhatsApp bridge. Migrations apply automatically in Development.
 
 Coding repo allowlist: AppHost sets `Coding__Repositories__0__Path` to the git root.
 
-## Docker Compose (alternative)
+Optional parts use the same names as production: `JARVIS_FEATURES="github home-assistant browser verification"` (see the root [README.md](../../README.md#run-locally)). `verification` swaps in the fake Codex app server and fake MCP server for the e2e scripts.
 
-Development profile:
-
-```sh
-docker compose --profile development --env-file infra/compose/.env \
-  -f infra/compose/docker-compose.yml up -d
-```
-
-Requires `CODEX_AUTH_FILE` pointing at host `auth.json`. Overlays: browser, GitHub, Home Assistant, coding — see root [README.md](../../README.md).
-
-**Do not run Aspire and Compose on the same ports simultaneously.**
+There are no hand-written Compose files. The AppHost (`src/Jarvis.AppHost`) is the only orchestration; production Compose is generated from it (`scripts/deploy/publish-compose.sh`, see [deployment-and-ci.md](deployment-and-ci.md)). To see the production stack locally: `scripts/deploy/publish-compose.sh` and open `artifacts/compose/docker-compose.yaml`.
 
 ## API and worker only
 
@@ -70,4 +58,4 @@ Development API accepts unauthenticated calls with a fixed owner id for scripts;
 | LiveKit WS | 7880 |
 | Signal CLI REST (dev) | 8080 (loopback) |
 
-Bind overrides: `JARVIS_LISTEN_URL`, `LIVEKIT_PUBLIC_URL`, `JARVIS_BIND_ADDRESS` — see [configuration.md](configuration.md).
+Bind overrides: `JARVIS_LISTEN_URL`, `LIVEKIT_PUBLIC_URL` — see [configuration.md](configuration.md).

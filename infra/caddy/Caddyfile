@@ -1,9 +1,39 @@
-{$JARVIS_DOMAIN} {
-	encode zstd gzip
-	reverse_proxy jarvis-api:5082
+# The public edge. Everything Jarvis serves, voice media included, arrives on ports 80 and 443 of one hostname.
+#
+# - HTTPS on TCP 443: the app and API, with LiveKit signaling under /rtc. LIVEKIT_DOMAIN defaults to JARVIS_DOMAIN
+#   (scripts/deploy/prepare-host.sh); a separate voice hostname, as older deployments use, still routes to LiveKit.
+# - Voice media: LiveKit owns UDP 443 directly, so Caddy serves no HTTP/3. When UDP is blocked, LiveKit's ICE-TCP
+#   fallback also uses TCP 443: a connection that does not open with a TLS handshake is passed to LiveKit (layer4
+#   listener wrapper, built in infra/caddy/Dockerfile).
+{
+	servers :443 {
+		protocols h1 h2
+		listener_wrappers {
+			layer4 {
+				@media not tls
+				route @media {
+					proxy livekit:443
+				}
+			}
+			tls
+		}
+	}
 }
 
-{$LIVEKIT_DOMAIN} {
+{$JARVIS_DOMAIN} {$LIVEKIT_DOMAIN} {
 	encode zstd gzip
-	reverse_proxy livekit:7880
+
+	@livekit_host {
+		host {$LIVEKIT_DOMAIN}
+		not host {$JARVIS_DOMAIN}
+	}
+	handle @livekit_host {
+		reverse_proxy livekit:7880
+	}
+	handle /rtc* {
+		reverse_proxy livekit:7880
+	}
+	handle {
+		reverse_proxy jarvis-api:5082
+	}
 }

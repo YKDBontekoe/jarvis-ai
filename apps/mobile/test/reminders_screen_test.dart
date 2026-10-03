@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:jarvis_mobile/reminders_screen.dart';
+import 'package:jarvis_mobile/features/reminders/reminders_screen.dart';
 import 'package:jarvis_mobile/schedule_format.dart';
 import 'package:jarvis_mobile/theme.dart';
 

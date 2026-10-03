@@ -22,6 +22,12 @@ if (args is ["voice-mcp"])
     return;
 }
 
+if (args is ["mcp-runner"])
+{
+    await Jarvis.Api.McpRunner.McpRunnerHost.RunAsync([]);
+    return;
+}
+
 JarvisSentry.ShouldCaptureException = exception => JarvisSentryExceptions.ShouldCapture(exception);
 
 var builder = WebApplication.CreateBuilder(args);
@@ -31,6 +37,7 @@ var accountTokens = AccountTokenOptions.From(builder.Configuration, builder.Envi
 builder.AddServiceDefaults();
 builder.Services.AddJarvisAuthentication(accountTokens, builder.Environment.IsDevelopment());
 builder.Services.AddJarvisApi(builder.Configuration, accountTokens);
+builder.Services.AddJarvisRateLimiting(builder.Configuration);
 
 var app = builder.Build();
 
@@ -45,6 +52,7 @@ if (app.Environment.IsDevelopment() && builder.Configuration.GetValue("Database:
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
+app.UseJarvisRateLimiting();
 app.UseExceptionHandler();
 app.UseJarvisApiProblemResponses();
 app.UseJarvisWebClient();
@@ -71,6 +79,7 @@ api.MapApprovalEndpoints();
 api.MapAutomationEndpoints(app.Logger);
 api.MapOwnerAutomationEndpoints(app.Logger);
 api.MapIntegrationEndpoints();
+api.MapMcpCatalogEndpoints();
 api.MapNotificationEndpoints();
 api.MapVoiceEndpoints(app.Logger);
 api.MapFileEndpoints(app.Logger);

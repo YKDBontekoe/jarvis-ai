@@ -1,8 +1,7 @@
 using Jarvis.Api.Realtime;
+using Jarvis.Application.Workflows;
 using Jarvis.Domain.Approvals;
-using Jarvis.Infrastructure.Persistence;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
 
 namespace Jarvis.Api.Notifications;
 
@@ -12,8 +11,8 @@ public sealed class NotificationRealtimeWorker(
     ILogger<NotificationRealtimeWorker> logger) : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
-    private DateTimeOffset _watermark = DateTimeOffset.MinValue;
-    private Guid _cursorId = Guid.Empty;
+    private const int BatchSize = 200;
+    private NotificationCursor? _cursor;
     private bool _seeded;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -40,35 +39,16 @@ public sealed class NotificationRealtimeWorker(
     private async Task PublishNewAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<JarvisDbContext>();
+        var feed = scope.ServiceProvider.GetRequiredService<INotificationFeed>();
         if (!_seeded)
         {
-            var latest = await db.Notifications.AsNoTracking()
-                .OrderByDescending(x => x.CreatedAt)
-                .Select(x => x.CreatedAt)
-                .FirstOrDefaultAsync(cancellationToken);
-            if (latest != default)
-            {
-                _watermark = latest;
-                _cursorId = await db.Notifications.AsNoTracking()
-                    .Where(x => x.CreatedAt == latest)
-                    .OrderByDescending(x => x.Id)
-                    .Select(x => x.Id)
-                    .FirstAsync(cancellationToken);
-            }
+            // Start after whatever already exists so a restart does not replay old notifications.
+            _cursor = await feed.GetLatestCursorAsync(cancellationToken);
             _seeded = true;
             return;
         }
 
-        var watermark = _watermark;
-        var cursorId = _cursorId;
-        var rows = await db.Notifications.AsNoTracking()
-            .Where(x => x.CreatedAt > watermark || (x.CreatedAt == watermark && x.Id.CompareTo(cursorId) > 0))
-            .OrderBy(x => x.CreatedAt)
-            .ThenBy(x => x.Id)
-            .Take(200)
-            .ToListAsync(cancellationToken);
-
+        var rows = await feed.ListAfterAsync(_cursor, BatchSize, cancellationToken);
         foreach (var notification in rows)
         {
             await PublishSafelyAsync(hub.Clients.Group(JarvisEventsHub.OwnerGroupName(notification.OwnerId)),
@@ -81,18 +61,13 @@ public sealed class NotificationRealtimeWorker(
                     sourceId = notification.SourceId
                 }, cancellationToken);
 
-            if (notification.Type == "approval.required" && notification.SourceId is { } approvalId)
-            {
-                var approval = await db.ToolApprovals.AsNoTracking()
-                    .SingleOrDefaultAsync(x => x.Id == approvalId && x.OwnerId == notification.OwnerId,
-                        cancellationToken);
-                if (approval is { Status: "pending" })
-                    await PublishSafelyAsync(hub.Clients.Group(JarvisEventsHub.GroupName(approval.ConversationId)),
-                        "tool.approval_required", ToApprovalEvent(approval), cancellationToken);
-            }
+            if (notification.Type == "approval.required" && notification.SourceId is { } approvalId &&
+                await feed.FindPendingApprovalAsync(notification.OwnerId, approvalId, cancellationToken)
+                    is { } approval)
+                await PublishSafelyAsync(hub.Clients.Group(JarvisEventsHub.GroupName(approval.ConversationId)),
+                    "tool.approval_required", ToApprovalEvent(approval), cancellationToken);
 
-            _watermark = notification.CreatedAt;
-            _cursorId = notification.Id;
+            _cursor = new NotificationCursor(notification.CreatedAt, notification.Id);
         }
     }
 

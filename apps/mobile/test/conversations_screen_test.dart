@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jarvis_mobile/conversation_export.dart';
-import 'package:jarvis_mobile/conversation_groups.dart';
-import 'package:jarvis_mobile/conversations_screen.dart';
+import 'package:jarvis_mobile/features/conversations/conversation_export.dart';
+import 'package:jarvis_mobile/features/conversations/conversation_groups.dart';
+import 'package:jarvis_mobile/features/conversations/conversations_screen.dart';
 
 import 'support/fixture_http.dart';
 

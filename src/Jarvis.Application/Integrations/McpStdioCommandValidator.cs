@@ -43,6 +43,9 @@ public static partial class McpStdioCommandValidator
     [GeneratedRegex(@"^[A-Za-z0-9@/._+-]+$", RegexOptions.CultureInvariant)]
     private static partial Regex ArgumentPattern();
 
-    [GeneratedRegex(@"^(@[A-Za-z0-9._-]+/)?[A-Za-z0-9._-]+$", RegexOptions.CultureInvariant)]
+    // A package name, optionally scoped and optionally pinned with @version (npx and uvx both accept it). It
+    // must start with a letter or digit so flags such as -y are not mistaken for the package.
+    [GeneratedRegex(@"^(@[A-Za-z0-9][A-Za-z0-9._-]*/)?[A-Za-z0-9][A-Za-z0-9._-]*(@[A-Za-z0-9][A-Za-z0-9._+-]*)?$",
+        RegexOptions.CultureInvariant)]
     private static partial Regex PackagePattern();
 }

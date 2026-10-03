@@ -5,7 +5,127 @@ namespace Jarvis.Application.Integrations;
 public sealed record UserMcpServer(string Id, string Name, string Endpoint,
     IReadOnlyList<string> AllowedTools, DateTimeOffset UpdatedAt, bool HasToken, bool Enabled = true,
     string Transport = "streamableHttp", string? Command = null, IReadOnlyList<string>? Arguments = null,
-    bool IsValid = true, string? ConfigurationIssue = null);
+    bool IsValid = true, string? ConfigurationIssue = null, IReadOnlyList<McpServerSecret>? Secrets = null,
+    string? CatalogName = null)
+{
+    /// <summary>Where each secret goes at runtime. Server-side only; clients see <see cref="Secrets"/>.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<McpSecretBinding>? SecretBindings { get; init; }
+}
+
+/// <summary>A secret the owner provides for a server, and whether it is stored. Values are never returned.</summary>
+public sealed record McpServerSecret(string Name, string Label, string? Description, bool Required, bool IsSet);
+
+/// <summary>
+/// Where Jarvis puts one owner secret when it starts a server: an environment variable for stdio servers
+/// (<see cref="Target"/> "env") or an HTTP header for remote servers ("header"), optionally after a prefix
+/// such as "Bearer".
+/// </summary>
+public sealed record McpSecretBinding(string SecretName, string Target, string Key, string? Prefix, string Label,
+    string? Description, bool Required);
+
+/// <summary>A complete server definition, used by catalog installs.</summary>
+public sealed record McpServerDefinition(string Name, string Transport, string? Endpoint, string? Command,
+    IReadOnlyList<string>? Arguments, IReadOnlyList<string> AllowedTools, IReadOnlyList<McpSecretBinding> Secrets,
+    string? CatalogName = null);
+
+public static partial class McpSecretBindings
+{
+    public const string EnvironmentTarget = "env";
+    public const string HeaderTarget = "header";
+    public const int MaxSecrets = 10;
+
+    // Variables that change how the runtime loads code or where it looks, so a registry entry cannot use the
+    // owner's secret prompt to inject them.
+    private static readonly string[] BlockedEnvironmentPrefixes =
+        ["LD_", "DYLD_", "NODE_", "NPM_CONFIG_", "PYTHON", "UV_", "PIP_", "DOTNET_", "COMPlus_"];
+
+    private static readonly HashSet<string> BlockedEnvironmentNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "PATH", "HOME", "SHELL", "USER", "TMPDIR", "TEMP", "TMP", "PWD", "IFS", "BASH_ENV", "ENV",
+        "SSL_CERT_FILE", "SSL_CERT_DIR", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "ALL_PROXY"
+    };
+
+    private static readonly HashSet<string> BlockedHeaders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Host", "Content-Length", "Content-Type", "Transfer-Encoding", "Connection", "Cookie", "Accept",
+        "Mcp-Session-Id", "Mcp-Protocol-Version", "Upgrade", "TE", "Trailer", "Proxy-Authorization"
+    };
+
+    public static IReadOnlyList<McpSecretBinding> Normalize(IReadOnlyList<McpSecretBinding>? bindings, string transport)
+    {
+        var list = bindings ?? [];
+        if (list.Count > MaxSecrets)
+            throw new ArgumentException($"A server can ask for at most {MaxSecrets} secrets.");
+        var expectedTarget = transport == "stdio" ? EnvironmentTarget : HeaderTarget;
+        var result = new List<McpSecretBinding>();
+        foreach (var binding in list)
+        {
+            var secretName = binding.SecretName?.Trim() ?? string.Empty;
+            if (!SecretNamePattern().IsMatch(secretName) ||
+                secretName == IntegrationCredentialProviders.UserMcpConfigSecret)
+                throw new ArgumentException("Secret names must be 1 to 48 lowercase letters, numbers, or underscores.");
+            if (binding.Target != expectedTarget)
+                throw new ArgumentException(transport == "stdio"
+                    ? "Installed connectors receive secrets as environment variables."
+                    : "Remote servers receive secrets as HTTP headers.");
+            var key = binding.Key?.Trim() ?? string.Empty;
+            if (expectedTarget == EnvironmentTarget && !IsAllowedEnvironmentName(key))
+                throw new ArgumentException($"Jarvis does not set the environment variable '{key}' for a connector.");
+            if (expectedTarget == HeaderTarget && !IsAllowedHeaderName(key))
+                throw new ArgumentException($"Jarvis does not send the header '{key}' to a remote server.");
+            var prefix = string.IsNullOrWhiteSpace(binding.Prefix) ? null : binding.Prefix.Trim();
+            if (prefix is not null && (expectedTarget != HeaderTarget || !PrefixPattern().IsMatch(prefix)))
+                throw new ArgumentException("A secret prefix must be one word such as Bearer, and only applies to headers.");
+            if (result.Any(existing => existing.SecretName == secretName ||
+                                       string.Equals(existing.Key, key, StringComparison.OrdinalIgnoreCase)))
+                throw new ArgumentException("Each secret and each variable or header can appear only once.");
+            result.Add(new McpSecretBinding(secretName, expectedTarget, key, prefix,
+                Clean(binding.Label, 80) ?? key, Clean(binding.Description, 300), binding.Required));
+        }
+        return result;
+    }
+
+    /// <summary>A stable secret name for an environment variable or header, such as notion_token.</summary>
+    public static string SecretNameFor(string key)
+    {
+        var name = NonWord().Replace(key.Trim().ToLowerInvariant(), "_").Trim('_');
+        if (name.Length == 0 || !char.IsAsciiLetterLower(name[0])) name = "secret_" + name;
+        name = name.Length > 48 ? name[..48].TrimEnd('_') : name;
+        return name == IntegrationCredentialProviders.UserMcpConfigSecret ? "secret_config" : name;
+    }
+
+    public static bool IsAllowedEnvironmentName(string name) =>
+        EnvironmentNamePattern().IsMatch(name) && !BlockedEnvironmentNames.Contains(name) &&
+        !BlockedEnvironmentPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+    public static bool IsAllowedHeaderName(string name) =>
+        HeaderNamePattern().IsMatch(name) && !BlockedHeaders.Contains(name) &&
+        !name.StartsWith("Sec-", StringComparison.OrdinalIgnoreCase) &&
+        !name.StartsWith("X-Forwarded-", StringComparison.OrdinalIgnoreCase);
+
+    private static string? Clean(string? value, int max)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var text = new string(value.Where(ch => !char.IsControl(ch)).ToArray()).Trim();
+        return text.Length <= max ? text : text[..max].TrimEnd() + "…";
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[a-z][a-z0-9_]{0,47}$")]
+    private static partial System.Text.RegularExpressions.Regex SecretNamePattern();
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]{0,63}$")]
+    private static partial System.Text.RegularExpressions.Regex EnvironmentNamePattern();
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9-]{0,63}$")]
+    private static partial System.Text.RegularExpressions.Regex HeaderNamePattern();
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[A-Za-z][A-Za-z0-9-]{0,31}$")]
+    private static partial System.Text.RegularExpressions.Regex PrefixPattern();
+
+    [System.Text.RegularExpressions.GeneratedRegex("[^a-z0-9]+")]
+    private static partial System.Text.RegularExpressions.Regex NonWord();
+}
 
 public sealed class InvalidMcpServerConfigurationException : InvalidOperationException
 {
@@ -35,6 +155,8 @@ public interface IUserMcpServerRegistry
     Task<UserMcpServer> AddAsync(Guid ownerId, AddUserMcpServerRequest request,
         CancellationToken cancellationToken);
     Task<UserMcpServer> AddStdioAsync(Guid ownerId, AddUserMcpStdioServerRequest request,
+        CancellationToken cancellationToken);
+    Task<UserMcpServer> AddDefinitionAsync(Guid ownerId, McpServerDefinition definition,
         CancellationToken cancellationToken);
     Task<UserMcpServer?> UpdateAsync(Guid ownerId, string id, AddUserMcpServerRequest request,
         CancellationToken cancellationToken);

@@ -2,19 +2,41 @@
 
 ## Production topology
 
-File: `infra/compose/docker-compose.production.yml`
+Defined in the AppHost: `src/Jarvis.AppHost/ProductionDeployment.cs`. There is no hand-written Compose file.
+`scripts/deploy/publish-compose.sh` publishes the AppHost (`dotnet run --project src/Jarvis.AppHost -- --operation
+publish --step publish`) into `artifacts/compose/docker-compose.yaml`, using a local .NET 10 SDK or the pinned SDK
+container. `scripts/deploy/remote-up.sh` does that first on every deploy, then runs Docker Compose against the
+generated file with the repository root as the project directory and project name `jarvis` (so existing
+`jarvis_*` volumes are reused). Settings Aspire's Compose model lacks (a PID limit, `platform`) are added by the
+AppHost right after publishing (`ComposeOutput.cs`).
 
-- **Caddy** edge TLS
+Optional parts are AppHost features, chosen with `JARVIS_FEATURES` (repository variable for deploys): `browser`,
+`github`, `home-assistant`, `coding`, `tunnel`. `DEPLOY_COMPOSE_FILES` from older setups maps its overlay names to
+the same features (`scripts/deploy/compose-env.sh`).
+
+- **MCP runner** for owner-installed connectors, and the nightly **backup** service
+
+- **Caddy** edge TLS, built on the host from `infra/caddy/Dockerfile` with the layer4 plugin
 - **Jarvis API + Worker** (GHCR images in CI)
 - **PostgreSQL** (app + Temporal DB)
 - **Garage** S3-compatible storage
 - **embeddings**: a CPU Text Embeddings Inference container with the local embedding model (see [configuration.md](configuration.md#local-embedding-model))
 - **ClamAV**, **LiveKit**, private **signal-cli** and **whatsapp-bridge** (built on the host from `workers/whatsapp-bridge`)
-- Only edge/media ports published; databases stay on private networks
+- Only ports 80 and 443 are public; databases stay on private networks. TCP 80/443 go to Caddy. LiveKit voice media
+  uses UDP 443 directly (single-port mode, `infra/livekit/production.yaml`), and its ICE-TCP fallback shares TCP 443:
+  Caddy passes any connection that does not start with a TLS handshake to LiveKit. Caddy therefore serves no HTTP/3.
+  With the `tunnel` feature another proxy owns 443, so LiveKit keeps TCP 7881 and UDP 50000-50100
+  (`infra/livekit/production-tunnel.yaml`).
 
-Env template: `infra/compose/.env.production.example` → `.env.production` (mode `0600`).
+No hand configuration: `scripts/deploy/prepare-host.sh` runs first on every deploy. It copies
+`infra/compose/.env.production.example` to `.env.production` (mode `0600`) when missing and fills every empty managed
+value (secrets, uid/gid, data directories under `JARVIS_DATA_DIR`, a Garage config, values derived from
+`JARVIS_DOMAIN`). It never changes an existing value, and keeps a template placeholder for a database password or
+storage key when its data volume already exists. `JARVIS_DOMAIN` is the only input (repository variable for
+deploys). Caddy serves LiveKit signaling under `/rtc` on that host, so one DNS record is enough. ChatGPT sign-in for
+the server's Codex CLI happens in the app (`/api/v1/settings/models/codex/sign-in`, device code).
 
-Bootstrap and deploy scripts: `scripts/deploy/remote-up.sh`.
+Bootstrap and deploy scripts: `scripts/deploy/remote-up.sh` (generate, pull, migrate, replace, health-check), `scripts/deploy/publish-compose.sh`, `scripts/deploy/compose-env.sh`.
 
 The migration command applies all missing migrations through the latest migration in
 the image. Migration timestamps can arrive out of order when feature branches merge;
@@ -22,6 +44,11 @@ the last pending migration must never be used as a target because EF would rever
 newer migrations that were already applied. Reapplying a migration recreates tables,
 but does not restore data removed by an earlier downgrade; recover that data from a
 database backup separately.
+
+## Backups
+
+The `backup` service takes a nightly `pg_dump` of both databases plus the data protection key ring into
+`JARVIS_BACKUP_DIR`. `scripts/backup/restore.sh` restores one. See [backup-and-restore.md](backup-and-restore.md).
 
 ## SemVer releases
 
@@ -41,7 +68,7 @@ database backup separately.
 
 Require the **All checks passed** job from `ci.yml` in branch protection before merging to `main`.
 
-Repository secrets: `DEPLOY_PATH`, optional `DEPLOY_COMPOSE_FILES` for tunnel/proxy overlays.
+Repository secret `DEPLOY_PATH`; repository variable `JARVIS_FEATURES` for optional parts such as `tunnel` (the older `DEPLOY_COMPOSE_FILES` still maps to features).
 
 Sentry release secrets, all optional: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT_BACKEND`, `SENTRY_PROJECT_MOBILE`, and `JARVIS_SENTRY_DSN`. When the token, org, and backend project are set, the API and worker image build uploads portable PDBs and source files for `github.sha`, and a following job associates that release with the git commits. The iOS workflow uploads the Dart symbol map, split debug info, and source context for `version+build`. Image builds stay green when those secrets are absent. The server `.env.production` still needs `SENTRY_DSN` before a running container reports anything. Link the GitHub repository in the Sentry project so stack traces open on the uploaded source.
 
@@ -117,10 +144,10 @@ web server against a separate local API, continue passing
 ## Production checklist (high level)
 
 1. Set `Authentication:*` and `DataProtection:KeysDirectory`
-2. `CODEX_HOME` with `codex login` on deploy user
+2. Sign the server in to ChatGPT from the app after the first deploy
 3. Firebase/APNs for push (optional)
 4. Pin container image digests
 5. Disable `Authentication:AllowRegistration` after bootstrap
-6. Never expose development Compose profile publicly
+6. Never expose a local Aspire (Development) instance publicly
 
-Detailed operator steps remain in [README.md](../../README.md#production-compose).
+Detailed operator steps remain in [README.md](../../README.md#production-deployment).

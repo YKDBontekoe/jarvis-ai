@@ -74,7 +74,7 @@ public static class CodingPathPolicy
         [
             "/approvals/", "/approval", "/identity/", "/security/", "authentication", "currentuser",
             "/migrations/", "program.cs", "appsettings", "dockerfile", "docker-compose", "infra/",
-            "/jarvis.mcp/", "credential"
+            "/jarvis.mcp/", "credential", "/jarvis.apphost/", "scripts/deploy/"
         ];
         var lower = "/" + normalized.ToLowerInvariant();
         return markers.Any(marker => lower.Contains(marker, StringComparison.Ordinal));

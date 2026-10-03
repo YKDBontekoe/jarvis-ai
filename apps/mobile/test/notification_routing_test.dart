@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jarvis_mobile/notification_routing.dart';
+import 'package:jarvis_mobile/features/notifications/notification_routing.dart';
 
 void main() {
   test('watch notifications open their linked item', () {

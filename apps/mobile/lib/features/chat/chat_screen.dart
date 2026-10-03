@@ -17,19 +17,19 @@ import '../../api/api_errors.dart';
 import '../../api/jarvis_http.dart';
 import '../../auth/auth_session.dart';
 import '../../auth/auth_validation.dart';
-import '../../conversations_screen.dart';
+import '../conversations/conversations_screen.dart';
 import '../../error_reporting.dart';
 import '../../json_maps.dart';
-import '../../notification_details_screen.dart';
+import '../notifications/notification_details_screen.dart';
 import '../coding/coding_run_detail_screen.dart';
-import '../../notification_routing.dart';
+import '../notifications/notification_routing.dart';
 import '../../push/notification_actions.dart';
 import '../../schedule_format.dart';
-import '../../file_download_stub.dart'
-    if (dart.library.io) '../../file_download_io.dart'
-    if (dart.library.js_interop) '../../file_download_web.dart'
+import '../files/file_download_stub.dart'
+    if (dart.library.io) '../files/file_download_io.dart'
+    if (dart.library.js_interop) '../files/file_download_web.dart'
     as file_download;
-import '../../task_details_screen.dart';
+import '../tasks/task_details_screen.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';

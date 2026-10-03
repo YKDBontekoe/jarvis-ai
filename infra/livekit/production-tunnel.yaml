@@ -1,0 +1,8 @@
+# Production LiveKit for the tunnel feature, where another proxy owns port 443: media uses its own ports, TCP 7881
+# and UDP 50000-50100, which must be open on the host firewall.
+port: 7880
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: true

@@ -20,13 +20,16 @@ Jarvis follows a **modular monolith** layout: clear project boundaries without m
 
 Tests: `tests/unit/Jarvis.UnitTests`, `tests/integration/Jarvis.IntegrationTests`, `tests/e2e/` (Node).
 
-## Dependency rules (intended)
+## Dependency rules (enforced)
 
 1. **Domain** has no references to ASP.NET, EF, Temporal, or Flutter.
 2. **Application** defines ports (`IConversationStore`, `IMemoryService`, …); implementations live in Infrastructure.
 3. **Agents** register tools and context providers; they call Application services, not EF directly.
 4. **Api** maps HTTP to Application services and hosts real-time/voice edge code under `Jarvis.Api/Realtime`.
 5. **Worker** reuses the same Agent + Infrastructure stack with `WorkerCurrentUser` standing in for `ICurrentUser`.
+6. **Api** does not use `JarvisDbContext` outside `Jarvis.Api.Hosting` (startup migrations). Background services such as push and real-time notification fan-out go through Application ports (`IPushDeliveryQueue`, `INotificationFeed`).
+
+`tests/unit/Jarvis.UnitTests/ArchitectureTests.cs` checks these rules on every unit test run: allowed project references per layer, no EF Core / ASP.NET Core / Npgsql / Temporal references in inner layers, and no `JarvisDbContext` in the API outside hosting. If a test fails, add an Application port rather than widening the allowlist.
 
 ## DI entry points
 

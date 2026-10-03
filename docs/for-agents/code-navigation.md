@@ -45,13 +45,15 @@ CodexCliChatClient
 apps/mobile/lib/main.dart
 apps/mobile/lib/api/jarvis_http.dart
 apps/mobile/lib/features/chat/     # largest surface
+apps/mobile/lib/features/<area>/   # one folder per product area; every screen lives here
 apps/mobile/lib/features/settings/
 ```
 
 ## Infrastructure and deploy
 
 ```
-infra/compose/                  Docker Compose stacks
+src/Jarvis.AppHost/              Aspire: local dev + production deployment (publishes Compose)
+infra/compose/                  Dockerfile, production env template
 infra/livekit/livekit.yaml
 scripts/deploy/
 .github/workflows/

@@ -250,6 +250,8 @@ jobs:
           SOURCE_BUNDLE: ${{ runner.temp }}/jarvis-source.bundle
           JARVIS_API_IMAGE: ${{ needs.prepare.outputs.prefix }}/api:${{ github.sha }}
           JARVIS_WORKER_IMAGE: ${{ needs.prepare.outputs.prefix }}/worker:${{ github.sha }}
+          JARVIS_DOMAIN: ${{ vars.JARVIS_DOMAIN }}
+          JARVIS_FEATURES: ${{ vars.JARVIS_FEATURES }}
           DEPLOY_COMPOSE_FILES: ${{ vars.DEPLOY_COMPOSE_FILES }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: bash scripts/deploy/runner_deploy.sh
