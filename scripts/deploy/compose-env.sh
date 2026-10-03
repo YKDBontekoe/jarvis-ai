@@ -31,7 +31,13 @@ jarvis_publish_compose() {
   JARVIS_FEATURES="${features}" scripts/deploy/publish-compose.sh "${JARVIS_COMPOSE_DIR}"
 }
 
-jarvis_compose() {
+jarvis_compose() (
+  # Actions exports an empty value when vars.JARVIS_DOMAIN is unset. Compose
+  # gives shell variables precedence over --env-file, including empty values.
+  # Let existing deployments use their saved hostname without changing the caller.
+  if [[ -z "${JARVIS_DOMAIN:-}" ]]; then
+    unset JARVIS_DOMAIN
+  fi
   docker compose -p jarvis --project-directory . --env-file "${ENV_FILE}" \
     -f "${JARVIS_COMPOSE_DIR}/docker-compose.yaml" "$@"
-}
+)
