@@ -41,7 +41,7 @@ Merging to `main` runs [`.github/workflows/create-release-tag.yml`](.github/work
 - [ ] API or SignalR contract change
 - [ ] Database migration
 - [ ] Temporal workflow or worker behavior
-- [ ] Docker / Compose / production deploy
+- [ ] Docker / AppHost / production deploy
 - [ ] MCP, integrations, or auth
 
 ### Mobile (Flutter)
@@ -71,7 +71,7 @@ python3 -m unittest discover -s tests/unit -p 'test_*.py'
 - [ ] Automated tests added or updated where behavior changed
 - [ ] `README.md` or ops docs updated if setup, secrets, or release steps changed
 - [ ] No secrets, tokens, or production `.env` files committed
-- [ ] Production Compose / GHCR image names unchanged unless intentional
+- [ ] Production AppHost deployment / GHCR image names unchanged unless intentional
 - [ ] iOS release workflow / `Jarvis.ipa` packaging considered if mobile or version fields changed
 
 ## Deployment / release notes

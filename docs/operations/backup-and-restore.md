@@ -1,6 +1,6 @@
 # Backup and restore
 
-Production Compose runs a `backup` service that takes a nightly backup of everything needed to bring Jarvis back on a new host, except uploaded file blobs (see [What is not included](#what-is-not-included)).
+The production deployment runs a `backup` service that takes a nightly backup of everything needed to bring Jarvis back on a new host, except uploaded file blobs (see [What is not included](#what-is-not-included)).
 
 ## What a backup contains
 
@@ -37,8 +37,8 @@ The service runs as `JARVIS_UID:JARVIS_GID` with a read-only root filesystem. It
 3. Deploy as usual (`scripts/deploy/remote-up.sh`). To take a backup right away:
 
    ```sh
-   docker compose --env-file infra/compose/.env.production \
-     -f infra/compose/docker-compose.production.yml run --rm backup --once
+   source scripts/deploy/compose-env.sh && ENV_FILE=infra/compose/.env.production
+   jarvis_compose run --rm backup --once   # after a deploy has generated artifacts/compose/
    ```
 
 4. Copy backups off the host on a schedule, for example with `rclone sync` or `restic` to a different provider. A backup on the same disk does not survive losing that disk.
@@ -60,7 +60,7 @@ The script:
 5. Copies the current key ring to `<keys dir>.before-restore-<timestamp>`, then replaces it with the backup's.
 6. Starts the stack.
 
-On a new host, deploy once first so Postgres and the volumes exist, then restore. `DEPLOY_COMPOSE_FILES` and `ENV_FILE` work the same way as in `remote-up.sh`.
+On a new host, deploy once first so Postgres and the volumes exist, then restore. `JARVIS_FEATURES`, `DEPLOY_COMPOSE_FILES` and `ENV_FILE` work the same way as in `remote-up.sh`.
 
 Practice a restore on a spare host now and then. A backup you have never restored is a guess.
 

@@ -85,6 +85,7 @@ jobs:
           SOURCE_BUNDLE: ${{ runner.temp }}/jarvis-source.bundle
           JARVIS_API_IMAGE: ${{ steps.images.outputs.api }}
           JARVIS_WORKER_IMAGE: ${{ steps.images.outputs.worker }}
+          JARVIS_FEATURES: ${{ vars.JARVIS_FEATURES }}
           DEPLOY_COMPOSE_FILES: ${{ vars.DEPLOY_COMPOSE_FILES }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: bash scripts/deploy/runner_deploy.sh

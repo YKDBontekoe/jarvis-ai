@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Nightly Jarvis backup, run by the `backup` service in docker-compose.production.yml.
+# Nightly Jarvis backup, run by the `backup` service of the production deployment (src/Jarvis.AppHost).
 #
 # Each run writes one directory under $BACKUP_DIR:
 #   jarvis-YYYYMMDDTHHMMSSZ/

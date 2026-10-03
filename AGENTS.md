@@ -30,7 +30,7 @@ Full index: **[docs/README.md](docs/README.md)**.
 | Backups / restore | [docs/operations/backup-and-restore.md](docs/operations/backup-and-restore.md) |
 | Security / owner scope | [docs/architecture/security-and-ownership.md](docs/architecture/security-and-ownership.md) |
 
-Operator runbook (Compose commands, feature list): **[README.md](README.md)** — prefer `docs/` for architecture and navigation.
+Operator runbook (deploy commands, feature list): **[README.md](README.md)** — prefer `docs/` for architecture and navigation.
 
 ## Engineering rules
 
@@ -60,9 +60,9 @@ Full-stack fixture flow: [docs/operations/testing.md](docs/operations/testing.md
 ## Local dependencies
 
 - **Aspire**: `dotnet run --project src/Jarvis.AppHost` (after `infra/compose/.env` and Codex login).
-- **Docker** required for integration tests and Compose; see [docs/operations/local-development.md](docs/operations/local-development.md).
+- **Docker** required for Aspire containers and integration tests; see [docs/operations/local-development.md](docs/operations/local-development.md).
 
-Do not run Aspire and development Compose on the same ports at once.
+The AppHost is the only orchestration. Never add a hand-written Compose file: change `src/Jarvis.AppHost` (production lives in `ProductionDeployment.cs`) and run `python3 -m unittest tests/unit/compose/test_production_compose.py`.
 
 ## Cursor Cloud environment
 

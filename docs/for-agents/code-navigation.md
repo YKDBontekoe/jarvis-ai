@@ -52,7 +52,8 @@ apps/mobile/lib/features/settings/
 ## Infrastructure and deploy
 
 ```
-infra/compose/                  Docker Compose stacks
+src/Jarvis.AppHost/              Aspire: local dev + production deployment (publishes Compose)
+infra/compose/                  Dockerfile, production env template
 infra/livekit/livekit.yaml
 scripts/deploy/
 .github/workflows/

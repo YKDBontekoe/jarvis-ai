@@ -61,11 +61,11 @@ Connector stderr is discarded because packages may print their own keys.
 `McpRunnerClientTransport` (`Jarvis.Mcp`) is the API side; `McpRunnerHost` (`Jarvis.Api/McpRunner`) is the
 runner. Operator host binaries such as `github-mcp-server` still run in the API image.
 
-In production Compose the runner has no database networks and no Docker socket. It runs as `JARVIS_UID` on a
+In the production deployment the runner has no database networks and no Docker socket. It runs as `JARVIS_UID` on a
 read-only root with dropped capabilities, a PID and memory limit, and tmpfs for work and package caches. It
 reaches the internet through `mcp-egress`, and the API and worker reach it through the internal `mcp` network.
 Aspire starts the same runner as the `mcp-runner` resource. Without `McpRunner:Url`, connectors run in-process
-as before (development Compose, tests).
+as before (tests).
 
 ## MCP architecture
 
@@ -80,10 +80,10 @@ Transports: **stdio** and **streamableHttp**. Allowlists are explicit tool names
 
 Agent management tools: list/discover/add/update/invoke plus chat setup (`OfferMcpSetup`, `AskForMcpCredential`, `InstallIntegrationPack`) — see [agent-tools.md](agent-tools.md).
 
-Compose overlays:
+AppHost features (`JARVIS_FEATURES`, see `src/Jarvis.AppHost/JarvisFeatures.cs`):
 
-- `docker-compose.github.yml` — official GitHub MCP server in API image
-- `docker-compose.home-assistant.yml` — Streamable HTTP to HA `/api/mcp`
+- `github` — official GitHub MCP server in the API image
+- `home-assistant` — Streamable HTTP to HA `/api/mcp` (`HOME_ASSISTANT_MCP_URL`)
 
 ## Channels
 
@@ -127,7 +127,7 @@ Allowlist per channel; replies approval-gated. Thread history in API + Flutter `
 
 ## Browser (Playwright)
 
-Opt-in Compose profile `docker-compose.browser.yml`:
+Opt-in AppHost feature `browser`:
 
 - Isolated MCP browser container, no Docker socket, Squid egress filtering.
 - `BrowseTheWeb` starts session; navigation/interaction approval-gated; read-only tools allowlisted.

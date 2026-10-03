@@ -2,7 +2,19 @@
 
 ## Production topology
 
-File: `infra/compose/docker-compose.production.yml`
+Defined in the AppHost: `src/Jarvis.AppHost/ProductionDeployment.cs`. There is no hand-written Compose file.
+`scripts/deploy/publish-compose.sh` publishes the AppHost (`dotnet run --project src/Jarvis.AppHost -- --operation
+publish --step publish`) into `artifacts/compose/docker-compose.yaml`, using a local .NET 10 SDK or the pinned SDK
+container. `scripts/deploy/remote-up.sh` does that first on every deploy, then runs Docker Compose against the
+generated file with the repository root as the project directory and project name `jarvis` (so existing
+`jarvis_*` volumes are reused). Settings Aspire's Compose model lacks (a PID limit, `platform`) are added by the
+AppHost right after publishing (`ComposeOutput.cs`).
+
+Optional parts are AppHost features, chosen with `JARVIS_FEATURES` (repository variable for deploys): `browser`,
+`github`, `home-assistant`, `coding`, `tunnel`. `DEPLOY_COMPOSE_FILES` from older setups maps its overlay names to
+the same features (`scripts/deploy/compose-env.sh`).
+
+- **MCP runner** for owner-installed connectors, and the nightly **backup** service
 
 - **Caddy** edge TLS
 - **Jarvis API + Worker** (GHCR images in CI)
@@ -14,7 +26,7 @@ File: `infra/compose/docker-compose.production.yml`
 
 Env template: `infra/compose/.env.production.example` → `.env.production` (mode `0600`).
 
-Bootstrap and deploy scripts: `scripts/deploy/remote-up.sh`.
+Bootstrap and deploy scripts: `scripts/deploy/remote-up.sh` (generate, pull, migrate, replace, health-check), `scripts/deploy/publish-compose.sh`, `scripts/deploy/compose-env.sh`.
 
 The migration command applies all missing migrations through the latest migration in
 the image. Migration timestamps can arrive out of order when feature branches merge;
@@ -46,7 +58,7 @@ The `backup` service takes a nightly `pg_dump` of both databases plus the data p
 
 Require the **All checks passed** job from `ci.yml` in branch protection before merging to `main`.
 
-Repository secrets: `DEPLOY_PATH`, optional `DEPLOY_COMPOSE_FILES` for tunnel/proxy overlays.
+Repository secret `DEPLOY_PATH`; repository variable `JARVIS_FEATURES` for optional parts such as `tunnel` (the older `DEPLOY_COMPOSE_FILES` still maps to features).
 
 Sentry release secrets, all optional: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT_BACKEND`, `SENTRY_PROJECT_MOBILE`, and `JARVIS_SENTRY_DSN`. When the token, org, and backend project are set, the API and worker image build uploads portable PDBs and source files for `github.sha`, and a following job associates that release with the git commits. The iOS workflow uploads the Dart symbol map, split debug info, and source context for `version+build`. Image builds stay green when those secrets are absent. The server `.env.production` still needs `SENTRY_DSN` before a running container reports anything. Link the GitHub repository in the Sentry project so stack traces open on the uploaded source.
 
@@ -126,6 +138,6 @@ web server against a separate local API, continue passing
 3. Firebase/APNs for push (optional)
 4. Pin container image digests
 5. Disable `Authentication:AllowRegistration` after bootstrap
-6. Never expose development Compose profile publicly
+6. Never expose a local Aspire (Development) instance publicly
 
-Detailed operator steps remain in [README.md](../../README.md#production-compose).
+Detailed operator steps remain in [README.md](../../README.md#production-deployment).

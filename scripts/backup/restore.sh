@@ -21,15 +21,10 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
-compose_files=(-f infra/compose/docker-compose.production.yml)
-if [[ -n "${DEPLOY_COMPOSE_FILES:-}" ]]; then
-  # shellcheck disable=SC2206
-  extra=(${DEPLOY_COMPOSE_FILES})
-  for file in "${extra[@]}"; do
-    compose_files+=(-f "${file}")
-  done
-fi
-compose() { docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" "$@"; }
+# shellcheck source=scripts/deploy/compose-env.sh
+source scripts/deploy/compose-env.sh
+if [[ ! -s "${JARVIS_COMPOSE_DIR}/docker-compose.yaml" ]]; then jarvis_publish_compose; fi
+compose() { jarvis_compose "$@"; }
 
 env_value() {
   # Reads KEY=value from the env file without sourcing it.
