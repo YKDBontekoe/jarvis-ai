@@ -194,7 +194,7 @@ internal sealed class McpContextProvider(
             builder.Append("- pack ").Append(pack.Pack.Name).Append(pack.Installed ? " installed" : " not installed");
             builder.AppendLine();
         }
-        builder.Append("When the user wants to connect a tool, call OfferMcpSetup. Collect tokens with AskForMcpCredential. Start OAuth with RequestMcpAuthorization. Pause or remove with SetMcpServerEnabled / RemoveMcpServer.");
+        builder.Append("When the user names an app to connect, call SearchMcpCatalog and InstallMcpFromCatalog; otherwise call OfferMcpSetup. Collect tokens with AskForMcpCredential. Start OAuth with RequestMcpAuthorization. Pause or remove with SetMcpServerEnabled / RemoveMcpServer.");
         return [new ChatMessage(ChatRole.User, builder.ToString())];
     }
 }

@@ -20,3 +20,7 @@ infra/compose/.env.production
 artifacts/
 infra/web/dist/
 **/node_modules/
+
+# Python bytecode
+__pycache__/
+*.pyc

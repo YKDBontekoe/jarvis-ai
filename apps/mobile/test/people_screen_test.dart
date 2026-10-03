@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/people/people_models.dart';
 import 'package:jarvis_mobile/features/people/people_screen.dart';
 import 'package:jarvis_mobile/features/people/person_detail_screen.dart';
-import 'package:jarvis_mobile/notification_routing.dart';
+import 'package:jarvis_mobile/features/notifications/notification_routing.dart';
 
 import 'support/fixture_http.dart';
 

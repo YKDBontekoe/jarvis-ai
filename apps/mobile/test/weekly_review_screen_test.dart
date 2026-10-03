@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/review/mood_trend_chart.dart';
 import 'package:jarvis_mobile/features/review/weekly_review_format.dart';
 import 'package:jarvis_mobile/features/review/weekly_review_screen.dart';
-import 'package:jarvis_mobile/notification_routing.dart';
+import 'package:jarvis_mobile/features/notifications/notification_routing.dart';
 import 'package:jarvis_mobile/schedule_format.dart';
 
 import 'support/fixture_http.dart';

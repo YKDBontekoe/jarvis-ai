@@ -13,19 +13,13 @@ if ! flock -n 9; then
 fi
 
 ENV_FILE="${ENV_FILE:-infra/compose/.env.production}"
-if [[ ! -f "${ENV_FILE}" ]]; then
-  echo "Production env file not found: ${ENV_FILE}" >&2
-  exit 1
-fi
+export ENV_FILE
+# Creates or completes the env file, data directories and Garage config; only JARVIS_DOMAIN is needed.
+scripts/deploy/prepare-host.sh
 
-compose_files=(-f infra/compose/docker-compose.production.yml)
-if [[ -n "${DEPLOY_COMPOSE_FILES:-}" ]]; then
-  # shellcheck disable=SC2206
-  extra=(${DEPLOY_COMPOSE_FILES})
-  for file in "${extra[@]}"; do
-    compose_files+=(-f "${file}")
-  done
-fi
+# shellcheck source=scripts/deploy/compose-env.sh
+source scripts/deploy/compose-env.sh
+jarvis_publish_compose
 
 required_images=(
   "${JARVIS_API_IMAGE:?Set JARVIS_API_IMAGE to the GHCR api image}"
@@ -42,7 +36,7 @@ service_images=(api worker)
 for index in "${!services[@]}"; do
   service="${services[$index]}"
   image_name="${service_images[$index]}"
-  container_id="$(docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" ps -q "${service}" | head -n1)"
+  container_id="$(jarvis_compose ps -q "${service}" | head -n1)"
   if [[ -z "${container_id}" ]]; then
     continue
   fi
@@ -61,22 +55,23 @@ done
 echo "Pulling Jarvis images:"
 printf '  %s\n' "${required_images[@]}"
 
-docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" pull \
+jarvis_compose pull \
   jarvis-api jarvis-worker garage embeddings
 
-# The WhatsApp bridge is built from the checked-out deployment bundle rather
-# than published to GHCR. Build it explicitly before the later --no-build up.
-docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" build \
-  whatsapp-bridge
+# The WhatsApp bridge and Caddy (with its layer4 plugin) are built from the
+# checked-out deployment bundle rather than published to GHCR. Build them
+# explicitly before the later --no-build up.
+jarvis_compose build \
+  whatsapp-bridge caddy
 
 # Start only migration prerequisites, then migrate with the new API image. A
 # failure exits here, before Compose is allowed to replace healthy app containers.
-docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" up \
+jarvis_compose up \
   -d --no-build --wait postgres
-docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" run \
+jarvis_compose run \
   --rm --no-deps jarvis-migrate
 
-docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" up \
+jarvis_compose up \
   -d --no-build --remove-orphans
 
 # Do not discard rollback images until the new API is healthy and the Temporal
@@ -84,7 +79,7 @@ docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" up \
 api_container=""
 api_healthy=false
 for attempt in $(seq 1 48); do
-  api_container="$(docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" ps -q jarvis-api | head -n1)"
+  api_container="$(jarvis_compose ps -q jarvis-api | head -n1)"
   if [[ -n "${api_container}" ]]; then
     api_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${api_container}" 2>/dev/null || true)"
     if [[ "${api_health}" == "healthy" ]]; then
@@ -120,7 +115,7 @@ docker exec "${api_container}" node -e '
 '
 
 for service in jarvis-worker; do
-  container_id="$(docker compose --env-file "${ENV_FILE}" "${compose_files[@]}" ps -q "${service}" | head -n1)"
+  container_id="$(jarvis_compose ps -q "${service}" | head -n1)"
   state=""
   if [[ -n "${container_id}" ]]; then
     state="$(docker inspect --format '{{.State.Status}}' "${container_id}" 2>/dev/null || true)"

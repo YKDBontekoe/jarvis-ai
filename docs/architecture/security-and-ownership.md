@@ -19,7 +19,7 @@ Production requires `Authentication:Issuer`, `Authentication:Audience`, and `Aut
 
 - **Integration credentials** (MCP tokens, OpenRouter key, channel secrets): stored encrypted via ASP.NET **Data Protection**; API lists provider/field names only.
 - **MCP per run**: credentials injected into stdio env or HTTP headers for that connection only; values **redacted** from tool results/errors before model context.
-- **Codex OAuth** (`auth.json` under `CODEX_HOME`): treated as host credential; mounted read/write in Compose for token refresh.
+- **Codex OAuth** (`auth.json` under `CODEX_HOME`): treated as host credential; mounted read/write in the production containers for token refresh.
 - **Audit log** (`GET /api/v1/audit`): action metadata only—no prompts, file bodies, or memory text.
 
 Configure `DataProtection:KeysDirectory` to a persistent `0700` directory in production.
@@ -27,7 +27,7 @@ Configure `DataProtection:KeysDirectory` to a persistent `0700` directory in pro
 ## Network and SSRF controls
 
 - **Condition watches** (public JSON): HTTPS only, no redirects to private IPs, JSON size cap, no local hostnames.
-- **Browser MCP** (optional Compose profile): isolated container, Squid egress deny private ranges, navigation tools approval-gated.
+- **Browser MCP** (optional `browser` feature): isolated container, Squid egress deny private ranges, navigation tools approval-gated.
 - **File uploads**: MIME/extension/signature allowlist, ClamAV scan **before** S3 put; fail closed if scanner unavailable.
 
 ## Approvals and risk
@@ -45,5 +45,5 @@ Set `Cors:AllowedOrigins` for Flutter web deployments (HTTPS or localhost). API 
 ## Related
 
 - [backend/integrations-and-mcp.md](../backend/integrations-and-mcp.md)
-- [operations/deployment-and-ci.md](../operations/deployment-and-ci.md) — production Compose topology
+- [operations/deployment-and-ci.md](../operations/deployment-and-ci.md) — production topology (generated from the AppHost)
 - Root [README.md](../../README.md) — operator security notes (audit, browser, Codex sandbox)

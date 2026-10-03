@@ -1,7 +1,6 @@
 // Calls the deployed Jarvis API and official SignalR client; no direct model APIs.
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
@@ -39,12 +38,10 @@ function save() {
   }, null, 2) + '\n');
 }
 function calls() {
+  // The fake MCP server (verification feature in the AppHost) appends each call to this file on the host.
+  const log = process.env.JARVIS_VERIFICATION_MCP_CALLS ?? '/tmp/jarvis-verification-mcp-calls.jsonl';
   try {
-    return execFileSync('docker', ['compose', '-p', 'jarvis-verification', '--profile', 'development',
-      '--env-file', 'artifacts/verification/deployment.env', '-f', 'infra/compose/docker-compose.yml',
-      '-f', 'tests/e2e/docker-compose.verification.yml', 'exec', '-T', 'jarvis-api',
-      'node', '-e', "try{process.stdout.write(require('fs').readFileSync('/tmp/jarvis-verification-mcp-calls.jsonl','utf8'))}catch{}"],
-      { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map(JSON.parse);
+    return readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
   } catch { return []; }
 }
 async function wait(path, predicate, seconds = 180) {

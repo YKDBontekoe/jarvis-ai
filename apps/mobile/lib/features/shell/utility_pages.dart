@@ -1,16 +1,16 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import '../../approvals_screen.dart';
-import '../../audit_screen.dart';
-import '../../condition_watches_screen.dart';
-import '../../daily_briefing_screen.dart';
-import '../../files_screen.dart';
-import '../../integrations_screen.dart';
-import '../../memory_screen.dart';
-import '../../automations_screen.dart';
-import '../../reminders_screen.dart';
-import '../../tasks_screen.dart';
+import '../approvals/approvals_screen.dart';
+import '../audit/audit_screen.dart';
+import '../watches/condition_watches_screen.dart';
+import '../briefing/daily_briefing_screen.dart';
+import '../files/files_screen.dart';
+import '../integrations/integrations_screen.dart';
+import '../memory/memory_screen.dart';
+import '../automations/automations_screen.dart';
+import '../reminders/reminders_screen.dart';
+import '../tasks/tasks_screen.dart';
 import '../agents/agents_screen.dart';
 import '../channels/channels_screen.dart';
 import '../coding/coding_runs_screen.dart';

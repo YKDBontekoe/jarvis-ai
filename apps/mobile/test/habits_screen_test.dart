@@ -4,7 +4,7 @@ import 'package:jarvis_mobile/features/habits/habit_detail_screen.dart';
 import 'package:jarvis_mobile/features/habits/habit_models.dart';
 import 'package:jarvis_mobile/features/habits/habits_home_card.dart';
 import 'package:jarvis_mobile/features/habits/habits_screen.dart';
-import 'package:jarvis_mobile/notification_routing.dart';
+import 'package:jarvis_mobile/features/notifications/notification_routing.dart';
 import 'package:jarvis_mobile/schedule_format.dart';
 
 import 'support/fixture_http.dart';

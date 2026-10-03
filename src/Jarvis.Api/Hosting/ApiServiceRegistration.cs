@@ -155,6 +155,7 @@ internal static class ApiServiceRegistration
             client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("jarvis", "1.0"));
         });
         services.AddSingleton<CodexInstallation>();
+        services.AddSingleton<CodexSignIn>();
         services.AddHttpClient("firebase-messaging", client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddHostedService<NotificationPushWorker>();
         services.AddHostedService<NotificationRealtimeWorker>();

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Jarvis.Api.Channels;
+using Jarvis.Api.Security;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Channels;
 using Jarvis.Application.Conversations;
@@ -216,7 +217,8 @@ internal static class ChannelEndpoints
                 !SecretComparer.FixedTimeEquals(expected, request.Query["hub.verify_token"].ToString()))
                 return Results.StatusCode(StatusCodes.Status403Forbidden);
             return Results.Text(request.Query["hub.challenge"].ToString(), "text/plain");
-        }).WithName("VerifyWhatsAppWebhook").AllowAnonymous();
+        }).WithName("VerifyWhatsAppWebhook").AllowAnonymous()
+            .RequireRateLimiting(ApiRateLimiting.PublicPolicy);
 
         channels.MapPost("/whatsapp/{key}/webhook", async (string key, HttpRequest request,
             IChannelRepository repository, IIntegrationCredentialStore credentials, CancellationToken ct) =>
@@ -237,7 +239,8 @@ internal static class ChannelEndpoints
                          connection.Account))
                 await repository.EnqueueInboundAsync(connection.Id, sender, text, externalId, ct);
             return Results.Ok();
-        }).WithName("ReceiveWhatsAppWebhook").AllowAnonymous().DisableAntiforgery();
+        }).WithName("ReceiveWhatsAppWebhook").AllowAnonymous().DisableAntiforgery()
+            .RequireRateLimiting(ApiRateLimiting.PublicPolicy);
 
         return api;
     }

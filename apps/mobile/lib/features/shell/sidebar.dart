@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../conversation_groups.dart';
+import '../conversations/conversation_groups.dart';
 import '../../theme.dart';
 import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';

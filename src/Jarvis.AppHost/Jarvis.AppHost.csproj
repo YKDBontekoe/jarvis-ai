@@ -2,11 +2,12 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsAspireHost>true</IsAspireHost>
-    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+    <NoWarn>$(NoWarn);ASPIRE010;ASPIRECOMPUTE001;ASPIREPIPELINES001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <PackageReference Include="Aspire.Hosting.Docker" />
     <ProjectReference Include="../Jarvis.Api/Jarvis.Api.csproj" />
     <ProjectReference Include="../../workers/Jarvis.Worker/Jarvis.Worker.csproj" />
   </ItemGroup>

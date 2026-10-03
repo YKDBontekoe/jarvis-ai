@@ -71,32 +71,17 @@ Development uses a fixed local owner ID when a request has no access token, so l
 
 ## Run locally
 
-Sign in to the Codex CLI with your ChatGPT account, then start the local dependencies and app:
+No configuration is needed. From the repository root:
 
 ```sh
-cp .env.example infra/compose/.env
-```
-
-Edit `infra/compose/.env` with strong local database and S3-compatible storage secrets. Confirm the Codex CLI session:
-
-```sh
-codex login status
-```
-
-For Aspire, run the API and local dependencies from the repository root:
-
-```sh
-set -a
-source infra/compose/.env
-set +a
 dotnet run --project src/Jarvis.AppHost
 ```
 
-Database migrations apply automatically in Development.
+Aspire starts PostgreSQL, Temporal, object storage, ClamAV, LiveKit, signal-cli, the WhatsApp bridge, the MCP runner, the API (`http://localhost:5082`) and the worker, with development secrets built in; database migrations apply automatically. If the Codex CLI on this machine is not signed in yet, the app's Home screen shows **Sign Jarvis in to ChatGPT** with a one-time code. To override a default (a LAN listen URL, a feature), copy `.env.example` to `infra/compose/.env`, edit it, and source it before running.
 
 ## Tests
 
-Pull requests targeting `main` run [`.github/workflows/ci.yml`](.github/workflows/ci.yml): .NET build and unit tests, PostgreSQL integration tests (Testcontainers), Python release/Compose/AltStore checks, Flutter analyze and widget tests, and API/worker container image builds. Require the **All checks passed** status in branch protection before merging.
+Pull requests targeting `main` run [`.github/workflows/ci.yml`](.github/workflows/ci.yml): .NET build and unit tests, PostgreSQL integration tests (Testcontainers), Python release/AltStore checks, the AppHost-generated production Compose checks, Flutter analyze and widget tests, and API/worker container image builds. Require the **All checks passed** status in branch protection before merging.
 
 Run deterministic unit tests with:
 
@@ -128,51 +113,28 @@ PostgreSQL integration tests use Testcontainers and the same pgvector PostgreSQL
 dotnet test tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj
 ```
 
-Aspire exposes the Temporal development UI at `http://localhost:8233`. To run the API, worker, PostgreSQL, and Temporal together in Docker Compose instead, set `CODEX_AUTH_FILE` in `.env` to the absolute path of the Codex CLI `auth.json` created by `codex login`, then use:
+Aspire exposes the Temporal development UI at `http://localhost:8233`. The AppHost (`src/Jarvis.AppHost`) is the only orchestration: there are no hand-written Compose files. Optional parts are switched on by name with `JARVIS_FEATURES` (or `--Jarvis:Features=`), the same names locally and in production:
 
 ```sh
-docker compose --profile development --env-file infra/compose/.env -f infra/compose/docker-compose.yml up -d
+JARVIS_FEATURES="github home-assistant browser" dotnet run --project src/Jarvis.AppHost
 ```
 
-To connect Home Assistant as well, set `HOME_ASSISTANT_MCP_URL` in the Compose env file and add the Home Assistant overlay:
+| Feature | Adds |
+|---------|------|
+| `github` | The official GitHub MCP server (locally it needs `github-mcp-server` on `PATH`; the API image bundles it) |
+| `home-assistant` | Home Assistant's MCP endpoint; set `HOME_ASSISTANT_MCP_URL` |
+| `browser` | Isolated Playwright MCP browser (production adds its filtering egress proxy) |
+| `coding` | Production only: the coding tool on a mounted checkout (`CODING_REPO_PATH`); Aspire already registers the current checkout |
+| `tunnel` | Production only: Caddy behind an existing host proxy or Cloudflare Tunnel |
+| `verification` | Local only: the fake Codex app server and fake MCP server used by the e2e scripts |
 
-```sh
-docker compose --profile development --env-file infra/compose/.env \
-  -f infra/compose/docker-compose.yml \
-  -f infra/compose/docker-compose.home-assistant.yml up -d
-```
+The API is available at `http://localhost:5082`; OpenAPI is at `/openapi/v1.json` in Development. Local development uses the Development identity bypass and binds to loopback by default; never expose it publicly.
 
-To enable GitHub in Compose, add its overlay and rebuild the API image so it includes the pinned official MCP server:
+Aspire starts `bbernhard/signal-cli-rest-api` and sets `Channels__Signal__BaseUrl` automatically. Link a Signal device from the app (Settings → WhatsApp & Signal → Connect → Signal, then scan the QR code); the REST port is bound to loopback as `http://127.0.0.1:8080` in development and stays unpublished in production. Set `SIGNAL_CLI_REST_URL` only when you already run signal-cli somewhere else.
 
-```sh
-docker compose --profile development --env-file infra/compose/.env \
-  -f infra/compose/docker-compose.yml \
-  -f infra/compose/docker-compose.github.yml up --build -d
-```
+File uploads are scanned by a private ClamAV daemon before object storage. Aspire persists its signature database and waits for ClamAV readiness; first startup may take several minutes while signatures download. Production must configure `Antivirus:Host` and keep the daemon private to the application network. Jarvis fails closed when the scanner is unavailable and rejects detected files before storage.
 
-To enable approval-gated coding tasks in Compose, mount a Git checkout and a writable worktree volume with the coding overlay. Set `CODING_REPO_PATH` to the host checkout (and optionally `CODING_REPO_NAME`):
-
-```sh
-CODING_REPO_PATH=/absolute/path/to/repo docker compose --profile development --env-file infra/compose/.env \
-  -f infra/compose/docker-compose.yml \
-  -f infra/compose/docker-compose.coding.yml up -d
-```
-
-The API is available at `http://localhost:5082`; OpenAPI is at `/openapi/v1.json` in Development. The API and Temporal worker mount the configured Codex CLI OAuth `auth.json` so their CLI subprocesses can authenticate. Treat that file as a credential; Compose writes refresh updates back to the host file. This Compose profile enables the Development identity bypass and binds the API to loopback by default. Do not use this profile as a production deployment. Aspire and Compose use the same local ports; run one orchestration option at a time.
-
-Aspire and the development Compose profile start `bbernhard/signal-cli-rest-api` and set `Channels__Signal__BaseUrl` automatically. Link a Signal device from the app (Settings → WhatsApp & Signal → Connect → Signal, then scan the QR code); the REST port is bound to loopback as `http://127.0.0.1:8080` in development and stays unpublished in production. Set `SIGNAL_CLI_REST_URL` only when you already run signal-cli somewhere else.
-
-File uploads are scanned by a private ClamAV daemon before object storage. The development orchestrators persist its signature database and wait for ClamAV readiness; first startup may take several minutes while signatures download. Production must configure `Antivirus:Host` and keep the daemon private to the application network. Jarvis fails closed when the scanner is unavailable and rejects detected files before storage.
-
-To include the isolated Playwright MCP browser in local development, enable its opt-in profile and Compose override:
-
-```sh
-docker compose --profile development --profile browser --env-file infra/compose/.env \
-  -f infra/compose/docker-compose.yml \
-  -f infra/compose/docker-compose.browser.yml up -d
-```
-
-Voice uses Flutter LiveKit rooms and an in-process C# runtime in the API. The API checks conversation ownership, asks the installed Codex CLI for its voice-mode voices (`thread/realtime/listVoices`), joins the LiveKit room itself, and starts Codex realtime with the owner's saved voice or that CLI's own default. It returns a ten-minute room JWT plus the owner's hands-free and caption preferences. The runtime bridges room PCM audio to Codex CLI's realtime voice session over WebRTC and publishes the returned audio directly back into the LiveKit room. Codex answers in that realtime session and calls the same Jarvis tools and memory as chat through a C# MCP host (`SearchMemory`, reminders, MCP servers, and the rest), including live Codex web search for current facts. Approval-gated tools still ask in the Jarvis app. The runtime posts live caption deltas, persists final utterances on the conversation, and keeps the mounted Codex CLI OAuth session; it does not use a model-provider API key. Set `VOICE_WORKER_SECRET` in `.env` to a unique random value before running Compose. Hands-free listening, captions, and the CLI voice list are under Settings → Voice. The realtime app-server protocol is experimental and must stay version-aligned with the pinned Codex CLI; audio behavior still needs validation with a signed-in account and a physical device.
+Voice uses Flutter LiveKit rooms and an in-process C# runtime in the API. The API checks conversation ownership, asks the installed Codex CLI for its voice-mode voices (`thread/realtime/listVoices`), joins the LiveKit room itself, and starts Codex realtime with the owner's saved voice or that CLI's own default. It returns a ten-minute room JWT plus the owner's hands-free and caption preferences. The runtime bridges room PCM audio to Codex CLI's realtime voice session over WebRTC and publishes the returned audio directly back into the LiveKit room. Codex answers in that realtime session and calls the same Jarvis tools and memory as chat through a C# MCP host (`SearchMemory`, reminders, MCP servers, and the rest), including live Codex web search for current facts. Approval-gated tools still ask in the Jarvis app. The runtime posts live caption deltas, persists final utterances on the conversation, and keeps the mounted Codex CLI OAuth session; it does not use a model-provider API key. Set `VOICE_WORKER_SECRET` in `.env` to a unique random value outside local development. Hands-free listening, captions, and the CLI voice list are under Settings → Voice. The realtime app-server protocol is experimental and must stay version-aligned with the pinned Codex CLI; audio behavior still needs validation with a signed-in account and a physical device.
 
 The audit log is available from the mobile app's Audit log action and `GET /api/v1/audit`. It stores action names, risk classes, outcomes, owner IDs, and limited resource metadata; it does not store prompts, file contents, or memory contents. The application rejects update and delete operations on audit events.
 
@@ -180,7 +142,7 @@ Integration credentials can be managed from the Flutter Integrations screen or t
 
 The browser container has no published host port, runs without the Docker socket, has resource limits, and lives on an internal Docker network. Chromium uses a dedicated Squid egress proxy; the proxy blocks loopback, private, link-local, multicast, and reserved IP ranges plus local-only hostnames, including on redirects. Browser navigation and interaction tools require approval; page snapshots, searches, screenshots, and console reads are allowlisted as read-only. Chat can start an isolated session with `BrowseTheWeb`; the app shows each Playwright step on a timeline. This opt-in development configuration is for the single local Development identity. Browser profiles and sessions still need per-user isolation before enabling the browser in a multi-user deployment.
 
-Aspire registers the current Git checkout as the `jarvis` coding repository. When Jarvis proposes a coding task, the user must approve it; Codex then edits a fresh detached worktree outside the primary checkout using its workspace-write sandbox. For repositories without a commit, or with tracked credential-like files, it creates a separate Git snapshot from nonignored files while filtering common credential paths. Changes stay uncommitted and the tool returns the workspace path and diff summary for review. Settings → Coding runs lists recent runs. Docker Compose does not expose a coding repository unless you include `infra/compose/docker-compose.coding.yml` with `CODING_REPO_PATH` and a writable worktree volume.
+Aspire registers the current Git checkout as the `jarvis` coding repository. When Jarvis proposes a coding task, the user must approve it; Codex then edits a fresh detached worktree outside the primary checkout using its workspace-write sandbox. For repositories without a commit, or with tracked credential-like files, it creates a separate Git snapshot from nonignored files while filtering common credential paths. Changes stay uncommitted and the tool returns the workspace path and diff summary for review. Settings → Coding runs lists recent runs. Production exposes a coding repository only with the `coding` feature, which mounts `CODING_REPO_PATH` and a writable worktree volume.
 
 PDF, text, Markdown, CSV, JSON, JPEG, PNG, and WebP uploads are indexed asynchronously by the Temporal worker. Image text is extracted with the same signed-in Codex CLI app-server and ChatGPT OAuth model path used for chat (up to 8 MiB per image). Jarvis can search extracted text when answering chat requests; document contents remain untrusted input and are not promoted into system instructions. Images without legible text finish indexing as `ready` with no text chunks. The files screen shows `queued`, `processing`, `ready`, or `failed` for indexable files.
 
@@ -190,32 +152,26 @@ The daily morning briefing can be enabled and configured from the Jarvis menu or
 
 The bundled Temporal server uses its development mode and SQLite persistence. A production deployment needs a supported Temporal server deployment with durable production storage, TLS/authentication, and operational monitoring. The API and worker use `Temporal__Address` (default `localhost:7233`).
 
-## Production Compose
+## Production deployment
 
-`infra/compose/docker-compose.production.yml` is a separate production topology. It runs Jarvis behind Caddy with persistent PostgreSQL, a PostgreSQL-backed Temporal server, private Garage S3-compatible storage, ClamAV, LiveKit, a private signal-cli REST API, and the Jarvis API/workers. Only Caddy's HTTP/HTTPS ports and LiveKit's required media ports are published; Postgres, Temporal, Garage, ClamAV, and signal-cli remain on private Docker networks.
+The production stack is defined in the AppHost (`src/Jarvis.AppHost/ProductionDeployment.cs`) and published as a Docker Compose file; Docker Compose only runs what Aspire generated, and the file is never edited by hand. It runs Jarvis behind Caddy with persistent PostgreSQL, a PostgreSQL-backed Temporal server, private Garage S3-compatible storage, ClamAV, LiveKit, a private signal-cli REST API, the MCP runner, nightly backups, and the Jarvis API/workers. Only Caddy's HTTP/HTTPS ports and LiveKit's required media ports are published; Postgres, Temporal, Garage, ClamAV, and signal-cli remain on private Docker networks.
 
-Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, set its mode to `0600`, and replace every placeholder. Set `JARVIS_UID`/`JARVIS_GID` to the account that owns `CODEX_HOME_DIR`, configure the account issuer, audience, signing key, and DNS names, and sign the Codex CLI in with ChatGPT OAuth using `CODEX_HOME="$CODEX_HOME_DIR" codex login`. Use a dedicated persistent directory for `CODEX_HOME_DIR`, owned by that numeric account with mode `0700`; it stores `auth.json`, writable Codex app-server state, and Settings-driven CLI updates under `cli/`. Those updates survive container recreation because the containers' root filesystems are read-only. The API and Temporal worker mount this directory and run as that unprivileged user. Development Compose shares the same `cli/` directory through the `codex-cli` volume.
+There is nothing to configure by hand. Every deploy runs `scripts/deploy/prepare-host.sh` first, which creates `infra/compose/.env.production` (mode `0600`) and fills in everything Jarvis manages: database, storage, account, LiveKit, voice and MCP runner secrets; the service account ids; the Codex home, key ring and backup directories under `JARVIS_DATA_DIR` (default `~/jarvis-data`, mode `0700`); and a single-node Garage config. The only input is the public hostname, `JARVIS_DOMAIN`. Values already in the file are never changed, so an existing server keeps its passwords and paths. Voice uses the same hostname: LiveKit signaling is served under `/rtc`, so one DNS record is enough (a separate `LIVEKIT_DOMAIN` still works).
 
-With DNS for `JARVIS_DOMAIN` and `LIVEKIT_DOMAIN` pointing at the host, start the stack with:
+After the first deploy, open Jarvis and use **Sign Jarvis in to ChatGPT** on the Home screen (also in Settings → Models). It shows a one-time code for ChatGPT's device sign-in, so nobody needs a shell on the server. It is only offered while the server is signed out.
 
-```sh
-docker compose --env-file infra/compose/.env.production \
-  -f infra/compose/docker-compose.production.yml up --build -d
-```
-
-`--build` compiles the API and Temporal worker on the host. After the GitHub Actions deploy pipeline is configured, prefer pulling the prebuilt GHCR images instead:
+To deploy by hand on the server:
 
 ```sh
+export JARVIS_DOMAIN=jarvis.example.org
 export JARVIS_API_IMAGE=ghcr.io/<owner>/jarvis-ai/api:<sha>
 export JARVIS_WORKER_IMAGE=ghcr.io/<owner>/jarvis-ai/worker:<sha>
-scripts/deploy/remote-up.sh
+JARVIS_FEATURES="github" scripts/deploy/remote-up.sh
 ```
 
-Add `-f infra/compose/docker-compose.home-assistant.yml` to that command and set `HOME_ASSISTANT_MCP_URL` in the production env file to enable Home Assistant.
+`remote-up.sh` prepares the host, publishes the AppHost into `artifacts/compose/docker-compose.yaml` (with a local .NET 10 SDK, or the pinned SDK container so the server needs only Docker), then pulls, migrates, and replaces containers. Features are listed under [Run locally](#run-locally) and in [docs/operations/deployment-and-ci.md](docs/operations/deployment-and-ci.md); `DEPLOY_COMPOSE_FILES` from older setups is mapped to them. Backups are on by default; see [docs/operations/backup-and-restore.md](docs/operations/backup-and-restore.md) for encryption and off-host copies.
 
-Add `-f infra/compose/docker-compose.github.yml` to enable GitHub. Host builds still need `--build` so the API image includes the pinned MCP server; GHCR images already include it.
-
-Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit media, plus outbound HTTPS for Codex OAuth/model access, Firebase FCM/OAuth, user-configured public condition-watch endpoints, Caddy certificate issuance, ClamAV signature updates, and GHCR pulls. The deployment script applies EF migrations after Postgres is healthy and before updating application containers. Temporal owns a separate persistent Postgres database. Garage creates the private `jarvis-files` bucket and its application access key before the API starts. Keep the Compose environment file, Garage config, and Codex OAuth file private, and pin every third-party container image to an audited release or digest before deploying. This production topology has been configuration-validated; live service startup still requires pulling its container images and setting real account signing keys, DNS, Firebase, APNs, and Codex OAuth credentials.
+Allow inbound TCP 80 and 443 plus UDP 443; nothing else is published. Caddy owns TCP 80/443, LiveKit voice media uses UDP 443 directly and falls back to TCP 443 through Caddy (with the `tunnel` feature, where another proxy owns 443, LiveKit media needs TCP 7881 and UDP 50000-50100 instead). Also allow outbound HTTPS for Codex OAuth/model access, Firebase FCM/OAuth, user-configured public condition-watch endpoints, Caddy certificate issuance, ClamAV signature updates, NuGet (for publishing the AppHost), the MCP registry and npm/PyPI (for connectors), and GHCR pulls. The deployment script applies EF migrations after Postgres is healthy and before updating application containers. Keep the environment file private, and pin every third-party container image to an audited release or digest before deploying.
 
 ## GitHub Actions pipelines
 
@@ -249,17 +205,16 @@ The self-hosted runner serves `/home/ykdbonte/.jarvis/altstore` through the host
 
 [`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) builds `api` and `worker`, pushes them to `ghcr.io/<owner>/jarvis-ai/<name>:<git-sha>` (plus the version tag and `latest` on `v*` tags). A `v*` tag builds those images from the Release workflow and deploys them only after **Approve release**. A manual run of this workflow can still deploy on its own production approval. Garage uses its pinned upstream image. The workflow does not run on every commit to `main`.
 
-Server bootstrap:
+Server setup:
 
-1. Clone this repository to a persistent path such as `/opt/jarvis`.
-2. Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, mode `0600`, and fill in real secrets. Set `GARAGE_CONFIG_FILE` to the private Garage config file path. The deploy job supplies the API and worker image names and commit tag.
-3. Install Docker with the Compose plugin. The deploy workflow transfers the checked-out source to the self-hosted runner as a short-lived Git bundle, so the server does not need GitHub repository access. GHCR pulls use the workflow's short-lived `GITHUB_TOKEN`.
-4. Add repository secret `DEPLOY_PATH` for the production checkout path on the server.
-5. Register a persistent Linux x64 self-hosted runner on the production server with the `jarvis-deploy` label. Run it as the account that owns the checkout and production env file, with Docker and Compose access. The build jobs stay on GitHub-hosted runners; only the deploy job runs on the server.
-6. Set repository variable `DEPLOY_COMPOSE_FILES` to `infra/compose/docker-compose.production.tunnel.yml` when using a host-level reverse proxy or Cloudflare Tunnel instead of the bundled public Caddy edge. Optional overlays can be space-separated after it, for example `infra/compose/docker-compose.github.yml infra/compose/docker-compose.home-assistant.yml`.
-7. In GitHub → Packages, link the two application container packages to this repository so `GITHUB_TOKEN` can push and the deploy job can pull. Keep packages private if the repo is private; the runner logs into GHCR with a short-lived token. For later manual pulls, `docker login ghcr.io` on the host with a PAT that has `read:packages`.
+1. Point DNS for your hostname at the server and install Docker with the Compose plugin.
+2. Register a persistent Linux x64 self-hosted runner on the server with the `jarvis-deploy` label, running as the account that should own Jarvis's data, with Docker access. The deploy workflow transfers the source as a short-lived Git bundle and pulls images with the workflow's `GITHUB_TOKEN`, so the server needs no GitHub credentials.
+3. Set repository variable `JARVIS_DOMAIN` to the hostname. Optionally set `JARVIS_FEATURES` (for example `github` or `tunnel` behind a host-level reverse proxy or Cloudflare Tunnel) and secret `DEPLOY_PATH` (default `~/jarvis`).
+4. Run the Release workflow (or merge a release PR) and approve the deploy. Then sign in to ChatGPT from the Home screen.
 
-`workflow_dispatch` accepts `skip_deploy` to build/push images without deploying, and an optional extra `image_tag`. Production secrets stay in `.env.production` on the server and are never passed through GitHub Actions. `python3 -m unittest tests/unit/compose/test_production_images.py` checks that Compose interpolates the GHCR image variables.
+In GitHub → Packages, the two application container packages must be linked to this repository so `GITHUB_TOKEN` can push and the deploy job can pull; keep them private if the repo is private.
+
+`workflow_dispatch` accepts `skip_deploy` to build/push images without deploying, and an optional extra `image_tag`. Production secrets stay in `.env.production` on the server and are never passed through GitHub Actions. `python3 -m unittest tests/unit/compose/test_production_compose.py` publishes the AppHost and checks the generated stack (images, isolation, features); CI runs it in the backend job.
 
 Production deployment runs `dotnet Jarvis.Api.dll migrate` as a one-shot task before
 replacing the API or worker containers. The task logs the target EF migration, uses a
@@ -278,9 +233,9 @@ MCP tools are disabled unless configured. Set `Mcp__Servers__0__Name`, `Mcp__Ser
 
 Jarvis can manage MCP servers in conversation. `list_host_mcp_servers` lists operator-installed host servers such as GitHub with their credential provider slug and configured allowlists before a token is stored. `list_mcp_servers` and `list_mcp_connections` show registered servers and the tools connected for this turn, including host servers. `discover_mcp_server_tools` returns tool names, descriptions, required arguments, prompts, and resources for a public HTTPS endpoint, or for a registered or host server id when credentials are available; host servers without a token still return their configured allowlist and Integrations provider slug. `add_mcp_server` registers public HTTPS servers and can omit `allowedTools` to register every tool name discovered from the endpoint (up to 80). `add_mcp_stdio_server` downloads and registers owner-scoped stdio servers through `npx -y` or `uvx`. `update_mcp_server`, `set_mcp_server_enabled`, `set_mcp_server_tools`, and `remove_mcp_server` change that registration. Add, update, enable, tool changes, and remove require approval. An allowlist is 1 to 80 exact tool names, or `*` for every tool the server exposes. The agent can also narrow or pause a host server such as GitHub, but it cannot enable tools the operator left out of that server's configuration. `invoke_mcp_tool`, `read_mcp_resource`, and `get_mcp_prompt` use an enabled server during the current turn; direct tools from a new or changed server appear on the next turn. Every one of those calls requires approval. After adding a remote server, store its optional bearer token in Integrations using the returned `jarvis-mcp-…` provider ID and the secret name `token`. Server definitions, host-server pauses, and credentials are encrypted in the owner-scoped integration credential store. The Integrations screen can pause a server, start an in-app OAuth session (`POST /api/v1/integrations/oauth/sessions` plus the anonymous `/api/v1/integrations/oauth/callback`), and install guided calendar/mail/contacts packs (`GET/POST /api/v1/integrations/packs`). Calendar packs can store a first-party ICS URL without adding an MCP server. `GET/POST/PUT/DELETE /api/v1/mcp-servers` plus `PUT /api/v1/mcp-servers/{id}/state` and `PUT /api/v1/mcp-controls/{name}` expose the same controls outside chat.
 
-Home Assistant's first-party MCP Server integration is supported over its Streamable HTTP `/api/mcp` endpoint. Enable the integration in Home Assistant and expose only the entities Jarvis may access. Set `HOME_ASSISTANT_MCP_URL` to its HTTPS `/api/mcp` URL, then include `infra/compose/docker-compose.home-assistant.yml` when starting either development or production Compose. In Jarvis → Integrations, use **Set or rotate token** and paste a Home Assistant long-lived access token; Jarvis stores it under `home-assistant` → `token`, encrypted, and adds the `Bearer` scheme only when connecting. The Compose overlay allowlists the Home Assistant server's exposed tools; Jarvis requires approval for every call by default. Use HTTPS because the per-owner token is sent in an Authorization header. See the [Home Assistant MCP Server setup](https://www.home-assistant.io/integrations/mcp_server) for enabling the server and exposing entities.
+Home Assistant's first-party MCP Server integration is supported over its Streamable HTTP `/api/mcp` endpoint. Enable the integration in Home Assistant and expose only the entities Jarvis may access. Set `HOME_ASSISTANT_MCP_URL` to its HTTPS `/api/mcp` URL, then turn on the `home-assistant` feature (`JARVIS_FEATURES`) locally or in production. In Jarvis → Integrations, use **Set or rotate token** and paste a Home Assistant long-lived access token; Jarvis stores it under `home-assistant` → `token`, encrypted, and adds the `Bearer` scheme only when connecting. The feature allowlists the Home Assistant server's exposed tools; Jarvis requires approval for every call by default. Use HTTPS because the per-owner token is sent in an Authorization header. See the [Home Assistant MCP Server setup](https://www.home-assistant.io/integrations/mcp_server) for enabling the server and exposing entities.
 
-GitHub uses the [official GitHub MCP server](https://github.com/github/github-mcp-server), pinned to v1.12.2 and built into the API container. The Compose overlay launches it over stdio with only its repository, issue, and pull request toolsets enabled. Store a least-privilege GitHub personal access token in Jarvis → Integrations under `github` → `token`; it is injected into that server process for the signed-in owner only. All exposed GitHub tools require approval. Model inference stays on Codex unless the owner selects OpenRouter in Settings → Models.
+GitHub uses the [official GitHub MCP server](https://github.com/github/github-mcp-server), pinned to v1.12.2 and built into the API container. The `github` feature launches it over stdio with only its repository, issue, and pull request toolsets enabled. Store a least-privilege GitHub personal access token in Jarvis → Integrations under `github` → `token`; it is injected into that server process for the signed-in owner only. All exposed GitHub tools require approval. Model inference stays on Codex unless the owner selects OpenRouter in Settings → Models.
 
 The Flutter default API URL is `http://localhost:5082`. On Android emulators use `--dart-define=JARVIS_API_URL=http://10.0.2.2:5082`. On a physical device, point the API URL at the machine's reachable address and configure the Compose port bindings and firewall for the device. The app expects the API host to be reachable and joins `/hubs/events` for incremental response updates.
 
@@ -309,21 +264,23 @@ Important settings are in `src/Jarvis.Api/appsettings.json` and may be overridde
 - `Authentication__SigningKey`: required outside Development; at least 32 random bytes. Do not reuse the Development key.
 - `Authentication__AllowRegistration`: allow `POST /api/v1/auth/register` (default `true`). Set `false` after the owner account exists.
 - `Authentication__AccessTokenMinutes` and `Authentication__RefreshTokenDays`: token lifetimes (defaults 15 minutes and 30 days).
+- `RateLimiting__AuthPermitsPerMinute` and `RateLimiting__PublicPermitsPerMinute`: per-client-IP limits for sign-in and OAuth callbacks (default 10) and for Agent2Agent and WhatsApp webhooks (default 120). Over the limit returns 429 with `Retry-After`.
+- `ReverseProxy__TrustForwardedHeaders`: take the client IP from the last `X-Forwarded-For` hop (default false). The production deployment sets it because the API is only reachable through Caddy.
 - `OTEL_EXPORTER_OTLP_ENDPOINT`: OpenTelemetry collector or Aspire Dashboard endpoint.
 - `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, and `SENTRY_RELEASE`: Sentry project for the API, worker, migrations, and WhatsApp bridge. Production already points at that project; set `SENTRY_DSN` only to replace it. Development does not send events. `Sentry__RecordAiContent` defaults to false. Release builds of the app report to the mobile project; override the DSN with `JARVIS_SENTRY_DSN`.
 - `Mcp__Servers__0__Name`, `Mcp__Servers__0__Transport`, `Mcp__Servers__0__Command`, `Mcp__Servers__0__Endpoint`, `Mcp__Servers__0__AllowedTools__0`, and `Mcp__Servers__0__AutoApprovedTools__0`: optional MCP server settings. Supported transports are `stdio` and `streamableHttp`. Only explicitly allowlisted tools reach the agent; tools require approval unless named in `AutoApprovedTools`.
 - `Mcp__Servers__0__CredentialProvider`, `Mcp__Servers__0__CredentialEnvironmentVariables__TOKEN`, and `Mcp__Servers__0__CredentialHeaders__Authorization`: map encrypted owner-scoped integration secrets to an MCP server's process environment or HTTPS headers. Credential map values name secret fields in `PUT /api/v1/integrations/{provider}/credentials`.
 - `Mcp__Servers__0__CredentialHeaderPrefixes__Authorization`: optional validated prefix (for example, `Bearer`) added to an encrypted credential when constructing an MCP HTTP header. Secret values and the constructed header are both redacted from tool results.
 - `Temporal__Address`: Temporal frontend address used by the API and reminder worker.
-- `LiveKit__ApiKey`, `LiveKit__ApiSecret`, `LiveKit__InternalUrl`, and `LiveKit__PublicUrl`: in-process voice runtime and short-lived mobile room token settings. Local development uses the configured `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` (the secret must contain at least 32 UTF-8 bytes); set Compose bind addresses and the public URL to the machine's LAN address when connecting from a physical device.
+- `LiveKit__ApiKey`, `LiveKit__ApiSecret`, `LiveKit__InternalUrl`, and `LiveKit__PublicUrl`: in-process voice runtime and short-lived mobile room token settings. Local development uses the configured `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` (the secret must contain at least 32 UTF-8 bytes); set the Aspire listen URL and the public URL to the machine's LAN address when connecting from a physical device.
 - `Voice__WorkerSecret`: shared secret the in-process voice MCP child uses for tool callbacks. Configure it from a secret store outside local development.
 - `Channels__PublicBaseUrl` or `Jarvis__PublicBaseUrl`: public origin used in WhatsApp webhook URLs and the Agent2Agent card (`https://jarvis.example.com`). When unset, the API uses the incoming request host.
-- `Channels__WhatsAppBridge__BaseUrl` / `Channels__WhatsAppBridge__Token`: the Baileys WhatsApp bridge (`workers/whatsapp-bridge`). Aspire and Compose build and start it automatically (`http://whatsapp-bridge:3000` inside Compose, session data in the `whatsapp-bridge-data` volume); set `WHATSAPP_BRIDGE_URL` only when it runs elsewhere and `WHATSAPP_BRIDGE_TOKEN` to require a bearer token. It is never published outside the Docker network. Link WhatsApp from the app: Settings → WhatsApp & Signal → Connect → WhatsApp, then scan the code under WhatsApp → Linked devices. This uses the unofficial WhatsApp Web protocol, so use it with your own account and expect the occasional re-link.
-- `Channels__Signal__BaseUrl`: signal-cli REST endpoint. Aspire and Compose default this to the bundled `bbernhard/signal-cli-rest-api` service (`http://127.0.0.1:8080` on the host, `http://signal-cli:8080` inside Compose). Override with `SIGNAL_CLI_REST_URL` only when signal-cli runs elsewhere. Leave the override empty to keep the bundled service.
+- `Channels__WhatsAppBridge__BaseUrl` / `Channels__WhatsAppBridge__Token`: the Baileys WhatsApp bridge (`workers/whatsapp-bridge`). Aspire and the production deployment build and start it automatically (`http://whatsapp-bridge:3000` inside Compose, session data in the `whatsapp-bridge-data` volume); set `WHATSAPP_BRIDGE_URL` only when it runs elsewhere and `WHATSAPP_BRIDGE_TOKEN` to require a bearer token. It is never published outside the Docker network. Link WhatsApp from the app: Settings → WhatsApp & Signal → Connect → WhatsApp, then scan the code under WhatsApp → Linked devices. This uses the unofficial WhatsApp Web protocol, so use it with your own account and expect the occasional re-link.
+- `Channels__Signal__BaseUrl`: signal-cli REST endpoint. Aspire and the production deployment default this to the bundled `bbernhard/signal-cli-rest-api` service (`http://127.0.0.1:8080` on the host, `http://signal-cli:8080` inside Compose). Override with `SIGNAL_CLI_REST_URL` only when signal-cli runs elsewhere. Leave the override empty to keep the bundled service.
 - `Channels__WhatsApp__GraphBaseUrl`: WhatsApp Cloud API origin (default `https://graph.facebook.com/v21.0`).
 - `Push__FirebaseProjectId` and `Push__GoogleServiceAccountFile`: enable the API's durable FCM sender (which relays iOS pushes through Firebase/APNs); keep the service-account file outside the repository and mount it read-only.
 - `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_PUBLIC_URL`, and `VOICE_WORKER_SECRET`: LiveKit and in-process voice runtime settings. Model inference is through the Codex CLI app-server only unless the owner selected OpenRouter for chat.
-- `JARVIS_BIND_ADDRESS`, `JARVIS_LISTEN_URL`, `LIVEKIT_BIND_ADDRESS`, and `LIVEKIT_PUBLIC_URL`: local device reachability. They default to loopback (`JARVIS_LISTEN_URL=http://localhost:5082` for Aspire). For a physical device, set Compose bind addresses or the Aspire listen URL to the machine's LAN interface, and set `LIVEKIT_PUBLIC_URL=ws://<machine-lan-address>:7880`. Local development uses the configured `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` (the secret must contain at least 32 UTF-8 bytes).
+- `JARVIS_LISTEN_URL`, `LIVEKIT_BIND_ADDRESS` (production LiveKit media), and `LIVEKIT_PUBLIC_URL`: device reachability. They default to loopback (`JARVIS_LISTEN_URL=http://localhost:5082` for Aspire). For a physical device, set the Aspire listen URL to the machine's LAN interface, and set `LIVEKIT_PUBLIC_URL=ws://<machine-lan-address>:7880`. Local development uses the configured `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` (the secret must contain at least 32 UTF-8 bytes).
 - `ObjectStorage__ServiceUrl`, `ObjectStorage__AccessKey`, `ObjectStorage__SecretKey`, `ObjectStorage__Bucket`, and `ObjectStorage__Region`: S3-compatible object storage. Local Aspire uses SeaweedFS; production should point to a supported S3-compatible service and provision a private bucket with least-privilege credentials.
 - `Antivirus__Host`, `Antivirus__Port`, and `Antivirus__TimeoutSeconds`: private ClamAV daemon endpoint and upload scan timeout. The port defaults to `3310`; timeout defaults to 60 seconds.
 

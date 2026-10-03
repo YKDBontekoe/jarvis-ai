@@ -30,7 +30,9 @@ public sealed class SelfFixTests
     [InlineData("src/Jarvis.Api/Program.cs")]
     [InlineData("src/Jarvis.Infrastructure/Persistence/Migrations/2026_Add.cs")]
     [InlineData("src/Jarvis.Mcp/McpToolHost.cs")]
-    [InlineData("infra/compose/docker-compose.yml")]
+    [InlineData("infra/compose/Dockerfile")]
+    [InlineData("src/Jarvis.AppHost/ProductionDeployment.cs")]
+    [InlineData("scripts/deploy/remote-up.sh")]
     public void Security_sensitive_paths_are_flagged_for_review(string path) =>
         Assert.True(CodingPathPolicy.IsProtected(path));
 
