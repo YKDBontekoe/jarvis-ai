@@ -24,7 +24,13 @@ the same features (`scripts/deploy/compose-env.sh`).
 - **ClamAV**, **LiveKit**, private **signal-cli** and **whatsapp-bridge** (built on the host from `workers/whatsapp-bridge`)
 - Only edge/media ports published; databases stay on private networks
 
-Env template: `infra/compose/.env.production.example` → `.env.production` (mode `0600`).
+No hand configuration: `scripts/deploy/prepare-host.sh` runs first on every deploy. It copies
+`infra/compose/.env.production.example` to `.env.production` (mode `0600`) when missing and fills every empty managed
+value (secrets, uid/gid, data directories under `JARVIS_DATA_DIR`, a Garage config, values derived from
+`JARVIS_DOMAIN`). It never changes an existing value, and keeps a template placeholder for a database password or
+storage key when its data volume already exists. `JARVIS_DOMAIN` is the only input (repository variable for
+deploys). Caddy serves LiveKit signaling under `/rtc` on that host, so one DNS record is enough. ChatGPT sign-in for
+the server's Codex CLI happens in the app (`/api/v1/settings/models/codex/sign-in`, device code).
 
 Bootstrap and deploy scripts: `scripts/deploy/remote-up.sh` (generate, pull, migrate, replace, health-check), `scripts/deploy/publish-compose.sh`, `scripts/deploy/compose-env.sh`.
 
@@ -134,7 +140,7 @@ web server against a separate local API, continue passing
 ## Production checklist (high level)
 
 1. Set `Authentication:*` and `DataProtection:KeysDirectory`
-2. `CODEX_HOME` with `codex login` on deploy user
+2. Sign the server in to ChatGPT from the app after the first deploy
 3. Firebase/APNs for push (optional)
 4. Pin container image digests
 5. Disable `Authentication:AllowRegistration` after bootstrap

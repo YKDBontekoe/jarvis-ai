@@ -71,28 +71,13 @@ Development uses a fixed local owner ID when a request has no access token, so l
 
 ## Run locally
 
-Sign in to the Codex CLI with your ChatGPT account, then start the local dependencies and app:
+No configuration is needed. From the repository root:
 
 ```sh
-cp .env.example infra/compose/.env
-```
-
-Edit `infra/compose/.env` with strong local database and S3-compatible storage secrets. Confirm the Codex CLI session:
-
-```sh
-codex login status
-```
-
-For Aspire, run the API and local dependencies from the repository root:
-
-```sh
-set -a
-source infra/compose/.env
-set +a
 dotnet run --project src/Jarvis.AppHost
 ```
 
-Database migrations apply automatically in Development.
+Aspire starts PostgreSQL, Temporal, object storage, ClamAV, LiveKit, signal-cli, the WhatsApp bridge, the MCP runner, the API (`http://localhost:5082`) and the worker, with development secrets built in; database migrations apply automatically. If the Codex CLI on this machine is not signed in yet, the app's Home screen shows **Sign Jarvis in to ChatGPT** with a one-time code. To override a default (a LAN listen URL, a feature), copy `.env.example` to `infra/compose/.env`, edit it, and source it before running.
 
 ## Tests
 
@@ -171,21 +156,22 @@ The bundled Temporal server uses its development mode and SQLite persistence. A 
 
 The production stack is defined in the AppHost (`src/Jarvis.AppHost/ProductionDeployment.cs`) and published as a Docker Compose file; Docker Compose only runs what Aspire generated, and the file is never edited by hand. It runs Jarvis behind Caddy with persistent PostgreSQL, a PostgreSQL-backed Temporal server, private Garage S3-compatible storage, ClamAV, LiveKit, a private signal-cli REST API, the MCP runner, nightly backups, and the Jarvis API/workers. Only Caddy's HTTP/HTTPS ports and LiveKit's required media ports are published; Postgres, Temporal, Garage, ClamAV, and signal-cli remain on private Docker networks.
 
-Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, set its mode to `0600`, and replace every placeholder. Set `JARVIS_UID`/`JARVIS_GID` to the account that owns `CODEX_HOME_DIR`, configure the account issuer, audience, signing key, and DNS names, and sign the Codex CLI in with ChatGPT OAuth using `CODEX_HOME="$CODEX_HOME_DIR" codex login`. Use a dedicated persistent directory for `CODEX_HOME_DIR`, owned by that numeric account with mode `0700`; it stores `auth.json`, writable Codex app-server state, and Settings-driven CLI updates under `cli/`. Those updates survive container recreation because the containers' root filesystems are read-only. The API and Temporal worker mount this directory and run as that unprivileged user. Host directories in the env file must exist before deploying; Compose no longer creates missing ones as root.
+There is nothing to configure by hand. Every deploy runs `scripts/deploy/prepare-host.sh` first, which creates `infra/compose/.env.production` (mode `0600`) and fills in everything Jarvis manages: database, storage, account, LiveKit, voice and MCP runner secrets; the service account ids; the Codex home, key ring and backup directories under `JARVIS_DATA_DIR` (default `~/jarvis-data`, mode `0700`); and a single-node Garage config. The only input is the public hostname, `JARVIS_DOMAIN`. Values already in the file are never changed, so an existing server keeps its passwords and paths. Voice uses the same hostname: LiveKit signaling is served under `/rtc`, so one DNS record is enough (a separate `LIVEKIT_DOMAIN` still works).
 
-Create `JARVIS_BACKUP_DIR` owned by that same account (mode `0700`). The `backup` service writes a nightly database and key ring backup there; see [docs/operations/backup-and-restore.md](docs/operations/backup-and-restore.md) for encryption, off-host copies, and `scripts/backup/restore.sh`.
+After the first deploy, open Jarvis and use **Sign Jarvis in to ChatGPT** on the Home screen (also in Settings → Models). It shows a one-time code for ChatGPT's device sign-in, so nobody needs a shell on the server. It is only offered while the server is signed out.
 
-With DNS for `JARVIS_DOMAIN` and `LIVEKIT_DOMAIN` pointing at the host, deploy with the GHCR images:
+To deploy by hand on the server:
 
 ```sh
+export JARVIS_DOMAIN=jarvis.example.org
 export JARVIS_API_IMAGE=ghcr.io/<owner>/jarvis-ai/api:<sha>
 export JARVIS_WORKER_IMAGE=ghcr.io/<owner>/jarvis-ai/worker:<sha>
-JARVIS_FEATURES="github home-assistant" scripts/deploy/remote-up.sh
+JARVIS_FEATURES="github" scripts/deploy/remote-up.sh
 ```
 
-`remote-up.sh` first runs `scripts/deploy/publish-compose.sh`, which publishes the AppHost into `artifacts/compose/docker-compose.yaml` (with a local .NET 10 SDK, or the pinned SDK container so the server needs only Docker), then pulls, migrates, and replaces containers. To inspect what would run: `scripts/deploy/publish-compose.sh` and read the generated file. Features are listed under [Run locally](#run-locally); `DEPLOY_COMPOSE_FILES` from older setups is still mapped to them.
+`remote-up.sh` prepares the host, publishes the AppHost into `artifacts/compose/docker-compose.yaml` (with a local .NET 10 SDK, or the pinned SDK container so the server needs only Docker), then pulls, migrates, and replaces containers. Features are listed under [Run locally](#run-locally) and in [docs/operations/deployment-and-ci.md](docs/operations/deployment-and-ci.md); `DEPLOY_COMPOSE_FILES` from older setups is mapped to them. Backups are on by default; see [docs/operations/backup-and-restore.md](docs/operations/backup-and-restore.md) for encryption and off-host copies.
 
-Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit media, plus outbound HTTPS for Codex OAuth/model access, Firebase FCM/OAuth, user-configured public condition-watch endpoints, Caddy certificate issuance, ClamAV signature updates, NuGet (for publishing the AppHost), and GHCR pulls. The deployment script applies EF migrations after Postgres is healthy and before updating application containers. Temporal owns a separate persistent Postgres database. Garage creates the private `jarvis-files` bucket and its application access key before the API starts. Keep the environment file, Garage config, and Codex OAuth file private, and pin every third-party container image to an audited release or digest before deploying.
+Allow inbound TCP 80/443 for Caddy, TCP 7881 and UDP 50000-50100 for LiveKit media, plus outbound HTTPS for Codex OAuth/model access, Firebase FCM/OAuth, user-configured public condition-watch endpoints, Caddy certificate issuance, ClamAV signature updates, NuGet (for publishing the AppHost), the MCP registry and npm/PyPI (for connectors), and GHCR pulls. The deployment script applies EF migrations after Postgres is healthy and before updating application containers. Keep the environment file private, and pin every third-party container image to an audited release or digest before deploying.
 
 ## GitHub Actions pipelines
 
@@ -219,15 +205,14 @@ The self-hosted runner serves `/home/ykdbonte/.jarvis/altstore` through the host
 
 [`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) builds `api` and `worker`, pushes them to `ghcr.io/<owner>/jarvis-ai/<name>:<git-sha>` (plus the version tag and `latest` on `v*` tags). A `v*` tag builds those images from the Release workflow and deploys them only after **Approve release**. A manual run of this workflow can still deploy on its own production approval. Garage uses its pinned upstream image. The workflow does not run on every commit to `main`.
 
-Server bootstrap:
+Server setup:
 
-1. Clone this repository to a persistent path such as `/opt/jarvis`.
-2. Copy `infra/compose/.env.production.example` to `infra/compose/.env.production`, mode `0600`, and fill in real secrets. Set `GARAGE_CONFIG_FILE` to the private Garage config file path. The deploy job supplies the API and worker image names and commit tag.
-3. Install Docker with the Compose plugin. The deploy workflow transfers the checked-out source to the self-hosted runner as a short-lived Git bundle, so the server does not need GitHub repository access. GHCR pulls use the workflow's short-lived `GITHUB_TOKEN`.
-4. Add repository secret `DEPLOY_PATH` for the production checkout path on the server.
-5. Register a persistent Linux x64 self-hosted runner on the production server with the `jarvis-deploy` label. Run it as the account that owns the checkout and production env file, with Docker and Compose access. The build jobs stay on GitHub-hosted runners; only the deploy job runs on the server.
-6. Set repository variable `JARVIS_FEATURES` to the optional parts this server runs, for example `tunnel github home-assistant` (`tunnel` when using a host-level reverse proxy or Cloudflare Tunnel instead of the bundled public Caddy edge). An existing `DEPLOY_COMPOSE_FILES` variable keeps working; its overlay names map to the same features.
-7. In GitHub → Packages, link the two application container packages to this repository so `GITHUB_TOKEN` can push and the deploy job can pull. Keep packages private if the repo is private; the runner logs into GHCR with a short-lived token. For later manual pulls, `docker login ghcr.io` on the host with a PAT that has `read:packages`.
+1. Point DNS for your hostname at the server and install Docker with the Compose plugin.
+2. Register a persistent Linux x64 self-hosted runner on the server with the `jarvis-deploy` label, running as the account that should own Jarvis's data, with Docker access. The deploy workflow transfers the source as a short-lived Git bundle and pulls images with the workflow's `GITHUB_TOKEN`, so the server needs no GitHub credentials.
+3. Set repository variable `JARVIS_DOMAIN` to the hostname. Optionally set `JARVIS_FEATURES` (for example `github` or `tunnel` behind a host-level reverse proxy or Cloudflare Tunnel) and secret `DEPLOY_PATH` (default `~/jarvis`).
+4. Run the Release workflow (or merge a release PR) and approve the deploy. Then sign in to ChatGPT from the Home screen.
+
+In GitHub → Packages, the two application container packages must be linked to this repository so `GITHUB_TOKEN` can push and the deploy job can pull; keep them private if the repo is private.
 
 `workflow_dispatch` accepts `skip_deploy` to build/push images without deploying, and an optional extra `image_tag`. Production secrets stay in `.env.production` on the server and are never passed through GitHub Actions. `python3 -m unittest tests/unit/compose/test_production_compose.py` publishes the AppHost and checks the generated stack (images, isolation, features); CI runs it in the backend job.
 

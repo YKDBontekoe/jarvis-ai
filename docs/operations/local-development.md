@@ -3,26 +3,23 @@
 ## Prerequisites
 
 - **.NET SDK** 10.x (see `global.json` / `.cursor/install.sh` pin `10.0.302`)
-- **Codex CLI** signed in (`codex login status`) for real model calls
+- **Codex CLI** installed; sign it in from the app (Home → Sign Jarvis in to ChatGPT) or with `codex login`
 - **Docker** (or Podman) — Aspire container dependencies and Testcontainers
 - **Flutter** — for mobile/web client work
 
 Cloud agents: run `bash .cursor/install.sh` from repo root; optional `dockerd` terminal per `.cursor/environment.json`.
 
-## Environment file
+## Environment file (optional)
 
-```sh
-cp .env.example infra/compose/.env
-```
-
-Set real secrets (LiveKit, voice worker, MCP runner token) before sourcing it for Aspire.
+The AppHost has development defaults for everything, so `dotnet run --project src/Jarvis.AppHost` works without
+one. To override a default (LAN listen URL, features), `cp .env.example infra/compose/.env`, edit it, and source it.
+If the local Codex CLI is not signed in, the app's Home screen offers **Sign Jarvis in to ChatGPT**.
 
 ## Aspire (recommended)
 
-From repo root after sourcing env:
+From repo root:
 
 ```sh
-set -a && source infra/compose/.env && set +a
 dotnet run --project src/Jarvis.AppHost
 ```
 

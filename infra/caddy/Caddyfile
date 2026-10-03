@@ -1,9 +1,20 @@
-{$JARVIS_DOMAIN} {
+# One site for Jarvis and LiveKit. LIVEKIT_DOMAIN defaults to JARVIS_DOMAIN (scripts/deploy/prepare-host.sh), so a
+# single DNS record is enough: LiveKit signaling is served under /rtc on the Jarvis host. A separate voice hostname,
+# as older deployments use, still routes everything to LiveKit.
+{$JARVIS_DOMAIN} {$LIVEKIT_DOMAIN} {
 	encode zstd gzip
-	reverse_proxy jarvis-api:5082
-}
 
-{$LIVEKIT_DOMAIN} {
-	encode zstd gzip
-	reverse_proxy livekit:7880
+	@livekit_host {
+		host {$LIVEKIT_DOMAIN}
+		not host {$JARVIS_DOMAIN}
+	}
+	handle @livekit_host {
+		reverse_proxy livekit:7880
+	}
+	handle /rtc* {
+		reverse_proxy livekit:7880
+	}
+	handle {
+		reverse_proxy jarvis-api:5082
+	}
 }

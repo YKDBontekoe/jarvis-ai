@@ -19,17 +19,14 @@ The service runs as `JARVIS_UID:JARVIS_GID` with a read-only root filesystem. It
 
 ## Setup
 
-1. Create the backup directory, owned by the Jarvis account:
+1. Nothing to create: `scripts/deploy/prepare-host.sh` (run by every deploy) makes `JARVIS_BACKUP_DIR` under
+   `JARVIS_DATA_DIR` (default `~/jarvis-data/backups`, mode `0700`) and records it in the env file.
 
-   ```sh
-   sudo install -d -m 0700 -o "$JARVIS_UID" -g "$JARVIS_GID" /srv/jarvis/backups
-   ```
-
-2. Set these in `infra/compose/.env.production`:
+2. Optionally change these in `infra/compose/.env.production`:
 
    | Variable | Default | Purpose |
    |----------|---------|---------|
-   | `JARVIS_BACKUP_DIR` | required | Host directory for backups |
+   | `JARVIS_BACKUP_DIR` | `~/jarvis-data/backups` | Host directory for backups |
    | `BACKUP_PASSPHRASE` | empty | Encrypt backups when set |
    | `BACKUP_HOUR_UTC` | `3` | Hour of the nightly run |
    | `BACKUP_RETENTION_DAYS` | `14` | Backups older than this are deleted |
@@ -67,5 +64,5 @@ Practice a restore on a spare host now and then. A backup you have never restore
 ## What is not included
 
 - **Uploaded files** live in Garage (`garage-data` and `garage-meta` volumes). Back them up at the volume level, or sync the `jarvis-files` bucket with an S3 tool. File metadata and search chunks are in `jarvis.dump`, so a restore without blobs keeps search results but downloads fail.
-- **Codex OAuth state** in `CODEX_HOME_DIR`. Sign in again with `codex login` after moving hosts.
+- **Codex OAuth state** in `CODEX_HOME_DIR`. Sign in again from the app (Home → Sign Jarvis in to ChatGPT) after moving hosts.
 - **Signal and WhatsApp link state** (`signal-cli-data`, `whatsapp-bridge-data`). Re-link from the app.
