@@ -54,6 +54,51 @@ const _catalog = <String, ToolDescription>{
     'Looked for patterns in your life',
     PhosphorIconsRegular.chartLine,
   ),
+  'CheckInbox': ToolDescription(
+    'Checking your inbox',
+    'Checked your inbox',
+    PhosphorIconsRegular.chatsCircle,
+  ),
+  'TriageInboxThread': ToolDescription(
+    'Reading a conversation',
+    'Read a conversation',
+    PhosphorIconsRegular.sparkle,
+  ),
+  'SetInboxState': ToolDescription(
+    'Updating your inbox',
+    'Updated your inbox',
+    PhosphorIconsRegular.checkCircle,
+  ),
+  'SnoozeInboxThread': ToolDescription(
+    'Snoozing a conversation',
+    'Snoozed a conversation',
+    PhosphorIconsRegular.clock,
+  ),
+  'TrackInboxItem': ToolDescription(
+    'Adding to your inbox',
+    'Added to your inbox',
+    PhosphorIconsRegular.paperPlaneTilt,
+  ),
+  'GetCommitments': ToolDescription(
+    'Checking your promises',
+    'Checked your promises',
+    PhosphorIconsRegular.listChecks,
+  ),
+  'AddCommitment': ToolDescription(
+    'Noting a promise',
+    'Noted a promise',
+    PhosphorIconsRegular.checkCircle,
+  ),
+  'AcceptCommitment': ToolDescription(
+    'Keeping a promise',
+    'Kept a promise',
+    PhosphorIconsRegular.checkCircle,
+  ),
+  'SetCommitmentStatus': ToolDescription(
+    'Updating a promise',
+    'Updated a promise',
+    PhosphorIconsRegular.checkCircle,
+  ),
   'ListWhatsAppChats': ToolDescription(
     'Checking your WhatsApp',
     'Checked your WhatsApp',

@@ -6,6 +6,7 @@ import '../audit/audit_screen.dart';
 import '../watches/condition_watches_screen.dart';
 import '../briefing/daily_briefing_screen.dart';
 import '../files/files_screen.dart';
+import '../inbox/inbox_screen.dart';
 import '../integrations/integrations_screen.dart';
 import '../memory/memory_screen.dart';
 import '../automations/automations_screen.dart';
@@ -87,6 +88,7 @@ Widget? utilityPageFor(
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'today' => DayPlannerScreen(http: http, onAskInChat: onAskInChat),
   'timeline' => TimelineScreen(http: http),
+  'inbox' => InboxScreen(http: http),
   'expenses' => ExpensesScreen(http: http),
   'habits' => HabitsScreen(http: http),
   'people' => PeopleScreen(http: http),

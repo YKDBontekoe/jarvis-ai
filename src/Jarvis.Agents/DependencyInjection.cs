@@ -70,6 +70,9 @@ public static class DependencyInjection
         services.AddScoped<IAgentContextContributor, Habits.HabitContextContributor>();
         services.AddScoped<IAgentToolContributor, Timeline.TimelineToolContributor>();
         services.AddScoped<IAgentContextContributor, Timeline.TimelineContextContributor>();
+        services.AddScoped<IAgentToolContributor, Inbox.InboxToolContributor>();
+        services.AddScoped<IAgentContextContributor, Inbox.InboxContextContributor>();
+        services.AddScoped<Jarvis.Application.Inbox.IInboxTriager, Inbox.ModelInboxTriager>();
         services.AddScoped<IAgentToolContributor, People.PeopleToolContributor>();
         services.AddScoped<IAgentContextContributor, People.PeopleContextContributor>();
         services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();

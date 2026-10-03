@@ -108,6 +108,7 @@ api.MapPersonalAssistantEndpoints();
 api.MapSearchEndpoints();
 api.MapPlannerEndpoints();
 api.MapTimelineEndpoints();
+api.MapInboxEndpoints(app.Logger);
 
 app.MapA2AProtocol();
 

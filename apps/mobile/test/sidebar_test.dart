@@ -12,6 +12,10 @@ void main() {
   testWidgets('sidebar has one search entry and core destinations', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     var openedTasks = false;
     var openedWhatsApp = false;
     var searched = false;
@@ -48,6 +52,8 @@ void main() {
       'Tasks',
       'Memory',
       'Journal',
+      'Inbox',
+      'Timeline',
       'Expenses',
       'Habits',
       'People',

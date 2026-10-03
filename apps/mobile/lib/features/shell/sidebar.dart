@@ -125,6 +125,11 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     onTap: () => widget.onUtility('journal'),
                   ),
                   _NavRow(
+                    icon: PhosphorIconsRegular.chatsCircle,
+                    label: 'Inbox',
+                    onTap: () => widget.onUtility('inbox'),
+                  ),
+                  _NavRow(
                     icon: PhosphorIconsRegular.clockCounterClockwise,
                     label: 'Timeline',
                     onTap: () => widget.onUtility('timeline'),

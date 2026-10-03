@@ -1,4 +1,6 @@
+using Jarvis.Application.Inbox;
 using Jarvis.Application.Timeline;
+using Jarvis.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Jarvis.Infrastructure;
@@ -18,6 +20,11 @@ public static class LifeFeaturesRegistration
         services.AddScoped<ITimelineSource, MemoryTimelineSource>();
         services.AddScoped<ITimelineSource, ConversationTimelineSource>();
         services.AddScoped<ITimelineService, TimelineService>();
+
+        // Inbox and commitments ledger.
+        services.AddScoped<IInboxRepository, InboxRepository>();
+        services.AddScoped<IInboxService, InboxService>();
+        services.AddScoped<ICommitmentService, CommitmentService>();
         return services;
     }
 }
