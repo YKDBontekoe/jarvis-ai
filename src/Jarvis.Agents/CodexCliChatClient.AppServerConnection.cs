@@ -68,7 +68,7 @@ public sealed partial class CodexCliChatClient
 
         public async Task<CodexTurnMetrics> RunTurnAsync(string threadId, PromptPayload prompt, string modelId,
             string? reasoningEffort, Action<string?, string> onDelta, CancellationToken cancellationToken,
-            Action<string, string>? onNativeTool = null)
+            Action<string, string, string>? onNativeTool = null)
         {
             _latestUsage = null;
             var webSearches = 0;
@@ -117,10 +117,18 @@ public sealed partial class CodexCliChatClient
                     onDelta(itemId, delta.GetString() ?? string.Empty);
                 }
                 else if ((methodName == "item/completed" || methodName == "item/started") &&
+                         NativeWorkTool(root) is { } nativeTool)
+                {
+                    // Codex's own shell and file edits: shown as steps by name only, never the command or its output.
+                    if (NativeItemId(root) is { } nativeId)
+                        onNativeTool?.Invoke("native-" + nativeId, nativeTool,
+                            methodName == "item/started" ? "started" : "completed");
+                }
+                else if ((methodName == "item/completed" || methodName == "item/started") &&
                          IsNativeWebSearchNotification(methodName, root))
                 {
                     if (NativeItemId(root) is { } itemId)
-                        onNativeTool?.Invoke("websearch-" + itemId,
+                        onNativeTool?.Invoke("websearch-" + itemId, NativeToolProgress.WebSearch,
                             methodName == "item/started" ? "started" : "completed");
                     if (methodName == "item/completed")
                     {

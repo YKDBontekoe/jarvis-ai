@@ -103,4 +103,17 @@ public sealed class CodexAccessTests
         Assert.Contains("scratch workspace", CodexCliChatClient.BuildPrompt(messages, null, [], false, true).Text);
         Assert.DoesNotContain("scratch workspace", CodexCliChatClient.BuildPrompt(messages, null, [], false).Text);
     }
+
+    [Theory]
+    [InlineData("commandExecution", "RunCommand")]
+    [InlineData("fileChange", "EditFiles")]
+    [InlineData("agentMessage", null)]
+    [InlineData("reasoning", null)]
+    public void Codex_shell_and_file_items_are_reported_as_named_steps(string itemType, string? expected)
+    {
+        var json = "{\"method\":\"item/started\",\"params\":{\"item\":{\"type\":\"" + itemType +
+                   "\",\"id\":\"exec-1\",\"command\":\"echo secret\"}}}";
+        using var message = System.Text.Json.JsonDocument.Parse(json);
+        Assert.Equal(expected, CodexCliChatClient.NativeWorkTool(message.RootElement));
+    }
 }

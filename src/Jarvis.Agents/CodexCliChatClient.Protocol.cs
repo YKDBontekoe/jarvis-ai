@@ -18,6 +18,19 @@ public sealed partial class CodexCliChatClient
                itemType.Equals("web_search_request", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>The step name for a Codex-run shell command or file edit item, or null for anything else.</summary>
+    internal static string? NativeWorkTool(JsonElement root) =>
+        root.TryGetProperty("params", out var parameters) &&
+        parameters.TryGetProperty("item", out var item) &&
+        item.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String
+            ? type.GetString() switch
+            {
+                "commandExecution" => NativeToolProgress.RunCommand,
+                "fileChange" => NativeToolProgress.EditFiles,
+                _ => null
+            }
+            : null;
+
     internal static bool IsNativeWebSearchNotification(string? method, JsonElement root)
     {
         if (!string.IsNullOrWhiteSpace(method) &&

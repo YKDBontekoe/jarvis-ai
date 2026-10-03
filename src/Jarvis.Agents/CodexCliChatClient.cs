@@ -179,8 +179,8 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
                 var rawResponse = new StringBuilder();
                 StructuredTextStreamDecoder textDecoder = new();
                 string? agentMessageId = null;
-                void ReportNativeTool(string callId, string phase) =>
-                    updates?.TryWrite(NativeToolProgress.Create(callId, NativeToolProgress.WebSearch, phase));
+                void ReportNativeTool(string callId, string toolName, string phase) =>
+                    updates?.TryWrite(NativeToolProgress.Create(callId, toolName, phase));
                 // Codex can answer one turn with several agent messages, for example the same structured
                 // response twice or a short one before a hosted web search. Each message is a complete
                 // response on its own, so only the last one is parsed.
