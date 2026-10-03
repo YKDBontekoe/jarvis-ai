@@ -290,7 +290,10 @@ internal static class ProductionDeployment
             s.Command = ["Jarvis.Api.dll", "mcp-runner"];
             s.User = User;
             s.ReadOnly = true;
-            s.Tmpfs = ["/tmp:rw,nosuid,size=1g", "/cache:rw,nosuid,size=2g"];
+            // Docker tmpfs mounts default to noexec. npx launches package entrypoints from /cache; uvx also
+            // executes its tools and downloaded Python from these directories. Only the isolated runner needs
+            // executable scratch space; keep its read-only root, non-root user and other restrictions.
+            s.Tmpfs = ["/tmp:rw,exec,nosuid,nodev,size=1g", "/cache:rw,exec,nosuid,nodev,size=2g"];
             s.CapDrop = ["ALL"];
             s.SecurityOpt = ["no-new-privileges:true"];
             s.Limit("2g", null);

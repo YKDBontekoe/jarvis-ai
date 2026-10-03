@@ -117,7 +117,12 @@ internal static partial class McpRunnerHost
         finally
         {
             await lifetime.CancelAsync();
-            try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+            try
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                else if (process.ExitCode != 0)
+                    LogExitFailure(logger, launch.Command, PackageOf(launch), process.ExitCode);
+            }
             catch (InvalidOperationException) { }
             await Task.WhenAll(Observe(toConnector), Observe(fromConnector), Observe(drainErrors));
             await CloseQuietlyAsync(socket, WebSocketCloseStatus.NormalClosure, "Connector stopped.");
@@ -243,6 +248,9 @@ internal static partial class McpRunnerHost
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not start {Command} connector: {ErrorType}.")]
     private static partial void LogStartFailed(ILogger logger, string command, string errorType);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "{Command} connector {Package} exited with code {ExitCode}.")]
+    private static partial void LogExitFailure(ILogger logger, string command, string package, int exitCode);
 }
 
 internal sealed record RunnerSettings(int MaxProcesses, TimeSpan MaxSession, string WorkRoot, string CacheRoot,
