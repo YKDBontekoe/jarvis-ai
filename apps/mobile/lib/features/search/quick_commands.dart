@@ -80,6 +80,12 @@ const quickCommands = [
     keywords: ['habits', 'habit', 'streak', 'gewoonte', 'gewoontes'],
   ),
   QuickCommand(
+    label: 'Go to Timeline',
+    icon: PhosphorIconsRegular.clockCounterClockwise,
+    destination: 'timeline',
+    keywords: ['timeline', 'history', 'rewind', 'on this day', 'tijdlijn'],
+  ),
+  QuickCommand(
     label: 'Go to Expenses',
     icon: PhosphorIconsRegular.wallet,
     destination: 'expenses',

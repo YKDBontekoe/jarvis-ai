@@ -32,6 +32,7 @@ import '../settings/appearance_screen.dart';
 import '../settings/model_settings_screen.dart';
 import '../settings/voice_settings_screen.dart';
 import '../skills/skills_screen.dart';
+import '../timeline/timeline_screen.dart';
 import '../usage/usage_screen.dart';
 import '../whatsapp/whatsapp_screen.dart';
 
@@ -85,6 +86,7 @@ Widget? utilityPageFor(
   ),
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'today' => DayPlannerScreen(http: http, onAskInChat: onAskInChat),
+  'timeline' => TimelineScreen(http: http),
   'expenses' => ExpensesScreen(http: http),
   'habits' => HabitsScreen(http: http),
   'people' => PeopleScreen(http: http),

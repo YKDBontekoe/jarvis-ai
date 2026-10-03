@@ -39,6 +39,21 @@ const _catalog = <String, ToolDescription>{
     'Deleted an expense',
     PhosphorIconsRegular.trash,
   ),
+  'QueryTimeline': ToolDescription(
+    'Looking back through your timeline',
+    'Looked back through your timeline',
+    PhosphorIconsRegular.clockCounterClockwise,
+  ),
+  'OnThisDay': ToolDescription(
+    'Checking this day in earlier years',
+    'Checked this day in earlier years',
+    PhosphorIconsRegular.calendarBlank,
+  ),
+  'GetLifeInsights': ToolDescription(
+    'Looking for patterns in your life',
+    'Looked for patterns in your life',
+    PhosphorIconsRegular.chartLine,
+  ),
   'ListWhatsAppChats': ToolDescription(
     'Checking your WhatsApp',
     'Checked your WhatsApp',
