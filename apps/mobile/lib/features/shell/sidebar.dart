@@ -120,6 +120,11 @@ class _JarvisSidebarState extends State<JarvisSidebar> {
                     onTap: () => widget.onUtility('memory'),
                   ),
                   _NavRow(
+                    icon: PhosphorIconsRegular.bookOpen,
+                    label: 'Library',
+                    onTap: () => widget.onUtility('library'),
+                  ),
+                  _NavRow(
                     icon: PhosphorIconsRegular.pencilSimple,
                     label: 'Journal',
                     onTap: () => widget.onUtility('journal'),

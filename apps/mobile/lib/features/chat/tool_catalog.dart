@@ -154,6 +154,51 @@ const _catalog = <String, ToolDescription>{
     'Created an automation',
     PhosphorIconsRegular.lightning,
   ),
+  'SearchLibrary': ToolDescription(
+    'Searching your library',
+    'Searched your library',
+    PhosphorIconsRegular.bookOpen,
+  ),
+  'GetLibraryItem': ToolDescription(
+    'Opening a saved item',
+    'Opened a saved item',
+    PhosphorIconsRegular.bookOpen,
+  ),
+  'SaveToLibrary': ToolDescription(
+    'Saving to your library',
+    'Saved to your library',
+    PhosphorIconsRegular.bookmarkSimple,
+  ),
+  'ClipUrlToLibrary': ToolDescription(
+    'Saving a web page',
+    'Saved a web page',
+    PhosphorIconsRegular.globeSimple,
+  ),
+  'StartDeepResearch': ToolDescription(
+    'Starting deep research',
+    'Started deep research',
+    PhosphorIconsRegular.atom,
+  ),
+  'GetLibraryDigest': ToolDescription(
+    'Summing up your library',
+    'Summed up your library',
+    PhosphorIconsRegular.bookOpen,
+  ),
+  'GetDueFlashcards': ToolDescription(
+    'Picking flashcards',
+    'Picked flashcards',
+    PhosphorIconsRegular.graduationCap,
+  ),
+  'GradeFlashcard': ToolDescription(
+    'Scheduling a flashcard',
+    'Scheduled a flashcard',
+    PhosphorIconsRegular.graduationCap,
+  ),
+  'AddFlashcards': ToolDescription(
+    'Adding flashcards',
+    'Added flashcards',
+    PhosphorIconsRegular.graduationCap,
+  ),
   'ListWhatsAppChats': ToolDescription(
     'Checking your WhatsApp',
     'Checked your WhatsApp',

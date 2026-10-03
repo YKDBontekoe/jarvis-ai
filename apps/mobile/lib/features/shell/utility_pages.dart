@@ -20,6 +20,7 @@ import '../devices/devices_screen.dart';
 import '../expenses/expenses_screen.dart';
 import '../habits/habits_screen.dart';
 import '../journal/journal_screen.dart';
+import '../library/library_screen.dart';
 import '../learning/learning_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
 import '../people/people_screen.dart';
@@ -89,6 +90,7 @@ Widget? utilityPageFor(
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'today' => DayPlannerScreen(http: http, onAskInChat: onAskInChat),
   'timeline' => TimelineScreen(http: http),
+  'library' => LibraryScreen(http: http),
   'inbox' => InboxScreen(http: http),
   'expenses' => ExpensesScreen(http: http),
   'finance' => FinanceScreen(http: http),

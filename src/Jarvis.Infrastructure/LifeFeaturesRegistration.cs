@@ -2,6 +2,8 @@ using Jarvis.Application.Automations;
 using Jarvis.Application.Expenses;
 using Jarvis.Application.Finance;
 using Jarvis.Application.Inbox;
+using Jarvis.Application.Library;
+using Jarvis.Infrastructure.Library;
 using Jarvis.Application.Timeline;
 using Jarvis.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +39,12 @@ public static class LifeFeaturesRegistration
         // Automation studio: webhooks that start event automations.
         services.AddScoped<IAutomationWebhookRepository, AutomationWebhookRepository>();
         services.AddScoped<IAutomationWebhookService, AutomationWebhookService>();
+
+        // Second brain: clipped pages, notes, reports, flashcards, deep research.
+        services.AddScoped<ILibraryRepository, LibraryRepository>();
+        services.AddScoped<IWebPageFetcher, PublicWebPageFetcher>();
+        services.AddScoped<ILibraryService, LibraryService>();
+        services.AddScoped<IResearchService, ResearchService>();
         return services;
     }
 }
