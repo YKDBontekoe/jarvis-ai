@@ -41,22 +41,18 @@ bool serverStoredReply(
   if (pendingUserText == null) {
     return messages.isNotEmpty && messages.last['role'] == 'assistant';
   }
-  var seenUser = false;
-  for (final message in messages) {
-    if (!seenUser) {
-      if (message['role'] == 'user' && message['content'] == pendingUserText) {
-        seenUser = true;
-      }
-      continue;
-    }
+  // The same text may have been sent before ("yes", "continue"): only the latest copy is this send.
+  final sent = messages.lastIndexWhere(
+    (message) =>
+        message['role'] == 'user' && message['content'] == pendingUserText,
+  );
+  if (sent < 0) return false;
+  return messages.skip(sent + 1).any((message) {
     final content = message['content'];
-    if (message['role'] == 'assistant' &&
+    return message['role'] == 'assistant' &&
         content is String &&
-        content.trim().isNotEmpty) {
-      return true;
-    }
-  }
-  return false;
+        content.trim().isNotEmpty;
+  });
 }
 
 /// Backoff for realtime reconnects: starts fast, caps at 30 s and never gives up.
