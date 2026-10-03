@@ -73,6 +73,7 @@ flowchart LR
 | Devices / home | `Devices/`, `Home/` | `DeviceToolContributor` | `DeviceEndpoints`, `/home` |
 | A2A / remote agents | `Agents/` (app) | `RemoteAgentToolContributor` | `A2AEndpoints` |
 | Surfaces (generative UI) | `Surfaces/` | `SurfaceToolContributor` | `SurfaceEndpoints` |
+| Timeline, inbox, finance, library, modes, missions | `Timeline/`, `Inbox/`, `Finance/`, `Library/`, `Modes/`, `Missions/` | matching folders | `TimelineEndpoints`, `InboxEndpoints`, `FinanceEndpoints`, `LibraryEndpoints`, `ModeEndpoints`, `MissionEndpoints` (see [life-features.md](../backend/life-features.md)) |
 
 ## Related documents
 

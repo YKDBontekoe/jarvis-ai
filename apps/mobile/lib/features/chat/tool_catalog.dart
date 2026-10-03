@@ -39,6 +39,211 @@ const _catalog = <String, ToolDescription>{
     'Deleted an expense',
     PhosphorIconsRegular.trash,
   ),
+  'QueryTimeline': ToolDescription(
+    'Looking back through your timeline',
+    'Looked back through your timeline',
+    PhosphorIconsRegular.clockCounterClockwise,
+  ),
+  'OnThisDay': ToolDescription(
+    'Checking this day in earlier years',
+    'Checked this day in earlier years',
+    PhosphorIconsRegular.calendarBlank,
+  ),
+  'GetLifeInsights': ToolDescription(
+    'Looking for patterns in your life',
+    'Looked for patterns in your life',
+    PhosphorIconsRegular.chartLine,
+  ),
+  'CheckInbox': ToolDescription(
+    'Checking your inbox',
+    'Checked your inbox',
+    PhosphorIconsRegular.chatsCircle,
+  ),
+  'TriageInboxThread': ToolDescription(
+    'Reading a conversation',
+    'Read a conversation',
+    PhosphorIconsRegular.sparkle,
+  ),
+  'SetInboxState': ToolDescription(
+    'Updating your inbox',
+    'Updated your inbox',
+    PhosphorIconsRegular.checkCircle,
+  ),
+  'SnoozeInboxThread': ToolDescription(
+    'Snoozing a conversation',
+    'Snoozed a conversation',
+    PhosphorIconsRegular.clock,
+  ),
+  'TrackInboxItem': ToolDescription(
+    'Adding to your inbox',
+    'Added to your inbox',
+    PhosphorIconsRegular.paperPlaneTilt,
+  ),
+  'GetCommitments': ToolDescription(
+    'Checking your promises',
+    'Checked your promises',
+    PhosphorIconsRegular.listChecks,
+  ),
+  'AddCommitment': ToolDescription(
+    'Noting a promise',
+    'Noted a promise',
+    PhosphorIconsRegular.checkCircle,
+  ),
+  'AcceptCommitment': ToolDescription(
+    'Keeping a promise',
+    'Kept a promise',
+    PhosphorIconsRegular.checkCircle,
+  ),
+  'SetCommitmentStatus': ToolDescription(
+    'Updating a promise',
+    'Updated a promise',
+    PhosphorIconsRegular.checkCircle,
+  ),
+  'GetFinanceOverview': ToolDescription(
+    'Checking your finances',
+    'Checked your finances',
+    PhosphorIconsRegular.chartLine,
+  ),
+  'GetBudgets': ToolDescription(
+    'Checking your budgets',
+    'Checked your budgets',
+    PhosphorIconsRegular.wallet,
+  ),
+  'SetBudget': ToolDescription(
+    'Setting a budget',
+    'Set a budget',
+    PhosphorIconsRegular.wallet,
+  ),
+  'RemoveBudget': ToolDescription(
+    'Removing a budget',
+    'Removed a budget',
+    PhosphorIconsRegular.trash,
+  ),
+  'GetSubscriptions': ToolDescription(
+    'Looking at your subscriptions',
+    'Looked at your subscriptions',
+    PhosphorIconsRegular.repeat,
+  ),
+  'SetSubscriptionStatus': ToolDescription(
+    'Updating a subscription',
+    'Updated a subscription',
+    PhosphorIconsRegular.repeat,
+  ),
+  'RemindBeforeCharge': ToolDescription(
+    'Setting a charge reminder',
+    'Set a charge reminder',
+    PhosphorIconsRegular.bell,
+  ),
+  'ImportBankStatement': ToolDescription(
+    'Reading a bank statement',
+    'Read a bank statement',
+    PhosphorIconsRegular.uploadSimple,
+  ),
+  'PreviewAutomation': ToolDescription(
+    'Previewing an automation',
+    'Previewed an automation',
+    PhosphorIconsRegular.play,
+  ),
+  'ListAutomationTemplates': ToolDescription(
+    'Looking at automation templates',
+    'Looked at automation templates',
+    PhosphorIconsRegular.lightning,
+  ),
+  'CreateAutomationFromTemplate': ToolDescription(
+    'Creating an automation',
+    'Created an automation',
+    PhosphorIconsRegular.lightning,
+  ),
+  'SearchLibrary': ToolDescription(
+    'Searching your library',
+    'Searched your library',
+    PhosphorIconsRegular.bookOpen,
+  ),
+  'GetLibraryItem': ToolDescription(
+    'Opening a saved item',
+    'Opened a saved item',
+    PhosphorIconsRegular.bookOpen,
+  ),
+  'SaveToLibrary': ToolDescription(
+    'Saving to your library',
+    'Saved to your library',
+    PhosphorIconsRegular.bookmarkSimple,
+  ),
+  'ClipUrlToLibrary': ToolDescription(
+    'Saving a web page',
+    'Saved a web page',
+    PhosphorIconsRegular.globeSimple,
+  ),
+  'StartDeepResearch': ToolDescription(
+    'Starting deep research',
+    'Started deep research',
+    PhosphorIconsRegular.atom,
+  ),
+  'GetLibraryDigest': ToolDescription(
+    'Summing up your library',
+    'Summed up your library',
+    PhosphorIconsRegular.bookOpen,
+  ),
+  'GetDueFlashcards': ToolDescription(
+    'Picking flashcards',
+    'Picked flashcards',
+    PhosphorIconsRegular.graduationCap,
+  ),
+  'GradeFlashcard': ToolDescription(
+    'Scheduling a flashcard',
+    'Scheduled a flashcard',
+    PhosphorIconsRegular.graduationCap,
+  ),
+  'AddFlashcards': ToolDescription(
+    'Adding flashcards',
+    'Added flashcards',
+    PhosphorIconsRegular.graduationCap,
+  ),
+  'GetCurrentMode': ToolDescription(
+    'Checking your mode',
+    'Checked your mode',
+    PhosphorIconsRegular.moon,
+  ),
+  'SetMode': ToolDescription(
+    'Switching mode',
+    'Switched mode',
+    PhosphorIconsRegular.moon,
+  ),
+  'PlanMission': ToolDescription(
+    'Planning a mission',
+    'Planned a mission',
+    PhosphorIconsRegular.flowArrow,
+  ),
+  'RunMission': ToolDescription(
+    'Starting a mission',
+    'Started a mission',
+    PhosphorIconsRegular.play,
+  ),
+  'GetMissions': ToolDescription(
+    'Checking your missions',
+    'Checked your missions',
+    PhosphorIconsRegular.flowArrow,
+  ),
+  'PauseOrResumeMission': ToolDescription(
+    'Pausing a mission',
+    'Changed a mission',
+    PhosphorIconsRegular.pauseCircle,
+  ),
+  'CancelMission': ToolDescription(
+    'Cancelling a mission',
+    'Cancelled a mission',
+    PhosphorIconsRegular.stopCircle,
+  ),
+  'PostToBlackboard': ToolDescription(
+    'Sharing a note with the crew',
+    'Shared a note with the crew',
+    PhosphorIconsRegular.notePencil,
+  ),
+  'ReadBlackboard': ToolDescription(
+    'Reading the crew notes',
+    'Read the crew notes',
+    PhosphorIconsRegular.notePencil,
+  ),
   'ListWhatsAppChats': ToolDescription(
     'Checking your WhatsApp',
     'Checked your WhatsApp',

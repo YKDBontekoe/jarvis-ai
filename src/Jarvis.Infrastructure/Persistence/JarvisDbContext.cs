@@ -47,6 +47,15 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<OwnerSettingEntity> OwnerSettings => Set<OwnerSettingEntity>();
     public DbSet<JournalEntryEntity> JournalEntries => Set<JournalEntryEntity>();
     public DbSet<ExpenseEntity> Expenses => Set<ExpenseEntity>();
+    public DbSet<InboxThreadEntity> InboxThreads => Set<InboxThreadEntity>();
+    public DbSet<CommitmentEntity> Commitments => Set<CommitmentEntity>();
+    public DbSet<BudgetEntity> Budgets => Set<BudgetEntity>();
+    public DbSet<LibraryItemEntity> LibraryItems => Set<LibraryItemEntity>();
+    public DbSet<FlashcardEntity> Flashcards => Set<FlashcardEntity>();
+    public DbSet<MissionEntity> Missions => Set<MissionEntity>();
+    public DbSet<MissionStepEntity> MissionSteps => Set<MissionStepEntity>();
+    public DbSet<MissionNoteEntity> MissionNotes => Set<MissionNoteEntity>();
+    public DbSet<SubscriptionEntity> Subscriptions => Set<SubscriptionEntity>();
     public DbSet<HabitEntity> Habits => Set<HabitEntity>();
     public DbSet<HabitCheckInEntity> HabitCheckIns => Set<HabitCheckInEntity>();
     public DbSet<PersonEntity> People => Set<PersonEntity>();
@@ -71,6 +80,7 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<CodingRun> CodingRuns => Set<CodingRun>();
     public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
     public DbSet<AutomationRun> AutomationRuns => Set<AutomationRun>();
+    public DbSet<AutomationWebhookEntity> AutomationWebhooks => Set<AutomationWebhookEntity>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {

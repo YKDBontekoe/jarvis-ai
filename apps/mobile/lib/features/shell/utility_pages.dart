@@ -6,8 +6,12 @@ import '../audit/audit_screen.dart';
 import '../watches/condition_watches_screen.dart';
 import '../briefing/daily_briefing_screen.dart';
 import '../files/files_screen.dart';
+import '../finance/finance_screen.dart';
+import '../inbox/inbox_screen.dart';
 import '../integrations/integrations_screen.dart';
 import '../memory/memory_screen.dart';
+import '../missions/missions_screen.dart';
+import '../modes/modes_screen.dart';
 import '../automations/automations_screen.dart';
 import '../reminders/reminders_screen.dart';
 import '../tasks/tasks_screen.dart';
@@ -18,6 +22,7 @@ import '../devices/devices_screen.dart';
 import '../expenses/expenses_screen.dart';
 import '../habits/habits_screen.dart';
 import '../journal/journal_screen.dart';
+import '../library/library_screen.dart';
 import '../learning/learning_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
 import '../people/people_screen.dart';
@@ -32,6 +37,7 @@ import '../settings/appearance_screen.dart';
 import '../settings/model_settings_screen.dart';
 import '../settings/voice_settings_screen.dart';
 import '../skills/skills_screen.dart';
+import '../timeline/timeline_screen.dart';
 import '../usage/usage_screen.dart';
 import '../whatsapp/whatsapp_screen.dart';
 
@@ -85,7 +91,13 @@ Widget? utilityPageFor(
   ),
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'today' => DayPlannerScreen(http: http, onAskInChat: onAskInChat),
+  'timeline' => TimelineScreen(http: http),
+  'missions' => MissionsScreen(http: http),
+  'modes' => ModesScreen(http: http),
+  'library' => LibraryScreen(http: http),
+  'inbox' => InboxScreen(http: http),
   'expenses' => ExpensesScreen(http: http),
+  'finance' => FinanceScreen(http: http),
   'habits' => HabitsScreen(http: http),
   'people' => PeopleScreen(http: http),
   'approvals' => ApprovalsScreen(http: http),

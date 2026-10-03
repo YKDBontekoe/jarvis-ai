@@ -25,6 +25,10 @@ Each reminder and automation rule has a **linked conversation** (`conversationId
 
 Schedule and poll workflows call activities that start run workflows with deterministic idempotency keys (`schedule:…`, `poll:…`, `reminder_due:…`).
 
+## Events, branching and the studio
+
+Besides schedules and polling, a rule can start from an **event** (`webhook`, `message_received`, `file_uploaded`, `task_completed`, `journal_saved`, `expense_logged`, `inbox_needs_reply`). The event is stored with the run; action text can use `{{event.title}}`, `{{event.detail}}`, `{{event.source}}` and `{{event.kind}}` (fenced as untrusted data inside prompts), and an action can carry an `"if"` condition to branch. Studio endpoints (`/automations/templates`, `/simulate`, `/webhooks`) and the `set_mode` action are described in [backend/life-features.md](backend/life-features.md#automation-studio).
+
 ## Safety
 
 - Public JSON URLs use the same SSRF rules as condition watches.

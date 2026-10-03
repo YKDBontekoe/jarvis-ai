@@ -23,6 +23,7 @@ This folder is the canonical reference for humans and coding agents working in t
 | Temporal workflows and worker | [backend/temporal.md](backend/temporal.md) |
 | Memory, knowledge graph, learning | [backend/memory-knowledge-learning.md](backend/memory-knowledge-learning.md) |
 | MCP, integrations, channels, browser | [backend/integrations-and-mcp.md](backend/integrations-and-mcp.md) |
+| Timeline, inbox, finance, studio, library, modes, missions | [backend/life-features.md](backend/life-features.md) |
 
 ## Client and operations
 

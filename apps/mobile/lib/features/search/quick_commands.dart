@@ -80,10 +80,46 @@ const quickCommands = [
     keywords: ['habits', 'habit', 'streak', 'gewoonte', 'gewoontes'],
   ),
   QuickCommand(
+    label: 'Go to Missions',
+    icon: PhosphorIconsRegular.flowArrow,
+    destination: 'missions',
+    keywords: ['missions', 'mission', 'crew', 'agents', 'plan trip', 'missie'],
+  ),
+  QuickCommand(
+    label: 'Go to Modes',
+    icon: PhosphorIconsRegular.moon,
+    destination: 'modes',
+    keywords: ['modes', 'mode', 'focus', 'sleep', 'meeting', 'do not disturb', 'stil', 'slapen'],
+  ),
+  QuickCommand(
+    label: 'Go to Library',
+    icon: PhosphorIconsRegular.bookOpen,
+    destination: 'library',
+    keywords: ['library', 'saved', 'flashcards', 'research', 'bibliotheek', 'leren'],
+  ),
+  QuickCommand(
+    label: 'Go to Inbox',
+    icon: PhosphorIconsRegular.chatsCircle,
+    destination: 'inbox',
+    keywords: ['inbox', 'reply', 'promises', 'commitments', 'beloofd', 'berichten'],
+  ),
+  QuickCommand(
+    label: 'Go to Timeline',
+    icon: PhosphorIconsRegular.clockCounterClockwise,
+    destination: 'timeline',
+    keywords: ['timeline', 'history', 'rewind', 'on this day', 'tijdlijn'],
+  ),
+  QuickCommand(
     label: 'Go to Expenses',
     icon: PhosphorIconsRegular.wallet,
     destination: 'expenses',
     keywords: ['expenses', 'expense', 'spend', 'uitgaven', 'kosten'],
+  ),
+  QuickCommand(
+    label: 'Go to Budgets & subscriptions',
+    icon: PhosphorIconsRegular.chartLine,
+    destination: 'finance',
+    keywords: ['finance', 'budget', 'budgets', 'subscriptions', 'abonnementen', 'forecast', 'import'],
   ),
   QuickCommand(
     label: 'Go to Journal',

@@ -5,7 +5,7 @@ public sealed class AutomationRun
     private AutomationRun() { }
 
     public AutomationRun(Guid ruleId, Guid ownerId, string workflowId, string idempotencyKey,
-        string triggerKind, string triggerReason, bool testRun = false)
+        string triggerKind, string triggerReason, bool testRun = false, string? eventJson = null)
     {
         Id = Guid.CreateVersion7();
         RuleId = ruleId;
@@ -15,6 +15,7 @@ public sealed class AutomationRun
         TriggerKind = triggerKind;
         TriggerReason = triggerReason;
         TestRun = testRun;
+        EventJson = eventJson;
         Status = AutomationRunStatuses.Running;
         StartedAt = DateTimeOffset.UtcNow;
     }
@@ -27,6 +28,9 @@ public sealed class AutomationRun
     public string TriggerKind { get; private set; } = string.Empty;
     public string TriggerReason { get; private set; } = string.Empty;
     public bool TestRun { get; private set; }
+
+    /// <summary>The event that fired an event-triggered run, as JSON; null for other triggers.</summary>
+    public string? EventJson { get; private set; }
     public string Status { get; private set; } = AutomationRunStatuses.Running;
     public string ActionResultsJson { get; private set; } = "[]";
     public string? FailureSummary { get; private set; }

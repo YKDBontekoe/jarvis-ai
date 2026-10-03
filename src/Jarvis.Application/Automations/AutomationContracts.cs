@@ -33,7 +33,8 @@ public sealed record AutomationRunRecord(
     string? FailureSummary,
     Guid? ApprovalId,
     DateTimeOffset StartedAt,
-    DateTimeOffset? CompletedAt);
+    DateTimeOffset? CompletedAt,
+    string? EventJson = null);
 
 public sealed record SaveAutomationRuleRequest(string Name, JsonElement Definition)
 {
@@ -46,7 +47,7 @@ public sealed record AutomationRunRequest(string? IdempotencyKey, string Trigger
     bool TestRun);
 
 public sealed record AutomationRunWorkflowInput(Guid RuleId, Guid OwnerId, Guid RunId, string IdempotencyKey,
-    string TriggerKind, string TriggerReason, bool TestRun, bool AfterApproval = false);
+    string TriggerKind, string TriggerReason, bool TestRun, bool AfterApproval = false, string? EventJson = null);
 
 public sealed record AutomationScheduleWorkflowInput(Guid RuleId, Guid OwnerId, string ScheduleWorkflowId);
 
@@ -60,7 +61,7 @@ public sealed record AutomationRunActivityResult(bool Continue, string ActionRes
 public sealed record AutomationRunCloseInput(Guid RunId, Guid OwnerId, string Reason);
 
 public sealed record AutomationTriggerFireInput(Guid RuleId, Guid OwnerId, string TriggerKind, string TriggerReason,
-    string IdempotencyKey, bool TestRun);
+    string IdempotencyKey, bool TestRun, string? EventJson = null);
 
 public interface IAutomationRuleRepository
 {
@@ -187,6 +188,7 @@ public static class AutomationActionPolicy
         AgentRunActionDefinition => true,
         TaskActionDefinition => false,
         NotificationActionDefinition => false,
+        SetModeActionDefinition => false,
         _ => true
     };
 }
@@ -201,5 +203,5 @@ public static class AutomationRecordMapping
     public static AutomationRunRecord ToRecord(this AutomationRun run) => new(
         run.Id, run.RuleId, run.OwnerId, run.WorkflowId, run.IdempotencyKey, run.TriggerKind, run.TriggerReason,
         run.TestRun, run.Status, run.ActionResultsJson, run.FailureSummary, run.ApprovalId, run.StartedAt,
-        run.CompletedAt);
+        run.CompletedAt, run.EventJson);
 }

@@ -1,3 +1,4 @@
+using Jarvis.Application.Automations;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
@@ -118,8 +119,9 @@ public sealed class WhatsAppReadAlongReceiver(IServiceScopeFactory scopes, Whats
 
                 var messages = await bridge.PullObservedAsync(connection.Id, cancellationToken);
                 if (messages.Count == 0) continue;
-                await chats.StoreObservedAsync(connection.Id, messages.Select(ToObserved).ToArray(),
-                    cancellationToken);
+                var observed = messages.Select(ToObserved).ToArray();
+                if (await chats.StoreObservedAsync(connection.Id, observed, cancellationToken) > 0)
+                    await PublishReceivedAsync(scope.ServiceProvider, chats, connection, observed, cancellationToken);
                 await bridge.AckObservedAsync(connection.Id, messages.Select(message => message.Id),
                     cancellationToken);
             }
@@ -127,6 +129,24 @@ public sealed class WhatsAppReadAlongReceiver(IServiceScopeFactory scopes, Whats
             {
                 pushed.TryRemove(connection.Id, out _); // Bridge restarting or session unknown; push again next tick.
             }
+        }
+    }
+
+    // Automations hear about messages from other people. A redelivered batch starts nothing twice, because an
+    // event's fingerprint is part of the run's idempotency key.
+    private static async Task PublishReceivedAsync(IServiceProvider services, IWhatsAppAssistantRepository chats,
+        ChannelConnectionRecord connection, IReadOnlyList<ObservedWhatsAppMessage> messages,
+        CancellationToken cancellationToken)
+    {
+        var bus = services.GetService<Jarvis.Application.Automations.IAutomationEventBus>();
+        if (bus is null) return;
+        foreach (var message in messages.Where(x => !x.FromMe).Take(20))
+        {
+            var chat = await chats.GetChatAsync(connection.OwnerId, connection.Id, message.ChatId, cancellationToken);
+            await bus.TryPublishAsync(connection.OwnerId, new Jarvis.Application.Automations.AutomationEvent(
+                Jarvis.Application.Automations.AutomationEventKinds.MessageReceived,
+                chat?.DisplayName ?? WhatsAppChatIds.FallbackName(message.ChatId), message.Text, "whatsapp", null,
+                message.SentAt), cancellationToken);
         }
     }
 

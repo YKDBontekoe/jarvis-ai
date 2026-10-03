@@ -175,7 +175,7 @@ internal static class OwnerAutomationEndpoints
         return approved ? Results.Accepted() : Results.NoContent();
     }
 
-    private static object ToDto(AutomationRuleRecord rule) => ToDto(rule, null);
+    internal static object ToDto(AutomationRuleRecord rule) => ToDto(rule, null);
 
     private static object ToDto(AutomationRuleRecord rule, AutomationRunRecord? lastRun) => new
     {

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Jarvis.Application.Automations;
 using Jarvis.Domain.Automations;
 using Microsoft.Extensions.Logging;
@@ -140,5 +141,60 @@ public sealed class AutomationTriggerPublisher(
                 cancellationToken);
             if (created) await scheduler.StartRunAsync(run, cancellationToken);
         }
+    }
+}
+
+/// <summary>
+/// Starts every enabled automation whose event trigger matches. One run per rule and event: the event's
+/// fingerprint is the idempotency key, so a redelivered webhook or a repeated sync starts nothing twice. Each
+/// automation's own cooldown keeps a rule that triggers itself (a task it creates finishing) from looping.
+/// </summary>
+public sealed class AutomationEventBus(
+    IAutomationRuleRepository rules,
+    IAutomationRunRepository runs,
+    IAutomationScheduler scheduler,
+    ILogger<AutomationEventBus> logger) : IAutomationEventBus
+{
+    public async Task<int> PublishAsync(Guid ownerId, AutomationEvent ev, CancellationToken cancellationToken)
+    {
+        ev = ev.Normalize();
+        var started = 0;
+        foreach (var rule in (await rules.ListAsync(ownerId, cancellationToken))
+                     .Where(x => x.Status == AutomationRuleStatuses.Enabled))
+        {
+            try
+            {
+                if (AutomationDefinitionJson.Deserialize(rule.DefinitionJson).Trigger is not EventTriggerDefinition trigger ||
+                    !AutomationEventMatcher.Matches(trigger, ev))
+                    continue;
+                if (await rules.CountActiveRunsAsync(ownerId, cancellationToken) >=
+                    AutomationSchema.MaxConcurrentRunsPerOwner)
+                {
+                    logger.LogInformation("Event {EventKind} skipped: too many automation runs are active.", ev.Kind);
+                    break;
+                }
+
+                var reason = $"{AutomationEventKinds.Describe(ev.Kind)}: {ev.Title}";
+                var (run, created) = await runs.TryStartAsync(new AutomationTriggerFireInput(rule.Id, ownerId,
+                    AutomationTriggerKinds.Event, reason.Length <= 480 ? reason : reason[..480],
+                    ev.Fingerprint(), false, ev.ToJson()), cancellationToken);
+                if (!created) continue;
+                try
+                {
+                    await scheduler.StartRunAsync(run, cancellationToken);
+                    started++;
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    await runs.FailAsync(run.Id, "Jarvis could not start this run.", "[]", CancellationToken.None);
+                    logger.LogWarning(exception, "Automation {RuleId} could not be started for an event.", rule.Id);
+                }
+            }
+            catch (Exception exception) when (exception is JsonException or ArgumentException)
+            {
+                logger.LogWarning(exception, "Automation {RuleId} has an unreadable definition.", rule.Id);
+            }
+        }
+        return started;
     }
 }

@@ -78,6 +78,7 @@ api.MapConversationEndpoints();
 api.MapApprovalEndpoints();
 api.MapAutomationEndpoints(app.Logger);
 api.MapOwnerAutomationEndpoints(app.Logger);
+api.MapAutomationStudioEndpoints(app.Logger);
 api.MapIntegrationEndpoints();
 api.MapMcpCatalogEndpoints();
 api.MapNotificationEndpoints();
@@ -107,6 +108,12 @@ api.MapBrowserEndpoints();
 api.MapPersonalAssistantEndpoints();
 api.MapSearchEndpoints();
 api.MapPlannerEndpoints();
+api.MapTimelineEndpoints();
+api.MapInboxEndpoints(app.Logger);
+api.MapFinanceEndpoints(app.Logger);
+api.MapLibraryEndpoints(app.Logger);
+api.MapModeEndpoints(app.Logger);
+api.MapMissionEndpoints(app.Logger);
 
 app.MapA2AProtocol();
 

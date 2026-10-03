@@ -1,3 +1,4 @@
+using Jarvis.Application.Automations;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Workflows;
@@ -10,7 +11,8 @@ using System.Text.Json;
 
 namespace Jarvis.Infrastructure.Persistence;
 
-public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository, INotificationRepository,
+public sealed class WorkflowRepository(JarvisDbContext db,
+    Jarvis.Application.Automations.IAutomationEventBus? events = null) : IReminderRepository, INotificationRepository,
     IPushDeviceRepository, IJarvisTaskRepository
 {
     public async Task<PushDeviceRecord> RegisterAsync(Guid ownerId, string token, string platform,
@@ -184,6 +186,9 @@ public sealed class WorkflowRepository(JarvisDbContext db) : IReminderRepository
         }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        await events.TryPublishAsync(task.OwnerId, new Jarvis.Application.Automations.AutomationEvent(
+            Jarvis.Application.Automations.AutomationEventKinds.TaskCompleted, task.Title,
+            TaskFinishedBody(task.Title, summary), "task", task.Id, DateTimeOffset.UtcNow), cancellationToken);
     }
 
     /// <summary>The task title plus the first line of its result, so the notification is useful on its own.</summary>

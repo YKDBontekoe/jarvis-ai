@@ -243,7 +243,7 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
     {
         var client = await GetClientAsync(cancellationToken);
         var input = new AutomationRunWorkflowInput(run.RuleId, run.OwnerId, run.Id, run.IdempotencyKey,
-            run.TriggerKind, run.TriggerReason, run.TestRun);
+            run.TriggerKind, run.TriggerReason, run.TestRun, EventJson: run.EventJson);
         await client.StartWorkflowAsync(
             (AutomationRunWorkflow workflow) => workflow.RunAsync(input),
             new WorkflowOptions(id: run.WorkflowId, taskQueue: TaskQueue)

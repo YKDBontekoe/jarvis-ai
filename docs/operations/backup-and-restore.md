@@ -8,7 +8,7 @@ Each run writes `$JARVIS_BACKUP_DIR/jarvis-YYYYMMDDTHHMMSSZ/`:
 
 | File | Contents |
 |------|----------|
-| `jarvis.dump` | `pg_dump` (custom format) of the application database: conversations, memories, journal, people, expenses, settings, encrypted integration credentials |
+| `jarvis.dump` | `pg_dump` (custom format) of the application database: conversations, memories, journal, people, expenses, budgets, inbox and commitments, library and flashcards, missions, webhooks (hashed tokens), settings, encrypted integration credentials |
 | `temporal.dump` | `pg_dump` of the Temporal database: schedules and in-flight workflows |
 | `data-protection-keys.tar.gz` | The ASP.NET Core key ring. **Without it, stored integration credentials and MCP tokens cannot be decrypted after a restore.** |
 | `SHA256SUMS` | Checksums of the files as stored |

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../approvals/approvals_screen.dart';
+import 'automation_studio_screen.dart';
 import '../../json_maps.dart';
 import '../../schedule_format.dart';
 import '../../theme.dart';
@@ -237,6 +238,21 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
       title: const Text('Automations'),
       actions: [
         HeaderAction(
+          key: const Key('automations-studio'),
+          label: 'Studio',
+          icon: PhosphorIconsRegular.magicWand,
+          collapsesWhenNarrow: true,
+          onPressed: () async {
+            await Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) => AutomationStudioScreen(http: widget.http),
+              ),
+            );
+            if (mounted) await _load();
+          },
+        ),
+        const SizedBox(width: 8),
+        HeaderAction(
           label: 'New',
           icon: PhosphorIconsRegular.plus,
           onPressed: _loading && _rules.isEmpty ? null : _create,
@@ -396,6 +412,8 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
       upcoming = 'Scheduling the next run…';
     } else if (kind == 'manual') {
       upcoming = 'Runs when you start it.';
+    } else if (kind == 'event') {
+      upcoming = 'Runs as soon as it happens.';
     } else {
       upcoming = 'Watching for its trigger.';
     }
@@ -493,6 +511,7 @@ IconData triggerIcon(String? kind) => switch (kind) {
   'calendar_window' => PhosphorIconsRegular.calendarBlank,
   'public_json_threshold' => PhosphorIconsRegular.pulse,
   'manual' => PhosphorIconsRegular.handTap,
+  'event' => PhosphorIconsRegular.broadcast,
   _ => PhosphorIconsRegular.lightning,
 };
 
@@ -518,6 +537,21 @@ String describeTrigger(Map<String, dynamic> trigger, {String? deviceZone}) {
       return '$days at ${time(trigger['localTime'])}$zoneNote';
     case 'manual':
       return 'Only when you run it';
+    case 'event':
+      final filter = asJsonString(trigger['contains']);
+      final base = switch (asJsonString(trigger['eventKind'])) {
+        'webhook' => 'A webhook is called',
+        'message_received' => 'A message arrives in a chat you read along with',
+        'file_uploaded' => 'A file is uploaded',
+        'task_completed' => 'A task finishes',
+        'journal_saved' => 'A journal entry is saved',
+        'expense_logged' => 'An expense is logged',
+        'inbox_needs_reply' => 'A conversation needs a reply',
+        _ => 'Something happens',
+      };
+      return filter == null || filter.isEmpty
+          ? base
+          : '$base and mentions “$filter”';
     case 'reminder_due':
       return trigger['reminderId'] == null
           ? 'Whenever a reminder goes off'
@@ -550,6 +584,10 @@ String describeAction(Map<String, dynamic> action) {
     'notification' => 'notify you${quoted('title')}',
     'task' => 'create a task${quoted('title')}',
     'agent_run' => 'start an agent task${quoted('title')}',
+    'set_mode' =>
+      asJsonString(action['mode']) == 'auto'
+          ? 'let Jarvis choose the mode'
+          : 'switch to ${asJsonString(action['mode']) ?? 'a'} mode',
     'channel_message' =>
       'send a message to ${asJsonString(action['recipient']) ?? 'a contact'}',
     _ => 'do something',

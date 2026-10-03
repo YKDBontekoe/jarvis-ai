@@ -21,6 +21,7 @@ public static class AutomationTriggerKinds
     public const string DeviceBattery = "device_battery";
     public const string DeviceLocation = "device_location";
     public const string PublicJsonThreshold = "public_json_threshold";
+    public const string Event = "event";
 
     public static bool IsPolling(string kind) => kind is DeviceBattery or DeviceLocation
         or PublicJsonThreshold or CalendarWindow;
@@ -32,4 +33,5 @@ public static class AutomationActionKinds
     public const string Task = "task";
     public const string ChannelMessage = "channel_message";
     public const string AgentRun = "agent_run";
+    public const string SetMode = "set_mode";
 }

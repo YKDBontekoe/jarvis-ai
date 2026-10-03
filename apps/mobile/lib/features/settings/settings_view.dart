@@ -92,6 +92,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         icon: PhosphorIconsRegular.flowArrow,
         destination: 'automations',
       ),
+      (
+        title: 'Modes',
+        subtitle: 'Focus, meeting, sleep: when Jarvis stays quiet',
+        icon: PhosphorIconsRegular.moon,
+        destination: 'modes',
+      ),
     ],
   ),
   (

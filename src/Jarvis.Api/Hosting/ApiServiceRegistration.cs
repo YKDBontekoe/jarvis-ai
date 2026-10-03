@@ -127,6 +127,7 @@ internal static class ApiServiceRegistration
         services.AddScoped<IAutomationRuleService, AutomationRuleService>();
         services.AddScoped<IAutomationApprovalResolver, AutomationApprovalResolver>();
         services.AddScoped<IAutomationTriggerPublisher, AutomationTriggerPublisher>();
+        services.AddScoped<IAutomationEventBus, AutomationEventBus>();
         services.AddSingleton<IAutomationScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddScoped<IJarvisTaskRepository, WorkflowRepository>();
         services.AddScoped<IJarvisTaskService, JarvisTaskService>();

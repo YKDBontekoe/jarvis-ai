@@ -119,8 +119,9 @@ public static class ExpenseSources
     public const string Chat = "chat";
     public const string Receipt = "receipt";
     public const string App = "app";
+    public const string Import = "import";
 
-    public static bool IsValid(string? source) => source is Chat or Receipt or App;
+    public static bool IsValid(string? source) => source is Chat or Receipt or App or Import;
 }
 
 public static class ExpenseRules
@@ -308,4 +309,10 @@ public sealed record ReceiptReadResult(ReceiptReading? Reading, ReceiptReadFailu
 public interface IReceiptReader
 {
     Task<ReceiptReadResult> ReadAsync(Guid ownerId, Guid fileId, CancellationToken cancellationToken);
+}
+
+/// <summary>Told about every new expense, so budgets can warn the moment a limit is crossed.</summary>
+public interface IExpenseObserver
+{
+    Task OnExpenseCreatedAsync(Expense expense, CancellationToken cancellationToken);
 }

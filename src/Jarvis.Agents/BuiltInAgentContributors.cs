@@ -54,7 +54,7 @@ internal sealed class CoreAgentTools(
             loggerFactory.CreateLogger<MemoryAgentTools>(), recalls, context.Profile);
         var watchTools = new ConditionWatchAgentTools(watchService, currentUser);
         var reminderTools = new ReminderAgentTools(reminderService, currentUser, briefings, deviceTelemetry);
-        var automationTools = new AutomationAgentTools(automationRules, currentUser);
+        var automationTools = new AutomationAgentTools(automationRules, currentUser, briefings, timeProvider);
         var fileTools = new FileAgentTools(fileSearch, fileRepository, conversationFileScope, fileCitations, collections,
             currentUser, context.ConversationId, context.Profile);
         var clockTools = new ClockAgentTools(timeProvider ?? TimeProvider.System);
@@ -77,6 +77,9 @@ internal sealed class CoreAgentTools(
         yield return AIFunctionFactory.Create(watchTools.CancelConditionWatchAsync);
         yield return AIFunctionFactory.Create(automationTools.ListAutomationsAsync);
         yield return AIFunctionFactory.Create(automationTools.CreateAutomationAsync);
+        yield return AIFunctionFactory.Create(automationTools.PreviewAutomationAsync);
+        yield return AIFunctionFactory.Create(automationTools.ListAutomationTemplatesAsync);
+        yield return AIFunctionFactory.Create(automationTools.CreateAutomationFromTemplateAsync);
         yield return AIFunctionFactory.Create(automationTools.EnableAutomationAsync);
         yield return AIFunctionFactory.Create(automationTools.DisableAutomationAsync);
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(automationTools.RunAutomationAsync));
