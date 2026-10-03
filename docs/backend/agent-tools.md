@@ -64,7 +64,7 @@ Order is controlled by `Order` on each contributor (`CoreAgentContext` uses `Ord
 
 1. Implement methods on a small class in `Jarvis.Agents` with `[Description]` on parameters (model-facing docs).
 2. Register via `AIFunctionFactory.Create(...)` in an `IAgentToolContributor`.
-3. Wrap with `ApprovalRequiredAIFunction` when the action is sensitive.
+3. Wrap with `ApprovalRequiredAIFunction` when the action is sensitive. Map it in `ApprovalCategories` when it should share a standing-approval category with related tools; unmapped tools each get their own category, which the owner can always-allow from the approval card.
 4. Use Application services; never query `JarvisDbContext` from Agents.
 5. Add unit tests in `tests/unit/Jarvis.UnitTests` when behavior is non-trivial.
 

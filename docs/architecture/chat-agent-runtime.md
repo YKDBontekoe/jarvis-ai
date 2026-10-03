@@ -18,6 +18,8 @@ Interactive chat is the primary path: Flutter sends a message, the API runs an a
 
 Tools wrapped in `ApprovalRequiredAIFunction` (see `BuiltInAgentContributors.cs` and MCP/browser/coding wrappers) create a pending approval row. The client lists `GET /api/v1/approvals` and posts a decision to `/approvals/{id}/decision`. The agent run resumes with the user's choice.
 
+The owner can choose **Always allow** on that card. `rememberCategory: true` stores a standing grant for the action's category (`ApprovalCategories`: forgetting memories, using the browser, one MCP tool on one server, and so on). Later calls in that category run in the same turn without a new card, including voice and automation actions. Grants are listed and revoked at `GET`/`DELETE /api/v1/approvals/standing`. They are owner settings; assistant profiles cannot add or remove them.
+
 Idempotency: approval rows are guarded by a unique key on owner + request + tool call id.
 
 ## Tool failures and self-correction

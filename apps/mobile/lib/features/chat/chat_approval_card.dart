@@ -4,12 +4,16 @@ class ApprovalCard extends StatelessWidget {
   const ApprovalCard({
     required this.approval,
     required this.onDecide,
+    this.onAlwaysAllow,
     this.loadMemoryText,
     super.key,
   });
 
   final ApprovalEntry approval;
   final void Function(bool approved) onDecide;
+
+  /// Approves this call and stores a standing grant for its category.
+  final VoidCallback? onAlwaysAllow;
 
   /// Looks up the text of a memory so its approval shows what will be lost.
   final Future<String?> Function(String memoryId)? loadMemoryText;
@@ -34,6 +38,14 @@ class ApprovalCard extends StatelessWidget {
     final submitting = approval.status == ApprovalStatus.submitting;
     final colors = JarvisColors.of(context);
     final pending = !decided;
+    final showAlways =
+        pending &&
+        !needsRetry &&
+        approval.canRememberCategory &&
+        onAlwaysAllow != null;
+    final alwaysLabel = _lowerFirst(
+      approval.categoryLabel ?? 'this kind of action',
+    );
     final eyebrow = switch (approval.status) {
       ApprovalStatus.approved => 'Approved',
       ApprovalStatus.denied => 'Declined',
@@ -181,57 +193,88 @@ class ApprovalCard extends StatelessWidget {
                     ? const SizedBox(width: double.infinity)
                     : Padding(
                         padding: const EdgeInsets.only(top: 16),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            if (!needsRetry) ...[
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: submitting
-                                      ? null
-                                      : () => onDecide(false),
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: const Size(0, 46),
+                            Row(
+                              children: [
+                                if (!needsRetry) ...[
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: submitting
+                                          ? null
+                                          : () => onDecide(false),
+                                      style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size(0, 46),
+                                      ),
+                                      child: const Text('Decline'),
+                                    ),
                                   ),
-                                  child: const Text('Decline'),
+                                  const SizedBox(width: 10),
+                                ],
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    onPressed: submitting
+                                        ? null
+                                        : () {
+                                            unawaited(
+                                              HapticFeedback.mediumImpact(),
+                                            );
+                                            onDecide(
+                                              needsRetry
+                                                  ? (approval.decision ?? true)
+                                                  : true,
+                                            );
+                                          },
+                                    style: FilledButton.styleFrom(
+                                      minimumSize: const Size(0, 46),
+                                    ),
+                                    icon: submitting
+                                        ? SizedBox.square(
+                                            dimension: 14,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: colors.muted,
+                                            ),
+                                          )
+                                        : Icon(
+                                            needsRetry
+                                                ? PhosphorIconsRegular
+                                                      .arrowsClockwise
+                                                : PhosphorIconsRegular.check,
+                                            size: 18,
+                                          ),
+                                    label: Text(
+                                      needsRetry ? 'Retry' : 'Approve',
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                            ],
-                            Expanded(
-                              child: FilledButton.icon(
+                              ],
+                            ),
+                            if (showAlways) ...[
+                              const SizedBox(height: 6),
+                              TextButton(
                                 onPressed: submitting
                                     ? null
-                                    : () {
-                                        unawaited(
-                                          HapticFeedback.mediumImpact(),
-                                        );
-                                        onDecide(
-                                          needsRetry
-                                              ? (approval.decision ?? true)
-                                              : true,
-                                        );
-                                      },
-                                style: FilledButton.styleFrom(
-                                  minimumSize: const Size(0, 46),
-                                ),
-                                icon: submitting
-                                    ? SizedBox.square(
-                                        dimension: 14,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: colors.muted,
+                                    : () => unawaited(
+                                        _confirmAlwaysAllow(
+                                          context,
+                                          alwaysLabel,
                                         ),
-                                      )
-                                    : Icon(
-                                        needsRetry
-                                            ? PhosphorIconsRegular
-                                                  .arrowsClockwise
-                                            : PhosphorIconsRegular.check,
-                                        size: 18,
                                       ),
-                                label: Text(needsRetry ? 'Retry' : 'Approve'),
+                                style: TextButton.styleFrom(
+                                  minimumSize: const Size(0, 40),
+                                  alignment: Alignment.centerLeft,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                ),
+                                child: Text(
+                                  'Always allow $alwaysLabel',
+                                  textAlign: TextAlign.start,
+                                ),
                               ),
-                            ),
+                            ],
                           ],
                         ),
                       ),
@@ -242,7 +285,37 @@ class ApprovalCard extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _confirmAlwaysAllow(BuildContext context, String label) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Always allow this?'),
+        content: Text(
+          'Jarvis will approve $label from now on, without asking. You can turn this off in Approvals.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Always allow'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      unawaited(HapticFeedback.mediumImpact());
+      onAlwaysAllow?.call();
+    }
+  }
 }
+
+/// "Forgetting memories" → "forgetting memories".
+String _lowerFirst(String text) =>
+    text.isEmpty ? text : text[0].toLowerCase() + text.substring(1);
 
 /// "start time" → "Start time".
 String _sentence(String text) =>

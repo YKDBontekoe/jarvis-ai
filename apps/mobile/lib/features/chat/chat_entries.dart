@@ -265,6 +265,8 @@ class ApprovalEntry extends ChatEntry {
     this.decision,
     this.error,
     this.retry = false,
+    this.categoryLabel,
+    this.canRememberCategory = false,
   });
 
   final String id;
@@ -277,6 +279,12 @@ class ApprovalEntry extends ChatEntry {
   /// The decision was recorded earlier but resuming the agent failed.
   final bool retry;
 
+  /// Owner-facing name of the action category, such as "Forgetting memories".
+  final String? categoryLabel;
+
+  /// The server can store a standing grant for this category.
+  final bool canRememberCategory;
+
   static ApprovalEntry? fromJson(Object? value) {
     if (value is! Map) return null;
     final id = value['id'] ?? value['Id'];
@@ -285,12 +293,19 @@ class ApprovalEntry extends ChatEntry {
     final arguments = value['argumentsJson'] ?? value['ArgumentsJson'];
     final status = value['status'];
     final approved = value['approved'];
+    final label = value['categoryLabel'] ?? value['CategoryLabel'];
     return ApprovalEntry(
       id: id,
       toolName: tool,
       argumentsJson: arguments is String ? arguments : '{}',
       retry: status is String && status != 'pending',
       decision: approved is bool ? approved : null,
+      categoryLabel: label is String && label.trim().isNotEmpty
+          ? label.trim()
+          : null,
+      canRememberCategory:
+          value['canRememberCategory'] == true ||
+          value['CanRememberCategory'] == true,
     );
   }
 
@@ -322,6 +337,8 @@ class ApprovalEntry extends ChatEntry {
     decision: clearDecision ? null : decision ?? this.decision,
     error: clearError ? null : error ?? this.error,
     retry: retry,
+    categoryLabel: categoryLabel,
+    canRememberCategory: canRememberCategory,
   );
 }
 

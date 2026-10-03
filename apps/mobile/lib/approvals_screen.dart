@@ -21,6 +21,7 @@ class ApprovalsScreen extends StatefulWidget {
 
 class _ApprovalsScreenState extends State<ApprovalsScreen> {
   List<Map<String, dynamic>> _approvals = [];
+  List<Map<String, dynamic>> _standing = [];
   bool _loading = true;
   String? _error;
   String? _processingId;
@@ -41,16 +42,28 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
     });
     try {
       final response = await widget.http.get<dynamic>('/api/v1/approvals');
+      var standing = _standing;
+      if (widget.conversationId == null) {
+        try {
+          final granted = await widget.http.get<dynamic>(
+            '/api/v1/approvals/standing',
+          );
+          standing = jsonMaps(granted.data);
+        } catch (_) {
+          standing = _standing;
+        }
+      }
       if (mounted && revision == _requestRevision) {
-        setState(
-          () => _approvals = jsonMaps(response.data)
+        setState(() {
+          _approvals = jsonMaps(response.data)
               .where(
                 (approval) =>
                     widget.conversationId == null ||
                     approval['conversationId'] == widget.conversationId,
               )
-              .toList(),
-        );
+              .toList();
+          _standing = standing;
+        });
       }
     } on DioException {
       if (mounted && revision == _requestRevision) {
@@ -67,7 +80,11 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
     }
   }
 
-  Future<void> _decide(Map<String, dynamic> approval, bool approved) async {
+  Future<void> _decide(
+    Map<String, dynamic> approval,
+    bool approved, {
+    bool rememberCategory = false,
+  }) async {
     final id = jsonString(approval, 'id');
     if (id == null) return;
     final retrying = approval['status'] != 'pending';
@@ -121,7 +138,10 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
     try {
       await widget.http.post(
         '/api/v1/approvals/$id/decision',
-        data: {'approved': approved},
+        data: {
+          'approved': approved,
+          if (rememberCategory) 'rememberCategory': true,
+        },
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -129,6 +149,8 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
             content: Text(
               retrying
                   ? 'Jarvis resumed the previous decision.'
+                  : rememberCategory
+                  ? 'Allowed from now on. Jarvis can do this without asking.'
                   : approved
                   ? 'Tool call approved.'
                   : 'Tool call rejected.',
@@ -142,8 +164,9 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         final message = error.response?.statusCode == 409
             ? 'This approval was already decided.'
             : 'Jarvis could not process this decision.';
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
         await _load();
       }
     } catch (_) {
@@ -158,6 +181,116 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
     } finally {
       if (mounted) setState(() => _processingId = null);
     }
+  }
+
+  Future<void> _alwaysAllow(Map<String, dynamic> approval) async {
+    final label = _lowerFirst(
+      asJsonString(approval['categoryLabel']) ?? 'this kind of action',
+    );
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Always allow this?'),
+        content: Text(
+          'Jarvis will approve $label from now on, without asking. You can turn this off here later.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Always allow'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _decide(approval, true, rememberCategory: true);
+  }
+
+  Future<void> _revoke(Map<String, dynamic> grant) async {
+    final category = asJsonString(grant['category']);
+    if (category == null) return;
+    final label = asJsonString(grant['label']) ?? 'this action';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Ask again next time?'),
+        content: Text(
+          'Jarvis will stop approving ${_lowerFirst(label)} on its own.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep allowing'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Turn off'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _processingId = 'standing:$category');
+    try {
+      await widget.http.delete<dynamic>(
+        '/api/v1/approvals/standing',
+        queryParameters: {'category': category},
+      );
+      await _load();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Jarvis could not turn this off.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _processingId = null);
+    }
+  }
+
+  Widget _standingSection() {
+    final colors = JarvisColors.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+          child: Text(
+            'ALWAYS ALLOWED',
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: colors.muted),
+          ),
+        ),
+        for (final grant in _standing)
+          SurfaceCard(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                const IconBadge(icon: PhosphorIconsRegular.shieldCheck),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    asJsonString(grant['label']) ?? 'Allowed action',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _processingId == null
+                      ? () => _revoke(grant)
+                      : null,
+                  child: const Text('Turn off'),
+                ),
+              ],
+            ),
+          ),
+        if (_approvals.isNotEmpty) const SizedBox(height: 8),
+      ],
+    );
   }
 
   String _formatArguments(String? raw) {
@@ -187,7 +320,9 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
     body: ListScreenBody(
       loading: _loading,
       error: _error,
-      isEmpty: _approvals.isEmpty,
+      isEmpty:
+          _approvals.isEmpty &&
+          (widget.conversationId != null || _standing.isEmpty),
       onRetry: _load,
       onRefresh: _load,
       empty: const EmptyState(
@@ -195,14 +330,22 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         title: 'All clear',
         message: 'No tool calls are waiting for approval.',
       ),
-      child: ListView.builder(
+      child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-        itemCount: _approvals.length,
-        itemBuilder: (context, index) =>
+        children: [
+          if (widget.conversationId == null && _standing.isNotEmpty)
+            ContentWidth(child: _standingSection()),
+          if (_approvals.isEmpty)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(8, 28, 8, 12),
+              child: Text('No tool calls are waiting for approval.'),
+            ),
+          for (var index = 0; index < _approvals.length; index++)
             FadeSlideIn(
               index: index,
               child: ContentWidth(child: _approvalCard(_approvals[index])),
             ),
+        ],
       ),
     ),
   );
@@ -244,8 +387,9 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
           const SizedBox(height: 16),
           Text(
             'ARGUMENTS',
-            style: Theme.of(context).textTheme.labelSmall
-                ?.copyWith(color: JarvisColors.of(context).muted),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: JarvisColors.of(context).muted,
+            ),
           ),
           const SizedBox(height: 8),
           _ArgumentsBlock(
@@ -284,11 +428,24 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
               ),
             ],
           ),
+          if (pending && approval['canRememberCategory'] == true)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: busy ? null : () => _alwaysAllow(approval),
+                child: Text(
+                  'Always allow ${_lowerFirst(asJsonString(approval['categoryLabel']) ?? 'this kind of action')}',
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 }
+
+String _lowerFirst(String text) =>
+    text.isEmpty ? text : text[0].toLowerCase() + text.substring(1);
 
 class _ArgumentsBlock extends StatelessWidget {
   const _ArgumentsBlock(this.text);

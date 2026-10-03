@@ -128,7 +128,7 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
     [
       (
         title: 'Approvals',
-        subtitle: 'Actions waiting for your OK',
+        subtitle: 'Actions waiting for your OK, and ones you always allow',
         icon: PhosphorIconsRegular.shieldCheck,
         destination: 'approvals',
       ),

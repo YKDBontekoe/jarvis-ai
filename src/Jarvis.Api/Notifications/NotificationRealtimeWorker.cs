@@ -1,5 +1,4 @@
 using Jarvis.Api.Realtime;
-using Jarvis.Domain.Approvals;
 using Jarvis.Infrastructure.Persistence;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -88,7 +87,7 @@ public sealed class NotificationRealtimeWorker(
                         cancellationToken);
                 if (approval is { Status: "pending" })
                     await PublishSafelyAsync(hub.Clients.Group(JarvisEventsHub.GroupName(approval.ConversationId)),
-                        "tool.approval_required", ToApprovalEvent(approval), cancellationToken);
+                        "tool.approval_required", ApprovalRealtime.Required(approval), cancellationToken);
             }
 
             _watermark = notification.CreatedAt;
@@ -113,12 +112,4 @@ public sealed class NotificationRealtimeWorker(
         }
     }
 
-    private static object ToApprovalEvent(ToolApproval approval) => new
-    {
-        approval.Id,
-        approval.ConversationId,
-        approval.ToolName,
-        approval.ArgumentsJson,
-        approval.CreatedAt
-    };
 }

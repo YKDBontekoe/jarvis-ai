@@ -43,8 +43,19 @@ public sealed class VoiceBackendSession(
 
         if (VoiceTools.RequiresApproval(function))
         {
+            var arguments = argumentsJson ?? "{}";
+            var category = ApprovalCategories.Resolve(function.Name, arguments);
+            var standing = scope.ServiceProvider.GetRequiredService<IStandingApprovalService>();
+            if (category.CanRemember && await standing.IsGrantedAsync(ownerId, category.Key, cancellationToken))
+            {
+                await standing.RecordAutomaticUseAsync(ownerId, function.Name, category, conversationId,
+                    cancellationToken);
+                return await ExecuteAsync(scope.ServiceProvider, ownerId, conversationId,
+                    VoiceTools.UnwrapApprovals(function), arguments, cancellationToken);
+            }
+
             var approval = await CreateApprovalAsync(scope.ServiceProvider, ownerId, conversationId, function.Name,
-                argumentsJson ?? "{}", cancellationToken);
+                arguments, cancellationToken);
             return new VoiceToolInvocation(VoiceTools.ApprovalNeeded, false, true, approval.Id);
         }
 
@@ -134,14 +145,8 @@ public sealed class VoiceBackendSession(
             VoiceTools.NewApprovalRequestId(), Guid.CreateVersion7().ToString("N"), toolName, argumentsJson, null,
             cancellationToken);
         var approval = created.Approval;
-        await PublishAsync(conversationId, "tool.approval_required", new
-        {
-            approval.Id,
-            approval.ConversationId,
-            approval.ToolName,
-            approval.ArgumentsJson,
-            approval.CreatedAt
-        }, cancellationToken);
+        await PublishAsync(conversationId, "tool.approval_required",
+            ApprovalRealtime.Required(approval), cancellationToken);
         if (created.Created)
             await PublishToOwnerAsync(ownerId, "notification.created", new
             {

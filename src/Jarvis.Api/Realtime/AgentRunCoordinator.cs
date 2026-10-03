@@ -99,8 +99,8 @@ public sealed class AgentRunCoordinator(
                 var created = await approvals.CreateAsync(ownerId, conversationId, request.RequestId,
                     request.ToolCallId, request.ToolName, request.ArgumentsJson, taskId, cancellationToken);
                 pending.Add(created.Approval);
-                await PublishSafelyAsync(clients, "tool.approval_required", ToApprovalEvent(created.Approval),
-                    conversationId, cancellationToken);
+                await PublishSafelyAsync(clients, "tool.approval_required",
+                    ApprovalRealtime.Required(created.Approval), conversationId, cancellationToken);
                 if (created.Created)
                     await PublishSafelyAsync(hub.Clients.Group(JarvisEventsHub.OwnerGroupName(ownerId)),
                         "notification.created",
@@ -285,7 +285,7 @@ public sealed class AgentRunCoordinator(
                     request.ToolCallId, request.ToolName, request.ArgumentsJson, taskId, cancellationToken);
                 var approval = created.Approval;
                 pending.Add(approval);
-                await PublishSafelyAsync(clients, "tool.approval_required", ToApprovalEvent(approval),
+                await PublishSafelyAsync(clients, "tool.approval_required", ApprovalRealtime.Required(approval),
                     conversationId, cancellationToken);
                 if (created.Created)
                     await PublishSafelyAsync(hub.Clients.Group(JarvisEventsHub.OwnerGroupName(ownerId)),
@@ -393,15 +393,6 @@ public sealed class AgentRunCoordinator(
             }
         });
     }
-
-    private static object ToApprovalEvent(ToolApprovalRecord approval) => new
-    {
-        approval.Id,
-        approval.ConversationId,
-        approval.ToolName,
-        approval.ArgumentsJson,
-        approval.CreatedAt
-    };
 
     private static void CloseOutstandingToolSpans(
         Dictionary<string, (Activity? Span, long StartedAt)> activeToolSpans, string outcome)

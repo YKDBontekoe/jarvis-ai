@@ -31,7 +31,8 @@ public sealed class RemoteQueryExecutor(
         return await turns.RegenerateAsync(ownerId, conversationId, query.Token);
     }
 
-    public async Task<ConversationTurnResult> DecideAsync(Guid ownerId, Guid approvalId, bool approved)
+    public async Task<ConversationTurnResult> DecideAsync(Guid ownerId, Guid approvalId, bool approved,
+        bool rememberCategory = false)
     {
         await using var scope = scopes.CreateOwnerScope(ownerId);
         var approvals = scope.ServiceProvider.GetRequiredService<Jarvis.Application.Approvals.IToolApprovalStore>();
@@ -40,6 +41,6 @@ public sealed class RemoteQueryExecutor(
 
         using var query = queries.Begin(ownerId, pending.ConversationId, lifetime.ApplicationStopping);
         var decisions = scope.ServiceProvider.GetRequiredService<ApprovalDecisionService>();
-        return await decisions.DecideAsync(ownerId, approvalId, approved, query.Token);
+        return await decisions.DecideAsync(ownerId, approvalId, approved, query.Token, rememberCategory);
     }
 }
