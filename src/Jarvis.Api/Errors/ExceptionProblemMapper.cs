@@ -90,7 +90,7 @@ internal static class ExceptionProblemMapper
     {
         var (code, title, detail) = StatusCodeProblemDefaults.For(statusCode);
         return new MappedProblem(code, title, statusCode,
-            statusCode == StatusCodes.Status400BadRequest ? "The request body could not be read." : detail);
+            statusCode == StatusCodes.Status400BadRequest ? "The request could not be read." : detail);
     }
 
     private static string SafeClientMessage(Exception exception, string fallback)
