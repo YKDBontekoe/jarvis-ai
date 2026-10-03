@@ -46,6 +46,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton<Jarvis.Application.People.IPeopleCheckInScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddHostedService<TemporalWorkflowReconciler>();
         services.AddHostedService<MemoryIndexingWorker>();
+        services.AddHostedService<MissionSupervisor>();
         services.AddHostedService<TemporalWorkerHostedService>();
         services.AddScoped<IReminderService, ReminderService>();
         services.AddScoped<IConditionWatchService, ConditionWatchService>();

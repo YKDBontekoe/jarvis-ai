@@ -3,6 +3,7 @@ using Jarvis.Application.Expenses;
 using Jarvis.Application.Finance;
 using Jarvis.Application.Inbox;
 using Jarvis.Application.Library;
+using Jarvis.Application.Missions;
 using Jarvis.Application.Modes;
 using Jarvis.Infrastructure.Library;
 using Jarvis.Application.Timeline;
@@ -49,6 +50,10 @@ public static class LifeFeaturesRegistration
 
         // Context modes: stored in the owner's settings, so no tables of their own.
         services.AddScoped<IModeService, ModeService>();
+
+        // Mission control: a supervised crew of tasks working on one goal.
+        services.AddScoped<IMissionRepository, MissionRepository>();
+        services.AddScoped<IMissionService, MissionService>();
         return services;
     }
 }

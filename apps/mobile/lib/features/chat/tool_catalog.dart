@@ -209,6 +209,41 @@ const _catalog = <String, ToolDescription>{
     'Switched mode',
     PhosphorIconsRegular.moon,
   ),
+  'PlanMission': ToolDescription(
+    'Planning a mission',
+    'Planned a mission',
+    PhosphorIconsRegular.flowArrow,
+  ),
+  'RunMission': ToolDescription(
+    'Starting a mission',
+    'Started a mission',
+    PhosphorIconsRegular.play,
+  ),
+  'GetMissions': ToolDescription(
+    'Checking your missions',
+    'Checked your missions',
+    PhosphorIconsRegular.flowArrow,
+  ),
+  'PauseOrResumeMission': ToolDescription(
+    'Pausing a mission',
+    'Changed a mission',
+    PhosphorIconsRegular.pauseCircle,
+  ),
+  'CancelMission': ToolDescription(
+    'Cancelling a mission',
+    'Cancelled a mission',
+    PhosphorIconsRegular.stopCircle,
+  ),
+  'PostToBlackboard': ToolDescription(
+    'Sharing a note with the crew',
+    'Shared a note with the crew',
+    PhosphorIconsRegular.notePencil,
+  ),
+  'ReadBlackboard': ToolDescription(
+    'Reading the crew notes',
+    'Read the crew notes',
+    PhosphorIconsRegular.notePencil,
+  ),
   'ListWhatsAppChats': ToolDescription(
     'Checking your WhatsApp',
     'Checked your WhatsApp',
