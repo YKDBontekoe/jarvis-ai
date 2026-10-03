@@ -8,6 +8,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../finance/finance_screen.dart';
 import 'expense_editor.dart';
 import 'expense_models.dart';
 
@@ -122,6 +123,20 @@ class _ExpensesScreenState extends State<ExpensesScreen>
       appBar: AppBar(
         title: const Text('Expenses'),
         actions: [
+          HeaderAction(
+            key: const Key('expenses-finance'),
+            label: 'Budgets & bills',
+            icon: PhosphorIconsRegular.chartLine,
+            collapsesWhenNarrow: true,
+            onPressed: () => unawaited(
+              Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => FinanceScreen(http: widget.http),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           HeaderAction(
             key: const Key('expenses-scan'),
             label: 'Scan receipt',

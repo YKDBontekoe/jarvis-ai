@@ -99,6 +99,46 @@ const _catalog = <String, ToolDescription>{
     'Updated a promise',
     PhosphorIconsRegular.checkCircle,
   ),
+  'GetFinanceOverview': ToolDescription(
+    'Checking your finances',
+    'Checked your finances',
+    PhosphorIconsRegular.chartLine,
+  ),
+  'GetBudgets': ToolDescription(
+    'Checking your budgets',
+    'Checked your budgets',
+    PhosphorIconsRegular.wallet,
+  ),
+  'SetBudget': ToolDescription(
+    'Setting a budget',
+    'Set a budget',
+    PhosphorIconsRegular.wallet,
+  ),
+  'RemoveBudget': ToolDescription(
+    'Removing a budget',
+    'Removed a budget',
+    PhosphorIconsRegular.trash,
+  ),
+  'GetSubscriptions': ToolDescription(
+    'Looking at your subscriptions',
+    'Looked at your subscriptions',
+    PhosphorIconsRegular.repeat,
+  ),
+  'SetSubscriptionStatus': ToolDescription(
+    'Updating a subscription',
+    'Updated a subscription',
+    PhosphorIconsRegular.repeat,
+  ),
+  'RemindBeforeCharge': ToolDescription(
+    'Setting a charge reminder',
+    'Set a charge reminder',
+    PhosphorIconsRegular.bell,
+  ),
+  'ImportBankStatement': ToolDescription(
+    'Reading a bank statement',
+    'Read a bank statement',
+    PhosphorIconsRegular.uploadSimple,
+  ),
   'ListWhatsAppChats': ToolDescription(
     'Checking your WhatsApp',
     'Checked your WhatsApp',

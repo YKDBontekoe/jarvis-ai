@@ -13,7 +13,7 @@ internal sealed class ExpenseConfiguration : IEntityTypeConfiguration<ExpenseEnt
         {
             table.HasCheckConstraint("ck_expenses_amount_positive", "amount > 0");
             table.HasCheckConstraint("ck_expenses_category", $"category IN ({categories})");
-            table.HasCheckConstraint("ck_expenses_source", "source IN ('chat', 'receipt', 'app')");
+            table.HasCheckConstraint("ck_expenses_source", "source IN ('chat', 'receipt', 'app', 'import')");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedNever();

@@ -3,8 +3,8 @@ using Jarvis.Domain.Expenses;
 
 namespace Jarvis.Application.Expenses;
 
-public sealed class ExpenseService(IExpenseRepository expenses, IFileService files, TimeProvider? timeProvider = null)
-    : IExpenseService
+public sealed class ExpenseService(IExpenseRepository expenses, IFileService files, TimeProvider? timeProvider = null,
+    IExpenseObserver? observer = null) : IExpenseService
 {
     private const int TopMerchantCount = 5;
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
@@ -55,6 +55,7 @@ public sealed class ExpenseService(IExpenseRepository expenses, IFileService fil
             ExpenseCategories.Normalize(draft.Category) ?? ExpenseCategories.Guess(merchant, note), note, spentOn,
             draft.ReceiptFileId, ExpenseSources.IsValid(draft.Source) ? draft.Source : ExpenseSources.App, now, now);
         await expenses.AddAsync(expense, cancellationToken);
+        await NotifyAsync(expense, cancellationToken);
         return ExpenseOperation<ExpenseCreated>.Ok(new ExpenseCreated(expense, false));
     }
 
@@ -137,6 +138,19 @@ public sealed class ExpenseService(IExpenseRepository expenses, IFileService fil
     {
         var from = new DateOnly(Math.Clamp(year, 2000, 2100), Math.Clamp(month, 1, 12), 1);
         return (from, from.AddMonths(1).AddDays(-1));
+    }
+
+    // Budget warnings are a bonus: a failing observer must never lose the expense that was just saved.
+    private async Task NotifyAsync(Expense expense, CancellationToken cancellationToken)
+    {
+        if (observer is null) return;
+        try
+        {
+            await observer.OnExpenseCreatedAsync(expense, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+        }
     }
 
     private async Task<(string Field, string Message)?> ValidateAsync(Guid ownerId, ExpenseDraft draft,

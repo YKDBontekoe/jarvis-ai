@@ -1,3 +1,5 @@
+using Jarvis.Application.Expenses;
+using Jarvis.Application.Finance;
 using Jarvis.Application.Inbox;
 using Jarvis.Application.Timeline;
 using Jarvis.Infrastructure.Persistence;
@@ -25,6 +27,11 @@ public static class LifeFeaturesRegistration
         services.AddScoped<IInboxRepository, InboxRepository>();
         services.AddScoped<IInboxService, InboxService>();
         services.AddScoped<ICommitmentService, CommitmentService>();
+
+        // Finance autopilot: budgets, subscriptions, forecast, bank import.
+        services.AddScoped<IFinanceRepository, FinanceRepository>();
+        services.AddScoped<IFinanceService, FinanceService>();
+        services.AddScoped<IExpenseObserver, BudgetExpenseObserver>();
         return services;
     }
 }

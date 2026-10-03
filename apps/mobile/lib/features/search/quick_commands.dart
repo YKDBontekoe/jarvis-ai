@@ -98,6 +98,12 @@ const quickCommands = [
     keywords: ['expenses', 'expense', 'spend', 'uitgaven', 'kosten'],
   ),
   QuickCommand(
+    label: 'Go to Budgets & subscriptions',
+    icon: PhosphorIconsRegular.chartLine,
+    destination: 'finance',
+    keywords: ['finance', 'budget', 'budgets', 'subscriptions', 'abonnementen', 'forecast', 'import'],
+  ),
+  QuickCommand(
     label: 'Go to Journal',
     icon: PhosphorIconsRegular.pencilSimple,
     destination: 'journal',

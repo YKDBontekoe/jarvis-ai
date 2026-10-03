@@ -109,6 +109,7 @@ api.MapSearchEndpoints();
 api.MapPlannerEndpoints();
 api.MapTimelineEndpoints();
 api.MapInboxEndpoints(app.Logger);
+api.MapFinanceEndpoints(app.Logger);
 
 app.MapA2AProtocol();
 

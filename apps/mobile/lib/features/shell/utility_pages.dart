@@ -6,6 +6,7 @@ import '../audit/audit_screen.dart';
 import '../watches/condition_watches_screen.dart';
 import '../briefing/daily_briefing_screen.dart';
 import '../files/files_screen.dart';
+import '../finance/finance_screen.dart';
 import '../inbox/inbox_screen.dart';
 import '../integrations/integrations_screen.dart';
 import '../memory/memory_screen.dart';
@@ -90,6 +91,7 @@ Widget? utilityPageFor(
   'timeline' => TimelineScreen(http: http),
   'inbox' => InboxScreen(http: http),
   'expenses' => ExpensesScreen(http: http),
+  'finance' => FinanceScreen(http: http),
   'habits' => HabitsScreen(http: http),
   'people' => PeopleScreen(http: http),
   'approvals' => ApprovalsScreen(http: http),
