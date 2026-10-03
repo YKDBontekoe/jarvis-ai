@@ -88,11 +88,15 @@ public sealed class CodexWebSearchTests
         Assert.Equal("--disable", start.ArgumentList[start.ArgumentList.IndexOf("standalone_web_search") - 1]);
         Assert.Equal("-c", start.ArgumentList[start.ArgumentList.IndexOf("web_search=\"live\"") - 1]);
         Assert.DoesNotContain(start.ArgumentList, argument => argument.Contains("web_search_request"));
+        // Hosted search runs through the code-mode host; disabling it makes every search fail.
+        Assert.DoesNotContain("code_mode_host", start.ArgumentList);
 
-        var disabled = CodexCliChatClient.CreateAppServerStart("codex", Path.GetTempPath(), enableWebSearch: false);
+        var disabled = CodexCliChatClient.CreateAppServerStart("codex", Path.GetTempPath(), enableWebSearch: false,
+            CodexAccess.Strict);
         Assert.Equal("--disable", disabled.ArgumentList[disabled.ArgumentList.IndexOf("standalone_web_search") - 1]);
         Assert.DoesNotContain("web_search=\"live\"", disabled.ArgumentList);
         Assert.Contains("web_search=\"disabled\"", disabled.ArgumentList);
+        Assert.Equal("--disable", disabled.ArgumentList[disabled.ArgumentList.IndexOf("code_mode_host") - 1]);
     }
 
     [Fact]

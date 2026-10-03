@@ -349,6 +349,9 @@ mixin _ChatScreenSession on _ChatScreenController {
           _signingOut) {
         return;
       }
+      // A message sent while this history was loading (a queued one going out after a reconnect) is not stored yet.
+      // Replacing the transcript now would drop its bubble and placeholder; the send reconciles itself.
+      if (_sending) return;
       setState(() => _replaceTranscript(jsonObject(messages.data), approvals));
       if (approvals == null) {
         unawaited(_syncConversationApprovals());

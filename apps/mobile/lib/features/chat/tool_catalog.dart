@@ -354,6 +354,16 @@ const _catalog = <String, ToolDescription>{
     'Searched the web',
     PhosphorIconsRegular.magnifyingGlass,
   ),
+  'RunCommand': ToolDescription(
+    'Running a command',
+    'Ran a command',
+    PhosphorIconsRegular.terminalWindow,
+  ),
+  'EditFiles': ToolDescription(
+    'Editing files',
+    'Edited files',
+    PhosphorIconsRegular.pencilSimple,
+  ),
   'BrowseTheWeb': ToolDescription(
     'Using the isolated browser',
     'Used the isolated browser',

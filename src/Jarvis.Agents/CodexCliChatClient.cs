@@ -11,14 +11,16 @@ using Microsoft.Extensions.AI;
 namespace Jarvis.Agents;
 
 /// <summary>
-/// Bridges Microsoft.Extensions.AI to the authenticated Codex CLI app-server. Codex tools
-/// and MCP servers are disabled; Jarvis functions are returned as structured calls and remain
-/// under Agent Framework's normal execution and approval pipeline.
+/// Bridges Microsoft.Extensions.AI to the authenticated Codex CLI app-server. Codex's MCP servers
+/// are disabled and its own tools follow <see cref="CodexAccess"/>; Jarvis functions are returned as
+/// structured calls and remain under Agent Framework's normal execution and approval pipeline.
 /// </summary>
 public sealed partial class CodexCliChatClient(CodexExecutable executable, string? model = null, string? visionModel = null,
     IReadOnlyDictionary<string, string>? modelClasses = null, bool enableWebSearch = true,
-    int turnTimeoutSeconds = 300, CodexProcessLimiter? processLimiter = null) : IChatClient
+    int turnTimeoutSeconds = 300, CodexProcessLimiter? processLimiter = null, CodexAccess? access = null) : IChatClient
 {
+    private readonly CodexAccess _access = access ?? CodexAccess.Open;
+
     private static readonly ActivitySource ActivitySource = new("Jarvis.CodexChatClient");
     private static readonly Meter Meter = new("Jarvis.CodexChatClient");
     private static readonly Histogram<double> ModelCallDuration = Meter.CreateHistogram<double>(
@@ -79,7 +81,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
     {
         ArgumentNullException.ThrowIfNull(messages);
         var tools = options?.Tools?.OfType<AIFunction>().ToArray() ?? [];
-        var prompt = BuildPrompt(messages, options, tools, enableWebSearch);
+        var prompt = BuildPrompt(messages, options, tools, enableWebSearch, _access.AllowShell);
         return await RunCodexAsync(prompt, options?.ModelId ?? model,
             GetReasoningEffort(options),
             tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal), null, cancellationToken);
@@ -90,7 +92,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
     {
         ArgumentNullException.ThrowIfNull(messages);
         var tools = options?.Tools?.OfType<AIFunction>().ToArray() ?? [];
-        var prompt = BuildPrompt(messages, options, tools, enableWebSearch);
+        var prompt = BuildPrompt(messages, options, tools, enableWebSearch, _access.AllowShell);
         var updates = Channel.CreateUnbounded<ChatResponseUpdate>(new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -146,7 +148,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         {
             Directory.CreateDirectory(scratch);
             var executablePath = executable.Resolve();
-            using var process = new Process { StartInfo = CreateAppServerStart(executablePath, scratch, enableWebSearch) };
+            using var process = new Process { StartInfo = CreateAppServerStart(executablePath, scratch, enableWebSearch, _access) };
             if (!process.Start()) throw new InvalidOperationException("Could not start the Codex CLI app-server.");
 
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -163,7 +165,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
             using var reader = process.StandardOutput;
             try
             {
-                var rpc = new AppServerConnection(writer, reader, stderrTask);
+                var rpc = new AppServerConnection(writer, reader, stderrTask, _access, scratch);
                 await rpc.InitializeAsync(runToken);
                 var modality = prompt.Images.Count > 0 ? "image" : "text";
                 var hasVisionClass = _modelClasses.ContainsKey("vision");
@@ -177,8 +179,8 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
                 var rawResponse = new StringBuilder();
                 StructuredTextStreamDecoder textDecoder = new();
                 string? agentMessageId = null;
-                void ReportNativeTool(string callId, string phase) =>
-                    updates?.TryWrite(NativeToolProgress.Create(callId, NativeToolProgress.WebSearch, phase));
+                void ReportNativeTool(string callId, string toolName, string phase) =>
+                    updates?.TryWrite(NativeToolProgress.Create(callId, toolName, phase));
                 // Codex can answer one turn with several agent messages, for example the same structured
                 // response twice or a short one before a hosted web search. Each message is a complete
                 // response on its own, so only the last one is parsed.
@@ -365,8 +367,9 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
     }
 
     internal static ProcessStartInfo CreateAppServerStart(string executable, string workingDirectory,
-        bool enableWebSearch = true)
+        bool enableWebSearch = true, CodexAccess? access = null)
     {
+        access ??= CodexAccess.Open;
         var start = new ProcessStartInfo(executable)
         {
             WorkingDirectory = workingDirectory,
@@ -385,7 +388,9 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         if (!string.IsNullOrWhiteSpace(inheritedPath)) start.Environment["PATH"] = inheritedPath;
         if (!string.IsNullOrWhiteSpace(home)) start.Environment["HOME"] = home;
         if (!string.IsNullOrWhiteSpace(codexHome)) start.Environment["CODEX_HOME"] = codexHome;
-        foreach (var key in new[] { "TMPDIR", "SSL_CERT_FILE", "SSL_CERT_DIR", "LANG", "LC_ALL" })
+        var passedThrough = new[] { "TMPDIR", "SSL_CERT_FILE", "SSL_CERT_DIR", "LANG", "LC_ALL" };
+        if (access.AllowNetwork) passedThrough = [.. passedThrough, .. CodexAccess.NetworkEnvironment];
+        foreach (var key in passedThrough)
         {
             var value = Environment.GetEnvironmentVariable(key);
             if (!string.IsNullOrWhiteSpace(value)) start.Environment[key] = value;
@@ -395,12 +400,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         start.ArgumentList.Add("--stdio");
         start.ArgumentList.Add("-c");
         start.ArgumentList.Add("mcp_servers={}");
-        foreach (var feature in new[]
-        {
-            "shell_tool", "shell_snapshot", "code_mode_host", "computer_use", "browser_use",
-            "browser_use_external", "in_app_browser", "apps", "plugins", "skill_search",
-            "image_generation", "multi_agent", "multi_agent_v2"
-        })
+        foreach (var feature in access.DisabledFeatures(enableWebSearch))
         {
             start.ArgumentList.Add("--disable");
             start.ArgumentList.Add(feature);

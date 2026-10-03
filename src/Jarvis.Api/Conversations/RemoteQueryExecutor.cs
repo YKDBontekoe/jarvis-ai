@@ -19,8 +19,15 @@ public sealed class RemoteQueryExecutor(
         using var query = queries.Begin(ownerId, conversationId, lifetime.ApplicationStopping);
         await using var scope = scopes.CreateOwnerScope(ownerId);
         var turns = scope.ServiceProvider.GetRequiredService<ConversationTurnService>();
-        return await turns.SendAsync(ownerId, conversationId, content, query.Token, onTextDelta, beforeRun,
-            attachments);
+        try
+        {
+            return await turns.SendAsync(ownerId, conversationId, content, query.Token, onTextDelta, beforeRun,
+                attachments);
+        }
+        catch (OperationCanceledException) when (query.StoppedByOwner)
+        {
+            throw new RunStoppedException();
+        }
     }
 
     public async Task<ConversationTurnResult> RegenerateAsync(Guid ownerId, Guid conversationId)
@@ -28,7 +35,14 @@ public sealed class RemoteQueryExecutor(
         using var query = queries.Begin(ownerId, conversationId, lifetime.ApplicationStopping);
         await using var scope = scopes.CreateOwnerScope(ownerId);
         var turns = scope.ServiceProvider.GetRequiredService<ConversationTurnService>();
-        return await turns.RegenerateAsync(ownerId, conversationId, query.Token);
+        try
+        {
+            return await turns.RegenerateAsync(ownerId, conversationId, query.Token);
+        }
+        catch (OperationCanceledException) when (query.StoppedByOwner)
+        {
+            throw new RunStoppedException();
+        }
     }
 
     public async Task<ConversationTurnResult> DecideAsync(Guid ownerId, Guid approvalId, bool approved,
@@ -41,6 +55,13 @@ public sealed class RemoteQueryExecutor(
 
         using var query = queries.Begin(ownerId, pending.ConversationId, lifetime.ApplicationStopping);
         var decisions = scope.ServiceProvider.GetRequiredService<ApprovalDecisionService>();
-        return await decisions.DecideAsync(ownerId, approvalId, approved, query.Token, rememberCategory);
+        try
+        {
+            return await decisions.DecideAsync(ownerId, approvalId, approved, query.Token, rememberCategory);
+        }
+        catch (OperationCanceledException) when (query.StoppedByOwner)
+        {
+            throw new RunStoppedException();
+        }
     }
 }

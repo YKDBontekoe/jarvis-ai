@@ -13,7 +13,8 @@ internal static class ExceptionProblemMapper
     {
         if (CancellationExceptions.Unwrap(exception) is not null)
         {
-            if (httpContext?.RequestAborted.IsCancellationRequested == true)
+            if (exception is Jarvis.Api.Conversations.RunStoppedException ||
+                httpContext?.RequestAborted.IsCancellationRequested == true)
             {
                 return new MappedProblem(
                     ApiErrorCodes.RequestCancelled,
@@ -42,6 +43,10 @@ internal static class ExceptionProblemMapper
                 "Upload rejected",
                 StatusCodes.Status422UnprocessableEntity,
                 "The uploaded file was rejected by malware scanning."),
+
+            // Raised by the framework for bodies it cannot read (malformed JSON, wrong type, too large): the
+            // client's fault, so keep its status instead of reporting a server error.
+            BadHttpRequestException badRequest => FromStatusCode(badRequest.StatusCode),
 
             ArgumentException argument => new MappedProblem(
                 ApiErrorCodes.ValidationFailed,
@@ -79,6 +84,13 @@ internal static class ExceptionProblemMapper
                 StatusCodes.Status500InternalServerError,
                 "An unexpected error occurred."),
         };
+    }
+
+    private static MappedProblem FromStatusCode(int statusCode)
+    {
+        var (code, title, detail) = StatusCodeProblemDefaults.For(statusCode);
+        return new MappedProblem(code, title, statusCode,
+            statusCode == StatusCodes.Status400BadRequest ? "The request could not be read." : detail);
     }
 
     private static string SafeClientMessage(Exception exception, string fallback)

@@ -50,6 +50,22 @@ void main() {
     );
   });
 
+  test('a repeated message is judged by its latest copy, not an older reply', () {
+    final messages = [
+      {'role': 'user', 'content': 'yes'},
+      {'role': 'assistant', 'content': 'Done.'},
+      {'role': 'user', 'content': 'yes'},
+    ];
+    expect(serverStoredReply(messages, 'yes'), isFalse);
+    expect(
+      serverStoredReply([
+        ...messages,
+        {'role': 'assistant', 'content': 'Done again.'},
+      ], 'yes'),
+      isTrue,
+    );
+  });
+
   test('catch-up retries unreachable API errors with backoff, then stops', () {
     expect(
       catchUpRetryDelay(

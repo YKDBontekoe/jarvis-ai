@@ -6,7 +6,8 @@ namespace Jarvis.Agents;
 /// <summary>JSON-RPC over the Codex app-server process's stdio.</summary>
 public sealed partial class CodexCliChatClient
 {
-    private sealed class AppServerConnection(StreamWriter writer, StreamReader reader, Task<string> stderrTask)
+    private sealed class AppServerConnection(StreamWriter writer, StreamReader reader, Task<string> stderrTask,
+        CodexAccess access, string scratch)
     {
         private int _requestId;
         private CodexTokenUsage? _latestUsage;
@@ -55,7 +56,7 @@ public sealed partial class CodexCliChatClient
             var requestId = await WriteAsync("thread/start", new
             {
                 approvalPolicy = "never",
-                sandbox = "read-only",
+                sandbox = access.ThreadSandbox,
                 cwd = scratch,
                 ephemeral = true,
                 model = modelId
@@ -67,7 +68,7 @@ public sealed partial class CodexCliChatClient
 
         public async Task<CodexTurnMetrics> RunTurnAsync(string threadId, PromptPayload prompt, string modelId,
             string? reasoningEffort, Action<string?, string> onDelta, CancellationToken cancellationToken,
-            Action<string, string>? onNativeTool = null)
+            Action<string, string, string>? onNativeTool = null)
         {
             _latestUsage = null;
             var webSearches = 0;
@@ -80,7 +81,7 @@ public sealed partial class CodexCliChatClient
                 model = modelId,
                 effort = reasoningEffort,
                 approvalPolicy = "never",
-                sandboxPolicy = new { type = "readOnly", networkAccess = false },
+                sandboxPolicy = access.TurnSandboxPolicy(scratch),
                 input = new object[] { new { type = "text", text = prompt.Text } }
                     .Concat(prompt.Images.Select(url => (object)new { type = "image", url, detail = "auto" })).ToArray(),
                 outputSchema = OutputSchema
@@ -116,10 +117,18 @@ public sealed partial class CodexCliChatClient
                     onDelta(itemId, delta.GetString() ?? string.Empty);
                 }
                 else if ((methodName == "item/completed" || methodName == "item/started") &&
+                         NativeWorkTool(root) is { } nativeTool)
+                {
+                    // Codex's own shell and file edits: shown as steps by name only, never the command or its output.
+                    if (NativeItemId(root) is { } nativeId)
+                        onNativeTool?.Invoke("native-" + nativeId, nativeTool,
+                            methodName == "item/started" ? "started" : "completed");
+                }
+                else if ((methodName == "item/completed" || methodName == "item/started") &&
                          IsNativeWebSearchNotification(methodName, root))
                 {
                     if (NativeItemId(root) is { } itemId)
-                        onNativeTool?.Invoke("websearch-" + itemId,
+                        onNativeTool?.Invoke("websearch-" + itemId, NativeToolProgress.WebSearch,
                             methodName == "item/started" ? "started" : "completed");
                     if (methodName == "item/completed")
                     {

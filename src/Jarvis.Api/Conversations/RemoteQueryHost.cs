@@ -35,7 +35,7 @@ public sealed class RemoteQueryHost
             runs.Add(run);
         }
 
-        return new RemoteQuery(cts.Token, () => End(run));
+        return new RemoteQuery(cts.Token, () => End(run), () => run.StoppedByOwner);
     }
 
     /// <summary>Stops the owner's in-flight query. A disconnect does not call this.</summary>
@@ -70,8 +70,11 @@ public sealed class RemoteQueryHost
         public Guid OwnerId { get; } = ownerId;
         public Guid ConversationId { get; } = conversationId;
 
+        public bool StoppedByOwner { get; private set; }
+
         public void Cancel()
         {
+            StoppedByOwner = true;
             try
             {
                 cts.Cancel();
@@ -85,14 +88,21 @@ public sealed class RemoteQueryHost
     }
 }
 
-public sealed class RemoteQuery(CancellationToken token, Action release) : IDisposable
+public sealed class RemoteQuery(CancellationToken token, Action release, Func<bool>? stoppedByOwner = null)
+    : IDisposable
 {
     private int _released;
 
     public CancellationToken Token { get; } = token;
+
+    /// <summary>True when the owner pressed stop, as opposed to a timeout or application shutdown.</summary>
+    public bool StoppedByOwner => stoppedByOwner?.Invoke() ?? false;
 
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _released, 1) == 0) release();
     }
 }
+
+/// <summary>The owner stopped the reply. It is a cancellation, not a timeout.</summary>
+public sealed class RunStoppedException() : OperationCanceledException("The reply was stopped.");

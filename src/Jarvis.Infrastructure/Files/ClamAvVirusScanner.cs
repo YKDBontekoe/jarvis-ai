@@ -6,26 +6,30 @@ using Microsoft.Extensions.Configuration;
 
 namespace Jarvis.Infrastructure.Files;
 
+/// <summary>
+/// Scans uploads with a ClamAV daemon. The settings are read when a scan starts, not when the scanner is created:
+/// the worker builds the whole agent (and so the file service) for every task but never scans an upload, so it
+/// has no daemon configured. A missing host still fails closed, because the scan throws.
+/// </summary>
 public sealed class ClamAvVirusScanner(IConfiguration configuration) : IFileMalwareScanner
 {
-    private readonly string _host = configuration["Antivirus:Host"]
-        ?? throw new InvalidOperationException("Antivirus:Host must point to a private ClamAV daemon.");
-    private readonly int _port = ReadPort(configuration["Antivirus:Port"]);
-    private readonly int _timeoutSeconds = ReadTimeout(configuration["Antivirus:TimeoutSeconds"]);
-
     public async Task ScanAsync(Stream content, CancellationToken cancellationToken)
     {
+        var host = configuration["Antivirus:Host"]
+            ?? throw new InvalidOperationException("Antivirus:Host must point to a private ClamAV daemon.");
+        var port = ReadPort(configuration["Antivirus:Port"]);
+        var timeoutSeconds = ReadTimeout(configuration["Antivirus:TimeoutSeconds"]);
         if (!content.CanSeek)
             throw new ArgumentException("The upload stream must support seeking for malware scanning.", nameof(content));
 
         var originalPosition = content.Position;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(_timeoutSeconds));
+        timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
         try
         {
             content.Position = 0;
             using var client = new TcpClient();
-            await client.ConnectAsync(_host, _port, timeout.Token);
+            await client.ConnectAsync(host, port, timeout.Token);
             await using var stream = client.GetStream();
             await stream.WriteAsync("zINSTREAM\0"u8.ToArray(), timeout.Token);
 
