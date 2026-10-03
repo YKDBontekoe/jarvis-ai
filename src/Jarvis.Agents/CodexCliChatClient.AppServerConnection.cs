@@ -6,7 +6,8 @@ namespace Jarvis.Agents;
 /// <summary>JSON-RPC over the Codex app-server process's stdio.</summary>
 public sealed partial class CodexCliChatClient
 {
-    private sealed class AppServerConnection(StreamWriter writer, StreamReader reader, Task<string> stderrTask)
+    private sealed class AppServerConnection(StreamWriter writer, StreamReader reader, Task<string> stderrTask,
+        CodexAccess access, string scratch)
     {
         private int _requestId;
         private CodexTokenUsage? _latestUsage;
@@ -55,7 +56,7 @@ public sealed partial class CodexCliChatClient
             var requestId = await WriteAsync("thread/start", new
             {
                 approvalPolicy = "never",
-                sandbox = "read-only",
+                sandbox = access.ThreadSandbox,
                 cwd = scratch,
                 ephemeral = true,
                 model = modelId
@@ -80,7 +81,7 @@ public sealed partial class CodexCliChatClient
                 model = modelId,
                 effort = reasoningEffort,
                 approvalPolicy = "never",
-                sandboxPolicy = new { type = "readOnly", networkAccess = false },
+                sandboxPolicy = access.TurnSandboxPolicy(scratch),
                 input = new object[] { new { type = "text", text = prompt.Text } }
                     .Concat(prompt.Images.Select(url => (object)new { type = "image", url, detail = "auto" })).ToArray(),
                 outputSchema = OutputSchema

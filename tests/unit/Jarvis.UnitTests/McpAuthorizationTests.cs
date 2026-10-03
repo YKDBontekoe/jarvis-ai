@@ -91,7 +91,8 @@ public sealed class CodexWebSearchTests
         // Hosted search runs through the code-mode host; disabling it makes every search fail.
         Assert.DoesNotContain("code_mode_host", start.ArgumentList);
 
-        var disabled = CodexCliChatClient.CreateAppServerStart("codex", Path.GetTempPath(), enableWebSearch: false);
+        var disabled = CodexCliChatClient.CreateAppServerStart("codex", Path.GetTempPath(), enableWebSearch: false,
+            CodexAccess.Strict);
         Assert.Equal("--disable", disabled.ArgumentList[disabled.ArgumentList.IndexOf("standalone_web_search") - 1]);
         Assert.DoesNotContain("web_search=\"live\"", disabled.ArgumentList);
         Assert.Contains("web_search=\"disabled\"", disabled.ArgumentList);

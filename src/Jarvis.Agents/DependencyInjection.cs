@@ -25,12 +25,13 @@ public static class DependencyInjection
             throw new InvalidOperationException("Codex:TurnTimeoutSeconds must be between 30 and 1800.");
         services.AddSingleton(CodexExecutable.From(configuration));
         services.AddSingleton<CodexProcessLimiter>();
+        var codexAccess = CodexAccess.From(configuration);
         var recordAiContent = configuration.GetValue("Sentry:RecordAiContent", false);
         services.AddSingleton<IChatClient>(serviceProvider => SentryChatInstrumentation.Instrument(
                 new CodexCliChatClient(
                     serviceProvider.GetRequiredService<CodexExecutable>(), model, visionModel,
                     modelClasses, enableWebSearch, turnTimeoutSeconds,
-                    serviceProvider.GetRequiredService<CodexProcessLimiter>()),
+                    serviceProvider.GetRequiredService<CodexProcessLimiter>(), codexAccess),
                 recordAiContent)
             .AsBuilder()
             .UseOpenTelemetry(
