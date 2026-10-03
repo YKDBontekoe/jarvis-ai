@@ -7,6 +7,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import 'codex_sign_in_card.dart';
 
 part 'openrouter_model_picker.dart';
 part 'codex_model_picker.dart';
@@ -473,6 +474,7 @@ class _ModelSettingsScreenState extends _ModelSettingsController
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      CodexSignInCard(http: widget.http),
                       _providerCard(),
                       const SizedBox(height: 16),
                       _codexCard(),

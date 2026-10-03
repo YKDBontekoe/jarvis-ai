@@ -146,6 +146,28 @@ internal static class ModelSettingsEndpoints
             }
         }).WithName("UpdateCodex");
 
+        // ChatGPT sign-in for the server's Codex CLI, so nobody needs a shell on the host. Starting is only possible
+        // while Codex is signed out.
+        models.MapGet("/codex/sign-in", async (CodexSignIn signIn, CancellationToken ct) =>
+            Results.Ok(await signIn.GetStatusAsync(ct)))
+            .WithName("GetCodexSignIn");
+
+        models.MapPost("/codex/sign-in", async (CodexSignIn signIn, IAuditEventStore audit, ICurrentUser currentUser,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                var status = await signIn.StartAsync(ct);
+                await EndpointHelpers.TryAppendAuditAsync(audit, logger, currentUser.OwnerId, "settings",
+                    "codex.sign_in_started", "moderate", true, null, null, ct);
+                return Results.Ok(status);
+            }
+            catch (InvalidOperationException exception)
+            {
+                return Results.Conflict(new { error = "codex_sign_in", message = exception.Message });
+            }
+        }).WithName("StartCodexSignIn");
+
         models.MapGet("/openrouter/catalog", async (string? search, OpenRouterCatalog catalog, CancellationToken ct) =>
         {
             try
