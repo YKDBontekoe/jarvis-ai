@@ -13,10 +13,9 @@ if ! flock -n 9; then
 fi
 
 ENV_FILE="${ENV_FILE:-infra/compose/.env.production}"
-if [[ ! -f "${ENV_FILE}" ]]; then
-  echo "Production env file not found: ${ENV_FILE}" >&2
-  exit 1
-fi
+export ENV_FILE
+# Creates or completes the env file, data directories and Garage config; only JARVIS_DOMAIN is needed.
+scripts/deploy/prepare-host.sh
 
 # shellcheck source=scripts/deploy/compose-env.sh
 source scripts/deploy/compose-env.sh
