@@ -18,6 +18,7 @@ internal sealed class AutomationRunConfiguration : IEntityTypeConfiguration<Auto
         entity.Property(x => x.TriggerKind).HasColumnName("trigger_kind").HasMaxLength(40).IsRequired();
         entity.Property(x => x.TriggerReason).HasColumnName("trigger_reason").HasMaxLength(500).IsRequired();
         entity.Property(x => x.TestRun).HasColumnName("test_run");
+        entity.Property(x => x.EventJson).HasColumnName("event_json").HasMaxLength(2_000);
         entity.Property(x => x.Status).HasMaxLength(30).IsRequired();
         entity.Property(x => x.ActionResultsJson).HasColumnName("action_results_json").HasMaxLength(16_000)
             .IsRequired();

@@ -33,6 +33,7 @@ public sealed class AutomationRunExecutor(
             return await SkipAsync(input, rule, "The automation is switched off.", cancellationToken);
 
         var definition = AutomationDefinitionJson.Parse(rule.DefinitionJson);
+        var ev = AutomationEvent.FromJson(input.EventJson);
         var ownerAsked = input.TestRun || input.TriggerKind == AutomationTriggerKinds.Manual;
         if (!input.AfterApproval && !ownerAsked && rule.CooldownUntil is not null &&
             rule.CooldownUntil > timeProvider.GetUtcNow())
@@ -50,11 +51,17 @@ public sealed class AutomationRunExecutor(
         var actionIndex = 0;
         // Actions before the first one that needs approval already ran in the first pass; the approved pass
         // picks up from that action and runs everything after it too.
-        var resumeFrom = input.AfterApproval ? FirstApprovalIndex(definition.Actions) : 0;
+        var resumeFrom = input.AfterApproval ? FirstApprovalIndex(definition.Actions, ev) : 0;
 
         for (var index = resumeFrom; index < definition.Actions.Count; index++)
         {
             var action = definition.Actions[index];
+            // A branch that does not apply is skipped without costing an action or asking for approval.
+            if (!AutomationActionConditions.Matches(action.If, ev))
+            {
+                results.Add(new AutomationActionResult(action.Kind, "skipped", "Its condition was not met.", null));
+                continue;
+            }
             if (actionIndex >= maxActions) break;
             if (timeProvider.GetUtcNow() > deadline)
             {
@@ -65,7 +72,7 @@ public sealed class AutomationRunExecutor(
             if (AutomationActionPolicy.RequiresApproval(action) && !input.TestRun && !input.AfterApproval)
             {
                 var toolName = AutomationApprovals.ToolName(action);
-                var arguments = ApprovalArguments(rule, definition.Actions, index);
+                var arguments = ApprovalArguments(rule, definition.Actions, index, ev);
                 var category = ApprovalCategories.Resolve(toolName, arguments);
                 if (category.CanRemember &&
                     await standingApprovals.IsGrantedAsync(input.OwnerId, category.Key, cancellationToken))
@@ -90,7 +97,7 @@ public sealed class AutomationRunExecutor(
 
             try
             {
-                results.Add(await ExecuteActionAsync(input, action, cancellationToken));
+                results.Add(await ExecuteActionAsync(input, action, ev, cancellationToken));
             }
             catch (Exception exception)
             {
@@ -125,10 +132,12 @@ public sealed class AutomationRunExecutor(
         return new AutomationRunActivityResult(true, json, false);
     }
 
-    private static int FirstApprovalIndex(IReadOnlyList<AutomationActionDefinition> actions)
+    private static int FirstApprovalIndex(IReadOnlyList<AutomationActionDefinition> actions, AutomationEvent? ev)
     {
         for (var index = 0; index < actions.Count; index++)
-            if (AutomationActionPolicy.RequiresApproval(actions[index])) return index;
+            if (AutomationActionConditions.Matches(actions[index].If, ev) &&
+                AutomationActionPolicy.RequiresApproval(actions[index]))
+                return index;
         return actions.Count;
     }
 
@@ -137,30 +146,34 @@ public sealed class AutomationRunExecutor(
     /// the actions that follow it, because approving releases all of them.
     /// </summary>
     private static string ApprovalArguments(AutomationRuleRecord rule,
-        IReadOnlyList<AutomationActionDefinition> actions, int index)
+        IReadOnlyList<AutomationActionDefinition> actions, int index, AutomationEvent? ev)
     {
         var fields = new Dictionary<string, string> { ["automation"] = rule.Name, ["action"] = Label(actions[index]) };
+        // The card shows the texts as they will be sent, with the event filled in.
+        var (title, body) = AutomationSimulator.Texts(actions[index], ev);
         switch (actions[index])
         {
             case ChannelMessageActionDefinition channel:
                 fields["recipient"] = channel.Recipient;
-                fields["message"] = Preview(channel.Body);
+                fields["message"] = Preview(body ?? channel.Body);
                 break;
-            case AgentRunActionDefinition agent:
-                fields["title"] = agent.Title;
-                fields["instructions"] = Preview(agent.Prompt);
+            case AgentRunActionDefinition:
+                fields["title"] = title ?? "";
+                fields["instructions"] = Preview(body ?? "");
                 break;
-            case TaskActionDefinition task:
-                fields["title"] = task.Title;
-                fields["instructions"] = Preview(task.Prompt);
+            case TaskActionDefinition:
+                fields["title"] = title ?? "";
+                fields["instructions"] = Preview(body ?? "");
                 break;
-            case NotificationActionDefinition notification:
-                fields["title"] = notification.Title;
-                fields["message"] = Preview(notification.Body);
+            case NotificationActionDefinition:
+                fields["title"] = title ?? "";
+                fields["message"] = Preview(body ?? "");
                 break;
         }
+        if (ev is not null) fields["triggeredBy"] = Preview($"{ev.Kind}: {ev.Title}", 160);
 
-        var afterwards = actions.Skip(index + 1).Select(Summary).ToArray();
+        var afterwards = actions.Skip(index + 1).Where(x => AutomationActionConditions.Matches(x.If, ev))
+            .Select(Summary).ToArray();
         if (afterwards.Length > 0) fields["afterwards"] = string.Join("; ", afterwards);
         return JsonSerializer.Serialize(fields);
     }
@@ -222,19 +235,20 @@ public sealed class AutomationRunExecutor(
     }
 
     private async Task<AutomationActionResult> ExecuteActionAsync(AutomationRunWorkflowInput input,
-        AutomationActionDefinition action, CancellationToken cancellationToken)
+        AutomationActionDefinition action, AutomationEvent? ev, CancellationToken cancellationToken)
     {
+        var (title, body) = AutomationSimulator.Texts(action, ev);
         switch (action)
         {
-            case NotificationActionDefinition notification:
+            case NotificationActionDefinition:
             {
                 var record = await notifications.CreateAsync(input.OwnerId, "automation.notification",
-                    notification.Title, notification.Body, input.RuleId, cancellationToken);
+                    Clip(title!, 200), Clip(body!, 2000), input.RuleId, cancellationToken);
                 return new AutomationActionResult(action.Kind, "completed", null, record.Id);
             }
-            case TaskActionDefinition task:
+            case TaskActionDefinition:
             {
-                var created = await tasks.CreateAsync(input.OwnerId, task.Title, task.Prompt, cancellationToken);
+                var created = await tasks.CreateAsync(input.OwnerId, Clip(title!, 200), body!, cancellationToken);
                 return new AutomationActionResult(action.Kind, "completed", null, created.Id);
             }
             case ChannelMessageActionDefinition channel:
@@ -242,14 +256,14 @@ public sealed class AutomationRunExecutor(
                 if (input.TestRun)
                     return new AutomationActionResult(action.Kind, "skipped", "Test run does not send messages.", null);
                 var messageId = await channelSender.SendPreconfiguredAsync(input.OwnerId, channel.ConnectionId,
-                    channel.Recipient, channel.Body, cancellationToken);
+                    channel.Recipient, body!, cancellationToken);
                 return new AutomationActionResult(action.Kind, "completed", null, messageId);
             }
-            case AgentRunActionDefinition agent:
+            case AgentRunActionDefinition:
             {
                 if (input.TestRun)
                     return new AutomationActionResult(action.Kind, "skipped", "Test run does not start agent tasks.", null);
-                var created = await tasks.CreateAsync(input.OwnerId, agent.Title, agent.Prompt, cancellationToken);
+                var created = await tasks.CreateAsync(input.OwnerId, Clip(title!, 200), body!, cancellationToken);
                 return new AutomationActionResult(action.Kind, "completed", null, created.Id);
             }
             default:
@@ -259,6 +273,8 @@ public sealed class AutomationRunExecutor(
 
     private static string Serialize(IReadOnlyList<AutomationActionResult> results) =>
         JsonSerializer.Serialize(results);
+
+    private static string Clip(string text, int max) => text.Length <= max ? text : text[..max];
 
     private static string Preview(string text, int max = 600) => text.Length <= max ? text : text[..(max - 1)] + "…";
 

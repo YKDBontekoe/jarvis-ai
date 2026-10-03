@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Jarvis.Application.Automations;
 using Jarvis.Application.Files;
 using Jarvis.Domain.Files;
 using Microsoft.Extensions.Configuration;
@@ -13,7 +14,8 @@ public sealed class FileService(
     IFileProcessingScheduler scheduler,
     IFileMalwareScanner malwareScanner,
     IConfiguration configuration,
-    ILogger<FileService> logger) : IFileService
+    ILogger<FileService> logger,
+    Jarvis.Application.Automations.IAutomationEventBus? events = null) : IFileService
 {
     private const long DefaultMaxUploadBytes = 20 * 1024 * 1024;
     private static readonly IReadOnlyDictionary<string, HashSet<string>> AcceptedTypes =
@@ -92,6 +94,10 @@ public sealed class FileService(
                 logger.LogWarning(exception, "File {FileId} remains queued for Temporal scheduling recovery.", stored.Id);
             }
         }
+        await events.TryPublishAsync(ownerId, new Jarvis.Application.Automations.AutomationEvent(
+            Jarvis.Application.Automations.AutomationEventKinds.FileUploaded, stored.FileName,
+            $"{stored.ContentType}, {stored.SizeBytes / 1024} KB", "upload", stored.Id, stored.CreatedAt),
+            cancellationToken);
         return stored;
     }
 

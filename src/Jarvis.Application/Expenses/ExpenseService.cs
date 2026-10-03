@@ -1,10 +1,12 @@
+using Jarvis.Application.Automations;
 using Jarvis.Application.Files;
 using Jarvis.Domain.Expenses;
 
 namespace Jarvis.Application.Expenses;
 
 public sealed class ExpenseService(IExpenseRepository expenses, IFileService files, TimeProvider? timeProvider = null,
-    IExpenseObserver? observer = null) : IExpenseService
+    IEnumerable<IExpenseObserver>? observers = null, Automations.IAutomationEventBus? events = null)
+    : IExpenseService
 {
     private const int TopMerchantCount = 5;
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
@@ -143,14 +145,25 @@ public sealed class ExpenseService(IExpenseRepository expenses, IFileService fil
     // Budget warnings are a bonus: a failing observer must never lose the expense that was just saved.
     private async Task NotifyAsync(Expense expense, CancellationToken cancellationToken)
     {
-        if (observer is null) return;
-        try
+        foreach (var observer in observers ?? [])
         {
-            await observer.OnExpenseCreatedAsync(expense, cancellationToken);
+            try
+            {
+                await observer.OnExpenseCreatedAsync(expense, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+            }
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-        }
+
+        // A statement import adds hundreds of rows at once; they must not each start an automation.
+        if (expense.Source == ExpenseSources.Import) return;
+        var amount = expense.Amount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        await events.TryPublishAsync(expense.OwnerId, new Automations.AutomationEvent(
+            Automations.AutomationEventKinds.ExpenseLogged,
+            $"{expense.Currency} {amount}" + (expense.Merchant is null ? "" : $" at {expense.Merchant}"),
+            string.Join(" · ", new[] { expense.Category, expense.Note }.Where(x => !string.IsNullOrWhiteSpace(x))),
+            expense.Source, expense.Id, expense.CreatedAt), cancellationToken);
     }
 
     private async Task<(string Field, string Message)?> ValidateAsync(Guid ownerId, ExpenseDraft draft,

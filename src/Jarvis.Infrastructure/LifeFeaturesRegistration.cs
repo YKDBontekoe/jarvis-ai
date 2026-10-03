@@ -1,3 +1,4 @@
+using Jarvis.Application.Automations;
 using Jarvis.Application.Expenses;
 using Jarvis.Application.Finance;
 using Jarvis.Application.Inbox;
@@ -32,6 +33,10 @@ public static class LifeFeaturesRegistration
         services.AddScoped<IFinanceRepository, FinanceRepository>();
         services.AddScoped<IFinanceService, FinanceService>();
         services.AddScoped<IExpenseObserver, BudgetExpenseObserver>();
+
+        // Automation studio: webhooks that start event automations.
+        services.AddScoped<IAutomationWebhookRepository, AutomationWebhookRepository>();
+        services.AddScoped<IAutomationWebhookService, AutomationWebhookService>();
         return services;
     }
 }

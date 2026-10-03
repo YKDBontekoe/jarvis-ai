@@ -139,6 +139,21 @@ const _catalog = <String, ToolDescription>{
     'Read a bank statement',
     PhosphorIconsRegular.uploadSimple,
   ),
+  'PreviewAutomation': ToolDescription(
+    'Previewing an automation',
+    'Previewed an automation',
+    PhosphorIconsRegular.play,
+  ),
+  'ListAutomationTemplates': ToolDescription(
+    'Looking at automation templates',
+    'Looked at automation templates',
+    PhosphorIconsRegular.lightning,
+  ),
+  'CreateAutomationFromTemplate': ToolDescription(
+    'Creating an automation',
+    'Created an automation',
+    PhosphorIconsRegular.lightning,
+  ),
   'ListWhatsAppChats': ToolDescription(
     'Checking your WhatsApp',
     'Checked your WhatsApp',

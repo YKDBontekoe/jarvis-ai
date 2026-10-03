@@ -77,6 +77,18 @@ public sealed record CalendarWindowTriggerDefinition(
     public override string Kind => AutomationTriggerKinds.CalendarWindow;
 }
 
+/// <summary>
+/// Fires when something happens inside Jarvis or arrives from outside, for example a WhatsApp message, an uploaded
+/// file, a finished task, or a webhook call. <see cref="Contains"/> and <see cref="Source"/> narrow it down.
+/// </summary>
+public sealed record EventTriggerDefinition(
+    [property: JsonPropertyName("eventKind")] string EventKind,
+    [property: JsonPropertyName("contains")] string? Contains,
+    [property: JsonPropertyName("source")] string? Source) : AutomationTriggerDefinition
+{
+    public override string Kind => AutomationTriggerKinds.Event;
+}
+
 public abstract record AutomationConditionDefinition
 {
     [JsonPropertyName("kind")]
@@ -105,7 +117,20 @@ public abstract record AutomationActionDefinition
 {
     [JsonPropertyName("kind")]
     public abstract string Kind { get; }
+
+    /// <summary>Run this action only when the condition holds, so one automation can branch on the event.</summary>
+    [JsonPropertyName("if")]
+    public AutomationActionCondition? If { get; init; }
 }
+
+/// <summary>
+/// Compares a field of the triggering event to a value. <c>Field</c> is event.title, event.detail, event.source
+/// or event.kind; <c>Op</c> is contains, not_contains, equals or not_equals (ignoring case).
+/// </summary>
+public sealed record AutomationActionCondition(
+    [property: JsonPropertyName("field")] string Field,
+    [property: JsonPropertyName("op")] string Op,
+    [property: JsonPropertyName("value")] string Value);
 
 public sealed record NotificationActionDefinition(
     [property: JsonPropertyName("title")] string Title,
@@ -177,6 +202,7 @@ internal sealed class AutomationTriggerJsonConverter : JsonConverter<AutomationT
             AutomationTriggerKinds.DeviceBattery => document.Deserialize<DeviceBatteryTriggerDefinition>(options),
             AutomationTriggerKinds.DeviceLocation => document.Deserialize<DeviceLocationTriggerDefinition>(options),
             AutomationTriggerKinds.CalendarWindow => document.Deserialize<CalendarWindowTriggerDefinition>(options),
+            AutomationTriggerKinds.Event => document.Deserialize<EventTriggerDefinition>(options),
             _ => throw new JsonException($"Unknown automation trigger kind '{kind}'.")
         };
     }

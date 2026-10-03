@@ -1,3 +1,4 @@
+using Jarvis.Application.Automations;
 using Jarvis.Application.Journal;
 using Jarvis.Application.Memory;
 using Jarvis.Domain.Journal;
@@ -10,7 +11,8 @@ namespace Jarvis.Memory;
 /// search, agent context, and dreaming can reference what the user wrote or said about their day.
 /// </summary>
 public sealed class JournalService(IJournalRepository repository, IMemoryService memories,
-    ILogger<JournalService> logger, TimeProvider? timeProvider = null) : IJournalService
+    ILogger<JournalService> logger, TimeProvider? timeProvider = null,
+    Jarvis.Application.Automations.IAutomationEventBus? events = null) : IJournalService
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
@@ -19,7 +21,22 @@ public sealed class JournalService(IJournalRepository repository, IMemoryService
         EnsureValid(draft);
         var now = clock.GetUtcNow();
         var entry = await repository.AddAsync(Build(Guid.CreateVersion7(), ownerId, draft, now, now, null), cancellationToken);
-        return await SyncMemoryAsync(entry, cancellationToken);
+        var synced = await SyncMemoryAsync(entry, cancellationToken);
+        await PublishAsync(synced, cancellationToken);
+        return synced;
+    }
+
+    /// <summary>Tells automations a journal entry was saved; the detail lists the ratings, e.g. "mood 2/5".</summary>
+    private Task PublishAsync(JournalEntry entry, CancellationToken cancellationToken)
+    {
+        var ratings = new List<string>();
+        if (entry.Rating is { } rating) ratings.Add($"day {rating}/10");
+        if (entry.Mood is { } mood) ratings.Add($"mood {mood}/5");
+        if (entry.Energy is { } energy) ratings.Add($"energy {energy}/5");
+        if (entry.Stress is { } stress) ratings.Add($"stress {stress}/5");
+        return events.TryPublishAsync(entry.OwnerId, new Jarvis.Application.Automations.AutomationEvent(
+            Jarvis.Application.Automations.AutomationEventKinds.JournalSaved, "Journal entry saved",
+            string.Join(", ", ratings), entry.Source, entry.Id, entry.UpdatedAt), cancellationToken);
     }
 
     public async Task<(JournalEntry Entry, bool Merged)> MergeAsync(Guid ownerId, JournalDraft draft,
@@ -55,7 +72,10 @@ public sealed class JournalService(IJournalRepository repository, IMemoryService
         if (existing is null) return null;
         var entry = Build(id, ownerId, draft, existing.CreatedAt, clock.GetUtcNow(), existing.MemoryId);
         var saved = await repository.UpdateAsync(entry, cancellationToken);
-        return saved is null ? null : await SyncMemoryAsync(saved, cancellationToken);
+        if (saved is null) return null;
+        var synced = await SyncMemoryAsync(saved, cancellationToken);
+        await PublishAsync(synced, cancellationToken);
+        return synced;
     }
 
     public Task<JournalEntry?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>

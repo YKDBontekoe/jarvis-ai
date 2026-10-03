@@ -172,6 +172,48 @@ public sealed class AutomationRunExecutorTests
         Assert.Equal(2, started);
     }
 
+    [Fact]
+    public async Task Event_runs_fill_in_the_event_and_skip_branches_that_do_not_apply()
+    {
+        var rule = Rule(new EventTriggerDefinition(AutomationEventKinds.MessageReceived, null, null),
+            new NotificationActionDefinition("From {{event.title}}", "{{event.detail}}")
+            {
+                If = new AutomationActionCondition("event.detail", "contains", "urgent")
+            },
+            new NotificationActionDefinition("Message from {{event.title}}", "{{event.detail}}")
+            {
+                If = new AutomationActionCondition("event.detail", "not_contains", "urgent")
+            });
+        var harness = new Harness(rule);
+        var ev = new AutomationEvent(AutomationEventKinds.MessageReceived, "Sanne", "Kun je bellen?", "whatsapp");
+
+        await harness.Executor.ExecuteRunAsync(harness.Input(AutomationTriggerKinds.Event) with
+        {
+            EventJson = ev.ToJson()
+        }, CancellationToken.None);
+
+        Assert.Equal(["Message from Sanne"], harness.Notifications);
+        Assert.Equal(AutomationRunStatuses.Completed, harness.RunStatus);
+    }
+
+    [Fact]
+    public async Task Event_text_in_an_approval_card_is_shown_as_it_will_be_sent()
+    {
+        var rule = Rule(new EventTriggerDefinition(AutomationEventKinds.MessageReceived, null, null),
+            new ChannelMessageActionDefinition(Guid.CreateVersion7(), "+31600000000", "Re: {{event.title}}"));
+        var harness = new Harness(rule);
+        var ev = new AutomationEvent(AutomationEventKinds.MessageReceived, "Lunch?", null, "whatsapp");
+
+        await harness.Executor.ExecuteRunAsync(harness.Input(AutomationTriggerKinds.Event) with
+        {
+            EventJson = ev.ToJson()
+        }, CancellationToken.None);
+
+        Assert.Equal(AutomationRunStatuses.WaitingApproval, harness.RunStatus);
+        Assert.Contains("Re: Lunch?", harness.Approvals.Single().ArgumentsJson);
+        Assert.Contains("message_received: Lunch?", harness.Approvals.Single().ArgumentsJson);
+    }
+
     private static NotificationActionDefinition Notify(string title = "Hello") => new(title, "Body");
 
     private static ChannelMessageActionDefinition Message() => new(Guid.CreateVersion7(), "+31600000000", "On my way");

@@ -7,6 +7,8 @@ public static partial class AutomationRuleValidator
 {
     public static void Validate(AutomationRuleDefinition definition)
     {
+        if (definition.Trigger is null || definition.Actions is null)
+            throw new ArgumentException("An automation needs a trigger and a list of actions.");
         if (definition.SchemaVersion != AutomationSchema.CurrentVersion)
             throw new ArgumentException($"Unsupported automation schema version {definition.SchemaVersion}.");
         if (definition.Actions.Count is < 1 or > AutomationSchema.MaxActionsPerRule)
@@ -18,6 +20,10 @@ public static partial class AutomationRuleValidator
         ValidateTrigger(definition.Trigger);
         foreach (var condition in conditions) ValidateCondition(condition);
         foreach (var action in definition.Actions) ValidateAction(action);
+        if (definition.Trigger is EventTriggerDefinition { EventKind: AutomationEventKinds.TaskCompleted } &&
+            definition.Actions.Any(x => x is TaskActionDefinition or AgentRunActionDefinition))
+            throw new ArgumentException(
+                "An automation that runs when a task finishes cannot start tasks itself: it would trigger itself.");
 
         var limits = definition.Limits;
         if (limits?.MaxActionsPerRun is < 1 or > AutomationSchema.MaxActionsPerRule)
@@ -66,6 +72,15 @@ public static partial class AutomationRuleValidator
                 if (calendar.MinutesBefore is < 1 or > 24 * 60)
                     throw new ArgumentException("minutesBefore is out of range.");
                 break;
+            case EventTriggerDefinition eventTrigger:
+                if (!AutomationEventKinds.IsValid(eventTrigger.EventKind))
+                    throw new ArgumentException(
+                        $"Unknown eventKind. Use one of: {string.Join(", ", AutomationEventKinds.All)}.");
+                if (eventTrigger.Contains is { Length: > AutomationEventLimits.MaxFilterLength } ||
+                    eventTrigger.Source is { Length: > AutomationEventLimits.MaxFilterLength })
+                    throw new ArgumentException(
+                        $"Event filters can contain at most {AutomationEventLimits.MaxFilterLength} characters.");
+                break;
             case ManualTriggerDefinition:
             case ReminderDueTriggerDefinition:
                 break;
@@ -91,6 +106,10 @@ public static partial class AutomationRuleValidator
 
     private static void ValidateAction(AutomationActionDefinition action)
     {
+        if (action.If is { } condition && !AutomationActionConditions.IsValid(condition))
+            throw new ArgumentException(
+                "An action's \"if\" needs a field (event.title, event.detail, event.source, event.kind), an op " +
+                "(contains, not_contains, equals, not_equals) and a value of 1 to 200 characters.");
         switch (action)
         {
             case NotificationActionDefinition notification:

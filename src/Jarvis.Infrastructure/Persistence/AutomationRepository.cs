@@ -170,7 +170,7 @@ public sealed class AutomationRunRepository(JarvisDbContext db) : IAutomationRun
 
         var workflowId = $"jarvis-automation-run-{Guid.CreateVersion7():N}";
         var run = new AutomationRun(input.RuleId, input.OwnerId, workflowId, input.IdempotencyKey,
-            input.TriggerKind, SanitizeReason(input.TriggerReason), input.TestRun);
+            input.TriggerKind, SanitizeReason(input.TriggerReason), input.TestRun, input.EventJson);
         db.AutomationRuns.Add(run);
         db.AuditEvents.Add(new AuditEvent(input.OwnerId, "automations", input.TestRun ? "run.test" : "run.started",
             "low", true, metadataJson: JsonSerializer.Serialize(new
@@ -308,4 +308,50 @@ public sealed class AutomationRunRepository(JarvisDbContext db) : IAutomationRun
         var trimmed = value.Trim();
         return trimmed.Length <= 500 ? trimmed : trimmed[..500];
     }
+}
+
+public sealed class AutomationWebhookEntity
+{
+    public Guid Id { get; set; }
+    public Guid OwnerId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string TokenHash { get; set; } = string.Empty;
+    public string TokenHint { get; set; } = string.Empty;
+    public int UseCount { get; set; }
+    public DateTimeOffset? LastUsedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public AutomationWebhookRecord ToRecord() => new(Id, OwnerId, Name, TokenHash, TokenHint, UseCount, LastUsedAt,
+        CreatedAt);
+}
+
+public sealed class AutomationWebhookRepository(JarvisDbContext db) : IAutomationWebhookRepository
+{
+    public async Task<IReadOnlyList<AutomationWebhookRecord>> ListAsync(Guid ownerId,
+        CancellationToken cancellationToken) =>
+        (await db.AutomationWebhooks.AsNoTracking().Where(x => x.OwnerId == ownerId).OrderBy(x => x.CreatedAt)
+            .ToListAsync(cancellationToken)).Select(x => x.ToRecord()).ToArray();
+
+    public async Task AddAsync(AutomationWebhookRecord webhook, CancellationToken cancellationToken)
+    {
+        db.AutomationWebhooks.Add(new AutomationWebhookEntity
+        {
+            Id = webhook.Id, OwnerId = webhook.OwnerId, Name = webhook.Name, TokenHash = webhook.TokenHash,
+            TokenHint = webhook.TokenHint, UseCount = 0, CreatedAt = webhook.CreatedAt
+        });
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
+        await db.AutomationWebhooks.Where(x => x.Id == id && x.OwnerId == ownerId)
+            .ExecuteDeleteAsync(cancellationToken) > 0;
+
+    public async Task<AutomationWebhookRecord?> FindByHashAsync(string tokenHash, CancellationToken cancellationToken) =>
+        (await db.AutomationWebhooks.AsNoTracking().SingleOrDefaultAsync(x => x.TokenHash == tokenHash,
+            cancellationToken))?.ToRecord();
+
+    public async Task RecordUseAsync(Guid id, DateTimeOffset at, CancellationToken cancellationToken) =>
+        await db.AutomationWebhooks.Where(x => x.Id == id).ExecuteUpdateAsync(
+            set => set.SetProperty(x => x.UseCount, x => x.UseCount + 1).SetProperty(x => x.LastUsedAt, at),
+            cancellationToken);
 }

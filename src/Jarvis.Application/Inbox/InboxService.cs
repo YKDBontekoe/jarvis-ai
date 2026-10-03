@@ -1,3 +1,4 @@
+using Jarvis.Application.Automations;
 using Jarvis.Application.WhatsApp;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Inbox;
@@ -5,7 +6,8 @@ using Jarvis.Domain.Inbox;
 namespace Jarvis.Application.Inbox;
 
 public sealed class InboxService(IInboxRepository repository, IWhatsAppAssistantRepository whatsApp,
-    IInboxTriager triager, ICommitmentService commitments, TimeProvider? timeProvider = null) : IInboxService
+    IInboxTriager triager, ICommitmentService commitments, TimeProvider? timeProvider = null,
+    Automations.IAutomationEventBus? events = null) : IInboxService
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
@@ -35,6 +37,7 @@ public sealed class InboxService(IInboxRepository repository, IWhatsAppAssistant
                     triage.State, triage.Priority, null, null, preview, newest.FromMe, newest.SentAt, null, null, now,
                     now), cancellationToken);
                 created++;
+                await PublishIfNeedsReplyAsync(ownerId, chat.DisplayName, preview, triage.State, newest, cancellationToken);
             }
             else
             {
@@ -54,10 +57,19 @@ public sealed class InboxService(IInboxRepository repository, IWhatsAppAssistant
                     UpdatedAt = now
                 }, cancellationToken);
                 updated++;
+                await PublishIfNeedsReplyAsync(ownerId, chat.DisplayName, preview, triage.State, newest, cancellationToken);
             }
         }
         return new InboxSyncResult(created, updated, scanned);
     }
+
+    private Task PublishIfNeedsReplyAsync(Guid ownerId, string title, string? preview, string state,
+        WhatsAppChatMessage newest, CancellationToken cancellationToken) =>
+        state == InboxStates.NeedsReply
+            ? events.TryPublishAsync(ownerId, new Automations.AutomationEvent(
+                Automations.AutomationEventKinds.InboxNeedsReply, title, preview, "whatsapp", newest.Id,
+                newest.SentAt), cancellationToken)
+            : Task.CompletedTask;
 
     public async Task<InboxListing> ListAsync(Guid ownerId, IReadOnlySet<string>? states,
         CancellationToken cancellationToken)

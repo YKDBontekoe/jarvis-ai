@@ -54,6 +54,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddScoped<Jarvis.Application.Reviews.IWeeklyReviewService, WeeklyReviewService>();
         services.AddScoped<IAutomationRuleService, AutomationRuleService>();
         services.AddScoped<IAutomationTriggerPublisher, AutomationTriggerPublisher>();
+        services.AddScoped<IAutomationEventBus, AutomationEventBus>();
         services.AddScoped<IAutomationRunExecutor, AutomationRunExecutor>();
         services.AddScoped<AutomationConditionEvaluator>();
         services.AddScoped<IAutomationMetrics, AutomationMetrics>();

@@ -75,6 +75,7 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<CodingRun> CodingRuns => Set<CodingRun>();
     public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
     public DbSet<AutomationRun> AutomationRuns => Set<AutomationRun>();
+    public DbSet<AutomationWebhookEntity> AutomationWebhooks => Set<AutomationWebhookEntity>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
