@@ -188,6 +188,7 @@ public static class AutomationActionPolicy
         AgentRunActionDefinition => true,
         TaskActionDefinition => false,
         NotificationActionDefinition => false,
+        SetModeActionDefinition => false,
         _ => true
     };
 }

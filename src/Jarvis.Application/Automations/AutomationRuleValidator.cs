@@ -130,6 +130,13 @@ public static partial class AutomationRuleValidator
                 ValidateShortText(agent.Title, 200, "Agent run title");
                 ValidateShortText(agent.Prompt, 32_000, "Agent run prompt");
                 break;
+            case SetModeActionDefinition mode:
+                if (mode.Mode != "auto" && !Modes.ModeIds.IsValid(mode.Mode))
+                    throw new ArgumentException(
+                        "set_mode needs a mode: " + string.Join(", ", Modes.ModeIds.All) + ", or auto.");
+                if (mode.Minutes is < 1 or > 24 * 60)
+                    throw new ArgumentException("set_mode minutes must be between 1 and 1440.");
+                break;
             default:
                 throw new ArgumentException($"Unknown action kind '{action.Kind}'.");
         }

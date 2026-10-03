@@ -78,6 +78,8 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Library.LibraryToolContributor>();
         services.AddScoped<IAgentContextContributor, Library.LibraryContextContributor>();
         services.AddScoped<Jarvis.Application.Library.ILibraryDigester, Library.ModelLibraryDigester>();
+        services.AddScoped<IAgentToolContributor, Modes.ModeToolContributor>();
+        services.AddScoped<IAgentContextContributor, Modes.ModeContextContributor>();
         services.AddScoped<IAgentToolContributor, People.PeopleToolContributor>();
         services.AddScoped<IAgentContextContributor, People.PeopleContextContributor>();
         services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();

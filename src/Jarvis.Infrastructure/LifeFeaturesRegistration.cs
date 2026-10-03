@@ -3,6 +3,7 @@ using Jarvis.Application.Expenses;
 using Jarvis.Application.Finance;
 using Jarvis.Application.Inbox;
 using Jarvis.Application.Library;
+using Jarvis.Application.Modes;
 using Jarvis.Infrastructure.Library;
 using Jarvis.Application.Timeline;
 using Jarvis.Infrastructure.Persistence;
@@ -45,6 +46,9 @@ public static class LifeFeaturesRegistration
         services.AddScoped<IWebPageFetcher, PublicWebPageFetcher>();
         services.AddScoped<ILibraryService, LibraryService>();
         services.AddScoped<IResearchService, ResearchService>();
+
+        // Context modes: stored in the owner's settings, so no tables of their own.
+        services.AddScoped<IModeService, ModeService>();
         return services;
     }
 }

@@ -292,6 +292,7 @@ public static class AutomationSimulator
         TaskActionDefinition => "Create a task",
         AgentRunActionDefinition => "Start an agent task",
         ChannelMessageActionDefinition => "Send a message",
+        SetModeActionDefinition m => m.Mode == "auto" ? "Let Jarvis choose the mode" : $"Switch to {m.Mode} mode",
         _ => action.Kind
     };
 

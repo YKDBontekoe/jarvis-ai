@@ -214,6 +214,26 @@ public sealed class AutomationRunExecutorTests
         Assert.Contains("message_received: Lunch?", harness.Approvals.Single().ArgumentsJson);
     }
 
+    [Fact]
+    public async Task A_set_mode_action_switches_the_mode_but_not_in_a_test_run()
+    {
+        var calls = new List<(string? Mode, int? Minutes)>();
+        var modes = Fake<Jarvis.Application.Modes.IModeService>.Create(("SetModeAsync", args =>
+        {
+            calls.Add(((string?)args[1], (int?)args[2]));
+            return Jarvis.Application.Modes.ModeOperation<Jarvis.Application.Modes.ModeState>.Invalid("x", "ignored");
+        }));
+        var rule = Rule(new ManualTriggerDefinition(), new SetModeActionDefinition("focus", 90));
+
+        var real = new Harness(rule, modes);
+        await real.Executor.ExecuteRunAsync(real.Input(AutomationTriggerKinds.Manual), CancellationToken.None);
+        var test = new Harness(rule, modes);
+        await test.Executor.ExecuteRunAsync(test.Input(AutomationTriggerKinds.Manual, testRun: true), CancellationToken.None);
+
+        Assert.Equal([("focus", (int?)90)], calls);
+        Assert.False(AutomationActionPolicy.RequiresApproval(new SetModeActionDefinition("sleep", null)));
+    }
+
     private static NotificationActionDefinition Notify(string title = "Hello") => new(title, "Body");
 
     private static ChannelMessageActionDefinition Message() => new(Guid.CreateVersion7(), "+31600000000", "On my way");
@@ -251,7 +271,7 @@ public sealed class AutomationRunExecutorTests
         public StandingApprovalService Standing { get; } = new(new InMemorySettingsStore(), new NullAudit());
         private readonly AutomationRuleRecord? _rule;
 
-        public Harness(AutomationRuleRecord? rule)
+        public Harness(AutomationRuleRecord? rule, Jarvis.Application.Modes.IModeService? modes = null)
         {
             _rule = rule;
             ConversationId = rule?.ConversationId ?? Guid.CreateVersion7();
@@ -299,7 +319,7 @@ public sealed class AutomationRunExecutorTests
             Executor = new AutomationRunExecutor(rules, runs, notifications, approvals, Standing,
                 Fake<IJarvisTaskService>.Create(), channel, conversations,
                 new AutomationConditionEvaluator(Fake<IAutomationMetrics>.Create(), clock), clock,
-                NullLogger<AutomationRunExecutor>.Instance);
+                NullLogger<AutomationRunExecutor>.Instance, modes);
         }
 
         public AutomationRunWorkflowInput Input(string triggerKind, bool testRun = false) =>

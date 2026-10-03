@@ -80,6 +80,12 @@ const quickCommands = [
     keywords: ['habits', 'habit', 'streak', 'gewoonte', 'gewoontes'],
   ),
   QuickCommand(
+    label: 'Go to Modes',
+    icon: PhosphorIconsRegular.moon,
+    destination: 'modes',
+    keywords: ['modes', 'mode', 'focus', 'sleep', 'meeting', 'do not disturb', 'stil', 'slapen'],
+  ),
+  QuickCommand(
     label: 'Go to Library',
     icon: PhosphorIconsRegular.bookOpen,
     destination: 'library',

@@ -20,7 +20,8 @@ public sealed class AutomationRunExecutor(
     IConversationStore conversations,
     AutomationConditionEvaluator conditions,
     TimeProvider timeProvider,
-    ILogger<AutomationRunExecutor> logger) : IAutomationRunExecutor
+    ILogger<AutomationRunExecutor> logger,
+    Jarvis.Application.Modes.IModeService? modes = null) : IAutomationRunExecutor
 {
     public async Task<AutomationRunActivityResult> ExecuteRunAsync(AutomationRunWorkflowInput input,
         CancellationToken cancellationToken)
@@ -184,6 +185,7 @@ public sealed class AutomationRunExecutor(
         AgentRunActionDefinition => "Start an agent task",
         TaskActionDefinition => "Create a task",
         NotificationActionDefinition => "Notify you",
+        SetModeActionDefinition => "Switch mode",
         _ => action.Kind
     };
 
@@ -193,6 +195,7 @@ public sealed class AutomationRunExecutor(
         AgentRunActionDefinition agent => $"Start an agent task “{agent.Title}”",
         TaskActionDefinition task => $"Create a task “{task.Title}”",
         NotificationActionDefinition notification => $"Notify you “{notification.Title}”",
+        SetModeActionDefinition mode => $"Switch to {mode.Mode} mode",
         _ => action.Kind
     };
 
@@ -265,6 +268,17 @@ public sealed class AutomationRunExecutor(
                     return new AutomationActionResult(action.Kind, "skipped", "Test run does not start agent tasks.", null);
                 var created = await tasks.CreateAsync(input.OwnerId, Clip(title!, 200), body!, cancellationToken);
                 return new AutomationActionResult(action.Kind, "completed", null, created.Id);
+            }
+            case SetModeActionDefinition setMode:
+            {
+                if (input.TestRun)
+                    return new AutomationActionResult(action.Kind, "skipped", "Test run does not change the mode.", null);
+                if (modes is null)
+                    return new AutomationActionResult(action.Kind, "failed", "Modes are not available here.", null);
+                var changed = await modes.SetModeAsync(input.OwnerId, setMode.Mode, setMode.Minutes, cancellationToken);
+                return changed.Succeeded
+                    ? new AutomationActionResult(action.Kind, "completed", null, null)
+                    : new AutomationActionResult(action.Kind, "failed", changed.Message, null);
             }
             default:
                 return new AutomationActionResult(action.Kind, "failed", "Unknown action.", null);

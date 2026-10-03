@@ -161,6 +161,14 @@ public sealed record AgentRunActionDefinition(
     public override string Kind => AutomationActionKinds.AgentRun;
 }
 
+/// <summary>Switches Jarvis to a context mode (focus, sleep, …), or back to automatic with "auto".</summary>
+public sealed record SetModeActionDefinition(
+    [property: JsonPropertyName("mode")] string Mode,
+    [property: JsonPropertyName("minutes")] int? Minutes) : AutomationActionDefinition
+{
+    public override string Kind => AutomationActionKinds.SetMode;
+}
+
 public static class AutomationDefinitionJson
 {
     private static readonly JsonSerializerOptions Options = new()
@@ -243,6 +251,7 @@ internal sealed class AutomationActionJsonConverter : JsonConverter<AutomationAc
             AutomationActionKinds.Task => document.Deserialize<TaskActionDefinition>(options),
             AutomationActionKinds.ChannelMessage => document.Deserialize<ChannelMessageActionDefinition>(options),
             AutomationActionKinds.AgentRun => document.Deserialize<AgentRunActionDefinition>(options),
+            AutomationActionKinds.SetMode => document.Deserialize<SetModeActionDefinition>(options),
             _ => throw new JsonException($"Unknown automation action kind '{kind}'.")
         };
     }

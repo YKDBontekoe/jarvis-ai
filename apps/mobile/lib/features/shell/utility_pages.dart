@@ -10,6 +10,7 @@ import '../finance/finance_screen.dart';
 import '../inbox/inbox_screen.dart';
 import '../integrations/integrations_screen.dart';
 import '../memory/memory_screen.dart';
+import '../modes/modes_screen.dart';
 import '../automations/automations_screen.dart';
 import '../reminders/reminders_screen.dart';
 import '../tasks/tasks_screen.dart';
@@ -90,6 +91,7 @@ Widget? utilityPageFor(
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'today' => DayPlannerScreen(http: http, onAskInChat: onAskInChat),
   'timeline' => TimelineScreen(http: http),
+  'modes' => ModesScreen(http: http),
   'library' => LibraryScreen(http: http),
   'inbox' => InboxScreen(http: http),
   'expenses' => ExpensesScreen(http: http),

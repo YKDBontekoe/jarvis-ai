@@ -584,6 +584,10 @@ String describeAction(Map<String, dynamic> action) {
     'notification' => 'notify you${quoted('title')}',
     'task' => 'create a task${quoted('title')}',
     'agent_run' => 'start an agent task${quoted('title')}',
+    'set_mode' =>
+      asJsonString(action['mode']) == 'auto'
+          ? 'let Jarvis choose the mode'
+          : 'switch to ${asJsonString(action['mode']) ?? 'a'} mode',
     'channel_message' =>
       'send a message to ${asJsonString(action['recipient']) ?? 'a contact'}',
     _ => 'do something',

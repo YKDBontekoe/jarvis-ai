@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Google.Apis.Auth.OAuth2;
+using Jarvis.Application.Modes;
 using Jarvis.Application.Workflows;
 
 namespace Jarvis.Api.Notifications;
@@ -71,6 +72,14 @@ public sealed class NotificationPushWorker(
             if (!claim.Claimed) continue;
             handled++;
             if (claim.Work is not { } work) continue;
+
+            // Modes such as Sleep or Meeting keep a push off the phone. The notification stays in the app.
+            if (scope.ServiceProvider.GetService<IModeService>() is { } modes &&
+                !await modes.ShouldPushAsync(work.OwnerId, work.Notification.Type, cancellationToken))
+            {
+                await queue.MarkDeliveredAsync(candidate, cancellationToken);
+                continue;
+            }
 
             try
             {

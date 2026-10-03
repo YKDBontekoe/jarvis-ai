@@ -199,6 +199,16 @@ const _catalog = <String, ToolDescription>{
     'Added flashcards',
     PhosphorIconsRegular.graduationCap,
   ),
+  'GetCurrentMode': ToolDescription(
+    'Checking your mode',
+    'Checked your mode',
+    PhosphorIconsRegular.moon,
+  ),
+  'SetMode': ToolDescription(
+    'Switching mode',
+    'Switched mode',
+    PhosphorIconsRegular.moon,
+  ),
   'ListWhatsAppChats': ToolDescription(
     'Checking your WhatsApp',
     'Checked your WhatsApp',
