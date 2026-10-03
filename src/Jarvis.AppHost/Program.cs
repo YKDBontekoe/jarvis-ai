@@ -7,6 +7,7 @@ var postgres = builder.AddPostgres("postgres")
     .WithDataVolume();
 var database = postgres.AddDatabase("jarvis");
 var voiceWorkerSecret = builder.Configuration["VOICE_WORKER_SECRET"] ?? "jarvis-local-voice-worker-development-secret";
+var mcpRunnerToken = builder.Configuration["MCP_RUNNER_TOKEN"] ?? "jarvis-local-mcp-runner-development-token";
 var livekitApiKey = builder.Configuration["LIVEKIT_API_KEY"] ?? "devkey";
 var livekitApiSecret = builder.Configuration["LIVEKIT_API_SECRET"] ?? "jarvis-local-livekit-development-secret";
 
@@ -62,6 +63,14 @@ if (string.IsNullOrWhiteSpace(whatsAppBridgeUrl))
         .WithHttpEndpoint(port: 3000, targetPort: 3000);
 }
 
+// Owner-installed npm and PyPI connectors run here, outside the API and worker, as in production.
+var mcpRunner = builder.AddProject<Projects.Jarvis_Api>("mcp-runner", launchProfileName: null)
+    .WithArgs("mcp-runner")
+    .WithEnvironment("McpRunner__Token", mcpRunnerToken)
+    .WithEnvironment("McpRunner__ListenUrl", "http://localhost:8090")
+    .WithEnvironment("McpRunner__PassEnvironment", "HTTPS_PROXY,HTTP_PROXY,NO_PROXY,NODE_EXTRA_CA_CERTS,SSL_CERT_FILE");
+const string mcpRunnerUrl = "ws://localhost:8090/run";
+
 var api = builder.AddProject<Projects.Jarvis_Api>("jarvis-api")
     .WithReference(database)
     .WithEnvironment("Coding__Repositories__0__Name", "jarvis")
@@ -81,12 +90,15 @@ var api = builder.AddProject<Projects.Jarvis_Api>("jarvis-api")
     .WithEnvironment("LiveKit__InternalUrl", "http://localhost:7880")
     .WithEnvironment("LiveKit__PublicUrl", builder.Configuration["LIVEKIT_PUBLIC_URL"] ?? "ws://localhost:7880")
     .WithEnvironment("Voice__WorkerSecret", voiceWorkerSecret)
+    .WithEnvironment("McpRunner__Url", mcpRunnerUrl)
+    .WithEnvironment("McpRunner__Token", mcpRunnerToken)
     .WithEnvironment("ASPNETCORE_URLS", builder.Configuration["JARVIS_LISTEN_URL"] ?? "http://localhost:5082")
     .WaitFor(database)
     .WaitFor(temporal)
     .WaitFor(objectStorage)
     .WaitFor(clamav)
-    .WaitFor(livekit);
+    .WaitFor(livekit)
+    .WaitFor(mcpRunner);
 if (signalCli is not null)
     api.WithEnvironment("Channels__Signal__BaseUrl", signalCli.GetEndpoint("http")).WaitFor(signalCli);
 else
@@ -107,6 +119,8 @@ var worker = builder.AddProject<Projects.Jarvis_Worker>("jarvis-worker")
     .WithEnvironment("Coding__Repositories__0__Path", workspaceRoot)
     .WithEnvironment("Temporal__Address", temporal.GetEndpoint("grpc"))
     .WithEnvironment("Codex__ExecutablePath", "codex")
+    .WithEnvironment("McpRunner__Url", mcpRunnerUrl)
+    .WithEnvironment("McpRunner__Token", mcpRunnerToken)
     .WithEnvironment("ObjectStorage__ServiceUrl", objectStorage.GetEndpoint("s3"))
     .WithEnvironment("ObjectStorage__AccessKey", objectStorageAccessKey)
     .WithEnvironment("ObjectStorage__SecretKey", objectStorageSecretKey)

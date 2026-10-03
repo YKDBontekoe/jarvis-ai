@@ -198,6 +198,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:5082
+      McpRunner__Url: ws://mcp-runner:8090/run
+      McpRunner__Token: ${MCP_RUNNER_TOKEN:?Set MCP_RUNNER_TOKEN}
       HOME: /tmp
       ReverseProxy__TrustForwardedHeaders: "true"
       DataProtection__KeysDirectory: /var/lib/jarvis-data-protection-keys
@@ -273,7 +275,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 90s
-    networks: [application, data]
+    networks: [application, data, mcp]
 
   # One-shot deployment task. It is profile-gated so a normal `compose up` never
   # reruns migrations; remote-up invokes it explicitly before replacing the API.
@@ -315,6 +317,8 @@ services:
     cpus: 2.0
     pids_limit: 256
     environment:
+      McpRunner__Url: ws://mcp-runner:8090/run
+      McpRunner__Token: ${MCP_RUNNER_TOKEN:?Set MCP_RUNNER_TOKEN}
       DOTNET_ENVIRONMENT: Production
       DataProtection__KeysDirectory: /var/lib/jarvis-data-protection-keys
       HOME: /tmp
@@ -355,7 +359,37 @@ services:
         condition: service_healthy
       temporal:
         condition: service_started
-    networks: [application, data]
+    networks: [application, data, mcp]
+
+  mcp-runner:
+    # Runs owner-installed npm and PyPI connectors away from the API and worker: no database networks, no
+    # Docker socket, a read-only root, and a fresh temporary home per connection.
+    # See docs/backend/integrations-and-mcp.md (MCP runner).
+    image: ${JARVIS_API_IMAGE:-ghcr.io/ykdbontekoe/jarvis-ai/api:latest}
+    command: ["Jarvis.Api.dll", "mcp-runner"]
+    user: "${JARVIS_UID:?Set JARVIS_UID}:${JARVIS_GID:?Set JARVIS_GID}"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,size=1g
+      - /cache:rw,nosuid,size=2g
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 512
+    mem_limit: 2g
+    restart: unless-stopped
+    environment:
+      HOME: /tmp
+      McpRunner__Token: ${MCP_RUNNER_TOKEN:?Set MCP_RUNNER_TOKEN}
+      McpRunner__ListenUrl: http://+:8090
+      McpRunner__WorkRoot: /tmp/mcp-runner
+      McpRunner__CacheRoot: /cache
+      McpRunner__MaxProcesses: ${MCP_RUNNER_MAX_PROCESSES:-16}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8090/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [mcp, mcp-egress]
 
   caddy:
     image: caddy:2-alpine
@@ -385,6 +419,10 @@ networks:
     internal: true
   temporal-data:
     internal: true
+  # API and worker reach the runner here; the runner reaches the internet through mcp-egress only.
+  mcp:
+    internal: true
+  mcp-egress:
 
 volumes:
   postgres-data:

@@ -328,13 +328,23 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
         return (true, secrets);
     }
 
-    private static IClientTransport CreateTransport(McpServerOptions server, ILoggerFactory loggerFactory)
+    private IClientTransport CreateTransport(McpServerOptions server, ILoggerFactory loggerFactory)
     {
         if (server.ConnectionTimeoutSeconds is < 1 or > 300)
             throw new InvalidOperationException($"MCP server '{server.Name}' connection timeout must be between 1 and 300 seconds.");
 
         return server.Transport.Trim().ToLowerInvariant() switch
         {
+            // Owner-added connectors run in the separate MCP runner when one is configured, so they never see
+            // this process's environment, files, or other owners' secrets. Operator host binaries stay local.
+            "stdio" when IntegrationCredentialProviders.IsUserMcpServerId(server.CredentialProvider) &&
+                         McpRunnerOptions.From(configuration) is { } runner =>
+                new McpRunnerClientTransport(runner,
+                    new McpRunnerLaunch(server.Command, server.Arguments,
+                        server.EnvironmentVariables
+                            .Where(pair => pair.Value is not null)
+                            .ToDictionary(pair => pair.Key, pair => pair.Value!, StringComparer.Ordinal)),
+                    server.Name, loggerFactory),
             "stdio" => CreateStdioTransport(server),
             "streamablehttp" => CreateHttpTransport(server, loggerFactory),
             var transport => throw new InvalidOperationException(

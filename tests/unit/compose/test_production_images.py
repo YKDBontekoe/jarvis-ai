@@ -31,6 +31,7 @@ REQUIRED_ENV = {
     "CODEX_HOME_DIR": "/tmp/codex-home",
     "JARVIS_DATA_PROTECTION_KEYS_DIR": "/tmp/jarvis-data-protection-keys",
     "JARVIS_BACKUP_DIR": "/tmp/jarvis-backups",
+    "MCP_RUNNER_TOKEN": "mcp-runner-test-token-0123456789abcdef",
     "AUTH_ISSUER": "https://jarvis.example.com",
     "AUTH_AUDIENCE": "jarvis-api",
     "AUTH_SIGNING_KEY": "production-test-signing-key-32bytes!",
@@ -135,6 +136,18 @@ class SignalCliComposeTests(unittest.TestCase):
         self.assertIn("${JARVIS_BACKUP_DIR:?Set JARVIS_BACKUP_DIR}:/backups:rw", service)
         self.assertNotIn("ports:", service)
         self.assertTrue(os.access(REPO_ROOT / "infra" / "backup" / "backup.sh", os.X_OK))
+
+    def test_mcp_runner_is_isolated_from_databases(self) -> None:
+        text = COMPOSE_FILE.read_text(encoding="utf-8")
+        service = text.split("\n  mcp-runner:\n", 1)[1].split("\n  caddy:\n", 1)[0]
+        self.assertIn('command: ["Jarvis.Api.dll", "mcp-runner"]', service)
+        self.assertIn("networks: [mcp, mcp-egress]", service)
+        self.assertIn("read_only: true", service)
+        self.assertIn("cap_drop: [ALL]", service)
+        self.assertNotIn("docker.sock", text)
+        self.assertNotIn("ports:", service)
+        networks = text.split("\nnetworks:\n", 1)[1]
+        self.assertIn("  mcp:\n    internal: true", networks)
 
     def test_production_defaults_signal_base_url_to_internal_service(self) -> None:
         text = COMPOSE_FILE.read_text(encoding="utf-8")

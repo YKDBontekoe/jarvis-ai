@@ -22,6 +22,12 @@ if (args is ["voice-mcp"])
     return;
 }
 
+if (args is ["mcp-runner"])
+{
+    await Jarvis.Api.McpRunner.McpRunnerHost.RunAsync([]);
+    return;
+}
+
 JarvisSentry.ShouldCaptureException = exception => JarvisSentryExceptions.ShouldCapture(exception);
 
 var builder = WebApplication.CreateBuilder(args);

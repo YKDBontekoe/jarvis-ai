@@ -47,6 +47,26 @@ A server missing a required secret reports `needs_credentials`.
 Catalog npm packages run with `npx -y pkg@version`; PyPI packages run with `uvx pkg@version` (the API image ships
 uv). Set `Mcp__Registry__BaseUrl` to an empty value to turn the catalog off, or to a mirror.
 
+### MCP runner
+
+Owner-installed npm and PyPI connectors do not run inside the API or worker when `McpRunner:Url` is set. The
+`mcp-runner` service (the API image started as `Jarvis.Api.dll mcp-runner`) accepts one authenticated WebSocket
+per connection (`Authorization: Bearer <McpRunner:Token>`). The first text message is the launch spec
+`{command, arguments, environment}`. The runner validates it again (`npx`/`uvx` only, pinned package rules,
+the secret variable blocklist) and starts the package with a fresh temporary home and a clean environment that
+holds only that server's keys. MCP traffic then flows over the socket as it would over stdin/stdout. When the
+socket closes, or after `McpRunner:MaxSessionMinutes`, the whole process tree is killed and the home deleted.
+Connector stderr is discarded because packages may print their own keys.
+
+`McpRunnerClientTransport` (`Jarvis.Mcp`) is the API side; `McpRunnerHost` (`Jarvis.Api/McpRunner`) is the
+runner. Operator host binaries such as `github-mcp-server` still run in the API image.
+
+In production Compose the runner has no database networks and no Docker socket. It runs as `JARVIS_UID` on a
+read-only root with dropped capabilities, a PID and memory limit, and tmpfs for work and package caches. It
+reaches the internet through `mcp-egress`, and the API and worker reach it through the internal `mcp` network.
+Aspire starts the same runner as the `mcp-runner` resource. Without `McpRunner:Url`, connectors run in-process
+as before (development Compose, tests).
+
 ## MCP architecture
 
 | Layer | Responsibility |
