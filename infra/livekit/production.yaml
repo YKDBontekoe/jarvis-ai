@@ -1,6 +1,8 @@
+# Production LiveKit behind Caddy: all media uses port 443. UDP 443 is published straight to LiveKit (single-port
+# mode); the ICE-TCP fallback listens on TCP 443 inside the container, and Caddy passes non-TLS connections on the
+# public TCP 443 to it (infra/caddy/Caddyfile). Signaling goes through Caddy under /rtc.
 port: 7880
 rtc:
-  tcp_port: 7881
-  port_range_start: 50000
-  port_range_end: 50100
+  udp_port: 443
+  tcp_port: 443
   use_external_ip: true

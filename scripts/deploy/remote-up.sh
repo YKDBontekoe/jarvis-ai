@@ -58,10 +58,11 @@ printf '  %s\n' "${required_images[@]}"
 jarvis_compose pull \
   jarvis-api jarvis-worker garage embeddings
 
-# The WhatsApp bridge is built from the checked-out deployment bundle rather
-# than published to GHCR. Build it explicitly before the later --no-build up.
+# The WhatsApp bridge and Caddy (with its layer4 plugin) are built from the
+# checked-out deployment bundle rather than published to GHCR. Build them
+# explicitly before the later --no-build up.
 jarvis_compose build \
-  whatsapp-bridge
+  whatsapp-bridge caddy
 
 # Start only migration prerequisites, then migrate with the new API image. A
 # failure exits here, before Compose is allowed to replace healthy app containers.

@@ -16,13 +16,17 @@ the same features (`scripts/deploy/compose-env.sh`).
 
 - **MCP runner** for owner-installed connectors, and the nightly **backup** service
 
-- **Caddy** edge TLS
+- **Caddy** edge TLS, built on the host from `infra/caddy/Dockerfile` with the layer4 plugin
 - **Jarvis API + Worker** (GHCR images in CI)
 - **PostgreSQL** (app + Temporal DB)
 - **Garage** S3-compatible storage
 - **embeddings**: a CPU Text Embeddings Inference container with the local embedding model (see [configuration.md](configuration.md#local-embedding-model))
 - **ClamAV**, **LiveKit**, private **signal-cli** and **whatsapp-bridge** (built on the host from `workers/whatsapp-bridge`)
-- Only edge/media ports published; databases stay on private networks
+- Only ports 80 and 443 are public; databases stay on private networks. TCP 80/443 go to Caddy. LiveKit voice media
+  uses UDP 443 directly (single-port mode, `infra/livekit/production.yaml`), and its ICE-TCP fallback shares TCP 443:
+  Caddy passes any connection that does not start with a TLS handshake to LiveKit. Caddy therefore serves no HTTP/3.
+  With the `tunnel` feature another proxy owns 443, so LiveKit keeps TCP 7881 and UDP 50000-50100
+  (`infra/livekit/production-tunnel.yaml`).
 
 No hand configuration: `scripts/deploy/prepare-host.sh` runs first on every deploy. It copies
 `infra/compose/.env.production.example` to `.env.production` (mode `0600`) when missing and fills every empty managed

@@ -148,10 +148,14 @@ internal static class ProductionDeployment
             s.Command = ["--config", "/etc/livekit.yaml", "--bind", "0.0.0.0"];
             s.Restart = "unless-stopped";
             s.Env(("LIVEKIT_KEYS", "${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET}"));
-            s.Volumes.Add(Bind("./infra/livekit/production.yaml", "/etc/livekit.yaml", readOnly: true));
-            // The host Caddy stack proxies public LiveKit signaling through this loopback port.
-            s.Ports = ["127.0.0.1:7880:7880/tcp", "${LIVEKIT_BIND_ADDRESS:-0.0.0.0}:7881:7881/tcp",
-                "${LIVEKIT_BIND_ADDRESS:-0.0.0.0}:50000-50100:50000-50100/udp"];
+            // Behind Caddy all media uses port 443: UDP straight to LiveKit, ICE-TCP through Caddy's TCP 443. With the
+            // tunnel feature another proxy owns 443, so media keeps its own ports. Loopback 7880 serves a host proxy.
+            s.Volumes.Add(Bind(features.Tunnel ? "./infra/livekit/production-tunnel.yaml" : "./infra/livekit/production.yaml",
+                "/etc/livekit.yaml", readOnly: true));
+            s.Ports = features.Tunnel
+                ? ["127.0.0.1:7880:7880/tcp", "${LIVEKIT_BIND_ADDRESS:-0.0.0.0}:7881:7881/tcp",
+                    "${LIVEKIT_BIND_ADDRESS:-0.0.0.0}:50000-50100:50000-50100/udp"]
+                : ["127.0.0.1:7880:7880/tcp", "${LIVEKIT_BIND_ADDRESS:-0.0.0.0}:443:443/udp"];
             s.Networks = ["application"];
         });
 
@@ -300,14 +304,18 @@ internal static class ProductionDeployment
             s.Networks = ["mcp", "mcp-egress"];
         });
 
-        builder.Service("caddy", "caddy:2-alpine", s =>
+        // Built on the host from infra/caddy/Dockerfile (Caddy with the layer4 plugin), like the WhatsApp bridge.
+        builder.Service("caddy", null, s =>
         {
+            s.Build = new Build { Context = "./infra/caddy" };
+            s.PullPolicy = "build";
             s.Restart = "unless-stopped";
             s.Env(("JARVIS_DOMAIN", "${JARVIS_DOMAIN:?Set JARVIS_DOMAIN}"),
                 ("LIVEKIT_DOMAIN", "${LIVEKIT_DOMAIN:?Set LIVEKIT_DOMAIN}"));
             // Behind an existing host proxy or Cloudflare Tunnel, Caddy only starts with the direct-edge profile.
             if (features.Tunnel) s.Profiles = ["direct-edge"];
-            else s.Ports = ["80:80/tcp", "443:443/tcp", "443:443/udp"];
+            // No UDP 443: LiveKit media owns it, so Caddy serves HTTP/1.1 and HTTP/2 only.
+            else s.Ports = ["80:80/tcp", "443:443/tcp"];
             s.Volumes.Add(Bind("./infra/caddy/Caddyfile", "/etc/caddy/Caddyfile", readOnly: true));
             s.Volumes.Add(Named("caddy-data", "/data"));
             s.Volumes.Add(Named("caddy-config", "/config"));

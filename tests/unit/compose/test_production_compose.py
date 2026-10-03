@@ -81,6 +81,9 @@ class ProductionComposeTests(unittest.TestCase):
         cls.base = _render(cls.base_file, profiles=("migration",))
         cls.all = _render(cls.all_file, profiles=("migration", "direct-edge"))
 
+    def mounts(self, name: str, path: str, project: dict) -> bool:
+        return any(volume.get("source", "").endswith(path) for volume in self.service(name, project).get("volumes", []))
+
     def service(self, name: str, project: dict | None = None) -> dict:
         return (project or self.base)["services"][name]
 
@@ -158,7 +161,33 @@ class ProductionComposeTests(unittest.TestCase):
         self.assertNotIn("playwright-mcp", self.base["services"])
         caddy = self.service("caddy")
         self.assertNotIn("profiles", caddy)
-        self.assertEqual({"80", "443"}, {str(port["published"]) for port in caddy["ports"]})
+
+    def test_only_ports_80_and_443_are_public(self) -> None:
+        def public(service: str, project: dict) -> set[str]:
+            return {f'{port["published"]}/{port.get("protocol", "tcp")}'
+                    for port in self.service(service, project).get("ports", [])
+                    if port.get("host_ip") not in ("127.0.0.1", "::1")}
+
+        exposed = {name: public(name, self.base) for name in self.base["services"]}
+        self.assertEqual({"80/tcp", "443/tcp"}, exposed.pop("caddy"))
+        # LiveKit media: UDP 443 directly, ICE-TCP through Caddy's TCP 443 (infra/caddy/Caddyfile).
+        self.assertEqual({"443/udp"}, exposed.pop("livekit"))
+        self.assertEqual({}, {name: ports for name, ports in exposed.items() if ports})
+        self.assertTrue(self.mounts("livekit", "infra/livekit/production.yaml", self.base))
+
+    def test_caddy_is_built_with_the_layer4_plugin(self) -> None:
+        caddy = self.service("caddy")
+        self.assertTrue(caddy["build"]["context"].endswith("infra/caddy"))
+        dockerfile = (REPO_ROOT / "infra/caddy/Dockerfile").read_text()
+        self.assertIn("github.com/mholt/caddy-l4@", dockerfile)
+        caddyfile = (REPO_ROOT / "infra/caddy/Caddyfile").read_text()
+        self.assertIn("proxy livekit:443", caddyfile)
+        self.assertIn("protocols h1 h2", caddyfile)
+
+    def test_tunnel_keeps_dedicated_media_ports(self) -> None:
+        ports = {f'{port["published"]}/{port.get("protocol", "tcp")}' for port in self.service("livekit", self.all)["ports"]}
+        self.assertEqual({"7880/tcp", "7881/tcp"} | {f"{port}/udp" for port in range(50000, 50101)}, ports)
+        self.assertTrue(self.mounts("livekit", "infra/livekit/production-tunnel.yaml", self.all))
 
     def test_all_features_add_their_services_and_settings(self) -> None:
         api = self.service("jarvis-api", self.all)
