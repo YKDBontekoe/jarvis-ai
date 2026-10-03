@@ -343,10 +343,26 @@ internal static class ConversationEndpoints
                 Results.Ok((await approvals.ListActionableAsync(currentUser.OwnerId, ct)).ToDtos()))
             .WithName("ListPendingApprovals");
 
+        api.MapGet("/approvals/standing", async (IStandingApprovalService standing, ICurrentUser currentUser,
+                CancellationToken ct) =>
+            Results.Ok((await standing.ListAsync(currentUser.OwnerId, ct))
+                .Select(grant => new StandingApprovalDto(grant.Category, grant.Label, grant.GrantedAt))))
+            .WithName("ListStandingApprovals");
+
+        api.MapDelete("/approvals/standing", async (string? category, IStandingApprovalService standing,
+                ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(category) || !ApprovalCategories.IsSafeKey(category))
+                return EndpointHelpers.Invalid("category", "Choose an always-allowed action to turn off.");
+            return await standing.RevokeAsync(currentUser.OwnerId, category, ct)
+                ? Results.NoContent()
+                : Results.NotFound();
+        }).WithName("RevokeStandingApproval");
+
         api.MapPost("/approvals/{approvalId:guid}/decision", async (Guid approvalId, ApprovalDecisionRequest request,
                 RemoteQueryExecutor remote, ICurrentUser currentUser) =>
             await RemoteQueryResults.ExecuteAsync(() =>
-                remote.DecideAsync(currentUser.OwnerId, approvalId, request.Approved)))
+                remote.DecideAsync(currentUser.OwnerId, approvalId, request.Approved, request.RememberCategory)))
             .WithName("DecideToolApproval");
 
         return api;

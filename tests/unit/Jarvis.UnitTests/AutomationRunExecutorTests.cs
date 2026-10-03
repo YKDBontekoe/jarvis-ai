@@ -98,6 +98,23 @@ public sealed class AutomationRunExecutorTests
     }
 
     [Fact]
+    public async Task Standing_approval_runs_a_sensitive_automation_action_without_asking()
+    {
+        var harness = new Harness(Rule(Message()));
+        var category = ApprovalCategories.Resolve("automation_channel_message", "{}");
+        Assert.Equal(StandingApprovalGrantResult.Granted,
+            await harness.Standing.GrantAsync(OwnerId, category, CancellationToken.None));
+
+        var result = await harness.Executor.ExecuteRunAsync(harness.Input(AutomationTriggerKinds.Schedule),
+            CancellationToken.None);
+
+        Assert.False(result.WaitingApproval);
+        Assert.Empty(harness.Approvals);
+        Assert.Equal(["On my way"], harness.ChannelMessages);
+        Assert.Equal(AutomationRunStatuses.Completed, harness.RunStatus);
+    }
+
+    [Fact]
     public async Task Approval_card_lists_the_actions_that_approving_releases()
     {
         var harness = new Harness(Rule(Message(), Notify("After")));
@@ -189,6 +206,7 @@ public sealed class AutomationRunExecutorTests
         public List<string> ChannelMessages { get; } = [];
         public List<ToolApprovalRecord> Approvals { get; } = [];
         public AutomationRunExecutor Executor { get; }
+        public StandingApprovalService Standing { get; } = new(new InMemorySettingsStore(), new NullAudit());
         private readonly AutomationRuleRecord? _rule;
 
         public Harness(AutomationRuleRecord? rule)
@@ -236,7 +254,7 @@ public sealed class AutomationRunExecutorTests
             }));
             var conversations = Fake<IConversationStore>.Create(("AddMessageAsync", _ => Task.CompletedTask));
             var clock = new FixedClock(Now);
-            Executor = new AutomationRunExecutor(rules, runs, notifications, approvals,
+            Executor = new AutomationRunExecutor(rules, runs, notifications, approvals, Standing,
                 Fake<IJarvisTaskService>.Create(), channel, conversations,
                 new AutomationConditionEvaluator(Fake<IAutomationMetrics>.Create(), clock), clock,
                 NullLogger<AutomationRunExecutor>.Instance);

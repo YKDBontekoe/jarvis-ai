@@ -34,9 +34,13 @@ internal static class ApiMappers
     public static FileCitationDto ToDto(this FileCitation citation) => new(citation.FileId, citation.DisplayName,
         citation.ChunkId, citation.ChunkIndex, citation.Excerpt, citation.PageNumber, citation.SourceStatus);
 
-    public static ToolApprovalDto ToDto(this ToolApprovalRecord approval) => new(approval.Id,
-        approval.ConversationId, approval.ToolName, approval.ArgumentsJson, approval.Status, approval.Approved,
-        approval.ResumeStatus, approval.CreatedAt);
+    public static ToolApprovalDto ToDto(this ToolApprovalRecord approval)
+    {
+        var category = ApprovalCategories.Resolve(approval.ToolName, approval.ArgumentsJson);
+        return new(approval.Id, approval.ConversationId, approval.ToolName, approval.ArgumentsJson, approval.Status,
+            approval.Approved, approval.ResumeStatus, approval.CreatedAt, category.Key, category.Label,
+            category.CanRemember);
+    }
 
     public static ReminderDto ToDto(this ReminderRecord reminder) => new(reminder.Id, reminder.Title,
         reminder.DueAt, reminder.Status, reminder.CreatedAt, reminder.CompletedAt, reminder.Recurrence,

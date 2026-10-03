@@ -141,10 +141,15 @@ void main() {
 
   test('tool catalog describes known and unknown tools', () {
     expect(describeTool('CreateReminder').done, 'Scheduled a reminder');
-    expect(describeTool('RequestMcpAuthorization').active,
-        'Asking you to authorize an integration');
+    expect(
+      describeTool('RequestMcpAuthorization').active,
+      'Asking you to authorize an integration',
+    );
     expect(describeTool('OfferMcpSetup').active, 'Opening integration setup');
-    expect(describeTool('AskForMcpCredential').done, 'Asked for a token in chat');
+    expect(
+      describeTool('AskForMcpCredential').done,
+      'Asked for a token in chat',
+    );
     expect(describeTool('SearchMemoryAsync').active, 'Searching memory');
     expect(
       describeTool('github_create_issue').active,
@@ -380,7 +385,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('I like jazz', findRichText: true), findsOneWidget);
+    expect(
+      find.textContaining('I like jazz', findRichText: true),
+      findsOneWidget,
+    );
     expect(find.textContaining('0199-abc', findRichText: true), findsNothing);
   });
 
@@ -404,6 +412,37 @@ void main() {
 
     await tester.tap(find.text('Approve'));
     expect(decisions, [true]);
+  });
+
+  testWidgets('always allow confirms, then remembers the category', (
+    tester,
+  ) async {
+    var remembered = 0;
+    await tester.pumpWidget(
+      _host(
+        ApprovalCard(
+          approval: const ApprovalEntry(
+            id: 'a-always',
+            toolName: 'ForgetMemory',
+            argumentsJson: '{}',
+            categoryLabel: 'Forgetting memories',
+            canRememberCategory: true,
+          ),
+          onDecide: (_) {},
+          onAlwaysAllow: () => remembered++,
+        ),
+      ),
+    );
+
+    expect(find.text('Always allow forgetting memories'), findsOneWidget);
+    await tester.tap(find.text('Always allow forgetting memories'));
+    await tester.pumpAndSettle();
+    expect(find.text('Always allow this?'), findsOneWidget);
+    expect(remembered, 0);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Always allow'));
+    await tester.pumpAndSettle();
+    expect(remembered, 1);
   });
 
   testWidgets('declined retry still resubmits the previous decline', (

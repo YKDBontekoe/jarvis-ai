@@ -32,8 +32,10 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | POST | `/conversations/{id}/regenerate` | Answer the last user message again, replacing the last reply. 409 while approvals are open or when that reply used tools (so actions are never repeated) |
 | POST | `/conversations/{id}/cancel` | Cancel in-flight run |
 | POST | `/conversations/{id}/summary` | Read-only recap: `summary`, `keyPoints`, `actionItems`, `messageCount`. Nothing is stored. 409 when the chat has fewer than 2 messages, 503 when the model is unavailable |
-| GET | `/approvals` | Pending tool approvals |
-| POST | `/approvals/{id}/decision` | Approve or decline |
+| GET | `/approvals` | Pending tool approvals. Each row includes `category`, `categoryLabel`, and `canRememberCategory` |
+| GET | `/approvals/standing` | Categories the owner always allows (`category`, `label`, `grantedAt`) |
+| DELETE | `/approvals/standing?category=` | Turn off one standing grant |
+| POST | `/approvals/{id}/decision` | Approve or decline (`approved`). `rememberCategory: true` with an approval also stores a standing grant for that action's category |
 
 ## Automation
 

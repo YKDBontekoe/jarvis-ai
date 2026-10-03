@@ -64,6 +64,7 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Agents.IA2ATokenRepository, A2ATokenRepository>();
         services.AddScoped<Jarvis.Application.Browser.IBrowserSessionStore, BrowserSessionRepository>();
         services.AddScoped<IToolApprovalStore, ToolApprovalStore>();
+        services.AddScoped<IStandingApprovalService, StandingApprovalService>();
         services.AddScoped<IAuditEventStore, AuditEventStore>();
         services.AddScoped<IReminderRepository, WorkflowRepository>();
         services.AddScoped<INotificationRepository, WorkflowRepository>();

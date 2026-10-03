@@ -15,8 +15,10 @@ namespace Jarvis.Agents;
 
 public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientResolver chatClients, McpToolHost mcpToolHost,
     IConversationStore conversations, IJarvisTaskRepository tasks, IAssistantProfileService profiles,
-    IOwnerSettingsStore settings, ICurrentUser currentUser, IFileService files) : IJarvisAgent
+    IOwnerSettingsStore settings, ICurrentUser currentUser, IFileService files,
+    IStandingApprovalService standingApprovals) : IJarvisAgent
 {
+    private const int MaxAutomaticApprovalsPerTurn = 16;
     private static readonly JsonSerializerOptions ArgumentsJsonOptions = new(JsonSerializerDefaults.Web);
     private AIAgent? _agent;
 
@@ -163,59 +165,82 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
     {
         var activeTools = new Dictionary<string, string>(StringComparer.Ordinal);
         var streamCompleted = false;
+        var nextInput = input;
+        var automaticApprovals = 0;
         try
         {
-            await foreach (var update in agent.RunStreamingAsync(input, session, cancellationToken: cancellationToken))
+            while (true)
             {
-                var checkpoint = false;
-                var approvalRequests = update.Contents.OfType<ToolApprovalRequestContent>().ToArray();
-                var approvalCallIds = approvalRequests
-                    .Select(request => request.ToolCall)
-                    .OfType<FunctionCallContent>()
-                    .Select(call => call.CallId)
-                    .ToHashSet(StringComparer.Ordinal);
-
-                if (NativeToolProgress.Read(update) is { } native)
+                var granted = new List<ToolApprovalRequestContent>();
+                await foreach (var update in agent.RunStreamingAsync(nextInput, session,
+                                   cancellationToken: cancellationToken))
                 {
-                    if (native.Phase == "started" ? activeTools.TryAdd(native.ToolCallId, native.ToolName)
-                            : activeTools.Remove(native.ToolCallId))
-                        yield return new AgentStreamEvent(ToolProgress: native);
+                    var checkpoint = false;
+                    var approvalRequests = update.Contents.OfType<ToolApprovalRequestContent>().ToArray();
+                    var approvalCallIds = approvalRequests
+                        .Select(request => request.ToolCall)
+                        .OfType<FunctionCallContent>()
+                        .Select(call => call.CallId)
+                        .ToHashSet(StringComparer.Ordinal);
+
+                    if (NativeToolProgress.Read(update) is { } native)
+                    {
+                        if (native.Phase == "started" ? activeTools.TryAdd(native.ToolCallId, native.ToolName)
+                                : activeTools.Remove(native.ToolCallId))
+                            yield return new AgentStreamEvent(ToolProgress: native);
+                    }
+
+                    foreach (var text in update.Contents.OfType<TextContent>())
+                    {
+                        if (!string.IsNullOrEmpty(text.Text)) yield return new AgentStreamEvent(TextDelta: text.Text);
+                    }
+
+                    foreach (var call in update.Contents.OfType<FunctionCallContent>())
+                    {
+                        if (call.InformationalOnly || approvalCallIds.Contains(call.CallId)) continue;
+                        if (!activeTools.TryAdd(call.CallId, call.Name)) continue;
+                        yield return new AgentStreamEvent(ToolProgress: new AgentToolProgress(call.CallId, call.Name, "started"));
+                    }
+
+                    foreach (var result in update.Contents.OfType<FunctionResultContent>())
+                    {
+                        if (!activeTools.Remove(result.CallId, out var toolName)) continue;
+                        yield return new AgentStreamEvent(ToolProgress: new AgentToolProgress(result.CallId, toolName,
+                            result.Exception is null ? "completed" : "failed"));
+                        checkpoint = true;
+                    }
+
+                    var calls = approvalRequests
+                        .Where(request => request.ToolCall is FunctionCallContent)
+                        .ToArray();
+                    // One call per turn. A standing grant answers it here so the tool runs in this same turn.
+                    if (calls.Length == 1 && automaticApprovals < MaxAutomaticApprovalsPerTurn &&
+                        await PermanentlyAllowedAsync(calls[0], conversationId, cancellationToken))
+                    {
+                        granted.Add(calls[0]);
+                        checkpoint = true;
+                    }
+                    else
+                    {
+                        foreach (var request in calls)
+                        {
+                            if (request.ToolCall is not FunctionCallContent functionCall) continue;
+                            yield return new AgentStreamEvent(ApprovalRequest: ToApprovalRequest(functionCall, request.RequestId));
+                            checkpoint = true;
+                        }
+                    }
+
+                    if (checkpoint)
+                        await SaveSessionAsync(agent, conversationId, session, cancellationToken);
                 }
 
-                foreach (var text in update.Contents.OfType<TextContent>())
-                {
-                    if (!string.IsNullOrEmpty(text.Text)) yield return new AgentStreamEvent(TextDelta: text.Text);
-                }
-
-                foreach (var call in update.Contents.OfType<FunctionCallContent>())
-                {
-                    if (call.InformationalOnly || approvalCallIds.Contains(call.CallId)) continue;
-                    if (!activeTools.TryAdd(call.CallId, call.Name)) continue;
-                    yield return new AgentStreamEvent(ToolProgress: new AgentToolProgress(call.CallId, call.Name, "started"));
-                }
-
-                foreach (var result in update.Contents.OfType<FunctionResultContent>())
-                {
-                    if (!activeTools.Remove(result.CallId, out var toolName)) continue;
-                    yield return new AgentStreamEvent(ToolProgress: new AgentToolProgress(result.CallId, toolName,
-                        result.Exception is null ? "completed" : "failed"));
-                    checkpoint = true;
-                }
-
-                foreach (var request in approvalRequests)
-                {
-                    if (request.ToolCall is not FunctionCallContent functionCall) continue;
-                    yield return new AgentStreamEvent(ApprovalRequest: new AgentToolApprovalRequest(
-                        request.RequestId,
-                        functionCall.CallId,
-                        functionCall.Name,
-                        JsonSerializer.Serialize(functionCall.Arguments ?? new Dictionary<string, object?>(),
-                            ArgumentsJsonOptions)));
-                    checkpoint = true;
-                }
-
-                if (checkpoint)
-                    await SaveSessionAsync(agent, conversationId, session, cancellationToken);
+                if (granted.Count == 0) break;
+                automaticApprovals += granted.Count;
+                nextInput =
+                [
+                    new ChatMessage(ChatRole.User, granted.Select(request =>
+                        request.CreateResponse(true)).ToArray())
+                ];
             }
 
             streamCompleted = true;
@@ -231,6 +256,32 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
             }
         }
     }
+
+    private async Task<bool> PermanentlyAllowedAsync(ToolApprovalRequestContent request, Guid conversationId,
+        CancellationToken cancellationToken)
+    {
+        if (request.ToolCall is not FunctionCallContent functionCall) return false;
+        try
+        {
+            var category = ApprovalCategories.Resolve(functionCall.Name, SerializeArguments(functionCall));
+            if (!category.CanRemember ||
+                !await standingApprovals.IsGrantedAsync(currentUser.OwnerId, category.Key, cancellationToken))
+                return false;
+            await standingApprovals.RecordAutomaticUseAsync(currentUser.OwnerId, functionCall.Name, category,
+                conversationId, cancellationToken);
+            return true;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return false;
+        }
+    }
+
+    private AgentToolApprovalRequest ToApprovalRequest(FunctionCallContent functionCall, string requestId) =>
+        new(requestId, functionCall.CallId, functionCall.Name, SerializeArguments(functionCall));
+
+    private string SerializeArguments(FunctionCallContent functionCall) =>
+        JsonSerializer.Serialize(functionCall.Arguments ?? new Dictionary<string, object?>(), ArgumentsJsonOptions);
 
     /// <param name="stripImages">
     /// True once the run has ended: photos were seen in their own turn, so the stored history keeps only a

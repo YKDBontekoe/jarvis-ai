@@ -14,6 +14,7 @@ public sealed class AutomationRunExecutor(
     IAutomationRunRepository runs,
     INotificationRepository notifications,
     IToolApprovalStore approvals,
+    IStandingApprovalService standingApprovals,
     IJarvisTaskService tasks,
     IAutomationChannelSender channelSender,
     IConversationStore conversations,
@@ -63,17 +64,28 @@ public sealed class AutomationRunExecutor(
 
             if (AutomationActionPolicy.RequiresApproval(action) && !input.TestRun && !input.AfterApproval)
             {
-                var approval = await approvals.CreateAsync(input.OwnerId,
-                    rule.ConversationId ?? await rules.EnsureConversationAsync(rule.Id, cancellationToken),
-                    AutomationApprovals.RequestId(input.RunId), $"action-{index}",
-                    AutomationApprovals.ToolName(action), ApprovalArguments(rule, definition.Actions, index),
-                    null, cancellationToken);
-                await runs.MarkWaitingApprovalAsync(input.RunId, approval.Approval.Id, cancellationToken);
-                results.Add(new AutomationActionResult(action.Kind, "waiting_approval", null, approval.Approval.Id));
-                if (approval.Created)
-                    await PostToLinkedChatAsync(rule, LinkedConversationCopy.AutomationWaitingApproval(rule.Name,
-                        Label(action)), cancellationToken);
-                return new AutomationRunActivityResult(false, Serialize(results), true);
+                var toolName = AutomationApprovals.ToolName(action);
+                var arguments = ApprovalArguments(rule, definition.Actions, index);
+                var category = ApprovalCategories.Resolve(toolName, arguments);
+                if (category.CanRemember &&
+                    await standingApprovals.IsGrantedAsync(input.OwnerId, category.Key, cancellationToken))
+                {
+                    await standingApprovals.RecordAutomaticUseAsync(input.OwnerId, toolName, category,
+                        rule.ConversationId, cancellationToken);
+                }
+                else
+                {
+                    var approval = await approvals.CreateAsync(input.OwnerId,
+                        rule.ConversationId ?? await rules.EnsureConversationAsync(rule.Id, cancellationToken),
+                        AutomationApprovals.RequestId(input.RunId), $"action-{index}",
+                        toolName, arguments, null, cancellationToken);
+                    await runs.MarkWaitingApprovalAsync(input.RunId, approval.Approval.Id, cancellationToken);
+                    results.Add(new AutomationActionResult(action.Kind, "waiting_approval", null, approval.Approval.Id));
+                    if (approval.Created)
+                        await PostToLinkedChatAsync(rule, LinkedConversationCopy.AutomationWaitingApproval(rule.Name,
+                            Label(action)), cancellationToken);
+                    return new AutomationRunActivityResult(false, Serialize(results), true);
+                }
             }
 
             try

@@ -26,12 +26,13 @@ public sealed class ApprovalDecisionService(
     IServiceScopeFactory scopes,
     IHubContext<JarvisEventsHub> hub,
     VoiceBackendSession voice,
-    IAutomationApprovalResolver automations)
+    IAutomationApprovalResolver automations,
+    IStandingApprovalService standingApprovals)
 {
     private const string CancelledMessage = "This task was cancelled.";
 
     public async Task<ConversationTurnResult> DecideAsync(Guid ownerId, Guid approvalId, bool approved,
-        CancellationToken ct)
+        CancellationToken ct, bool rememberCategory = false)
     {
         var pending = await approvals.GetActionableAsync(approvalId, ownerId, ct);
         if (pending is null) return new ConversationTurnResult.NotFound();
@@ -53,6 +54,16 @@ public sealed class ApprovalDecisionService(
             var task = await taskRepository.GetTaskAsync(boundTaskId, ownerId, ct);
             if (task is null || task.Status != "needs_approval")
                 return new ConversationTurnResult.Conflict("This approval is no longer attached to an active task.");
+        }
+        if (pending.Status == "pending" && approved && rememberCategory)
+        {
+            var grant = await standingApprovals.GrantAsync(ownerId,
+                ApprovalCategories.Resolve(pending.ToolName, pending.ArgumentsJson), ct);
+            if (grant == StandingApprovalGrantResult.TooMany)
+                return new ConversationTurnResult.Conflict(
+                    "You already always-allow as many actions as Jarvis can store. Turn one off in Approvals first.");
+            if (grant == StandingApprovalGrantResult.NotAllowed)
+                return new ConversationTurnResult.Conflict("This action cannot be always allowed.");
         }
         ToolApprovalRecord? decided;
         if (pending.Status == "pending")

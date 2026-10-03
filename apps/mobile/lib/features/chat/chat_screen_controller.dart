@@ -246,7 +246,11 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _loadConversationSurfaces(String conversationId);
   Future<void> _rate(MessageEntry message, String rating);
   Future<void> _retry(MessageEntry message);
-  Future<void> _decide(ApprovalEntry approval, bool approved);
+  Future<void> _decide(
+    ApprovalEntry approval,
+    bool approved, {
+    bool rememberCategory = false,
+  });
   void _finishRemoteQuery();
   void _ensurePlaceholder();
   void _removePlaceholder();

@@ -451,8 +451,7 @@ mixin _ChatScreenSend on _ChatScreenController {
     void restore(String? error) {
       setState(() {
         final at = _entries.indexWhere(
-          (entry) =>
-              entry is MessageEntry && !entry.isUser && entry.pending,
+          (entry) => entry is MessageEntry && !entry.isUser && entry.pending,
         );
         if (at >= 0) {
           _entries[at] = reply;
@@ -497,9 +496,7 @@ mixin _ChatScreenSend on _ChatScreenController {
         return;
       }
       restore(
-        error.type == DioExceptionType.cancel
-            ? null
-            : describeApiError(error),
+        error.type == DioExceptionType.cancel ? null : describeApiError(error),
       );
     } catch (_) {
       if (mounted && _conversationId == conversationId) {
@@ -533,7 +530,11 @@ mixin _ChatScreenSend on _ChatScreenController {
     }
   }
 
-  Future<void> _decide(ApprovalEntry approval, bool approved) async {
+  Future<void> _decide(
+    ApprovalEntry approval,
+    bool approved, {
+    bool rememberCategory = false,
+  }) async {
     final conversationId = _conversationId;
     if (conversationId == null ||
         _busy ||
@@ -574,7 +575,10 @@ mixin _ChatScreenSend on _ChatScreenController {
     try {
       final response = await _http.post<dynamic>(
         '/api/v1/approvals/${approval.id}/decision',
-        data: {'approved': approved},
+        data: {
+          'approved': approved,
+          if (rememberCategory) 'rememberCategory': true,
+        },
         cancelToken: run,
         options: longRunningOptions(),
       );

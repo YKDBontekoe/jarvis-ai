@@ -32,11 +32,13 @@ public sealed record MessageDto(Guid Id, string Role, string Content, DateTimeOf
 public sealed record FileCitationDto(Guid FileId, string DisplayName, Guid ChunkId, int ChunkIndex, string Excerpt,
     int? PageNumber, string SourceStatus = "available");
 public sealed record MessagePageDto(IReadOnlyList<MessageDto> Items, string? NextCursor, bool HasMore);
-public sealed record ApprovalDecisionRequest(bool Approved);
+public sealed record ApprovalDecisionRequest(bool Approved, bool RememberCategory = false);
+public sealed record StandingApprovalDto(string Category, string Label, DateTimeOffset GrantedAt);
 
 public sealed record OpenPullRequestRequest(string? Title, string? Body);
 public sealed record ToolApprovalDto(Guid Id, Guid ConversationId, string ToolName, string ArgumentsJson,
-    string Status, bool? Approved, string ResumeStatus, DateTimeOffset CreatedAt);
+    string Status, bool? Approved, string ResumeStatus, DateTimeOffset CreatedAt,
+    string Category = "", string CategoryLabel = "", bool CanRememberCategory = false);
 /// <summary>A timed reminder needs <c>DueAt</c>; a place reminder sends <c>Place</c> instead.</summary>
 public sealed record ReminderRequest(string? Title, DateTimeOffset? DueAt, string? Recurrence = null,
     int Weekdays = 0, string? TimeZoneId = null, DateOnly? Until = null, TimeOnly? LocalTime = null,

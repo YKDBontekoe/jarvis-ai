@@ -582,6 +582,9 @@ mixin _ChatScreenUi on _ChatScreenController {
     ApprovalEntry() => ApprovalCard(
       approval: entry,
       onDecide: (approved) => unawaited(_decide(entry, approved)),
+      onAlwaysAllow: entry.canRememberCategory
+          ? () => unawaited(_decide(entry, true, rememberCategory: true))
+          : null,
       loadMemoryText: _loadMemoryText,
     ),
     UiSurfaceEntry() => _surfaceView(entry),

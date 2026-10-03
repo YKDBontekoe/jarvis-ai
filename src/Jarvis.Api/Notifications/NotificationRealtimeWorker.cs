@@ -1,6 +1,5 @@
 using Jarvis.Api.Realtime;
 using Jarvis.Application.Workflows;
-using Jarvis.Domain.Approvals;
 using Microsoft.AspNetCore.SignalR;
 
 namespace Jarvis.Api.Notifications;
@@ -65,7 +64,7 @@ public sealed class NotificationRealtimeWorker(
                 await feed.FindPendingApprovalAsync(notification.OwnerId, approvalId, cancellationToken)
                     is { } approval)
                 await PublishSafelyAsync(hub.Clients.Group(JarvisEventsHub.GroupName(approval.ConversationId)),
-                    "tool.approval_required", ToApprovalEvent(approval), cancellationToken);
+                    "tool.approval_required", ApprovalRealtime.Required(approval), cancellationToken);
 
             _cursor = new NotificationCursor(notification.CreatedAt, notification.Id);
         }
@@ -88,12 +87,4 @@ public sealed class NotificationRealtimeWorker(
         }
     }
 
-    private static object ToApprovalEvent(ToolApproval approval) => new
-    {
-        approval.Id,
-        approval.ConversationId,
-        approval.ToolName,
-        approval.ArgumentsJson,
-        approval.CreatedAt
-    };
 }
