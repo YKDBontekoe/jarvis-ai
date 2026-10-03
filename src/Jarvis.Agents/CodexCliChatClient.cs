@@ -397,13 +397,21 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         start.ArgumentList.Add("mcp_servers={}");
         foreach (var feature in new[]
         {
-            "shell_tool", "shell_snapshot", "code_mode_host", "computer_use", "browser_use",
+            "shell_tool", "shell_snapshot", "computer_use", "browser_use",
             "browser_use_external", "in_app_browser", "apps", "plugins", "skill_search",
             "image_generation", "multi_agent", "multi_agent_v2"
         })
         {
             start.ArgumentList.Add("--disable");
             start.ArgumentList.Add(feature);
+        }
+        // Codex 0.160 runs its hosted web search through the code-mode host: with the host disabled every search
+        // fails with "code-mode host is disabled" and the model reports that it has no web access. The host only
+        // adds search, goal, image and (read-only sandbox, so rejected) patch helpers; there is still no shell.
+        if (!enableWebSearch)
+        {
+            start.ArgumentList.Add("--disable");
+            start.ArgumentList.Add("code_mode_host");
         }
         // Chat turns use Codex's hosted web_search tool in live mode. The CLI's standalone search feature is
         // still under development: it replaces the hosted tool with a client-side web.run call to a separate

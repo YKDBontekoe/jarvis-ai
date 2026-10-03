@@ -54,12 +54,32 @@ public sealed class ApiProblemDetailsTests
         Assert.Equal(status, mapped.Status);
     }
 
+    [Theory]
+    [InlineData(400, ApiErrorCodes.ValidationFailed)]
+    [InlineData(404, ApiErrorCodes.ResourceNotFound)]
+    public void ExceptionProblemMapper_keeps_the_status_of_unreadable_request_bodies(int status, string code)
+    {
+        var mapped = ExceptionProblemMapper.Map(new BadHttpRequestException("Failed to read parameter.", status));
+        Assert.Equal(code, mapped.Code);
+        Assert.Equal(status, mapped.Status);
+        Assert.DoesNotContain("parameter", mapped.Detail);
+    }
+
     [Fact]
     public void ExceptionProblemMapper_maps_client_abort_to_request_cancelled()
     {
         var httpContext = new DefaultHttpContext();
         httpContext.RequestAborted = new CancellationToken(canceled: true);
         var mapped = ExceptionProblemMapper.Map(new OperationCanceledException(), httpContext);
+        Assert.Equal(ApiErrorCodes.RequestCancelled, mapped.Code);
+        Assert.Equal(StatusCodes.Status499ClientClosedRequest, mapped.Status);
+    }
+
+    [Fact]
+    public void ExceptionProblemMapper_maps_an_owner_stop_to_request_cancelled_not_timeout()
+    {
+        var mapped = ExceptionProblemMapper.Map(new Jarvis.Api.Conversations.RunStoppedException(),
+            new DefaultHttpContext());
         Assert.Equal(ApiErrorCodes.RequestCancelled, mapped.Code);
         Assert.Equal(StatusCodes.Status499ClientClosedRequest, mapped.Status);
     }
