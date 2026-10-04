@@ -220,6 +220,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     ),
     JarvisTab.chats => ChatsScreen(
       chats: _chatList,
+      http: _http,
       onOpen: _openChatItem,
       onNewChat: _busy ? null : _startNewChat,
       onSearch: () => unawaited(_openSearch(context)),
