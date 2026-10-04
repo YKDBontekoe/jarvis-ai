@@ -201,6 +201,7 @@ jobs:
       - backend
       - integration
       - python
+      - whatsapp-bridge
       - mobile
       - container-images
     if: always()
@@ -219,5 +220,6 @@ jobs:
           check backend "${{ needs.backend.result }}"
           check integration "${{ needs.integration.result }}"
           check python "${{ needs.python.result }}"
+          check whatsapp-bridge "${{ needs.whatsapp-bridge.result }}"
           check mobile "${{ needs.mobile.result }}"
           check container-images "${{ needs.container-images.result }}"

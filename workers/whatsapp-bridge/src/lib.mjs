@@ -594,7 +594,7 @@ export class ChatBook {
         name: typeof chat.name === 'string' ? chat.name : null,
         group: isGroupJid(chat.id),
         lastMessageAt: Number(chat.lastMessageAt) || 0,
-        anchor: chat.anchor?.id && isChatId(chatIdOf(chat.anchor.remoteJid)) ? chat.anchor : undefined,
+        ...(chat.anchor?.id && isChatId(chatIdOf(chat.anchor.remoteJid)) ? { anchor: chat.anchor } : {}),
       });
     }
     for (const [id, name] of Object.entries(saved?.names ?? {})) if (typeof name === 'string') this.names.set(id, name);
