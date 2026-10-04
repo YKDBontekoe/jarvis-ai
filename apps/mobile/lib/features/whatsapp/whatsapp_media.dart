@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../theme.dart';
 import '../../ui/phosphor_icons.dart';
-import '../chat/chat_photos.dart';
+import '../chat/chat_widgets.dart' show PhotoViewerPage;
 import 'whatsapp_models.dart';
 import 'whatsapp_open_stub.dart'
     if (dart.library.io) 'whatsapp_open_io.dart'

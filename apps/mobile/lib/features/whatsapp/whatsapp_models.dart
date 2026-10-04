@@ -288,17 +288,30 @@ String whatsAppPreviewText(String text) {
   return extra == null || extra.isEmpty ? label : '$label · $extra';
 }
 
+/// One grapheme that is only emoji, joiners, and presentation selectors.
+final _oneEmoji = RegExp(
+  r'^(?:'
+  r'\u200d|\ufe0f|\u20e3|'
+  r'[\u{1f3fb}-\u{1f3ff}]|'
+  r'[\u{1f1e6}-\u{1f1ff}]|'
+  r'[\u{1f000}-\u{1faff}]|'
+  r'[\u{2600}-\u{27bf}]|'
+  r'[\u{2300}-\u{23ff}]|'
+  r'[\u{2b00}-\u{2bff}]'
+  r')+$',
+  unicode: true,
+);
+
 /// One to four emoji and nothing else, drawn large the way a sticker-sized reaction reads.
 bool whatsAppEmojiOnly(String text) {
   final trimmed = text.trim();
   if (trimmed.isEmpty) return false;
   final glyphs = trimmed.characters;
   if (glyphs.isEmpty || glyphs.length > 4) return false;
-  final rest = trimmed.replaceAll(
-    RegExp(r'[\p{Extended_Pictographic}\u200d\ufe0f\u20e3]', unicode: true),
-    '',
-  );
-  return rest.trim().isEmpty;
+  for (final glyph in glyphs) {
+    if (!_oneEmoji.hasMatch(glyph)) return false;
+  }
+  return true;
 }
 
 String whatsAppConnectionLabel(String state) => switch (state) {
