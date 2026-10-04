@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../whatsapp/read_along_screen.dart';
 import '../whatsapp/whatsapp_models.dart';
 import 'chat_list.dart';
 
@@ -19,6 +21,7 @@ class ChatsScreen extends StatefulWidget {
     this.onManage,
     this.onConnectWhatsApp,
     this.selectedKey,
+    this.http,
     super.key,
   });
 
@@ -36,6 +39,9 @@ class ChatsScreen extends StatefulWidget {
 
   /// The row to mark as open (wide layout).
   final String? selectedKey;
+
+  /// Loads WhatsApp profile pictures. Without it, rows keep their initials.
+  final Dio? http;
 
   @override
   State<ChatsScreen> createState() => _ChatsScreenState();
@@ -156,6 +162,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                             itemBuilder: (context, index) => _ChatRow(
                               item: items[index],
                               selected: items[index].key == widget.selectedKey,
+                              http: widget.http,
                               onTap: () => widget.onOpen(items[index]),
                             ),
                           ),
@@ -243,11 +250,13 @@ class _ChatRow extends StatelessWidget {
     required this.item,
     required this.selected,
     required this.onTap,
+    this.http,
   });
 
   final ChatListItem item;
   final bool selected;
   final VoidCallback onTap;
+  final Dio? http;
 
   @override
   Widget build(BuildContext context) {
@@ -278,7 +287,7 @@ class _ChatRow extends StatelessWidget {
           ),
           child: Row(
             children: [
-              _Avatar(item: item),
+              _Avatar(item: item, http: http),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -360,14 +369,28 @@ class _ChatRow extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.item});
+  const _Avatar({required this.item, this.http});
 
   final ChatListItem item;
+  final Dio? http;
 
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     if (item.isJarvis) return const JarvisOrb(size: 44, glow: false);
+    final chat = item.whatsApp;
+    final channelId = item.channelId;
+    // The open chat already loads this picture. The list uses the same
+    // request and the same session cache, so a face seen in a chat shows here.
+    if (chat != null && channelId != null) {
+      return ChatAvatar(
+        key: ValueKey('chat-avatar-${item.key}'),
+        chat: chat,
+        http: http,
+        channelId: channelId,
+        size: 44,
+      );
+    }
     return Container(
       width: 44,
       height: 44,

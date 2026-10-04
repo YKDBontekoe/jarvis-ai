@@ -1,10 +1,24 @@
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/chats/chat_list.dart';
 import 'package:jarvis_mobile/features/chats/chats_screen.dart';
+import 'package:jarvis_mobile/features/whatsapp/read_along_screen.dart';
 import 'package:jarvis_mobile/theme.dart';
 
 import 'support/fixture_http.dart';
+
+// A 1x1 transparent PNG.
+final _png = Uint8List.fromList([
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, //
+  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+  0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
+  0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+  0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+]);
 
 String _iso(DateTime time) => time.toUtc().toIso8601String();
 
@@ -20,6 +34,7 @@ void main() {
   var refreshed = 0;
 
   setUp(() {
+    WhatsAppPictures.clear();
     http = FixtureHttp();
     chats = ChatList();
     opened = [];
@@ -60,7 +75,11 @@ void main() {
     await tester.runAsync(() => chats.loadWhatsApp(http.client()));
   }
 
-  Future<void> show(WidgetTester tester, {bool withManage = true}) async {
+  Future<void> show(
+    WidgetTester tester, {
+    bool withManage = true,
+    Dio? pictures,
+  }) async {
     tester.view.physicalSize = const Size(400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -71,6 +90,7 @@ void main() {
         home: Scaffold(
           body: ChatsScreen(
             chats: chats,
+            http: pictures,
             onOpen: opened.add,
             onNewChat: () => newChat++,
             onSearch: () => searched++,
@@ -98,6 +118,25 @@ void main() {
     final lisbon = tester.getTopLeft(find.text('Lisbon trip')).dy;
     expect(sam, lessThan(family));
     expect(family, lessThan(lisbon));
+  });
+
+  testWidgets('WhatsApp rows show the profile picture the open chat uses', (
+    tester,
+  ) async {
+    await linkWhatsApp(tester);
+    final pictures = _PictureHttp({'+31611': _png});
+    await show(tester, pictures: pictures.client());
+    expect(find.byKey(const Key('whatsapp-picture-+31611')), findsOneWidget);
+    expect(find.byKey(const Key('whatsapp-picture-fam@g.us')), findsNothing);
+    expect(pictures.subjects, ['+31611', 'fam@g.us']);
+    // Jarvis conversations have no WhatsApp picture.
+    expect(pictures.subjects.where((id) => id.contains('c1')), isEmpty);
+
+    // A picture already loaded in a chat is reused, without asking again.
+    pictures.subjects.clear();
+    await show(tester, pictures: pictures.client());
+    expect(find.byKey(const Key('whatsapp-picture-+31611')), findsOneWidget);
+    expect(pictures.subjects, isEmpty);
   });
 
   testWidgets('tapping a row reports the chat', (tester) async {
@@ -138,7 +177,10 @@ void main() {
   testWidgets('the search field filters by title and preview', (tester) async {
     await linkWhatsApp(tester);
     await show(tester);
-    await tester.enterText(find.byKey(const Key('chats-filter-field')), 'dinner');
+    await tester.enterText(
+      find.byKey(const Key('chats-filter-field')),
+      'dinner',
+    );
     await tester.pumpAndSettle();
     expect(find.text('Sam'), findsOneWidget);
     expect(find.text('Family'), findsNothing);
@@ -196,4 +238,46 @@ void main() {
     expect(find.text('Energy contracts'), findsOneWidget);
     expect(find.text('Lisbon trip'), findsNothing);
   });
+}
+
+/// Serves profile-picture bytes the way `GET …/chats/open/picture` does.
+class _PictureHttp implements HttpClientAdapter {
+  _PictureHttp(this.pictures);
+
+  final Map<String, Uint8List> pictures;
+  final subjects = <String>[];
+
+  Dio client() =>
+      Dio(BaseOptions(baseUrl: 'https://fixture.invalid'))
+        ..httpClientAdapter = this;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final subject = '${options.queryParameters['subject']}';
+    subjects.add(subject);
+    final bytes = pictures[subject];
+    if (bytes == null) {
+      return ResponseBody.fromString(
+        '{}',
+        404,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      );
+    }
+    return ResponseBody.fromBytes(
+      bytes,
+      200,
+      headers: {
+        Headers.contentTypeHeader: ['image/png'],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
 }
