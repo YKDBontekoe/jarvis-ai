@@ -4,7 +4,6 @@ import 'package:jarvis_mobile/features/projects/project_editor.dart';
 import 'package:jarvis_mobile/features/projects/project_screen.dart';
 import 'package:jarvis_mobile/features/projects/project_style.dart';
 import 'package:jarvis_mobile/features/projects/projects_screen.dart';
-import 'package:jarvis_mobile/features/shell/sidebar.dart';
 import 'package:jarvis_mobile/theme.dart';
 
 import 'support/fixture_http.dart';
@@ -179,39 +178,5 @@ void main() {
     expect(sent['name'], 'Taxes');
     expect(sent['instructions'], 'Use 2026 rules.');
     expect(sent['color'], 'teal');
-  });
-
-  testWidgets('sidebar lists projects and opens one', (tester) async {
-    String? opened;
-    var created = false;
-    Widget sidebar(List<Map<String, dynamic>> projects) => Scaffold(
-      body: JarvisSidebar(
-        conversations: const [],
-        selectedConversationId: null,
-        homeSelected: true,
-        connected: true,
-        onHome: () {},
-        onNewChat: () {},
-        onVoice: () {},
-        onConversation: (_) {},
-        onSeeAll: () {},
-        onUtility: (_) {},
-        onSettings: () {},
-        onJarvisSearch: () {},
-        projects: projects,
-        onProject: (id) => opened = id,
-        onAllProjects: () {},
-        onNewProject: () => created = true,
-      ),
-    );
-
-    await show(tester, sidebar(const []));
-    await tester.tap(find.text('New project'));
-    expect(created, isTrue);
-
-    await show(tester, sidebar([_project()]));
-    expect(find.text('Projects'), findsOneWidget);
-    await tester.tap(find.text('Kitchen renovation'));
-    expect(opened, _id);
   });
 }

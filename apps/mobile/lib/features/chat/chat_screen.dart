@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -36,17 +35,21 @@ import '../../ui/phosphor_icons.dart';
 import '../devices/device_invoke.dart';
 import '../devices/device_telemetry.dart';
 import '../devices/place_reminder_tracker.dart';
-import '../home/home_overview.dart';
+import '../chats/chat_list.dart';
+import '../chats/chats_screen.dart';
+import '../everything/everything_screen.dart';
+import '../home/jarvis_home.dart';
+import '../tiles/tile_controller.dart';
 import '../people/people_screen.dart';
 import '../settings/settings_view.dart';
 import '../search/command_palette.dart';
 import '../search/recent_searches_store.dart';
 import '../search/search_navigation.dart';
 import '../search/search_screen.dart';
-import '../projects/project_editor.dart';
 import '../projects/project_style.dart';
-import '../shell/sidebar.dart';
+import '../shell/jarvis_tab_bar.dart';
 import '../shell/utility_pages.dart';
+import '../whatsapp/whatsapp_chat_screen.dart';
 import '../voice/chat_gpt_voices.dart';
 import '../voice/voice_errors.dart';
 import '../voice/voice_stage.dart';
@@ -122,6 +125,12 @@ class _ChatScreenState extends _ChatScreenController
     _input.addListener(_rememberDraft);
     unawaited(_openDrafts());
     unawaited(_openOutbox());
+    unawaited(_tiles.open());
+    _chatsTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (!_signedOut && !_signingOut && _chatList.whatsAppLinked) {
+        unawaited(_chatList.loadWhatsApp(_http));
+      }
+    });
     if (widget.skipAuthentication) _restoringSession = false;
     _attachPushListeners();
     attachJarvisAuthInterceptor(
@@ -152,7 +161,8 @@ class _ChatScreenState extends _ChatScreenController
         final wide = constraints.maxWidth >= _wideLayoutWidth;
         _isWide = wide;
         final voice = _selectedDestination == 2;
-        final content = Scaffold(
+        final showTabs = !_inChat && !voice;
+        final chat = Scaffold(
           extendBodyBehindAppBar: voice,
           appBar: _topBar(wide: wide, voice: voice),
           body: AnimatedSwitcher(
@@ -165,30 +175,47 @@ class _ChatScreenState extends _ChatScreenController
             ),
           ),
         );
-        final sidebar = _sidebar(wide: wide);
-        final shell = Scaffold(
-          key: _scaffoldKey,
-          drawer: wide
-              ? null
-              : Drawer(
-                  width: math.min(330, constraints.maxWidth * .86),
-                  backgroundColor: JarvisColors.of(context).canvas,
-                  surfaceTintColor: Colors.transparent,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.horizontal(
-                      right: Radius.circular(28),
+        final content = AnimatedSwitcher(
+          duration: JarvisMotion.of(context, JarvisMotion.base),
+          switchInCurve: JarvisMotion.standard,
+          switchOutCurve: JarvisMotion.exit,
+          transitionBuilder: JarvisMotion.fadeRise,
+          child: showTabs
+              ? KeyedSubtree(
+                  key: ValueKey('page-${_tab.name}'),
+                  child: Scaffold(
+                    body: SafeArea(
+                      bottom: false,
+                      child: Column(
+                        children: [
+                          _shellNotice(),
+                          Expanded(child: _tabPage()),
+                        ],
+                      ),
                     ),
                   ),
-                  child: sidebar,
-                ),
-          onDrawerChanged: (open) {
-            if (open) unawaited(_loadRecent());
-          },
+                )
+              : KeyedSubtree(key: const ValueKey('chat'), child: chat),
+        );
+        final chatsAttention = _chatList.unreadCount > 0;
+        final shell = Scaffold(
+          bottomNavigationBar: !wide && showTabs
+              ? JarvisTabBar(
+                  selected: _tab,
+                  onSelect: _selectTab,
+                  onJarvis: _openJarvis,
+                  chatsAttention: chatsAttention,
+                )
+              : null,
           body: wide
               ? Row(
                   children: [
-                    SizedBox(width: 292, child: sidebar),
-                    const VerticalDivider(width: 1),
+                    JarvisNavRail(
+                      selected: _utilityPane == null && showTabs ? _tab : null,
+                      onSelect: _selectTab,
+                      onJarvis: _openJarvis,
+                      chatsAttention: chatsAttention,
+                    ),
                     Expanded(
                       child: AnimatedSwitcher(
                         duration: JarvisMotion.of(context, JarvisMotion.base),
@@ -197,7 +224,7 @@ class _ChatScreenState extends _ChatScreenController
                         transitionBuilder: JarvisMotion.fadeRise,
                         child: _utilityPane == null
                             ? KeyedSubtree(
-                                key: const ValueKey('chat'),
+                                key: const ValueKey('content'),
                                 child: content,
                               )
                             : _paneNavigator(),
@@ -281,6 +308,9 @@ class _ChatScreenState extends _ChatScreenController
     WidgetsBinding.instance.removeObserver(this);
     unawaited(PlaceReminderTracker.instance.detach());
     _catchUpTimer?.cancel();
+    _chatsTimer?.cancel();
+    _chatList.dispose();
+    _tiles.dispose();
     _deltaTimer?.cancel();
     _transcriptTick.dispose();
     _runCancel?.cancel();

@@ -152,8 +152,9 @@ abstract class _UiSurfaceCardController extends State<UiSurfaceCard> {
         const SizedBox(height: 12),
         Text(
           title,
-          style: JarvisType.serifOf(context)
-              .copyWith(fontSize: 28, height: 1.12),
+          style: JarvisType.displayOf(
+            context,
+          ).copyWith(fontSize: 28, height: 1.12),
         ),
         if (body != null) ...[
           const SizedBox(height: 6),

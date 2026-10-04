@@ -306,7 +306,9 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                     Text(
                       date == null ? 'Today' : longDayLabel(date),
                       key: const Key('planner-date'),
-                      style: JarvisType.serifOf(context).copyWith(fontSize: 34),
+                      style: JarvisType.displayOf(
+                        context,
+                      ).copyWith(fontSize: 34),
                     ),
                     const SizedBox(height: 6),
                     Text(

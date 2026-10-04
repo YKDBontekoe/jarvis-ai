@@ -49,16 +49,24 @@ void main() {
   }
 
   Future<void> openChat(WidgetTester tester) async {
-    await tester.tap(find.text('Continue conversation'));
+    await tester.tap(find.byKey(const Key('tab-jarvis')));
     await settle(tester);
   }
 
-  Future<void> openFromMenu(WidgetTester tester, String label) async {
-    await tester.tap(find.byTooltip('Menu'));
+  Future<void> openTab(WidgetTester tester, String name) async {
+    await tester.tap(find.byKey(Key('tab-$name')));
     await settle(tester);
-    final target = find.text(label).last;
-    await tester.ensureVisible(target);
-    await tester.tap(target);
+  }
+
+  /// Opens a feature's page through Everything, as a person adding it would.
+  Future<void> openFeature(WidgetTester tester, String id) async {
+    await openTab(tester, 'everything');
+    final tile = find.byKey(Key('everything-$id'));
+    await tester.ensureVisible(tile);
+    await settle(tester);
+    await tester.tap(tile);
+    await settle(tester);
+    await tester.tap(find.byKey(const Key('tile-open')));
     await settle(tester);
   }
 
@@ -87,12 +95,32 @@ void main() {
       await capture(tester, '04-chat-typing-$mode');
     });
 
-    screenshotTest('menu $mode', (tester) async {
+    screenshotTest('chats $mode', (tester) async {
       usePhone(tester);
       await start(tester, dark: dark);
-      await tester.tap(find.byTooltip('Menu'));
+      await openTab(tester, 'chats');
+      await capture(tester, '05-chats-$mode');
+    });
+
+    screenshotTest('everything $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openTab(tester, 'everything');
+      await capture(tester, '31-everything-$mode');
+      final tile = find.byKey(const Key('everything-expenses'));
+      await tester.ensureVisible(tile);
       await settle(tester);
-      await capture(tester, '05-menu-$mode');
+      await tester.tap(tile);
+      await settle(tester);
+      await capture(tester, '32-tile-preview-$mode');
+    });
+
+    screenshotTest('edit home $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await tester.tap(find.byKey(const Key('home-edit')));
+      await settle(tester);
+      await capture(tester, '33-edit-home-$mode');
     });
   }
 
@@ -113,22 +141,22 @@ void main() {
   });
 
   for (final (index, label) in [
-    (7, 'Reminders'),
-    (8, 'Memory'),
-    (9, 'Tasks'),
-    (10, 'Habits'),
-    (12, 'Today'),
-    (13, 'Expenses'),
-    (14, 'People'),
-    (15, 'Journal'),
+    (7, 'reminders'),
+    (8, 'memory'),
+    (9, 'tasks'),
+    (10, 'habits'),
+    (12, 'today'),
+    (13, 'expenses'),
+    (14, 'people'),
+    (15, 'journal'),
   ]) {
     screenshotTest('page $label', (tester) async {
       usePhone(tester);
       await start(tester);
-      await openFromMenu(tester, label);
+      await openFeature(tester, label);
       await capture(
         tester,
-        '${index.toString().padLeft(2, '0')}-${label.toLowerCase()}',
+        '${index.toString().padLeft(2, '0')}-$label',
       );
     });
   }
@@ -136,7 +164,7 @@ void main() {
   screenshotTest('reminder swipe', (tester) async {
     usePhone(tester);
     await start(tester);
-    await openFromMenu(tester, 'Reminders');
+    await openFeature(tester, 'reminders');
     final gesture = await tester.startGesture(
       tester.getCenter(find.text('Call mum')),
     );
@@ -304,6 +332,7 @@ void main() {
     usePhone(tester);
     http.routes.addAll(fixtureRoutes());
     await start(tester);
+    await openChat(tester);
     await tester.drag(find.byType(Scrollable).first, const Offset(0, 900));
     await settle(tester);
     expect(find.text('Review'), findsOneWidget);
@@ -316,7 +345,8 @@ void main() {
   screenshotTest('search', (tester) async {
     usePhone(tester);
     await start(tester);
-    await tester.tap(find.byTooltip('Search'));
+    await openTab(tester, 'chats');
+    await tester.tap(find.byKey(const Key('chats-search')));
     await settle(tester);
     await capture(tester, '29-search');
     await tester.enterText(find.byType(TextField).first, 'herin');
@@ -336,18 +366,13 @@ void main() {
   screenshotTest('settings', (tester) async {
     usePhone(tester);
     await start(tester);
-    await tester.tap(find.byTooltip('Menu'));
-    await settle(tester);
-    await tester.tap(find.text('Settings'));
-    await settle(tester);
+    await openTab(tester, 'you');
     await capture(tester, '17-settings');
   });
 
   screenshotTest('voice', (tester) async {
     usePhone(tester);
     await start(tester, dark: true);
-    await tester.tap(find.byTooltip('Menu'));
-    await settle(tester);
     await tester.tap(find.text('Voice'));
     await settle(tester);
     await capture(tester, '18-voice');

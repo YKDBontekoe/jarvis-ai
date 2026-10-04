@@ -360,7 +360,7 @@ class _StoryCard extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             latest ? 'Your week in review' : 'Looking back',
-            style: JarvisType.serifOf(context).copyWith(fontSize: 30),
+            style: JarvisType.displayOf(context).copyWith(fontSize: 30),
           ),
           const SizedBox(height: 10),
           SelectableText(
@@ -407,7 +407,7 @@ class _FirstReviewCard extends StatelessWidget {
           const SizedBox(height: 18),
           Text(
             'Your week, in one look',
-            style: JarvisType.serifOf(context).copyWith(fontSize: 30),
+            style: JarvisType.displayOf(context).copyWith(fontSize: 30),
           ),
           const SizedBox(height: 10),
           Text(

@@ -12,9 +12,12 @@ mixin _ChatScreenUi on _ChatScreenController {
     }
   }
 
-  /// Leaves the home view for the transcript, landing on the latest message.
+  /// Opens the conversation over the tab pages, landing on the latest message.
   void _showTranscript() {
-    setState(() => _showHome = false);
+    setState(() {
+      _showHome = false;
+      _inChat = true;
+    });
     _scrollToBottom(jump: true, force: true);
   }
 
@@ -55,69 +58,193 @@ mixin _ChatScreenUi on _ChatScreenController {
     });
   }
 
-  Widget _sidebar({required bool wide}) => JarvisSidebar(
-    conversations: _recent,
-    selectedConversationId: _showHome ? null : _conversationId,
-    homeSelected:
-        _showHome && _selectedDestination == 0 && _utilityPane == null,
-    connected: _connected,
-    onHome: () => _fromSidebar(() {
-      if (_hasPendingApproval) {
-        if (_selectedDestination != 0) _selectDestination(0);
-        _showTranscript();
-        return;
-      }
-      if (_selectedDestination != 0) _selectDestination(0);
-      setState(() => _showHome = true);
-    }),
-    onNewChat: () => _fromSidebar(_startNewChat),
-    onVoice: () => _fromSidebar(() => _selectDestination(2)),
-    onConversation: (id) => _fromSidebar(() async {
-      if (_selectedDestination != 0) _selectDestination(0);
-      if (id == _conversationId) {
-        _showTranscript();
-        return;
-      }
-      try {
-        await _openConversation(id);
-      } on DioException catch (error) {
-        if (mounted) setState(() => _error = describeApiError(error));
-      } catch (_) {
-        if (mounted) {
-          setState(() => _error = 'Could not open that conversation.');
-        }
-      }
-    }),
-    onSeeAll: () => _fromSidebar(() => unawaited(_chooseConversation())),
-    onUtility: (destination) => _fromSidebar(() => _openUtility(destination)),
-    onSettings: () => _fromSidebar(_openSettings),
-    onJarvisSearch: () => _fromSidebar(() => unawaited(_openSearch(context))),
-    projects: _projects,
-    selectedProjectId:
-        _paneDestination?.startsWith(projectDestinationPrefix) ?? false
-        ? _paneDestination!.substring(projectDestinationPrefix.length)
-        : null,
-    onProject: (id) =>
-        _fromSidebar(() => _openUtility('$projectDestinationPrefix$id')),
-    onAllProjects: () => _fromSidebar(() => _openUtility('projects')),
-    onNewProject: () => _fromSidebar(() => unawaited(_createProject())),
-  );
-
   void _dismissKeyboard() => FocusManager.instance.primaryFocus?.unfocus();
 
-  void _fromSidebar(VoidCallback action) {
+  /// Runs a move made from the tab bar, the rail or a tile: pages it opens
+  /// replace whatever the content area shows instead of stacking on it.
+  void _fromShell(VoidCallback action) {
     _dismissKeyboard();
-    final scaffold = _scaffoldKey.currentState;
-    if (scaffold?.isDrawerOpen ?? false) scaffold!.closeDrawer();
-    // Anything chosen in the sidebar replaces whatever the content area shows.
     _closeUtilityPane();
-    _openingFromSidebar = true;
+    _openingFromShell = true;
     try {
       action();
     } finally {
-      _openingFromSidebar = false;
+      _openingFromShell = false;
     }
   }
+
+  void _selectTab(JarvisTab tab) => _fromShell(() {
+    if (_selectedDestination != 0) _selectDestination(0);
+    setState(() {
+      _tab = tab;
+      _inChat = false;
+    });
+    if (tab == JarvisTab.chats) unawaited(_refreshChats());
+  });
+
+  Future<void> _refreshChats() async {
+    if (_signedOut || _signingOut) return;
+    await Future.wait([_loadRecent(), _chatList.loadWhatsApp(_http)]);
+  }
+
+  void _presentChat() {
+    if (!_inChat && mounted) setState(() => _inChat = true);
+  }
+
+  Future<void> _presentConversation(String conversationId) {
+    _presentChat();
+    return _openConversation(conversationId);
+  }
+
+  /// The orb: back to the conversation that is open, or a fresh one.
+  void _openJarvis() => _fromShell(() {
+    if (_selectedDestination != 0) _selectDestination(0);
+    if (_conversationId == null) {
+      setState(() => _inChat = true);
+      unawaited(_createAndOpenConversation());
+    } else if (_hasMessages) {
+      _showTranscript();
+    } else {
+      setState(() => _inChat = true);
+    }
+  });
+
+  void _leaveChat() {
+    _dismissKeyboard();
+    setState(() => _inChat = false);
+  }
+
+  Future<void> _openJarvisChat(String id) async {
+    if (_selectedDestination != 0) _selectDestination(0);
+    if (id == _conversationId) {
+      _showTranscript();
+      return;
+    }
+    setState(() => _inChat = true);
+    try {
+      await _openConversation(id);
+    } on DioException catch (error) {
+      if (mounted) setState(() => _error = describeApiError(error));
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Could not open that conversation.');
+    }
+  }
+
+  void _openChatItem(ChatListItem item) => _fromShell(() {
+    if (item.isJarvis) {
+      final id = item.conversationId;
+      if (id != null) unawaited(_openJarvisChat(id));
+      return;
+    }
+    final chat = item.whatsApp;
+    final channelId = item.channelId;
+    if (chat == null || channelId == null) return;
+    final page = WhatsAppChatScreen(
+      http: _http,
+      channelId: channelId,
+      chat: chat,
+      account: item.account,
+    );
+    if (_isWide) {
+      _showInPane('whatsapp-chat', page);
+    } else {
+      unawaited(_openUtilityPage('whatsapp-chat', page));
+    }
+  });
+
+  void _openChatByKey(String key) {
+    for (final item in _chatList.all) {
+      if (item.key == key) {
+        _openChatItem(item);
+        return;
+      }
+    }
+  }
+
+  /// Opens what a tile or a settings row points at.
+  void _openTile(String destination) {
+    switch (destination) {
+      case 'chats':
+        _selectTab(JarvisTab.chats);
+      case 'settings':
+        _selectTab(JarvisTab.you);
+      case 'voice':
+        _fromShell(() => _selectDestination(2));
+      default:
+        _fromShell(() => _openUtility(destination));
+    }
+  }
+
+  /// Connection and sign-in problems, above whichever tab is showing.
+  Widget _shellNotice() {
+    final message = _error;
+    if (message == null) return const SizedBox.shrink();
+    return ContentWidth(
+      maxWidth: 808,
+      child: InlineNotice(
+        message: message,
+        margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        actions: [
+          if (_conversationId == null || !_connected)
+            TextButton(onPressed: _retryConnection, child: const Text('Retry')),
+          TextButton(
+            onPressed: () => setState(() => _error = null),
+            style: TextButton.styleFrom(
+              foregroundColor: JarvisColors.of(context).inkSoft,
+            ),
+            child: const Text('Dismiss'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tabPage() => switch (_tab) {
+    JarvisTab.home => JarvisHome(
+      source: _tileSource,
+      layout: _tiles,
+      chats: _chatList,
+      ready: _conversationId != null,
+      refreshRevision: _homeRevision,
+      onOpen: _openTile,
+      onOpenChat: _openChatByKey,
+      onAddTile: () => _selectTab(JarvisTab.everything),
+      onSettings: () => _selectTab(JarvisTab.you),
+      onSuggestion: _conversationId == null || _busy || _hasPendingApproval
+          ? null
+          : (text) {
+              _presentChat();
+              unawaited(_send(text));
+            },
+    ),
+    JarvisTab.chats => ChatsScreen(
+      chats: _chatList,
+      onOpen: _openChatItem,
+      onNewChat: _busy ? null : _startNewChat,
+      onSearch: () => unawaited(_openSearch(context)),
+      onManage: () => _fromShell(() => unawaited(_chooseConversation())),
+      onRefresh: _refreshChats,
+      onConnectWhatsApp: () => _openTile('whatsapp'),
+    ),
+    JarvisTab.everything => EverythingScreen(
+      source: _tileSource,
+      layout: _tiles,
+      onOpen: _openTile,
+    ),
+    JarvisTab.you => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
+          child: Text(
+            'Settings',
+            style: JarvisType.displayOf(context).copyWith(fontSize: 28),
+          ),
+        ),
+        Expanded(child: _settingsBody()),
+      ],
+    ),
+  };
 
   void _showQuickActions() {
     Widget action(String title, String subtitle, IconData icon, String to) =>
@@ -212,26 +339,19 @@ mixin _ChatScreenUi on _ChatScreenController {
         backgroundColor: voice ? Colors.transparent : null,
         automaticallyImplyLeading: false,
         leadingWidth: 64,
-        leading: voice
-            ? Center(
-                child: CircleIconButton(
+        leading: Center(
+          child: voice
+              ? CircleIconButton(
                   icon: PhosphorIconsRegular.x,
                   tooltip: 'Close voice',
                   onPressed: () => _selectDestination(0),
+                )
+              : CircleIconButton(
+                  icon: PhosphorIconsRegular.arrowLeft,
+                  tooltip: 'Back',
+                  onPressed: _leaveChat,
                 ),
-              )
-            : wide
-            ? null
-            : Center(
-                child: CircleIconButton(
-                  icon: PhosphorIconsRegular.list,
-                  tooltip: 'Menu',
-                  onPressed: () {
-                    _dismissKeyboard();
-                    _scaffoldKey.currentState?.openDrawer();
-                  },
-                ),
-              ),
+        ),
         centerTitle: true,
         title: Column(
           mainAxisSize: MainAxisSize.min,
@@ -258,7 +378,7 @@ mixin _ChatScreenUi on _ChatScreenController {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontFamily: 'Inter',
+                        fontFamily: 'Geist',
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
                         letterSpacing: -.3,
@@ -630,30 +750,52 @@ mixin _ChatScreenUi on _ChatScreenController {
 
   Widget _settingsBody() => SettingsView(
     connected: _connected,
-    onOpen: _openUtility,
+    onOpen: (destination) => _fromShell(() => _openUtility(destination)),
     onSignOut: _auth.enabled ? () => unawaited(_signOut()) : null,
   );
 
-  Widget _welcome() => HomeOverview(
-    http: _http,
-    mark: const JarvisOrb(size: 56),
-    ready: _conversationId != null,
-    voiceStarting: _voiceStarting,
-    onTalk: _conversationId == null || _busy || _hasPendingApproval
-        ? null
-        : () => _selectDestination(2),
-    onOpenTasks: () => _openUtility('tasks'),
-    onOpenUsage: () => _openUtility('usage'),
-    onOpenApprovals: () => _openUtility('approvals'),
-    onOpenReminders: () => _openUtility('reminders'),
-    onOpenHabits: () => _openUtility('habits'),
-    onOpenIntegrations: () => _openUtility('integrations'),
-    onOpenCoding: () => _openUtility('coding'),
-    refreshRevision: _homeRevision,
-    onContinueConversation: _hasMessages ? _showTranscript : null,
+  Widget _welcome() => _NewChatWelcome(
     onSuggestion: _conversationId == null || _busy || _hasPendingApproval
         ? null
         : (text) => unawaited(_send(text)),
+  );
+}
+
+/// A conversation with nothing in it yet: the mark, a question, and a few
+/// things to try.
+class _NewChatWelcome extends StatelessWidget {
+  const _NewChatWelcome({required this.onSuggestion});
+
+  final ValueChanged<String>? onSuggestion;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) => ListView(
+      key: const Key('new-chat-welcome'),
+      padding: EdgeInsets.fromLTRB(20, box.maxHeight > 600 ? 48 : 16, 20, 24),
+      children: [
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Center(child: JarvisOrb(size: 56)),
+                const SizedBox(height: 22),
+                Text(
+                  'What do you need?',
+                  textAlign: TextAlign.center,
+                  style: JarvisType.displayOf(context).copyWith(fontSize: 34),
+                ),
+                const SizedBox(height: 22),
+                if (onSuggestion != null)
+                  SuggestionChips(onSelected: onSuggestion),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 

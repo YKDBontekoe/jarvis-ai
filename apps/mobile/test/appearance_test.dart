@@ -116,7 +116,7 @@ void main() {
       JarvisApp(skipAuthentication: true, appearance: appearance),
     );
     await tester.pumpAndSettle();
-    final context = tester.element(find.text('What do you need?'));
+    final context = tester.element(find.byKey(const Key('home-clock')));
     expect(Theme.of(context).brightness, Brightness.dark);
     expect(JarvisColors.of(context).canvas, JarvisColors.dark.canvas);
     expect(JarvisColors.of(context).ink, JarvisColors.dark.ink);
@@ -132,14 +132,14 @@ void main() {
       JarvisApp(skipAuthentication: true, appearance: appearance),
     );
     await tester.pumpAndSettle();
-    var context = tester.element(find.text('What do you need?'));
+    var context = tester.element(find.byKey(const Key('home-clock')));
     expect(appearance.themeMode, ThemeMode.system);
     expect(Theme.of(context).brightness, Brightness.dark);
     expect(JarvisColors.of(context).isDark, isTrue);
 
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
     await tester.pumpAndSettle();
-    context = tester.element(find.text('What do you need?'));
+    context = tester.element(find.byKey(const Key('home-clock')));
     expect(Theme.of(context).brightness, Brightness.light);
     expect(JarvisColors.of(context).canvas, JarvisColors.light.canvas);
   });
@@ -153,9 +153,7 @@ void main() {
         JarvisApp(skipAuthentication: true, appearance: appearance),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Menu'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Settings'));
+      await tester.tap(find.byKey(const Key('tab-you')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Appearance'));
       await tester.pumpAndSettle();

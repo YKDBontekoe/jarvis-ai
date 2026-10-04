@@ -15,10 +15,13 @@ mixin _ChatScreenNav on _ChatScreenController {
         } else if (Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
         }
-        await _openConversation(id);
+        await _presentConversation(id);
       },
       onAskInChat: destination == 'integrations' || destination == 'journal'
-          ? (prompt) => unawaited(_send(prompt))
+          ? (prompt) {
+              _presentChat();
+              unawaited(_send(prompt));
+            }
           : null,
       onQuickCreateDone: (message) => _quickCreateDone(destination, message),
     );
@@ -60,18 +63,19 @@ mixin _ChatScreenNav on _ChatScreenController {
       );
   }
 
-  /// Shows [page] in the wide layout's content area. Opened from the sidebar it
-  /// replaces what is there; opened from inside a page it stacks, so Back works.
+  /// Shows [page] in the wide layout's content area. Opened from the rail or a
+  /// tile it replaces what is there; opened from inside a page it stacks, so
+  /// Back works.
   void _showInPane(String destination, Widget page) {
     final paneContext = _paneContext;
     if (_utilityPane != null &&
-        !_openingFromSidebar &&
+        !_openingFromShell &&
         paneContext != null &&
         paneContext.mounted) {
       unawaited(
-        Navigator.of(paneContext).push<void>(
-          MaterialPageRoute<void>(builder: (_) => page),
-        ),
+        Navigator.of(
+          paneContext,
+        ).push<void>(MaterialPageRoute<void>(builder: (_) => page)),
       );
       return;
     }
@@ -125,6 +129,11 @@ mixin _ChatScreenNav on _ChatScreenController {
     if (destination == 'projects' ||
         destination.startsWith(projectDestinationPrefix)) {
       unawaited(_loadRecent());
+    }
+    if (destination == 'whatsapp' ||
+        destination == 'whatsapp-chat' ||
+        destination == 'channels') {
+      unawaited(_chatList.loadWhatsApp(_http));
     }
     if (destination == 'approvals') {
       await _syncConversationApprovals();
@@ -246,6 +255,8 @@ mixin _ChatScreenNav on _ChatScreenController {
         _settledEntries = 0;
         _recent = [];
         _projects = [];
+        _inChat = false;
+        _tab = JarvisTab.home;
         _password.clear();
         _replaceComposerText('');
         _pendingPhotos = [];
@@ -288,6 +299,9 @@ mixin _ChatScreenNav on _ChatScreenController {
       _outboxTimer?.cancel();
       await _outbox.clear();
       await OutboxStore.clearAll();
+      _chatList.clear();
+      _tileSource.reset();
+      _tiles.reset();
       await hub?.stop();
     } finally {
       _signingOut = false;
@@ -347,6 +361,7 @@ mixin _ChatScreenNav on _ChatScreenController {
           response.data,
         ).where((item) => item['id'] is String).toList(),
       );
+      _chatList.setConversations(_recent);
     } on DioException {
       // The sidebar keeps its last known list while the API is unreachable.
     } catch (_) {
@@ -374,42 +389,18 @@ mixin _ChatScreenNav on _ChatScreenController {
     }
   }
 
-  /// Opens the editor for a new project, then the project itself.
-  Future<void> _createProject() async {
-    _dismissKeyboard();
-    final created = await Navigator.of(context).push<Map<String, dynamic>>(
-      MaterialPageRoute(builder: (_) => ProjectEditorScreen(http: _http)),
-    );
-    if (!mounted) return;
-    unawaited(_loadRecent());
-    final id = jsonId(created);
-    if (id != null) _openUtility('$projectDestinationPrefix$id');
-  }
-
-  void _openSettings() {
-    Widget page() => Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: _settingsBody(),
-    );
-    if (_isWide) {
-      _showInPane('settings', page());
-      return;
-    }
-    unawaited(
-      Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(builder: (_) => page()),
-      ),
-    );
-  }
-
   void _startNewChat() {
     _dismissKeyboard();
     _closeUtilityPane();
     if (_selectedDestination != 0) setState(() => _selectedDestination = 0);
     if (!_hasMessages && _conversationId != null) {
-      setState(() => _showHome = true);
+      setState(() {
+        _showHome = true;
+        _inChat = true;
+      });
       return;
     }
+    setState(() => _inChat = true);
     unawaited(_createAndOpenConversation());
   }
 }

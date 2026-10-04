@@ -11,7 +11,7 @@ mixin _ChatScreenSearch on _ChatScreenController {
   Future<void> _openSearch(BuildContext context) async {
     if (_signedOut || _signingOut) return;
     _dismissKeyboard();
-    Future<void> openConversation(String id) => _openConversation(id);
+    Future<void> openConversation(String id) => _presentConversation(id);
     if (_useCommandPalette(context)) {
       await showJarvisCommandPalette(
         context,
@@ -39,7 +39,7 @@ mixin _ChatScreenSearch on _ChatScreenController {
       context,
       http: _http,
       route: route,
-      onConversation: (id) => _openConversation(id),
+      onConversation: (id) => _presentConversation(id),
       onUtility: _openUtility,
     );
   }

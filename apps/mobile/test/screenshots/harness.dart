@@ -59,13 +59,13 @@ class ScreenshotHttp implements HttpClientAdapter {
 
 Future<void> loadAppFonts() async {
   final fonts = <String, List<String>>{
-    'Inter': [
-      'Inter-Regular.ttf',
-      'Inter-Medium.ttf',
-      'Inter-SemiBold.ttf',
-      'Inter-Bold.ttf',
+    'Geist': [
+      'Geist-Light.ttf',
+      'Geist-Regular.ttf',
+      'Geist-Medium.ttf',
+      'Geist-SemiBold.ttf',
+      'Geist-Bold.ttf',
     ],
-    'InstrumentSerif': ['InstrumentSerif-Regular.ttf'],
     'PhosphorRegular': ['Phosphor-Regular.ttf'],
     'PhosphorFill': ['Phosphor-Fill.ttf'],
     'PhosphorBold': ['Phosphor-Bold.ttf'],
@@ -77,7 +77,7 @@ Future<void> loadAppFonts() async {
       final bytes = File('assets/fonts/$file').readAsBytesSync();
       loader.addFont(Future.value(ByteData.view(bytes.buffer)));
     }
-    if (family == 'Inter' && emojiFile.existsSync()) {
+    if (family == 'Geist' && emojiFile.existsSync()) {
       loader.addFont(
         Future.value(ByteData.view(emojiFile.readAsBytesSync().buffer)),
       );
@@ -110,7 +110,7 @@ Future<void> loadAppFonts() async {
   roboto.addFont(
     Future.value(
       ByteData.view(
-        File('assets/fonts/Inter-Regular.ttf').readAsBytesSync().buffer,
+        File('assets/fonts/Geist-Regular.ttf').readAsBytesSync().buffer,
       ),
     ),
   );
