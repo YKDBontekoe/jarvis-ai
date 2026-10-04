@@ -27,3 +27,7 @@ Environment: `PORT` (3000), `DATA_DIR` (`/data`, mount a volume — it holds the
 npm ci && npm test   # unit tests for the message filtering logic
 DATA_DIR=./data node src/server.mjs
 ```
+
+### Read-along history and live ids
+
+The bridge accepts `POST /sessions/{id}/history` with `{chatId, before?: {id, fromMe, timestamp}}` only for watched chats on an open session. It requests up to 100 earlier messages using Baileys on-demand history (timestamp input is in seconds). Without an explicit cursor it uses the last message key supplied by the phone, persisted as chat metadata. If neither exists, it returns 409; a connected phone must supply a message first. The phone returns history asynchronously and may have limited history available. History events are forwarded only for watched chats, marked `historical`; they do not enter the assistant self-chat inbox. Live LID/phone mappings preserve the selected watch id. Batch diagnostics report counts and failure types without message bodies or phone numbers.

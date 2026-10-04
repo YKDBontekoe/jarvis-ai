@@ -53,6 +53,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
   DateTime? _lastStatusCheck;
   String? _refreshError;
   String? _markedMessage;
+  bool _requestingHistory = false;
 
   String _path([String? action]) =>
       whatsAppChatPath(widget.channelId, action: action);
@@ -135,7 +136,9 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
           : 0.0;
       setState(() {
         _messages = _merge(messages);
-        if (firstLoad) _hasOlder = messages.length == 60;
+        if (firstLoad || messages.length == 60) {
+          _hasOlder = messages.length == 60;
+        }
         _loading = false;
         _error = null;
         _refreshError = null;
@@ -225,11 +228,58 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
         _messages = _merge(older);
         _hasOlder = older.length == 60;
       });
+      if (older.isEmpty && _chat.readAlong) unawaited(_requestHistory());
     } catch (_) {
       if (mounted) _snack('Could not load older messages. Try again.');
     } finally {
       if (mounted) setState(() => _loadingOlder = false);
     }
+  }
+
+  Future<void> _requestHistory() async {
+    if (_requestingHistory || !_chat.readAlong) return;
+    setState(() => _requestingHistory = true);
+    final targetChat = _chat.chatId;
+    final targetChannel = widget.channelId;
+    try {
+      await widget.http.post<dynamic>(
+        _path('history'),
+        queryParameters: _query(
+          _messages.isEmpty ? null : {'beforeId': _messages.first.id},
+        ),
+      );
+      if (!mounted ||
+          _chat.chatId != targetChat ||
+          widget.channelId != targetChannel) {
+        return;
+      }
+      _snack(
+        'History requested. Keep WhatsApp connected on your phone; messages appear as it sends them.',
+      );
+      unawaited(_load(quiet: true));
+    } on DioException catch (error) {
+      if (mounted &&
+          _chat.chatId == targetChat &&
+          widget.channelId == targetChannel) {
+        _snack(
+          firstProblemMessage(error.response?.data) ??
+              'Could not request WhatsApp history. Try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _requestingHistory = false);
+    }
+  }
+
+  Future<void> _startReading() async {
+    final confirmed = await showJarvisConfirm(
+      context,
+      title: 'Read along with ${_chat.name}?',
+      message:
+          'Jarvis will save new messages from this chat. You can also request available history from your phone.',
+      confirmLabel: 'Start reading',
+    );
+    if (confirmed == true && mounted) await _save(readAlong: true);
   }
 
   Future<void> _markRead() async {
@@ -376,6 +426,8 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
       if (!mounted) return;
       if (readAlong == false) {
         Navigator.of(context).pop();
+      } else if (readAlong == true) {
+        unawaited(_load());
       } else if (autoReminders != null) {
         _snack(
           autoReminders
@@ -468,7 +520,9 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
                       ?(_account ?? widget.account),
                       _connectionState != null && _connectionState != 'open'
                           ? whatsAppConnectionLabel(_connectionState!)
-                          : 'Read along',
+                          : _chat.readAlong
+                          ? 'Read along'
+                          : 'Reading is off',
                     ].join(' · '),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -499,6 +553,8 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
               ),
               'clear' => unawaited(_clearHistory()),
               'stop' => unawaited(_stopReading()),
+              'start' => unawaited(_startReading()),
+              'history' => unawaited(_requestHistory()),
               _ => null,
             },
             itemBuilder: (_) => [
@@ -511,7 +567,20 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
                 value: 'clear',
                 child: Text('Clear saved messages'),
               ),
-              const PopupMenuItem(value: 'stop', child: Text('Stop reading')),
+              if (_chat.readAlong)
+                PopupMenuItem(
+                  value: 'history',
+                  enabled: !_requestingHistory,
+                  child: Text(
+                    _requestingHistory
+                        ? 'Requesting history…'
+                        : 'Load WhatsApp history',
+                  ),
+                ),
+              PopupMenuItem(
+                value: _chat.readAlong ? 'stop' : 'start',
+                child: Text(_chat.readAlong ? 'Stop reading' : 'Start reading'),
+              ),
             ],
           ),
         ],
@@ -521,6 +590,16 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
           if (_connectionState != null && _connectionState != 'open')
             InlineNotice(message: whatsAppConnectionMessage(_connectionState!)),
           if (_refreshError != null) InlineNotice(message: _refreshError!),
+          if (!_chat.readAlong) ...[
+            const InlineNotice(
+              message:
+                  'Reading is off for this chat. Jarvis is not receiving its messages.',
+            ),
+            TextButton(
+              onPressed: () => unawaited(_startReading()),
+              child: const Text('Start reading this chat'),
+            ),
+          ],
           Expanded(
             child: _loading
                 ? const LoadingState()
@@ -530,12 +609,12 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
                     onRetry: () => unawaited(_load()),
                   )
                 : _messages.isEmpty
-                ? const EmptyState(
+                ? EmptyState(
                     icon: PhosphorIconsRegular.chatsCircle,
                     title: 'Waiting for messages',
-                    message:
-                        'Jarvis sees new messages in this chat from the moment '
-                        'you turned it on. They show up here as they arrive.',
+                    message: _chat.readAlong
+                        ? 'New messages appear as they arrive. Use More → Load WhatsApp history to request older messages from your phone.'
+                        : 'Turn on reading to receive messages from this chat.',
                   )
                 : ContentWidth(
                     child: _MessageList(
@@ -556,7 +635,9 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
             drafting: _drafting,
             onDraft: () => unawaited(_draft()),
             onSend: () => unawaited(_send()),
-            canSend: _connectionState == null || _connectionState == 'open',
+            canSend:
+                _chat.readAlong &&
+                (_connectionState == null || _connectionState == 'open'),
           ),
         ],
       ),
@@ -736,12 +817,18 @@ class _Bubble extends StatelessWidget {
                       ? null
                       : BoxDecoration(
                           color: background,
-                          border: mine ? null : Border.all(color: colors.outline),
+                          border: mine
+                              ? null
+                              : Border.all(color: colors.outline),
                           borderRadius: BorderRadius.only(
                             topLeft: radius,
                             topRight: radius,
-                            bottomLeft: mine ? radius : const Radius.circular(4),
-                            bottomRight: mine ? const Radius.circular(4) : radius,
+                            bottomLeft: mine
+                                ? radius
+                                : const Radius.circular(4),
+                            bottomRight: mine
+                                ? const Radius.circular(4)
+                                : radius,
                           ),
                         ),
                   child: Column(

@@ -109,7 +109,8 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
         setState(() {
           _live = false;
           _state = 'unreachable';
-          _refreshError = 'Could not refresh chats. Showing the last saved list; retrying automatically.';
+          _refreshError =
+              'Could not refresh chats. Showing the last saved list; retrying automatically.';
         });
         return;
       }
@@ -236,7 +237,7 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
               ),
               const SizedBox(height: 12),
               const Text(
-                'Jarvis only reads chats you turn on, starting with new messages. Earlier WhatsApp history is not imported. You can stop reading or clear saved messages at any time.',
+                'Jarvis only reads chats you turn on. In an enabled chat, use More → Load WhatsApp history to request older messages available on your phone. You can stop reading or clear saved messages at any time.',
               ),
               const SizedBox(height: 12),
               const Text(
@@ -361,8 +362,9 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
                       children: [
                         Text(
                           'A little help with your chats.',
-                          style: JarvisType.displayOf(context)
-                              .copyWith(fontSize: 30),
+                          style: JarvisType.displayOf(
+                            context,
+                          ).copyWith(fontSize: 30),
                         ),
                         const SizedBox(height: 8),
                         Text(

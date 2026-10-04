@@ -164,9 +164,14 @@ public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider
             var senderId = message.SenderId is { Length: > 100 } longSender ? longSender[..100] : message.SenderId;
             var mediaJson = message.MediaJson;
             var messageId = Guid.CreateVersion7();
+            // History is context, not a new arrival. Put it at or before read along began for unread/reminder
+            // watermarks, so importing old appointments never schedules them as newly received messages.
+            var receivedAt = message.Historical
+                ? (message.SentAt < chat.CreatedAt ? message.SentAt : chat.CreatedAt)
+                : now;
             var rows = await db.Database.ExecuteSqlInterpolatedAsync($"""
                 INSERT INTO whatsapp_messages ("Id", owner_id, connection_id, chat_id, external_id, from_me, sender, sender_id, text, media, sent_at, created_at)
-                VALUES ({messageId}, {chat.OwnerId}, {connectionId}, {chat.ChatId}, {message.ExternalId}, {message.FromMe}, {sender}, {senderId}, {text}, CAST({mediaJson} AS jsonb), {message.SentAt}, {now})
+                VALUES ({messageId}, {chat.OwnerId}, {connectionId}, {chat.ChatId}, {message.ExternalId}, {message.FromMe}, {sender}, {senderId}, {text}, CAST({mediaJson} AS jsonb), {message.SentAt}, {receivedAt})
                 ON CONFLICT (connection_id, external_id) DO NOTHING
                 """, cancellationToken);
             if (rows == 0) continue;
@@ -177,7 +182,7 @@ public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider
                 });
             inserted++;
             if (chat.LastMessageAt is null || message.SentAt > chat.LastMessageAt) chat.LastMessageAt = message.SentAt;
-            chat.LastReceivedAt = now;
+            if (!message.Historical) chat.LastReceivedAt = now;
         }
         if (inserted > 0) await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -216,6 +221,11 @@ public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider
             .Take(Math.Clamp(limit, 1, 200))
             .ToListAsync(cancellationToken)).Select(x => x.ToRecord()).ToArray();
     }
+
+    public async Task<WhatsAppChatMessage?> GetMessageAsync(Guid ownerId, Guid connectionId, string chatId,
+        Guid messageId, CancellationToken cancellationToken) =>
+        (await db.WhatsAppMessages.AsNoTracking().SingleOrDefaultAsync(x => x.OwnerId == ownerId &&
+            x.ConnectionId == connectionId && x.ChatId == chatId && x.Id == messageId, cancellationToken))?.ToRecord();
 
     public async Task<IReadOnlyList<WhatsAppSearchHit>> SearchAsync(Guid ownerId, string query, Guid? connectionId,
         string? chatId, int limit, CancellationToken cancellationToken)
