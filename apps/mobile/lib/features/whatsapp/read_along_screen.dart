@@ -994,7 +994,7 @@ class WhatsAppPictures {
       return Uint8List.fromList(data);
     } on DioException catch (error) {
       if (error.response?.statusCode == 404) return null;
-      throw error;
+      rethrow;
     }
   }
 }
