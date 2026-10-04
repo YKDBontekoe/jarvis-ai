@@ -23,6 +23,23 @@ export function isLidJid(jid) {
   return typeof jid === 'string' && jid.endsWith(`@${LID_SERVER}`);
 }
 
+/**
+ * Drops the device (`:12`) and domain-agent (`_1`) suffix Baileys leaves on a jid, and lowercases the server.
+ * "31612345678:12@s.whatsapp.net" -> "31612345678@s.whatsapp.net".
+ */
+export function canonicalJid(jid) {
+  if (typeof jid !== 'string') return null;
+  const at = jid.lastIndexOf('@');
+  if (at <= 0) return null;
+  let user = jid.slice(0, at);
+  const server = jid.slice(at + 1).toLowerCase();
+  const device = user.indexOf(':');
+  if (device > 0) user = user.slice(0, device);
+  const agent = user.lastIndexOf('_');
+  if (agent > 0 && /^\d+$/.test(user.slice(agent + 1))) user = user.slice(0, agent);
+  return user && server ? `${user}@${server}` : null;
+}
+
 /** Plain text of a WhatsApp message, or null for media, reactions, protocol messages, etc. */
 export function textOf(message) {
   if (!message || typeof message !== 'object') return null;
@@ -109,9 +126,12 @@ export function safeSessionId(value) {
 
 const GROUP_SERVER = 'g.us';
 const MAX_OBSERVED_TEXT = 8_000;
+const GROUP_ID = /^[0-9-]{5,64}@g\.us$/;
+const LID_ID = /^[0-9]{5,32}@lid$/;
 
 export function isGroupJid(jid) {
-  return typeof jid === 'string' && jid.endsWith(`@${GROUP_SERVER}`);
+  const canonical = canonicalJid(jid);
+  return canonical !== null && canonical.endsWith(`@${GROUP_SERVER}`);
 }
 
 /**
@@ -119,11 +139,14 @@ export function isGroupJid(jid) {
  * group, or the @lid jid when the phone number is unknown. Broadcasts, status, newsletters and the like return null.
  */
 export function chatIdOf(jid, resolvePhone = () => null) {
-  if (typeof jid !== 'string') return null;
-  if (isGroupJid(jid)) return /^[0-9-]{5,64}@g\.us$/.test(jid) ? jid : null;
-  const phone = phoneFromJid(jid);
+  const canonical = canonicalJid(jid);
+  if (canonical === null) return null;
+  if (canonical.endsWith(`@${GROUP_SERVER}`)) return GROUP_ID.test(canonical) ? canonical : null;
+  const phone = phoneFromJid(canonical);
   if (phone) return phone;
-  if (isLidJid(jid)) return phoneFromJid(resolvePhone(jid)) ?? (/^[0-9]{5,32}@lid$/.test(jid.replace(/:\d+@/, '@')) ? jid.replace(/:\d+@/, '@') : null);
+  if (canonical.endsWith(`@${LID_SERVER}`)) {
+    return phoneFromJid(resolvePhone(canonical)) ?? (LID_ID.test(canonical) ? canonical : null);
+  }
   return null;
 }
 
@@ -131,7 +154,15 @@ export function chatIdOf(jid, resolvePhone = () => null) {
 export function isChatId(id) {
   if (typeof id !== 'string') return false;
   if (/^\+[1-9][0-9]{6,14}$/.test(id)) return true;
-  return /^[0-9-]{5,64}@g\.us$/.test(id) || /^[0-9]{5,32}@lid$/.test(id);
+  return GROUP_ID.test(id) || LID_ID.test(id);
+}
+
+/** A phone number from a jid, or from the LID mapping when the jid is an @lid. */
+function phoneOf(jid, resolvePhone) {
+  const direct = phoneFromJid(jid);
+  if (direct) return direct;
+  if (typeof resolvePhone !== 'function' || !isLidJid(canonicalJid(jid))) return null;
+  return phoneFromJid(resolvePhone(canonicalJid(jid)));
 }
 
 /** The WhatsApp jid to send to for a Jarvis chat id. */
@@ -193,9 +224,11 @@ export function observedFrom(entry, { selfPhone, watched, resolvePhone = () => n
   let sender = null;
   if (!fromMe) {
     const name = typeof entry.pushName === 'string' ? entry.pushName.trim().slice(0, 80) : '';
+    // Baileys 7 puts the other address in participantAlt: the phone when the group is LID-addressed,
+    // and the LID when it is still phone-addressed. participantPn is the older field name.
     const phone = group
-      ? phoneFromJid(key.participantPn) ?? phoneFromJid(key.participant) ?? phoneFromJid(resolvePhone(key.participant))
-      : chatId.startsWith('+') ? chatId : null;
+      ? phoneOf(key.participantAlt, resolvePhone) ?? phoneOf(key.participantPn, resolvePhone) ?? phoneOf(key.participant, resolvePhone)
+      : chatId.startsWith('+') ? chatId : phoneOf(key.participantAlt, resolvePhone);
     sender = name || phone || null;
   }
   return {

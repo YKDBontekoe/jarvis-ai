@@ -120,14 +120,21 @@ String whatsAppConnectionMessage(String state) => switch (state) {
   'connecting' =>
     'WhatsApp is reconnecting. Saved messages are still available.',
   'paused' => 'This account is paused. New messages are not being collected.',
-  'none' || 'logged_out' || 'qr' =>
-    'This account needs to be linked again. Open account settings to reconnect.',
-  _ =>
-    'WhatsApp could not be reached. Showing saved messages; Jarvis will retry automatically.',
+  'none' || 'logged_out' || 'qr' => 'This account needs to be linked again. Open account settings to reconnect.',
+  _ => 'WhatsApp could not be reached. Showing saved messages; Jarvis will retry automatically.',
 };
 
-String whatsAppChatPath(String channelId, String chatId) =>
-    '/api/v1/channels/$channelId/chats/${Uri.encodeComponent(chatId)}';
+/// Path of one chat action. The chat id is passed separately as the `chatId`
+/// query value: group ids contain `@`, which proxies drop from the path.
+String whatsAppChatPath(String channelId, {String? action}) {
+  final tail = action == null ? 'open' : 'open/$action';
+  return '/api/v1/channels/$channelId/chats/$tail';
+}
+
+Map<String, dynamic> whatsAppChatQuery(
+  String chatId, [
+  Map<String, dynamic>? extra,
+]) => {'chatId': chatId, ...?extra};
 
 /// "14:05", "Yesterday", "Mon" or "12 Sep", the way chat lists show time.
 String whatsAppListTime(DateTime? time, {DateTime? now}) {

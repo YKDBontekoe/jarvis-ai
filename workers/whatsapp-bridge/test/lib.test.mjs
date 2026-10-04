@@ -90,12 +90,15 @@ test('session ids are restricted to safe characters', () => {
 test('chat ids: phones, groups and unresolved lids', () => {
   assert.equal(chatIdOf('31687654321@s.whatsapp.net'), '+31687654321');
   assert.equal(chatIdOf('120363025-1@g.us'), '120363025-1@g.us');
+  assert.equal(chatIdOf('120363025123456789:0@g.us'), '120363025123456789@g.us');
+  assert.equal(chatIdOf('120363025123456789_1@g.us'), '120363025123456789@g.us');
   assert.equal(chatIdOf('99887766:2@lid'), '99887766@lid');
   assert.equal(chatIdOf('99887766@lid', () => '31687654321@s.whatsapp.net'), '+31687654321');
   assert.equal(chatIdOf('status@broadcast'), null);
   assert.equal(chatIdOf('123@newsletter'), null);
   assert.ok(isChatId('+31687654321'));
   assert.ok(isChatId('120363025-1@g.us'));
+  assert.ok(!isChatId('120363025123456789:0@g.us'));
   assert.ok(!isChatId('31687654321'));
   assert.ok(!isChatId('../etc'));
   assert.equal(jidFromChatId('+31687654321'), '31687654321@s.whatsapp.net');
@@ -127,6 +130,22 @@ test('observed messages: only watched chats, both directions, never the self cha
   }), opts);
   assert.equal(group.chatId, '120363025-1@g.us');
   assert.equal(group.sender, '+31655555555');
+  const lidWatched = new Set([...watched, '120363025123456789@g.us']);
+  const lidGroup = observedFrom(entry({
+    key: {
+      remoteJid: '120363025123456789:0@g.us',
+      participant: '999@lid',
+      participantAlt: '31655555555@s.whatsapp.net',
+    },
+    rest: { pushName: '' },
+  }), { ...opts, watched: lidWatched });
+  assert.equal(lidGroup.chatId, '120363025123456789@g.us');
+  assert.equal(lidGroup.sender, '+31655555555');
+  const mapped = observedFrom(entry({
+    key: { remoteJid: '120363025-1@g.us', participant: '999:2@lid' },
+    rest: { pushName: '' },
+  }), { ...opts, resolvePhone: (lid) => (lid === '999@lid' ? '31655555555@s.whatsapp.net' : null) });
+  assert.equal(mapped.sender, '+31655555555');
   assert.equal(observedFrom(entry(), { selfPhone: self, watched: new Set() }), null);
 });
 

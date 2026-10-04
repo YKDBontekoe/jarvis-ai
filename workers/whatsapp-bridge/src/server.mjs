@@ -16,6 +16,7 @@ import {
   ChatBook,
   Inbox,
   RecentIds,
+  canonicalJid,
   chatIdOf,
   inboundFrom,
   isGroupJid,
@@ -106,46 +107,70 @@ class Session {
     this.socket = socket;
     socket.ev.on('creds.update', saveCreds);
     socket.ev.on('connection.update', (update) => void this.onConnection(update));
-    const resolvePhone = (lid) => socket.signalRepository?.lidMapping?.getPNForLIDSync?.(lid) ?? null;
+    const remember = (jid, name) => {
+      const chatId = chatIdOf(jid);
+      if (chatId) this.chats.name(chatId, name);
+    };
     socket.ev.on('messages.upsert', ({ messages, type }) => {
-      const recent = Math.floor(Date.now() / 1000) - APPEND_WINDOW_SECONDS;
-      for (const entry of messages) {
-        const timestamp = toNumber(entry.messageTimestamp);
-        const chatId = chatIdOf(entry?.key?.remoteJid, resolvePhone);
-        if (chatId) {
-          const personName = !entry.key.fromMe && !isGroupJid(chatId) ? entry.pushName : null;
-          this.chats.touch(chatId, { name: personName, timestamp });
-        }
-        // 'append' carries messages sent from the phone while this device was catching up; keep only recent ones.
-        if (type !== 'notify' && !(type === 'append' && timestamp >= recent)) continue;
-        const observed = observedFrom(entry, { selfPhone: this.phone, watched: this.watched, resolvePhone });
-        if (observed) this.observed.push(observed);
-        if (type !== 'notify') continue;
-        const inbound = inboundFrom(entry, { selfPhone: this.phone, sentIds: this.sent, resolvePhone });
-        if (inbound) this.inbox.push(inbound);
-      }
+      void this.ingest(messages, type).catch((error) =>
+        log.debug({ session: this.id, err: error?.message }, 'could not read a WhatsApp message'));
     });
     socket.ev.on('messaging-history.set', ({ chats, contacts }) => {
-      for (const contact of contacts ?? []) this.addContact(contact, resolvePhone);
-      for (const chat of chats ?? []) this.addChat(chat, resolvePhone);
+      void this.rememberDirectory(contacts, chats).catch((error) =>
+        log.debug({ session: this.id, err: error?.message }, 'could not read the WhatsApp chat list'));
     });
-    socket.ev.on('chats.upsert', (chats) => chats.forEach((chat) => this.addChat(chat, resolvePhone)));
-    socket.ev.on('chats.update', (chats) => chats.forEach((chat) => this.addChat(chat, resolvePhone, false)));
-    socket.ev.on('contacts.upsert', (contacts) => contacts.forEach((contact) => this.addContact(contact, resolvePhone)));
-    socket.ev.on('contacts.update', (contacts) => contacts.forEach((contact) => this.addContact(contact, resolvePhone)));
-    socket.ev.on('groups.upsert', (groups) => groups.forEach((group) => this.chats.name(chatIdOf(group.id), group.subject)));
-    socket.ev.on('groups.update', (groups) => groups.forEach((group) => this.chats.name(chatIdOf(group.id), group.subject)));
+    socket.ev.on('chats.upsert', (chats) => chats.forEach((chat) => this.addChat(chat)));
+    socket.ev.on('chats.update', (chats) => chats.forEach((chat) => this.addChat(chat, () => null, false)));
+    socket.ev.on('contacts.upsert', (contacts) => contacts.forEach((contact) => this.addContact(contact)));
+    socket.ev.on('contacts.update', (contacts) => contacts.forEach((contact) => this.addContact(contact)));
+    socket.ev.on('groups.upsert', (groups) => groups.forEach((group) => remember(group.id, group.subject)));
+    socket.ev.on('groups.update', (groups) => groups.forEach((group) => remember(group.id, group.subject)));
   }
 
-  addChat(chat, resolvePhone, create = true) {
+  async ingest(messages, type) {
+    const recent = Math.floor(Date.now() / 1000) - APPEND_WINDOW_SECONDS;
+    const jids = [];
+    for (const entry of messages ?? []) {
+      const key = entry?.key ?? {};
+      jids.push(key.remoteJid, key.remoteJidAlt, key.participant, key.participantAlt, key.participantPn);
+    }
+    const resolvePhone = await phonesFor(this.socket, jids);
+    for (const entry of messages ?? []) {
+      const timestamp = toNumber(entry.messageTimestamp);
+      const chatId = chatIdOf(entry?.key?.remoteJid, resolvePhone);
+      if (chatId) {
+        const personName = !entry.key.fromMe && !isGroupJid(chatId) ? entry.pushName : null;
+        this.chats.touch(chatId, { name: personName, timestamp });
+      }
+      // 'append' carries messages sent from the phone while this device was catching up; keep only recent ones.
+      if (type !== 'notify' && !(type === 'append' && timestamp >= recent)) continue;
+      const observed = observedFrom(entry, { selfPhone: this.phone, watched: this.watched, resolvePhone });
+      if (observed) this.observed.push(observed);
+      if (type !== 'notify') continue;
+      const inbound = inboundFrom(entry, { selfPhone: this.phone, sentIds: this.sent, resolvePhone });
+      if (inbound) this.inbox.push(inbound);
+    }
+  }
+
+  async rememberDirectory(contacts, chats) {
+    const jids = [];
+    for (const contact of contacts ?? []) jids.push(contact?.phoneNumber, contact?.id, contact?.lid);
+    for (const chat of chats ?? []) jids.push(chat?.id, chat?.lidJid, chat?.pnJid, chat?.accountLid);
+    const resolvePhone = await phonesFor(this.socket, jids);
+    for (const contact of contacts ?? []) this.addContact(contact, resolvePhone);
+    for (const chat of chats ?? []) this.addChat(chat, resolvePhone);
+  }
+
+  addChat(chat, resolvePhone = () => null, create = true) {
     const chatId = chatIdOf(chat?.id, resolvePhone);
     if (!chatId || chatId === this.phone) return;
+    const name = chat?.name ?? chat?.subject ?? chat?.displayName ?? null;
     if (create || this.chats.chats.has(chatId))
-      this.chats.touch(chatId, { name: chat.name ?? null, timestamp: toNumber(chat.conversationTimestamp) });
-    else if (chat.name) this.chats.name(chatId, chat.name);
+      this.chats.touch(chatId, { name, timestamp: toNumber(chat.conversationTimestamp) });
+    else if (name) this.chats.name(chatId, name);
   }
 
-  addContact(contact, resolvePhone) {
+  addContact(contact, resolvePhone = () => null) {
     const name = contact?.name ?? contact?.notify ?? contact?.verifiedName ?? null;
     if (!name) return;
     for (const jid of [contact.phoneNumber, contact.id, contact.lid]) {
@@ -173,8 +198,9 @@ class Session {
     try {
       const groups = await this.socket?.groupFetchAllParticipating?.();
       for (const group of Object.values(groups ?? {})) {
-        this.chats.name(chatIdOf(group.id), group.subject);
-        if (chatIdOf(group.id)) this.chats.touch(chatIdOf(group.id), { timestamp: toNumber(group.creation) });
+        const chatId = chatIdOf(group.id);
+        this.chats.name(chatId, group.subject);
+        if (chatId && !this.chats.chats.has(chatId)) this.chats.touch(chatId, { timestamp: toNumber(group.subjectTime) || toNumber(group.creation) });
       }
     } catch (error) {
       log.debug({ session: this.id, err: error?.message }, 'could not load group names');
@@ -348,6 +374,25 @@ async function route(request) {
 const CHATS_FILE = 'jarvis-chats.json';
 const WATCH_FILE = 'jarvis-watch.json';
 const APPEND_WINDOW_SECONDS = 48 * 3600;
+
+/** Resolves @lid jids to phone jids. Baileys 7 only offers the async mapping. */
+async function phonesFor(socket, jids) {
+  const found = new Map();
+  const lids = new Set();
+  for (const jid of jids) {
+    const canonical = canonicalJid(jid);
+    if (canonical?.endsWith('@lid')) lids.add(canonical);
+  }
+  await Promise.all([...lids].map(async (lid) => {
+    try {
+      const pn = await socket?.signalRepository?.lidMapping?.getPNForLID?.(lid);
+      if (typeof pn === 'string' && pn.length > 0) found.set(lid, pn);
+    } catch {
+      // The mapping store is empty until the phone finishes its first sync.
+    }
+  }));
+  return (lid) => found.get(canonicalJid(lid) ?? '') ?? null;
+}
 
 /** Baileys timestamps can be numbers or protobuf Longs. */
 function toNumber(value) {

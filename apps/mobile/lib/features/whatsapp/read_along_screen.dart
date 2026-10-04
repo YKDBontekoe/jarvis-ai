@@ -108,8 +108,7 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
         setState(() {
           _live = false;
           _state = 'unreachable';
-          _refreshError =
-              'Could not refresh chats. Showing the last saved list; retrying automatically.';
+          _refreshError = 'Could not refresh chats. Showing the last saved list; retrying automatically.';
         });
         return;
       }
@@ -149,7 +148,8 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
     });
     try {
       await widget.http.put<dynamic>(
-        whatsAppChatPath(widget.channelId, chat.chatId),
+        whatsAppChatPath(widget.channelId),
+        queryParameters: whatsAppChatQuery(chat.chatId),
         data: {
           'name': chat.name,
           'readAlong': on,
@@ -360,9 +360,8 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
                       children: [
                         Text(
                           'A little help with your chats.',
-                          style: JarvisType.displayOf(
-                            context,
-                          ).copyWith(fontSize: 30),
+                          style: JarvisType.displayOf(context)
+                              .copyWith(fontSize: 30),
                         ),
                         const SizedBox(height: 8),
                         Text(

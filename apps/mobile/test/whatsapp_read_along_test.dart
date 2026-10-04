@@ -8,7 +8,9 @@ import 'support/fixture_http.dart';
 
 const _channel = '11111111-1111-1111-1111-111111111111';
 const _chats = '/api/v1/channels/$_channel/chats';
-const _piet = '$_chats/%2B31611111111';
+const _piet = '$_chats/open';
+const _pietQuery = 'chatId=%2B31611111111';
+const _sanneQuery = 'chatId=%2B31622222222';
 
 const _pietChat = WhatsAppChat(
   chatId: '+31611111111',
@@ -66,7 +68,7 @@ void main() {
         },
       ],
     });
-    http.on('PUT', '$_chats/%2B31622222222', {
+    http.on('PUT', '$_piet?$_sanneQuery', {
       'chatId': '+31622222222',
       'name': 'Sanne',
       'isGroup': false,
@@ -86,7 +88,8 @@ void main() {
     await tester.tap(find.byKey(const Key('read-along-switch-+31622222222')));
     await tester.pumpAndSettle();
 
-    final put = http.sent('PUT', '$_chats/%2B31622222222').single;
+    final put = http.sent('PUT', _piet).single;
+    expect(put.query['chatId'], '+31622222222');
     expect((put.body! as Map)['readAlong'], isTrue);
     expect(find.textContaining('now reads along with Sanne'), findsOneWidget);
 
@@ -127,7 +130,9 @@ void main() {
       final initial = [for (var i = 60; i >= 1; i--) message(i)];
       final oldest = message(1)['id'];
       http.on('GET', '$_piet/messages', initial);
-      http.on('GET', '$_piet/messages?beforeId=$oldest', [message(0)]);
+      http.on('GET', '$_piet/messages?$_pietQuery&beforeId=$oldest', [
+        message(0),
+      ]);
       http.on('POST', '$_piet/read', {}, status: 204);
       await show(
         tester,
@@ -260,9 +265,11 @@ void main() {
     http.on('GET', '$_piet/messages', [
       for (var i = 100; i >= 41; i--) message(i),
     ]);
-    http.on('GET', '$_piet/messages?beforeId=${message(41)['id']}', [
-      for (var i = 40; i >= 0; i--) message(i),
-    ]);
+    http.on(
+      'GET',
+      '$_piet/messages?$_pietQuery&beforeId=${message(41)['id']}',
+      [for (var i = 40; i >= 0; i--) message(i)],
+    );
     await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();
     expect(
@@ -384,6 +391,11 @@ void main() {
     expect(
       whatsAppDayLabel(DateTime(2026, 9, 28), now: now),
       'Monday 28 September',
+    );
+    expect(whatsAppChatPath(_channel, action: 'messages'), '$_piet/messages');
+    expect(
+      whatsAppChatPath(_channel, action: 'messages').contains('@'),
+      isFalse,
     );
     expect(_pietChat.initials, 'PV');
     expect(_pietChat.phone, '+31611111111');

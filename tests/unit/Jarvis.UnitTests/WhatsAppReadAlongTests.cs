@@ -1,10 +1,19 @@
+using System.Net;
+using System.Text.Json;
 using Jarvis.Agents.WhatsApp;
 using Jarvis.Api.Channels;
 using Jarvis.Api.Endpoints;
 using Jarvis.Application.Channels;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.WhatsApp;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Jarvis.UnitTests;
@@ -19,13 +28,54 @@ public sealed class WhatsAppReadAlongTests
     [InlineData("+31 6 1234 5678", "+31612345678")]
     [InlineData("0031612345678", "+31612345678")]
     [InlineData("120363025-1@g.us", "120363025-1@g.us")]
+    [InlineData("120363025-1%40g.us", "120363025-1@g.us")]
+    [InlineData("120363025-1%2540g.us", "120363025-1@g.us")]
+    [InlineData("120363025123456789:0@g.us", "120363025123456789@g.us")]
+    [InlineData("120363025123456789_1@g.us", "120363025123456789@g.us")]
     [InlineData("99887766@lid", "99887766@lid")]
+    [InlineData("99887766:2@lid", "99887766@lid")]
     [InlineData("31612345678@s.whatsapp.net", null)]
     [InlineData("status@broadcast", null)]
     [InlineData("12", null)]
     [InlineData("", null)]
     public void Chat_ids_are_phones_groups_or_lids(string input, string? expected) =>
         Assert.Equal(expected, WhatsAppChatIds.Normalize(input));
+
+    [Fact]
+    public async Task Group_ids_round_trip_as_a_query_and_still_as_a_path()
+    {
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        var app = builder.Build();
+        var group = app.MapGroup("/api/v1/channels/{id:guid}/chats");
+        group.MapGet("/open/messages", (string chatId) => Results.Ok(new { chatId }));
+        group.MapGet("/{chatId}/messages", (string chatId) => Results.Ok(new { chatId }));
+        group.MapPut("/open", (string chatId) => Results.Ok(new { chatId }));
+        await app.StartAsync();
+        using var client = new HttpClient
+        {
+            BaseAddress = new Uri(app.Services.GetRequiredService<IServer>().Features
+                .GetRequiredFeature<IServerAddressesFeature>().Addresses.First())
+        };
+        var id = Guid.CreateVersion7();
+        var query = await client.GetAsync($"/api/v1/channels/{id}/chats/open/messages?chatId=120363025-1%40g.us");
+        var path = await client.GetAsync($"/api/v1/channels/{id}/chats/120363025-1%40g.us/messages");
+        var save = await client.PutAsync($"/api/v1/channels/{id}/chats/open?chatId=120363025-1%40g.us", null);
+
+        Assert.Equal(HttpStatusCode.OK, query.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, path.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, save.StatusCode);
+        Assert.Equal("120363025-1@g.us", await ChatId(query));
+        Assert.Equal("120363025-1@g.us", await ChatId(path));
+        Assert.Equal("120363025-1@g.us", await ChatId(save));
+        await app.StopAsync();
+
+        static async Task<string> ChatId(HttpResponseMessage response)
+        {
+            using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            return document.RootElement.GetProperty("chatId").GetString()!;
+        }
+    }
 
     [Fact]
     public void Names_fall_back_and_are_trimmed()
