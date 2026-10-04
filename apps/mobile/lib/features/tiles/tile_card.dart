@@ -304,38 +304,42 @@ class _Label extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
-    return Row(
-      children: [
-        Icon(spec.icon, size: 15, color: colors.muted),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            spec.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w500,
-              color: colors.muted,
-            ),
-          ),
-        ),
-        if (trailing != null)
-          Flexible(
+    return LayoutBuilder(
+      builder: (context, box) => Row(
+        children: [
+          Icon(spec.icon, size: 15, color: colors.muted),
+          const SizedBox(width: 6),
+          Expanded(
             child: Text(
-              trailing!,
+              spec.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: info.attention ? colors.accent : colors.muted,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                color: colors.muted,
               ),
             ),
-          )
-        else if (info.attention)
-          const _Dot(),
-      ],
+          ),
+          if (trailing != null)
+            ConstrainedBox(
+              // Room for a count; a long unit gives way to the name.
+              constraints: BoxConstraints(maxWidth: box.maxWidth * .55),
+              child: Text(
+                trailing!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: info.attention ? colors.accent : colors.muted,
+                ),
+              ),
+            )
+          else if (info.attention)
+            const _Dot(),
+        ],
+      ),
     );
   }
 }

@@ -474,8 +474,8 @@ Future<TileData?> _today(TileEnv env) async {
     subtitle: today > 0
         ? '${next.title} · ${clockTime(next.start)}'
         : 'Nothing else today',
-    focusLabel: next.title,
-    countdownTo: next.start,
+    focusLabel: today > 0 ? next.title : null,
+    countdownTo: today > 0 ? next.start : null,
     visual: TileVisual.timeline,
     timeline: _timeline(items, now),
     rows: [
