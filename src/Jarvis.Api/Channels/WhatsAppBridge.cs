@@ -14,7 +14,9 @@ public sealed record BridgeChat(string Id, string? Name, bool Group, long LastMe
 
 /// <summary>A message in a chat on the watch list; <c>Timestamp</c> is in Unix seconds.</summary>
 public sealed record BridgeObservedMessage(string Id, string ChatId, bool FromMe, string? Sender, string Text,
-    long Timestamp);
+    long Timestamp, string? SenderId = null);
+
+public sealed record BridgePicture(byte[] Bytes, string ContentType);
 
 /// <summary>HTTP client for the Baileys-based WhatsApp bridge. Its session id is the channel connection id.</summary>
 public sealed class WhatsAppBridgeClient(HttpClient http, ChannelOptions options)
@@ -57,6 +59,25 @@ public sealed class WhatsAppBridgeClient(HttpClient http, ChannelOptions options
 
     public Task AckObservedAsync(Guid sessionId, IEnumerable<string> ids, CancellationToken cancellationToken) =>
         SendAsync<JsonElement?>(HttpMethod.Post, sessionId, "observed/ack", new { ids }, cancellationToken);
+
+    /// <summary>Preview picture for a chat or participant. Null when they have none or the bridge is down.</summary>
+    public async Task<BridgePicture?> GetPictureAsync(Guid sessionId, string chatId, CancellationToken cancellationToken)
+    {
+        var baseUrl = options.WhatsAppBridgeUrl
+                      ?? throw new InvalidOperationException("Channels:WhatsAppBridge:BaseUrl is not configured.");
+        var url = $"{baseUrl.TrimEnd('/')}/sessions/{sessionId:D}/picture?jid={Uri.EscapeDataString(chatId)}";
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        if (!string.IsNullOrWhiteSpace(options.WhatsAppBridgeToken))
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.WhatsAppBridgeToken);
+        using var response = await http.SendAsync(request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"The WhatsApp bridge rejected the request ({(int)response.StatusCode}).");
+        var type = response.Content.Headers.ContentType?.MediaType;
+        if (type is not ("image/jpeg" or "image/png" or "image/webp")) return null;
+        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        return bytes.Length is > 0 and <= 300_000 ? new BridgePicture(bytes, type) : null;
+    }
 
     /// <summary>Logs the device out of WhatsApp and removes the stored session.</summary>
     public Task DeleteAsync(Guid sessionId, CancellationToken cancellationToken) =>

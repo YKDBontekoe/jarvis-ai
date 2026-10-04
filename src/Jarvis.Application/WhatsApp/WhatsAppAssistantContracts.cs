@@ -29,11 +29,11 @@ public sealed record WhatsAppChatMessage(
     bool FromMe,
     string? Sender,
     string Text,
-    DateTimeOffset SentAt, DateTimeOffset? ReceivedAt = null);
+    DateTimeOffset SentAt, DateTimeOffset? ReceivedAt = null, string? SenderId = null);
 
 /// <summary>A message the bridge forwarded for a chat on the owner's watch list.</summary>
 public sealed record ObservedWhatsAppMessage(string ExternalId, string ChatId, bool FromMe, string? Sender,
-    string Text, DateTimeOffset SentAt);
+    string Text, DateTimeOffset SentAt, string? SenderId = null);
 
 /// <summary>
 /// New messages in one chat that the reminder scan has not looked at yet, with the context before them.
@@ -138,15 +138,50 @@ public static partial class WhatsAppChatIds
 
     /// <summary>
     /// Normalizes a chat id: a phone number becomes "+digits"; group (@g.us) and unresolved (@lid) jids stay as
-    /// they are. Returns null for anything else.
+    /// they are, without a device or domain suffix. Percent-encoding is decoded first, so a chat id that arrived
+    /// still encoded matches the id that was saved. Returns null for anything else.
     /// </summary>
     public static string? Normalize(string? value)
     {
-        var trimmed = (value ?? string.Empty).Trim();
-        if (GroupPattern().IsMatch(trimmed) || LidPattern().IsMatch(trimmed)) return trimmed;
-        if (trimmed.Contains('@')) return null;
-        var phone = ChannelAddresses.Normalize(trimmed);
+        var trimmed = Unescape(value ?? string.Empty).Trim();
+        var canonical = CanonicalJid(trimmed);
+        if (GroupPattern().IsMatch(canonical) || LidPattern().IsMatch(canonical)) return canonical;
+        if (canonical.Contains('@')) return null;
+        var phone = ChannelAddresses.Normalize(canonical);
         return ChannelAddresses.IsPhoneNumber(phone) ? phone : null;
+    }
+
+    /// <summary>Drops ":device" and "_agent" from a jid and lowercases the server. Values without @ are unchanged.</summary>
+    private static string CanonicalJid(string value)
+    {
+        var at = value.LastIndexOf('@');
+        if (at <= 0) return value;
+        var user = value[..at];
+        var server = value[(at + 1)..].ToLowerInvariant();
+        var device = user.IndexOf(':');
+        if (device > 0) user = user[..device];
+        var agent = user.LastIndexOf('_');
+        if (agent > 0 && user[(agent + 1)..].All(char.IsAsciiDigit)) user = user[..agent];
+        return string.IsNullOrEmpty(user) || string.IsNullOrEmpty(server) ? value : $"{user}@{server}";
+    }
+
+    private static string Unescape(string value)
+    {
+        var current = value.Trim();
+        for (var attempt = 0; attempt < 2 && current.Contains('%'); attempt++)
+        {
+            try
+            {
+                var decoded = Uri.UnescapeDataString(current);
+                if (decoded == current) return current;
+                current = decoded.Trim();
+            }
+            catch (UriFormatException)
+            {
+                return current;
+            }
+        }
+        return current;
     }
 
     public static bool IsGroup(string chatId) => chatId.EndsWith("@g.us", StringComparison.Ordinal);

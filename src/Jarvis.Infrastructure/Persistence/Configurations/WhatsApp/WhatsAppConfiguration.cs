@@ -45,6 +45,7 @@ internal sealed class WhatsAppMessageConfiguration : IEntityTypeConfiguration<Wh
         builder.Property(x => x.ExternalId).HasColumnName("external_id").HasMaxLength(200).IsRequired();
         builder.Property(x => x.FromMe).HasColumnName("from_me");
         builder.Property(x => x.Sender).HasColumnName("sender").HasMaxLength(80);
+        builder.Property(x => x.SenderId).HasColumnName("sender_id").HasMaxLength(100);
         builder.Property(x => x.Text).HasColumnName("text").IsRequired();
         builder.Property(x => x.SentAt).HasColumnName("sent_at");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");

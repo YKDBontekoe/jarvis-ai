@@ -16,13 +16,17 @@ import {
   ChatBook,
   Inbox,
   RecentIds,
+  PictureCache,
+  canonicalJid,
   chatIdOf,
   inboundFrom,
+  isChatId,
   isGroupJid,
   jidFromChatId,
   normalizeWatchList,
   observedFrom,
   phoneFromJid,
+  pictureUrlAllowed,
   safeSessionId,
 } from './lib.mjs';
 
@@ -76,6 +80,7 @@ class Session {
     this.watched = new Set();
     this.observed = new Inbox(2_000);
     this.chats = new ChatBook();
+    this.pictures = new PictureCache();
     this.loaded = false;
     this.saveTimer = null;
     this.stopped = false;
@@ -106,46 +111,70 @@ class Session {
     this.socket = socket;
     socket.ev.on('creds.update', saveCreds);
     socket.ev.on('connection.update', (update) => void this.onConnection(update));
-    const resolvePhone = (lid) => socket.signalRepository?.lidMapping?.getPNForLIDSync?.(lid) ?? null;
+    const remember = (jid, name) => {
+      const chatId = chatIdOf(jid);
+      if (chatId) this.chats.name(chatId, name);
+    };
     socket.ev.on('messages.upsert', ({ messages, type }) => {
-      const recent = Math.floor(Date.now() / 1000) - APPEND_WINDOW_SECONDS;
-      for (const entry of messages) {
-        const timestamp = toNumber(entry.messageTimestamp);
-        const chatId = chatIdOf(entry?.key?.remoteJid, resolvePhone);
-        if (chatId) {
-          const personName = !entry.key.fromMe && !isGroupJid(chatId) ? entry.pushName : null;
-          this.chats.touch(chatId, { name: personName, timestamp });
-        }
-        // 'append' carries messages sent from the phone while this device was catching up; keep only recent ones.
-        if (type !== 'notify' && !(type === 'append' && timestamp >= recent)) continue;
-        const observed = observedFrom(entry, { selfPhone: this.phone, watched: this.watched, resolvePhone });
-        if (observed) this.observed.push(observed);
-        if (type !== 'notify') continue;
-        const inbound = inboundFrom(entry, { selfPhone: this.phone, sentIds: this.sent, resolvePhone });
-        if (inbound) this.inbox.push(inbound);
-      }
+      void this.ingest(messages, type).catch((error) =>
+        log.debug({ session: this.id, err: error?.message }, 'could not read a WhatsApp message'));
     });
     socket.ev.on('messaging-history.set', ({ chats, contacts }) => {
-      for (const contact of contacts ?? []) this.addContact(contact, resolvePhone);
-      for (const chat of chats ?? []) this.addChat(chat, resolvePhone);
+      void this.rememberDirectory(contacts, chats).catch((error) =>
+        log.debug({ session: this.id, err: error?.message }, 'could not read the WhatsApp chat list'));
     });
-    socket.ev.on('chats.upsert', (chats) => chats.forEach((chat) => this.addChat(chat, resolvePhone)));
-    socket.ev.on('chats.update', (chats) => chats.forEach((chat) => this.addChat(chat, resolvePhone, false)));
-    socket.ev.on('contacts.upsert', (contacts) => contacts.forEach((contact) => this.addContact(contact, resolvePhone)));
-    socket.ev.on('contacts.update', (contacts) => contacts.forEach((contact) => this.addContact(contact, resolvePhone)));
-    socket.ev.on('groups.upsert', (groups) => groups.forEach((group) => this.chats.name(chatIdOf(group.id), group.subject)));
-    socket.ev.on('groups.update', (groups) => groups.forEach((group) => this.chats.name(chatIdOf(group.id), group.subject)));
+    socket.ev.on('chats.upsert', (chats) => chats.forEach((chat) => this.addChat(chat)));
+    socket.ev.on('chats.update', (chats) => chats.forEach((chat) => this.addChat(chat, () => null, false)));
+    socket.ev.on('contacts.upsert', (contacts) => contacts.forEach((contact) => this.addContact(contact)));
+    socket.ev.on('contacts.update', (contacts) => contacts.forEach((contact) => this.addContact(contact)));
+    socket.ev.on('groups.upsert', (groups) => groups.forEach((group) => remember(group.id, group.subject)));
+    socket.ev.on('groups.update', (groups) => groups.forEach((group) => remember(group.id, group.subject)));
   }
 
-  addChat(chat, resolvePhone, create = true) {
+  async ingest(messages, type) {
+    const recent = Math.floor(Date.now() / 1000) - APPEND_WINDOW_SECONDS;
+    const jids = [];
+    for (const entry of messages ?? []) {
+      const key = entry?.key ?? {};
+      jids.push(key.remoteJid, key.remoteJidAlt, key.participant, key.participantAlt, key.participantPn);
+    }
+    const resolvePhone = await phonesFor(this.socket, jids);
+    for (const entry of messages ?? []) {
+      const timestamp = toNumber(entry.messageTimestamp);
+      const chatId = chatIdOf(entry?.key?.remoteJid, resolvePhone);
+      if (chatId) {
+        const personName = !entry.key.fromMe && !isGroupJid(chatId) ? entry.pushName : null;
+        this.chats.touch(chatId, { name: personName, timestamp });
+      }
+      // 'append' carries messages sent from the phone while this device was catching up; keep only recent ones.
+      if (type !== 'notify' && !(type === 'append' && timestamp >= recent)) continue;
+      const observed = observedFrom(entry, { selfPhone: this.phone, watched: this.watched, resolvePhone });
+      if (observed) this.observed.push(observed);
+      if (type !== 'notify') continue;
+      const inbound = inboundFrom(entry, { selfPhone: this.phone, sentIds: this.sent, resolvePhone });
+      if (inbound) this.inbox.push(inbound);
+    }
+  }
+
+  async rememberDirectory(contacts, chats) {
+    const jids = [];
+    for (const contact of contacts ?? []) jids.push(contact?.phoneNumber, contact?.id, contact?.lid);
+    for (const chat of chats ?? []) jids.push(chat?.id, chat?.lidJid, chat?.pnJid, chat?.accountLid);
+    const resolvePhone = await phonesFor(this.socket, jids);
+    for (const contact of contacts ?? []) this.addContact(contact, resolvePhone);
+    for (const chat of chats ?? []) this.addChat(chat, resolvePhone);
+  }
+
+  addChat(chat, resolvePhone = () => null, create = true) {
     const chatId = chatIdOf(chat?.id, resolvePhone);
     if (!chatId || chatId === this.phone) return;
+    const name = chat?.name ?? chat?.subject ?? chat?.displayName ?? null;
     if (create || this.chats.chats.has(chatId))
-      this.chats.touch(chatId, { name: chat.name ?? null, timestamp: toNumber(chat.conversationTimestamp) });
-    else if (chat.name) this.chats.name(chatId, chat.name);
+      this.chats.touch(chatId, { name, timestamp: toNumber(chat.conversationTimestamp) });
+    else if (name) this.chats.name(chatId, name);
   }
 
-  addContact(contact, resolvePhone) {
+  addContact(contact, resolvePhone = () => null) {
     const name = contact?.name ?? contact?.notify ?? contact?.verifiedName ?? null;
     if (!name) return;
     for (const jid of [contact.phoneNumber, contact.id, contact.lid]) {
@@ -173,8 +202,9 @@ class Session {
     try {
       const groups = await this.socket?.groupFetchAllParticipating?.();
       for (const group of Object.values(groups ?? {})) {
-        this.chats.name(chatIdOf(group.id), group.subject);
-        if (chatIdOf(group.id)) this.chats.touch(chatIdOf(group.id), { timestamp: toNumber(group.creation) });
+        const chatId = chatIdOf(group.id);
+        this.chats.name(chatId, group.subject);
+        if (chatId && !this.chats.chats.has(chatId)) this.chats.touch(chatId, { timestamp: toNumber(group.subjectTime) || toNumber(group.creation) });
       }
     } catch (error) {
       log.debug({ session: this.id, err: error?.message }, 'could not load group names');
@@ -203,6 +233,7 @@ class Session {
         log.warn({ session: this.id }, 'whatsapp session was logged out from the phone');
         clearInterval(this.saveTimer);
         this.chats = new ChatBook();
+        this.pictures = new PictureCache();
         this.watched = new Set();
         this.observed = new Inbox(2_000);
         await rm(this.dir, { recursive: true, force: true });
@@ -232,6 +263,45 @@ class Session {
     return result?.key?.id ?? null;
   }
 
+  /** Preview profile picture for a chat or participant, or null when WhatsApp has none. */
+  async picture(chatId) {
+    if (!isChatId(chatId)) throw new HttpError(400, 'Invalid chat.');
+    const cached = this.pictures.get(chatId);
+    if (cached !== undefined) return cached;
+    if (this.state !== 'open' || typeof this.socket?.profilePictureUrl !== 'function') {
+      return null;
+    }
+    let url;
+    try {
+      url = await this.socket.profilePictureUrl(jidFromChatId(chatId), 'preview');
+    } catch {
+      url = undefined;
+    }
+    if (!pictureUrlAllowed(url)) {
+      this.pictures.set(chatId, null);
+      return null;
+    }
+    let response;
+    try {
+      response = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+    } catch {
+      return null;
+    }
+    const type = String(response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+    if (!response.ok || !['image/jpeg', 'image/png', 'image/webp'].includes(type)) {
+      this.pictures.set(chatId, null);
+      return null;
+    }
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length === 0 || bytes.length > 300_000) {
+      this.pictures.set(chatId, null);
+      return null;
+    }
+    const image = { bytes, type };
+    this.pictures.set(chatId, image);
+    return image;
+  }
+
   async stop({ logout }) {
     if (!logout) await this.saveChats();
     this.stopped = true;
@@ -244,6 +314,13 @@ class Session {
     }
     this.socket?.end?.(undefined);
     if (logout) await rm(this.dir, { recursive: true, force: true });
+  }
+}
+
+class Picture {
+  constructor(bytes, type) {
+    this.bytes = bytes;
+    this.type = type;
   }
 }
 
@@ -330,6 +407,12 @@ async function route(request) {
     }
     return { ok: true, id };
   }
+  if (action === 'picture' && request.method === 'GET') {
+    const subject = url.searchParams.get('jid');
+    const image = await session.picture(isChatId(subject) ? subject : chatIdOf(subject));
+    if (!image) throw new HttpError(404, 'No picture.');
+    return new Picture(image.bytes, image.type);
+  }
   if (action === 'chats' && request.method === 'GET') return { chats: session.chats.list().filter((chat) => chat.id !== session.phone) };
   if (action === 'watch' && request.method === 'GET') return { chats: [...session.watched] };
   if (action === 'watch' && request.method === 'PUT') {
@@ -348,6 +431,25 @@ async function route(request) {
 const CHATS_FILE = 'jarvis-chats.json';
 const WATCH_FILE = 'jarvis-watch.json';
 const APPEND_WINDOW_SECONDS = 48 * 3600;
+
+/** Resolves @lid jids to phone jids. Baileys 7 only offers the async mapping. */
+async function phonesFor(socket, jids) {
+  const found = new Map();
+  const lids = new Set();
+  for (const jid of jids) {
+    const canonical = canonicalJid(jid);
+    if (canonical?.endsWith('@lid')) lids.add(canonical);
+  }
+  await Promise.all([...lids].map(async (lid) => {
+    try {
+      const pn = await socket?.signalRepository?.lidMapping?.getPNForLID?.(lid);
+      if (typeof pn === 'string' && pn.length > 0) found.set(lid, pn);
+    } catch {
+      // The mapping store is empty until the phone finishes its first sync.
+    }
+  }));
+  return (lid) => found.get(canonicalJid(lid) ?? '') ?? null;
+}
 
 /** Baileys timestamps can be numbers or protobuf Longs. */
 function toNumber(value) {
@@ -378,7 +480,17 @@ const server = createServer(async (request, response) => {
   };
   try {
     if (request.url !== '/health' && !authorized(request)) return reply(401, { error: 'Unauthorized.' });
-    reply(200, await route(request));
+    const result = await route(request);
+    if (result instanceof Picture) {
+      response.writeHead(200, {
+        'content-type': result.type,
+        'cache-control': 'private, max-age=3600',
+        'content-length': result.bytes.length,
+      });
+      response.end(result.bytes);
+      return;
+    }
+    reply(200, result);
   } catch (error) {
     if (error instanceof HttpError) return reply(error.status, { error: error.message });
     log.error(error, 'request failed');

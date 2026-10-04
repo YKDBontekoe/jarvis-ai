@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -108,8 +109,7 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
         setState(() {
           _live = false;
           _state = 'unreachable';
-          _refreshError =
-              'Could not refresh chats. Showing the last saved list; retrying automatically.';
+          _refreshError = 'Could not refresh chats. Showing the last saved list; retrying automatically.';
         });
         return;
       }
@@ -149,7 +149,8 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
     });
     try {
       await widget.http.put<dynamic>(
-        whatsAppChatPath(widget.channelId, chat.chatId),
+        whatsAppChatPath(widget.channelId),
+        queryParameters: whatsAppChatQuery(chat.chatId),
         data: {
           'name': chat.name,
           'readAlong': on,
@@ -360,9 +361,8 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
                       children: [
                         Text(
                           'A little help with your chats.',
-                          style: JarvisType.displayOf(
-                            context,
-                          ).copyWith(fontSize: 30),
+                          style: JarvisType.displayOf(context)
+                              .copyWith(fontSize: 30),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -479,6 +479,8 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
                     saving: _saving,
                     onToggle: _setReadAlong,
                     onOpen: _open,
+                    http: widget.http,
+                    channelId: widget.channelId,
                   ),
                 if (people.isNotEmpty)
                   _Section(
@@ -486,6 +488,8 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
                     chats: people,
                     saving: _saving,
                     onToggle: _setReadAlong,
+                    http: widget.http,
+                    channelId: widget.channelId,
                   ),
                 if (groups.isNotEmpty)
                   _Section(
@@ -493,6 +497,8 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
                     chats: groups,
                     saving: _saving,
                     onToggle: _setReadAlong,
+                    http: widget.http,
+                    channelId: widget.channelId,
                   ),
               ] else ...[
                 if (visible.isEmpty)
@@ -532,7 +538,11 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                       onTap: () => unawaited(_open(chat)),
-                      child: _ConversationRow(chat: chat),
+                      child: _ConversationRow(
+                        chat: chat,
+                        http: widget.http,
+                        channelId: widget.channelId,
+                      ),
                     ),
                   ),
               ],
@@ -545,8 +555,14 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
 }
 
 class _ConversationRow extends StatelessWidget {
-  const _ConversationRow({required this.chat});
+  const _ConversationRow({
+    required this.chat,
+    required this.http,
+    required this.channelId,
+  });
   final WhatsAppChat chat;
+  final Dio http;
+  final String channelId;
 
   @override
   Widget build(BuildContext context) {
@@ -562,7 +578,7 @@ class _ConversationRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        ChatAvatar(chat: chat, size: 46),
+        ChatAvatar(chat: chat, http: http, channelId: channelId, size: 46),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
@@ -651,6 +667,8 @@ class _Section extends StatelessWidget {
     required this.chats,
     required this.saving,
     required this.onToggle,
+    required this.http,
+    required this.channelId,
     this.onOpen,
   });
 
@@ -659,6 +677,8 @@ class _Section extends StatelessWidget {
   final Set<String> saving;
   final Future<void> Function(WhatsAppChat chat, bool on) onToggle;
   final Future<void> Function(WhatsAppChat chat)? onOpen;
+  final Dio http;
+  final String channelId;
 
   @override
   Widget build(BuildContext context) => ContentWidth(
@@ -674,6 +694,8 @@ class _Section extends StatelessWidget {
               for (final chat in chats)
                 _ChatRow(
                   chat: chat,
+                  http: http,
+                  channelId: channelId,
                   saving: saving.contains(chat.chatId),
                   onToggle: (on) => unawaited(onToggle(chat, on)),
                   onOpen: onOpen == null
@@ -691,12 +713,16 @@ class _Section extends StatelessWidget {
 class _ChatRow extends StatelessWidget {
   const _ChatRow({
     required this.chat,
+    required this.http,
+    required this.channelId,
     required this.saving,
     required this.onToggle,
     this.onOpen,
   });
 
   final WhatsAppChat chat;
+  final Dio http;
+  final String channelId;
   final bool saving;
   final ValueChanged<bool> onToggle;
   final VoidCallback? onOpen;
@@ -718,7 +744,7 @@ class _ChatRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
         child: Row(
           children: [
-            ChatAvatar(chat: chat),
+            ChatAvatar(chat: chat, http: http, channelId: channelId),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -817,35 +843,158 @@ class _ChatRow extends StatelessWidget {
   }
 }
 
-/// Round initials avatar; groups get a people glyph.
-class ChatAvatar extends StatelessWidget {
-  const ChatAvatar({required this.chat, this.size = 42, super.key});
+/// Round picture, or initials when WhatsApp has no picture. Groups without a
+/// picture get a people glyph.
+class ChatAvatar extends StatefulWidget {
+  const ChatAvatar({
+    this.chat,
+    this.http,
+    this.channelId,
+    this.subject,
+    this.initials,
+    this.group = false,
+    this.size = 42,
+    super.key,
+  });
 
-  final WhatsAppChat chat;
+  final WhatsAppChat? chat;
+  final Dio? http;
+  final String? channelId;
+
+  /// Chat id or participant id whose picture to load. Defaults to [chat].
+  final String? subject;
+  final String? initials;
+  final bool group;
   final double size;
+
+  @override
+  State<ChatAvatar> createState() => _ChatAvatarState();
+}
+
+class _ChatAvatarState extends State<ChatAvatar> {
+  Uint8List? _image;
+  String? _requested;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(ChatAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final subject = _subject;
+    if (subject != _requested) _load();
+  }
+
+  String? get _subject => widget.subject ?? widget.chat?.chatId;
+
+  void _load() {
+    final http = widget.http;
+    final channelId = widget.channelId;
+    final subject = _subject;
+    _requested = subject;
+    if (http == null ||
+        channelId == null ||
+        subject == null ||
+        subject.isEmpty) {
+      return;
+    }
+    WhatsAppPictures.load(http, channelId, subject).then((bytes) {
+      if (!mounted || bytes == null || _requested != subject) return;
+      setState(() => _image = bytes);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     final color = colors.inkSoft;
+    final group = widget.chat?.isGroup ?? widget.group;
+    final letters = widget.initials ?? widget.chat?.initials ?? '#';
+    final image = _image;
     return Container(
-      width: size,
-      height: size,
+      width: widget.size,
+      height: widget.size,
       alignment: Alignment.center,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: colors.surfaceRaised,
       ),
-      child: chat.isGroup
-          ? Icon(PhosphorIconsRegular.users, size: size * .45, color: color)
-          : Text(
-              chat.initials,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w700,
-                fontSize: size * .36,
-              ),
-            ),
+      child: image != null
+          ? Image.memory(
+              image,
+              key: ValueKey('whatsapp-picture-$_subject'),
+              width: widget.size,
+              height: widget.size,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              errorBuilder: (_, _, _) => _fallback(group, letters, color),
+            )
+          : _fallback(group, letters, color),
     );
+  }
+
+  Widget _fallback(bool group, String letters, Color color) => group
+      ? Icon(PhosphorIconsRegular.users, size: widget.size * .45, color: color)
+      : Text(
+          letters,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w700,
+            fontSize: widget.size * .36,
+          ),
+        );
+}
+
+/// Session cache so a group does not download the same face for every message.
+class WhatsAppPictures {
+  static final _memory = <String, Uint8List?>{};
+  static final _loading = <String, Future<Uint8List?>>{};
+
+  static void clear() {
+    _memory.clear();
+    _loading.clear();
+  }
+
+  static Future<Uint8List?> load(Dio http, String channelId, String subject) {
+    final key = '$channelId\n$subject';
+    if (_memory.containsKey(key)) return Future.value(_memory[key]);
+    return _loading[key] ??= _fetch(http, channelId, subject).then(
+      (bytes) {
+        _memory[key] = bytes;
+        _loading.remove(key);
+        return bytes;
+      },
+      onError: (_) {
+        _loading.remove(key);
+        return null;
+      },
+    );
+  }
+
+  static Future<Uint8List?> _fetch(
+    Dio http,
+    String channelId,
+    String subject,
+  ) async {
+    try {
+      final response = await http.get<List<int>>(
+        whatsAppChatPath(channelId, action: 'picture'),
+        queryParameters: {'subject': subject},
+        options: Options(
+          responseType: ResponseType.bytes,
+          receiveTimeout: const Duration(seconds: 15),
+        ),
+      );
+      final data = response.data;
+      if (data == null || data.isEmpty) return null;
+      return Uint8List.fromList(data);
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) return null;
+      rethrow;
+    }
   }
 }

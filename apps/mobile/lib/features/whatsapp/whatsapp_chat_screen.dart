@@ -53,7 +53,11 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
   String? _refreshError;
   String? _markedMessage;
 
-  String get _path => whatsAppChatPath(widget.channelId, _chat.chatId);
+  String _path([String? action]) =>
+      whatsAppChatPath(widget.channelId, action: action);
+
+  Map<String, dynamic> _query([Map<String, dynamic>? extra]) =>
+      whatsAppChatQuery(_chat.chatId, extra);
 
   @override
   void initState() {
@@ -173,8 +177,8 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
 
   Future<List<WhatsAppMessage>> _fetchPage({String? beforeId}) async {
     final response = await widget.http.get<dynamic>(
-      '$_path/messages',
-      queryParameters: beforeId == null ? null : {'beforeId': beforeId},
+      _path('messages'),
+      queryParameters: _query(beforeId == null ? null : {'beforeId': beforeId}),
     );
     if (response.data is! List) {
       throw const FormatException('Invalid message list');
@@ -215,7 +219,8 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     if (_markedMessage == newestReceived.id) return;
     try {
       await widget.http.post<dynamic>(
-        '$_path/read',
+        _path('read'),
+        queryParameters: _query(),
         data: {'messageId': newestReceived.id},
       );
       _markedMessage = newestReceived.id;
@@ -254,7 +259,11 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
     try {
-      await widget.http.post<dynamic>('$_path/send', data: {'text': text});
+      await widget.http.post<dynamic>(
+        _path('send'),
+        queryParameters: _query(),
+        data: {'text': text},
+      );
       if (!mounted) return;
       _composer.clear();
       unawaited(_load(quiet: true));
@@ -284,7 +293,8 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     setState(() => _drafting = true);
     try {
       final response = await widget.http.post<dynamic>(
-        '$_path/suggest',
+        _path('suggest'),
+        queryParameters: _query(),
         data: {'instruction': instruction},
         options: Options(receiveTimeout: const Duration(seconds: 75)),
       );
@@ -313,7 +323,8 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _AskSheet(http: widget.http, path: _path, chat: _chat),
+      builder: (_) =>
+          _AskSheet(http: widget.http, path: _path('ask'), chat: _chat),
     );
     if (reply == null || !mounted) return;
     _composer.value = TextEditingValue(
@@ -332,7 +343,8 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     );
     try {
       await widget.http.put<dynamic>(
-        _path,
+        _path(),
+        queryParameters: _query(),
         data: {
           'name': _chat.name,
           'readAlong': _chat.readAlong,
@@ -369,7 +381,10 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     if (confirmed != true || !mounted) return;
     try {
       ++_requestRevision;
-      await widget.http.delete<void>('$_path/messages');
+      await widget.http.delete<void>(
+        _path('messages'),
+        queryParameters: _query(),
+      );
       ++_requestRevision;
       if (mounted) {
         setState(() {
@@ -409,7 +424,12 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
-            ChatAvatar(chat: _chat, size: 40),
+            ChatAvatar(
+              chat: _chat,
+              http: widget.http,
+              channelId: widget.channelId,
+              size: 40,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -499,6 +519,8 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
                     child: _MessageList(
                       messages: _messages,
                       isGroup: _chat.isGroup,
+                      http: widget.http,
+                      channelId: widget.channelId,
                       controller: _scroll,
                       hasOlder: _hasOlder,
                       loadingOlder: _loadingOlder,
@@ -524,6 +546,8 @@ class _MessageList extends StatelessWidget {
   const _MessageList({
     required this.messages,
     required this.isGroup,
+    required this.http,
+    required this.channelId,
     required this.controller,
     required this.hasOlder,
     required this.loadingOlder,
@@ -532,6 +556,8 @@ class _MessageList extends StatelessWidget {
 
   final List<WhatsAppMessage> messages;
   final bool isGroup;
+  final Dio http;
+  final String channelId;
   final ScrollController controller;
   final bool hasOlder;
   final bool loadingOlder;
@@ -549,17 +575,22 @@ class _MessageList extends StatelessWidget {
           next != null &&
           next.fromMe == message.fromMe &&
           next.sender == message.sender &&
+          next.senderId == message.senderId &&
           next.sentAt.difference(message.sentAt).inMinutes < 5;
       items.add(
         _Bubble(
           key: ValueKey(message.id),
           message: message,
+          isGroup: isGroup,
+          http: http,
+          channelId: channelId,
           showSender:
               isGroup &&
               !message.fromMe &&
               (previous == null ||
                   previous.fromMe ||
-                  previous.sender != message.sender),
+                  previous.sender != message.sender ||
+                  previous.senderId != message.senderId),
           tight: grouped,
         ),
       );
@@ -623,12 +654,18 @@ class _DaySeparator extends StatelessWidget {
 class _Bubble extends StatelessWidget {
   const _Bubble({
     required this.message,
+    required this.isGroup,
+    required this.http,
+    required this.channelId,
     required this.showSender,
     required this.tight,
     super.key,
   });
 
   final WhatsAppMessage message;
+  final bool isGroup;
+  final Dio http;
+  final String channelId;
   final bool showSender;
   final bool tight;
 
@@ -639,60 +676,84 @@ class _Bubble extends StatelessWidget {
     final mine = message.fromMe;
     final background = mine ? colors.surfaceRaised : colors.surface;
     const radius = Radius.circular(20);
+    final showFace = isGroup && !mine;
     return Padding(
       padding: EdgeInsets.only(top: tight ? 2 : 8),
       child: Align(
         alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth: (MediaQuery.sizeOf(context).width * .78).clamp(0, 560),
+            maxWidth: (MediaQuery.sizeOf(context).width * .86).clamp(0, 620),
           ),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 11, 16, 8),
-            decoration: BoxDecoration(
-              color: background,
-              border: mine ? null : Border.all(color: colors.outline),
-              borderRadius: BorderRadius.only(
-                topLeft: radius,
-                topRight: radius,
-                bottomLeft: mine ? radius : const Radius.circular(4),
-                bottomRight: mine ? const Radius.circular(4) : radius,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (showSender && message.sender != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 2),
-                    child: Text(
-                      message.sender!,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: colors.accentDeep,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                SelectableText(
-                  message.text,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontSize: 15.5,
-                    height: 1.45,
-                  ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (showFace) ...[
+                SizedBox(
+                  width: 28,
+                  child: showSender
+                      ? ChatAvatar(
+                          http: http,
+                          channelId: channelId,
+                          subject: message.senderId,
+                          initials: whatsAppInitials(message.sender ?? ''),
+                          size: 28,
+                        )
+                      : null,
                 ),
-                const SizedBox(height: 2),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    whatsAppClock(message.sentAt),
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colors.muted,
-                      fontSize: 10.5,
-                    ),
-                  ),
-                ),
+                const SizedBox(width: 8),
               ],
-            ),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(16, 11, 16, 8),
+                  decoration: BoxDecoration(
+                    color: background,
+                    border: mine ? null : Border.all(color: colors.outline),
+                    borderRadius: BorderRadius.only(
+                      topLeft: radius,
+                      topRight: radius,
+                      bottomLeft: mine ? radius : const Radius.circular(4),
+                      bottomRight: mine ? const Radius.circular(4) : radius,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (showSender && message.sender != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Text(
+                            message.sender!,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: colors.accentDeep,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      SelectableText(
+                        message.text,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 15.5,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          whatsAppClock(message.sentAt),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colors.muted,
+                            fontSize: 10.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -939,7 +1000,8 @@ class _AskSheetState extends State<_AskSheet> {
     });
     try {
       final response = await widget.http.post<dynamic>(
-        '${widget.path}/ask',
+        widget.path,
+        queryParameters: whatsAppChatQuery(widget.chat.chatId),
         data: {'question': text},
         options: Options(receiveTimeout: const Duration(minutes: 6)),
       );
