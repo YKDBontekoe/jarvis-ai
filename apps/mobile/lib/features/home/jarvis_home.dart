@@ -11,6 +11,7 @@ import '../chat/tool_catalog.dart' show humanizeToolName;
 import '../chats/chat_list.dart';
 import '../settings/codex_sign_in_card.dart';
 import '../tiles/tile_actions.dart';
+import '../tiles/tile_card.dart' show tileRadius;
 import '../tiles/tile_controller.dart';
 import '../tiles/tile_grid.dart';
 import '../tiles/tile_models.dart';
@@ -400,7 +401,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size.fromHeight(50),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(tileRadius),
                           ),
                         ),
                       ),
@@ -437,10 +438,10 @@ class _ApprovalsBanner extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 16),
       child: Material(
         color: colors.accentSoft,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(tileRadius),
         child: InkWell(
           key: const Key('home-approvals'),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(tileRadius),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),

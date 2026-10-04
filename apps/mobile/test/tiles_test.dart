@@ -217,6 +217,7 @@ void main() {
       final data = (await load('tasks'))!;
       expect(data.stat, '2');
       expect(data.unit, 'active');
+      expect(data.subtitle, '1 needs you');
       expect(data.attention, isTrue);
       expect(data.rows.map((r) => r.text), ['Compare flights', 'Bank summary']);
       expect(data.rows.last.attention, isTrue);

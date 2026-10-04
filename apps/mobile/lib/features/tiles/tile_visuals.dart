@@ -218,9 +218,16 @@ class _TileBarChartState extends State<TileBarChart> {
 /// The day as a strip: what is on it and where the clock is. Touch an item to
 /// read what it is.
 class TileTimelineStrip extends StatefulWidget {
-  const TileTimelineStrip({required this.timeline, super.key});
+  const TileTimelineStrip({
+    required this.timeline,
+    this.caption = true,
+    super.key,
+  });
 
   final TileTimeline timeline;
+
+  /// The line above the bar naming a touched item. Small tiles leave it out.
+  final bool caption;
 
   @override
   State<TileTimelineStrip> createState() => _TileTimelineStripState();
@@ -248,25 +255,26 @@ class _TileTimelineStripState extends State<TileTimelineStrip> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          height: 15,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              selected == null
-                  ? (line.spans.isEmpty ? 'Nothing planned' : '')
-                  : '${_time(selected.startMinute)}  ${selected.label}',
-              key: const Key('timeline-caption'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: selected == null ? colors.muted : colors.ink,
+        if (widget.caption)
+          SizedBox(
+            height: 15,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                selected == null
+                    ? (line.spans.isEmpty ? 'Nothing planned' : '')
+                    : '${_time(selected.startMinute)}  ${selected.label}',
+                key: const Key('timeline-caption'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: selected == null ? colors.muted : colors.ink,
+                ),
               ),
             ),
           ),
-        ),
         SizedBox(
           height: 22,
           child: LayoutBuilder(

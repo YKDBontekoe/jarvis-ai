@@ -542,11 +542,15 @@ Future<TileData?> _tasks(TileEnv env) async {
     'waiting' => 'Waiting',
     _ => 'Queued',
   };
-  final needs = active.any((t) => t['status'] == 'needs_approval');
+  final waiting = active.where((t) => t['status'] == 'needs_approval').length;
+  final needs = waiting > 0;
   return TileData(
     stat: '${active.length}',
     unit: 'active',
-    subtitle: _first(active.first, ['title']),
+    // Say why the tile is marked rather than leave a bare dot.
+    subtitle: needs
+        ? '$waiting ${_plural(waiting, 'needs', 'need')} you'
+        : _first(active.first, ['title']),
     attention: needs,
     rows: [
       for (final task in active.take(_maxRows))

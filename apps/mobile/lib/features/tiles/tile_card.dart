@@ -57,8 +57,12 @@ class TileCard extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: colors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: colors.outline),
+          borderRadius: BorderRadius.circular(tileRadius),
+          // Light tiles float on a soft shadow; dark ones need an edge.
+          border: colors.isDark
+              ? Border.all(color: colors.outline.withValues(alpha: .6))
+              : null,
+          boxShadow: JarvisShadows.soft(colors.brightness),
         ),
         child: _content(),
       ),
@@ -93,6 +97,45 @@ class TileCard extends StatelessWidget {
         pending: pending,
       ),
     };
+  }
+}
+
+/// How tall a tile's name row is, with its icon chip.
+const _labelHeight = 24.0;
+
+/// Corner radius of every tile.
+const tileRadius = 24.0;
+
+/// The colour a feature's icon is drawn in, by what kind of feature it is.
+Color tileTint(TileSpec spec, JarvisColors colors) => switch (spec.category) {
+  TileCategory.plan => colors.accent,
+  TileCategory.talk => colors.sky,
+  TileCategory.know => colors.violet,
+  TileCategory.money => colors.success,
+  TileCategory.automate => colors.warning,
+  TileCategory.system => colors.inkSoft,
+};
+
+/// A feature's icon on a soft square of its colour.
+class TileIconChip extends StatelessWidget {
+  const TileIconChip({required this.spec, this.size = 24, super.key});
+
+  final TileSpec spec;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final tint = tileTint(spec, colors);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: tint.withValues(alpha: colors.isDark ? .18 : .11),
+        borderRadius: BorderRadius.circular(size * .32),
+      ),
+      child: Icon(spec.icon, size: size * .56, color: tint),
+    );
   }
 }
 
@@ -177,10 +220,13 @@ class _IconTile extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (info.visual == TileVisual.waveform)
-                TileWaveform(color: colors.accent)
+                SizedBox(
+                  height: 40,
+                  child: Center(child: TileWaveform(color: colors.accent)),
+                )
               else
-                Icon(spec.icon, size: 24, color: colors.inkSoft),
-              const SizedBox(height: 7),
+                TileIconChip(spec: spec, size: 40),
+              const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
@@ -190,11 +236,12 @@ class _IconTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -.1,
                     color: info.visual == TileVisual.waveform
                         ? colors.accent
-                        : colors.inkSoft,
+                        : colors.ink,
                     height: 1,
                   ),
                 ),
@@ -237,24 +284,29 @@ class _StripTile extends StatelessWidget {
           if (live)
             TileWaveform(color: colors.accent, height: 22)
           else
-            Icon(spec.icon, size: 22, color: colors.inkSoft),
+            TileIconChip(spec: spec, size: 30),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _AnimatedText(
-                  TextSpan(
-                    text: headline,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -.1,
-                      color: colors.ink,
+                // A long figure shrinks a little rather than lose its unit.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: _AnimatedText(
+                    TextSpan(
+                      text: headline,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -.1,
+                        color: colors.ink,
+                      ),
                     ),
+                    keyText: headline,
                   ),
-                  keyText: headline,
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -304,41 +356,69 @@ class _Label extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
-    return LayoutBuilder(
-      builder: (context, box) => Row(
-        children: [
-          Icon(spec.icon, size: 15, color: colors.muted),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              spec.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w500,
-                color: colors.muted,
-              ),
-            ),
-          ),
-          if (trailing != null)
-            ConstrainedBox(
-              // Room for a count; a long unit gives way to the name.
-              constraints: BoxConstraints(maxWidth: box.maxWidth * .55),
+    // A fixed height, so tiles can count on it when they fit rows below.
+    return SizedBox(
+      height: _labelHeight,
+      child: LayoutBuilder(
+        builder: (context, box) => Row(
+          children: [
+            TileIconChip(spec: spec),
+            const SizedBox(width: 8),
+            Expanded(
               child: Text(
-                trailing!,
+                spec.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: info.attention ? colors.accent : colors.muted,
+                  letterSpacing: -.1,
+                  color: colors.inkSoft,
                 ),
               ),
-            )
-          else if (info.attention)
-            const _Dot(),
-        ],
+            ),
+            if (trailing != null)
+              ConstrainedBox(
+                // Room for a count; a long unit gives way to the name.
+                constraints: BoxConstraints(maxWidth: box.maxWidth * .55),
+                child: _Badge(text: trailing!, strong: info.attention),
+              )
+            else if (info.attention)
+              const _Dot(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A small rounded count, such as "2 unread".
+class _Badge extends StatelessWidget {
+  const _Badge({required this.text, required this.strong});
+
+  final String text;
+
+  /// Needs the person: drawn in the accent colour.
+  final bool strong;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: strong ? colors.accentSoft : colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+          color: strong ? colors.accent : colors.inkSoft,
+        ),
       ),
     );
   }
@@ -599,7 +679,7 @@ class _SquareTile extends StatelessWidget {
           ),
           keyText: sub,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         _ActionRow(
           actions: info.actions,
           onAction: onAction,
@@ -625,13 +705,13 @@ class _SquareTile extends StatelessWidget {
             child: _AnimatedText(
               TextSpan(
                 text: info.stat,
-                style: _stat(colors, size: 34),
+                style: _stat(colors, size: 36),
                 children: [
                   if (info.unit != null)
                     TextSpan(
                       text: ' ${info.unit}',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 14,
                         fontWeight: FontWeight.w500,
                         letterSpacing: 0,
                         color: colors.muted,
@@ -642,24 +722,56 @@ class _SquareTile extends StatelessWidget {
               keyText: '${info.stat}${info.unit}',
             ),
           ),
-        if (info.stat != null) const Spacer(),
+        // Between the number and the detail: the day's timeline when there
+        // is room for it, otherwise air.
+        if (info.stat != null)
+          Expanded(
+            child:
+                info.visual == TileVisual.timeline &&
+                    (info.timeline?.spans.isNotEmpty ?? false)
+                ? LayoutBuilder(
+                    // The strip is the bar and its hours.
+                    builder: (context, box) =>
+                        box.maxHeight <
+                            MediaQuery.textScalerOf(context).scale(14) + 34
+                        ? const SizedBox.shrink()
+                        : Align(
+                            alignment: Alignment.bottomLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: TileTimelineStrip(
+                                timeline: info.timeline!,
+                                caption: false,
+                              ),
+                            ),
+                          ),
+                  )
+                : const SizedBox.shrink(),
+          ),
         if (info.visual == TileVisual.waveform)
           _LiveStatus(text: subtitle ?? '')
         else if (subtitle != null) ...[
           if (info.stat == null) const SizedBox(height: 5),
           Text(
             subtitle,
+            // A countdown reads on one line; a long name may take two.
             maxLines: info.stat == null
                 ? 3
-                : info.progress != null
+                : info.progress != null || info.countdownTo != null
                 ? 1
                 : 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: info.stat == null ? 15 : 12.5,
-              fontWeight: info.stat == null ? FontWeight.w600 : null,
+              fontWeight: info.stat == null || info.attention
+                  ? FontWeight.w600
+                  : FontWeight.w500,
               height: 1.3,
-              color: info.stat == null ? colors.ink : colors.inkSoft,
+              color: info.stat == null
+                  ? colors.ink
+                  : info.attention
+                  ? colors.accent
+                  : colors.inkSoft,
             ),
           ),
         ],
@@ -717,12 +829,16 @@ class _ListTile extends StatelessWidget {
           final live = info.visual == TileVisual.waveform;
           final status = live ? 26.0 : 0.0;
           final room =
-              box.maxHeight - 18 - 8 - status - (showHeadline ? 56 : 0);
+              box.maxHeight -
+              _labelHeight -
+              8 -
+              status -
+              (showHeadline ? 56 : 0);
           // A picture is worth more than rows once there is room for both.
           final showPicture = picture > 0 && room >= picture + 4;
           final used =
               status +
-              18 +
+              _labelHeight +
               8 +
               (showHeadline ? 56 : 0) +
               (showPicture ? picture + 6 : 0);

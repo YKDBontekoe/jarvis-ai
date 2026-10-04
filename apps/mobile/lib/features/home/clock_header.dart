@@ -49,9 +49,10 @@ class ClockHeader extends StatelessWidget {
               child: Text(
                 longDate(now),
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: colors.muted,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -.1,
+                  color: colors.inkSoft,
                 ),
               ),
             ),
@@ -69,25 +70,18 @@ class ClockHeader extends StatelessWidget {
                 child: const Text('Done'),
               )
             else ...[
-              IconButton(
+              _RoundIcon(
                 key: const Key('home-edit'),
                 tooltip: 'Edit Home',
+                icon: PhosphorIconsRegular.sliders,
                 onPressed: onEdit,
-                icon: Icon(
-                  PhosphorIconsRegular.sliders,
-                  size: 20,
-                  color: colors.inkSoft,
-                ),
               ),
-              IconButton(
+              const SizedBox(width: 8),
+              _RoundIcon(
                 key: const Key('home-settings'),
                 tooltip: 'Settings',
+                icon: PhosphorIconsRegular.userCircle,
                 onPressed: onSettings,
-                icon: Icon(
-                  PhosphorIconsRegular.userCircle,
-                  size: 22,
-                  color: colors.inkSoft,
-                ),
               ),
             ],
           ],
@@ -101,8 +95,7 @@ class ClockHeader extends StatelessWidget {
             children: [
               const SizedBox(height: 6),
               Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Text(
                     clockTime(item?.start ?? now),
@@ -112,19 +105,29 @@ class ClockHeader extends StatelessWidget {
                     style: JarvisType.clock(colors.ink),
                   ),
                   if (item != null) ...[
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Flexible(
                       child: AnimatedSwitcher(
                         duration: JarvisMotion.of(context, JarvisMotion.base),
-                        child: Text(
-                          countdownLabel(item.start, now),
+                        child: Container(
                           key: ValueKey(countdownLabel(item.start, now)),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            color: colors.accent,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.accentSoft,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            countdownLabel(item.start, now),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              color: colors.accent,
+                            ),
                           ),
                         ),
                       ),
@@ -139,9 +142,10 @@ class ClockHeader extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.w600,
-                  letterSpacing: -.3,
+                  letterSpacing: -.4,
+                  height: 1.25,
                   color: colors.ink,
                 ),
               ),
@@ -193,6 +197,47 @@ class ClockHeader extends StatelessWidget {
             ],
           ),
       ],
+    );
+  }
+}
+
+/// A small round button on the canvas, such as Settings.
+class _RoundIcon extends StatelessWidget {
+  const _RoundIcon({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Tooltip(
+      message: tooltip,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surface,
+          shape: BoxShape.circle,
+          border: colors.isDark ? Border.all(color: colors.outline) : null,
+          boxShadow: JarvisShadows.hairline(colors.brightness),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onPressed,
+            child: SizedBox.square(
+              dimension: 40,
+              child: Icon(icon, size: 19, color: colors.ink),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
