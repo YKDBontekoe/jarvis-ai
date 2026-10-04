@@ -884,8 +884,14 @@ class _ChatAvatarState extends State<ChatAvatar> {
   @override
   void didUpdateWidget(ChatAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final subject = _subject;
-    if (subject != _requested) _load();
+    final subjectChanged = _subject != _requested;
+    final sourceChanged =
+        widget.channelId != oldWidget.channelId ||
+        widget.http != oldWidget.http;
+    if (!subjectChanged && !sourceChanged) return;
+    // Drop a picture from the previous account before asking for the new one.
+    if (sourceChanged) _image = null;
+    _load();
   }
 
   String? get _subject => widget.subject ?? widget.chat?.chatId;
@@ -894,6 +900,9 @@ class _ChatAvatarState extends State<ChatAvatar> {
     final http = widget.http;
     final channelId = widget.channelId;
     final subject = _subject;
+    // A reused row must not keep the previous person's face while the next
+    // picture is still loading, or when that chat has no picture.
+    if (subject != _requested) _image = null;
     _requested = subject;
     if (http == null ||
         channelId == null ||
@@ -901,8 +910,11 @@ class _ChatAvatarState extends State<ChatAvatar> {
         subject.isEmpty) {
       return;
     }
+    final known = WhatsAppPictures.cached(channelId, subject);
+    if (known != null) _image = known;
     WhatsAppPictures.load(http, channelId, subject).then((bytes) {
       if (!mounted || bytes == null || _requested != subject) return;
+      if (identical(_image, bytes)) return;
       setState(() => _image = bytes);
     });
   }
@@ -958,6 +970,10 @@ class WhatsAppPictures {
     _memory.clear();
     _loading.clear();
   }
+
+  /// Picture already fetched this session, or null when it is unknown or absent.
+  static Uint8List? cached(String channelId, String subject) =>
+      _memory['$channelId\n$subject'];
 
   static Future<Uint8List?> load(Dio http, String channelId, String subject) {
     final key = '$channelId\n$subject';

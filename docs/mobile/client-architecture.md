@@ -84,7 +84,7 @@ Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide
 - **Quick actions** (`tile_actions.dart`): reminders Done / +10 min, habits Check in / Undo, approvals Decline. `applyTileAction` updates the tile at once, then `runTileAction` calls the API and Home reloads; a failure restores the tile and shows a snackbar. Approvals can only be declined or reviewed on a tile; approving always happens on the approvals page.
 - Long-press a tile for a menu (resize, edit Home, remove). In edit mode drag to reorder. Home waits for the saved layout (`TileLayoutController.ready`) before drawing the grid.
 
-**Chats** merges the Jarvis conversation list the shell already loads with the chats of every linked WhatsApp account (`/api/v1/channels` → `/chats`). WhatsApp unread counts drive the dot on the Chats tab and the Chats tile. Signal has no chat-list endpoint, so it is not in this list; manage it under Channels. Jarvis conversations have no preview text yet because `GET /conversations` returns none.
+**Chats** merges the Jarvis conversation list the shell already loads with the chats of every linked WhatsApp account (`/api/v1/channels` → `/chats`). WhatsApp rows load the same profile picture as the open chat (`GET …/chats/open/picture`) and fall back to initials when WhatsApp has none. WhatsApp unread counts drive the dot on the Chats tab and the Chats tile. Signal has no chat-list endpoint, so it is not in this list; manage it under Channels. Jarvis conversations have no preview text yet because `GET /conversations` returns none.
 
 ## Screenshots and layout audit
 
