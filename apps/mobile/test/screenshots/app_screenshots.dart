@@ -118,6 +118,7 @@ void main() {
     screenshotTest('edit home $mode', (tester) async {
       usePhone(tester);
       await start(tester, dark: dark);
+      await tester.ensureVisible(find.byKey(const Key('home-edit')));
       await tester.tap(find.byKey(const Key('home-edit')));
       await settle(tester);
       await capture(tester, '33-edit-home-$mode');
@@ -154,10 +155,7 @@ void main() {
       usePhone(tester);
       await start(tester);
       await openFeature(tester, label);
-      await capture(
-        tester,
-        '${index.toString().padLeft(2, '0')}-$label',
-      );
+      await capture(tester, '${index.toString().padLeft(2, '0')}-$label');
     });
   }
 
@@ -180,7 +178,9 @@ void main() {
   for (final dark in [false, true]) {
     screenshotTest('components ${dark ? 'dark' : 'light'}', (tester) async {
       usePhone(tester);
-      final input = TextEditingController(text: 'Find a quiet fado bar near Alfama');
+      final input = TextEditingController(
+        text: 'Find a quiet fado bar near Alfama',
+      );
       addTearDown(input.dispose);
       await tester.pumpWidget(
         RepaintBoundary(
@@ -200,7 +200,8 @@ void main() {
                       const MessageBubble(
                         message: MessageEntry(
                           role: 'user',
-                          content: 'Find a quiet fado bar near Alfama for Saturday.',
+                          content:
+                              'Find a quiet fado bar near Alfama for Saturday.',
                         ),
                       ),
                       ToolRunView(
@@ -246,7 +247,9 @@ void main() {
                       ),
                       const SizedBox(height: 12),
                       ChatComposer(
-                        controller: TextEditingController(text: 'Book it for 21:00'),
+                        controller: TextEditingController(
+                          text: 'Book it for 21:00',
+                        ),
                         onSend: () {},
                         onVoice: () {},
                         onAttach: () {},
@@ -282,8 +285,12 @@ void main() {
             body: EmptyState(
               icon: PhosphorIconsRegular.notebook,
               title: 'Nothing written yet',
-              message: 'Tell Jarvis about your day and it keeps the notes here.',
-              action: FilledButton(onPressed: () {}, child: const Text('Write today')),
+              message:
+                  'Tell Jarvis about your day and it keeps the notes here.',
+              action: FilledButton(
+                onPressed: () {},
+                child: const Text('Write today'),
+              ),
             ),
           ),
         ),
@@ -346,7 +353,9 @@ void main() {
     usePhone(tester);
     await start(tester);
     await openTab(tester, 'chats');
-    await tester.tap(find.byKey(const Key('chats-search')));
+    await tester.tap(find.byKey(const Key('chats-more')));
+    await settle(tester);
+    await tester.tap(find.text('Search everything'));
     await settle(tester);
     await capture(tester, '29-search');
     await tester.enterText(find.byType(TextField).first, 'herin');

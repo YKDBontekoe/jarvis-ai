@@ -1,61 +1,14 @@
-import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Answers by "METHOD /path" (exact, then by longest matching prefix) and
-/// logs everything it could not answer so fixtures are easy to fill in.
-class ScreenshotHttp implements HttpClientAdapter {
-  ScreenshotHttp(this.routes);
-
-  final Map<String, Object?> routes;
-  final Set<String> missing = {};
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    final key = '${options.method} ${options.path}';
-    Object? body;
-    var found = false;
-    if (routes.containsKey(key)) {
-      body = routes[key];
-      found = true;
-    } else {
-      final prefixes = routes.keys.where(
-        (route) =>
-            route.endsWith('*') &&
-            key.startsWith(route.substring(0, route.length - 1)),
-      );
-      if (prefixes.isNotEmpty) {
-        final best = prefixes.reduce((a, b) => a.length >= b.length ? a : b);
-        body = routes[best];
-        found = true;
-      }
-    }
-    if (!found) missing.add(key);
-    return ResponseBody.fromString(
-      jsonEncode(
-        body ?? (options.method == 'GET' ? <Object>[] : <String, Object>{}),
-      ),
-      found ? 200 : (options.method == 'GET' ? 404 : 200),
-      headers: {
-        Headers.contentTypeHeader: [Headers.jsonContentType],
-      },
-    );
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
+export 'fixture_adapter.dart';
 
 Future<void> loadAppFonts() async {
   final fonts = <String, List<String>>{
@@ -115,6 +68,11 @@ Future<void> loadAppFonts() async {
     ),
   );
   await roboto.load();
+  final cupertino = FontLoader('packages/cupertino_icons/CupertinoIcons')
+    ..addFont(
+      rootBundle.load('packages/cupertino_icons/assets/CupertinoIcons.ttf'),
+    );
+  await cupertino.load();
 }
 
 final screenshotKey = GlobalKey();
@@ -135,6 +93,19 @@ void useDesktop(WidgetTester tester, {Size size = const Size(1440, 900)}) {
 }
 
 Future<void> capture(WidgetTester tester, String name) async {
+  // Asset decoding happens outside the fake clock. Wait for mounted asset
+  // images, including resized orbs, before painting the first screenshot.
+  await tester.runAsync(() async {
+    await Future.wait([
+      for (final element in find.byType(Image).evaluate())
+        if ((element.widget as Image).image case final provider
+            when provider is AssetImage ||
+                (provider is ResizeImage &&
+                    provider.imageProvider is AssetImage))
+          _waitForImage(provider, element),
+    ]);
+  });
+  await tester.pump();
   final dir = Directory(
     Platform.environment['SCREENSHOT_DIR'] ?? 'build/screenshots',
   )..createSync(recursive: true);
@@ -148,6 +119,25 @@ Future<void> capture(WidgetTester tester, String name) async {
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     File('${dir.path}/$name.png').writeAsBytesSync(data!.buffer.asUint8List());
   });
+}
+
+Future<void> _waitForImage(ImageProvider provider, BuildContext context) async {
+  final stream = provider.resolve(createLocalImageConfiguration(context));
+  final ready = Completer<void>();
+  final listener = ImageStreamListener(
+    (_, _) {
+      if (!ready.isCompleted) ready.complete();
+    },
+    onError: (Object error, StackTrace? trace) {
+      if (!ready.isCompleted) ready.completeError(error, trace);
+    },
+  );
+  stream.addListener(listener);
+  try {
+    await ready.future;
+  } finally {
+    stream.removeListener(listener);
+  }
 }
 
 void mockPlatformChannels() {

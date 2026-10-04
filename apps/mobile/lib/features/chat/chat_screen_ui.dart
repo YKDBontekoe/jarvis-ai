@@ -210,7 +210,6 @@ mixin _ChatScreenUi on _ChatScreenController {
       onOpen: _openTile,
       onOpenChat: _openChatByKey,
       onAddTile: () => _selectTab(JarvisTab.everything),
-      onSettings: () => _selectTab(JarvisTab.you),
       onSuggestion: _conversationId == null || _busy || _hasPendingApproval
           ? null
           : (text) {

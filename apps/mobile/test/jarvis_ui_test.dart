@@ -11,6 +11,112 @@ Widget _host(Widget child) => MaterialApp(
 );
 
 void main() {
+  testWidgets('rapid content changes leave only the latest interactive page', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final page = ValueNotifier(0);
+    addTearDown(page.dispose);
+    final opened = <int>[];
+    await tester.pumpWidget(
+      _host(
+        ValueListenableBuilder<int>(
+          valueListenable: page,
+          builder: (context, value, _) => MotionSwitcher(
+            child: SizedBox(
+              key: ValueKey(value),
+              width: 200,
+              height: 200,
+              child: TextButton(
+                onPressed: () => opened.add(value),
+                child: Text('Page $value'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    page.value = 1;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 40));
+    expect(find.bySemanticsLabel('Page 0'), findsNothing);
+    page.value = 2;
+    await tester.pump();
+    await tester.tapAt(tester.getCenter(find.text('Page 2')));
+    expect(opened, [2]);
+    await tester.pumpAndSettle();
+    expect(find.text('Page 0'), findsNothing);
+    expect(find.text('Page 1'), findsNothing);
+    expect(find.text('Page 2'), findsOneWidget);
+    expect(tester.hasRunningAnimations, isFalse);
+    semantics.dispose();
+  });
+
+  testWidgets('cancelled presses release feedback without activating', (
+    tester,
+  ) async {
+    var activations = 0;
+    await tester.pumpWidget(
+      _host(
+        Center(
+          child: PressFeedback(
+            builder: (context, highlight) => InkWell(
+              onTap: () => activations++,
+              onHighlightChanged: highlight,
+              child: const SizedBox(
+                width: 150,
+                height: 50,
+                child: Text('Press'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('Press')),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    final scale = tester.widget<AnimatedScale>(find.byType(AnimatedScale));
+    expect(scale.scale, lessThan(1));
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+    expect(activations, 0);
+    expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale, 1);
+  });
+
+  testWidgets('Reduce Motion keeps pressed surfaces still and functional', (
+    tester,
+  ) async {
+    var activations = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildJarvisTheme(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(disableAnimations: true),
+          child: child!,
+        ),
+        home: Scaffold(
+          body: Center(
+            child: SurfaceCard(
+              onTap: () => activations++,
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('Open')),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale, 1);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(activations, 1);
+    expect(tester.hasRunningAnimations, isFalse);
+  });
+
   test('status styles share labels and colors across screens', () {
     expect(statusStyle('needs_approval').label, 'Needs approval');
     expect(statusStyle('needs_approval').color, JarvisColors.light.warning);

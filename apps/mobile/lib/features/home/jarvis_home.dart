@@ -21,7 +21,7 @@ import 'clock_header.dart';
 import 'get_started_card.dart';
 import 'next_up.dart';
 
-/// Home: the next thing on your day as a clock, then the tiles you chose.
+/// Home: the next thing on your day, then the content and shortcuts you chose.
 class JarvisHome extends StatefulWidget {
   const JarvisHome({
     required this.source,
@@ -32,7 +32,6 @@ class JarvisHome extends StatefulWidget {
     required this.onOpen,
     required this.onOpenChat,
     required this.onAddTile,
-    required this.onSettings,
     this.onSuggestion,
     this.jarvisBusy = false,
     this.clock,
@@ -53,7 +52,6 @@ class JarvisHome extends StatefulWidget {
   /// Opens a chat from the Chats tile, by its [ChatListItem.key].
   final ValueChanged<String> onOpenChat;
   final VoidCallback onAddTile;
-  final VoidCallback onSettings;
   final ValueChanged<String>? onSuggestion;
 
   /// Jarvis is writing a reply, possibly in a conversation that is not open.
@@ -69,6 +67,7 @@ class JarvisHome extends StatefulWidget {
 class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   late final Map<String, TileData?> _data = Map.of(widget.source.cache);
   late Map<String, dynamic>? _briefing = widget.source.lastBriefing;
+  late String? _preferredName = widget.source.lastPreferredName;
   bool _editing = false;
   Timer? _tick;
   int _ticks = 0;
@@ -113,6 +112,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
       setState(() {
         _data.clear();
         _briefing = null;
+        _preferredName = null;
       });
     } else if (!oldWidget.ready ||
         oldWidget.refreshRevision != widget.refreshRevision) {
@@ -165,6 +165,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     if (!widget.ready) return;
     final generation = ++_generation;
     widget.source.invalidate();
+    unawaited(_loadPreferredName(generation));
     final briefing = await widget.source.briefing();
     if (!mounted || generation != _generation) return;
     setState(() => _briefing = briefing);
@@ -175,12 +176,42 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     ]);
   }
 
+  Future<void> _loadPreferredName(int generation) async {
+    final name = await widget.source.preferredName();
+    if (!mounted || generation != _generation) return;
+    setState(() => _preferredName = name);
+  }
+
   /// What the Chats tile shows, straight from the shared chat list.
   TileData _chatsData() {
     final chats = widget.chats;
     final items = chats.all.take(8).toList();
     final unread = chats.unreadCount;
     if (items.isEmpty) return const TileData(subtitle: 'No conversations yet');
+    (String, ChatSource, String?) identity(ChatListItem item) =>
+        (item.title, item.source, item.isJarvis ? item.preview : item.account);
+    final identities = <(String, ChatSource, String?), int>{};
+    for (final item in items) {
+      identities.update(
+        identity(item),
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
+    }
+    String contextLine(ChatListItem item) {
+      final profile = item.preview?.trim();
+      return [
+        item.isJarvis ? 'Jarvis' : 'WhatsApp',
+        if (item.isJarvis && profile?.isNotEmpty == true && profile != 'Jarvis')
+          profile!,
+        if (!item.isJarvis && item.account?.isNotEmpty == true) item.account!,
+        if (identities[identity(item)]! > 1 &&
+            item.isJarvis &&
+            item.startedAt != null)
+          '${item.startedAt!.day}/${item.startedAt!.month} · ${clockTime(item.startedAt!)}',
+      ].join(' · ');
+    }
+
     return TileData(
       stat: unread > 0 ? '$unread' : null,
       unit: unread > 0 ? 'unread' : null,
@@ -200,6 +231,19 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
             item.title,
             meta: whatsAppListTime(item.time, now: _now),
             attention: item.unread > 0,
+            target: 'chat:${item.key}',
+          ),
+      ],
+      chats: [
+        for (final item in items)
+          TileChat(
+            title: item.title,
+            context: contextLine(item),
+            preview: item.isJarvis ? null : item.preview,
+            time: whatsAppListTime(item.time, now: _now),
+            unread: item.unread,
+            isJarvis: item.isJarvis,
+            group: item.group,
             target: 'chat:${item.key}',
           ),
       ],
@@ -322,10 +366,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                   ClockHeader(
                     now: now,
                     next: upcoming.isEmpty ? null : upcoming.first,
-                    editing: _editing,
-                    onEdit: () => setState(() => _editing = true),
-                    onDone: () => setState(() => _editing = false),
-                    onSettings: widget.onSettings,
+                    preferredName: _preferredName,
                     onOpen: () => widget.onOpen('today'),
                     emptyHint: calendarOff && widget.onSuggestion != null
                         ? 'Connect a calendar'
@@ -333,7 +374,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                     onEmptyHint: () =>
                         widget.onSuggestion?.call(mcpCalendarPrompt),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 20),
                   if (!_editing && approvals.isNotEmpty)
                     _ApprovalsBanner(
                       approvals: approvals,
@@ -351,13 +392,25 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                   if (_editing)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        'Hold and drag to move. Use the corner button to change size.',
-                        key: const Key('home-edit-hint'),
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: JarvisColors.of(context).inkSoft,
-                        ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Hold and drag to move. Use the corner button to change size.',
+                              key: const Key('home-edit-hint'),
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: JarvisColors.of(context).inkSoft,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          TextButton(
+                            key: const Key('home-edit-done'),
+                            onPressed: () => setState(() => _editing = false),
+                            child: const Text('Done'),
+                          ),
+                        ],
                       ),
                     ),
                   ListenableBuilder(
@@ -390,6 +443,25 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                             onReorder: widget.layout.move,
                           ),
                   ),
+                  if (!_editing)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 20),
+                      child: Center(
+                        child: TextButton.icon(
+                          key: const Key('home-edit'),
+                          onPressed: () => setState(() => _editing = true),
+                          style: TextButton.styleFrom(
+                            foregroundColor: JarvisColors.of(context).inkSoft,
+                            minimumSize: const Size(44, 44),
+                          ),
+                          icon: const Icon(
+                            PhosphorIconsRegular.sliders,
+                            size: 16,
+                          ),
+                          label: const Text('Customize Home'),
+                        ),
+                      ),
+                    ),
                   if (_editing)
                     Padding(
                       padding: const EdgeInsets.only(top: 12),

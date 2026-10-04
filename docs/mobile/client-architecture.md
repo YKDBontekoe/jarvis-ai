@@ -19,11 +19,11 @@ root. It shares the existing account and owner-scoped data. See
 | Path | Screen / concern |
 |------|------------------|
 | `features/chat/` | Chat transcript, composer, SignalR realtime, approvals, generative UI, browser timeline |
-| `features/shell/` | Tab bar (`jarvis_tab_bar.dart`), wide-layout rail, the custom tab icons (`tab_icons.dart`), and `utility_pages.dart`, which maps a destination name to its page |
-| `features/home/` | Home: the clock header (`clock_header.dart`, `next_up.dart`), the tile grid screen (`jarvis_home.dart`), the first-run checklist |
+| `features/shell/` | Tab bar (`jarvis_tab_bar.dart`), wide-layout rail, the Cupertino tab symbols (`tab_icons.dart`), and `utility_pages.dart`, which maps a destination name to its page |
+| `features/home/` | Home: the next-event header (`clock_header.dart`, `next_up.dart`), the tile grid screen (`jarvis_home.dart`), the first-run checklist |
 | `features/tiles/` | The tile system: registry of every feature, sizes, grid packing, saved layout, live data loaders, the grid with edit mode |
 | `features/chats/` | Chats: one list of Jarvis conversations and linked WhatsApp chats (`chat_list.dart`, `chats_screen.dart`) |
-| `features/everything/` | Everything: every feature by category, with a size preview and pin-to-Home sheet |
+| `features/everything/` | Everything: compact feature launchers by category, pinned shortcuts, and the size preview / pin-to-Home sheet |
 | `features/projects/` | Projects list, project page (instructions, chats, files, tasks), editor, and the move-to-project sheet; reached from the Projects tile |
 | `features/review/` | Weekly review screen and mood trend chart |
 | `features/memory/` | Memory list/editor, knowledge graph map |
@@ -51,6 +51,8 @@ Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide
 ## Motion and visual language
 
 - `lib/ui/motion.dart` — `JarvisMotion` tokens: `fast` 150 ms (presses, icon swaps), `base` 220 ms (content changes), `slow` 320 ms (pages), `standard` ease-out curve, travel 8 px, start scale 0.98. Read timings from here instead of hardcoding durations, and use `JarvisMotion.of(context, …)` so reduced motion turns them off.
+- `MotionSwitcher` fades between shell pages and changed Home summaries; outgoing content stops receiving taps, announcing semantics and running tickers. `MotionSize` eases preview and summary height changes, laying out immediately with Reduce Motion. `PressFeedback` uses the Ink highlight lifecycle so interrupted touches release cleanly; navigation, chat rows and feature launchers share it.
+- Chats uses a native sliding tab indicator and briefly fades the filtered list. Search typing updates in place, with clear actions on both Chats and Everything. Navigation icons crossfade between outlined and selected states; the orb remains still until Jarvis is replying or listening. Tab selection and orb/preview actions have light haptics.
 - `JarvisPageTransitionsBuilder` (fade + grow + small rise) is the pushed-page transition everywhere except iOS, which keeps the native slide for the edge swipe back.
 - `lib/ui/jarvis_ui.dart` — `FadeSlideIn` for content that arrives (pass `animate: false` for rows already on screen), `SkeletonList` for loading lists (used by `ListScreenBody`), `afterRouteSettles` to open an editor once a page has finished animating in.
 - Chat: only live entries animate in (`_settledEntries` marks loaded history); home and the transcript, and the wide layout's panes, fade through each other.
@@ -58,7 +60,7 @@ Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide
 - Search and the palette list quick commands (`features/search/quick_commands.dart`): create commands before anything is typed, and matching "New …" / "Go to …" commands (English and Dutch keywords) above results.
 - While an approval waits and its card has scrolled away, an approval dock above the composer jumps back to it. The decision itself stays on the card.
 - `JarvisColors.accentGradient` (indigo → violet) is reserved for the primary send action and selection accents; `JarvisColors.scrim` dims behind sheets and dialogs.
-- Everything is Geist (bundled in `assets/fonts`, weights 300–700). Page and dialog titles use `JarvisType.display` (semibold, tight tracking); the Home clock uses `JarvisType.clock` (light, 64 pt, and it does not follow the device text size). A custom `TextStyle` that names no `fontFamily` inherits Geist from the theme, but button `textStyle`s replace the theme's, so they need `fontFamily: 'Geist'`.
+- Everything is Geist (bundled in `assets/fonts`, weights 300–700). Page and dialog titles use `JarvisType.display` (semibold, tight tracking); Home opens with a bold 32–38 pt local-time greeting and the owner’s Persona name in the existing purple accent, then the next event title at 30 pt, followed by its time and a quieter day/countdown line; the current-time fallback uses the light `JarvisType.clock` style at 32 pt. A custom `TextStyle` that names no `fontFamily` inherits Geist from the theme, but button `textStyle`s replace the theme's, so they need `fontFamily: 'Geist'`.
 - Palette is Iris: cool greys plus one indigo accent (`JarvisColors.accent`). The accent marks only what needs the person (unread, due, the primary action). `success` is the accent too; `warning` and `danger` stay for real problems. Do not add new colours for decoration.
 - Other shared pieces in `jarvis_ui.dart`: `ToolbarCapsule` (grouped top-bar buttons), `StatusChip` (quiet states such as offline), `EdgeFade` (content dissolves under header and composer), `HeroGlow` (home backdrop), `SwipeActions` (row swipe with haptics; reminders use it for done/snooze).
 
@@ -66,12 +68,12 @@ Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide
 
 `ChatScreen` (`features/chat/`) is the app shell. There is no drawer.
 
-- **Phone**: a bottom tab bar with Home, Chats, the Jarvis orb, Everything and You. The orb opens the open conversation instead of switching tabs. A conversation covers the tabs (`_inChat`); its top bar has Back, and the bar is hidden while it shows. Voice is full-screen too.
+- **Phone**: an icon-only floating bottom bar with Home, Chats, the Jarvis orb, Everything and You. Cupertino outline/filled symbols distinguish the current destination; names remain in VoiceOver and tooltips. The orb opens the open conversation instead of switching tabs. A conversation covers the tabs (`_inChat`); its top bar has Back, and the bar is hidden while it shows. Voice is full-screen too.
 - **Wide (>= 840 px)**: the same destinations as a rail on the left. Pages opened from a tile or the rail replace the content area (`_utilityPane`); pages opened from inside a page stack so Back works.
 - **You** is Settings. Connection and sign-in problems show as a notice above whichever tab is open.
 - `_showHome` still means "show the empty welcome instead of the transcript" inside a conversation. Whether a conversation is on screen at all is `_inChat`. Code that brings someone to a conversation (`_presentChat`, `_presentConversation`) sets it; background work such as the outbox must not.
 
-**Home** (`JarvisHome`) is the clock header (the next calendar event or reminder from `/api/v1/home`, or the time when nothing is coming up), pending approvals, the setup cards (Codex sign-in, get started) and the tile grid. Long-press a tile or tap the sliders to edit: drag to reorder, the corner button changes size, the cross unpins.
+**Home** (`JarvisHome`) starts with a local-time “Good morning”, “Good afternoon” or “Good evening” greeting and the owner’s preferred name (`GET /api/v1/persona`, cached and cleared on account reset). The header has no action buttons; Settings remains in You. This is followed by “Next up” (the next calendar event or reminder from `/api/v1/home`, its time, day, countdown and available context; “Happening now” for an ongoing event), pending approvals, the setup cards (Codex sign-in, get started) and the tile grid. Long-press a tile or use “Customize Home” below the widgets to edit: drag to reorder, the corner button changes size, the cross unpins.
 
 **Tiles** are the unit of Home and Everything:
 
@@ -81,10 +83,15 @@ Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide
 - The layout is saved on the device (`TileLayoutController`, key `home.tiles.v1`), not on the account, so each device has its own. Unknown ids and unsupported sizes are repaired when it loads.
 - Tiles keep their grid size, so their text grows at most 15% with the device text size.
 - **Live tiles**: `TileData` can also carry `progress` (ring), `bars` (7-day chart), `timeline` (day strip with a "now" marker), `countdownTo` (ticks with the clock) and `actions`. Visuals live in `tile_visuals.dart`; the waveform on Chats shows while Jarvis is replying and respects reduced motion. Tiles show skeletons while loading and refresh every minute and on return to Home.
+- **Chats widget**: `TileData.chats` supplies typed conversation context to `chats_tile.dart`. Square widgets focus on the latest conversation; wide and large widgets adapt the number of avatar rows to the available space. Rows separate titles, profile / channel context, WhatsApp previews, times and unread dots, and keep the shared conversation tap targets. Same-profile repeated titles include their start date/time. Small icon and strip sizes keep the existing summary presentation.
 - **Quick actions** (`tile_actions.dart`): reminders Done / +10 min, habits Check in / Undo, approvals Decline. `applyTileAction` updates the tile at once, then `runTileAction` calls the API and Home reloads; a failure restores the tile and shows a snackbar. Approvals can only be declined or reviewed on a tile; approving always happens on the approvals page.
 - Long-press a tile for a menu (resize, edit Home, remove). In edit mode drag to reorder. Home waits for the saved layout (`TileLayoutController.ready`) before drawing the grid.
 
-**Chats** merges the Jarvis conversation list the shell already loads with the chats of every linked WhatsApp account (`/api/v1/channels` → `/chats`). WhatsApp rows load the same profile picture as the open chat (`GET …/chats/open/picture`) and fall back to initials when WhatsApp has none. WhatsApp unread counts drive the dot on the Chats tab and the Chats tile. Signal has no chat-list endpoint, so it is not in this list; manage it under Channels. Jarvis conversations have no preview text yet because `GET /conversations` returns none.
+**Everything** uses grouped rows within one surface per category (Plan, Talk, Know, Money, Automate, System), following Settings' hierarchy. Each row shows the feature's name, a practical description from `TileSpec.description`, its existing Phosphor icon, and a quiet disclosure indicator. Names and descriptions wrap without ellipses at all text sizes. Search matches purpose as well as name and category. The “On Home” strip uses icon shortcuts, reflects the saved pinned layout, and disappears while searching. Tapping a row or favorite keeps the existing live tile preview, sizing, pinning and Open controls; the preview explains the feature too. Home uses a restrained `JarvisColors.litSurface` treatment for its next event, with neutral edges rather than colored frames.
+
+Home icon-size tiles are flat shortcuts; content and summary tiles keep their rounded surfaces. Edit, resize, drag and long-press menus use the same saved layout. The shared `JarvisOrb` uses the transparent generated glass asset in `assets/brand/jarvis-orb-v1.png`, decoded at its display size, with the original procedural mark as a decode fallback. Generation prompts and the optional app-icon master are documented in `assets/brand/README.md`. Its animation respects reduced motion. The orb retains its iridescent purple/blue appearance and “Ask Jarvis” tooltip and accessibility label, without persistent navigation text.
+
+**Chats** merges the Jarvis conversation list the shell already loads with the chats of every linked WhatsApp account (`/api/v1/channels` → `/chats`). WhatsApp rows load the same profile picture as the open chat (`GET …/chats/open/picture`) and fall back to initials when WhatsApp has none. WhatsApp unread counts drive the dot on the Chats tab and the Chats tile. Signal has no chat-list endpoint, so it is not in this list; manage it under Channels. Jarvis conversations have no message preview yet because `GET /conversations` returns none. Rows show the assistant profile, and repeated titles include their session start date/time. WhatsApp previews and channel metadata are separate lines; repeated names include the linked account. Missing previews invite opening the chat. Search chats is the single search field; the more menu retains global search and conversation management.
 
 ## Screenshots and layout audit
 
@@ -93,8 +100,17 @@ Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide
 ```sh
 cd apps/mobile
 flutter test test/screenshots/app_screenshots.dart   # main screens, light + dark → build/screenshots
+flutter test test/screenshots/ui_polish.dart        # main shell at 320/375/393/430pt, 100% + 200% text
 flutter test test/screenshots/layout_audit.dart      # every utility page at 393pt and 320pt
 ```
+
+Run the real app shell on a simulator with local fixture data (no account or backend needed):
+
+```sh
+flutter run -d <device-id> -t tool/ui_preview.dart
+```
+
+This development-only entry point shares the screenshot fixture adapter and starts in dark appearance.
 
 The audit fails on layout overflows and on toolbars squeezed below their height. `debugJarvisHttpAdapter` in `lib/api/api_config.dart` is the hook that serves the whole app from `fixtures.dart`; set `SCREENSHOT_DIR` to write elsewhere.
 

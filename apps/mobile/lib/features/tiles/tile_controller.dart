@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../json_maps.dart';
 import 'tile_actions.dart';
 import 'tile_layout.dart';
 import 'tile_models.dart';
@@ -112,6 +113,25 @@ class TileDataSource {
   /// Replaces the wall clock in tests.
   final DateTime Function()? clock;
   Future<Map<String, dynamic>?>? _briefing;
+  Future<String?>? _preferredName;
+  int _accountRevision = 0;
+
+  /// Owner's Persona name, retained when returning to Home or while offline.
+  String? lastPreferredName;
+
+  Future<String?> preferredName() => _preferredName ??= _fetchPreferredName();
+
+  Future<String?> _fetchPreferredName() async {
+    final revision = _accountRevision;
+    try {
+      final response = await http.get<dynamic>('/api/v1/persona');
+      if (revision != _accountRevision) return null;
+      final name = asJsonString(jsonObject(response.data)?['preferredName']);
+      return lastPreferredName = name?.trim();
+    } catch (_) {
+      return revision == _accountRevision ? lastPreferredName : null;
+    }
+  }
 
   /// The last data each tile loaded, so Home shows something at once when it
   /// is opened again.
@@ -137,12 +157,18 @@ class TileDataSource {
   }
 
   /// The next [briefing] call fetches again.
-  void invalidate() => _briefing = null;
+  void invalidate() {
+    _briefing = null;
+    _preferredName = null;
+  }
 
   /// Forgets everything, for a different account.
   void reset() {
+    _accountRevision++;
     _briefing = null;
     lastBriefing = null;
+    _preferredName = null;
+    lastPreferredName = null;
     cache.clear();
   }
 

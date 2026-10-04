@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
@@ -68,6 +69,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
           builder: (context, _) {
             final items = widget.chats.filtered(_filter, _query.text);
             final unread = widget.chats.unreadCount;
+            final titleCounts = <(ChatSource, String), int>{};
+            for (final item in widget.chats.all) {
+              final key = (item.source, item.title.toLowerCase());
+              titleCounts.update(key, (count) => count + 1, ifAbsent: () => 1);
+            }
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -83,27 +89,30 @@ class _ChatsScreenState extends State<ChatsScreen> {
                           ).copyWith(fontSize: 28),
                         ),
                       ),
-                      IconButton(
-                        key: const Key('chats-search'),
-                        tooltip: 'Search everything',
-                        onPressed: widget.onSearch,
+                      PopupMenuButton<String>(
+                        key: const Key('chats-more'),
+                        tooltip: 'More chat options',
                         icon: Icon(
-                          PhosphorIconsRegular.magnifyingGlass,
-                          size: 20,
+                          PhosphorIconsRegular.dotsThree,
+                          size: 22,
                           color: colors.inkSoft,
                         ),
-                      ),
-                      if (widget.onManage != null)
-                        IconButton(
-                          key: const Key('chats-manage'),
-                          tooltip: 'All conversations',
-                          onPressed: widget.onManage,
-                          icon: Icon(
-                            PhosphorIconsRegular.dotsThree,
-                            size: 22,
-                            color: colors.inkSoft,
+                        onSelected: (action) {
+                          if (action == 'manage') widget.onManage?.call();
+                          if (action == 'search') widget.onSearch();
+                        },
+                        itemBuilder: (_) => [
+                          if (widget.onManage != null)
+                            const PopupMenuItem(
+                              value: 'manage',
+                              child: Text('Manage conversations'),
+                            ),
+                          const PopupMenuItem(
+                            value: 'search',
+                            child: Text('Search everything'),
                           ),
-                        ),
+                        ],
+                      ),
                       IconButton(
                         key: const Key('chats-new'),
                         tooltip: 'New chat',
@@ -130,6 +139,18 @@ class _ChatsScreenState extends State<ChatsScreen> {
                         size: 18,
                         color: colors.muted,
                       ),
+                      suffixIcon: _query.text.isEmpty
+                          ? null
+                          : IconButton(
+                              key: const Key('chats-clear-search'),
+                              tooltip: 'Clear chat search',
+                              onPressed: () => setState(_query.clear),
+                              icon: Icon(
+                                PhosphorIconsRegular.x,
+                                size: 16,
+                                color: colors.inkSoft,
+                              ),
+                            ),
                       filled: true,
                       fillColor: colors.surfaceMuted,
                       contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -142,30 +163,53 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 _FilterTabs(
                   selected: _filter,
                   unread: unread,
-                  onSelected: (filter) => setState(() => _filter = filter),
+                  onSelected: (filter) {
+                    if (_filter == filter) return;
+                    unawaited(HapticFeedback.selectionClick());
+                    setState(() => _filter = filter);
+                  },
                 ),
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: widget.onRefresh,
-                    child: items.isEmpty
-                        ? _Empty(
-                            filter: _filter,
-                            searching: _query.text.trim().isNotEmpty,
-                            linked: widget.chats.whatsAppLinked,
-                            onConnect: widget.onConnectWhatsApp,
-                          )
-                        : ListView.builder(
-                            key: const Key('chats-list'),
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                            itemCount: items.length,
-                            itemBuilder: (context, index) => _ChatRow(
-                              item: items[index],
-                              selected: items[index].key == widget.selectedKey,
-                              http: widget.http,
-                              onTap: () => widget.onOpen(items[index]),
-                            ),
-                          ),
+                    child: MotionSwitcher(
+                      duration: JarvisMotion.fast,
+                      child: KeyedSubtree(
+                        key: ValueKey((_filter, items.isEmpty)),
+                        child: items.isEmpty
+                            ? _Empty(
+                                filter: _filter,
+                                searching: _query.text.trim().isNotEmpty,
+                                linked: widget.chats.whatsAppLinked,
+                                onConnect: widget.onConnectWhatsApp,
+                              )
+                            : ListView.builder(
+                                key: const Key('chats-list'),
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  4,
+                                  16,
+                                  24,
+                                ),
+                                itemCount: items.length,
+                                itemBuilder: (context, index) => _ChatRow(
+                                  item: items[index],
+                                  selected:
+                                      items[index].key == widget.selectedKey,
+                                  http: widget.http,
+                                  duplicate:
+                                      (titleCounts[(
+                                            items[index].source,
+                                            items[index].title.toLowerCase(),
+                                          )] ??
+                                          0) >
+                                      1,
+                                  onTap: () => widget.onOpen(items[index]),
+                                ),
+                              ),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -182,7 +226,7 @@ const _noBorder = OutlineInputBorder(
   borderSide: BorderSide.none,
 );
 
-class _FilterTabs extends StatelessWidget {
+class _FilterTabs extends StatefulWidget {
   const _FilterTabs({
     required this.selected,
     required this.unread,
@@ -194,52 +238,106 @@ class _FilterTabs extends StatelessWidget {
   final ValueChanged<ChatFilter> onSelected;
 
   @override
+  State<_FilterTabs> createState() => _FilterTabsState();
+}
+
+class _FilterTabsState extends State<_FilterTabs>
+    with TickerProviderStateMixin {
+  TabController? _controller;
+  Duration? _duration;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final duration = JarvisMotion.of(context, JarvisMotion.base);
+    if (_duration == duration) return;
+    _controller?.dispose();
+    _controller = TabController(
+      length: ChatFilter.values.length,
+      initialIndex: widget.selected.index,
+      animationDuration: duration,
+      vsync: this,
+    );
+    _duration = duration;
+  }
+
+  @override
+  void didUpdateWidget(_FilterTabs oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_controller!.index != widget.selected.index) {
+      _controller!.animateTo(
+        widget.selected.index,
+        duration: JarvisMotion.of(context, JarvisMotion.base),
+        curve: JarvisMotion.standard,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
+    const labelStyle = TextStyle(
+      fontFamily: 'Geist',
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+    );
+    String label(ChatFilter filter) =>
+        filter == ChatFilter.unread && widget.unread > 0
+        ? '${filter.label} ${widget.unread}'
+        : filter.label;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: colors.outline)),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (final filter in ChatFilter.values)
-              Semantics(
-                button: true,
-                selected: filter == selected,
-                child: InkWell(
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final fits = ChatFilter.values.every((filter) {
+            final text = TextPainter(
+              text: TextSpan(text: label(filter), style: labelStyle),
+              textDirection: Directionality.of(context),
+              textScaler: MediaQuery.textScalerOf(context),
+            )..layout();
+            final fits =
+                text.width + 20 <= box.maxWidth / ChatFilter.values.length;
+            text.dispose();
+            return fits;
+          });
+          return TabBar(
+            controller: _controller,
+            isScrollable: !fits,
+            tabAlignment: fits ? TabAlignment.fill : TabAlignment.start,
+            indicatorSize: TabBarIndicatorSize.label,
+            indicatorAnimation: TabIndicatorAnimation.linear,
+            indicator: UnderlineTabIndicator(
+              borderSide: BorderSide(color: colors.ink, width: 2),
+              borderRadius: BorderRadius.circular(1),
+            ),
+            dividerColor: Colors.transparent,
+            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+            padding: EdgeInsets.zero,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 10),
+            labelColor: colors.ink,
+            unselectedLabelColor: colors.inkSoft,
+            labelStyle: labelStyle,
+            unselectedLabelStyle: labelStyle,
+            onTap: (index) => widget.onSelected(ChatFilter.values[index]),
+            tabs: [
+              for (final filter in ChatFilter.values)
+                Tab(
                   key: Key('chats-tab-${filter.name}'),
-                  onTap: () => onSelected(filter),
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(0, 10, 0, 10),
-                    margin: const EdgeInsets.only(right: 20),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(
-                          width: 2,
-                          color: filter == selected
-                              ? colors.ink
-                              : Colors.transparent,
-                        ),
-                      ),
-                    ),
-                    child: Text(
-                      filter == ChatFilter.unread && unread > 0
-                          ? '${filter.label} $unread'
-                          : filter.label,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: filter == selected ? colors.ink : colors.muted,
-                      ),
-                    ),
-                  ),
+                  height: MediaQuery.textScalerOf(context).scale(14) + 26,
+                  child: Text(label(filter)),
                 ),
-              ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -251,8 +349,10 @@ class _ChatRow extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.http,
+    this.duplicate = false,
   });
 
+  final bool duplicate;
   final ChatListItem item;
   final bool selected;
   final VoidCallback onTap;
@@ -262,111 +362,155 @@ class _ChatRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     final unread = item.unread > 0;
+    final profile = item.preview?.trim();
+    final channel = item.isJarvis
+        ? (profile == null || profile.isEmpty || profile == 'Jarvis'
+              ? 'Jarvis'
+              : 'Jarvis · $profile')
+        : [
+            'WhatsApp',
+            if (duplicate && item.account?.isNotEmpty == true) item.account!,
+          ].join(' · ');
+    final started = item.startedAt ?? item.time;
+    final contextLine = item.isJarvis && duplicate && started != null
+        ? '$channel · ${started.day} ${_months[started.month - 1]} · ${started.hour.toString().padLeft(2, '0')}:${started.minute.toString().padLeft(2, '0')}'
+        : channel;
     final preview = item.isJarvis
-        ? (item.preview ?? 'Jarvis')
-        : 'WhatsApp · ${item.preview ?? 'No messages yet'}';
+        ? contextLine
+        : item.preview?.isNotEmpty == true
+        ? item.preview!
+        : 'Tap to open chat';
     return Semantics(
       button: true,
       selected: selected,
       label: [
         item.title,
         if (unread) '${item.unread} unread',
-        if (!item.isJarvis) 'WhatsApp',
+        contextLine,
+        if (!item.isJarvis) preview,
       ].join(', '),
       onTap: onTap,
       excludeSemantics: true,
-      child: InkWell(
-        key: Key('chat-${item.key}'),
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-          decoration: BoxDecoration(
-            color: selected ? colors.surfaceMuted : null,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Row(
-            children: [
-              _Avatar(item: item, http: http),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        if (item.pinned) ...[
-                          Icon(
-                            PhosphorIconsRegular.pushPin,
-                            size: 12,
-                            color: colors.muted,
-                          ),
-                          const SizedBox(width: 4),
-                        ],
-                        Expanded(
-                          child: Text(
-                            item.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: -.1,
-                              color: colors.ink,
+      child: PressFeedback(
+        scale: .99,
+        builder: (context, highlight) => InkWell(
+          key: Key('chat-${item.key}'),
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          onHighlightChanged: highlight,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+            decoration: BoxDecoration(
+              color: selected ? colors.surfaceMuted : null,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                _Avatar(item: item, http: http),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          if (item.pinned) ...[
+                            Icon(
+                              PhosphorIconsRegular.pushPin,
+                              size: 12,
+                              color: colors.muted,
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Expanded(
+                            child: Text(
+                              item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: -.1,
+                                color: colors.ink,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          whatsAppListTime(item.time),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: unread
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                            color: unread ? colors.accent : colors.muted,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            preview,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              color: colors.inkSoft,
-                            ),
-                          ),
-                        ),
-                        if (unread) ...[
                           const SizedBox(width: 8),
-                          Container(
-                            key: const Key('chat-unread-dot'),
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: colors.accent,
-                              shape: BoxShape.circle,
+                          Text(
+                            whatsAppListTime(item.time),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: unread
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                              color: unread ? colors.accent : colors.inkSoft,
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              preview,
+                              maxLines: item.isJarvis && duplicate ? null : 1,
+                              overflow: item.isJarvis && duplicate
+                                  ? TextOverflow.visible
+                                  : TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                color: colors.inkSoft,
+                              ),
+                            ),
+                          ),
+                          if (unread) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              key: const Key('chat-unread-dot'),
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: colors.accent,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (!item.isJarvis) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          contextLine,
+                          style: TextStyle(fontSize: 12, color: colors.inkSoft),
+                        ),
                       ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
+
+const _months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 
 class _Avatar extends StatelessWidget {
   const _Avatar({required this.item, this.http});

@@ -113,10 +113,6 @@ class _ChatScreenState extends _ChatScreenController
         _ChatScreenPhotos,
         _ChatScreenOutbox,
         _ChatScreenSummary {
-  /// Outgoing content fades out before incoming content fades in, so the two
-  /// never overlap mid-transition.
-  static const _fadeThrough = Interval(.5, 1, curve: Curves.easeOutCubic);
-
   @override
   void initState() {
     super.initState();
@@ -165,21 +161,14 @@ class _ChatScreenState extends _ChatScreenController
         final chat = Scaffold(
           extendBodyBehindAppBar: voice,
           appBar: _topBar(wide: wide, voice: voice),
-          body: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 260),
-            switchInCurve: _fadeThrough,
-            switchOutCurve: _fadeThrough,
+          body: MotionSwitcher(
             child: KeyedSubtree(
               key: ValueKey(voice),
               child: voice ? _voiceBody() : _chatBody(),
             ),
           ),
         );
-        final content = AnimatedSwitcher(
-          duration: JarvisMotion.of(context, JarvisMotion.base),
-          switchInCurve: JarvisMotion.standard,
-          switchOutCurve: JarvisMotion.exit,
-          transitionBuilder: JarvisMotion.fadeRise,
+        final content = MotionSwitcher(
           child: showTabs
               ? KeyedSubtree(
                   key: ValueKey('page-${_tab.name}'),
@@ -205,6 +194,7 @@ class _ChatScreenState extends _ChatScreenController
                   onSelect: _selectTab,
                   onJarvis: _openJarvis,
                   chatsAttention: chatsAttention,
+                  jarvisBusy: _busy,
                 )
               : null,
           body: wide
@@ -215,13 +205,10 @@ class _ChatScreenState extends _ChatScreenController
                       onSelect: _selectTab,
                       onJarvis: _openJarvis,
                       chatsAttention: chatsAttention,
+                      jarvisBusy: _busy,
                     ),
                     Expanded(
-                      child: AnimatedSwitcher(
-                        duration: JarvisMotion.of(context, JarvisMotion.base),
-                        switchInCurve: JarvisMotion.standard,
-                        switchOutCurve: JarvisMotion.exit,
-                        transitionBuilder: JarvisMotion.fadeRise,
+                      child: MotionSwitcher(
                         child: _utilityPane == null
                             ? KeyedSubtree(
                                 key: const ValueKey('content'),

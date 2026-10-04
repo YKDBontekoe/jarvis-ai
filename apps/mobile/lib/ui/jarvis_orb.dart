@@ -33,17 +33,24 @@ class _JarvisOrbState extends State<JarvisOrb>
     duration: const Duration(seconds: 6),
   );
 
-  bool get _running => widget.animate || widget.listening;
+  bool _reducedMotion = false;
+
+  bool get _running => !_reducedMotion && (widget.animate || widget.listening);
 
   @override
-  void initState() {
-    super.initState();
-    if (_running) _controller.repeat();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reducedMotion = JarvisMotion.reduced(context);
+    _syncAnimation();
   }
 
   @override
   void didUpdateWidget(JarvisOrb oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _syncAnimation();
+  }
+
+  void _syncAnimation() {
     if (_running && !_controller.isAnimating) {
       _controller.repeat();
     } else if (!_running && _controller.isAnimating) {
@@ -98,12 +105,14 @@ class _JarvisOrbState extends State<JarvisOrb>
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: JarvisColors.of(context).accent
-              .withValues(alpha: .28 * (1 - progress)),
+          color: JarvisColors.of(
+            context,
+          ).accent.withValues(alpha: .28 * (1 - progress)),
           width: 1.5,
         ),
-        color: JarvisColors.of(context).violet
-            .withValues(alpha: .06 * (1 - progress)),
+        color: JarvisColors.of(
+          context,
+        ).violet.withValues(alpha: .06 * (1 - progress)),
       ),
     ),
   );
@@ -123,57 +132,66 @@ class _JarvisOrbState extends State<JarvisOrb>
             ]
           : null,
     ),
-    child: ClipOval(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          ImageFiltered(
-            imageFilter: ui.ImageFilter.blur(
-              sigmaX: size * .08,
-              sigmaY: size * .08,
-              tileMode: TileMode.mirror,
-            ),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: SweepGradient(
-                  transform: GradientRotation(rotation),
-                  colors: const [
-                    Color(0xff5a52e6),
-                    Color(0xff9a8cf5),
-                    Color(0xffe9bfe0),
-                    Color(0xff9ccdf2),
-                    Color(0xff6c63ea),
-                    Color(0xff5a52e6),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: Alignment(-.35, -.5),
-                radius: .75,
-                colors: [
-                  Color(0xd9ffffff),
-                  Color(0x33ffffff),
-                  Color(0x00ffffff),
-                ],
-                stops: [0, .45, 1],
-              ),
-            ),
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: .55),
-                width: math.max(1, size * .02),
-              ),
-            ),
-          ),
-        ],
+    child: Transform.rotate(
+      angle: _running ? .06 * math.sin(rotation) : 0,
+      child: Image.asset(
+        'assets/brand/jarvis-orb-v1.png',
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+        cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).ceil(),
+        // Keep the original mark available if the image cannot be decoded.
+        errorBuilder: (context, error, trace) =>
+            _fallbackSphere(size, rotation),
       ),
+    ),
+  );
+
+  Widget _fallbackSphere(double size, double rotation) => ClipOval(
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        ImageFiltered(
+          imageFilter: ui.ImageFilter.blur(
+            sigmaX: size * .08,
+            sigmaY: size * .08,
+            tileMode: TileMode.mirror,
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: SweepGradient(
+                transform: GradientRotation(rotation),
+                colors: const [
+                  Color(0xff5a52e6),
+                  Color(0xff9a8cf5),
+                  Color(0xffe9bfe0),
+                  Color(0xff9ccdf2),
+                  Color(0xff6c63ea),
+                  Color(0xff5a52e6),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment(-.35, -.5),
+              radius: .75,
+              colors: [Color(0xd9ffffff), Color(0x33ffffff), Color(0x00ffffff)],
+              stops: [0, .45, 1],
+            ),
+          ),
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: .55),
+              width: math.max(1, size * .02),
+            ),
+          ),
+        ),
+      ],
     ),
   );
 }

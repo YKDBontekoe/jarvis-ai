@@ -6,10 +6,54 @@ import 'package:jarvis_mobile/theme.dart';
 
 Widget _host(Widget child) => MaterialApp(
   theme: buildJarvisTheme(),
-  home: Scaffold(body: Align(alignment: Alignment.bottomCenter, child: child)),
+  home: Scaffold(
+    body: Align(alignment: Alignment.bottomCenter, child: child),
+  ),
 );
 
 void main() {
+  testWidgets(
+    'the busy orb stops moving with Reduce Motion and still opens chat',
+    (tester) async {
+      final reduced = ValueNotifier(false);
+      addTearDown(reduced.dispose);
+      var opened = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildJarvisTheme(),
+          builder: (context, child) => ValueListenableBuilder<bool>(
+            valueListenable: reduced,
+            builder: (context, value, _) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(disableAnimations: value),
+              child: child!,
+            ),
+          ),
+          home: Scaffold(
+            body: JarvisTabBar(
+              selected: JarvisTab.home,
+              jarvisBusy: true,
+              onSelect: (_) {},
+              onJarvis: () => opened++,
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(tester.hasRunningAnimations, isTrue);
+      expect(
+        find.bySemanticsLabel('Jarvis is replying. Open chat'),
+        findsOneWidget,
+      );
+      reduced.value = true;
+      await tester.pumpAndSettle();
+      expect(tester.hasRunningAnimations, isFalse);
+      await tester.tap(find.byKey(const Key('tab-jarvis')));
+      await tester.pumpAndSettle();
+      expect(opened, 1);
+      expect(tester.hasRunningAnimations, isFalse);
+    },
+  );
+
   testWidgets('the bar shows four tabs and the orb', (tester) async {
     await tester.pumpWidget(
       _host(
@@ -22,9 +66,12 @@ void main() {
     );
     for (final tab in JarvisTab.values) {
       expect(find.byKey(Key('tab-${tab.name}')), findsOneWidget);
-      expect(find.text(tab.label), findsOneWidget);
+      expect(find.text(tab.label), findsNothing);
+      expect(find.bySemanticsLabel(tab.label), findsOneWidget);
     }
     expect(find.byKey(const Key('tab-jarvis')), findsOneWidget);
+    expect(find.text('Jarvis'), findsNothing);
+    expect(find.bySemanticsLabel('Ask Jarvis'), findsOneWidget);
     expect(find.byKey(const Key('tab-attention')), findsNothing);
   });
 
@@ -118,7 +165,7 @@ void main() {
             children: [
               for (final glyph in TabGlyph.values) ...[
                 TabIcon(glyph: glyph, color: Colors.black),
-                TabIcon(glyph: glyph, color: Colors.black, fill: Colors.grey),
+                TabIcon(glyph: glyph, color: Colors.black, selected: true),
               ],
             ],
           ),
@@ -126,33 +173,6 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       expect(find.byType(TabIcon), findsNWidgets(TabGlyph.values.length * 2));
-    });
-
-    test('path data stays inside the 24 unit grid', () {
-      for (final data in [
-        'M4.5 10.2 12 4.2l7.5 6V19a1.3 1.3 0 0 1-1.3 1.3H15v-5.2a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5.2H5.8A1.3 1.3 0 0 1 4.5 19z',
-        'M5.2 19.6c1.1-3.3 3.7-5.1 6.8-5.1s5.7 1.8 6.8 5.1',
-      ]) {
-        final bounds = parseSvgPath(data).getBounds();
-        expect(bounds.left, greaterThanOrEqualTo(0));
-        expect(bounds.top, greaterThanOrEqualTo(0));
-        expect(bounds.right, lessThanOrEqualTo(24));
-        expect(bounds.bottom, lessThanOrEqualTo(24));
-        expect(bounds.width, greaterThan(5));
-      }
-    });
-
-    test('the parser follows absolute and relative commands', () {
-      final square = parseSvgPath('M2 2H8V8H2z').getBounds();
-      expect(square, const Rect.fromLTRB(2, 2, 8, 8));
-      final relative = parseSvgPath('m2 2h6v6h-6z').getBounds();
-      expect(relative, square);
-      final implicitLines = parseSvgPath('M0 0 4 0 4 4').getBounds();
-      expect(implicitLines, const Rect.fromLTRB(0, 0, 4, 4));
-    });
-
-    test('an unsupported command is an error, not a silent gap', () {
-      expect(() => parseSvgPath('M0 0Q1 1 2 2'), throwsFormatException);
     });
   });
 }

@@ -108,6 +108,22 @@ List<TileData> _rich() => [
     visual: TileVisual.waveform,
     rows: [TileRow('Lisbon trip', meta: '18:04')],
   ),
+  TileData(
+    stat: '12',
+    attention: true,
+    chats: [
+      for (var i = 0; i < 8; i++)
+        TileChat(
+          title: '$_long $i',
+          context: i.isEven ? 'Jarvis · Personal' : 'WhatsApp · Work',
+          target: 'chat:$i',
+          isJarvis: i.isEven,
+          preview: i.isEven ? null : _long,
+          time: '19:45',
+          unread: i.isEven ? 0 : 6,
+        ),
+    ],
+  ),
 ];
 
 Widget _host(Widget child, {double scale = 1}) => MaterialApp(

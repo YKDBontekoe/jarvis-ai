@@ -56,9 +56,18 @@ String clockTime(DateTime time) =>
 
 /// "now", "in 25 min", "in 1 h 29 min", "in 3 h", or the weekday when it is a
 /// day or more away.
-String countdownLabel(DateTime start, DateTime now) {
+String countdownLabel(
+  DateTime start,
+  DateTime now, {
+  bool durationOnly = false,
+}) {
   final gap = start.difference(now);
   if (gap.inMinutes <= 0) return 'now';
+  if (durationOnly && gap.inHours >= 24) {
+    final days = gap.inDays;
+    final hours = gap.inHours % 24;
+    return hours == 0 ? 'in $days d' : 'in $days d $hours h';
+  }
   if (gap.inHours >= 24) {
     final today = DateTime(now.year, now.month, now.day);
     final day = DateTime(start.year, start.month, start.day);

@@ -408,6 +408,12 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   ],
   'GET /api/v1/projects': projects(),
   'GET /api/v1/home': home(),
+  'GET /api/v1/persona': {
+    'preferredName': 'Youri',
+    'language': 'en',
+    'customInstructions': '',
+    'traits': <Object>[],
+  },
   'GET /api/v1/usage': usage(),
   'GET /api/v1/tasks': tasks(),
   'GET /api/v1/habits': habits(),
