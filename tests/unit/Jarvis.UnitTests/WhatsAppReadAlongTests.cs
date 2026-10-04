@@ -218,6 +218,8 @@ public sealed class WhatsAppReadAlongTests
         Assert.Equal(new ObservedWhatsAppMessage("wa:ABC", "+31611111111", false, "Piet", "Hoi", Now), observed);
         Assert.Null(WhatsAppReadAlongReceiver.ToObserved(
             new BridgeObservedMessage("D", "+31611111111", true, " ", "x", 1)).Sender);
+        Assert.Equal("+31655555555", WhatsAppReadAlongReceiver.ToObserved(
+            new BridgeObservedMessage("E", "120363025-1@g.us", false, "Sanne", "Hoi", 1, "31 6 555 55 555")).SenderId);
     }
 
     private static WhatsAppChatSettings Settings(string chatId, string name, bool readAlong) =>

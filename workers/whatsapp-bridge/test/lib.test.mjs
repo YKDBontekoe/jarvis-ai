@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   ChatBook,
   Inbox,
+  PictureCache,
   RecentIds,
   chatIdOf,
   describeMessage,
@@ -13,6 +14,7 @@ import {
   normalizeWatchList,
   observedFrom,
   phoneFromJid,
+  pictureUrlAllowed,
   safeSessionId,
   textOf,
 } from '../src/lib.mjs';
@@ -118,11 +120,12 @@ test('observed messages: only watched chats, both directions, never the self cha
   const watched = new Set(['+31687654321', '120363025-1@g.us', self]);
   const opts = { selfPhone: self, watched };
   assert.deepEqual(observedFrom(entry({ rest: { pushName: 'Piet' } }), opts), {
-    id: 'A1', chatId: '+31687654321', fromMe: false, sender: 'Piet', text: 'hello', timestamp: 1_700_000_000,
+    id: 'A1', chatId: '+31687654321', fromMe: false, sender: 'Piet', senderId: '+31687654321', text: 'hello', timestamp: 1_700_000_000,
   });
   const mine = observedFrom(entry({ key: { fromMe: true } }), opts);
   assert.equal(mine.fromMe, true);
   assert.equal(mine.sender, null);
+  assert.equal(mine.senderId, null);
   assert.equal(observedFrom(entry({ key: { remoteJid: '31600000000@s.whatsapp.net' } }), opts), null);
   assert.equal(observedFrom(entry({ key: { remoteJid: '31612345678@s.whatsapp.net', fromMe: true } }), opts), null);
   const group = observedFrom(entry({
@@ -130,6 +133,7 @@ test('observed messages: only watched chats, both directions, never the self cha
   }), opts);
   assert.equal(group.chatId, '120363025-1@g.us');
   assert.equal(group.sender, '+31655555555');
+  assert.equal(group.senderId, '+31655555555');
   const lidWatched = new Set([...watched, '120363025123456789@g.us']);
   const lidGroup = observedFrom(entry({
     key: {
@@ -146,6 +150,7 @@ test('observed messages: only watched chats, both directions, never the self cha
     rest: { pushName: '' },
   }), { ...opts, resolvePhone: (lid) => (lid === '999@lid' ? '31655555555@s.whatsapp.net' : null) });
   assert.equal(mapped.sender, '+31655555555');
+  assert.equal(mapped.senderId, '+31655555555');
   assert.equal(observedFrom(entry(), { selfPhone: self, watched: new Set() }), null);
 });
 
@@ -166,6 +171,19 @@ test('chat book merges names, tracks activity and sorts newest first', () => {
   const copy = new ChatBook();
   copy.load(JSON.parse(JSON.stringify(book)));
   assert.deepEqual(copy.list(), book.list());
+});
+
+test('picture urls stay on WhatsApp hosts and the cache remembers a miss', () => {
+  assert.equal(pictureUrlAllowed('https://pps.whatsapp.net/v/t61/abc'), true);
+  assert.equal(pictureUrlAllowed('https://evil.example/pps.whatsapp.net'), false);
+  assert.equal(pictureUrlAllowed('http://pps.whatsapp.net/a'), false);
+  const cache = new PictureCache({ ttlMs: 1_000, missingTtlMs: 50, limit: 2 });
+  assert.equal(cache.get('a', 0), undefined);
+  cache.set('a', null, 0);
+  assert.equal(cache.get('a', 10), null);
+  assert.equal(cache.get('a', 60), undefined);
+  cache.set('b', { bytes: Buffer.from('img'), type: 'image/jpeg' }, 0);
+  assert.equal(cache.get('b', 10)?.type, 'image/jpeg');
 });
 
 test('watch lists keep valid chat ids only', () => {

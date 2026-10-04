@@ -16,14 +16,17 @@ import {
   ChatBook,
   Inbox,
   RecentIds,
+  PictureCache,
   canonicalJid,
   chatIdOf,
   inboundFrom,
+  isChatId,
   isGroupJid,
   jidFromChatId,
   normalizeWatchList,
   observedFrom,
   phoneFromJid,
+  pictureUrlAllowed,
   safeSessionId,
 } from './lib.mjs';
 
@@ -77,6 +80,7 @@ class Session {
     this.watched = new Set();
     this.observed = new Inbox(2_000);
     this.chats = new ChatBook();
+    this.pictures = new PictureCache();
     this.loaded = false;
     this.saveTimer = null;
     this.stopped = false;
@@ -229,6 +233,7 @@ class Session {
         log.warn({ session: this.id }, 'whatsapp session was logged out from the phone');
         clearInterval(this.saveTimer);
         this.chats = new ChatBook();
+        this.pictures = new PictureCache();
         this.watched = new Set();
         this.observed = new Inbox(2_000);
         await rm(this.dir, { recursive: true, force: true });
@@ -258,6 +263,45 @@ class Session {
     return result?.key?.id ?? null;
   }
 
+  /** Preview profile picture for a chat or participant, or null when WhatsApp has none. */
+  async picture(chatId) {
+    if (!isChatId(chatId)) throw new HttpError(400, 'Invalid chat.');
+    const cached = this.pictures.get(chatId);
+    if (cached !== undefined) return cached;
+    if (this.state !== 'open' || typeof this.socket?.profilePictureUrl !== 'function') {
+      return null;
+    }
+    let url;
+    try {
+      url = await this.socket.profilePictureUrl(jidFromChatId(chatId), 'preview');
+    } catch {
+      url = undefined;
+    }
+    if (!pictureUrlAllowed(url)) {
+      this.pictures.set(chatId, null);
+      return null;
+    }
+    let response;
+    try {
+      response = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+    } catch {
+      return null;
+    }
+    const type = String(response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+    if (!response.ok || !['image/jpeg', 'image/png', 'image/webp'].includes(type)) {
+      this.pictures.set(chatId, null);
+      return null;
+    }
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length === 0 || bytes.length > 300_000) {
+      this.pictures.set(chatId, null);
+      return null;
+    }
+    const image = { bytes, type };
+    this.pictures.set(chatId, image);
+    return image;
+  }
+
   async stop({ logout }) {
     if (!logout) await this.saveChats();
     this.stopped = true;
@@ -270,6 +314,13 @@ class Session {
     }
     this.socket?.end?.(undefined);
     if (logout) await rm(this.dir, { recursive: true, force: true });
+  }
+}
+
+class Picture {
+  constructor(bytes, type) {
+    this.bytes = bytes;
+    this.type = type;
   }
 }
 
@@ -356,6 +407,12 @@ async function route(request) {
     }
     return { ok: true, id };
   }
+  if (action === 'picture' && request.method === 'GET') {
+    const subject = url.searchParams.get('jid');
+    const image = await session.picture(isChatId(subject) ? subject : chatIdOf(subject));
+    if (!image) throw new HttpError(404, 'No picture.');
+    return new Picture(image.bytes, image.type);
+  }
   if (action === 'chats' && request.method === 'GET') return { chats: session.chats.list().filter((chat) => chat.id !== session.phone) };
   if (action === 'watch' && request.method === 'GET') return { chats: [...session.watched] };
   if (action === 'watch' && request.method === 'PUT') {
@@ -423,7 +480,17 @@ const server = createServer(async (request, response) => {
   };
   try {
     if (request.url !== '/health' && !authorized(request)) return reply(401, { error: 'Unauthorized.' });
-    reply(200, await route(request));
+    const result = await route(request);
+    if (result instanceof Picture) {
+      response.writeHead(200, {
+        'content-type': result.type,
+        'cache-control': 'private, max-age=3600',
+        'content-length': result.bytes.length,
+      });
+      response.end(result.bytes);
+      return;
+    }
+    reply(200, result);
   } catch (error) {
     if (error instanceof HttpError) return reply(error.status, { error: error.message });
     log.error(error, 'request failed');

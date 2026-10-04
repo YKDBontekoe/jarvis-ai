@@ -222,6 +222,7 @@ export function observedFrom(entry, { selfPhone, watched, resolvePhone = () => n
   const group = isGroupJid(chatId);
   const fromMe = Boolean(key.fromMe);
   let sender = null;
+  let senderId = null;
   if (!fromMe) {
     const name = typeof entry.pushName === 'string' ? entry.pushName.trim().slice(0, 80) : '';
     // Baileys 7 puts the other address in participantAlt: the phone when the group is LID-addressed,
@@ -230,15 +231,62 @@ export function observedFrom(entry, { selfPhone, watched, resolvePhone = () => n
       ? phoneOf(key.participantAlt, resolvePhone) ?? phoneOf(key.participantPn, resolvePhone) ?? phoneOf(key.participant, resolvePhone)
       : chatId.startsWith('+') ? chatId : phoneOf(key.participantAlt, resolvePhone);
     sender = name || phone || null;
+    senderId = phone;
+    if (!senderId && group) {
+      const lid = canonicalJid(key.participant);
+      if (lid && isChatId(lid)) senderId = lid;
+    }
   }
   return {
     id: key.id,
     chatId,
     fromMe,
     sender,
+    senderId,
     text,
     timestamp: Number(entry.messageTimestamp ?? 0) || Math.floor(Date.now() / 1000),
   };
+}
+
+/** Profile-picture URLs come from WhatsApp. Anything else is refused before the bridge downloads it. */
+export function pictureUrlAllowed(value) {
+  let url;
+  try {
+    url = new URL(String(value));
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) return false;
+  const host = url.hostname.toLowerCase();
+  return host === 'whatsapp.net' || host.endsWith('.whatsapp.net') || host === 'fbcdn.net' || host.endsWith('.fbcdn.net');
+}
+
+/** Remembers profile pictures, and the fact that someone has none, so the phone is not asked on every scroll. */
+export class PictureCache {
+  constructor({ ttlMs = 12 * 60 * 60 * 1000, missingTtlMs = 60 * 60 * 1000, limit = 400 } = {}) {
+    this.ttlMs = ttlMs;
+    this.missingTtlMs = missingTtlMs;
+    this.limit = limit;
+    /** @type {Map<string, { until: number, image: { bytes: Buffer, type: string } | null }>} */
+    this.items = new Map();
+  }
+
+  /** Undefined when unknown. Null when this id has no picture. */
+  get(id, now = Date.now()) {
+    const item = this.items.get(id);
+    if (!item) return undefined;
+    if (item.until <= now) {
+      this.items.delete(id);
+      return undefined;
+    }
+    return item.image;
+  }
+
+  set(id, image, now = Date.now()) {
+    if (this.items.has(id)) this.items.delete(id);
+    this.items.set(id, { until: now + (image ? this.ttlMs : this.missingTtlMs), image });
+    while (this.items.size > this.limit) this.items.delete(this.items.keys().next().value);
+  }
 }
 
 /**

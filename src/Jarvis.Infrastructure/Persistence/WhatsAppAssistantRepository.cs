@@ -41,11 +41,14 @@ public sealed class WhatsAppMessageEntity
     public string ExternalId { get; set; } = string.Empty;
     public bool FromMe { get; set; }
     public string? Sender { get; set; }
+    /// <summary>Phone number or @lid of the person who sent a group message, used to load their picture.</summary>
+    public string? SenderId { get; set; }
     public string Text { get; set; } = string.Empty;
     public DateTimeOffset SentAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
-    public WhatsAppChatMessage ToRecord() => new(Id, ConnectionId, ChatId, ExternalId, FromMe, Sender, Text, SentAt, CreatedAt);
+    public WhatsAppChatMessage ToRecord() => new(Id, ConnectionId, ChatId, ExternalId, FromMe, Sender, Text, SentAt,
+        CreatedAt, SenderId);
 }
 
 public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider? clock = null)
@@ -144,9 +147,10 @@ public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider
             if (!chats.TryGetValue(message.ChatId, out var chat)) continue;
             var text = message.Text.Length <= 8_000 ? message.Text : message.Text[..8_000];
             var sender = message.Sender is { Length: > 80 } name ? name[..80] : message.Sender;
+            var senderId = message.SenderId is { Length: > 100 } id ? id[..100] : message.SenderId;
             var rows = await db.Database.ExecuteSqlInterpolatedAsync($"""
-                INSERT INTO whatsapp_messages ("Id", owner_id, connection_id, chat_id, external_id, from_me, sender, text, sent_at, created_at)
-                VALUES ({Guid.CreateVersion7()}, {chat.OwnerId}, {connectionId}, {chat.ChatId}, {message.ExternalId}, {message.FromMe}, {sender}, {text}, {message.SentAt}, {now})
+                INSERT INTO whatsapp_messages ("Id", owner_id, connection_id, chat_id, external_id, from_me, sender, sender_id, text, sent_at, created_at)
+                VALUES ({Guid.CreateVersion7()}, {chat.OwnerId}, {connectionId}, {chat.ChatId}, {message.ExternalId}, {message.FromMe}, {sender}, {senderId}, {text}, {message.SentAt}, {now})
                 ON CONFLICT (connection_id, external_id) DO NOTHING
                 """, cancellationToken);
             if (rows == 0) continue;

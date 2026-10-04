@@ -22,7 +22,7 @@ public sealed record WhatsAppMarkReadRequest(Guid MessageId);
 public sealed record SaveWhatsAppChatRequest(string? Name, bool ReadAlong, bool? AutoReminders);
 
 public sealed record WhatsAppMessageDto(Guid Id, string ChatId, bool FromMe, string? Sender, string Text,
-    DateTimeOffset SentAt, DateTimeOffset? ReceivedAt = null);
+    DateTimeOffset SentAt, DateTimeOffset? ReceivedAt = null, string? SenderId = null);
 
 public sealed record WhatsAppSuggestRequest(string? Instruction);
 
@@ -102,6 +102,25 @@ internal static class WhatsAppAssistantEndpoints
             MessagesAsync(id, chatId, before, beforeId, limit, channels, chats, currentUser, ct);
         group.MapGet("/open/messages", Messages);
         group.MapGet("/{chatId}/messages", Messages).WithName("ListWhatsAppChatMessages");
+
+        group.MapGet("/open/picture", async (Guid id, string subject, IChannelRepository channels,
+            WhatsAppBridgeClient bridge, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var normalized = WhatsAppChatIds.Normalize(subject);
+            if (normalized is null) return Results.NotFound();
+            var connection = await LinkedAsync(channels, currentUser.OwnerId, id, ct);
+            if (connection is null || !bridge.Configured) return Results.NotFound();
+            try
+            {
+                var picture = await bridge.GetPictureAsync(id, normalized, ct);
+                return picture is null ? Results.NotFound() : Results.File(picture.Bytes, picture.ContentType);
+            }
+            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+            {
+                logger.LogDebug(exception, "Could not load a WhatsApp profile picture for {ConnectionId}.", id);
+                return Results.NotFound();
+            }
+        }).WithName("GetWhatsAppPicture");
 
         Task<IResult> Clear(Guid id, string chatId, IWhatsAppAssistantRepository chats, IAuditEventStore audit,
             ICurrentUser currentUser, CancellationToken ct) =>
@@ -356,5 +375,6 @@ internal static class WhatsAppAssistantEndpoints
         new(chat.ChatId, chat.DisplayName, chat.IsGroup, chat.LastMessageAt, chat.ReadAlong, chat.AutoReminders);
 
     private static WhatsAppMessageDto ToDto(WhatsAppChatMessage message) =>
-        new(message.Id, message.ChatId, message.FromMe, message.Sender, message.Text, message.SentAt, message.ReceivedAt);
+        new(message.Id, message.ChatId, message.FromMe, message.Sender, message.Text, message.SentAt,
+            message.ReceivedAt, message.SenderId);
 }

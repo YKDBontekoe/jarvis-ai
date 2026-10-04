@@ -150,10 +150,14 @@ public sealed class WhatsAppReadAlongReceiver(IServiceScopeFactory scopes, Whats
         }
     }
 
-    internal static ObservedWhatsAppMessage ToObserved(BridgeObservedMessage message) =>
-        new(ExternalId(message.Id), message.ChatId, message.FromMe,
-            string.IsNullOrWhiteSpace(message.Sender) ? null : message.Sender.Trim(), message.Text,
-            message.Timestamp > 0 ? DateTimeOffset.FromUnixTimeSeconds(message.Timestamp) : DateTimeOffset.UtcNow);
+    internal static ObservedWhatsAppMessage ToObserved(BridgeObservedMessage message)
+    {
+        var sender = string.IsNullOrWhiteSpace(message.Sender) ? null : message.Sender.Trim();
+        if (sender is { Length: > 80 }) sender = sender[..80];
+        return new(ExternalId(message.Id), message.ChatId, message.FromMe, sender, message.Text,
+            message.Timestamp > 0 ? DateTimeOffset.FromUnixTimeSeconds(message.Timestamp) : DateTimeOffset.UtcNow,
+            WhatsAppChatIds.Normalize(message.SenderId));
+    }
 }
 
 /// <summary>

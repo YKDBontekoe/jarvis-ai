@@ -29,11 +29,11 @@ public sealed record WhatsAppChatMessage(
     bool FromMe,
     string? Sender,
     string Text,
-    DateTimeOffset SentAt, DateTimeOffset? ReceivedAt = null);
+    DateTimeOffset SentAt, DateTimeOffset? ReceivedAt = null, string? SenderId = null);
 
 /// <summary>A message the bridge forwarded for a chat on the owner's watch list.</summary>
 public sealed record ObservedWhatsAppMessage(string ExternalId, string ChatId, bool FromMe, string? Sender,
-    string Text, DateTimeOffset SentAt);
+    string Text, DateTimeOffset SentAt, string? SenderId = null);
 
 /// <summary>
 /// New messages in one chat that the reminder scan has not looked at yet, with the context before them.

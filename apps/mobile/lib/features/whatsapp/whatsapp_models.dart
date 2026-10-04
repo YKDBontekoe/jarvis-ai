@@ -60,18 +60,21 @@ class WhatsAppChat {
   String? get phone => chatId.startsWith('+') && name != chatId ? chatId : null;
 
   /// One or two letters for the avatar.
-  String get initials {
-    final words = name
-        .replaceAll(RegExp(r'[^\p{L}\p{N} ]', unicode: true), ' ')
-        .split(' ')
-        .where((word) => word.isNotEmpty)
-        .toList();
-    if (words.isEmpty) return '#';
-    if (RegExp(r'^\d').hasMatch(words.first)) return '#';
-    final first = words.first.characters.first;
-    final second = words.length > 1 ? words.last.characters.first : '';
-    return (first + second).toUpperCase();
-  }
+  String get initials => whatsAppInitials(name);
+}
+
+/// One or two letters for an avatar when a picture is missing.
+String whatsAppInitials(String name) {
+  final words = name
+      .replaceAll(RegExp(r'[^\p{L}\p{N} ]', unicode: true), ' ')
+      .split(' ')
+      .where((word) => word.isNotEmpty)
+      .toList();
+  if (words.isEmpty) return '#';
+  if (RegExp(r'^\d').hasMatch(words.first)) return '#';
+  final first = words.first.characters.first;
+  final second = words.length > 1 ? words.last.characters.first : '';
+  return (first + second).toUpperCase();
 }
 
 /// A stored message in a read-along chat.
@@ -82,12 +85,16 @@ class WhatsAppMessage {
     required this.text,
     required this.sentAt,
     this.sender,
+    this.senderId,
     this.receivedAt,
   });
 
   final String id;
   final bool fromMe;
   final String? sender;
+
+  /// Phone number or @lid of a group participant, used to load their picture.
+  final String? senderId;
   final String text;
   final DateTime sentAt;
   final DateTime? receivedAt;
@@ -100,6 +107,7 @@ class WhatsAppMessage {
       id: id,
       fromMe: asJsonBool(json['fromMe']),
       sender: asJsonString(json['sender']),
+      senderId: asJsonString(json['senderId']),
       text: asJsonString(json['text']) ?? '',
       sentAt: sentAt,
       receivedAt: jsonDate(json['receivedAt']),
