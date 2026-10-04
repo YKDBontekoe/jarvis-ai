@@ -18,6 +18,9 @@ public sealed class S3ObjectStorage(IAmazonS3 client, IConfiguration configurati
             Key = objectKey,
             InputStream = content,
             ContentType = contentType,
+            // Send a normally signed, fixed-length payload to the self-hosted S3 endpoint.
+            UseChunkEncoding = false,
+            DisablePayloadSigning = false,
             AutoCloseStream = false,
             AutoResetStreamPosition = false
         }, cancellationToken);
