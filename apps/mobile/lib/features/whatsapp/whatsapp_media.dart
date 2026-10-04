@@ -33,7 +33,6 @@ class WhatsAppMessageContent extends StatelessWidget {
     final quote = message.quote;
     if (media == null && quote == null) return _text(theme, message.text);
     final caption = media == null ? null : whatsAppMediaCaption(message.text);
-    final showCaption = caption != null && !_captionIsTitle(media!, caption);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -46,8 +45,10 @@ class WhatsAppMessageContent extends StatelessWidget {
             http: http,
             channelId: channelId,
           ),
-        if (showCaption) ...[
-          if (media != null) const SizedBox(height: 6),
+        if (media != null &&
+            caption != null &&
+            !_captionIsTitle(media, caption)) ...[
+          const SizedBox(height: 6),
           _text(theme, caption),
         ],
       ],
