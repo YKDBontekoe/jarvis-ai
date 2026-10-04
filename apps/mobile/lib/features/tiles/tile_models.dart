@@ -40,10 +40,31 @@ enum TileCategory {
   final String label;
 }
 
+/// Something a person can do from a tile without leaving Home.
+@immutable
+class TileAction {
+  const TileAction(this.id, this.label, {this.icon, this.primary = false});
+
+  final String id;
+  final String label;
+  final IconData? icon;
+
+  /// Drawn as the filled, main button of a pair.
+  final bool primary;
+}
+
 /// One line inside a wide or large tile.
 @immutable
 class TileRow {
-  const TileRow(this.text, {this.meta, this.attention = false, this.target});
+  const TileRow(
+    this.text, {
+    this.meta,
+    this.attention = false,
+    this.target,
+    this.id,
+    this.done = false,
+    this.actions = const [],
+  });
 
   final String text;
 
@@ -56,7 +77,67 @@ class TileRow {
   /// Opens something specific instead of the tile's own page, such as
   /// `chat:<id>`. Null opens the tile's page.
   final String? target;
+
+  /// The server id of what the row shows, handed back with an action.
+  final String? id;
+
+  /// Already finished today (a habit that is checked in, for example).
+  final bool done;
+
+  /// What can be done to this row. The first action is the quick one, shown as
+  /// a round button in front of the text.
+  final List<TileAction> actions;
 }
+
+/// One bar of a small chart.
+@immutable
+class TileBar {
+  const TileBar(this.label, this.value, this.text);
+
+  /// Under the bar, such as `M`.
+  final String label;
+  final double value;
+
+  /// Shown when the bar is touched, such as `Mon · €38`.
+  final String text;
+}
+
+/// A stretch of the day drawn on the timeline.
+@immutable
+class TileSpan {
+  const TileSpan(
+    this.startMinute,
+    this.endMinute,
+    this.label, {
+    this.reminder = false,
+  });
+
+  /// Minutes since midnight.
+  final int startMinute;
+  final int endMinute;
+  final String label;
+  final bool reminder;
+}
+
+/// The day from [startMinute] to [endMinute] with what is on it and where the
+/// clock is.
+@immutable
+class TileTimeline {
+  const TileTimeline({
+    required this.startMinute,
+    required this.endMinute,
+    required this.nowMinute,
+    required this.spans,
+  });
+
+  final int startMinute;
+  final int endMinute;
+  final int nowMinute;
+  final List<TileSpan> spans;
+}
+
+/// A picture a tile can show next to or instead of its number.
+enum TileVisual { none, ring, bars, timeline, waveform }
 
 /// What a tile shows right now. Every field is optional so a tile degrades to
 /// its name and subtitle when a server has nothing to report.
@@ -69,6 +150,13 @@ class TileData {
     this.rows = const [],
     this.attention = false,
     this.progress,
+    this.visual = TileVisual.none,
+    this.bars = const [],
+    this.timeline,
+    this.actions = const [],
+    this.focusId,
+    this.focusLabel,
+    this.countdownTo,
   });
 
   /// The big number or word, such as `4`, `€412` or `2/3`.
@@ -80,8 +168,22 @@ class TileData {
   /// Something here needs the person; shown as a dot on small tiles.
   final bool attention;
 
-  /// 0 to 1, drawn as a thin bar under the number.
+  /// 0 to 1, drawn as a thin bar under the number or as the ring.
   final double? progress;
+  final TileVisual visual;
+  final List<TileBar> bars;
+  final TileTimeline? timeline;
+
+  /// What can be done to the item the tile is about ([focusId]), as buttons on
+  /// the square size.
+  final List<TileAction> actions;
+  final String? focusId;
+
+  /// Names the focused item, such as the next event.
+  final String? focusLabel;
+
+  /// When set with [focusLabel], the subtitle counts down to it live.
+  final DateTime? countdownTo;
 
   static const empty = TileData();
 }

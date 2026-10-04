@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import 'tile_actions.dart';
 import 'tile_layout.dart';
 import 'tile_models.dart';
 import 'tile_registry.dart';
@@ -12,10 +13,22 @@ import 'tile_registry.dart';
 class TileLayoutController extends ChangeNotifier {
   TileLayoutController({TileLayoutStore? store})
     : _store = store ?? TileLayoutStore.memory(),
-      _layout = List.of(defaultTileLayout);
+      _layout = List.of(defaultTileLayout),
+      _ready = true;
+
+  /// A controller that reads this device's saved layout; [ready] turns true
+  /// once [open] has finished, so Home does not draw the default layout first.
+  TileLayoutController.device()
+    : _store = TileLayoutStore.memory(),
+      _layout = List.of(defaultTileLayout),
+      _ready = false;
 
   TileLayoutStore _store;
   List<TilePlacement> _layout;
+  bool _ready;
+
+  /// The saved layout is loaded, so the grid can be drawn.
+  bool get ready => _ready;
 
   List<TilePlacement> get layout => List.unmodifiable(_layout);
 
@@ -23,6 +36,7 @@ class TileLayoutController extends ChangeNotifier {
   Future<void> open() async {
     _store = await TileLayoutStore.open();
     _layout = List.of(_store.read());
+    _ready = true;
     notifyListeners();
   }
 
@@ -133,6 +147,13 @@ class TileDataSource {
   }
 
   TileEnv env() => TileEnv(http: http, briefing: briefing, now: clock?.call());
+
+  /// Runs a quick action from a tile; see [runTileAction].
+  Future<TileActionOutcome> act(
+    String tileId,
+    String actionId,
+    String? itemId,
+  ) => runTileAction(http, tileId, actionId, itemId);
 
   /// What [spec] shows now, or null when it has no data or the call failed.
   Future<TileData?> load(TileSpec spec) async {

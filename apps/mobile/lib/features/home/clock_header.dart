@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme.dart';
+import '../../ui/motion.dart';
 import '../../ui/phosphor_icons.dart';
 import 'next_up.dart';
 
@@ -14,6 +15,7 @@ class ClockHeader extends StatelessWidget {
     required this.onEdit,
     required this.onDone,
     required this.onSettings,
+    this.onOpen,
     this.emptyHint,
     this.onEmptyHint,
     super.key,
@@ -25,6 +27,9 @@ class ClockHeader extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDone;
   final VoidCallback onSettings;
+
+  /// Tapping the time or the title opens today's plan.
+  final VoidCallback? onOpen;
 
   /// Shown under the time when nothing is coming up, such as "Connect a calendar".
   final String? emptyHint;
@@ -87,46 +92,60 @@ class ClockHeader extends StatelessWidget {
             ],
           ],
         ),
-        const SizedBox(height: 6),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              clockTime(item?.start ?? now),
-              key: const Key('home-clock-time'),
-              // Already large; scaling it again would not fit a phone.
-              textScaler: TextScaler.noScaling,
-              style: JarvisType.clock(colors.ink),
-            ),
-            if (item != null) ...[
-              const SizedBox(width: 10),
-              Flexible(
-                child: Text(
-                  countdownLabel(item.start, now),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: colors.accent,
+        InkWell(
+          key: const Key('home-clock-tap'),
+          borderRadius: BorderRadius.circular(12),
+          onTap: onOpen,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    clockTime(item?.start ?? now),
+                    key: const Key('home-clock-time'),
+                    // Already large; scaling it again would not fit a phone.
+                    textScaler: TextScaler.noScaling,
+                    style: JarvisType.clock(colors.ink),
                   ),
+                  if (item != null) ...[
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: AnimatedSwitcher(
+                        duration: JarvisMotion.of(context, JarvisMotion.base),
+                        child: Text(
+                          countdownLabel(item.start, now),
+                          key: ValueKey(countdownLabel(item.start, now)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: colors.accent,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                item?.title ?? 'Nothing else today',
+                key: const Key('home-clock-title'),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -.3,
+                  color: colors.ink,
                 ),
               ),
             ],
-          ],
-        ),
-        const SizedBox(height: 10),
-        Text(
-          item?.title ?? 'Nothing else today',
-          key: const Key('home-clock-title'),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -.3,
-            color: colors.ink,
           ),
         ),
         const SizedBox(height: 2),

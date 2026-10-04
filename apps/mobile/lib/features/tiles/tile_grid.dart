@@ -23,6 +23,11 @@ class TileGrid extends StatelessWidget {
     this.onResize,
     this.onReorder,
     this.onEdit,
+    this.now,
+    this.isLoading,
+    this.pending = const {},
+    this.onAction,
+    this.onMenu,
     super.key,
   });
 
@@ -38,8 +43,24 @@ class TileGrid extends StatelessWidget {
   final ValueChanged<TilePlacement>? onResize;
   final void Function(int from, int to)? onReorder;
 
-  /// Long-press on a tile outside edit mode.
+  /// Long-press on a tile outside edit mode, when there is no [onMenu].
   final VoidCallback? onEdit;
+
+  /// The clock live countdowns on tiles read; the wall clock when null.
+  final DateTime? now;
+
+  /// Whether a tile's first data is still on its way.
+  final bool Function(String id)? isLoading;
+
+  /// Ids of items an action is running on.
+  final Set<String> pending;
+
+  /// A quick action on a tile was pressed; [itemId] is null for the tile itself.
+  final void Function(TileSpec spec, TileAction action, String? itemId)?
+  onAction;
+
+  /// Long-press on a tile outside edit mode: show its menu at the touch point.
+  final void Function(TileSpec spec, Offset position)? onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -56,10 +77,9 @@ class TileGrid extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               for (final spot in placed)
-                AnimatedPositioned(
+                _Slide(
                   key: ValueKey(layout[spot.index].id),
                   duration: duration,
-                  curve: JarvisMotion.standard,
                   left: spot.column * (cell + gap),
                   top: spot.row * (cell + gap),
                   width: spot.columns * cell + (spot.columns - 1) * gap,
@@ -83,6 +103,12 @@ class TileGrid extends StatelessWidget {
       onRowTap: editing || onRowTap == null
           ? null
           : (row) => onRowTap!(spec, row),
+      onAction: editing || onAction == null
+          ? null
+          : (action, itemId) => onAction!(spec, action, itemId),
+      now: now,
+      loading: isLoading?.call(spec.id) ?? false,
+      pending: pending,
     );
     if (!editing) {
       return Semantics(
@@ -90,7 +116,11 @@ class TileGrid extends StatelessWidget {
         label: spec.name,
         child: _Pressable(
           onTap: () => onOpen(spec),
-          onLongPress: onEdit,
+          onLongPress: onMenu != null
+              ? (position) => onMenu!(spec, position)
+              : onEdit == null
+              ? null
+              : (_) => onEdit!(),
           child: card,
         ),
       );
@@ -109,6 +139,43 @@ class TileGrid extends StatelessWidget {
   }
 }
 
+/// Places a tile in the grid and slides it when its position changes. The
+/// size changes at once: a tile's content cannot be laid out in a box that is
+/// still growing, so it would overflow on the way.
+class _Slide extends StatelessWidget {
+  const _Slide({
+    required this.duration,
+    required this.left,
+    required this.top,
+    required this.width,
+    required this.height,
+    required this.child,
+    super.key,
+  });
+
+  final Duration duration;
+  final double left;
+  final double top;
+  final double width;
+  final double height;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<Offset>(
+    tween: Tween(end: Offset(left, top)),
+    duration: duration,
+    curve: JarvisMotion.standard,
+    builder: (context, offset, child) => Positioned(
+      left: offset.dx,
+      top: offset.dy,
+      width: width,
+      height: height,
+      child: child!,
+    ),
+    child: child,
+  );
+}
+
 /// Eases down a hair while pressed, like the app's other tappable surfaces.
 class _Pressable extends StatefulWidget {
   const _Pressable({
@@ -118,7 +185,7 @@ class _Pressable extends StatefulWidget {
   });
 
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
+  final ValueChanged<Offset>? onLongPress;
   final Widget child;
 
   @override
@@ -133,14 +200,18 @@ class _PressableState extends State<_Pressable> {
     scale: _down ? JarvisMotion.startScale : 1,
     duration: JarvisMotion.of(context, JarvisMotion.fast),
     curve: JarvisMotion.standard,
-    child: Material(
-      type: MaterialType.transparency,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: widget.onTap,
-        onLongPress: widget.onLongPress,
-        onHighlightChanged: (value) => setState(() => _down = value),
-        child: widget.child,
+    child: GestureDetector(
+      onLongPressStart: widget.onLongPress == null
+          ? null
+          : (details) => widget.onLongPress!(details.globalPosition),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: widget.onTap,
+          onHighlightChanged: (value) => setState(() => _down = value),
+          child: widget.child,
+        ),
       ),
     ),
   );

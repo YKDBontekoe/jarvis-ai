@@ -457,13 +457,23 @@ Future<TileData?> _today(TileEnv env) async {
   final now = env.clock;
   final items = upcomingItems(briefing, now);
   if (items.isEmpty) {
-    return const TileData(stat: '0', unit: 'events', subtitle: 'A free day');
+    return TileData(
+      stat: '0',
+      unit: 'events',
+      subtitle: 'A free day',
+      visual: TileVisual.timeline,
+      timeline: _timeline(const [], now),
+    );
   }
   final next = items.first;
   return TileData(
     stat: '${items.length}',
     unit: _plural(items.length, 'thing', 'things'),
     subtitle: '${next.title} · ${clockTime(next.start)}',
+    focusLabel: next.title,
+    countdownTo: next.start,
+    visual: TileVisual.timeline,
+    timeline: _timeline(items, now),
     rows: [
       for (final item in items.take(_maxRows))
         TileRow(
@@ -472,6 +482,39 @@ Future<TileData?> _today(TileEnv env) async {
           attention: identical(item, next),
         ),
     ],
+  );
+}
+
+/// The rest of today as a strip: what is on it, and where the clock is.
+TileTimeline _timeline(List<UpNext> items, DateTime now) {
+  final midnight = DateTime(now.year, now.month, now.day);
+  final nowMinute = now.difference(midnight).inMinutes;
+  final spans = <TileSpan>[
+    for (final item in items)
+      if (item.start.difference(midnight).inMinutes case final start
+          when item.start.year == now.year &&
+              item.start.month == now.month &&
+              item.start.day == now.day)
+        TileSpan(
+          start,
+          item.reminder ? start + 10 : start + 45,
+          item.title,
+          reminder: item.reminder,
+        ),
+  ];
+  var from = nowMinute - 60;
+  var to = nowMinute + 360;
+  for (final span in spans) {
+    if (span.startMinute < from) from = span.startMinute - 30;
+    if (span.endMinute > to) to = span.endMinute + 60;
+  }
+  from = (from ~/ 60 * 60).clamp(0, 1380);
+  to = ((to + 59) ~/ 60 * 60).clamp(from + 360, 1440);
+  return TileTimeline(
+    startMinute: from,
+    endMinute: to,
+    nowMinute: nowMinute,
+    spans: spans,
   );
 }
 
@@ -534,15 +577,35 @@ Future<TileData?> _reminders(TileEnv env) async {
     return due == null ? null : shortWhen(due, now);
   }
 
+  const done = TileAction(
+    'done',
+    'Done',
+    icon: PhosphorIconsRegular.check,
+    primary: true,
+  );
+  const snooze = TileAction(
+    'snooze',
+    '+10 min',
+    icon: PhosphorIconsRegular.clock,
+  );
+  final first = pending.first;
   return TileData(
     stat: '${dueToday > 0 ? dueToday : pending.length}',
     unit: dueToday > 0 ? 'today' : 'upcoming',
-    subtitle:
-        '${_first(pending.first, ['title'])} · ${when(pending.first) ?? ''}',
+    subtitle: '${_first(first, ['title'])} · ${when(first) ?? ''}',
     attention: dueToday > 0,
+    focusId: asJsonString(first['id']),
+    focusLabel: _first(first, ['title']),
+    countdownTo: jsonDate(first['dueAt'], local: true),
+    actions: const [done, snooze],
     rows: [
       for (final item in pending.take(_maxRows))
-        TileRow(_first(item, ['title']) ?? 'Reminder', meta: when(item)),
+        TileRow(
+          _first(item, ['title']) ?? 'Reminder',
+          meta: when(item),
+          id: asJsonString(item['id']),
+          actions: const [done],
+        ),
     ],
   );
 }
@@ -560,6 +623,17 @@ Future<TileData?> _habits(TileEnv env) async {
     for (final habit in habits)
       if (!doneToday(habit)) habit,
   ];
+  const check = TileAction(
+    'check',
+    'Check in',
+    icon: PhosphorIconsRegular.check,
+    primary: true,
+  );
+  const uncheck = TileAction(
+    'uncheck',
+    'Undo',
+    icon: PhosphorIconsRegular.check,
+  );
   return TileData(
     stat: '$done/${habits.length}',
     unit: 'done',
@@ -568,6 +642,10 @@ Future<TileData?> _habits(TileEnv env) async {
         : '${_first(open.first, ['name'])} left',
     attention: open.isNotEmpty && done == 0,
     progress: done / habits.length,
+    visual: TileVisual.ring,
+    focusId: open.isEmpty ? null : asJsonString(open.first['id']),
+    focusLabel: open.isEmpty ? null : _first(open.first, ['name']),
+    actions: open.isEmpty ? const [] : const [check],
     rows: [
       for (final habit in habits.take(_maxRows))
         TileRow(
@@ -576,6 +654,9 @@ Future<TileData?> _habits(TileEnv env) async {
               ? 'Done'
               : '${asJsonInt(jsonObject(habit['stats'])?['currentStreak'])} day streak',
           attention: !doneToday(habit),
+          id: asJsonString(habit['id']),
+          done: doneToday(habit),
+          actions: [doneToday(habit) ? uncheck : check],
         ),
     ],
   );
@@ -631,14 +712,30 @@ Future<TileData?> _approvals(TileEnv env) async {
     return name[0].toUpperCase() + name.substring(1);
   }
 
+  const deny = TileAction('deny', 'Decline', icon: PhosphorIconsRegular.x);
+  const review = TileAction(
+    'review',
+    'Review',
+    icon: PhosphorIconsRegular.arrowUpRight,
+    primary: true,
+  );
   return TileData(
     stat: '${pending.length}',
     unit: 'waiting',
     subtitle: label(pending.first),
     attention: true,
+    focusId: asJsonString(pending.first['id']),
+    focusLabel: label(pending.first),
+    actions: const [deny, review],
     rows: [
       for (final item in pending.take(_maxRows))
-        TileRow(label(item), meta: 'Review', attention: true),
+        TileRow(
+          label(item),
+          meta: 'Review',
+          attention: true,
+          id: asJsonString(item['id']),
+          actions: const [deny],
+        ),
     ],
   );
 }
@@ -756,6 +853,20 @@ Future<TileData?> _expenses(TileEnv env) async {
   final data = ExpenseMonthData.fromJson(response.data);
   if (data == null) return null;
   final change = data.change;
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  final perDay = {
+    for (final day in data.days)
+      DateTime(day.date.year, day.date.month, day.date.day): day.total,
+  };
+  final bars = [
+    for (var back = 6; back >= 0; back--)
+      if (DateTime(now.year, now.month, now.day - back) case final day)
+        TileBar(
+          weekdays[day.weekday - 1][0],
+          perDay[day] ?? 0,
+          '${weekdays[day.weekday - 1]} · ${formatMoney(perDay[day] ?? 0, data.currency, cents: false)}',
+        ),
+  ];
   return TileData(
     stat: formatMoney(data.total, data.currency, cents: false),
     unit: 'this month',
@@ -764,6 +875,10 @@ Future<TileData?> _expenses(TileEnv env) async {
         : change == null
         ? '${data.count} ${_plural(data.count, 'expense', 'expenses')}'
         : '${change >= 0 ? '+' : '−'}${(change.abs() * 100).round()}% vs last month',
+    visual: bars.any((bar) => bar.value > 0)
+        ? TileVisual.bars
+        : TileVisual.none,
+    bars: bars,
     rows: [
       for (final merchant in data.topMerchants.take(_maxRows))
         TileRow(
@@ -943,8 +1058,11 @@ Future<TileData?> _devices(TileEnv env) async {
     stat: battery is num ? '${battery.round()}%' : null,
     unit: asJsonBool(device['charging']) ? 'charging' : 'battery',
     subtitle: [
+      if (asJsonBool(device['charging'])) 'Charging',
       if (asJsonBool(device['hasLocation'])) 'Location available',
     ].join(' · '),
+    visual: battery is num ? TileVisual.ring : TileVisual.none,
+    progress: battery is num ? (battery / 100).clamp(0, 1).toDouble() : null,
   );
 }
 

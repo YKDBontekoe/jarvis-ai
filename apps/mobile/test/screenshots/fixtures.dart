@@ -301,6 +301,7 @@ List<Map<String, Object?>> memories() => [
 
 Map<String, Object?> expenseMonth() {
   final now = _now();
+  const spent = [22.4, 38.2, 12.9, 64.0, 18.5, 91.3, 31.0];
   return {
     'year': now.year,
     'month': now.month,
@@ -309,14 +310,29 @@ Map<String, Object?> expenseMonth() {
     'count': 14,
     'previousTotal': 380.0,
     'categories': <Object>[],
-    'days': <Object>[],
+    'days': [
+      for (var back = 6; back >= 0; back--)
+        {
+          'date': _day(now.subtract(Duration(days: back))),
+          'total': spent[6 - back],
+        },
+    ],
     'topMerchants': [
       {'merchant': 'Albert Heijn', 'total': 128.4, 'count': 6},
       {'merchant': 'NS', 'total': 64.2, 'count': 4},
       {'merchant': 'Café Loetje', 'total': 58.0, 'count': 1},
     ],
     'otherCurrencies': <Object>[],
-    'expenses': <Object>[],
+    'expenses': [
+      {
+        'id': 'e1',
+        'amount': 31.0,
+        'currency': 'EUR',
+        'category': 'dining',
+        'merchant': 'Café Loetje',
+        'spentOn': _day(now),
+      },
+    ],
   };
 }
 
@@ -348,9 +364,28 @@ Map<String, Object?> whatsAppChats() {
     'state': 'open',
     'account': '+31600000000',
     'chats': [
-      chat('+31611111111', 'Sam', 'Can we push dinner to 19:45?', const Duration(minutes: 12), unread: 2),
-      chat('family@g.us', 'Family', 'Photos from Sunday are in the album', const Duration(hours: 1), group: true, unread: 3),
-      chat('+31622222222', 'Tom', 'Running 10 min late', const Duration(hours: 2), fromMe: true),
+      chat(
+        '+31611111111',
+        'Sam',
+        'Can we push dinner to 19:45?',
+        const Duration(minutes: 12),
+        unread: 2,
+      ),
+      chat(
+        'family@g.us',
+        'Family',
+        'Photos from Sunday are in the album',
+        const Duration(hours: 1),
+        group: true,
+        unread: 3,
+      ),
+      chat(
+        '+31622222222',
+        'Tom',
+        'Running 10 min late',
+        const Duration(hours: 2),
+        fromMe: true,
+      ),
     ],
   };
 }

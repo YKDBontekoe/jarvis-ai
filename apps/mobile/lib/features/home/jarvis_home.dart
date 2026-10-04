@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../theme.dart';
 import '../../ui/phosphor_icons.dart';
@@ -9,6 +10,7 @@ import '../chat/mcp_setup.dart';
 import '../chat/tool_catalog.dart' show humanizeToolName;
 import '../chats/chat_list.dart';
 import '../settings/codex_sign_in_card.dart';
+import '../tiles/tile_actions.dart';
 import '../tiles/tile_controller.dart';
 import '../tiles/tile_grid.dart';
 import '../tiles/tile_models.dart';
@@ -31,6 +33,7 @@ class JarvisHome extends StatefulWidget {
     required this.onAddTile,
     required this.onSettings,
     this.onSuggestion,
+    this.jarvisBusy = false,
     this.clock,
     super.key,
   });
@@ -52,6 +55,9 @@ class JarvisHome extends StatefulWidget {
   final VoidCallback onSettings;
   final ValueChanged<String>? onSuggestion;
 
+  /// Jarvis is writing a reply, possibly in a conversation that is not open.
+  final bool jarvisBusy;
+
   /// Replaces the wall clock in tests.
   final DateTime Function()? clock;
 
@@ -64,7 +70,11 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   late Map<String, dynamic>? _briefing = widget.source.lastBriefing;
   bool _editing = false;
   Timer? _tick;
+  int _ticks = 0;
   int _generation = 0;
+
+  /// Items an action is running on, so their rows can show it.
+  final Set<String> _pending = {};
 
   DateTime get _now => widget.clock?.call() ?? DateTime.now();
 
@@ -74,7 +84,15 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     widget.layout.addListener(_layoutChanged);
     widget.chats.addListener(_rebuild);
-    _tick = Timer.periodic(const Duration(seconds: 30), (_) => _rebuild());
+    _tick = Timer.periodic(const Duration(seconds: 30), (_) {
+      _ticks++;
+      // The clock and countdowns follow every tick; the data every other one.
+      if (_ticks.isEven && widget.ready && !_editing && _pending.isEmpty) {
+        unawaited(_refresh());
+      } else {
+        _rebuild();
+      }
+    });
     if (widget.ready) unawaited(_refresh());
   }
 
@@ -165,13 +183,16 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     return TileData(
       stat: unread > 0 ? '$unread' : null,
       unit: unread > 0 ? 'unread' : null,
-      subtitle: unread > 0
+      subtitle: widget.jarvisBusy
+          ? 'Jarvis is replying…'
+          : unread > 0
           ? [
               for (final item in chats.whatsApp)
                 if (item.unread > 0) item.title,
             ].take(3).join(', ')
           : items.first.title,
-      attention: unread > 0,
+      visual: widget.jarvisBusy ? TileVisual.waveform : TileVisual.none,
+      attention: unread > 0 || widget.jarvisBusy,
       rows: [
         for (final item in items)
           TileRow(
@@ -185,6 +206,96 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   }
 
   Map<String, TileData?> get _tileData => {..._data, 'chats': _chatsData()};
+
+  bool _isLoading(String id) =>
+      widget.ready && tileSpecFor(id)?.load != null && !_data.containsKey(id);
+
+  /// Runs a quick action from a tile: the tile answers at once, the server
+  /// confirms, and the real data replaces the guess.
+  Future<void> _runAction(
+    TileSpec spec,
+    TileAction action,
+    String? itemId,
+  ) async {
+    if (action.id == 'review') {
+      widget.onOpen(spec.destination);
+      return;
+    }
+    if (itemId == null || _pending.contains(itemId)) return;
+    unawaited(HapticFeedback.selectionClick());
+    final before = _data[spec.id];
+    setState(() {
+      _pending.add(itemId);
+      if (before != null) {
+        _data[spec.id] = applyTileAction(spec.id, before, action.id, itemId);
+      }
+    });
+    final outcome = await widget.source.act(spec.id, action.id, itemId);
+    if (!mounted) return;
+    setState(() => _pending.remove(itemId));
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(outcome.message)));
+    if (!outcome.ok && before != null) {
+      setState(() => _data[spec.id] = before);
+    }
+    // What the briefing says (the clock, the approvals banner, Today) changed
+    // too, so fetch it again along with the tile.
+    widget.source.invalidate();
+    final briefing = await widget.source.briefing();
+    if (!mounted) return;
+    setState(() => _briefing = briefing);
+    final generation = _generation;
+    for (final id in {spec.id, 'today'}) {
+      final other = tileSpecFor(id);
+      if (other?.load != null && widget.layout.contains(id)) {
+        unawaited(_loadTile(other!, generation));
+      }
+    }
+  }
+
+  /// The long-press menu: other sizes, remove, or edit the whole of Home.
+  Future<void> _showMenu(TileSpec spec, Offset position) async {
+    unawaited(HapticFeedback.mediumImpact());
+    final current = widget.layout.sizeOf(spec.id);
+    final overlay =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final choice = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        position & const Size(1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        for (final size in spec.sizes)
+          if (size != current)
+            PopupMenuItem(
+              key: Key('menu-size-${size.name}'),
+              value: 'size:${size.name}',
+              child: Text('Show as ${size.label.toLowerCase()}'),
+            ),
+        const PopupMenuItem(
+          key: Key('menu-edit'),
+          value: 'edit',
+          child: Text('Edit Home'),
+        ),
+        const PopupMenuItem(
+          key: Key('menu-remove'),
+          value: 'remove',
+          child: Text('Remove from Home'),
+        ),
+      ],
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'edit') {
+      setState(() => _editing = true);
+    } else if (choice == 'remove') {
+      widget.layout.unpin(spec.id);
+    } else if (choice.startsWith('size:')) {
+      final size = TileSize.parse(choice.substring(5));
+      if (size != null) widget.layout.pin(spec.id, size);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -214,6 +325,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                     onEdit: () => setState(() => _editing = true),
                     onDone: () => setState(() => _editing = false),
                     onSettings: widget.onSettings,
+                    onOpen: () => widget.onOpen('today'),
                     emptyHint: calendarOff && widget.onSuggestion != null
                         ? 'Connect a calendar'
                         : null,
@@ -249,24 +361,33 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                     ),
                   ListenableBuilder(
                     listenable: widget.layout,
-                    builder: (context, _) => TileGrid(
-                      layout: widget.layout.layout,
-                      data: _tileData,
-                      editing: _editing,
-                      onOpen: (spec) => widget.onOpen(spec.destination),
-                      onRowTap: (spec, row) {
-                        final target = row.target;
-                        if (target != null && target.startsWith('chat:')) {
-                          widget.onOpenChat(target.substring(5));
-                        } else {
-                          widget.onOpen(spec.destination);
-                        }
-                      },
-                      onEdit: () => setState(() => _editing = true),
-                      onRemove: (item) => widget.layout.unpin(item.id),
-                      onResize: (item) => widget.layout.cycleSize(item.id),
-                      onReorder: widget.layout.move,
-                    ),
+                    builder: (context, _) => !widget.layout.ready
+                        ? const SizedBox(height: 240)
+                        : TileGrid(
+                            layout: widget.layout.layout,
+                            data: _tileData,
+                            editing: _editing,
+                            onOpen: (spec) => widget.onOpen(spec.destination),
+                            onRowTap: (spec, row) {
+                              final target = row.target;
+                              if (target != null &&
+                                  target.startsWith('chat:')) {
+                                widget.onOpenChat(target.substring(5));
+                              } else {
+                                widget.onOpen(spec.destination);
+                              }
+                            },
+                            onEdit: () => setState(() => _editing = true),
+                            now: now,
+                            isLoading: _isLoading,
+                            pending: _pending,
+                            onAction: _runAction,
+                            onMenu: _showMenu,
+                            onRemove: (item) => widget.layout.unpin(item.id),
+                            onResize: (item) =>
+                                widget.layout.cycleSize(item.id),
+                            onReorder: widget.layout.move,
+                          ),
                   ),
                   if (_editing)
                     Padding(

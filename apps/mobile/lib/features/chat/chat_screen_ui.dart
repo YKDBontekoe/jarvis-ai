@@ -206,6 +206,7 @@ mixin _ChatScreenUi on _ChatScreenController {
       chats: _chatList,
       ready: _conversationId != null,
       refreshRevision: _homeRevision,
+      jarvisBusy: _busy,
       onOpen: _openTile,
       onOpenChat: _openChatByKey,
       onAddTile: () => _selectTab(JarvisTab.everything),

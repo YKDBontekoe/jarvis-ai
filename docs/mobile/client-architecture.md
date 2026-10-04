@@ -80,6 +80,9 @@ Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide
 - The grid is four columns of square cells. `packTiles` places tiles in order into the first free spot, so a small tile fills a gap beside a tall one.
 - The layout is saved on the device (`TileLayoutController`, key `home.tiles.v1`), not on the account, so each device has its own. Unknown ids and unsupported sizes are repaired when it loads.
 - Tiles keep their grid size, so their text grows at most 15% with the device text size.
+- **Live tiles**: `TileData` can also carry `progress` (ring), `bars` (7-day chart), `timeline` (day strip with a "now" marker), `countdownTo` (ticks with the clock) and `actions`. Visuals live in `tile_visuals.dart`; the waveform on Chats shows while Jarvis is replying and respects reduced motion. Tiles show skeletons while loading and refresh every minute and on return to Home.
+- **Quick actions** (`tile_actions.dart`): reminders Done / +10 min, habits Check in / Undo, approvals Decline. `applyTileAction` updates the tile at once, then `runTileAction` calls the API and Home reloads; a failure restores the tile and shows a snackbar. Approvals can only be declined or reviewed on a tile; approving always happens on the approvals page.
+- Long-press a tile for a menu (resize, edit Home, remove). In edit mode drag to reorder. Home waits for the saved layout (`TileLayoutController.ready`) before drawing the grid.
 
 **Chats** merges the Jarvis conversation list the shell already loads with the chats of every linked WhatsApp account (`/api/v1/channels` → `/chats`). WhatsApp unread counts drive the dot on the Chats tab and the Chats tile. Signal has no chat-list endpoint, so it is not in this list; manage it under Channels. Jarvis conversations have no preview text yet because `GET /conversations` returns none.
 
