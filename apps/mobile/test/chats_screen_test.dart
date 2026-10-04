@@ -80,6 +80,7 @@ void main() {
     WidgetTester tester, {
     bool withManage = true,
     Dio? pictures,
+    ValueNotifier<bool>? reducedMotion,
   }) async {
     tester.view.physicalSize = const Size(400, 900);
     tester.view.devicePixelRatio = 1;
@@ -88,6 +89,17 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildJarvisTheme(),
+        builder: (context, child) => reducedMotion == null
+            ? child!
+            : ValueListenableBuilder<bool>(
+                valueListenable: reducedMotion,
+                builder: (context, reduced, _) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(disableAnimations: reduced),
+                  child: child!,
+                ),
+              ),
         home: Scaffold(
           body: ChatsScreen(
             chats: chats,
@@ -111,7 +123,7 @@ void main() {
     expect(find.text('Lisbon trip'), findsOneWidget);
     expect(find.text('Sam'), findsOneWidget);
     expect(find.text('Family'), findsOneWidget);
-    expect(find.text('WhatsApp · Can we push dinner?'), findsOneWidget);
+    expect(find.text('Can we push dinner?'), findsOneWidget);
     expect(find.byKey(const Key('chat-unread-dot')), findsOneWidget);
     // Newest first: Sam, Family, then the Jarvis chat from hours ago.
     final sam = tester.getTopLeft(find.text('Sam')).dy;
@@ -119,6 +131,40 @@ void main() {
     final lisbon = tester.getTopLeft(find.text('Lisbon trip')).dy;
     expect(sam, lessThan(family));
     expect(family, lessThan(lisbon));
+  });
+
+  testWidgets('repeated names show session and channel context', (
+    tester,
+  ) async {
+    chats.setConversations([
+      for (var i = 0; i < 2; i++)
+        {
+          'id': 'c$i',
+          'title': 'Jarvis AI',
+          'profileName': i == 0 ? 'Personal' : 'Work',
+          'createdAt': _iso(DateTime(2026, 10, i + 1, 10)),
+          'updatedAt': _iso(now),
+        },
+    ]);
+    http.on('GET', '/api/v1/channels', [
+      {'id': 'wa1', 'kind': 'whatsapp_linked', 'account': 'Personal'},
+      {'id': 'wa2', 'kind': 'whatsapp_linked', 'account': 'Work'},
+    ]);
+    for (final id in ['wa1', 'wa2']) {
+      http.on('GET', '/api/v1/channels/$id/chats', {
+        'chats': [
+          {'chatId': 'rosa', 'name': 'rosa', 'lastMessageAt': _iso(now)},
+        ],
+      });
+    }
+    await tester.runAsync(() => chats.loadWhatsApp(http.client()));
+    await show(tester);
+    expect(find.text('Jarvis · Personal · 1 Oct · 10:00'), findsOneWidget);
+    expect(find.text('Jarvis · Work · 2 Oct · 10:00'), findsOneWidget);
+    expect(find.text('WhatsApp · Personal'), findsOneWidget);
+    expect(find.text('WhatsApp · Work'), findsOneWidget);
+    expect(find.text('Tap to open chat'), findsNWidgets(2));
+    expect(find.text('No messages yet'), findsNothing);
   });
 
   testWidgets('WhatsApp rows show the profile picture the open chat uses', (
@@ -189,19 +235,64 @@ void main() {
     await tester.enterText(find.byKey(const Key('chats-filter-field')), 'zzz');
     await tester.pumpAndSettle();
     expect(find.text('No chats match'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chats-clear-search')));
+    await tester.pumpAndSettle();
+    expect(find.text('Sam'), findsOneWidget);
+    expect(find.text('Family'), findsOneWidget);
+    expect(find.byKey(const Key('chats-clear-search')), findsNothing);
+  });
+
+  testWidgets('changing Reduce Motion keeps filters working without a slide', (
+    tester,
+  ) async {
+    final reduced = ValueNotifier(false);
+    addTearDown(reduced.dispose);
+    await linkWhatsApp(tester);
+    await show(tester, reducedMotion: reduced);
+    await tester.tap(find.byKey(const Key('chats-tab-unread')));
+    await tester.pump(const Duration(milliseconds: 50));
+    reduced.value = true;
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TabBar>(find.byType(TabBar)).controller!.animationDuration,
+      Duration.zero,
+    );
+    await tester.tap(find.byKey(const Key('chats-tab-jarvis')));
+    await tester.pumpAndSettle();
+    expect(find.text('Lisbon trip'), findsOneWidget);
+    expect(find.text('Sam'), findsNothing);
+    expect(tester.hasRunningAnimations, isFalse);
+    reduced.value = false;
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('chats-tab-all')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chats-tab-all')));
+    await tester.pumpAndSettle();
+    expect(find.text('Sam'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('header buttons call back', (tester) async {
     await show(tester);
-    await tester.tap(find.byKey(const Key('chats-search')));
+    expect(find.byKey(const Key('chats-search')), findsNothing);
+    await tester.tap(find.byKey(const Key('chats-more')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Search everything'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chats-new')));
-    await tester.tap(find.byKey(const Key('chats-manage')));
+    await tester.tap(find.byKey(const Key('chats-more')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Manage conversations'));
+    await tester.pumpAndSettle();
     expect((searched, newChat, managed), (1, 1, 1));
   });
 
   testWidgets('manage is hidden when not offered', (tester) async {
     await show(tester, withManage: false);
-    expect(find.byKey(const Key('chats-manage')), findsNothing);
+    await tester.tap(find.byKey(const Key('chats-more')));
+    await tester.pumpAndSettle();
+    expect(find.text('Manage conversations'), findsNothing);
+    expect(find.text('Search everything'), findsOneWidget);
   });
 
   testWidgets('WhatsApp offers to connect while nothing is linked', (

@@ -20,6 +20,7 @@ final List<TileSpec> tileSpecs = [
   // Plan
   const TileSpec(
     id: 'today',
+    description: 'Your calendar, reminders and plan for today.',
     name: 'Today',
     icon: PhosphorIconsRegular.sunHorizon,
     category: TileCategory.plan,
@@ -30,6 +31,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'tasks',
+    description: 'Track work you have asked Jarvis to do.',
     name: 'Tasks',
     icon: PhosphorIconsRegular.listChecks,
     category: TileCategory.plan,
@@ -40,6 +42,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'reminders',
+    description: 'Set reminders for a time or place.',
     name: 'Reminders',
     icon: PhosphorIconsRegular.bell,
     category: TileCategory.plan,
@@ -50,6 +53,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'habits',
+    description: 'Check in on routines and follow your streaks.',
     name: 'Habits',
     icon: PhosphorIconsRegular.target,
     category: TileCategory.plan,
@@ -60,6 +64,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'journal',
+    description: 'Write about your day and record your mood.',
     name: 'Journal',
     icon: PhosphorIconsRegular.pencilSimple,
     category: TileCategory.plan,
@@ -70,6 +75,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'weekly-review',
+    description: 'Look back at your week and mood trends.',
     name: 'Weekly review',
     icon: PhosphorIconsRegular.chartLine,
     category: TileCategory.plan,
@@ -79,6 +85,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'briefing',
+    description: 'Read your daily summary and priorities.',
     name: 'Daily briefing',
     icon: PhosphorIconsRegular.sparkle,
     category: TileCategory.plan,
@@ -89,6 +96,7 @@ final List<TileSpec> tileSpecs = [
   // Talk
   const TileSpec(
     id: 'chats',
+    description: 'Your Jarvis and WhatsApp conversations.',
     name: 'Chats',
     icon: PhosphorIconsRegular.chatCircle,
     category: TileCategory.talk,
@@ -98,6 +106,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'voice',
+    description: 'Have a hands-free conversation with Jarvis.',
     name: 'Voice',
     icon: PhosphorIconsRegular.waveform,
     category: TileCategory.talk,
@@ -107,6 +116,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'whatsapp',
+    description: 'Manage linked accounts and chats Jarvis can read.',
     name: 'WhatsApp',
     icon: PhosphorIconsRegular.whatsappLogo,
     category: TileCategory.talk,
@@ -116,6 +126,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'inbox',
+    description: 'Review messages that need your attention.',
     name: 'Inbox',
     icon: PhosphorIconsRegular.chatsCircle,
     category: TileCategory.talk,
@@ -126,6 +137,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'approvals',
+    description: 'Review sensitive actions before Jarvis proceeds.',
     name: 'Approvals',
     icon: PhosphorIconsRegular.shieldCheck,
     category: TileCategory.talk,
@@ -136,6 +148,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'channels',
+    description: 'Connect messaging accounts to Jarvis.',
     name: 'Channels',
     icon: PhosphorIconsRegular.broadcast,
     category: TileCategory.talk,
@@ -147,6 +160,7 @@ final List<TileSpec> tileSpecs = [
   // Know
   const TileSpec(
     id: 'memory',
+    description: 'Review and edit what Jarvis remembers about you.',
     name: 'Memory',
     icon: PhosphorIconsRegular.notebook,
     category: TileCategory.know,
@@ -157,6 +171,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'library',
+    description: 'Find articles, links and notes you have saved.',
     name: 'Library',
     icon: PhosphorIconsRegular.bookOpen,
     category: TileCategory.know,
@@ -167,6 +182,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'people',
+    description: 'Keep track of people, birthdays and follow-ups.',
     name: 'People',
     icon: PhosphorIconsRegular.users,
     category: TileCategory.know,
@@ -177,6 +193,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'timeline',
+    description: 'Browse your activity and events over time.',
     name: 'Timeline',
     icon: PhosphorIconsRegular.clockCounterClockwise,
     category: TileCategory.know,
@@ -186,6 +203,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'files',
+    description: 'Manage documents Jarvis can search and use.',
     name: 'Files',
     icon: PhosphorIconsRegular.folderOpen,
     category: TileCategory.know,
@@ -196,6 +214,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'graph',
+    description: 'Explore connections between people and ideas.',
     name: 'Knowledge graph',
     icon: PhosphorIconsRegular.graph,
     category: TileCategory.know,
@@ -205,6 +224,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'projects',
+    description: 'Keep related chats, files and tasks together.',
     name: 'Projects',
     icon: PhosphorIconsRegular.folderSimple,
     category: TileCategory.know,
@@ -216,6 +236,7 @@ final List<TileSpec> tileSpecs = [
   // Money
   const TileSpec(
     id: 'expenses',
+    description: 'Log purchases and see where your money goes.',
     name: 'Expenses',
     icon: PhosphorIconsRegular.wallet,
     category: TileCategory.money,
@@ -226,6 +247,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'finance',
+    description: 'Review budgets and recurring subscriptions.',
     name: 'Finance',
     icon: PhosphorIconsRegular.chartBar,
     category: TileCategory.money,
@@ -237,6 +259,7 @@ final List<TileSpec> tileSpecs = [
   // Automate
   const TileSpec(
     id: 'missions',
+    description: 'Plan larger goals with a team of agents.',
     name: 'Missions',
     icon: PhosphorIconsRegular.flowArrow,
     category: TileCategory.automate,
@@ -247,6 +270,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'automations',
+    description: 'Set up actions that repeat on a schedule.',
     name: 'Automations',
     icon: PhosphorIconsRegular.lightning,
     category: TileCategory.automate,
@@ -257,6 +281,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'watches',
+    description: 'Ask Jarvis to monitor changes and notify you.',
     name: 'Watches',
     icon: PhosphorIconsRegular.eye,
     category: TileCategory.automate,
@@ -267,6 +292,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'modes',
+    description: 'Adjust Jarvis’s behavior and notifications.',
     name: 'Modes',
     icon: PhosphorIconsRegular.circleHalf,
     category: TileCategory.automate,
@@ -276,6 +302,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'coding',
+    description: 'Follow coding runs and review their progress.',
     name: 'Coding',
     icon: PhosphorIconsRegular.code,
     category: TileCategory.automate,
@@ -286,6 +313,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'agents',
+    description: 'Connect other assistants that Jarvis can work with.',
     name: 'Agents',
     icon: PhosphorIconsRegular.robot,
     category: TileCategory.automate,
@@ -297,6 +325,7 @@ final List<TileSpec> tileSpecs = [
   // System
   const TileSpec(
     id: 'integrations',
+    description: 'Connect apps and services to Jarvis.',
     name: 'Integrations',
     icon: PhosphorIconsRegular.plugsConnected,
     category: TileCategory.system,
@@ -307,6 +336,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'skills',
+    description: 'Manage the instructions and skills Jarvis uses.',
     name: 'Skills',
     icon: PhosphorIconsRegular.graduationCap,
     category: TileCategory.system,
@@ -317,6 +347,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'persona',
+    description: 'Choose how Jarvis speaks and responds to you.',
     name: 'Persona',
     icon: PhosphorIconsRegular.userCircle,
     category: TileCategory.system,
@@ -326,6 +357,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'profiles',
+    description: 'Create assistants with separate context and settings.',
     name: 'Profiles',
     icon: PhosphorIconsRegular.identificationCard,
     category: TileCategory.system,
@@ -336,6 +368,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'learning',
+    description: 'Manage how Jarvis learns your preferences.',
     name: 'Learning',
     icon: PhosphorIconsRegular.brain,
     category: TileCategory.system,
@@ -345,6 +378,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'devices',
+    description: 'Manage your devices and their capabilities.',
     name: 'Devices',
     icon: PhosphorIconsRegular.deviceMobile,
     category: TileCategory.system,
@@ -355,6 +389,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'usage',
+    description: 'See model usage, token counts and costs.',
     name: 'Usage',
     icon: PhosphorIconsRegular.pulse,
     category: TileCategory.system,
@@ -365,6 +400,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'audit',
+    description: 'Inspect the actions Jarvis has taken.',
     name: 'Audit log',
     icon: PhosphorIconsRegular.scroll,
     category: TileCategory.system,
@@ -374,6 +410,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'notifications',
+    description: 'Read updates and alerts from Jarvis.',
     name: 'Notifications',
     icon: PhosphorIconsRegular.bellRinging,
     category: TileCategory.system,
@@ -384,6 +421,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'settings',
+    description: 'Appearance, connection and account preferences.',
     name: 'Settings',
     icon: PhosphorIconsRegular.gearSix,
     category: TileCategory.system,
@@ -515,7 +553,9 @@ TileTimeline _timeline(List<UpNext> items, DateTime now) {
     if (span.startMinute < from) from = span.startMinute - 30;
     if (span.endMinute > to) to = span.endMinute + 60;
   }
-  from = (from ~/ 60 * 60).clamp(0, 1380);
+  // Keep six hours within the day, even late at night. Otherwise the
+  // lower clamp bound exceeds midnight and Today falls back to a placeholder.
+  from = (from ~/ 60 * 60).clamp(0, 1080);
   to = ((to + 59) ~/ 60 * 60).clamp(from + 360, 1440);
   return TileTimeline(
     startMinute: from,

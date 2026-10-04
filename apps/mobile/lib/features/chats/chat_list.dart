@@ -29,6 +29,7 @@ class ChatListItem {
     required this.title,
     this.preview,
     this.time,
+    this.startedAt,
     this.unread = 0,
     this.group = false,
     this.pinned = false,
@@ -44,6 +45,7 @@ class ChatListItem {
   final String title;
   final String? preview;
   final DateTime? time;
+  final DateTime? startedAt;
   final int unread;
   final bool group;
   final bool pinned;
@@ -82,6 +84,7 @@ class ChatList extends ChangeNotifier {
             title: jsonString(conversation, 'title') ?? 'New conversation',
             preview: jsonString(conversation, 'profileName'),
             time: jsonDate(conversation['updatedAt'], local: true),
+            startedAt: jsonDate(conversation['createdAt'], local: true),
             pinned: asJsonBool(conversation['pinned']),
             conversationId: id,
           ),

@@ -141,8 +141,11 @@ class _SurfaceCardState extends State<SurfaceCard> {
     return Padding(
       padding: widget.margin,
       child: AnimatedScale(
-        scale: _pressed && widget.onTap != null ? JarvisMotion.startScale : 1,
-        duration: JarvisMotion.fast,
+        scale:
+            _pressed && widget.onTap != null && !JarvisMotion.reduced(context)
+            ? JarvisMotion.startScale
+            : 1,
+        duration: JarvisMotion.of(context, JarvisMotion.fast),
         curve: JarvisMotion.standard,
         child: DecoratedBox(
           decoration: BoxDecoration(

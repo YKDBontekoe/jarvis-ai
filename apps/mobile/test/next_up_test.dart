@@ -97,6 +97,25 @@ void main() {
       expect(at(const Duration(days: 3)), 'Tuesday');
     });
 
+    test('Home can pair a day with a duration beyond 24 hours', () {
+      expect(
+        countdownLabel(
+          now.add(const Duration(hours: 25)),
+          now,
+          durationOnly: true,
+        ),
+        'in 1 d 1 h',
+      );
+      expect(
+        countdownLabel(
+          now.add(const Duration(days: 3)),
+          now,
+          durationOnly: true,
+        ),
+        'in 3 d',
+      );
+    });
+
     test('longDate and greeting', () {
       expect(longDate(now), 'Saturday 3 October');
       expect(greetingFor(DateTime(2026, 1, 1, 8)), 'Good morning');

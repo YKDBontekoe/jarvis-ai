@@ -68,6 +68,110 @@ abstract final class JarvisMotion {
       Stack(alignment: Alignment.topCenter, children: [...previous, ?current]);
 }
 
+/// Quiet content changes. Outgoing content cannot receive taps, announce
+/// duplicate labels or keep its own looping animations running.
+class MotionSwitcher extends StatelessWidget {
+  const MotionSwitcher({
+    required this.child,
+    this.duration = JarvisMotion.base,
+    this.resize = false,
+    super.key,
+  });
+
+  final Widget child;
+  final Duration duration;
+  final bool resize;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduced = JarvisMotion.reduced(context);
+    final content = AnimatedSwitcher(
+      duration: JarvisMotion.of(context, duration),
+      reverseDuration: JarvisMotion.of(context, JarvisMotion.fast),
+      layoutBuilder: (current, previous) => Stack(
+        alignment: Alignment.topLeft,
+        children: [
+          for (final old in previous)
+            IgnorePointer(
+              child: ExcludeSemantics(
+                child: TickerMode(enabled: false, child: old),
+              ),
+            ),
+          ?current,
+        ],
+      ),
+      transitionBuilder: (child, animation) => AnimatedBuilder(
+        animation: animation,
+        child: child,
+        builder: (context, child) {
+          final leaving = animation.status == AnimationStatus.reverse;
+          final curve = leaving
+              ? const Interval(.65, 1, curve: JarvisMotion.exit)
+              : const Interval(.12, 1, curve: JarvisMotion.standard);
+          return Opacity(
+            opacity: reduced
+                ? (leaving ? 0 : 1)
+                : curve.transform(animation.value),
+            child: child,
+          );
+        },
+      ),
+      child: child,
+    );
+    return resize ? MotionSize(child: content) : content;
+  }
+}
+
+/// Resize in place, or lay out immediately with Reduce Motion. A zero-duration
+/// AnimatedSize can restart its controller during layout when content changes.
+class MotionSize extends StatelessWidget {
+  const MotionSize({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => JarvisMotion.reduced(context)
+      ? child
+      : AnimatedSize(
+          duration: JarvisMotion.base,
+          curve: JarvisMotion.standard,
+          alignment: Alignment.topLeft,
+          child: child,
+        );
+}
+
+/// Uses the existing InkWell/InkResponse highlight lifecycle, so a cancelled
+/// tap or a scroll releases the surface and keyboard activation still works.
+class PressFeedback extends StatefulWidget {
+  const PressFeedback({required this.builder, this.scale = .98, super.key});
+
+  final Widget Function(BuildContext context, ValueChanged<bool> onHighlight)
+  builder;
+  final double scale;
+
+  @override
+  State<PressFeedback> createState() => _PressFeedbackState();
+}
+
+class _PressFeedbackState extends State<PressFeedback> {
+  bool _pressed = false;
+
+  void _highlight(bool value) {
+    if (mounted && value != _pressed) setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedScale(
+    scale: _pressed && !JarvisMotion.reduced(context) ? widget.scale : 1,
+    duration: JarvisMotion.of(
+      context,
+      _pressed ? JarvisMotion.fast : JarvisMotion.base,
+    ),
+    curve: JarvisMotion.standard,
+    child: widget.builder(context, _highlight),
+  );
+}
+
 /// Page transition for pushed routes: the new page fades in while it grows from
 /// 98% and rises a few pixels.
 class JarvisPageTransitionsBuilder extends PageTransitionsBuilder {

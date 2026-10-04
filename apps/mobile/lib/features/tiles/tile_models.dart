@@ -139,6 +139,30 @@ class TileTimeline {
 /// A picture a tile can show next to or instead of its number.
 enum TileVisual { none, ring, bars, timeline, waveform }
 
+/// The context that distinguishes a conversation on the Home widget.
+@immutable
+class TileChat {
+  const TileChat({
+    required this.title,
+    required this.context,
+    required this.target,
+    required this.isJarvis,
+    this.preview,
+    this.time,
+    this.unread = 0,
+    this.group = false,
+  });
+
+  final String title;
+  final String context;
+  final String target;
+  final bool isJarvis;
+  final String? preview;
+  final String? time;
+  final int unread;
+  final bool group;
+}
+
 /// What a tile shows right now. Every field is optional so a tile degrades to
 /// its name and subtitle when a server has nothing to report.
 @immutable
@@ -157,6 +181,7 @@ class TileData {
     this.focusId,
     this.focusLabel,
     this.countdownTo,
+    this.chats = const [],
   });
 
   /// The big number or word, such as `4`, `€412` or `2/3`.
@@ -164,6 +189,7 @@ class TileData {
   final String? unit;
   final String? subtitle;
   final List<TileRow> rows;
+  final List<TileChat> chats;
 
   /// Something here needs the person; shown as a dot on small tiles.
   final bool attention;
@@ -215,6 +241,7 @@ class TileSpec {
     required this.destination,
     this.load,
     this.fallback = '',
+    this.description = '',
   });
 
   final String id;
@@ -229,6 +256,10 @@ class TileSpec {
 
   /// Shown under the name while there is no data.
   final String fallback;
+
+  /// What this feature does, independent of its current data or empty state.
+  /// Shown in Everything and its preview, and included in feature search.
+  final String description;
 
   bool supports(TileSize size) => sizes.contains(size);
 

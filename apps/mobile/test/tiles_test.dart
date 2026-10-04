@@ -208,6 +208,23 @@ void main() {
 
     Future<TileData?> load(String id) => source.load(tileSpecFor(id)!);
 
+    test(
+      'Persona names refresh, survive outages and clear for a new owner',
+      () async {
+        http.on('GET', '/api/v1/persona', {'preferredName': ' Youri '});
+        expect(await source.preferredName(), 'Youri');
+        expect(await source.preferredName(), 'Youri');
+        expect(http.sent('GET', '/api/v1/persona'), hasLength(1));
+        source.invalidate();
+        http.on('GET', '/api/v1/persona', {}, status: 503);
+        expect(await source.preferredName(), 'Youri');
+        source.reset();
+        expect(source.lastPreferredName, isNull);
+        http.on('GET', '/api/v1/persona', {'preferredName': 'Sanne'});
+        expect(await source.preferredName(), 'Sanne');
+      },
+    );
+
     test('tasks count the active ones and flag those waiting on you', () async {
       http.on('GET', '/api/v1/tasks', [
         {'id': '1', 'title': 'Compare flights', 'status': 'running'},
@@ -364,6 +381,25 @@ void main() {
       expect(data.stat, '2');
       expect(data.subtitle, 'Design review · 13:30');
       expect(data.rows.map((r) => r.text), ['Design review', 'Call mum']);
+    });
+
+    test('Today still loads late in the evening', () async {
+      final late = DateTime(2026, 10, 3, 23, 30);
+      http.on('GET', '/api/v1/home', {
+        'reminders': [
+          {
+            'title': 'Wind down',
+            'dueAt': iso(late.add(const Duration(minutes: 15))),
+          },
+        ],
+      });
+      final source = TileDataSource(http.client(), clock: () => late);
+      final data = await source.load(tileSpecFor('today')!);
+      expect(data, isNotNull);
+      expect(data!.stat, '1');
+      expect(data.timeline!.startMinute, lessThan(data.timeline!.endMinute));
+      expect(data.timeline!.endMinute, lessThanOrEqualTo(1440));
+      expect(data.rows.single.text, 'Wind down');
     });
 
     test('today counts only today, not what comes tomorrow', () async {

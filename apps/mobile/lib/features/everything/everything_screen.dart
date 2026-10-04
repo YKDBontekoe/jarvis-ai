@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
@@ -11,8 +12,8 @@ import '../tiles/tile_grid.dart';
 import '../tiles/tile_models.dart';
 import '../tiles/tile_registry.dart';
 
-/// Every feature as a tile, by category. Tapping one previews it at each size
-/// and pins it to Home.
+/// Compact feature launchers, grouped by category and what is pinned to Home.
+/// The existing preview sheet keeps sizing and pinning in one place.
 class EverythingScreen extends StatefulWidget {
   const EverythingScreen({
     required this.source,
@@ -47,17 +48,24 @@ class _EverythingScreenState extends State<EverythingScreen> {
         if (spec.category == category &&
             (needle.isEmpty ||
                 spec.name.toLowerCase().contains(needle) ||
+                spec.description.toLowerCase().contains(needle) ||
                 spec.category.label.toLowerCase().contains(needle)))
           spec,
     ];
   }
 
   void _preview(TileSpec spec) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    unawaited(HapticFeedback.selectionClick());
     unawaited(
       showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         showDragHandle: true,
+        sheetAnimationStyle: AnimationStyle(
+          duration: JarvisMotion.of(context, JarvisMotion.slow),
+          reverseDuration: JarvisMotion.of(context, JarvisMotion.base),
+        ),
         builder: (sheet) => _PreviewSheet(
           spec: spec,
           source: widget.source,
@@ -94,21 +102,43 @@ class _EverythingScreenState extends State<EverythingScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Everything',
-                  style: JarvisType.displayOf(context).copyWith(fontSize: 28),
+                  style: JarvisType.displayOf(context).copyWith(fontSize: 32),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 8),
+                Text(
+                  'Explore features and choose what goes on Home.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    color: colors.inkSoft,
+                  ),
+                ),
+                const SizedBox(height: 20),
                 TextField(
                   key: const Key('everything-search'),
                   controller: _query,
                   onChanged: (_) => setState(() {}),
                   textInputAction: TextInputAction.search,
                   decoration: InputDecoration(
-                    hintText: 'Search',
+                    hintText: 'Find a feature',
+                    hintStyle: TextStyle(color: colors.inkSoft),
                     prefixIcon: Icon(
                       PhosphorIconsRegular.magnifyingGlass,
                       size: 18,
                       color: colors.muted,
                     ),
+                    suffixIcon: _query.text.isEmpty
+                        ? null
+                        : IconButton(
+                            key: const Key('everything-clear-search'),
+                            tooltip: 'Clear feature search',
+                            onPressed: () => setState(_query.clear),
+                            icon: Icon(
+                              PhosphorIconsRegular.x,
+                              size: 16,
+                              color: colors.inkSoft,
+                            ),
+                          ),
                     filled: true,
                     fillColor: colors.surfaceMuted,
                     contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -129,13 +159,18 @@ class _EverythingScreenState extends State<EverythingScreen> {
                 ListenableBuilder(
                   listenable: widget.layout,
                   builder: (context, _) {
+                    final favorites = [
+                      for (final item in widget.layout.layout)
+                        if (tileSpecFor(item.id) case final spec?)
+                          if (_matches(spec.category).contains(spec)) spec,
+                    ];
                     final sections = [
                       for (final category in TileCategory.values)
                         if (_matches(category) case final specs
                             when specs.isNotEmpty)
                           (category, specs),
                     ];
-                    if (sections.isEmpty) {
+                    if (sections.isEmpty && favorites.isEmpty) {
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 48),
                         child: Center(
@@ -149,22 +184,53 @@ class _EverythingScreenState extends State<EverythingScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        for (final (category, specs) in sections) ...[
+                        if (favorites.isNotEmpty &&
+                            _query.text.trim().isEmpty) ...[
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(2, 22, 2, 10),
+                            padding: const EdgeInsets.fromLTRB(2, 24, 2, 8),
                             child: Text(
-                              category.label,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: colors.muted,
+                              'On Home',
+                              style: JarvisType.sectionOf(context),
+                            ),
+                          ),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: IntrinsicHeight(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  for (final spec in favorites)
+                                    _FavoriteLauncher(
+                                      spec: spec,
+                                      onTap: () => _preview(spec),
+                                    ),
+                                ],
                               ),
                             ),
                           ),
-                          _IconGrid(
-                            specs: specs,
-                            pinned: widget.layout.contains,
-                            onTap: _preview,
+                        ],
+                        for (final (category, specs) in sections) ...[
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(2, 26, 2, 12),
+                            child: Text(
+                              category.label,
+                              style: JarvisType.displayOf(
+                                context,
+                              ).copyWith(fontSize: 20, letterSpacing: -.4),
+                            ),
+                          ),
+                          SurfaceCard(
+                            radius: JarvisRadii.lg,
+                            padding: EdgeInsets.zero,
+                            color: colors.surface,
+                            borderColor: colors.outline.withValues(
+                              alpha: colors.isDark ? .5 : .25,
+                            ),
+                            child: _FeatureList(
+                              specs: specs,
+                              pinned: widget.layout.contains,
+                              onTap: _preview,
+                            ),
                           ),
                         ],
                       ],
@@ -180,8 +246,63 @@ class _EverythingScreenState extends State<EverythingScreen> {
   }
 }
 
-class _IconGrid extends StatelessWidget {
-  const _IconGrid({
+/// A familiar shortcut strip; the feature directory below explains each tool.
+class _FavoriteLauncher extends StatelessWidget {
+  const _FavoriteLauncher({required this.spec, required this.onTap});
+
+  final TileSpec spec;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final width = MediaQuery.textScalerOf(context).scale(90).clamp(90.0, 180.0);
+    return Semantics(
+      button: true,
+      label: '${spec.name}, on Home. ${spec.description}',
+      onTap: onTap,
+      excludeSemantics: true,
+      child: SizedBox(
+        width: width,
+        child: Material(
+          type: MaterialType.transparency,
+          child: PressFeedback(
+            scale: .96,
+            builder: (context, highlight) => InkWell(
+              key: Key('favorite-${spec.id}'),
+              borderRadius: BorderRadius.circular(JarvisRadii.md),
+              onTap: onTap,
+              onHighlightChanged: highlight,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
+                child: Column(
+                  children: [
+                    TileIconChip(spec: spec, size: 46),
+                    const SizedBox(height: 8),
+                    Text(
+                      spec.name,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: colors.ink,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Grouped iOS-style rows leave room for the purpose of every feature.
+class _FeatureList extends StatelessWidget {
+  const _FeatureList({
     required this.specs,
     required this.pinned,
     required this.onTap,
@@ -194,56 +315,86 @@ class _IconGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
-    return LayoutBuilder(
-      builder: (context, box) {
-        const columns = TileGrid.columns;
-        const gap = TileGrid.gap;
-        final cell = (box.maxWidth - gap * (columns - 1)) / columns;
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
-          children: [
-            for (final spec in specs)
-              SizedBox.square(
-                dimension: cell,
-                child: Semantics(
-                  button: true,
-                  label: pinned(spec.id) ? '${spec.name}, on Home' : spec.name,
-                  child: InkWell(
-                    key: Key('everything-${spec.id}'),
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () => onTap(spec),
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: ExcludeSemantics(
-                            child: IgnorePointer(
-                              child: TileCard(
-                                spec: spec,
-                                size: TileSize.icon,
-                                data: null,
-                              ),
-                            ),
-                          ),
+    return Column(
+      children: [
+        for (var index = 0; index < specs.length; index++) ...[
+          if (index > 0)
+            Divider(
+              height: .5,
+              thickness: .5,
+              indent: 64,
+              endIndent: 16,
+              color: colors.outlineStrong.withValues(alpha: .45),
+            ),
+          _row(context, specs[index], colors),
+        ],
+      ],
+    );
+  }
+
+  Widget _row(BuildContext context, TileSpec spec, JarvisColors colors) {
+    final isPinned = pinned(spec.id);
+    return Semantics(
+      button: true,
+      label: '${spec.name}${isPinned ? ', on Home' : ''}. ${spec.description}',
+      excludeSemantics: true,
+      child: PressFeedback(
+        scale: .99,
+        builder: (context, highlight) => InkWell(
+          key: Key('everything-${spec.id}'),
+          borderRadius: BorderRadius.circular(JarvisRadii.md),
+          onTap: () => onTap(spec),
+          onHighlightChanged: highlight,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                TileIconChip(spec: spec, size: 36),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        spec.name,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          height: 1.25,
+                          color: colors.ink,
                         ),
-                        if (pinned(spec.id))
-                          Positioned(
-                            top: 7,
-                            right: 7,
-                            child: Icon(
-                              PhosphorIconsRegular.pushPin,
-                              size: 12,
-                              color: colors.accent,
-                            ),
-                          ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        spec.description,
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.35,
+                          color: colors.inkSoft,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-          ],
-        );
-      },
+                const SizedBox(width: 12),
+                if (isPinned) ...[
+                  Icon(
+                    PhosphorIconsRegular.pushPin,
+                    size: 12,
+                    color: colors.inkSoft,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Icon(
+                  PhosphorIconsRegular.caretRight,
+                  size: 12,
+                  color: colors.inkSoft,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -318,8 +469,12 @@ class _PreviewSheetState extends State<_PreviewSheet> {
                         ).copyWith(fontSize: 22),
                       ),
                       Text(
-                        spec.category.label,
-                        style: TextStyle(fontSize: 13, color: colors.muted),
+                        spec.description,
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.4,
+                          color: colors.inkSoft,
+                        ),
                       ),
                     ],
                   ),
@@ -342,10 +497,7 @@ class _PreviewSheetState extends State<_PreviewSheet> {
                         TileGrid.columns;
                     return Align(
                       alignment: Alignment.topLeft,
-                      child: AnimatedSize(
-                        duration: JarvisMotion.of(context, JarvisMotion.base),
-                        curve: JarvisMotion.standard,
-                        alignment: Alignment.topLeft,
+                      child: MotionSize(
                         child: SizedBox(
                           key: const Key('tile-preview'),
                           width:
@@ -369,7 +521,11 @@ class _PreviewSheetState extends State<_PreviewSheet> {
                     key: Key('size-${size.name}'),
                     label: Text(size.label),
                     selected: size == _size,
-                    onSelected: (_) => setState(() => _size = size),
+                    onSelected: (_) {
+                      if (_size == size) return;
+                      unawaited(HapticFeedback.selectionClick());
+                      setState(() => _size = size);
+                    },
                     showCheckmark: false,
                   ),
               ],
@@ -378,12 +534,17 @@ class _PreviewSheetState extends State<_PreviewSheet> {
             FilledButton(
               key: const Key('tile-pin'),
               onPressed: () {
+                unawaited(HapticFeedback.lightImpact());
                 if (pinnedSize == _size) {
                   widget.layout.unpin(spec.id);
                   widget.onDone('${spec.name} removed from Home');
                 } else {
                   widget.layout.pin(spec.id, _size);
-                  widget.onDone('${spec.name} added to Home');
+                  widget.onDone(
+                    pinnedSize == null
+                        ? '${spec.name} added to Home'
+                        : '${spec.name} size updated',
+                  );
                 }
               },
               style: FilledButton.styleFrom(

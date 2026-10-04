@@ -5,6 +5,7 @@ import '../../theme.dart';
 import '../../ui/motion.dart';
 import '../../ui/phosphor_icons.dart';
 import '../home/next_up.dart' show countdownLabel;
+import 'chats_tile.dart';
 import 'tile_models.dart';
 import 'tile_visuals.dart';
 
@@ -56,13 +57,15 @@ class TileCard extends StatelessWidget {
       maxScaleFactor: 1.15,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: colors.surface,
+          color: size == TileSize.icon ? null : colors.surface,
           borderRadius: BorderRadius.circular(tileRadius),
           // Light tiles float on a soft shadow; dark ones need an edge.
-          border: colors.isDark
+          border: size != TileSize.icon && colors.isDark
               ? Border.all(color: colors.outline.withValues(alpha: .6))
               : null,
-          boxShadow: JarvisShadows.soft(colors.brightness),
+          boxShadow: size == TileSize.icon
+              ? null
+              : JarvisShadows.hairline(colors.brightness),
         ),
         child: _content(),
       ),
@@ -73,6 +76,13 @@ class TileCard extends StatelessWidget {
     if (data == null && loading) return TileSkeleton(size: size);
     final info = data ?? TileData(subtitle: spec.fallback);
     final clock = now ?? DateTime.now();
+    if (spec.id == 'chats' &&
+        (info.chats.isNotEmpty || info.rows.isEmpty) &&
+        (size == TileSize.square ||
+            size == TileSize.wide ||
+            size == TileSize.large)) {
+      return ChatsTileContent(info: info, size: size, onRowTap: onRowTap);
+    }
     return switch (size) {
       TileSize.icon => _IconTile(spec: spec, info: info),
       TileSize.strip => _StripTile(
@@ -213,45 +223,51 @@ class _IconTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
-    return Stack(
-      children: [
-        Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (info.visual == TileVisual.waveform)
-                SizedBox(
-                  height: 40,
-                  child: Center(child: TileWaveform(color: colors.accent)),
-                )
-              else
-                TileIconChip(spec: spec, size: 40),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  info.visual == TileVisual.waveform
-                      ? (info.subtitle ?? spec.name)
-                      : spec.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -.1,
-                    color: info.visual == TileVisual.waveform
-                        ? colors.accent
-                        : colors.ink,
-                    height: 1,
+    return LayoutBuilder(
+      builder: (context, box) {
+        final iconSize = (box.maxHeight - 38).clamp(24.0, 40.0);
+        return Stack(
+          children: [
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (info.visual == TileVisual.waveform)
+                    SizedBox(
+                      height: iconSize,
+                      child: Center(child: TileWaveform(color: colors.accent)),
+                    )
+                  else
+                    TileIconChip(spec: spec, size: iconSize),
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      info.visual == TileVisual.waveform
+                          ? (info.subtitle ?? spec.name)
+                          : spec.name,
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.visible,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -.1,
+                        color: info.visual == TileVisual.waveform
+                            ? colors.accent
+                            : colors.ink,
+                        height: 1.15,
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-        ),
-        if (info.attention && info.visual != TileVisual.waveform)
-          const Positioned(top: 9, right: 9, child: _Dot()),
-      ],
+            ),
+            if (info.attention && info.visual != TileVisual.waveform)
+              const Positioned(top: 9, right: 9, child: _Dot()),
+          ],
+        );
+      },
     );
   }
 }
@@ -365,15 +381,24 @@ class _Label extends StatelessWidget {
             TileIconChip(spec: spec),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                spec.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -.1,
-                  color: colors.inkSoft,
+              // Keep full feature names when a compact tile needs another line.
+              child: LayoutBuilder(
+                builder: (context, labelBox) => FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(
+                    width: labelBox.maxWidth,
+                    child: Text(
+                      spec.name,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -.1,
+                        height: 1.1,
+                        color: colors.inkSoft,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -550,17 +575,21 @@ class _SquareTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     final hasFocus = info.actions.isNotEmpty && info.focusId != null;
-    Widget body;
-    if (info.visual == TileVisual.ring && info.progress != null) {
-      body = _ringBody(colors, hasFocus);
-    } else if (info.visual == TileVisual.bars && info.bars.isNotEmpty) {
-      body = _barsBody(colors);
-    } else if (hasFocus) {
-      body = _focusBody(colors);
-    } else {
-      body = _plainBody(colors);
-    }
-    return Padding(padding: const EdgeInsets.all(14), child: body);
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: LayoutBuilder(
+        builder: (context, box) {
+          if (info.visual == TileVisual.ring && info.progress != null) {
+            return _ringBody(colors, hasFocus);
+          } else if (info.visual == TileVisual.bars && info.bars.isNotEmpty) {
+            return _barsBody(colors);
+          } else if (hasFocus) {
+            return _focusBody(colors);
+          }
+          return _plainBody(colors, compact: box.maxHeight < 125);
+        },
+      ),
+    );
   }
 
   Widget _ringBody(JarvisColors colors, bool hasFocus) => Column(
@@ -689,7 +718,7 @@ class _SquareTile extends StatelessWidget {
     );
   }
 
-  Widget _plainBody(JarvisColors colors) {
+  Widget _plainBody(JarvisColors colors, {bool compact = false}) {
     final subtitle = _subtitle(info, clock);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -697,7 +726,10 @@ class _SquareTile extends StatelessWidget {
         _Label(spec: spec, info: info),
         // The number sits under the name, so neighbouring tiles line up; the
         // detail settles at the bottom.
-        if (info.stat != null) const SizedBox(height: 12) else const Spacer(),
+        if (info.stat != null)
+          SizedBox(height: compact ? 6 : 12)
+        else
+          const Spacer(),
         if (info.stat != null)
           FittedBox(
             fit: BoxFit.scaleDown,

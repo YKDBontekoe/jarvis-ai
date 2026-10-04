@@ -73,6 +73,22 @@ class JarvisColors extends ThemeExtension<JarvisColors> {
     colors: [accent, violet],
   );
 
+  /// A quiet pool of accent light on an existing surface. Use for a focal
+  /// piece of content, rather than giving every row the same emphasis.
+  LinearGradient litSurface(Color tint, {double strength = .14}) =>
+      LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color.alphaBlend(
+            tint.withValues(alpha: isDark ? strength : strength * .45),
+            surface,
+          ),
+          surface,
+        ],
+        stops: const [0, .85],
+      );
+
   /// Dims the screen behind sheets and dialogs without going black.
   Color get scrim => (isDark ? const Color(0xff000000) : ink).withValues(
     alpha: isDark ? .5 : .28,
@@ -248,6 +264,14 @@ class JarvisType {
 
   static TextStyle displayOf(BuildContext context) =>
       display(JarvisColors.of(context).ink);
+
+  /// Quiet but readable labels for screen sections.
+  static TextStyle sectionOf(BuildContext context) => TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    color: JarvisColors.of(context).inkSoft,
+  );
 
   static TextStyle clock(Color color) => TextStyle(
     fontFamily: 'Geist',

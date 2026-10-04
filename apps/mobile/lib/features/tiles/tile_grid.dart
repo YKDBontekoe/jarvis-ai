@@ -197,7 +197,9 @@ class _PressableState extends State<_Pressable> {
 
   @override
   Widget build(BuildContext context) => AnimatedScale(
-    scale: _down ? JarvisMotion.startScale : 1,
+    scale: _down && !JarvisMotion.reduced(context)
+        ? JarvisMotion.startScale
+        : 1,
     duration: JarvisMotion.of(context, JarvisMotion.fast),
     curve: JarvisMotion.standard,
     child: GestureDetector(

@@ -22,7 +22,6 @@ void main() {
   late List<String> opened;
   late List<String> openedChats;
   var addTile = 0;
-  var settings = 0;
   final suggestions = <String>[];
 
   setUp(() {
@@ -34,8 +33,8 @@ void main() {
     opened = [];
     openedChats = [];
     addTile = 0;
-    settings = 0;
     suggestions.clear();
+    http.on('GET', '/api/v1/persona', {'preferredName': 'Youri'});
     http.on('GET', '/api/v1/home', {
       'calendar': {
         'connected': true,
@@ -69,6 +68,7 @@ void main() {
     bool ready = true,
     bool busy = false,
     List<TilePlacement>? tiles,
+    DateTime? at,
   }) async {
     tester.view.physicalSize = const Size(400, 1200);
     tester.view.devicePixelRatio = 1;
@@ -97,11 +97,10 @@ void main() {
             chats: chats,
             ready: ready,
             refreshRevision: 0,
-            clock: () => now,
+            clock: () => at ?? now,
             onOpen: opened.add,
             onOpenChat: openedChats.add,
             onAddTile: () => addTile++,
-            onSettings: () => settings++,
             onSuggestion: suggestions.add,
             jarvisBusy: busy,
           ),
@@ -111,6 +110,14 @@ void main() {
     await tester.pumpAndSettle();
     // Setup cards mount once the briefing arrives; let their requests finish.
     await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> enterEdit(WidgetTester tester) async {
+    await tester.ensureVisible(find.byKey(const Key('home-edit')));
+    await tester.tap(find.byKey(const Key('home-edit')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('home-edit-hint')));
     await tester.pumpAndSettle();
   }
 
@@ -127,6 +134,19 @@ void main() {
       'Dinner with Sanne',
     );
     expect(find.text('Café Loetje'), findsOneWidget);
+  });
+
+  testWidgets('the greeting follows the local time and omits an unset name', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/persona', {'preferredName': ''});
+    await show(tester, at: DateTime(2026, 10, 3, 9));
+    expect(find.text('Good morning'), findsOneWidget);
+    expect(find.byKey(const Key('home-name')), findsNothing);
+    await show(tester, at: DateTime(2026, 10, 3, 14));
+    expect(find.text('Good afternoon'), findsOneWidget);
+    await show(tester, at: DateTime(2026, 10, 3, 21));
+    expect(find.text('Good evening'), findsOneWidget);
   });
 
   testWidgets('with nothing coming up it shows the time and says so', (
@@ -173,6 +193,31 @@ void main() {
     expect(opened, ['tasks', 'memory']);
   });
 
+  testWidgets('Chats tile distinguishes repeated names by profile', (
+    tester,
+  ) async {
+    chats.setConversations([
+      {
+        'id': 'work',
+        'title': 'Jarvis AI',
+        'profileName': 'Work',
+        'updatedAt': _iso(now),
+      },
+      {
+        'id': 'personal',
+        'title': 'Jarvis AI',
+        'profileName': 'Personal',
+        'updatedAt': _iso(now),
+      },
+    ]);
+    await show(tester, tiles: const [TilePlacement('chats', TileSize.wide)]);
+    expect(find.text('Jarvis AI'), findsNWidgets(2));
+    expect(find.text('Jarvis · Work'), findsOneWidget);
+    expect(find.text('Jarvis · Personal'), findsOneWidget);
+    await tester.tap(find.text('Jarvis · Work'));
+    expect(openedChats, ['jarvis:work']);
+  });
+
   testWidgets('a tile with no data shows what it is for', (tester) async {
     await show(tester, tiles: const [TilePlacement('skills', TileSize.strip)]);
     expect(find.text('What Jarvis can do'), findsOneWidget);
@@ -216,11 +261,14 @@ void main() {
     expect(opened, ['approvals']);
   });
 
-  testWidgets('the header opens settings and edit mode', (tester) async {
+  testWidgets('a personal greeting replaces the header buttons', (
+    tester,
+  ) async {
     await show(tester);
-    await tester.tap(find.byKey(const Key('home-settings')));
-    expect(settings, 1);
-    await tester.tap(find.byKey(const Key('home-edit')));
+    expect(find.text('Good evening'), findsOneWidget);
+    expect(find.text('Youri'), findsOneWidget);
+    expect(find.byKey(const Key('home-settings')), findsNothing);
+    await enterEdit(tester);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('home-edit-done')), findsOneWidget);
     expect(find.byKey(const Key('home-edit-hint')), findsOneWidget);
@@ -272,7 +320,7 @@ void main() {
         TilePlacement('memory', TileSize.icon),
       ],
     );
-    await tester.tap(find.byKey(const Key('home-edit')));
+    await enterEdit(tester);
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('tile-resize-tasks')));
@@ -295,7 +343,7 @@ void main() {
         TilePlacement('journal', TileSize.icon),
       ],
     );
-    await tester.tap(find.byKey(const Key('home-edit')));
+    await enterEdit(tester);
     await tester.pumpAndSettle();
 
     final from = tester.getCenter(find.text('Tasks'));
@@ -316,7 +364,7 @@ void main() {
 
   testWidgets('Add tile in edit mode asks for Everything', (tester) async {
     await show(tester);
-    await tester.tap(find.byKey(const Key('home-edit')));
+    await enterEdit(tester);
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const Key('home-add-tile')));
     await tester.tap(find.byKey(const Key('home-add-tile')));
@@ -501,7 +549,7 @@ void main() {
         tester,
         tiles: const [TilePlacement('habits', TileSize.square)],
       );
-      await tester.tap(find.byKey(const Key('home-edit')));
+      await enterEdit(tester);
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const Key('tile-action-check')),
@@ -539,7 +587,6 @@ void main() {
               onOpen: opened.add,
               onOpenChat: openedChats.add,
               onAddTile: () {},
-              onSettings: () {},
             ),
           ),
         ),
@@ -623,7 +670,7 @@ void main() {
         busy: true,
         tiles: const [TilePlacement('chats', TileSize.wide)],
       );
-      expect(find.text('Jarvis is replying…'), findsOneWidget);
+      expect(find.text('Replying…'), findsOneWidget);
       expect(find.byKey(const Key('tile-waveform')), findsOneWidget);
       expect(find.text('Lisbon trip'), findsOneWidget);
     });

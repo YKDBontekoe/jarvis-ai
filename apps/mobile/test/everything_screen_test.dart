@@ -5,6 +5,7 @@ import 'package:jarvis_mobile/features/tiles/tile_controller.dart';
 import 'package:jarvis_mobile/features/tiles/tile_models.dart';
 import 'package:jarvis_mobile/features/tiles/tile_registry.dart';
 import 'package:jarvis_mobile/theme.dart';
+import 'package:jarvis_mobile/ui/phosphor_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/fixture_http.dart';
@@ -26,7 +27,7 @@ void main() {
     ]);
   });
 
-  Future<void> show(WidgetTester tester) async {
+  Future<void> show(WidgetTester tester, {bool reducedMotion = false}) async {
     tester.view.physicalSize = const Size(400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -34,6 +35,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildJarvisTheme(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(disableAnimations: reducedMotion),
+          child: child!,
+        ),
         home: Scaffold(
           body: EverythingScreen(
             source: TileDataSource(http.client()),
@@ -91,6 +98,36 @@ void main() {
     await tester.enterText(find.byKey(const Key('everything-search')), 'zzz');
     await tester.pumpAndSettle();
     expect(find.textContaining('Nothing matches'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('everything-clear-search')));
+    await tester.pumpAndSettle();
+    expect(find.text('On Home'), findsOneWidget);
+    expect(find.byKey(const Key('everything-tasks')), findsOneWidget);
+    expect(find.byKey(const Key('everything-clear-search')), findsNothing);
+  });
+
+  testWidgets('feature search also finds a feature by what it does', (
+    tester,
+  ) async {
+    await show(tester);
+    await tester.enterText(
+      find.byKey(const Key('everything-search')),
+      'hands-free',
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('everything-voice')), findsOneWidget);
+    expect(
+      find.text('Have a hands-free conversation with Jarvis.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('everything-tasks')), findsNothing);
+    await openPreview(tester, 'voice');
+    expect(
+      find.text('Have a hands-free conversation with Jarvis.'),
+      findsWidgets,
+    );
+    await tester.tap(find.byKey(const Key('tile-open')));
+    await tester.pumpAndSettle();
+    expect(opened, ['voice']);
   });
 
   testWidgets('pinned features carry a pin', (tester) async {
@@ -100,7 +137,7 @@ void main() {
       find.descendant(
         of: find.byKey(const Key('everything-tasks')),
         matching: find.byWidgetPredicate(
-          (w) => w is Icon && w.size == 12,
+          (w) => w is Icon && w.icon == PhosphorIconsRegular.pushPin,
         ),
       ),
       findsOneWidget,
@@ -108,10 +145,32 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const Key('everything-reminders')),
-        matching: find.byWidgetPredicate((w) => w is Icon && w.size == 12),
+        matching: find.byWidgetPredicate(
+          (w) => w is Icon && w.icon == PhosphorIconsRegular.pushPin,
+        ),
       ),
       findsNothing,
     );
+  });
+
+  testWidgets('On Home shortcuts follow pins and disappear during search', (
+    tester,
+  ) async {
+    await show(tester);
+    expect(find.text('On Home'), findsOneWidget);
+    expect(find.byKey(const Key('favorite-tasks')), findsOneWidget);
+    expect(find.byKey(const Key('favorite-reminders')), findsNothing);
+    layout.unpin('tasks');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('favorite-tasks')), findsNothing);
+    expect(find.byKey(const Key('everything-tasks')), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('everything-search')),
+      'weekly',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('On Home'), findsNothing);
+    expect(find.text('Weekly review'), findsOneWidget);
   });
 
   testWidgets('previewing shows live data and pins at the chosen size', (
@@ -124,8 +183,11 @@ void main() {
     expect(find.text('3 skills'), findsOneWidget);
     expect(find.byKey(const Key('size-icon')), findsOneWidget);
     expect(find.byKey(const Key('size-strip')), findsOneWidget);
-    expect(find.byKey(const Key('size-square')), findsNothing,
-        reason: 'Skills only offers icon and strip');
+    expect(
+      find.byKey(const Key('size-square')),
+      findsNothing,
+      reason: 'Skills only offers icon and strip',
+    );
     expect(find.text('Add to Home'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('size-icon')));
@@ -151,12 +213,27 @@ void main() {
     await tester.tap(find.byKey(const Key('tile-pin')));
     await tester.pumpAndSettle();
     expect(layout.sizeOf('tasks'), other);
+    expect(find.text('Tasks size updated'), findsOneWidget);
 
     await openPreview(tester, 'tasks');
     await tester.tap(find.byKey(const Key('tile-pin')));
     await tester.pumpAndSettle();
     expect(layout.contains('tasks'), isFalse);
     expect(find.text('Tasks removed from Home'), findsOneWidget);
+  });
+
+  testWidgets('tile preview resizes immediately with Reduce Motion', (
+    tester,
+  ) async {
+    await show(tester, reducedMotion: true);
+    await openPreview(tester, 'tasks');
+    final before = tester.getSize(find.byKey(const Key('tile-preview')));
+    await tester.tap(find.byKey(const Key('size-icon')));
+    await tester.pumpAndSettle();
+    final after = tester.getSize(find.byKey(const Key('tile-preview')));
+    expect(after.width, lessThan(before.width));
+    expect(tester.hasRunningAnimations, isFalse);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Open from the preview goes to the feature', (tester) async {
