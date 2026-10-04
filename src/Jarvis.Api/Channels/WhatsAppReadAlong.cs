@@ -119,7 +119,9 @@ public sealed class WhatsAppReadAlongReceiver(IServiceScopeFactory scopes, Whats
 
                 var messages = await bridge.PullObservedAsync(connection.Id, cancellationToken);
                 if (messages.Count == 0) continue;
-                var observed = messages.Select(ToObserved).ToArray();
+                var observed = new List<ObservedWhatsAppMessage>(messages.Count);
+                foreach (var message in messages)
+                    observed.Add(await ToObservedAsync(bridge, connection.Id, message, cancellationToken));
                 if (await chats.StoreObservedAsync(connection.Id, observed, cancellationToken) > 0)
                     await PublishReceivedAsync(scope.ServiceProvider, chats, connection, observed, cancellationToken);
                 await bridge.AckObservedAsync(connection.Id, messages.Select(message => message.Id),
@@ -150,13 +152,32 @@ public sealed class WhatsAppReadAlongReceiver(IServiceScopeFactory scopes, Whats
         }
     }
 
-    internal static ObservedWhatsAppMessage ToObserved(BridgeObservedMessage message)
+    internal static ObservedWhatsAppMessage ToObserved(BridgeObservedMessage message, byte[]? content = null)
     {
         var sender = string.IsNullOrWhiteSpace(message.Sender) ? null : message.Sender.Trim();
         if (sender is { Length: > 80 }) sender = sender[..80];
+        var stored = WhatsAppMediaCodec.Prepare(message.Media, message.Quote, content);
         return new(ExternalId(message.Id), message.ChatId, message.FromMe, sender, message.Text,
             message.Timestamp > 0 ? DateTimeOffset.FromUnixTimeSeconds(message.Timestamp) : DateTimeOffset.UtcNow,
-            WhatsAppChatIds.Normalize(message.SenderId));
+            WhatsAppChatIds.Normalize(message.SenderId), stored?.Json, stored?.Content, stored?.ContentType);
+    }
+
+    private static async Task<ObservedWhatsAppMessage> ToObservedAsync(WhatsAppBridgeClient bridge, Guid connectionId,
+        BridgeObservedMessage message, CancellationToken cancellationToken)
+    {
+        byte[]? content = null;
+        if (message.Media is { HasContent: true })
+        {
+            try
+            {
+                content = (await bridge.GetMediaAsync(connectionId, message.Id, cancellationToken))?.Bytes;
+            }
+            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+            {
+                content = null;
+            }
+        }
+        return ToObserved(message, content);
     }
 }
 

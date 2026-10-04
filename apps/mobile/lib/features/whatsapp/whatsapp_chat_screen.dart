@@ -8,6 +8,7 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'read_along_screen.dart';
+import 'whatsapp_media.dart';
 import 'whatsapp_models.dart';
 
 /// One read-along chat: the conversation as Jarvis sees it, a reply drafted in
@@ -75,6 +76,27 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
       }
     });
     _composer.addListener(() => setState(() {}));
+  }
+
+  @override
+  void didUpdateWidget(WhatsAppChatScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.channelId == widget.channelId &&
+        oldWidget.chat.chatId == widget.chat.chatId) {
+      return;
+    }
+    // The wide layout reuses this screen when another chat is opened. Keep the
+    // new group's id, or the list keeps showing the previous conversation.
+    _chat = widget.chat;
+    _messages = const [];
+    _loading = true;
+    _error = null;
+    _refreshError = null;
+    _markedMessage = null;
+    _hasOlder = false;
+    _requestRevision++;
+    _fetching = false;
+    unawaited(_load());
   }
 
   @override
@@ -162,7 +184,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
         _error = 'Could not load this chat.';
       });
     } finally {
-      _fetching = false;
+      if (revision == _requestRevision) _fetching = false;
     }
   }
 
@@ -674,6 +696,7 @@ class _Bubble extends StatelessWidget {
     final colors = JarvisColors.of(context);
     final theme = Theme.of(context);
     final mine = message.fromMe;
+    final naked = whatsAppNakedSticker(message);
     final background = mine ? colors.surfaceRaised : colors.surface;
     const radius = Radius.circular(20);
     final showFace = isGroup && !mine;
@@ -706,17 +729,21 @@ class _Bubble extends StatelessWidget {
               ],
               Flexible(
                 child: Container(
-                  padding: const EdgeInsets.fromLTRB(16, 11, 16, 8),
-                  decoration: BoxDecoration(
-                    color: background,
-                    border: mine ? null : Border.all(color: colors.outline),
-                    borderRadius: BorderRadius.only(
-                      topLeft: radius,
-                      topRight: radius,
-                      bottomLeft: mine ? radius : const Radius.circular(4),
-                      bottomRight: mine ? const Radius.circular(4) : radius,
-                    ),
-                  ),
+                  padding: naked
+                      ? const EdgeInsets.only(bottom: 2)
+                      : const EdgeInsets.fromLTRB(16, 11, 16, 8),
+                  decoration: naked
+                      ? null
+                      : BoxDecoration(
+                          color: background,
+                          border: mine ? null : Border.all(color: colors.outline),
+                          borderRadius: BorderRadius.only(
+                            topLeft: radius,
+                            topRight: radius,
+                            bottomLeft: mine ? radius : const Radius.circular(4),
+                            bottomRight: mine ? const Radius.circular(4) : radius,
+                          ),
+                        ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -731,12 +758,10 @@ class _Bubble extends StatelessWidget {
                             ),
                           ),
                         ),
-                      SelectableText(
-                        message.text,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 15.5,
-                          height: 1.45,
-                        ),
+                      WhatsAppMessageContent(
+                        message: message,
+                        http: http,
+                        channelId: channelId,
                       ),
                       const SizedBox(height: 2),
                       Align(

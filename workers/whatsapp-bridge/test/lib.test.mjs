@@ -3,15 +3,20 @@ import test from 'node:test';
 import {
   ChatBook,
   Inbox,
+  MediaBin,
   PictureCache,
   RecentIds,
+  acceptMediaBytes,
   chatIdOf,
   describeMessage,
+  mediaOf,
+  quoteOf,
   inboundFrom,
   isChatId,
   jidFromChatId,
   jidFromPhone,
   normalizeWatchList,
+  messageChatId,
   observedFrom,
   phoneFromJid,
   pictureUrlAllowed,
@@ -114,6 +119,76 @@ test('describeMessage keeps text and labels media with their caption', () => {
   assert.equal(describeMessage({ audioMessage: {} }), '[Voice message]');
   assert.equal(describeMessage({ protocolMessage: {} }), null);
   assert.equal(describeMessage({ reactionMessage: { text: '👍' } }), null);
+  assert.equal(describeMessage({ contactMessage: { displayName: 'Piet' } }), '[Contact card] Piet');
+  assert.equal(describeMessage({ videoMessage: { gifPlayback: true, seconds: 2 } }), '[GIF]');
+  assert.equal(describeMessage({
+    extendedTextMessage: { text: 'Noice', contextInfo: { quotedMessage: { conversation: 'Hoi' } } },
+  }), 'Noice');
+});
+
+test('mediaOf describes photos, stickers and the other WhatsApp elements', () => {
+  assert.equal(mediaOf({ conversation: 'hoi' }), null);
+  const photo = mediaOf({ imageMessage: { caption: 'kijk', mimetype: 'image/jpeg', width: 800, height: 600 } });
+  assert.equal(photo.kind, 'image');
+  assert.equal(photo.mime, 'image/jpeg');
+  assert.equal(photo.width, 800);
+  assert.equal(photo.download, 'full');
+  const sticker = mediaOf({ stickerMessage: { mimetype: 'image/webp', isAnimated: true } });
+  assert.equal(sticker.kind, 'sticker');
+  assert.equal(sticker.animated, true);
+  assert.equal(sticker.download, 'full');
+  const video = mediaOf({ videoMessage: { seconds: 12, mimetype: 'video/mp4' } });
+  assert.equal(video.kind, 'video');
+  assert.equal(video.seconds, 12);
+  assert.equal(video.download, 'thumbnail');
+  assert.equal(mediaOf({ videoMessage: { gifPlayback: true } }).kind, 'gif');
+  const voice = mediaOf({ audioMessage: { ptt: true, seconds: 3, mimetype: 'audio/ogg; codecs=opus' } });
+  assert.equal(voice.kind, 'audio');
+  assert.equal(voice.voice, true);
+  assert.equal(voice.mime, 'audio/ogg');
+  assert.equal(voice.seconds, 3);
+  const file = mediaOf({ documentMessage: { fileName: '../Piet.pdf', mimetype: 'application/pdf' } });
+  assert.equal(file.kind, 'document');
+  assert.equal(file.fileName, 'Piet.pdf');
+  const where = mediaOf({ locationMessage: { degreesLatitude: 52.37, degreesLongitude: 4.89, name: 'Oma' } });
+  assert.equal(where.kind, 'location');
+  assert.equal(where.place, 'Oma');
+  assert.equal(where.latitude, 52.37);
+  assert.equal(where.download, null);
+  assert.equal(mediaOf({ contactMessage: { displayName: 'Piet' } }).contactName, 'Piet');
+  assert.deepEqual(mediaOf({ pollCreationMessage: { name: 'Eten?', options: [{ optionName: 'Ja' }, { optionName: 'Nee' }] } }).pollOptions, ['Ja', 'Nee']);
+  assert.deepEqual(quoteOf({
+    extendedTextMessage: {
+      text: 'Noice',
+      contextInfo: { participant: '31611111111@s.whatsapp.net', quotedMessage: { conversation: 'Hoi' } },
+    },
+  }), { author: '+31611111111', text: 'Hoi' });
+});
+
+function padded(header) {
+  return Buffer.concat([Buffer.from(header), Buffer.alloc(24, 1)]);
+}
+
+test('acceptMediaBytes trusts the file header, not the declared type', () => {
+  const jpeg = padded([0xff, 0xd8, 0xff, 0xe0]);
+  assert.equal(acceptMediaBytes('image', 'image/jpeg', jpeg)?.type, 'image/jpeg');
+  assert.equal(acceptMediaBytes('sticker', 'image/webp', jpeg), null);
+  assert.equal(acceptMediaBytes('video', 'image/jpeg', jpeg)?.type, 'image/jpeg');
+  const webp = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBP'), Buffer.alloc(8)]);
+  assert.equal(acceptMediaBytes('sticker', 'image/webp', webp)?.type, 'image/webp');
+  const ogg = Buffer.concat([Buffer.from('OggS'), Buffer.alloc(12)]);
+  assert.equal(acceptMediaBytes('audio', 'audio/ogg', ogg)?.type, 'audio/ogg');
+  const pdf = Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.alloc(8)]);
+  assert.equal(acceptMediaBytes('document', 'application/pdf', pdf)?.type, 'application/pdf');
+  assert.equal(acceptMediaBytes('document', 'text/html', Buffer.from('<html>hello</html>')), null);
+  assert.equal(acceptMediaBytes('image', 'image/svg+xml', Buffer.from('<svg></svg>')), null);
+  const bin = new MediaBin(jpeg.length + 1);
+  assert.equal(bin.put('a', { bytes: jpeg, type: 'image/jpeg' }), true);
+  assert.equal(bin.get('a').type, 'image/jpeg');
+  bin.put('b', { bytes: jpeg, type: 'image/jpeg' });
+  assert.equal(bin.get('a'), null);
+  bin.drop(['b']);
+  assert.equal(bin.get('b'), null);
 });
 
 test('observed messages: only watched chats, both directions, never the self chat', () => {
@@ -122,6 +197,21 @@ test('observed messages: only watched chats, both directions, never the self cha
   assert.deepEqual(observedFrom(entry({ rest: { pushName: 'Piet' } }), opts), {
     id: 'A1', chatId: '+31687654321', fromMe: false, sender: 'Piet', senderId: '+31687654321', text: 'hello', timestamp: 1_700_000_000,
   });
+  const photo = observedFrom(entry({
+    rest: { message: { imageMessage: { caption: 'kijk', mimetype: 'image/jpeg' } }, pushName: 'Piet' },
+  }), opts);
+  assert.equal(photo.text, '[Photo] kijk');
+  assert.equal(photo.media.kind, 'image');
+  assert.equal(photo.media.hasContent, false);
+  assert.equal(photo.media.download, undefined);
+  const swapped = observedFrom(entry({
+    key: { remoteJid: '31655555555@s.whatsapp.net', remoteJidAlt: '120363025-1@g.us' },
+    rest: { pushName: 'Piet' },
+  }), { ...opts, watched: new Set(['120363025-1@g.us']) });
+  assert.equal(swapped.chatId, '120363025-1@g.us');
+  assert.equal(swapped.senderId, '+31655555555');
+  assert.equal(messageChatId({ remoteJid: '31655555555@s.whatsapp.net', remoteJidAlt: '120363025-1@g.us' }),
+    '120363025-1@g.us');
   const mine = observedFrom(entry({ key: { fromMe: true } }), opts);
   assert.equal(mine.fromMe, true);
   assert.equal(mine.sender, null);

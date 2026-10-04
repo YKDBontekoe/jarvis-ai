@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/chats/chat_list.dart';
 import 'package:jarvis_mobile/features/chats/chats_screen.dart';
 import 'package:jarvis_mobile/features/whatsapp/read_along_screen.dart';
+import 'package:jarvis_mobile/features/whatsapp/whatsapp_models.dart';
 import 'package:jarvis_mobile/theme.dart';
 
 import 'support/fixture_http.dart';
@@ -257,7 +258,9 @@ class _PictureHttp implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    final subject = '${options.queryParameters['subject']}';
+    final subject = whatsAppChatIdFromToken(
+      '${options.queryParameters['subject']}',
+    );
     subjects.add(subject);
     final bytes = pictures[subject];
     if (bytes == null) {

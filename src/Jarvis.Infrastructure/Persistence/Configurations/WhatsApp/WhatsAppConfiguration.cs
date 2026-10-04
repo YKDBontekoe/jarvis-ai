@@ -47,6 +47,7 @@ internal sealed class WhatsAppMessageConfiguration : IEntityTypeConfiguration<Wh
         builder.Property(x => x.Sender).HasColumnName("sender").HasMaxLength(80);
         builder.Property(x => x.SenderId).HasColumnName("sender_id").HasMaxLength(100);
         builder.Property(x => x.Text).HasColumnName("text").IsRequired();
+        builder.Property(x => x.MediaJson).HasColumnName("media").HasColumnType("jsonb");
         builder.Property(x => x.SentAt).HasColumnName("sent_at");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");
         builder.HasOne<ChannelConnectionEntity>().WithMany().HasForeignKey(x => x.ConnectionId)
@@ -54,5 +55,21 @@ internal sealed class WhatsAppMessageConfiguration : IEntityTypeConfiguration<Wh
         builder.HasIndex(x => new { x.ConnectionId, x.ExternalId }).IsUnique();
         builder.HasIndex(x => new { x.ConnectionId, x.ChatId, x.SentAt });
         builder.HasIndex(x => new { x.OwnerId, x.SentAt });
+    }
+}
+
+internal sealed class WhatsAppMessageMediaConfiguration : IEntityTypeConfiguration<WhatsAppMessageMediaEntity>
+{
+    public void Configure(EntityTypeBuilder<WhatsAppMessageMediaEntity> builder)
+    {
+        builder.ToTable("whatsapp_message_media");
+        builder.HasKey(x => x.MessageId);
+        builder.Property(x => x.MessageId).HasColumnName("message_id").ValueGeneratedNever();
+        builder.Property(x => x.OwnerId).HasColumnName("owner_id");
+        builder.Property(x => x.ContentType).HasColumnName("content_type").HasMaxLength(100).IsRequired();
+        builder.Property(x => x.Content).HasColumnName("content").HasColumnType("bytea").IsRequired();
+        builder.HasOne<WhatsAppMessageEntity>().WithMany().HasForeignKey(x => x.MessageId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(x => x.OwnerId);
     }
 }

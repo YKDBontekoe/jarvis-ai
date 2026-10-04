@@ -129,7 +129,7 @@ internal sealed class WhatsAppAssistant(IChatClientResolver chatClients, Persona
         foreach (var message in messages)
             builder.Append('[').Append(message.SentAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))
                 .Append("] ").Append(message.FromMe ? "me" : Quote(message.Sender ?? "them")).Append(": ")
-                .AppendLine(AgentText.Limit(message.Text.ReplaceLineEndings(" "), 1_000));
+                .AppendLine(AgentText.Limit(WhatsAppMediaCodec.ForAgent(message), 1_000));
     }
 
     private static string Quote(string value) => JsonSerializer.Serialize(value);

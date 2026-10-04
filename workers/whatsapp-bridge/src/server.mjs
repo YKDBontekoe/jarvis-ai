@@ -5,6 +5,7 @@ import path from 'node:path';
 import makeWASocket, {
   Browsers,
   DisconnectReason,
+  downloadMediaMessage,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
@@ -15,19 +16,24 @@ import QRCode from 'qrcode';
 import {
   ChatBook,
   Inbox,
+  MediaBin,
   RecentIds,
   PictureCache,
+  acceptMediaBytes,
   canonicalJid,
   chatIdOf,
+  messageChatId,
   inboundFrom,
   isChatId,
   isGroupJid,
   jidFromChatId,
+  mediaOf,
   normalizeWatchList,
   observedFrom,
   phoneFromJid,
   pictureUrlAllowed,
   safeSessionId,
+  thumbnailBytes,
 } from './lib.mjs';
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -79,6 +85,7 @@ class Session {
     // Read along: chats the owner turned on in Jarvis, their buffered messages, and the chat list for the picker.
     this.watched = new Set();
     this.observed = new Inbox(2_000);
+    this.media = new MediaBin();
     this.chats = new ChatBook();
     this.pictures = new PictureCache();
     this.loaded = false;
@@ -141,7 +148,7 @@ class Session {
     const resolvePhone = await phonesFor(this.socket, jids);
     for (const entry of messages ?? []) {
       const timestamp = toNumber(entry.messageTimestamp);
-      const chatId = chatIdOf(entry?.key?.remoteJid, resolvePhone);
+      const chatId = messageChatId(entry?.key, resolvePhone);
       if (chatId) {
         const personName = !entry.key.fromMe && !isGroupJid(chatId) ? entry.pushName : null;
         this.chats.touch(chatId, { name: personName, timestamp });
@@ -149,7 +156,11 @@ class Session {
       // 'append' carries messages sent from the phone while this device was catching up; keep only recent ones.
       if (type !== 'notify' && !(type === 'append' && timestamp >= recent)) continue;
       const observed = observedFrom(entry, { selfPhone: this.phone, watched: this.watched, resolvePhone });
-      if (observed) this.observed.push(observed);
+      if (observed) {
+        await this.attachMedia(entry, observed);
+        const dropped = this.observed.push(observed);
+        if (dropped) this.media.drop(dropped);
+      }
       if (type !== 'notify') continue;
       const inbound = inboundFrom(entry, { selfPhone: this.phone, sentIds: this.sent, resolvePhone });
       if (inbound) this.inbox.push(inbound);
@@ -193,7 +204,9 @@ class Session {
   async setWatched(ids) {
     this.watched = normalizeWatchList(ids);
     // Drop buffered messages of chats that were turned off, so nothing from them reaches Jarvis afterwards.
+    const dropped = this.observed.items.filter((item) => !this.watched.has(item.chatId)).map((item) => item.id);
     this.observed.items = this.observed.items.filter((item) => this.watched.has(item.chatId));
+    this.media.drop(dropped);
     await writeJsonFile(path.join(this.dir, WATCH_FILE), { chats: [...this.watched] });
     return this.watched.size;
   }
@@ -236,6 +249,7 @@ class Session {
         this.pictures = new PictureCache();
         this.watched = new Set();
         this.observed = new Inbox(2_000);
+        this.media = new MediaBin();
         await rm(this.dir, { recursive: true, force: true });
         return;
       }
@@ -248,6 +262,36 @@ class Session {
 
   snapshot() {
     return { state: this.state, qr: this.qr, phone: this.phone };
+  }
+
+  /** Downloads a photo, sticker, voice note or document, or keeps a video's jpeg preview. */
+  async attachMedia(entry, observed) {
+    const spec = mediaOf(entry?.message);
+    if (!spec?.download || !observed.media) return;
+    const file = spec.download === 'thumbnail'
+      ? thumbnailBytes(entry.message, spec.kind)
+      : await this.downloadMedia(entry, spec) ?? (spec.kind === 'image' ? thumbnailBytes(entry.message, 'image') : null);
+    if (file && this.media.put(observed.id, file)) {
+      observed.media.hasContent = true;
+      observed.media.mime = file.type;
+    }
+  }
+
+  async downloadMedia(entry, spec) {
+    if (this.state !== 'open' || typeof this.socket?.updateMediaMessage !== 'function') return null;
+    try {
+      const buffer = await Promise.race([
+        downloadMediaMessage(entry, 'buffer', {}, {
+          logger: pino({ level: 'silent' }),
+          reuploadRequest: (message) => this.socket.updateMediaMessage(message),
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15_000)),
+      ]);
+      return acceptMediaBytes(spec.kind, spec.mime, buffer);
+    } catch (error) {
+      log.debug({ session: this.id, err: error?.message }, 'could not download WhatsApp media');
+      return null;
+    }
   }
 
   async send(chatId, text) {
@@ -422,8 +466,16 @@ async function route(request) {
   if (action === 'observed' && request.method === 'GET' && !parts[3]) return { messages: session.observed.list() };
   if (action === 'observed' && parts[3] === 'ack' && request.method === 'POST') {
     const body = await readJson(request);
-    session.observed.ack(Array.isArray(body.ids) ? body.ids.map(String) : []);
+    const ids = Array.isArray(body.ids) ? body.ids.map(String) : [];
+    session.observed.ack(ids);
+    session.media.drop(ids);
     return { ok: true };
+  }
+  if (action === 'media' && request.method === 'GET' && parts[3]) {
+    if (!/^[A-Za-z0-9_-]{6,80}$/.test(parts[3])) throw new HttpError(400, 'Invalid message.');
+    const file = session.media.get(decodeURIComponent(parts[3]));
+    if (!file) throw new HttpError(404, 'No media.');
+    return new Picture(file.bytes, file.type);
   }
   throw new HttpError(404, 'Not found.');
 }

@@ -32,6 +32,7 @@ public sealed class WhatsAppReadAlongTests
     [InlineData("120363025-1%2540g.us", "120363025-1@g.us")]
     [InlineData("120363025123456789:0@g.us", "120363025123456789@g.us")]
     [InlineData("120363025123456789_1@g.us", "120363025123456789@g.us")]
+    [InlineData("b64.MTIwMzYzMDI1LTFAZy51cw", "120363025-1@g.us")]
     [InlineData("99887766@lid", "99887766@lid")]
     [InlineData("99887766:2@lid", "99887766@lid")]
     [InlineData("31612345678@s.whatsapp.net", null)]
@@ -220,6 +221,30 @@ public sealed class WhatsAppReadAlongTests
             new BridgeObservedMessage("D", "+31611111111", true, " ", "x", 1)).Sender);
         Assert.Equal("+31655555555", WhatsAppReadAlongReceiver.ToObserved(
             new BridgeObservedMessage("E", "120363025-1@g.us", false, "Sanne", "Hoi", 1, "31 6 555 55 555")).SenderId);
+
+        var jpeg = new byte[32];
+        jpeg[0] = 0xff;
+        jpeg[1] = 0xd8;
+        jpeg[2] = 0xff;
+        var photo = WhatsAppReadAlongReceiver.ToObserved(new BridgeObservedMessage("F", "+31611111111", false, "Piet",
+            "[Photo] kijk", 1, Media: new WhatsAppIncomingMedia("image", "image/jpeg", null, null, 40, 40,
+                HasContent: true), Quote: new WhatsAppQuote("Rosa", "Hoi")), jpeg);
+        Assert.NotNull(photo.MediaJson);
+        Assert.Equal("image/jpeg", photo.ContentType);
+        Assert.Equal(jpeg, photo.Content);
+        var read = WhatsAppMediaCodec.Read(photo.MediaJson);
+        Assert.Equal("image", read.Media?.Kind);
+        Assert.True(read.Media?.HasContent);
+        Assert.Equal("Hoi", read.Quote?.Text);
+        Assert.Contains("replying to: Hoi", WhatsAppMediaCodec.ForAgent(new WhatsAppChatMessage(Guid.CreateVersion7(),
+            Guid.CreateVersion7(), "+31611111111", "wa:F", false, "Piet", "[Photo] kijk", Now, Quote: read.Quote)));
+
+        var rejected = WhatsAppReadAlongReceiver.ToObserved(new BridgeObservedMessage("G", "+31611111111", false, null,
+            "[Sticker]", 1, Media: new WhatsAppIncomingMedia("sticker", "image/webp", HasContent: true)), jpeg);
+        var sticker = WhatsAppMediaCodec.Read(rejected.MediaJson);
+        Assert.Equal("sticker", sticker.Media?.Kind);
+        Assert.False(sticker.Media?.HasContent);
+        Assert.Null(rejected.Content);
     }
 
     private static WhatsAppChatSettings Settings(string chatId, string name, bool readAlong) =>
@@ -283,6 +308,10 @@ public sealed class WhatsAppReadAlongTests
 
         public Task<int> StoreObservedAsync(Guid connectionId, IReadOnlyList<ObservedWhatsAppMessage> messages,
             CancellationToken cancellationToken) => Task.FromResult(0);
+
+        public Task<(byte[] Content, string ContentType)?> OpenMediaAsync(Guid ownerId, Guid connectionId,
+            Guid messageId, CancellationToken cancellationToken) =>
+            Task.FromResult<(byte[] Content, string ContentType)?>(null);
 
         public Task<IReadOnlyList<WhatsAppChatMessage>> ListMessagesAsync(Guid ownerId, Guid connectionId,
             string chatId, int limit, DateTimeOffset? before, CancellationToken cancellationToken, Guid? beforeId = null) =>

@@ -574,7 +574,7 @@ class _ConversationRow extends StatelessWidget {
         MediaQuery.textScalerOf(context).scale(14) > 18;
     final preview = chat.preview == null
         ? 'Waiting for new messages'
-        : '${chat.previewFromMe == true ? 'You: ' : ''}${chat.preview!.replaceAll(RegExp(r'\s+'), ' ')}';
+        : '${chat.previewFromMe == true ? 'You: ' : ''}${whatsAppPreviewText(chat.preview!)}';
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -767,7 +767,7 @@ class _ChatRow extends StatelessWidget {
                     ),
                   if (chat.preview != null && chat.readAlong)
                     Text(
-                      '${chat.previewFromMe == true ? 'You: ' : ''}${chat.preview!.replaceAll(RegExp(r'\s+'), ' ')}',
+                      '${chat.previewFromMe == true ? 'You: ' : ''}${whatsAppPreviewText(chat.preview!)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -999,7 +999,7 @@ class WhatsAppPictures {
     try {
       final response = await http.get<List<int>>(
         whatsAppChatPath(channelId, action: 'picture'),
-        queryParameters: {'subject': subject},
+        queryParameters: {'subject': whatsAppChatToken(subject)},
         options: Options(
           responseType: ResponseType.bytes,
           receiveTimeout: const Duration(seconds: 15),

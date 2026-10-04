@@ -347,6 +347,45 @@ void main() {
     await close(tester);
   });
 
+  testWidgets('a group loads its saved messages without putting @ in the url', (
+    tester,
+  ) async {
+    const group = WhatsAppChat(
+      chatId: '120363025-1@g.us',
+      name: 'Familie',
+      isGroup: true,
+      readAlong: true,
+      autoReminders: true,
+    );
+    http.on('GET', '$_piet/messages', [
+      {
+        'id': 'g1',
+        'fromMe': false,
+        'sender': 'Piet',
+        'senderId': '+31611111111',
+        'text': 'Eten we vrijdag bij oma?',
+        'sentAt': DateTime.now().toUtc().toIso8601String(),
+      },
+    ]);
+    await show(
+      tester,
+      WhatsAppChatScreen(
+        http: http.client(),
+        channelId: _channel,
+        chat: group,
+        pollInterval: const Duration(hours: 1),
+      ),
+    );
+    final requested = http.sent('GET', '$_piet/messages').single.query['chatId']
+        as String;
+    expect(requested.startsWith('b64.'), isTrue);
+    expect(requested.contains('@'), isFalse);
+    expect(find.text('Eten we vrijdag bij oma?'), findsOneWidget);
+    expect(find.text('Piet'), findsOneWidget);
+    expect(find.text('Waiting for messages'), findsNothing);
+    await close(tester);
+  });
+
   testWidgets('ask Jarvis answers about the chat and can become the reply', (
     tester,
   ) async {

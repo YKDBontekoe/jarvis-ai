@@ -139,5 +139,5 @@ internal sealed class WhatsAppAgentTools(IWhatsAppAssistantRepository chats, IWh
     private static void AppendMessage(StringBuilder text, WhatsAppChatMessage message) =>
         text.Append("- [").Append(message.SentAt.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture))
             .Append("] ").Append(message.FromMe ? "you" : message.Sender ?? "them").Append(": ")
-            .AppendLine(AgentText.Limit(message.Text.ReplaceLineEndings(" "), 1_500));
+            .AppendLine(AgentText.Limit(WhatsAppMediaCodec.ForAgent(message), 1_500));
 }

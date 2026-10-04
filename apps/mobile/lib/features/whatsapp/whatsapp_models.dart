@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/widgets.dart';
 
 import '../../json_maps.dart';
@@ -87,6 +89,8 @@ class WhatsAppMessage {
     this.sender,
     this.senderId,
     this.receivedAt,
+    this.media,
+    this.quote,
   });
 
   final String id;
@@ -98,6 +102,8 @@ class WhatsAppMessage {
   final String text;
   final DateTime sentAt;
   final DateTime? receivedAt;
+  final WhatsAppMedia? media;
+  final WhatsAppQuote? quote;
 
   static WhatsAppMessage? fromJson(Map<String, dynamic>? json) {
     final id = asJsonString(json?['id']);
@@ -111,8 +117,201 @@ class WhatsAppMessage {
       text: asJsonString(json['text']) ?? '',
       sentAt: sentAt,
       receivedAt: jsonDate(json['receivedAt']),
+      media: WhatsAppMedia.fromJson(json['media']),
+      quote: WhatsAppQuote.fromJson(json['quote']),
     );
   }
+}
+
+/// A photo, sticker, video, voice note, document, location, contact or poll.
+class WhatsAppMedia {
+  const WhatsAppMedia({
+    required this.kind,
+    this.mime,
+    this.fileName,
+    this.seconds,
+    this.width,
+    this.height,
+    this.animated = false,
+    this.voice = false,
+    this.latitude,
+    this.longitude,
+    this.place,
+    this.contactName,
+    this.pollOptions = const [],
+    this.hasContent = false,
+  });
+
+  final String kind;
+  final String? mime;
+  final String? fileName;
+  final int? seconds;
+  final int? width;
+  final int? height;
+  final bool animated;
+  final bool voice;
+  final double? latitude;
+  final double? longitude;
+  final String? place;
+  final String? contactName;
+  final List<String> pollOptions;
+  final bool hasContent;
+
+  static WhatsAppMedia? fromJson(Object? value) {
+    final json = jsonObject(value);
+    final kind = asJsonString(json?['kind']);
+    if (json == null || kind == null || !whatsAppMediaKinds.contains(kind)) {
+      return null;
+    }
+    return WhatsAppMedia(
+      kind: kind,
+      mime: asJsonString(json['mime']),
+      fileName: asJsonString(json['fileName']),
+      seconds: (json['seconds'] as num?)?.toInt(),
+      width: (json['width'] as num?)?.toInt(),
+      height: (json['height'] as num?)?.toInt(),
+      animated: asJsonBool(json['animated']),
+      voice: asJsonBool(json['voice']),
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      place: asJsonString(json['place']),
+      contactName: asJsonString(json['contactName']),
+      pollOptions: [
+        for (final option in json['pollOptions'] is List
+            ? json['pollOptions'] as List
+            : const [])
+          if (option is String && option.trim().isNotEmpty) option.trim(),
+      ],
+      hasContent: asJsonBool(json['hasContent']),
+    );
+  }
+
+  /// Short label such as "Photo" or "Voice message".
+  String get label => whatsAppMediaLabel(kind, voice: voice);
+}
+
+/// The message this one replies to.
+class WhatsAppQuote {
+  const WhatsAppQuote({this.author, required this.text});
+
+  final String? author;
+  final String text;
+
+  static WhatsAppQuote? fromJson(Object? value) {
+    final json = jsonObject(value);
+    final text = asJsonString(json?['text'])?.trim();
+    if (json == null || text == null || text.isEmpty) return null;
+    return WhatsAppQuote(author: asJsonString(json['author']), text: text);
+  }
+}
+
+const whatsAppMediaKinds = {
+  'image',
+  'sticker',
+  'video',
+  'gif',
+  'audio',
+  'document',
+  'location',
+  'contact',
+  'poll',
+};
+
+String whatsAppMediaLabel(String kind, {bool voice = false}) => switch (kind) {
+  'image' => 'Photo',
+  'sticker' => 'Sticker',
+  'video' => 'Video',
+  'gif' => 'GIF',
+  'audio' => voice ? 'Voice message' : 'Audio',
+  'document' => 'Document',
+  'location' => 'Location',
+  'contact' => 'Contact',
+  'poll' => 'Poll',
+  _ => 'Attachment',
+};
+
+final _legacyMedia = RegExp(
+  r'^\[(Photo|Video|GIF|Voice message|Audio|Document|Sticker|Location|Live location|Contact card|Contact cards|Poll)\](?:\s+([\s\S]*))?$',
+);
+
+/// A message saved before files were downloaded, recognised from its "[Photo] caption" text.
+WhatsAppMedia? whatsAppLegacyMedia(String text) {
+  final match = _legacyMedia.firstMatch(text.trim());
+  if (match == null) return null;
+  final label = match.group(1)!;
+  final extra = match.group(2)?.trim();
+  final caption = extra == null || extra.isEmpty ? null : extra;
+  final kind = switch (label) {
+    'Photo' => 'image',
+    'Sticker' => 'sticker',
+    'Video' => 'video',
+    'GIF' => 'gif',
+    'Voice message' || 'Audio' => 'audio',
+    'Document' => 'document',
+    'Location' || 'Live location' => 'location',
+    'Contact card' || 'Contact cards' => 'contact',
+    'Poll' => 'poll',
+    _ => null,
+  };
+  if (kind == null) return null;
+  return WhatsAppMedia(
+    kind: kind,
+    voice: label == 'Voice message',
+    fileName: kind == 'document' ? caption : null,
+    place: kind == 'location' ? caption : label == 'Live location' ? caption : null,
+    contactName: kind == 'contact' ? caption : null,
+  );
+}
+
+/// Caption after the "[Photo]" label, or null when the text is only the label.
+String? whatsAppMediaCaption(String text) {
+  final match = _legacyMedia.firstMatch(text.trim());
+  if (match == null) {
+    final trimmed = text.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+  final extra = match.group(2)?.trim();
+  return extra == null || extra.isEmpty ? null : extra;
+}
+
+/// "Photo · fiezbiez" for a chat-list preview that was stored as "[Photo] fiezbiez".
+String whatsAppPreviewText(String text) {
+  final flat = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+  final match = _legacyMedia.firstMatch(flat);
+  if (match == null) return flat;
+  final label = switch (match.group(1)!) {
+    'Contact card' => 'Contact',
+    'Contact cards' => 'Contacts',
+    final other => other,
+  };
+  final extra = match.group(2)?.trim();
+  return extra == null || extra.isEmpty ? label : '$label · $extra';
+}
+
+/// One grapheme that is only emoji, joiners, and presentation selectors.
+final _oneEmoji = RegExp(
+  r'^(?:'
+  r'\u200d|\ufe0f|\u20e3|'
+  r'[\u{1f3fb}-\u{1f3ff}]|'
+  r'[\u{1f1e6}-\u{1f1ff}]|'
+  r'[\u{1f000}-\u{1faff}]|'
+  r'[\u{2600}-\u{27bf}]|'
+  r'[\u{2300}-\u{23ff}]|'
+  r'[\u{2b00}-\u{2bff}]'
+  r')+$',
+  unicode: true,
+);
+
+/// One to four emoji and nothing else, drawn large the way a sticker-sized reaction reads.
+bool whatsAppEmojiOnly(String text) {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) return false;
+  final glyphs = trimmed.characters;
+  if (glyphs.isEmpty || glyphs.length > 4) return false;
+  for (final glyph in glyphs) {
+    if (!_oneEmoji.hasMatch(glyph)) return false;
+  }
+  return true;
 }
 
 String whatsAppConnectionLabel(String state) => switch (state) {
@@ -133,16 +332,37 @@ String whatsAppConnectionMessage(String state) => switch (state) {
 };
 
 /// Path of one chat action. The chat id is passed separately as the `chatId`
-/// query value: group ids contain `@`, which proxies drop from the path.
+/// query value: group ids contain `@`, which proxies drop from the path and,
+/// on some fronts, from the query string too.
 String whatsAppChatPath(String channelId, {String? action}) {
   final tail = action == null ? 'open' : 'open/$action';
   return '/api/v1/channels/$channelId/chats/$tail';
 }
 
+/// Phone numbers stay readable. Anything with `@` (a group or an unresolved
+/// lid) is `b64.` plus base64url, so the request URL never contains `@`.
+String whatsAppChatToken(String chatId) {
+  if (!chatId.contains('@') && !chatId.contains('%')) return chatId;
+  final encoded = base64Url.encode(utf8.encode(chatId)).replaceAll('=', '');
+  return 'b64.$encoded';
+}
+
+/// Reverses [whatsAppChatToken]. Values that are not tokens are returned as they are.
+String whatsAppChatIdFromToken(String token) {
+  if (!token.startsWith('b64.') || token.length < 8) return token;
+  try {
+    final encoded = token.substring(4);
+    final pad = '=' * ((4 - encoded.length % 4) % 4);
+    return utf8.decode(base64Url.decode('$encoded$pad'));
+  } on FormatException {
+    return token;
+  }
+}
+
 Map<String, dynamic> whatsAppChatQuery(
   String chatId, [
   Map<String, dynamic>? extra,
-]) => {'chatId': chatId, ...?extra};
+]) => {'chatId': whatsAppChatToken(chatId), ...?extra};
 
 /// "14:05", "Yesterday", "Mon" or "12 Sep", the way chat lists show time.
 String whatsAppListTime(DateTime? time, {DateTime? now}) {
