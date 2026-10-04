@@ -120,7 +120,9 @@ public static class DependencyInjection
         {
             ServiceURL = serviceUrl,
             AuthenticationRegion = region,
-            ForcePathStyle = true
+            ForcePathStyle = true,
+            // Garage/SeaweedFS accept signed payloads but not all AWS checksum trailer formats.
+            RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED
         }));
         return services;
     }

@@ -10,6 +10,12 @@ Primary file: `src/Jarvis.Api/appsettings.json`. Override with environment varia
 | `ObjectStorage__*` | S3 endpoint, keys, bucket, max upload |
 | `Database:ApplyMigrationsAtStartup` | Migrate on boot (non-dev optional) |
 
+File storage uses path-style S3 requests with fixed-length, SigV4-signed upload payloads.
+The client calculates optional AWS checksums only when required, avoiding checksum trailers
+that self-hosted S3 implementations may reject as `Invalid payload signature`. Payload signing,
+the upload SHA-256 hash, file validation and ClamAV scanning remain enabled. This compatibility
+setting is built into the client; no additional storage secrets or environment variables are needed.
+
 ## Codex and models
 
 | Key | Purpose |
