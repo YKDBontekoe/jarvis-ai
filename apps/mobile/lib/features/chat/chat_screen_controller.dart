@@ -68,8 +68,19 @@ abstract class _ChatScreenController extends State<ChatScreen>
   String? _paneDestination;
   int _paneRevision = 0;
   BuildContext? _paneContext;
-  bool _openingFromSidebar = false;
+  bool _openingFromShell = false;
+
+  /// Inside a conversation, [_showHome] picks between its empty welcome and the
+  /// transcript.
   bool _showHome = true;
+
+  /// A Jarvis conversation covers the tab pages. Leaving it returns to [_tab].
+  bool _inChat = false;
+  JarvisTab _tab = JarvisTab.home;
+  final _chatList = ChatList();
+  final _tiles = TileLayoutController.device();
+  late final _tileSource = TileDataSource(_http);
+  Timer? _chatsTimer;
   int _realtimeGeneration = 0;
   final _deltaBuffer = StringBuffer();
   Timer? _deltaTimer;
@@ -82,7 +93,6 @@ abstract class _ChatScreenController extends State<ChatScreen>
   int _recentRevision = 0;
   int _initGeneration = 0;
   EventsListener<RoomEvent>? _voiceEvents;
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
   List<Map<String, dynamic>> _recent = [];
   List<Map<String, dynamic>> _projects = [];
   String? _pushToken;
@@ -198,6 +208,8 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _createAndOpenConversation();
   Future<void> _switchConversationProfile();
   void _openUtility(String destination);
+  void _showInPane(String destination, Widget page);
+  Future<void> _openUtilityPage(String destination, Widget page);
   Future<void> _refreshUnreadNotifications();
   void _closeUtilityPane();
   void _selectDestination(int index);
@@ -223,9 +235,9 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<Uint8List?> _loadPhoto(String fileId);
   Future<void> _retryConnection();
   Future<void> _loadRecent();
-  Future<void> _createProject();
-  void _openSettings();
   void _startNewChat();
+  void _presentChat();
+  Future<void> _presentConversation(String conversationId);
 
   Future<void> _connectRealtime([int? generation]);
 
@@ -289,7 +301,6 @@ abstract class _ChatScreenController extends State<ChatScreen>
   void _flushDeltas();
   void _discardDeltas();
   void _dismissKeyboard();
-  Widget _settingsBody();
 
   List<ConversationSourceChip> get _sourceChips;
   Future<void> _loadConversationSources(String conversationId);

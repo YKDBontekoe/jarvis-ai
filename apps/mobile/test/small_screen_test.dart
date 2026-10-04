@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/chat/remote_query.dart';
@@ -38,7 +39,8 @@ void main() {
           await tester.pumpAndSettle();
 
           expect(tester.takeException(), isNull);
-          expect(find.text('Jarvis'), findsOneWidget);
+          expect(find.byKey(const Key('home-clock')), findsOneWidget);
+          expect(find.byKey(const Key('tab-jarvis')), findsOneWidget);
         },
       );
     }

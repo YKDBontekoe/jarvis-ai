@@ -18,7 +18,7 @@ class _ProjectHeader extends StatelessWidget {
         const SizedBox(height: 14),
         Text(
           asJsonString(project['name']) ?? 'Untitled project',
-          style: JarvisType.serifOf(context).copyWith(fontSize: 32),
+          style: JarvisType.displayOf(context).copyWith(fontSize: 32),
         ),
         if (description != null && description.isNotEmpty) ...[
           const SizedBox(height: 6),

@@ -75,8 +75,9 @@ class VoiceStage extends StatelessWidget {
                         _title,
                         key: ValueKey(phase),
                         textAlign: TextAlign.center,
-                        style: JarvisType.serifOf(context)
-                            .copyWith(fontSize: 40),
+                        style: JarvisType.displayOf(
+                          context,
+                        ).copyWith(fontSize: 40),
                       ),
                     ),
                     const SizedBox(height: 10),

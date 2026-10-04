@@ -42,6 +42,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       if (stale()) return;
       await _openConversation(conversationId, showHome: true);
       if (stale()) return;
+      unawaited(_chatList.loadWhatsApp(_http));
       unawaited(_refreshUnreadNotifications());
       if (Firebase.apps.isNotEmpty) {
         final initialPush = await FirebaseMessaging.instance
@@ -265,7 +266,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       }
       if (!mounted || _signedOut || _signingOut) return;
       try {
-        await _openConversation(selection.conversationId!);
+        await _presentConversation(selection.conversationId!);
       } on DioException catch (error) {
         if (mounted) setState(() => _error = describeApiError(error));
       } catch (_) {

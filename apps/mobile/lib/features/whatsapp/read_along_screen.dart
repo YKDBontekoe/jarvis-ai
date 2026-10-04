@@ -360,7 +360,7 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
                       children: [
                         Text(
                           'A little help with your chats.',
-                          style: JarvisType.serifOf(
+                          style: JarvisType.displayOf(
                             context,
                           ).copyWith(fontSize: 30),
                         ),

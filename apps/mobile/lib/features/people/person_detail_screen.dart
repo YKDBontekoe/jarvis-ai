@@ -185,7 +185,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                   Text(
                     person.name,
                     textAlign: TextAlign.center,
-                    style: JarvisType.serifOf(context).copyWith(fontSize: 34),
+                    style: JarvisType.displayOf(context).copyWith(fontSize: 34),
                   ),
                   if (person.relationship case final relationship?)
                     Padding(

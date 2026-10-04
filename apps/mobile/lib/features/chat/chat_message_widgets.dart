@@ -305,7 +305,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                       style: TextButton.styleFrom(
                         visualDensity: VisualDensity.compact,
                         textStyle: const TextStyle(
-                          fontFamily: 'Inter',
+                          fontFamily: 'Geist',
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -324,7 +324,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                   foregroundColor: JarvisColors.of(context).danger,
                   visualDensity: VisualDensity.compact,
                   textStyle: const TextStyle(
-                    fontFamily: 'Inter',
+                    fontFamily: 'Geist',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -442,7 +442,7 @@ class _CopyButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
         textStyle: const TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Geist',
           fontSize: 12.5,
           fontWeight: FontWeight.w500,
         ),

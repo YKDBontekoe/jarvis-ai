@@ -5,8 +5,10 @@
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:jarvis_mobile/main.dart';
 
@@ -16,6 +18,7 @@ void main() {
   );
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(secureStorage, (call) async => null);
   });
@@ -25,11 +28,16 @@ void main() {
         .setMockMethodCallHandler(secureStorage, null);
   });
 
-  testWidgets('Jarvis chat shell renders', (WidgetTester tester) async {
+  testWidgets('Jarvis opens on Home with the tab bar', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const JarvisApp(skipAuthentication: true));
     await tester.pumpAndSettle();
-    expect(find.text('Jarvis'), findsOneWidget);
-    expect(find.text('What do you need?'), findsOneWidget);
+    expect(find.byKey(const Key('home-clock')), findsOneWidget);
+    for (final tab in ['home', 'chats', 'everything', 'you']) {
+      expect(find.byKey(Key('tab-$tab')), findsOneWidget);
+    }
+    expect(find.bySemanticsLabel('Ask Jarvis'), findsOneWidget);
   });
 
   testWidgets('account sign-in is shown before a session exists', (
@@ -50,26 +58,30 @@ void main() {
     expect(find.text('Create account'), findsOneWidget);
   });
 
-  testWidgets('on a wide screen tasks open beside the sidebar', (tester) async {
+  testWidgets('on a wide screen tasks open beside the rail', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(const JarvisApp(skipAuthentication: true));
     await tester.pumpAndSettle();
-    expect(find.text('Recents'), findsOneWidget);
+    expect(find.byKey(const Key('tab-chats')), findsOneWidget);
 
     await tester.tap(find.text('Tasks').first);
     await tester.pumpAndSettle();
-    expect(find.text('Recents'), findsOneWidget, reason: 'sidebar stays visible');
+    expect(
+      find.byKey(const Key('tab-chats')),
+      findsOneWidget,
+      reason: 'the rail stays visible',
+    );
     expect(find.text('New task'), findsOneWidget);
 
-    await tester.tap(find.text('Memory').first);
+    await tester.tap(find.byKey(const Key('tab-home')));
     await tester.pumpAndSettle();
     expect(find.text('New task'), findsNothing);
-    expect(find.text('Recents'), findsOneWidget);
+    expect(find.byKey(const Key('home-clock')), findsOneWidget);
 
-    await tester.tap(find.text('Jarvis').first);
+    await tester.tap(find.byKey(const Key('tab-jarvis')));
     await tester.pumpAndSettle();
     expect(find.text('Ask Jarvis anything'), findsOneWidget);
   });

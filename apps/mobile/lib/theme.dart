@@ -81,60 +81,61 @@ class JarvisColors extends ThemeExtension<JarvisColors> {
   static JarvisColors of(BuildContext context) =>
       Theme.of(context).extension<JarvisColors>() ?? light;
 
+  /// Iris: cool greys plus one indigo accent. Semantic colours stay quiet.
   static const light = JarvisColors(
     brightness: Brightness.light,
-    canvas: Color(0xfffaf9f6),
+    canvas: Color(0xfff7f7fa),
     surface: Color(0xffffffff),
-    surfaceMuted: Color(0xfff3f1ec),
-    surfaceRaised: Color(0xffebe8e2),
-    outline: Color(0xffe8e5df),
-    outlineStrong: Color(0xffd9d5cd),
-    ink: Color(0xff1c1b19),
-    inkSoft: Color(0xff5b5853),
-    muted: Color(0xff8f8b84),
+    surfaceMuted: Color(0xffefeff4),
+    surfaceRaised: Color(0xffe5e5ee),
+    outline: Color(0xffe6e6ec),
+    outlineStrong: Color(0xffd3d3de),
+    ink: Color(0xff16161d),
+    inkSoft: Color(0xff5a5b68),
+    muted: Color(0xff8a8b9a),
     onInk: Color(0xffffffff),
-    accent: Color(0xff4f46e5),
-    accentDeep: Color(0xff3730a3),
-    accentSoft: Color(0xffeef0ff),
-    violet: Color(0xff8b7cf6),
-    sky: Color(0xff38bdf8),
-    rose: Color(0xfff0a6c8),
-    success: Color(0xff16a34a),
-    successSoft: Color(0xffeaf6ee),
-    warning: Color(0xffd97706),
-    warningSoft: Color(0xfffcf4e6),
+    accent: Color(0xff5b4ef0),
+    accentDeep: Color(0xff4338ca),
+    accentSoft: Color(0xffeeedfe),
+    violet: Color(0xff7c5cf0),
+    sky: Color(0xff3b82f6),
+    rose: Color(0xffb8a9f5),
+    success: Color(0xff5b4ef0),
+    successSoft: Color(0xffeeedfe),
+    warning: Color(0xffb45309),
+    warningSoft: Color(0xfffcf3e6),
     danger: Color(0xffdc2626),
     dangerSoft: Color(0xfffcebeb),
     info: Color(0xff2563eb),
-    infoSoft: Color(0xffecf2fe),
+    infoSoft: Color(0xffe7eefd),
   );
 
   static const dark = JarvisColors(
     brightness: Brightness.dark,
-    canvas: Color(0xff12110f),
-    surface: Color(0xff1c1b18),
-    surfaceMuted: Color(0xff24231f),
-    surfaceRaised: Color(0xff2e2c27),
-    outline: Color(0xff3a3832),
-    outlineStrong: Color(0xff4a4740),
-    ink: Color(0xfff4f1ea),
-    inkSoft: Color(0xffb7b2a8),
-    muted: Color(0xff8c877e),
-    onInk: Color(0xff12110f),
-    accent: Color(0xff8b85ff),
-    accentDeep: Color(0xffc7c4ff),
-    accentSoft: Color(0xff222044),
-    violet: Color(0xffa99cff),
-    sky: Color(0xff7dd3fc),
-    rose: Color(0xfff5bdd6),
-    success: Color(0xff4ade80),
-    successSoft: Color(0xff16301f),
+    canvas: Color(0xff0f0f14),
+    surface: Color(0xff18181f),
+    surfaceMuted: Color(0xff202029),
+    surfaceRaised: Color(0xff2a2a35),
+    outline: Color(0xff26262f),
+    outlineStrong: Color(0xff363642),
+    ink: Color(0xfff2f2f7),
+    inkSoft: Color(0xffa9aab8),
+    muted: Color(0xff7c7d8d),
+    onInk: Color(0xff0f0f14),
+    accent: Color(0xff8f86ff),
+    accentDeep: Color(0xffc4c0ff),
+    accentSoft: Color(0xff221f45),
+    violet: Color(0xffa78bfa),
+    sky: Color(0xff7aa2ff),
+    rose: Color(0xffc9bdfb),
+    success: Color(0xff8f86ff),
+    successSoft: Color(0xff221f45),
     warning: Color(0xfffbbf24),
     warningSoft: Color(0xff3a2a12),
     danger: Color(0xfff87171),
     dangerSoft: Color(0xff3a1c1c),
-    info: Color(0xff60a5fa),
-    infoSoft: Color(0xff1a2740),
+    info: Color(0xff7aa2ff),
+    infoSoft: Color(0xff1a2347),
   );
 
   @override
@@ -233,18 +234,30 @@ class JarvisRadii {
   static const xl = 26.0;
 }
 
-/// Editorial serif for greetings and hero headlines; everything else is Inter.
+/// Geist for everything. [display] is the tight, semibold style used for page
+/// titles and headlines; [clock] is the thin large numeral on Home.
 class JarvisType {
-  static TextStyle serif([Color color = const Color(0xff1c1b19)]) => TextStyle(
-    fontFamily: 'InstrumentSerif',
-    color: color,
-    fontWeight: FontWeight.w400,
-    letterSpacing: -.4,
-    height: 1.1,
-  );
+  static TextStyle display([Color color = const Color(0xff16161d)]) =>
+      TextStyle(
+        fontFamily: 'Geist',
+        color: color,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -.9,
+        height: 1.1,
+      );
 
-  static TextStyle serifOf(BuildContext context) =>
-      serif(JarvisColors.of(context).ink);
+  static TextStyle displayOf(BuildContext context) =>
+      display(JarvisColors.of(context).ink);
+
+  static TextStyle clock(Color color) => TextStyle(
+    fontFamily: 'Geist',
+    color: color,
+    fontWeight: FontWeight.w300,
+    fontSize: 64,
+    letterSpacing: -3.6,
+    height: 1,
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
 }
 
 class JarvisShadows {
@@ -326,7 +339,7 @@ class JarvisShadows {
         ];
 }
 
-const _fontFamily = 'Inter';
+const _fontFamily = 'Geist';
 
 TextTheme _textTheme(JarvisColors colors) {
   final base = TextStyle(
@@ -473,9 +486,9 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       systemOverlayStyle: overlay,
       iconTheme: IconThemeData(color: colors.ink, size: 20),
       actionsIconTheme: IconThemeData(color: colors.inkSoft, size: 20),
-      // Page titles use the editorial serif, like the home greeting, so
-      // every screen carries the same voice; dense UI stays in Inter.
-      titleTextStyle: JarvisType.serif(colors.ink).copyWith(fontSize: 27),
+      // Page titles use the tight display style so every screen carries the
+      // same voice.
+      titleTextStyle: JarvisType.display(colors.ink).copyWith(fontSize: 26),
     ),
     iconTheme: IconThemeData(color: colors.inkSoft, size: 20),
     iconButtonTheme: IconButtonThemeData(
@@ -645,7 +658,7 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(JarvisRadii.xl),
       ),
-      titleTextStyle: JarvisType.serif(colors.ink).copyWith(fontSize: 28),
+      titleTextStyle: JarvisType.display(colors.ink).copyWith(fontSize: 26),
       contentTextStyle: text.bodyMedium?.copyWith(color: colors.inkSoft),
       actionsPadding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
     ),

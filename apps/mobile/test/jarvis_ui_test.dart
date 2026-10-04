@@ -227,35 +227,45 @@ void main() {
     expect(result, isTrue);
   });
 
-  testWidgets('menu opens the sidebar with destinations and recents', (
+  testWidgets('the tab bar moves between Home, Chats, Everything and You', (
     tester,
   ) async {
     await tester.pumpWidget(const JarvisApp(skipAuthentication: true));
     await tester.pumpAndSettle();
-    expect(find.text('Recents'), findsNothing);
-    await tester.tap(find.byTooltip('Menu'));
-    await tester.pumpAndSettle();
-    for (final label in ['Voice', 'Today', 'Tasks', 'Memory', 'Settings']) {
-      expect(find.text(label), findsOneWidget);
-    }
-    // The destination list scrolls once it outgrows a small window.
-    await tester.dragUntilVisible(
-      find.text('Recents'),
-      find.text('Memory'),
-      const Offset(0, -120),
-    );
-    expect(find.text('Recents'), findsOneWidget);
-  });
+    expect(find.byKey(const Key('home-clock')), findsOneWidget);
 
-  testWidgets('settings opens from the sidebar', (tester) async {
-    await tester.pumpWidget(const JarvisApp(skipAuthentication: true));
+    await tester.tap(find.byKey(const Key('tab-chats')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Menu'));
+    expect(find.byKey(const Key('chats-filter-field')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('tab-everything')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Settings'));
+    expect(find.byKey(const Key('everything-search')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('tab-you')));
     await tester.pumpAndSettle();
     expect(find.text('Your assistant'), findsOneWidget);
     expect(find.text('Appearance'), findsOneWidget);
     expect(find.text('Connected apps'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('tab-home')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('home-clock')), findsOneWidget);
+  });
+
+  testWidgets('the orb opens a conversation and Back returns to the tab', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const JarvisApp(skipAuthentication: true));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tab-jarvis')));
+    await tester.pumpAndSettle();
+    expect(find.text('Ask Jarvis anything'), findsOneWidget);
+    expect(find.byKey(const Key('tab-home')), findsNothing);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('home-clock')), findsOneWidget);
+    expect(find.byKey(const Key('tab-home')), findsOneWidget);
   });
 }

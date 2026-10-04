@@ -888,7 +888,7 @@ class HeaderAction extends StatelessWidget {
       borderRadius: BorderRadius.circular(JarvisRadii.sm + 2),
     ),
     textStyle: const TextStyle(
-      fontFamily: 'Inter',
+      fontFamily: 'Geist',
       fontSize: 13.5,
       fontWeight: FontWeight.w500,
       letterSpacing: -.1,

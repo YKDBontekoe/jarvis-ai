@@ -351,8 +351,10 @@ class _TodayHero extends StatelessWidget {
                       ? 'A fresh day'
                       : 'Keep it going',
                   style: TextStyle(
-                    fontFamily: 'InstrumentSerif',
+                    fontFamily: 'Geist',
                     fontSize: 26,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -.9,
                     height: 1.1,
                     color: colors.ink,
                   ),
