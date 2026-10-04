@@ -32,7 +32,7 @@ class TileGrid extends StatelessWidget {
   });
 
   static const columns = 4;
-  static const gap = 10.0;
+  static const gap = 12.0;
 
   final List<TilePlacement> layout;
   final Map<String, TileData?> data;
@@ -207,7 +207,7 @@ class _PressableState extends State<_Pressable> {
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(tileRadius),
           onTap: widget.onTap,
           onHighlightChanged: (value) => setState(() => _down = value),
           child: widget.child,
@@ -268,7 +268,7 @@ class _EditableTile extends StatelessWidget {
             child: DecoratedBox(
               position: DecorationPosition.foreground,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(tileRadius),
                 border: Border.all(color: colors.outlineStrong),
               ),
               child: card,
@@ -319,7 +319,7 @@ class _EditableTile extends StatelessWidget {
               height: 110,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(tileRadius),
                   boxShadow: JarvisShadows.floating(colors.brightness),
                 ),
                 child: TileCard(spec: spec, size: TileSize.strip, data: null),

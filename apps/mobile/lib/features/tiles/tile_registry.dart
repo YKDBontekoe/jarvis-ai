@@ -466,12 +466,16 @@ Future<TileData?> _today(TileEnv env) async {
     );
   }
   final next = items.first;
+  // The tile is about today: what comes later only shows as "next".
+  final today = items.where((item) => _sameDay(item.start, now)).length;
   return TileData(
-    stat: '${items.length}',
-    unit: _plural(items.length, 'thing', 'things'),
-    subtitle: '${next.title} · ${clockTime(next.start)}',
-    focusLabel: next.title,
-    countdownTo: next.start,
+    stat: '$today',
+    unit: _plural(today, 'thing', 'things'),
+    subtitle: today > 0
+        ? '${next.title} · ${clockTime(next.start)}'
+        : 'Nothing else today',
+    focusLabel: today > 0 ? next.title : null,
+    countdownTo: today > 0 ? next.start : null,
     visual: TileVisual.timeline,
     timeline: _timeline(items, now),
     rows: [
@@ -484,6 +488,9 @@ Future<TileData?> _today(TileEnv env) async {
     ],
   );
 }
+
+bool _sameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
 
 /// The rest of today as a strip: what is on it, and where the clock is.
 TileTimeline _timeline(List<UpNext> items, DateTime now) {
@@ -535,11 +542,15 @@ Future<TileData?> _tasks(TileEnv env) async {
     'waiting' => 'Waiting',
     _ => 'Queued',
   };
-  final needs = active.any((t) => t['status'] == 'needs_approval');
+  final waiting = active.where((t) => t['status'] == 'needs_approval').length;
+  final needs = waiting > 0;
   return TileData(
     stat: '${active.length}',
     unit: 'active',
-    subtitle: _first(active.first, ['title']),
+    // Say why the tile is marked rather than leave a bare dot.
+    subtitle: needs
+        ? '$waiting ${_plural(waiting, 'needs', 'need')} you'
+        : _first(active.first, ['title']),
     attention: needs,
     rows: [
       for (final task in active.take(_maxRows))

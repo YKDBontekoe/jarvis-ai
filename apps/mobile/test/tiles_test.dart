@@ -217,6 +217,7 @@ void main() {
       final data = (await load('tasks'))!;
       expect(data.stat, '2');
       expect(data.unit, 'active');
+      expect(data.subtitle, '1 needs you');
       expect(data.attention, isTrue);
       expect(data.rows.map((r) => r.text), ['Compare flights', 'Bank summary']);
       expect(data.rows.last.attention, isTrue);
@@ -363,6 +364,18 @@ void main() {
       expect(data.stat, '2');
       expect(data.subtitle, 'Design review · 13:30');
       expect(data.rows.map((r) => r.text), ['Design review', 'Call mum']);
+    });
+
+    test('today counts only today, not what comes tomorrow', () async {
+      http.on('GET', '/api/v1/home', {
+        'reminders': [
+          {'title': 'Training', 'dueAt': iso(DateTime(2026, 10, 4, 16, 30))},
+        ],
+      });
+      final data = (await load('today'))!;
+      expect(data.stat, '0');
+      expect(data.subtitle, 'Nothing else today');
+      expect(data.rows.single.meta, 'Tomorrow');
     });
 
     test('devices read the battery from the briefing', () async {
