@@ -104,6 +104,36 @@ internal static class WhatsAppAssistantEndpoints
         group.MapGet("/open/messages", Messages);
         group.MapGet("/{chatId}/messages", Messages).WithName("ListWhatsAppChatMessages");
 
+        group.MapPost("/open/history", async (Guid id, string chatId, Guid? beforeId, IChannelRepository channels,
+            IWhatsAppAssistantRepository chats, WhatsAppBridgeClient bridge, WhatsAppReadAlongReceiver receiver,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var chat = await FindAsync(chats, currentUser.OwnerId, id, chatId, ct);
+            var connection = await LinkedAsync(channels, currentUser.OwnerId, id, ct);
+            if (chat is null || connection is null) return Results.NotFound();
+            if (!chat.ReadAlong || !connection.Enabled)
+                return Results.Json(new { message = "Turn on read along for this chat and account first." }, statusCode: 409);
+            var anchor = beforeId is { } cursor
+                ? await chats.GetMessageAsync(currentUser.OwnerId, id, chat.ChatId, cursor, ct)
+                : (await chats.ListMessagesAsync(currentUser.OwnerId, id, chat.ChatId, 60, null, ct)).LastOrDefault();
+            if (beforeId is not null && anchor is null) return Results.NotFound();
+            try
+            {
+                await receiver.SyncWatchAsync(id, await chats.ListWatchedChatIdsAsync(id, ct), ct);
+                await bridge.RequestHistoryAsync(id, chat.ChatId, anchor, ct);
+                return Results.Accepted(value: new { state = "requested",
+                    message = "History requested from your phone. Keep WhatsApp connected; messages arrive asynchronously." });
+            }
+            catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                return Results.Json(new { message = "WhatsApp must be connected and supply at least one message in this chat before history can be requested. Send or receive a message, then retry." }, statusCode: 409);
+            }
+            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+            {
+                return Results.Json(new { message = "Could not request WhatsApp history. Reconnect the linked phone and retry." }, statusCode: 503);
+            }
+        }).WithName("RequestWhatsAppChatHistory");
+
         group.MapGet("/open/media", async (Guid id, Guid messageId, IChannelRepository channels,
             IWhatsAppAssistantRepository chats, ICurrentUser currentUser, CancellationToken ct) =>
         {

@@ -35,7 +35,7 @@ public sealed record WhatsAppChatMessage(
 /// <summary>A message the bridge forwarded for a chat on the owner's watch list.</summary>
 public sealed record ObservedWhatsAppMessage(string ExternalId, string ChatId, bool FromMe, string? Sender,
     string Text, DateTimeOffset SentAt, string? SenderId = null, string? MediaJson = null, byte[]? Content = null,
-    string? ContentType = null);
+    string? ContentType = null, bool Historical = false);
 
 /// <summary>
 /// New messages in one chat that the reminder scan has not looked at yet, with the context before them.
@@ -51,6 +51,8 @@ public sealed record WhatsAppChatActivity(string ChatId, string? Preview, bool? 
 
 public interface IWhatsAppAssistantRepository
 {
+    Task<WhatsAppChatMessage?> GetMessageAsync(Guid ownerId, Guid connectionId, string chatId, Guid messageId,
+        CancellationToken cancellationToken);
     Task<IReadOnlyList<WhatsAppChatSettings>> ListChatsAsync(Guid ownerId, Guid? connectionId,
         CancellationToken cancellationToken);
     Task<WhatsAppChatSettings?> GetChatAsync(Guid ownerId, Guid connectionId, string chatId,

@@ -278,6 +278,12 @@ public sealed class WhatsAppReadAlongTests
         public List<WhatsAppChatSettings> Chats { get; } = [];
         public List<WhatsAppChatMessage> Messages { get; } = [];
 
+        public Task<WhatsAppChatMessage?> GetMessageAsync(Guid ownerId, Guid connectionId, string chatId,
+            Guid messageId, CancellationToken cancellationToken) =>
+            Task.FromResult(Chats.Any(x => x.OwnerId == ownerId && x.ConnectionId == connectionId && x.ChatId == chatId)
+                ? Messages.SingleOrDefault(x => x.Id == messageId && x.ConnectionId == connectionId && x.ChatId == chatId)
+                : null);
+
         public WhatsAppChatSettings Add(string chatId, string name, bool readAlong)
         {
             var chat = Settings(chatId, name, readAlong);

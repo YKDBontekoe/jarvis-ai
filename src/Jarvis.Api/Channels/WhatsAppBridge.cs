@@ -15,7 +15,8 @@ public sealed record BridgeChat(string Id, string? Name, bool Group, long LastMe
 
 /// <summary>A message in a chat on the watch list; <c>Timestamp</c> is in Unix seconds.</summary>
 public sealed record BridgeObservedMessage(string Id, string ChatId, bool FromMe, string? Sender, string Text,
-    long Timestamp, string? SenderId = null, WhatsAppIncomingMedia? Media = null, WhatsAppQuote? Quote = null);
+    long Timestamp, string? SenderId = null, WhatsAppIncomingMedia? Media = null, WhatsAppQuote? Quote = null,
+    bool Historical = false);
 
 public sealed record BridgePicture(byte[] Bytes, string ContentType);
 
@@ -53,6 +54,17 @@ public sealed class WhatsAppBridgeClient(HttpClient http, ChannelOptions options
     public Task SetWatchedAsync(Guid sessionId, IReadOnlyList<string> chats, CancellationToken cancellationToken) =>
         SendAsync<JsonElement?>(HttpMethod.Put, sessionId, "watch", new { chats }, cancellationToken);
 
+    public Task RequestHistoryAsync(Guid sessionId, string chatId, WhatsAppChatMessage? before,
+        CancellationToken cancellationToken) => SendAsync<JsonElement?>(HttpMethod.Post, sessionId, "history", new
+        {
+            chatId,
+            before = before is null ? null : new
+            {
+                id = before.ExternalId.StartsWith("wa:", StringComparison.Ordinal) ? before.ExternalId[3..] : before.ExternalId,
+                fromMe = before.FromMe, timestamp = before.SentAt.ToUnixTimeSeconds()
+            }
+        }, cancellationToken);
+
     public async Task<IReadOnlyList<BridgeObservedMessage>> PullObservedAsync(Guid sessionId,
         CancellationToken cancellationToken) =>
         (await SendAsync<BridgeObserved>(HttpMethod.Get, sessionId, "observed", null, cancellationToken))?.Messages
@@ -76,7 +88,8 @@ public sealed class WhatsAppBridgeClient(HttpClient http, ChannelOptions options
         using var response = await http.SendAsync(request, cancellationToken);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
         if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException($"The WhatsApp bridge rejected the request ({(int)response.StatusCode}).");
+            throw new HttpRequestException($"The WhatsApp bridge rejected the request ({(int)response.StatusCode}).",
+                null, response.StatusCode);
         var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
         if (bytes.Length is 0 or > WhatsAppMediaBytes.MaxBytes) return null;
         var type = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
@@ -95,7 +108,8 @@ public sealed class WhatsAppBridgeClient(HttpClient http, ChannelOptions options
         using var response = await http.SendAsync(request, cancellationToken);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
         if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException($"The WhatsApp bridge rejected the request ({(int)response.StatusCode}).");
+            throw new HttpRequestException($"The WhatsApp bridge rejected the request ({(int)response.StatusCode}).",
+                null, response.StatusCode);
         var type = response.Content.Headers.ContentType?.MediaType;
         if (type is not ("image/jpeg" or "image/png" or "image/webp")) return null;
         var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
@@ -118,7 +132,8 @@ public sealed class WhatsAppBridgeClient(HttpClient http, ChannelOptions options
         if (body is not null) request.Content = JsonContent.Create(body);
         using var response = await http.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException($"The WhatsApp bridge rejected the request ({(int)response.StatusCode}).");
+            throw new HttpRequestException($"The WhatsApp bridge rejected the request ({(int)response.StatusCode}).",
+                null, response.StatusCode);
         return await response.Content.ReadFromJsonAsync<T>(BridgeJson, cancellationToken);
     }
 

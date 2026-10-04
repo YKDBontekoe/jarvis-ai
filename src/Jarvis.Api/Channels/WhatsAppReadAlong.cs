@@ -95,7 +95,7 @@ public sealed class WhatsAppReadAlongReceiver(IServiceScopeFactory scopes, Whats
             }
             catch (Exception exception)
             {
-                logger.LogDebug(exception, "WhatsApp read-along poll failed; retrying.");
+                logger.LogWarning("WhatsApp read-along poll failed ({FailureType}); retrying.", exception.GetType().Name);
             }
         }
         while (await timer.WaitForNextTickAsync(stoppingToken));
@@ -142,7 +142,7 @@ public sealed class WhatsAppReadAlongReceiver(IServiceScopeFactory scopes, Whats
     {
         var bus = services.GetService<Jarvis.Application.Automations.IAutomationEventBus>();
         if (bus is null) return;
-        foreach (var message in messages.Where(x => !x.FromMe).Take(20))
+        foreach (var message in messages.Where(x => !x.FromMe && !x.Historical).Take(20))
         {
             var chat = await chats.GetChatAsync(connection.OwnerId, connection.Id, message.ChatId, cancellationToken);
             await bus.TryPublishAsync(connection.OwnerId, new Jarvis.Application.Automations.AutomationEvent(
@@ -159,7 +159,8 @@ public sealed class WhatsAppReadAlongReceiver(IServiceScopeFactory scopes, Whats
         var stored = WhatsAppMediaCodec.Prepare(message.Media, message.Quote, content);
         return new(ExternalId(message.Id), message.ChatId, message.FromMe, sender, message.Text,
             message.Timestamp > 0 ? DateTimeOffset.FromUnixTimeSeconds(message.Timestamp) : DateTimeOffset.UtcNow,
-            WhatsAppChatIds.Normalize(message.SenderId), stored?.Json, stored?.Content, stored?.ContentType);
+            WhatsAppChatIds.Normalize(message.SenderId), stored?.Json, stored?.Content, stored?.ContentType,
+            message.Historical);
     }
 
     private static async Task<ObservedWhatsAppMessage> ToObservedAsync(WhatsAppBridgeClient bridge, Guid connectionId,

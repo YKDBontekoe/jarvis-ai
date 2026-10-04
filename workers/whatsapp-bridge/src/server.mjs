@@ -124,11 +124,13 @@ class Session {
     };
     socket.ev.on('messages.upsert', ({ messages, type }) => {
       void this.ingest(messages, type).catch((error) =>
-        log.debug({ session: this.id, err: error?.message }, 'could not read a WhatsApp message'));
+        log.warn({ session: this.id, errorType: error?.name }, 'could not read a WhatsApp message'));
     });
-    socket.ev.on('messaging-history.set', ({ chats, contacts }) => {
-      void this.rememberDirectory(contacts, chats).catch((error) =>
-        log.debug({ session: this.id, err: error?.message }, 'could not read the WhatsApp chat list'));
+    socket.ev.on('messaging-history.set', ({ chats, contacts, messages }) => {
+      void (async () => {
+        await this.rememberDirectory(contacts, chats);
+        await this.ingest(messages, 'history');
+      })().catch((error) => log.warn({ session: this.id, errorType: error?.name }, 'could not import WhatsApp history'));
     });
     socket.ev.on('chats.upsert', (chats) => chats.forEach((chat) => this.addChat(chat)));
     socket.ev.on('chats.update', (chats) => chats.forEach((chat) => this.addChat(chat, () => null, false)));
@@ -139,32 +141,38 @@ class Session {
   }
 
   async ingest(messages, type) {
+    let forwarded = 0;
     const recent = Math.floor(Date.now() / 1000) - APPEND_WINDOW_SECONDS;
     const jids = [];
     for (const entry of messages ?? []) {
       const key = entry?.key ?? {};
       jids.push(key.remoteJid, key.remoteJidAlt, key.participant, key.participantAlt, key.participantPn);
     }
+    jids.push(...this.watched);
     const resolvePhone = await phonesFor(this.socket, jids);
     for (const entry of messages ?? []) {
       const timestamp = toNumber(entry.messageTimestamp);
       const chatId = messageChatId(entry?.key, resolvePhone);
       if (chatId) {
         const personName = !entry.key.fromMe && !isGroupJid(chatId) ? entry.pushName : null;
-        this.chats.touch(chatId, { name: personName, timestamp });
+        this.chats.touch(chatId, { name: personName, timestamp, key: entry.key });
       }
       // 'append' carries messages sent from the phone while this device was catching up; keep only recent ones.
-      if (type !== 'notify' && !(type === 'append' && timestamp >= recent)) continue;
+      if (type !== 'history' && type !== 'notify' && !(type === 'append' && timestamp >= recent)) continue;
       const observed = observedFrom(entry, { selfPhone: this.phone, watched: this.watched, resolvePhone });
       if (observed) {
+        observed.historical = type === 'history';
         await this.attachMedia(entry, observed);
+        if (!this.watched.has(observed.chatId)) continue;
         const dropped = this.observed.push(observed);
+        forwarded++;
         if (dropped) this.media.drop(dropped);
       }
       if (type !== 'notify') continue;
       const inbound = inboundFrom(entry, { selfPhone: this.phone, sentIds: this.sent, resolvePhone });
       if (inbound) this.inbox.push(inbound);
     }
+    if (messages?.length) log.info({ session: this.id, type, received: messages.length, forwarded }, 'processed WhatsApp message batch');
   }
 
   async rememberDirectory(contacts, chats) {
@@ -176,12 +184,27 @@ class Session {
     for (const chat of chats ?? []) this.addChat(chat, resolvePhone);
   }
 
+  async requestHistory(chatId, before) {
+    if (!isChatId(chatId) || !this.watched.has(chatId)) throw new HttpError(403, 'Turn on read along for this chat first.');
+    if (this.state !== 'open') throw new HttpError(409, 'WhatsApp is not connected.');
+    const resolvePhone = await phonesFor(this.socket, [jidFromChatId(chatId)]);
+    const directoryId = chatIdOf(jidFromChatId(chatId), resolvePhone);
+    const anchor = before ?? this.chats.chats.get(chatId)?.anchor ?? this.chats.chats.get(directoryId)?.anchor;
+    if (!anchor?.id || !/^[A-Za-z0-9_-]{6,80}$/.test(anchor.id) || !Number.isFinite(anchor.timestamp) || anchor.timestamp <= 0)
+      throw new HttpError(409, 'The phone has not supplied a message for this chat yet. Send or receive a message, then retry history.');
+    await this.socket.fetchMessageHistory(100, { remoteJid: jidFromChatId(chatId), id: anchor.id,
+      fromMe: Boolean(anchor.fromMe) }, Math.floor(anchor.timestamp * 1000));
+    return { state: 'requested' };
+  }
+
   addChat(chat, resolvePhone = () => null, create = true) {
     const chatId = chatIdOf(chat?.id, resolvePhone);
     if (!chatId || chatId === this.phone) return;
     const name = chat?.name ?? chat?.subject ?? chat?.displayName ?? null;
     if (create || this.chats.chats.has(chatId))
-      this.chats.touch(chatId, { name, timestamp: toNumber(chat.conversationTimestamp) });
+      this.chats.touch(chatId, { name,
+        timestamp: toNumber(chat.messages?.[0]?.message?.messageTimestamp) || toNumber(chat.conversationTimestamp),
+        key: chat.messages?.[0]?.message?.key });
     else if (name) this.chats.name(chatId, name);
   }
 
@@ -459,6 +482,10 @@ async function route(request) {
   }
   if (action === 'chats' && request.method === 'GET') return { chats: session.chats.list().filter((chat) => chat.id !== session.phone) };
   if (action === 'watch' && request.method === 'GET') return { chats: [...session.watched] };
+  if (action === 'history' && request.method === 'POST') {
+    const body = await readJson(request);
+    return session.requestHistory(body.chatId, body.before);
+  }
   if (action === 'watch' && request.method === 'PUT') {
     const body = await readJson(request);
     return { watched: await session.setWatched(body.chats) };

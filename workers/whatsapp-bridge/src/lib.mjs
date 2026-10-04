@@ -437,8 +437,15 @@ export function thumbnailBytes(message, kind) {
 export function observedFrom(entry, { selfPhone, watched, resolvePhone = () => null }) {
   const key = entry?.key;
   if (!key?.remoteJid || !key.id || !watched || watched.size === 0) return null;
-  const chatId = messageChatId(key, resolvePhone);
-  if (chatId === null || chatId === selfPhone || !watched.has(chatId)) return null;
+  const canonical = messageChatId(key, resolvePhone);
+  if (canonical === null || canonical === selfPhone) return null;
+  // Keep the owner's saved id when WhatsApp later resolves a LID to its phone number. Group ids never
+  // fall back to a participant's direct chat; a watch choice applies to the actual conversation only.
+  const candidates = isGroupJid(canonical) ? [canonical] : [canonical,
+    chatIdOf(key.remoteJid), chatIdOf(key.remoteJidAlt),
+    ...[...watched].filter((id) => !isGroupJid(id) && chatIdOf(id, resolvePhone) === canonical)];
+  const chatId = candidates.find((id) => id && watched.has(id));
+  if (!chatId) return null;
   const text = describeMessage(entry.message);
   if (text === null) return null;
   const media = publishedMedia(mediaOf(entry.message));
@@ -587,6 +594,7 @@ export class ChatBook {
         name: typeof chat.name === 'string' ? chat.name : null,
         group: isGroupJid(chat.id),
         lastMessageAt: Number(chat.lastMessageAt) || 0,
+        ...(chat.anchor?.id && isChatId(chatIdOf(chat.anchor.remoteJid)) ? { anchor: chat.anchor } : {}),
       });
     }
     for (const [id, name] of Object.entries(saved?.names ?? {})) if (typeof name === 'string') this.names.set(id, name);
@@ -608,7 +616,7 @@ export class ChatBook {
   }
 
   /** Records activity in a chat; `timestamp` is in seconds. */
-  touch(chatId, { name = null, timestamp = 0 } = {}) {
+  touch(chatId, { name = null, timestamp = 0, key = null } = {}) {
     if (!chatId) return;
     let chat = this.chats.get(chatId);
     if (!chat) {
@@ -618,6 +626,10 @@ export class ChatBook {
     }
     if (name) this.name(chatId, name);
     const at = Number(timestamp) || 0;
+    if (key?.id && at > 0 && at >= chat.lastMessageAt) {
+      chat.anchor = { id: key.id, remoteJid: key.remoteJid, fromMe: Boolean(key.fromMe), timestamp: at };
+      this.dirty = true;
+    }
     if (at > chat.lastMessageAt) {
       chat.lastMessageAt = at;
       this.dirty = true;
