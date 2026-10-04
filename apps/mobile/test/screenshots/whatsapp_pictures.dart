@@ -138,7 +138,10 @@ class _PictureHttp implements HttpClientAdapter {
       '${options.path} ${options.queryParameters} ${options.responseType}',
     );
     if (options.path.endsWith('/picture')) {
-      final bytes = pictures[options.queryParameters['subject']];
+      final subject = options.queryParameters['subject'];
+      final bytes = subject is String
+          ? pictures[whatsAppChatIdFromToken(subject)]
+          : null;
       if (bytes == null) {
         return ResponseBody.fromString(
           '{}',

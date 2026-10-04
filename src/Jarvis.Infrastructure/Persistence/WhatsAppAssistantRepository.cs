@@ -44,11 +44,24 @@ public sealed class WhatsAppMessageEntity
     /// <summary>Phone number or @lid of the person who sent a group message, used to load their picture.</summary>
     public string? SenderId { get; set; }
     public string Text { get; set; } = string.Empty;
+    /// <summary>JSON description of a photo, sticker or other WhatsApp element, without the bytes.</summary>
+    public string? MediaJson { get; set; }
     public DateTimeOffset SentAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
-    public WhatsAppChatMessage ToRecord() => new(Id, ConnectionId, ChatId, ExternalId, FromMe, Sender, Text, SentAt,
-        CreatedAt, SenderId);
+    public WhatsAppChatMessage ToRecord()
+    {
+        var (media, quote) = WhatsAppMediaCodec.Read(MediaJson);
+        return new(Id, ConnectionId, ChatId, ExternalId, FromMe, Sender, Text, SentAt, CreatedAt, SenderId, media, quote);
+    }
+}
+
+public sealed class WhatsAppMessageMediaEntity
+{
+    public Guid MessageId { get; set; }
+    public Guid OwnerId { get; set; }
+    public string ContentType { get; set; } = string.Empty;
+    public byte[] Content { get; set; } = [];
 }
 
 public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider? clock = null)
@@ -142,24 +155,45 @@ public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider
             .ToDictionaryAsync(x => x.ChatId, cancellationToken);
         var now = time.GetUtcNow();
         var inserted = 0;
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         foreach (var message in messages)
         {
             if (!chats.TryGetValue(message.ChatId, out var chat)) continue;
             var text = message.Text.Length <= 8_000 ? message.Text : message.Text[..8_000];
             var sender = message.Sender is { Length: > 80 } name ? name[..80] : message.Sender;
-            var senderId = message.SenderId is { Length: > 100 } id ? id[..100] : message.SenderId;
+            var senderId = message.SenderId is { Length: > 100 } longSender ? longSender[..100] : message.SenderId;
+            var mediaJson = message.MediaJson;
+            var messageId = Guid.CreateVersion7();
             var rows = await db.Database.ExecuteSqlInterpolatedAsync($"""
-                INSERT INTO whatsapp_messages ("Id", owner_id, connection_id, chat_id, external_id, from_me, sender, sender_id, text, sent_at, created_at)
-                VALUES ({Guid.CreateVersion7()}, {chat.OwnerId}, {connectionId}, {chat.ChatId}, {message.ExternalId}, {message.FromMe}, {sender}, {senderId}, {text}, {message.SentAt}, {now})
+                INSERT INTO whatsapp_messages ("Id", owner_id, connection_id, chat_id, external_id, from_me, sender, sender_id, text, media, sent_at, created_at)
+                VALUES ({messageId}, {chat.OwnerId}, {connectionId}, {chat.ChatId}, {message.ExternalId}, {message.FromMe}, {sender}, {senderId}, {text}, CAST({mediaJson} AS jsonb), {message.SentAt}, {now})
                 ON CONFLICT (connection_id, external_id) DO NOTHING
                 """, cancellationToken);
             if (rows == 0) continue;
+            if (message.Content is { Length: > 0 } content && message.ContentType is not null)
+                db.WhatsAppMessageMedia.Add(new WhatsAppMessageMediaEntity
+                {
+                    MessageId = messageId, OwnerId = chat.OwnerId, ContentType = message.ContentType, Content = content
+                });
             inserted++;
             if (chat.LastMessageAt is null || message.SentAt > chat.LastMessageAt) chat.LastMessageAt = message.SentAt;
             chat.LastReceivedAt = now;
         }
         if (inserted > 0) await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return inserted;
+    }
+
+    public async Task<(byte[] Content, string ContentType)?> OpenMediaAsync(Guid ownerId, Guid connectionId,
+        Guid messageId, CancellationToken cancellationToken)
+    {
+        var row = await (
+            from blob in db.WhatsAppMessageMedia.AsNoTracking()
+            join message in db.WhatsAppMessages.AsNoTracking() on blob.MessageId equals message.Id
+            where blob.MessageId == messageId && blob.OwnerId == ownerId && message.OwnerId == ownerId &&
+                  message.ConnectionId == connectionId
+            select new { blob.Content, blob.ContentType }).SingleOrDefaultAsync(cancellationToken);
+        return row is null ? null : (row.Content, row.ContentType);
     }
 
     public async Task<IReadOnlyList<WhatsAppChatMessage>> ListMessagesAsync(Guid ownerId, Guid connectionId,

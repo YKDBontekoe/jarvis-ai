@@ -127,7 +127,7 @@ class ChatList extends ChangeNotifier {
                 title: chat.name,
                 preview: chat.preview == null
                     ? null
-                    : '${chat.previewFromMe == true ? 'You: ' : ''}${chat.preview}',
+                    : '${chat.previewFromMe == true ? 'You: ' : ''}${whatsAppPreviewText(chat.preview!)}',
                 time: chat.lastMessageAt,
                 unread: chat.unreadCount,
                 group: chat.isGroup,

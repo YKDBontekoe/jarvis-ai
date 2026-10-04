@@ -22,7 +22,8 @@ public sealed record WhatsAppMarkReadRequest(Guid MessageId);
 public sealed record SaveWhatsAppChatRequest(string? Name, bool ReadAlong, bool? AutoReminders);
 
 public sealed record WhatsAppMessageDto(Guid Id, string ChatId, bool FromMe, string? Sender, string Text,
-    DateTimeOffset SentAt, DateTimeOffset? ReceivedAt = null, string? SenderId = null);
+    DateTimeOffset SentAt, DateTimeOffset? ReceivedAt = null, string? SenderId = null, WhatsAppMedia? Media = null,
+    WhatsAppQuote? Quote = null);
 
 public sealed record WhatsAppSuggestRequest(string? Instruction);
 
@@ -102,6 +103,15 @@ internal static class WhatsAppAssistantEndpoints
             MessagesAsync(id, chatId, before, beforeId, limit, channels, chats, currentUser, ct);
         group.MapGet("/open/messages", Messages);
         group.MapGet("/{chatId}/messages", Messages).WithName("ListWhatsAppChatMessages");
+
+        group.MapGet("/open/media", async (Guid id, Guid messageId, IChannelRepository channels,
+            IWhatsAppAssistantRepository chats, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var connection = await LinkedAsync(channels, currentUser.OwnerId, id, ct);
+            if (connection is null) return Results.NotFound();
+            var media = await chats.OpenMediaAsync(currentUser.OwnerId, id, messageId, ct);
+            return media is null ? Results.NotFound() : Results.File(media.Value.Content, media.Value.ContentType);
+        }).WithName("GetWhatsAppMessageMedia");
 
         group.MapGet("/open/picture", async (Guid id, string subject, IChannelRepository channels,
             WhatsAppBridgeClient bridge, ICurrentUser currentUser, CancellationToken ct) =>
@@ -376,5 +386,5 @@ internal static class WhatsAppAssistantEndpoints
 
     private static WhatsAppMessageDto ToDto(WhatsAppChatMessage message) =>
         new(message.Id, message.ChatId, message.FromMe, message.Sender, message.Text, message.SentAt,
-            message.ReceivedAt, message.SenderId);
+            message.ReceivedAt, message.SenderId, message.Media, message.Quote);
 }

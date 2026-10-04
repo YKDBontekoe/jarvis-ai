@@ -29,11 +29,13 @@ public sealed record WhatsAppChatMessage(
     bool FromMe,
     string? Sender,
     string Text,
-    DateTimeOffset SentAt, DateTimeOffset? ReceivedAt = null, string? SenderId = null);
+    DateTimeOffset SentAt, DateTimeOffset? ReceivedAt = null, string? SenderId = null,
+    WhatsAppMedia? Media = null, WhatsAppQuote? Quote = null);
 
 /// <summary>A message the bridge forwarded for a chat on the owner's watch list.</summary>
 public sealed record ObservedWhatsAppMessage(string ExternalId, string ChatId, bool FromMe, string? Sender,
-    string Text, DateTimeOffset SentAt, string? SenderId = null);
+    string Text, DateTimeOffset SentAt, string? SenderId = null, string? MediaJson = null, byte[]? Content = null,
+    string? ContentType = null);
 
 /// <summary>
 /// New messages in one chat that the reminder scan has not looked at yet, with the context before them.
@@ -74,6 +76,10 @@ public interface IWhatsAppAssistantRepository
     /// many were new.
     /// </summary>
     Task<int> StoreObservedAsync(Guid connectionId, IReadOnlyList<ObservedWhatsAppMessage> messages,
+        CancellationToken cancellationToken);
+
+    /// <summary>Bytes for one stored photo, sticker, voice note, document or video preview. Owner scoped.</summary>
+    Task<(byte[] Content, string ContentType)?> OpenMediaAsync(Guid ownerId, Guid connectionId, Guid messageId,
         CancellationToken cancellationToken);
 
     /// <summary>Newest first, up to <paramref name="limit"/>, optionally before a point in time.</summary>
@@ -143,7 +149,8 @@ public static partial class WhatsAppChatIds
     /// </summary>
     public static string? Normalize(string? value)
     {
-        var trimmed = Unescape(value ?? string.Empty).Trim();
+        var trimmed = DecodeToken(Unescape(value ?? string.Empty).Trim());
+        if (trimmed is null) return null;
         var canonical = CanonicalJid(trimmed);
         if (GroupPattern().IsMatch(canonical) || LidPattern().IsMatch(canonical)) return canonical;
         if (canonical.Contains('@')) return null;
@@ -163,6 +170,26 @@ public static partial class WhatsAppChatIds
         var agent = user.LastIndexOf('_');
         if (agent > 0 && user[(agent + 1)..].All(char.IsAsciiDigit)) user = user[..agent];
         return string.IsNullOrEmpty(user) || string.IsNullOrEmpty(server) ? value : $"{user}@{server}";
+    }
+
+    /// <summary>
+    /// Group ids contain <c>@</c>. Clients send those as <c>b64.</c> plus base64url so a proxy that treats
+    /// <c>@</c> as user-info cannot drop the id from the message request. Plain ids stay valid.
+    /// </summary>
+    private static string? DecodeToken(string value)
+    {
+        if (!value.StartsWith("b64.", StringComparison.Ordinal)) return value;
+        if (value.Length is < 8 or > 200) return null;
+        try
+        {
+            var encoded = value[4..].Replace('-', '+').Replace('_', '/');
+            encoded = (encoded.Length % 4) switch { 2 => encoded + "==", 3 => encoded + "=", _ => encoded };
+            return System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encoded)).Trim();
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 
     private static string Unescape(string value)

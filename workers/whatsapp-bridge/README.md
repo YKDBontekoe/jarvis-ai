@@ -13,8 +13,9 @@ Jarvis owns the UX (`POST /api/v1/channels/link`); this service is internal and 
 | `POST` | `/sessions/{id}/send` | `{to, text}` or `{chat, text}` (phone, `…@g.us` group or `…@lid`); returns `{id}` |
 | `GET` | `/sessions/{id}/chats` | Chat list for the read-along picker `{id, name, group, lastMessageAt}` (names only, no text) |
 | `GET`/`PUT` | `/sessions/{id}/watch` | `{chats}` — the chats the owner turned on in Jarvis; nothing else is forwarded |
-| `GET` | `/sessions/{id}/observed` | Buffered messages of watched chats `{id, chatId, fromMe, sender, text, timestamp}` (media as `[Photo] caption`) |
-| `POST` | `/sessions/{id}/observed/ack` | `{ids}` — drop stored read-along messages |
+| `GET` | `/sessions/{id}/observed` | Buffered messages of watched chats `{id, chatId, fromMe, sender, senderId, text, timestamp, media, quote}`. `text` stays a readable line (`[Photo] caption`). `media` describes a photo, sticker, video, voice note, document, location, contact or poll. `quote` is the message being replied to. |
+| `GET` | `/sessions/{id}/media/{messageId}` | Bytes for an observed message that has `media.hasContent` (photo, sticker, voice, document, or a video's jpeg preview). Gone after ack. |
+| `POST` | `/sessions/{id}/observed/ack` | `{ids}` — drop stored read-along messages and their media |
 | `DELETE` | `/sessions/{id}` | Log out and delete the stored credentials |
 | `GET` | `/health` | Liveness (no auth) |
 

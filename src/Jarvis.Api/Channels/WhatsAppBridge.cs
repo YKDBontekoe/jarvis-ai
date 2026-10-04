@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Jarvis.Application.Channels;
+using Jarvis.Application.WhatsApp;
 
 namespace Jarvis.Api.Channels;
 
@@ -14,7 +15,7 @@ public sealed record BridgeChat(string Id, string? Name, bool Group, long LastMe
 
 /// <summary>A message in a chat on the watch list; <c>Timestamp</c> is in Unix seconds.</summary>
 public sealed record BridgeObservedMessage(string Id, string ChatId, bool FromMe, string? Sender, string Text,
-    long Timestamp, string? SenderId = null);
+    long Timestamp, string? SenderId = null, WhatsAppIncomingMedia? Media = null, WhatsAppQuote? Quote = null);
 
 public sealed record BridgePicture(byte[] Bytes, string ContentType);
 
@@ -59,6 +60,28 @@ public sealed class WhatsAppBridgeClient(HttpClient http, ChannelOptions options
 
     public Task AckObservedAsync(Guid sessionId, IEnumerable<string> ids, CancellationToken cancellationToken) =>
         SendAsync<JsonElement?>(HttpMethod.Post, sessionId, "observed/ack", new { ids }, cancellationToken);
+
+    /// <summary>Bytes the bridge is holding for one observed message. Null when they are already gone.</summary>
+    public async Task<BridgePicture?> GetMediaAsync(Guid sessionId, string messageId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(messageId) || messageId.Length is < 6 or > 80 ||
+            messageId.Any(ch => !char.IsAsciiLetterOrDigit(ch) && ch is not '_' and not '-'))
+            return null;
+        var baseUrl = options.WhatsAppBridgeUrl
+                      ?? throw new InvalidOperationException("Channels:WhatsAppBridge:BaseUrl is not configured.");
+        var url = $"{baseUrl.TrimEnd('/')}/sessions/{sessionId:D}/media/{Uri.EscapeDataString(messageId)}";
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        if (!string.IsNullOrWhiteSpace(options.WhatsAppBridgeToken))
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.WhatsAppBridgeToken);
+        using var response = await http.SendAsync(request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"The WhatsApp bridge rejected the request ({(int)response.StatusCode}).");
+        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        if (bytes.Length is 0 or > WhatsAppMediaBytes.MaxBytes) return null;
+        var type = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+        return new BridgePicture(bytes, type);
+    }
 
     /// <summary>Preview picture for a chat or participant. Null when they have none or the bridge is down.</summary>
     public async Task<BridgePicture?> GetPictureAsync(Guid sessionId, string chatId, CancellationToken cancellationToken)

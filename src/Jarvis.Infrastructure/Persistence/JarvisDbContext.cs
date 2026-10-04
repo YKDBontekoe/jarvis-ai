@@ -69,6 +69,7 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<ChannelThreadEntity> ChannelThreads => Set<ChannelThreadEntity>();
     public DbSet<WhatsAppChatEntity> WhatsAppChats => Set<WhatsAppChatEntity>();
     public DbSet<WhatsAppMessageEntity> WhatsAppMessages => Set<WhatsAppMessageEntity>();
+    public DbSet<WhatsAppMessageMediaEntity> WhatsAppMessageMedia => Set<WhatsAppMessageMediaEntity>();
     public DbSet<UiSurfaceEntity> UiSurfaces => Set<UiSurfaceEntity>();
     public DbSet<RemoteAgentEntity> RemoteAgents => Set<RemoteAgentEntity>();
     public DbSet<A2ATokenEntity> A2ATokens => Set<A2ATokenEntity>();
