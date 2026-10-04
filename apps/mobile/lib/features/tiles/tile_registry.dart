@@ -466,10 +466,14 @@ Future<TileData?> _today(TileEnv env) async {
     );
   }
   final next = items.first;
+  // The tile is about today: what comes later only shows as "next".
+  final today = items.where((item) => _sameDay(item.start, now)).length;
   return TileData(
-    stat: '${items.length}',
-    unit: _plural(items.length, 'thing', 'things'),
-    subtitle: '${next.title} · ${clockTime(next.start)}',
+    stat: '$today',
+    unit: _plural(today, 'thing', 'things'),
+    subtitle: today > 0
+        ? '${next.title} · ${clockTime(next.start)}'
+        : 'Nothing else today',
     focusLabel: next.title,
     countdownTo: next.start,
     visual: TileVisual.timeline,
@@ -484,6 +488,9 @@ Future<TileData?> _today(TileEnv env) async {
     ],
   );
 }
+
+bool _sameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
 
 /// The rest of today as a strip: what is on it, and where the clock is.
 TileTimeline _timeline(List<UpNext> items, DateTime now) {

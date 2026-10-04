@@ -365,6 +365,18 @@ void main() {
       expect(data.rows.map((r) => r.text), ['Design review', 'Call mum']);
     });
 
+    test('today counts only today, not what comes tomorrow', () async {
+      http.on('GET', '/api/v1/home', {
+        'reminders': [
+          {'title': 'Training', 'dueAt': iso(DateTime(2026, 10, 4, 16, 30))},
+        ],
+      });
+      final data = (await load('today'))!;
+      expect(data.stat, '0');
+      expect(data.subtitle, 'Nothing else today');
+      expect(data.rows.single.meta, 'Tomorrow');
+    });
+
     test('devices read the battery from the briefing', () async {
       http.on('GET', '/api/v1/home', {
         'device': {'batteryPercent': 63, 'charging': true},

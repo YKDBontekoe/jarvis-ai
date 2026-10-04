@@ -306,6 +306,8 @@ class _Label extends StatelessWidget {
     final colors = JarvisColors.of(context);
     return Row(
       children: [
+        Icon(spec.icon, size: 15, color: colors.muted),
+        const SizedBox(width: 6),
         Expanded(
           child: Text(
             spec.name,
@@ -319,12 +321,16 @@ class _Label extends StatelessWidget {
           ),
         ),
         if (trailing != null)
-          Text(
-            trailing!,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: info.attention ? colors.accent : colors.muted,
+          Flexible(
+            child: Text(
+              trailing!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: info.attention ? colors.accent : colors.muted,
+              ),
             ),
           )
         else if (info.attention)
@@ -605,7 +611,9 @@ class _SquareTile extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _Label(spec: spec, info: info),
-        const Spacer(),
+        // The number sits under the name, so neighbouring tiles line up; the
+        // detail settles at the bottom.
+        if (info.stat != null) const SizedBox(height: 12) else const Spacer(),
         if (info.stat != null)
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -613,7 +621,7 @@ class _SquareTile extends StatelessWidget {
             child: _AnimatedText(
               TextSpan(
                 text: info.stat,
-                style: _stat(colors),
+                style: _stat(colors, size: 34),
                 children: [
                   if (info.unit != null)
                     TextSpan(
@@ -630,10 +638,11 @@ class _SquareTile extends StatelessWidget {
               keyText: '${info.stat}${info.unit}',
             ),
           ),
+        if (info.stat != null) const Spacer(),
         if (info.visual == TileVisual.waveform)
           _LiveStatus(text: subtitle ?? '')
         else if (subtitle != null) ...[
-          const SizedBox(height: 5),
+          if (info.stat == null) const SizedBox(height: 5),
           Text(
             subtitle,
             maxLines: info.stat == null
@@ -715,10 +724,21 @@ class _ListTile extends StatelessWidget {
               (showPicture ? picture + 6 : 0);
           final fit = ((box.maxHeight - used) / rowHeight).floor().clamp(0, 12);
           final rows = info.rows.take(fit).toList();
+          // When the rows fill the tile, they share what is left over instead
+          // of leaving a gap under the last one.
+          final spread = rows.isNotEmpty && rows.length == fit
+              ? math.min(rowHeight * 1.25, (box.maxHeight - used) / fit)
+              : rowHeight;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Label(spec: spec, info: info),
+              _Label(
+                spec: spec,
+                info: info,
+                trailing: !showHeadline && info.attention && info.stat != null
+                    ? '${info.stat}${info.unit == null ? '' : ' ${info.unit}'}'
+                    : null,
+              ),
               if (live) _LiveStatus(text: info.subtitle ?? ''),
               if (showHeadline) ...[
                 const SizedBox(height: 10),
@@ -780,7 +800,7 @@ class _ListTile extends StatelessWidget {
                 for (final row in rows)
                   _RowView(
                     row: row,
-                    height: rowHeight,
+                    height: spread,
                     busy: row.id != null && pending.contains(row.id),
                     onTap: onRowTap == null || row.target == null
                         ? null
@@ -876,7 +896,14 @@ class _RowView extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13.5,
-                    color: struck ? colors.muted : colors.inkSoft,
+                    fontWeight: row.attention && !struck
+                        ? FontWeight.w600
+                        : FontWeight.w400,
+                    color: struck
+                        ? colors.muted
+                        : row.attention
+                        ? colors.ink
+                        : colors.inkSoft,
                     decoration: struck && (busy || row.done)
                         ? TextDecoration.lineThrough
                         : null,

@@ -132,7 +132,7 @@ class ClockHeader extends StatelessWidget {
                   ],
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               Text(
                 item?.title ?? 'Nothing else today',
                 key: const Key('home-clock-title'),
@@ -148,7 +148,7 @@ class ClockHeader extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 6),
         if (item == null && emptyHint != null)
           InkWell(
             onTap: onEmptyHint,
@@ -163,12 +163,34 @@ class ClockHeader extends StatelessWidget {
             ),
           )
         else
-          Text(
-            item == null
-                ? 'Your calendar and reminders are clear'
-                : item.detail ??
-                      (item.reminder ? 'Reminder' : shortDay(item.start, now)),
-            style: TextStyle(fontSize: 14, color: colors.muted),
+          Row(
+            children: [
+              if (item != null) ...[
+                Icon(
+                  item.reminder
+                      ? PhosphorIconsRegular.bell
+                      : item.detail != null
+                      ? PhosphorIconsRegular.mapPin
+                      : PhosphorIconsRegular.calendarBlank,
+                  size: 15,
+                  color: colors.muted,
+                ),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  item == null
+                      ? 'Your calendar and reminders are clear'
+                      : item.detail ??
+                            (item.reminder
+                                ? 'Reminder'
+                                : shortDay(item.start, now)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14, color: colors.muted),
+                ),
+              ),
+            ],
           ),
       ],
     );
