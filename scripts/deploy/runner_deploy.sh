@@ -11,6 +11,12 @@ set -euo pipefail
 : "${JARVIS_API_IMAGE:?JARVIS_API_IMAGE is required}"
 : "${JARVIS_WORKER_IMAGE:?JARVIS_WORKER_IMAGE is required}"
 
+# GitHub resolves an absent optional secret to an empty environment variable. Unset it so Compose can use
+# the existing host key instead of overriding the env file with an empty value.
+if [[ -z "${FINANCE_QUOTES_API_KEY:-}" ]]; then
+  unset FINANCE_QUOTES_API_KEY
+fi
+
 mkdir -p "${DEPLOY_PATH}"
 cd "${DEPLOY_PATH}"
 if [[ ! -d .git ]]; then

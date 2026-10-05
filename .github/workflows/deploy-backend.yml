@@ -254,4 +254,5 @@ jobs:
           JARVIS_FEATURES: ${{ vars.JARVIS_FEATURES }}
           DEPLOY_COMPOSE_FILES: ${{ vars.DEPLOY_COMPOSE_FILES }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          FINANCE_QUOTES_API_KEY: ${{ secrets.FINANCE_QUOTES_API_KEY }}
         run: bash scripts/deploy/runner_deploy.sh
