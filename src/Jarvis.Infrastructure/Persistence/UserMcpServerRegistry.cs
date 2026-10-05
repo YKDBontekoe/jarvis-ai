@@ -68,7 +68,9 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         };
         stored = stored with
         {
-            Secrets = McpSecretBindings.Normalize(definition.Secrets, definition.Transport).ToArray(),
+            Secrets = ICloudMailMcpProfile.Matches(stored.Name, stored.Command, stored.Arguments)
+                ? ICloudMailMcpProfile.Secrets.ToArray()
+                : McpSecretBindings.Normalize(definition.Secrets, definition.Transport).ToArray(),
             CatalogName = string.IsNullOrWhiteSpace(definition.CatalogName) ? null : definition.CatalogName.Trim()
         };
         var id = ProviderPrefix + Guid.NewGuid().ToString("N");
@@ -134,7 +136,7 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         var endpoint = stored.Value.Server.Transport is "stdio"
             ? stored.Value.Server.Endpoint
             : await McpServerEndpointValidator.ValidateAsync(stored.Value.Server.Endpoint, cancellationToken);
-        var updated = stored.Value.Server with { AllowedTools = tools, Endpoint = endpoint };
+        var updated = ApplyMailProfile(stored.Value.Server with { AllowedTools = tools, Endpoint = endpoint });
         await credentials.SaveSecretAsync(ownerId, id, ConfigSecret, JsonSerializer.Serialize(updated, JsonOptions),
             cancellationToken);
         return ToPublic(id, updated, DateTimeOffset.UtcNow, stored.Value.SecretNames);
@@ -172,7 +174,7 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         var name = ValidateName(request.Name);
         var allowedTools = McpToolSelection.Normalize(request.AllowedTools);
         var (command, arguments) = McpStdioCommandValidator.Normalize(request.Command, request.Arguments);
-        return new StoredServer(name, string.Empty, allowedTools, true, "stdio", command, arguments, null);
+        return ApplyMailProfile(new StoredServer(name, string.Empty, allowedTools, true, "stdio", command, arguments, null));
     }
 
     private static string ValidateName(string? name)
@@ -195,8 +197,18 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
                 ? string.IsNullOrWhiteSpace(stored.Command)
                 : string.IsNullOrWhiteSpace(stored.Endpoint)))
             throw new InvalidMcpServerConfigurationException();
-        return stored;
+        return ApplyMailProfile(stored);
     }
+
+    // Existing registrations receive the same required credential fields and read-only restrictions when read.
+    private static StoredServer ApplyMailProfile(StoredServer stored) =>
+        stored.Transport == "stdio" && ICloudMailMcpProfile.Matches(stored.Name, stored.Command, stored.Arguments)
+            ? stored with
+            {
+                Secrets = ICloudMailMcpProfile.Secrets.ToArray(),
+                AllowedTools = ICloudMailMcpProfile.RestrictTools(stored.AllowedTools)
+            }
+            : stored;
 
     private void LogInvalidConfiguration(Guid ownerId, string serverId, Exception exception) =>
         logger.LogWarning(exception, "Invalid MCP configuration for owner {OwnerId} and server {ServerId}; error type {ExceptionType}",

@@ -90,10 +90,12 @@ internal static partial class McpRunnerHost
         using var process = new Process { StartInfo = StartInfo(launch, settings, workDirectory) };
         try
         {
+            ICloudMailRunnerSetup.Prepare(launch, workDirectory);
             if (!process.Start())
                 throw new InvalidOperationException("The connector did not start.");
         }
-        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception
+                                              or IOException or UnauthorizedAccessException)
         {
             LogStartFailed(logger, launch.Command, exception.GetType().Name);
             await CloseQuietlyAsync(socket, WebSocketCloseStatus.InternalServerError, "The connector could not start.");
@@ -195,6 +197,7 @@ internal static partial class McpRunnerHost
         start.Environment["UV_CACHE_DIR"] = Path.Combine(settings.CacheRoot, "uv");
         start.Environment["UV_PYTHON_INSTALL_DIR"] = Path.Combine(settings.CacheRoot, "uv-python");
         start.Environment["UV_TOOL_DIR"] = Path.Combine(workDirectory, "uv-tools");
+        ICloudMailRunnerSetup.RestrictProcess(launch, start);
         return start;
     }
 
