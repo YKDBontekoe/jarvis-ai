@@ -35,6 +35,10 @@ void main() {
       incomingPhotoFileName('content://media/1', '.png'),
       'photo.png',
     );
+    expect(
+      incomingPhotoFileName('https://cdn.example/leaf.png', '.png'),
+      'photo.png',
+    );
     expect(incomingPhotoFileName(null, '.webp'), 'photo.webp');
   });
 

@@ -130,6 +130,7 @@ String incomingPhotoFileName(String? name, String extension) =>
 String _photoStem(String? name) {
   if (name == null || name.trim().isEmpty) return 'photo';
   var trimmed = name.trim().split('?').first;
+  if (trimmed.contains('://')) return 'photo';
   trimmed = trimmed.split('/').last.split('\\').last;
   if (trimmed.isEmpty || trimmed.contains(':')) return 'photo';
   final dot = trimmed.lastIndexOf('.');
