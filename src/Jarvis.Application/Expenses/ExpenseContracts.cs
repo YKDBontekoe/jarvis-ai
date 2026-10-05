@@ -114,6 +114,63 @@ public static class ExpenseCategories
     }
 }
 
+/// <summary>Whether a transaction spends money, brings it in, or moves it between the owner's own accounts.</summary>
+public static class TransactionKinds
+{
+    public const string Expense = "expense";
+    public const string Income = "income";
+    public const string Transfer = "transfer";
+
+    public static bool IsValid([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] string? kind) =>
+        kind is Expense or Income or Transfer;
+}
+
+public static class IncomeCategories
+{
+    public const string Salary = "salary";
+    public const string Freelance = "freelance";
+    public const string Interest = "interest";
+    public const string Dividends = "dividends";
+    public const string Refund = "refund";
+    public const string Gift = "gift";
+    public const string OtherIncome = "other_income";
+
+    /// <summary>The category stored on transfers, which are neither spending nor income.</summary>
+    public const string Transfer = "transfer";
+
+    public static readonly IReadOnlyList<string> All =
+        [Salary, Freelance, Interest, Dividends, Refund, Gift, OtherIncome];
+
+    public static bool IsValid(string? category) => category is not null && All.Contains(category);
+
+    public static string? Normalize(string? category)
+    {
+        var key = ExpenseRules.Key(category).Replace(' ', '_');
+        if (IsValid(key)) return key;
+        return key switch
+        {
+            "salaris" or "loon" or "wage" or "wages" or "pay" or "paycheck" or "income" => Salary,
+            "freelancer" or "zzp" or "invoice" => Freelance,
+            "rente" => Interest,
+            "dividend" => Dividends,
+            "terugbetaling" or "restitutie" or "reimbursement" => Refund,
+            "cadeau" => Gift,
+            "other" or "overig" => OtherIncome,
+            _ => null
+        };
+    }
+
+    public static string Guess(string? merchant, string? note)
+    {
+        var text = ExpenseRules.Key($"{merchant} {note}");
+        if (text.Contains("salar") || text.Contains("loon") || text.Contains("payroll")) return Salary;
+        if (text.Contains("dividend")) return Dividends;
+        if (text.Contains("rente") || text.Contains("interest")) return Interest;
+        if (text.Contains("refund") || text.Contains("terugbetaling") || text.Contains("restitutie")) return Refund;
+        return OtherIncome;
+    }
+}
+
 public static class ExpenseSources
 {
     public const string Chat = "chat";
@@ -193,7 +250,10 @@ public sealed record ExpenseDraft(
     string? Note = null,
     DateOnly? SpentOn = null,
     Guid? ReceiptFileId = null,
-    string Source = ExpenseSources.App);
+    string Source = ExpenseSources.App,
+    string? Kind = null,
+    Guid? AccountId = null,
+    Guid? TransferAccountId = null);
 
 public enum ExpenseFailure
 {
@@ -245,6 +305,17 @@ public sealed record ExpenseMonthSummary(
     IReadOnlyList<MerchantTotal> TopMerchants,
     IReadOnlyList<CurrencyTotal> OtherCurrencies);
 
+/// <summary>Filters for the transaction ledger. Dates are inclusive; <see cref="Offset"/> pages through results.</summary>
+public sealed record TransactionQuery(
+    DateOnly? From = null,
+    DateOnly? To = null,
+    Guid? AccountId = null,
+    string? Kind = null,
+    string? Category = null,
+    string? Search = null,
+    int Offset = 0,
+    int Limit = 50);
+
 public interface IExpenseRepository
 {
     /// <summary>The owner's expenses dated within [from, to], newest first.</summary>
@@ -252,6 +323,13 @@ public interface IExpenseRepository
 
     Task<IReadOnlyList<Expense>> ListRecentAsync(Guid ownerId, int limit, CancellationToken cancellationToken);
     Task<Expense?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+
+    /// <summary>Every kind of transaction matching the query, newest first. <see cref="ListAsync"/> stays spending-only.</summary>
+    Task<IReadOnlyList<Expense>> QueryAsync(Guid ownerId, TransactionQuery query, CancellationToken cancellationToken);
+
+    /// <summary>Every transaction that touches an account, used to work out balances.</summary>
+    Task<IReadOnlyList<Expense>> ListAccountMovementsAsync(Guid ownerId, CancellationToken cancellationToken);
+
     Task AddAsync(Expense expense, CancellationToken cancellationToken);
     Task<bool> UpdateAsync(Expense expense, CancellationToken cancellationToken);
     Task<bool> DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
@@ -281,6 +359,9 @@ public interface IExpenseService
 
     Task<ExpenseMonthSummary> SummarizeMonthAsync(Guid ownerId, int year, int month,
         CancellationToken cancellationToken);
+
+    /// <summary>The transaction ledger across all kinds and accounts.</summary>
+    Task<IReadOnlyList<Expense>> QueryAsync(Guid ownerId, TransactionQuery query, CancellationToken cancellationToken);
 }
 
 /// <summary>What a receipt photo says, read by a model. Every field may be missing when the photo is unclear.</summary>

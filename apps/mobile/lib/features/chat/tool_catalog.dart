@@ -139,6 +139,41 @@ const _catalog = <String, ToolDescription>{
     'Read a bank statement',
     PhosphorIconsRegular.uploadSimple,
   ),
+  'GetAccounts': ToolDescription(
+    'Checking your accounts',
+    'Checked your accounts',
+    PhosphorIconsRegular.wallet,
+  ),
+  'AddAccount': ToolDescription(
+    'Adding an account',
+    'Added an account',
+    PhosphorIconsRegular.wallet,
+  ),
+  'LogIncome': ToolDescription(
+    'Logging income',
+    'Logged income',
+    PhosphorIconsRegular.trendUp,
+  ),
+  'GetTransactions': ToolDescription(
+    'Looking through your transactions',
+    'Looked through your transactions',
+    PhosphorIconsRegular.receipt,
+  ),
+  'GetPortfolio': ToolDescription(
+    'Checking your portfolio',
+    'Checked your portfolio',
+    PhosphorIconsRegular.chartLine,
+  ),
+  'RecordTrade': ToolDescription(
+    'Recording a trade',
+    'Recorded a trade',
+    PhosphorIconsRegular.chartLine,
+  ),
+  'SetHoldingPrice': ToolDescription(
+    'Updating a share price',
+    'Updated a share price',
+    PhosphorIconsRegular.chartLine,
+  ),
   'PreviewAutomation': ToolDescription(
     'Previewing an automation',
     'Previewed an automation',

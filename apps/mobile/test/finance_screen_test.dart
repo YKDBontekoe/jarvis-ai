@@ -80,6 +80,7 @@ void main() {
         home: FinanceScreen(
           http: http.client(),
           now: _now,
+          initialTab: FinanceTab.budgets,
           pickStatement: pick,
         ),
       ),

@@ -47,6 +47,7 @@ public static class BankCsvParser
             .Select(x => x.index).Take(2).ToArray();
 
         var rows = new List<ImportRow>();
+        var incomeRows = new List<ImportRow>();
         int income = 0, unreadable = 0;
         foreach (var line in lines.Skip(1))
         {
@@ -78,16 +79,24 @@ public static class BankCsvParser
                 continue;
             }
 
-            if (value >= 0) { income++; continue; }
             var text = string.Join(" · ", descriptionColumns.Select(i => Clean(Cell(cells, i)))
                 .Where(x => x.Length > 0).Distinct());
             var merchant = CleanMerchant(descriptionColumns.Length == 0 ? "" : Cell(cells, descriptionColumns[0]));
             var currency = Expenses.ExpenseRules.NormalizeCurrency(Cell(cells, currencyColumn)) ?? fallback;
-            rows.Add(new ImportRow(day, Math.Round(Math.Abs(value!.Value), 2), currency,
+            var row = new ImportRow(day, Math.Round(Math.Abs(value!.Value), 2), currency,
                 merchant.Length == 0 ? null : merchant,
-                text.Length == 0 ? null : text.Length > 200 ? text[..200] : text));
+                text.Length == 0 ? null : text.Length > 200 ? text[..200] : text,
+                value >= 0 ? Expenses.TransactionKinds.Income : Expenses.TransactionKinds.Expense);
+            if (value >= 0)
+            {
+                income++;
+                if (value > 0) incomeRows.Add(row);
+                continue;
+            }
+            rows.Add(row);
         }
-        return new CsvParseResult(rows, income, unreadable, rows.Count == 0 && income == 0 ? "No rows could be read." : null);
+        return new CsvParseResult(rows, income, unreadable,
+            rows.Count == 0 && income == 0 ? "No rows could be read." : null, incomeRows);
     }
 
     private static string ExpensesCurrency(string? currency) =>
