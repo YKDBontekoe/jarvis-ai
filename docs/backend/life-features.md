@@ -11,6 +11,7 @@ Seven owner-scoped features built on the existing domains. Each follows the usua
 | [Library and deep research](#library-and-deep-research) | `Application/Library`, `Agents/Library` | `library_items`, `flashcards` | `features/library` |
 | [Context modes](#context-modes) | `Application/Modes`, `Agents/Modes` | owner settings (`context-modes`) | `features/modes` |
 | [Mission control](#mission-control) | `Application/Missions`, `Agents/Missions` | `missions`, `mission_steps`, `mission_notes` | `features/missions` |
+| [Routine miner](#routine-miner) | `Application/Routines`, `Agents/Routines` | `routine_suggestions`, owner settings (`routines`) | `features/automations` |
 
 ## Life timeline
 
@@ -84,6 +85,19 @@ A mission splits a goal into up to 8 steps with roles (`researcher`, `planner`, 
 - Owner control: pause/resume, cancel (stops running tasks), edit a waiting step, skip a step (dependents carry on), retry a failed step (blocked steps come back).
 - Endpoints: `GET/POST /missions`, `GET/DELETE /missions/{id}`, `POST /missions/{id}/start|pause|resume|cancel`, `PUT /missions/steps/{id}`, `POST /missions/steps/{id}/skip|retry`. At most 5 active missions per owner.
 - Tools: `PlanMission`, `RunMission` (approval), `GetMissions`, `PauseOrResumeMission`, `CancelMission`.
+
+## Routine miner
+
+Jarvis looks for repeated behaviour in the life timeline and offers a ready automation for each pattern. `RoutineMinerEngine` is pure: it reads 8 weeks of timeline moments (journal, expense, habit, finished task) in the owner's time zone and finds two kinds of pattern.
+
+- **Time habits**: the same thing done inside a ±45 minute stretch of the day on a weekday set. A weekday counts when it has at least 3 hits and at least 60% of that weekday's days in the window. The suggestion is a `schedule` trigger at the median time with a notification (or, for a recurring finished task, a task action).
+- **Follow-ups**: event A (journal saved, expense logged, task finished) followed by the same thing B within 2 hours in at least 70% of at least 4 occurrences. The suggestion is an `event` trigger with a notification and a 4-hour cooldown. A task-finished trigger never gets a task action, so an automation can not start itself.
+- Every suggestion carries a full automation definition that passes `AutomationRuleValidator`. At most 6 are kept, strongest first.
+
+`RoutineSuggestionService` stores them in `routine_suggestions` (unique per owner and `fingerprint`). A refresh runs after the nightly dream, and also when the list is read and the last run is over 24 hours old, so it works with dreaming off. Pending rows follow the data and are dropped when the pattern disappears; accepted and dismissed rows are the owner's decision and are never changed, so a dismissed pattern does not come back. At most one `routine.suggested` notification is sent per week.
+
+- Accepting runs the definition through the validator and creates the automation as a **draft**; the owner still switches it on in the Automations screen. Each suggestion also returns the `AutomationSimulator` result (when, then, approvals) so the owner sees what it would do.
+- Endpoints: `GET /routines/suggestions`, `POST /routines/suggestions/refresh`, `POST /routines/suggestions/{id}/accept`, `POST /routines/suggestions/{id}/dismiss`. Tool: `GetRoutineSuggestions` (read-only; accepting stays in the app). Flutter shows them as "Suggested for you" at the top of Automations.
 
 ## Safety summary
 

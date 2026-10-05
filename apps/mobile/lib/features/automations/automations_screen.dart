@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../approvals/approvals_screen.dart';
 import 'automation_studio_screen.dart';
+import 'routine_suggestions.dart';
 import '../../json_maps.dart';
 import '../../schedule_format.dart';
 import '../../theme.dart';
@@ -25,6 +26,8 @@ class AutomationsScreen extends StatefulWidget {
 
 class _AutomationsScreenState extends State<AutomationsScreen> {
   List<Map<String, dynamic>> _rules = [];
+  List<Map<String, dynamic>> _suggestions = [];
+  final Set<String> _suggestionBusy = {};
   final Set<String> _busy = {};
   bool _loading = true;
   String? _error;
@@ -52,6 +55,7 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
       if (mounted && revision == _requestRevision) {
         setState(() => _rules = jsonMaps(response.data));
       }
+      await _loadSuggestions(revision);
     } on DioException {
       if (mounted && revision == _requestRevision) {
         setState(() => _error = 'Jarvis could not load automations.');
@@ -64,6 +68,65 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
       if (mounted && revision == _requestRevision) {
         setState(() => _loading = false);
       }
+    }
+  }
+
+  /// Suggestions are a bonus: when they cannot be loaded the list still works.
+  Future<void> _loadSuggestions(int revision) async {
+    try {
+      final response = await widget.http.get<dynamic>(
+        '/api/v1/routines/suggestions',
+      );
+      if (mounted && revision == _requestRevision) {
+        setState(() => _suggestions = jsonMaps(response.data));
+      }
+    } catch (_) {
+      if (mounted && revision == _requestRevision) {
+        setState(() => _suggestions = []);
+      }
+    }
+  }
+
+  Future<void> _createFromSuggestion(String id) async {
+    setState(() => _suggestionBusy.add(id));
+    try {
+      await widget.http.post<dynamic>(
+        '/api/v1/routines/suggestions/$id/accept',
+      );
+      await _load();
+      if (mounted) _show('Draft created. Switch it on when you are ready.');
+    } on DioException catch (error) {
+      if (mounted) {
+        _show(
+          firstProblemMessage(error.response?.data) ??
+              'Jarvis could not create that automation.',
+        );
+      }
+    } catch (_) {
+      if (mounted) _show('Jarvis could not create that automation.');
+    } finally {
+      if (mounted) setState(() => _suggestionBusy.remove(id));
+    }
+  }
+
+  Future<void> _dismissSuggestion(String id) async {
+    setState(() => _suggestionBusy.add(id));
+    try {
+      await widget.http.post<dynamic>(
+        '/api/v1/routines/suggestions/$id/dismiss',
+      );
+      if (mounted) {
+        setState(
+          () => _suggestions = [
+            for (final s in _suggestions)
+              if (jsonId(s) != id) s,
+          ],
+        );
+      }
+    } catch (_) {
+      if (mounted) _show('Jarvis could not dismiss that suggestion.');
+    } finally {
+      if (mounted) setState(() => _suggestionBusy.remove(id));
     }
   }
 
@@ -262,7 +325,7 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
     body: ListScreenBody(
       loading: _loading,
       error: _error,
-      isEmpty: _rules.isEmpty,
+      isEmpty: _rules.isEmpty && _suggestions.isEmpty,
       onRetry: _load,
       onRefresh: _load,
       empty: const EmptyState(
@@ -273,11 +336,23 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
       ),
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        itemCount: _rules.length,
-        itemBuilder: (context, index) => FadeSlideIn(
-          index: index,
-          child: ContentWidth(child: _ruleCard(_rules[index])),
-        ),
+        itemCount: _rules.length + 1,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return ContentWidth(
+              child: RoutineSuggestionsSection(
+                suggestions: _suggestions,
+                busy: _suggestionBusy,
+                onCreate: _createFromSuggestion,
+                onDismiss: _dismissSuggestion,
+              ),
+            );
+          }
+          return FadeSlideIn(
+            index: index - 1,
+            child: ContentWidth(child: _ruleCard(_rules[index - 1])),
+          );
+        },
       ),
     ),
   );

@@ -5,6 +5,7 @@ using Jarvis.Application.Inbox;
 using Jarvis.Application.Library;
 using Jarvis.Application.Missions;
 using Jarvis.Application.Modes;
+using Jarvis.Application.Routines;
 using Jarvis.Infrastructure.Library;
 using Jarvis.Application.Timeline;
 using Jarvis.Infrastructure.Persistence;
@@ -50,6 +51,10 @@ public static class LifeFeaturesRegistration
 
         // Context modes: stored in the owner's settings, so no tables of their own.
         services.AddScoped<IModeService, ModeService>();
+
+        // Routine miner: repeated behaviour turned into suggested automations.
+        services.AddScoped<IRoutineSuggestionRepository, RoutineSuggestionRepository>();
+        services.AddScoped<IRoutineSuggestionService, RoutineSuggestionService>();
 
         // Mission control: a supervised crew of tasks working on one goal.
         services.AddScoped<IMissionRepository, MissionRepository>();
