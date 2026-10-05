@@ -1,3 +1,4 @@
+using Jarvis.Domain.Workflows;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -35,6 +36,8 @@ internal sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subsc
             table.HasCheckConstraint("ck_subscriptions_status", "status IN ('active', 'dismissed', 'cancelled')");
             table.HasCheckConstraint("ck_subscriptions_cadence",
                 "cadence IN ('weekly', 'monthly', 'quarterly', 'yearly')");
+            table.HasCheckConstraint("ck_subscriptions_negotiation_goal",
+                "negotiation_goal IS NULL OR negotiation_goal IN ('cancel', 'lower_price')");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedNever();
@@ -53,6 +56,13 @@ internal sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subsc
         builder.Property(x => x.ReminderId).HasColumnName("reminder_id");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        builder.Property(x => x.CancelUrl).HasColumnName("cancel_url").HasMaxLength(500);
+        builder.Property(x => x.NegotiationTaskId).HasColumnName("negotiation_task_id");
+        builder.Property(x => x.NegotiationGoal).HasColumnName("negotiation_goal").HasMaxLength(20);
+        builder.Property(x => x.NegotiationStartedAt).HasColumnName("negotiation_started_at");
         builder.HasIndex(x => new { x.OwnerId, x.MerchantKey, x.Currency }).IsUnique();
+        // Deleting the drafting task only forgets the link; the subscription stays.
+        builder.HasOne<JarvisTask>().WithMany().HasForeignKey(x => x.NegotiationTaskId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

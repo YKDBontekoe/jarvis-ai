@@ -48,10 +48,14 @@ public sealed class SubscriptionEntity
     public Guid? ReminderId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    public string? CancelUrl { get; set; }
+    public Guid? NegotiationTaskId { get; set; }
+    public string? NegotiationGoal { get; set; }
+    public DateTimeOffset? NegotiationStartedAt { get; set; }
 
     public Subscription ToRecord() => new(Id, OwnerId, MerchantKey, Merchant, Amount, Currency, Cadence,
         LastChargedOn, NextDueOn, ChargeCount, PreviousAmount, Status, RemindDaysBefore, ReminderId, CreatedAt,
-        UpdatedAt);
+        UpdatedAt, CancelUrl, NegotiationTaskId, NegotiationGoal, NegotiationStartedAt);
 
     public void Apply(Subscription subscription)
     {
@@ -68,6 +72,10 @@ public sealed class SubscriptionEntity
         RemindDaysBefore = subscription.RemindDaysBefore;
         ReminderId = subscription.ReminderId;
         UpdatedAt = subscription.UpdatedAt;
+        CancelUrl = subscription.CancelUrl;
+        NegotiationTaskId = subscription.NegotiationTaskId;
+        NegotiationGoal = subscription.NegotiationGoal;
+        NegotiationStartedAt = subscription.NegotiationStartedAt;
     }
 }
 

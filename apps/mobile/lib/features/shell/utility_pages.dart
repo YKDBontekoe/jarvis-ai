@@ -99,7 +99,7 @@ Widget? utilityPageFor(
   'library' => LibraryScreen(http: http),
   'inbox' => InboxScreen(http: http),
   'expenses' => ExpensesScreen(http: http),
-  'finance' => FinanceScreen(http: http),
+  'finance' => FinanceScreen(http: http, onAskInChat: onAskInChat),
   'habits' => HabitsScreen(http: http),
   'people' => PeopleScreen(http: http),
   'approvals' => ApprovalsScreen(http: http),

@@ -69,6 +69,10 @@ class SubscriptionData {
     required this.perMonth,
     this.previousAmount,
     this.remindDaysBefore,
+    this.cancelUrl,
+    this.negotiationTaskId,
+    this.negotiationGoal,
+    this.negotiationStartedAt,
   });
 
   final String id;
@@ -81,6 +85,14 @@ class SubscriptionData {
   final double perMonth;
   final double? previousAmount;
   final int? remindDaysBefore;
+
+  /// The page the owner saved for cancelling, if any.
+  final String? cancelUrl;
+
+  /// The background task that last drafted a cancel or price message, and what it was for.
+  final String? negotiationTaskId;
+  final String? negotiationGoal;
+  final DateTime? negotiationStartedAt;
 
   bool get priceWentUp => previousAmount != null && amount > previousAmount!;
 
@@ -104,6 +116,12 @@ class SubscriptionData {
       remindDaysBefore: map['remindDaysBefore'] is int
           ? map['remindDaysBefore'] as int
           : null,
+      cancelUrl: jsonString(map, 'cancelUrl'),
+      negotiationTaskId: jsonString(map, 'negotiationTaskId'),
+      negotiationGoal: jsonString(map, 'negotiationGoal'),
+      negotiationStartedAt: DateTime.tryParse(
+        jsonString(map, 'negotiationStartedAt') ?? '',
+      )?.toLocal(),
     );
   }
 }

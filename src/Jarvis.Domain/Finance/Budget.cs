@@ -19,7 +19,10 @@ public sealed record Budget(
 /// <summary>
 /// A charge that comes back on a schedule, found in the owner's expenses. <see cref="PreviousAmount"/> is set when
 /// the latest charge differs from the one before. <see cref="RemindDaysBefore"/> asks for a reminder that many days
-/// before <see cref="NextDueOn"/>; <see cref="ReminderId"/> is that reminder.
+/// before <see cref="NextDueOn"/>; <see cref="ReminderId"/> is that reminder. <see cref="CancelUrl"/> is the page the
+/// owner saved for cancelling. <see cref="NegotiationTaskId"/> is the background task that last drafted a cancel or
+/// price message (<see cref="NegotiationGoal"/>, started at <see cref="NegotiationStartedAt"/>); doing it live in the
+/// browser happens in a chat and leaves nothing here.
 /// </summary>
 public sealed record Subscription(
     Guid Id,
@@ -37,4 +40,8 @@ public sealed record Subscription(
     int? RemindDaysBefore,
     Guid? ReminderId,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? CancelUrl = null,
+    Guid? NegotiationTaskId = null,
+    string? NegotiationGoal = null,
+    DateTimeOffset? NegotiationStartedAt = null);

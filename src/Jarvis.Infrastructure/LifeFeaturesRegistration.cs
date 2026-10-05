@@ -39,6 +39,7 @@ public static class LifeFeaturesRegistration
         // Finance autopilot: budgets, subscriptions, forecast, bank import.
         services.AddScoped<IFinanceRepository, FinanceRepository>();
         services.AddScoped<IFinanceService, FinanceService>();
+        services.AddScoped<ISubscriptionNegotiationService, SubscriptionNegotiationService>();
         services.AddScoped<IExpenseObserver, BudgetExpenseObserver>();
 
         // Automation studio: webhooks that start event automations.

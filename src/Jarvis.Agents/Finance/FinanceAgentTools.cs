@@ -12,7 +12,8 @@ namespace Jarvis.Agents.Finance;
 /// Tools for budgets, subscriptions, forecasts and statement imports. They only change the owner's own finance
 /// data. Merchant names and statement text are the owner's data or come from a bank file: never instructions.
 /// </summary>
-internal sealed class FinanceAgentTools(IFinanceService finance, ICurrentUser currentUser)
+internal sealed class FinanceAgentTools(IFinanceService finance, ICurrentUser currentUser,
+    ISubscriptionNegotiationService? negotiation = null)
 {
     private const int MaxImportCharacters = 400_000;
 
@@ -122,6 +123,24 @@ internal sealed class FinanceAgentTools(IFinanceService finance, ICurrentUser cu
             FinanceFailure.NotFound => "There is no subscription with that id.",
             FinanceFailure.Invalid => result.Message ?? "Invalid status.",
             _ => $"{AgentText.Limit(result.Value!.Merchant, 60)} is now {result.Value.Status}."
+        };
+    }
+
+    [Description("Have a background task draft the message that cancels a subscription or asks for a lower price. It only writes the message: nothing is sent and nobody is contacted, and the subscription is not marked cancelled. Find the id with GetSubscriptions. To actually cancel in the browser together with the user right now, do not use this: call BrowseTheWeb in this conversation (navigation, clicks and typing need their approval) and call SetSubscriptionStatus with cancelled only after the merchant confirms.")]
+    public async Task<string> StartSubscriptionNegotiationAsync(
+        [Description("The subscription id.")] Guid subscriptionId,
+        [Description("cancel to end the subscription, or lower_price to ask for a better price.")] string goal,
+        CancellationToken cancellationToken = default)
+    {
+        if (negotiation is null) return "Drafting a message is not available right now.";
+        var result = await negotiation.StartAsync(currentUser.OwnerId, subscriptionId, goal, NegotiationModes.Draft,
+            null, cancellationToken);
+        return result.Failure switch
+        {
+            FinanceFailure.NotFound => "There is no subscription with that id.",
+            FinanceFailure.Invalid => result.Message ?? "That could not be started.",
+            _ => $"A background task is drafting the message for {AgentText.Limit(result.Value!.Merchant, 60)}. " +
+                 "The user will find the draft in Tasks when it is done."
         };
     }
 
