@@ -5,7 +5,6 @@ part of 'chat_screen.dart';
 /// Photos picked in the composer: picked, uploaded to the owner's files, and
 /// sent with the next message by file id.
 mixin _ChatScreenPhotos on _ChatScreenController {
-  static const _maxPhotoBytes = 8 * 1024 * 1024;
   int _photoSerial = 0;
 
   void _showPhotoSources() {
@@ -30,11 +29,22 @@ mixin _ChatScreenPhotos on _ChatScreenController {
                 leading: const IconBadge(icon: PhosphorIconsRegular.image),
                 title: const Text('Choose from library'),
                 subtitle: Text(
-                  'Up to $_maxPhotosPerMessage photos per message',
+                  'Up to $maxPhotosPerMessage photos per message',
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   unawaited(_pickPhotos(ImageSource.gallery));
+                },
+              ),
+              ListTile(
+                leading: const IconBadge(
+                  icon: PhosphorIconsRegular.clipboardText,
+                ),
+                title: const Text('Paste a photo'),
+                subtitle: const Text('From the clipboard'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  unawaited(_pastePhotosFromClipboard());
                 },
               ),
             ],
@@ -44,11 +54,22 @@ mixin _ChatScreenPhotos on _ChatScreenController {
     );
   }
 
+  Future<void> _pastePhotosFromClipboard() async {
+    final incoming = await readClipboardImages();
+    if (!mounted) return;
+    if (incoming.isEmpty) {
+      _composerFocus.value++;
+      _showPhotoNotice('Copy a photo, then paste it in the message box.');
+      return;
+    }
+    await _enqueueIncomingPhotos(incoming);
+  }
+
   Future<void> _pickPhotos(ImageSource source) async {
-    final room = _maxPhotosPerMessage - _pendingPhotos.length;
+    final room = maxPhotosPerMessage - _pendingPhotos.length;
     if (room <= 0) {
       _showPhotoNotice(
-        'You can send up to $_maxPhotosPerMessage photos at once.',
+        'You can send up to $maxPhotosPerMessage photos at once.',
       );
       return;
     }
@@ -80,24 +101,31 @@ mixin _ChatScreenPhotos on _ChatScreenController {
       return;
     }
     if (!mounted || picked.isEmpty) return;
-    if (picked.length > room) {
-      _showPhotoNotice('Only the first $room photos were added.');
-      picked = picked.take(room).toList();
-    }
+    final incoming = <IncomingPhoto>[];
     for (final file in picked) {
-      final bytes = await file.readAsBytes();
-      if (!mounted) return;
-      if (bytes.isEmpty || bytes.length > _maxPhotoBytes) {
-        _showPhotoNotice('A photo is larger than 8 MB and was skipped.');
-        continue;
-      }
-      final photo = PendingPhoto(
-        localId: 'photo-${++_photoSerial}',
-        bytes: bytes,
-        fileName: photoFileName(file.name),
+      incoming.add(
+        IncomingPhoto(bytes: await file.readAsBytes(), name: file.name),
       );
-      setState(() => _pendingPhotos = [..._pendingPhotos, photo]);
-      unawaited(_uploadPhoto(photo));
+      if (!mounted) return;
+    }
+    await _enqueueIncomingPhotos(incoming);
+  }
+
+  Future<void> _enqueueIncomingPhotos(List<IncomingPhoto> incoming) async {
+    final result = prepareIncomingPhotos(
+      incoming: incoming,
+      remainingSlots: maxPhotosPerMessage - _pendingPhotos.length,
+    );
+    if (result.notice != null) _showPhotoNotice(result.notice!);
+    for (final photo in result.photos) {
+      if (!mounted) return;
+      final pending = PendingPhoto(
+        localId: 'photo-${++_photoSerial}',
+        bytes: photo.bytes,
+        fileName: photo.fileName,
+      );
+      setState(() => _pendingPhotos = [..._pendingPhotos, pending]);
+      unawaited(_uploadPhoto(pending));
     }
   }
 
@@ -168,8 +196,6 @@ mixin _ChatScreenPhotos on _ChatScreenController {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
-
-const _maxPhotosPerMessage = 4;
 
 /// Keeps a picked photo's name with an extension the server accepts.
 String photoFileName(String name) {
