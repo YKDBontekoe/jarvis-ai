@@ -18,6 +18,7 @@ import '../tasks/tasks_screen.dart';
 import '../agents/agents_screen.dart';
 import '../channels/channels_screen.dart';
 import '../coding/coding_runs_screen.dart';
+import '../decisions/decisions_screen.dart';
 import '../devices/devices_screen.dart';
 import '../expenses/expenses_screen.dart';
 import '../habits/habits_screen.dart';
@@ -90,6 +91,7 @@ Widget? utilityPageFor(
     onCreateDone: onQuickCreateDone,
   ),
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
+  'decisions' => DecisionsScreen(http: http),
   'today' => DayPlannerScreen(http: http, onAskInChat: onAskInChat),
   'timeline' => TimelineScreen(http: http),
   'missions' => MissionsScreen(http: http),
@@ -97,7 +99,7 @@ Widget? utilityPageFor(
   'library' => LibraryScreen(http: http),
   'inbox' => InboxScreen(http: http),
   'expenses' => ExpensesScreen(http: http),
-  'finance' => FinanceScreen(http: http),
+  'finance' => FinanceScreen(http: http, onAskInChat: onAskInChat),
   'habits' => HabitsScreen(http: http),
   'people' => PeopleScreen(http: http),
   'approvals' => ApprovalsScreen(http: http),

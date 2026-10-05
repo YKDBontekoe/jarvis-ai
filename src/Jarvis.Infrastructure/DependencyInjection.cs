@@ -53,6 +53,10 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.People.IPeopleRepository, PeopleRepository>();
         services.AddScoped<Jarvis.Application.People.IPeopleService, Jarvis.Application.People.PeopleService>();
         services.AddScoped<Jarvis.Application.People.IPeopleCheckInService, Jarvis.Application.People.PeopleCheckInService>();
+        services.AddScoped<Jarvis.Application.People.Radar.IPersonLinkRepository, PersonLinkRepository>();
+        services.AddScoped<Jarvis.Application.People.Radar.IChatActivityStats, WhatsAppAssistantRepository>();
+        services.AddScoped<Jarvis.Application.People.Radar.IRelationshipRadarService,
+            Jarvis.Application.People.Radar.RelationshipRadarService>();
         services.AddScoped<Jarvis.Application.Channels.IChannelRepository, ChannelRepository>();
         services.AddScoped<Jarvis.Application.Devices.IDeviceTelemetryStore, DeviceTelemetryStore>();
         services.AddScoped<Jarvis.Application.Integrations.IMcpOAuthSessionStore, McpOAuthSessionStore>();

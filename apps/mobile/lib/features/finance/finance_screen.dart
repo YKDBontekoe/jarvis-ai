@@ -11,7 +11,9 @@ import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../expenses/expense_models.dart'
     show dayLabel, expenseCategories, expenseCategoryLabel, formatMoney;
+import '../tasks/task_details_screen.dart';
 import 'finance_models.dart';
+import 'negotiate_sheet.dart';
 
 Future<String?> _pickStatement() async {
   final file = await FilePicker.pickFile(
@@ -28,11 +30,15 @@ class FinanceScreen extends StatefulWidget {
     required this.http,
     this.now,
     this.pickStatement,
+    this.onAskInChat,
     super.key,
   });
 
   final Dio http;
   final DateTime? now;
+
+  /// Starts a chat with a prompt, used to cancel in the browser together with Jarvis. Null hides that route.
+  final ValueChanged<String>? onAskInChat;
 
   /// Returns the text of a bank CSV; replaced in tests.
   final Future<String?> Function()? pickStatement;
@@ -94,6 +100,52 @@ class _FinanceScreenState extends State<FinanceScreen> {
       }
     }
   }
+
+  Future<void> _negotiate(SubscriptionData item) async {
+    final ask = widget.onAskInChat;
+    final choice = await showNegotiateSheet(
+      context,
+      merchant: item.merchant,
+      savedCancelUrl: item.cancelUrl,
+      browserAvailable: ask != null,
+    );
+    if (choice == null || !mounted) return;
+    try {
+      final response = await widget.http.post<dynamic>(
+        '/api/v1/finance/subscriptions/${item.id}/negotiate',
+        data: {
+          'goal': choice.goal,
+          'mode': choice.mode,
+          'cancelUrl': choice.cancelUrl,
+        },
+      );
+      if (!mounted) return;
+      final prompt = jsonString(
+        jsonObject(response.data) ?? const {},
+        'prompt',
+      );
+      if (choice.mode == 'browser' && prompt != null && ask != null) {
+        // The browser runs in a chat, where navigation, clicks and typing need the owner's approval.
+        Navigator.of(context).pop();
+        ask(prompt);
+        return;
+      }
+      _toast('Jarvis is drafting the message. You will find it in Tasks.');
+      await _load();
+    } on DioException catch (error) {
+      if (mounted) {
+        _toast(
+          firstProblemMessage(error.response?.data) ?? 'That did not work.',
+        );
+      }
+    }
+  }
+
+  Future<void> _openTask(String taskId) => Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(
+      builder: (_) => TaskDetailsScreen(http: widget.http, taskId: taskId),
+    ),
+  );
 
   Future<void> _addBudget() async {
     final result = await showDialog<Map<String, Object>>(
@@ -423,9 +475,59 @@ class _FinanceScreenState extends State<FinanceScreen> {
               ),
               child: const Text('Track again'),
             ),
+          if (active) ..._negotiation(context, item),
         ],
       ),
     );
+  }
+
+  /// Cancel or ask for a better price, with where an earlier drafted message ended up.
+  List<Widget> _negotiation(BuildContext context, SubscriptionData item) {
+    final colors = JarvisColors.of(context);
+    final taskId = item.negotiationTaskId;
+    final started = item.negotiationStartedAt;
+    final host = item.cancelUrl == null
+        ? null
+        : Uri.tryParse(item.cancelUrl!)?.host;
+    return [
+      if (host != null && host.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(
+            'Cancel page: $host',
+            key: Key('subscription-cancel-url-${item.id}'),
+            style: TextStyle(color: colors.muted, fontSize: 13),
+          ),
+        ),
+      if (taskId != null)
+        Row(
+          key: Key('subscription-negotiation-${item.id}'),
+          children: [
+            Expanded(
+              child: Text(
+                '${item.negotiationGoal == 'lower_price' ? 'Price' : 'Cancel'} '
+                'message asked'
+                '${started == null ? '' : ' ${dayLabel(started, now: _now)}'}',
+                style: TextStyle(color: colors.inkSoft, fontSize: 13.5),
+              ),
+            ),
+            TextButton(
+              key: Key('subscription-task-${item.id}'),
+              onPressed: () => unawaited(_openTask(taskId)),
+              child: const Text('Open task'),
+            ),
+          ],
+        ),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          key: Key('subscription-negotiate-${item.id}'),
+          onPressed: () => unawaited(_negotiate(item)),
+          icon: const Icon(PhosphorIconsRegular.chatCircle, size: 16),
+          label: const Text('Cancel or get a better price'),
+        ),
+      ),
+    ];
   }
 
   static String _noun(String cadence) => switch (cadence) {
@@ -488,7 +590,9 @@ class _BudgetDialogState extends State<_BudgetDialog> {
       FilledButton(
         key: const Key('budget-save'),
         onPressed: () {
-          final limit = double.tryParse(_limit.text.trim().replaceAll(',', '.'));
+          final limit = double.tryParse(
+            _limit.text.trim().replaceAll(',', '.'),
+          );
           if (limit == null || limit <= 0) return;
           Navigator.pop(context, {'category': _category, 'limit': limit});
         },

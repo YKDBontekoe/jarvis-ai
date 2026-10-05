@@ -75,6 +75,8 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Inbox.IInboxTriager, Inbox.ModelInboxTriager>();
         services.AddScoped<IAgentToolContributor, Finance.FinanceToolContributor>();
         services.AddScoped<IAgentContextContributor, Finance.FinanceContextContributor>();
+        services.AddScoped<IAgentToolContributor, Routines.RoutineToolContributor>();
+        services.AddScoped<IAgentToolContributor, Decisions.DecisionToolContributor>();
         services.AddScoped<IAgentToolContributor, Library.LibraryToolContributor>();
         services.AddScoped<IAgentContextContributor, Library.LibraryContextContributor>();
         services.AddScoped<Jarvis.Application.Library.ILibraryDigester, Library.ModelLibraryDigester>();
@@ -84,6 +86,8 @@ public static class DependencyInjection
         services.AddScoped<IAgentContextContributor, Missions.MissionContextContributor>();
         services.AddScoped<Jarvis.Application.Missions.IMissionPlanner, Missions.ModelMissionPlanner>();
         services.AddScoped<IAgentToolContributor, People.PeopleToolContributor>();
+        services.AddScoped<IAgentToolContributor, People.RadarToolContributor>();
+        services.AddScoped<Jarvis.Application.People.Radar.IRadarToneAnalyzer, People.ModelRadarToneAnalyzer>();
         services.AddScoped<IAgentContextContributor, People.PeopleContextContributor>();
         services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();
         services.AddScoped<IAgentContextContributor, Persona.PersonaContextContributor>();

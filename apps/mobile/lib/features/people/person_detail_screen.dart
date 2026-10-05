@@ -9,6 +9,8 @@ import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'people_models.dart';
 import 'person_widgets.dart';
+import 'radar_models.dart';
+import 'radar_widgets.dart';
 
 /// One person: birthday, keep-in-touch rhythm, notes, and what Jarvis
 /// remembers about them from conversations.
@@ -30,6 +32,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   late PersonData _person = widget.person;
   List<({String predicate, String value})> _facts = const [];
   bool _saving = false;
+  PersonRadarData? _radar;
 
   String get _path => '/api/v1/people/${_person.id}';
 
@@ -37,6 +40,48 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   void initState() {
     super.initState();
     unawaited(_load());
+    unawaited(_loadRadar());
+  }
+
+  // The radar is a bonus: without it the page simply has no radar card.
+  Future<void> _loadRadar() async {
+    try {
+      final response = await widget.http.get<dynamic>('$_path/radar');
+      if (!mounted) return;
+      setState(() => _radar = PersonRadarData.fromJson(response.data));
+    } on DioException {
+      // Keep whatever is already shown.
+    }
+  }
+
+  Future<void> _linkChat() async {
+    final chat = await showChatPicker(context, widget.http);
+    if (chat == null || !mounted) return;
+    try {
+      await widget.http.post<dynamic>(
+        '$_path/links',
+        data: {'connectionId': chat.connectionId, 'chatId': chat.chatId},
+      );
+      _toast('Linked ${_person.name} to ${chat.displayName}.');
+      await _loadRadar();
+    } on DioException catch (error) {
+      _toast(
+        firstProblemMessage(error.response?.data) ??
+            'Could not link that chat.',
+      );
+    }
+  }
+
+  Future<void> _unlink(PersonLinkData link) async {
+    try {
+      await widget.http.delete<dynamic>('$_path/links/${link.id}');
+      _toast('Unlinked ${link.displayName}.');
+      await _loadRadar();
+    } on DioException catch (error) {
+      _toast(
+        firstProblemMessage(error.response?.data) ?? 'Could not unlink that.',
+      );
+    }
   }
 
   Future<void> _load() async {
@@ -294,6 +339,19 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
               ),
             ),
           ),
+          if (_radar != null) ...[
+            const SizedBox(height: 24),
+            ContentWidth(
+              child: FadeSlideIn(
+                index: 3,
+                child: RadarCard(
+                  radar: _radar,
+                  onLink: () => unawaited(_linkChat()),
+                  onUnlink: (link) => unawaited(_unlink(link)),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
           ContentWidth(
             child: FadeSlideIn(

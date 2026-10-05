@@ -244,6 +244,30 @@ public sealed class FinanceTests
     }
 
     [Fact]
+    public async Task Refreshing_keeps_the_saved_cancel_page_and_the_drafting_task()
+    {
+        var (service, expenses, repository, _) = Create();
+        expenses.Expenses.AddRange(Monthly("Netflix", 13.99m, 4, new DateOnly(2026, 10, 3)));
+        var netflix = (await service.RefreshSubscriptionsAsync(Owner, Today, default)).Single();
+        var taskId = Guid.CreateVersion7();
+        var started = new DateTimeOffset(2026, 10, 4, 9, 0, 0, TimeSpan.Zero);
+        await repository.UpdateSubscriptionAsync(netflix with
+        {
+            CancelUrl = "https://www.netflix.com/cancelplan", NegotiationTaskId = taskId,
+            NegotiationGoal = NegotiationGoals.Cancel, NegotiationStartedAt = started
+        }, default);
+
+        // A new charge changes the amount and dates; what the owner set up stays.
+        expenses.Expenses.Add(Spend(new DateOnly(2026, 10, 3).AddMonths(1).AddDays(-5), 15.99m, "Netflix", "subscriptions"));
+        var refreshed = (await service.RefreshSubscriptionsAsync(Owner, Today, default)).Single();
+
+        Assert.Equal("https://www.netflix.com/cancelplan", refreshed.CancelUrl);
+        Assert.Equal(taskId, refreshed.NegotiationTaskId);
+        Assert.Equal(NegotiationGoals.Cancel, refreshed.NegotiationGoal);
+        Assert.Equal(started, refreshed.NegotiationStartedAt);
+    }
+
+    [Fact]
     public async Task A_reminder_is_scheduled_before_the_next_charge_and_dropped_when_dismissed()
     {
         var (service, expenses, _, reminders) = Create();

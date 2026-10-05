@@ -12,9 +12,10 @@ public static class TimelineKinds
     public const string Reminder = "reminder";
     public const string Memory = "memory";
     public const string Conversation = "conversation";
+    public const string Decision = "decision";
 
     public static readonly IReadOnlyList<string> All =
-        [Journal, Expense, Habit, Contact, Birthday, Task, Reminder, Memory, Conversation];
+        [Journal, Expense, Habit, Contact, Birthday, Task, Reminder, Memory, Conversation, Decision];
 
     private static readonly HashSet<string> Known = new(All, StringComparer.Ordinal);
 

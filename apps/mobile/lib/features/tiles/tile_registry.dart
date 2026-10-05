@@ -74,6 +74,18 @@ final List<TileSpec> tileSpecs = [
     fallback: 'How was today?',
   ),
   const TileSpec(
+    id: 'decisions',
+    description:
+        'Log a call with how sure you are, answer later, and see how well calibrated you are.',
+    name: 'Decisions',
+    icon: PhosphorIconsRegular.hourglassMedium,
+    category: TileCategory.plan,
+    sizes: [_icon, _strip, _square],
+    destination: 'decisions',
+    load: _decisions,
+    fallback: 'Track a call',
+  ),
+  const TileSpec(
     id: 'weekly-review',
     description: 'Look back at your week and mood trends.',
     name: 'Weekly review',
@@ -724,6 +736,35 @@ Future<TileData?> _journal(TileEnv env) async {
     stat: '$streak',
     unit: 'day streak',
     subtitle: streak == 0 ? 'Write today’s entry' : 'How was today?',
+  );
+}
+
+Future<TileData?> _decisions(TileEnv env) async {
+  final response = await env.http.get<dynamic>(
+    '/api/v1/decisions',
+    queryParameters: const {'status': 'due'},
+  );
+  final due = _items(response);
+  if (due.isEmpty) {
+    return const TileData(
+      stat: '0',
+      unit: 'to answer',
+      subtitle: 'Nothing waiting',
+    );
+  }
+  return TileData(
+    stat: '${due.length}',
+    unit: 'to answer',
+    subtitle: _first(due.first, ['title']),
+    attention: true,
+    rows: [
+      for (final decision in due.take(_maxRows))
+        TileRow(
+          _first(decision, ['title']) ?? 'Decision',
+          meta: _first(decision, ['prediction']),
+          id: asJsonString(decision['id']),
+        ),
+    ],
   );
 }
 

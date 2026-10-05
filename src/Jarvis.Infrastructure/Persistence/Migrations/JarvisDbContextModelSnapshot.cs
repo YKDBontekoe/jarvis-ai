@@ -2070,6 +2070,77 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.ToTable("conversation_file_attachments", (string)null);
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.DecisionEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Context")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("context");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool?>("Outcome")
+                        .HasColumnType("boolean")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("OutcomeNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("outcome_note");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("Prediction")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("prediction");
+
+                    b.Property<double>("Probability")
+                        .HasColumnType("double precision")
+                        .HasColumnName("probability");
+
+                    b.Property<Guid?>("ReminderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reminder_id");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<DateOnly>("ReviewOn")
+                        .HasColumnType("date")
+                        .HasColumnName("review_on");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "ResolvedAt");
+
+                    b.HasIndex("OwnerId", "ReviewOn");
+
+                    b.ToTable("decisions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_decisions_probability", "probability BETWEEN 0.01 AND 0.99");
+                        });
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.DocumentCollectionFileEntity", b =>
                 {
                     b.Property<Guid>("CollectionId")
@@ -3224,6 +3295,64 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.ToTable("owner_settings", (string)null);
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.PersonChannelLinkEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ChatId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("chat_id");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("connection_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<Guid>("PersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("person_id");
+
+                    b.Property<DateTimeOffset?>("ToneAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("tone_at");
+
+                    b.Property<string>("ToneReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("tone_reason");
+
+                    b.Property<int?>("ToneScore")
+                        .HasColumnType("integer")
+                        .HasColumnName("tone_score");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConnectionId");
+
+                    b.HasIndex("PersonId");
+
+                    b.HasIndex("OwnerId", "PersonId");
+
+                    b.HasIndex("OwnerId", "ConnectionId", "ChatId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_person_channel_links_owner_chat");
+
+                    b.ToTable("person_channel_links", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_person_channel_links_tone", "tone_score IS NULL OR tone_score BETWEEN -2 AND 2");
+                        });
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.PersonEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3360,6 +3489,74 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("remote_agents", (string)null);
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.RoutineSuggestionEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AutomationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("automation_id");
+
+                    b.Property<double>("Confidence")
+                        .HasColumnType("double precision")
+                        .HasColumnName("confidence");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DefinitionJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("definition_json");
+
+                    b.Property<string>("Evidence")
+                        .IsRequired()
+                        .HasMaxLength(600)
+                        .HasColumnType("character varying(600)")
+                        .HasColumnName("evidence");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("fingerprint");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "Fingerprint")
+                        .IsUnique()
+                        .HasDatabaseName("ux_routine_suggestions_owner_fingerprint");
+
+                    b.HasIndex("OwnerId", "Status");
+
+                    b.ToTable("routine_suggestions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_routine_suggestions_status", "status IN ('pending', 'accepted', 'dismissed')");
+                        });
                 });
 
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.SkillEntity", b =>
@@ -3568,6 +3765,11 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(12)")
                         .HasColumnName("cadence");
 
+                    b.Property<string>("CancelUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("cancel_url");
+
                     b.Property<int>("ChargeCount")
                         .HasColumnType("integer")
                         .HasColumnName("charge_count");
@@ -3597,6 +3799,19 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("merchant_key");
+
+                    b.Property<string>("NegotiationGoal")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("negotiation_goal");
+
+                    b.Property<DateTimeOffset?>("NegotiationStartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("negotiation_started_at");
+
+                    b.Property<Guid?>("NegotiationTaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("negotiation_task_id");
 
                     b.Property<DateOnly>("NextDueOn")
                         .HasColumnType("date")
@@ -3631,12 +3846,16 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("NegotiationTaskId");
+
                     b.HasIndex("OwnerId", "MerchantKey", "Currency")
                         .IsUnique();
 
                     b.ToTable("subscriptions", null, t =>
                         {
                             t.HasCheckConstraint("ck_subscriptions_cadence", "cadence IN ('weekly', 'monthly', 'quarterly', 'yearly')");
+
+                            t.HasCheckConstraint("ck_subscriptions_negotiation_goal", "negotiation_goal IS NULL OR negotiation_goal IN ('cancel', 'lower_price')");
 
                             t.HasCheckConstraint("ck_subscriptions_status", "status IN ('active', 'dismissed', 'cancelled')");
                         });
@@ -4243,6 +4462,21 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.PersonChannelLinkEntity", b =>
+                {
+                    b.HasOne("Jarvis.Infrastructure.Persistence.ChannelConnectionEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Jarvis.Infrastructure.Persistence.PersonEntity", null)
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.PersonEntity", b =>
                 {
                     b.HasOne("Jarvis.Infrastructure.Persistence.GraphEntityEntity", null)
@@ -4265,6 +4499,14 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.HasOne("Jarvis.Domain.Projects.Project", null)
                         .WithMany()
                         .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.SubscriptionEntity", b =>
+                {
+                    b.HasOne("Jarvis.Domain.Workflows.JarvisTask", null)
+                        .WithMany()
+                        .HasForeignKey("NegotiationTaskId")
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 

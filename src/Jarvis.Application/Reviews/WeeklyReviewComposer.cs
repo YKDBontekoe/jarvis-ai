@@ -54,7 +54,8 @@ public static class WeeklyReviewComposer
     public const int MaxNotificationLength = 600;
 
     public static WeeklyReviewStats BuildStats(IReadOnlyList<JournalSample> entries, double? previousMood,
-        int tasksCompleted, int remindersHandled, int remindersUpcoming, int newMemories)
+        int tasksCompleted, int remindersHandled, int remindersUpcoming, int newMemories,
+        int decisionsResolved = 0, double? brierScore = null, double? previousBrierScore = null)
     {
         var days = entries
             .GroupBy(entry => entry.Date)
@@ -75,7 +76,7 @@ public static class WeeklyReviewComposer
             Average(entries.Select(x => x.Mood)), Average(entries.Select(x => x.Energy)),
             Average(entries.Select(x => x.Stress)), Average(entries.Select(x => x.Rating)),
             previousMood, best?.Date, best?.Rating, tasksCompleted, remindersHandled, remindersUpcoming, newMemories,
-            tags, days);
+            tags, days, decisionsResolved, brierScore, previousBrierScore);
     }
 
     /// <summary>Per-week journal averages, oldest first, with empty weeks kept so the chart keeps its rhythm.</summary>
@@ -102,7 +103,7 @@ public static class WeeklyReviewComposer
     {
         var stats = facts.Stats;
         if (stats.JournalEntries == 0 && stats.TasksCompleted == 0 && stats.RemindersHandled == 0 &&
-            stats.NewMemories == 0)
+            stats.NewMemories == 0 && stats.DecisionsResolved == 0)
         {
             var quiet = "A quiet week: no journal entries, finished tasks, or reminders.";
             if (stats.RemindersUpcoming > 0)
@@ -133,9 +134,28 @@ public static class WeeklyReviewComposer
         if (stats.RemindersHandled > 0) done.Add(Count(stats.RemindersHandled, "reminder", "reminders") + " handled");
         if (stats.NewMemories > 0) done.Add(Count(stats.NewMemories, "new memory", "new memories"));
         if (done.Count > 0) parts.Add(Capitalize(JoinList(done)) + ".");
+        if (DescribeDecisions(stats) is { } decisions) parts.Add(decisions);
         if (stats.RemindersUpcoming > 0)
             parts.Add($"Next week has {Count(stats.RemindersUpcoming, "reminder", "reminders")} lined up.");
         return string.Join(' ', parts);
+    }
+
+    /// <summary>One sentence on the decisions settled this week and how the predictions scored, or null.</summary>
+    public static string? DescribeDecisions(WeeklyReviewStats stats)
+    {
+        if (stats.DecisionsResolved <= 0) return null;
+        var text = $"You settled {Count(stats.DecisionsResolved, "decision", "decisions")}";
+        if (stats.BrierScore is not { } score) return text + ".";
+        text += $"; your predictions scored {score.ToString("0.00", CultureInfo.InvariantCulture)} " +
+                "(0 is perfect, always saying 50% scores 0.25)";
+        if (stats.PreviousBrierScore is { } before)
+        {
+            var delta = Math.Round(before - score, 2);
+            text += delta > 0.02 ? ", better than before"
+                : delta < -0.02 ? ", worse than before" : ", in line with before";
+        }
+
+        return text + ".";
     }
 
     public static string NotificationBody(string story)

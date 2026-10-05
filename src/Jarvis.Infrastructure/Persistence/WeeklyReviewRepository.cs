@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Jarvis.Application.Decisions;
 using Jarvis.Application.Reviews;
 using Jarvis.Domain.Audit;
 using Jarvis.Domain.Workflows;
@@ -54,9 +55,22 @@ public sealed class WeeklyReviewRepository(JarvisDbContext db) : IWeeklyReviewRe
         var samples = thisWeek
             .Select(x => new JournalSample(x.EntryDate, x.Mood, x.Energy, x.Stress, x.Rating, x.Tags))
             .ToArray();
+
+        // Calibration: the decisions settled this week, against the latest ones settled before it.
+        var settled = (await db.Decisions.AsNoTracking()
+                .Where(x => x.OwnerId == ownerId && x.Outcome != null && x.ResolvedAt >= start && x.ResolvedAt < end)
+                .Select(x => new { x.Probability, x.Outcome, x.ResolvedAt }).ToListAsync(cancellationToken))
+            .Select(x => new ResolvedPrediction(x.Probability, x.Outcome!.Value, x.ResolvedAt!.Value)).ToArray();
+        var earlier = (await db.Decisions.AsNoTracking()
+                .Where(x => x.OwnerId == ownerId && x.Outcome != null && x.ResolvedAt < start)
+                .OrderByDescending(x => x.ResolvedAt).Take(CalibrationCalculator.TrendWindow * 2)
+                .Select(x => new { x.Probability, x.Outcome, x.ResolvedAt }).ToListAsync(cancellationToken))
+            .Select(x => new ResolvedPrediction(x.Probability, x.Outcome!.Value, x.ResolvedAt!.Value)).ToArray();
+
         var stats = WeeklyReviewComposer.BuildStats(samples,
             previousMoods.Length == 0 ? null : Math.Round(previousMoods.Average(), 2),
-            completedTasks.Count, remindersHandled, remindersUpcoming, newMemories);
+            completedTasks.Count, remindersHandled, remindersUpcoming, newMemories,
+            settled.Length, CalibrationCalculator.Brier(settled), CalibrationCalculator.Brier(earlier));
         return new WeeklyReviewFacts(weekStart, timeZoneId, stats,
             thisWeek.Select(x => x.Highlights).Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => Clip(x!, 200)).Take(7).ToArray(),

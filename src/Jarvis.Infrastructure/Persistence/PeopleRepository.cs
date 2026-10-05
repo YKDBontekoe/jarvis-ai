@@ -81,7 +81,10 @@ public sealed class PeopleRepository(JarvisDbContext db) : IPeopleRepository
     public async Task<IReadOnlyList<Guid>> ListOwnersWithCheckInsAsync(CancellationToken cancellationToken) =>
         await db.People.AsNoTracking()
             .Where(x => x.BirthdayMonth != null || x.ContactEveryDays != null)
-            .Select(x => x.OwnerId).Distinct()
+            .Select(x => x.OwnerId)
+            // The relationship radar also rides on the daily check-in, so owners with linked chats need it too.
+            .Union(db.PersonChannelLinks.AsNoTracking().Select(x => x.OwnerId))
+            .Distinct()
             .ToListAsync(cancellationToken);
 
     public async Task MarkNotifiedAsync(Guid ownerId, IReadOnlyCollection<Guid> birthdayIds, int birthdayYear,

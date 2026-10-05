@@ -99,6 +99,7 @@ api.MapLearningEndpoints(app.Logger);
 api.MapUsageEndpoints();
 api.MapKnowledgeGraphEndpoints();
 api.MapPeopleEndpoints(app.Logger);
+api.MapPeopleRadarEndpoints(app.Logger);
 api.MapChannelEndpoints(app.Logger);
 api.MapWhatsAppAssistantEndpoints(app.Logger);
 api.MapSurfaceEndpoints();
@@ -113,6 +114,8 @@ api.MapInboxEndpoints(app.Logger);
 api.MapFinanceEndpoints(app.Logger);
 api.MapLibraryEndpoints(app.Logger);
 api.MapModeEndpoints(app.Logger);
+api.MapRoutineEndpoints(app.Logger);
+api.MapDecisionEndpoints(app.Logger);
 api.MapMissionEndpoints(app.Logger);
 
 app.MapA2AProtocol();

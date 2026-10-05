@@ -214,4 +214,43 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('settled decisions show with how the predictions scored', (
+    tester,
+  ) async {
+    http.on(
+      'GET',
+      '/api/v1/reviews/weekly',
+      _overview(
+        reviews: [
+          {
+            ..._review('r2', '2026-09-28', 'A bright week.'),
+            'stats': {
+              ..._stats(),
+              'decisionsResolved': 3,
+              'brierScore': 0.12,
+              'previousBrierScore': 0.30,
+            },
+          },
+        ],
+      ),
+    );
+    await show(tester);
+
+    expect(find.text('Decisions settled'), findsOneWidget);
+    expect(find.text('Score 0.12 · better than before'), findsOneWidget);
+  });
+
+  testWidgets('a week without settled decisions has no decisions tile', (
+    tester,
+  ) async {
+    http.on(
+      'GET',
+      '/api/v1/reviews/weekly',
+      _overview(reviews: [_review('r2', '2026-09-28', 'A bright week.')]),
+    );
+    await show(tester);
+
+    expect(find.text('Decisions settled'), findsNothing);
+  });
 }

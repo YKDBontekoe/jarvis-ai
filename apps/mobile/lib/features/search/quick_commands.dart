@@ -128,6 +128,12 @@ const quickCommands = [
     keywords: ['journal', 'dagboek'],
   ),
   QuickCommand(
+    label: 'Go to Decisions',
+    icon: PhosphorIconsRegular.hourglassMedium,
+    destination: 'decisions',
+    keywords: ['decisions', 'decision', 'predictions', 'calibration', 'beslissingen', 'voorspelling'],
+  ),
+  QuickCommand(
     label: 'Go to People',
     icon: PhosphorIconsRegular.users,
     destination: 'people',

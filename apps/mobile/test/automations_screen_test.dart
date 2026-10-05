@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/automations/automations_screen.dart';
+import 'package:jarvis_mobile/features/notifications/notification_routing.dart';
 import 'package:jarvis_mobile/schedule_format.dart';
 import 'package:jarvis_mobile/theme.dart';
 
@@ -174,5 +175,83 @@ void main() {
       relativeFromNow(now.subtract(const Duration(hours: 2)), now: now),
       '2 h ago',
     );
+  });
+
+  Map<String, Object?> suggestion() => {
+    'id': 's1',
+    'title': 'Remind me to write in your journal at 22:10',
+    'evidence':
+        'You write in your journal around 22:10 on 30 of the last 56 days.',
+    'confidence': 0.8,
+    'simulation': {
+      'trigger': 'Every day at 22:10',
+      'steps': [
+        {'label': 'Notify you', 'needsApproval': false},
+      ],
+      'approvalsNeeded': 0,
+    },
+  };
+
+  testWidgets('suggested routines show their evidence and can be created', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/automations', <Object?>[]);
+    http.on('GET', '/api/v1/routines/suggestions', [suggestion()]);
+    http.on('POST', '/api/v1/routines/suggestions/s1/accept', {
+      'automationId': 'a9',
+      'status': 'accepted',
+    });
+    await show(tester);
+
+    expect(find.text('Suggested for you'), findsOneWidget);
+    expect(find.textContaining('22:10 on 30 of the last 56'), findsOneWidget);
+    expect(find.text('When: Every day at 22:10'), findsOneWidget);
+
+    http.on('GET', '/api/v1/routines/suggestions', <Object?>[]);
+    await tester.tap(find.byKey(const Key('routine-create-s1')));
+    await tester.pumpAndSettle();
+
+    expect(
+      http.sent('POST', '/api/v1/routines/suggestions/s1/accept'),
+      hasLength(1),
+    );
+    expect(find.text('Suggested for you'), findsNothing);
+    expect(find.textContaining('Draft created'), findsOneWidget);
+  });
+
+  testWidgets('a dismissed suggestion disappears without reloading', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/automations', <Object?>[]);
+    http.on('GET', '/api/v1/routines/suggestions', [suggestion()]);
+    http.on(
+      'POST',
+      '/api/v1/routines/suggestions/s1/dismiss',
+      null,
+      status: 204,
+    );
+    await show(tester);
+
+    await tester.tap(find.byKey(const Key('routine-dismiss-s1')));
+    await tester.pumpAndSettle();
+
+    expect(
+      http.sent('POST', '/api/v1/routines/suggestions/s1/dismiss'),
+      hasLength(1),
+    );
+    expect(find.byKey(const Key('routine-suggestion-s1')), findsNothing);
+  });
+
+  testWidgets('automations still load when suggestions cannot', (tester) async {
+    http.on('GET', '/api/v1/automations', [rule()]);
+    await show(tester);
+
+    expect(find.text('Morning coffee'), findsOneWidget);
+    expect(find.text('Suggested for you'), findsNothing);
+  });
+
+  test('routine suggestion notifications open automations', () {
+    expect(opensRoutineSuggestions('routine.suggested'), isTrue);
+    expect(opensRoutineSuggestions('people.checkin'), isFalse);
   });
 }

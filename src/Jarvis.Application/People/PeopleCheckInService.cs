@@ -1,3 +1,4 @@
+using Jarvis.Application.People.Radar;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.People;
 
@@ -6,13 +7,17 @@ namespace Jarvis.Application.People;
 /// <summary>
 /// The daily people check-in: at <see cref="LocalCheckInTime"/> in the owner's time zone it sends a birthday
 /// notification for everyone whose birthday is today and one keep-in-touch nudge for the people the owner is due
-/// to contact. Each birthday notifies once a year; a nudge repeats at most weekly until contact is logged.
+/// to contact. Each birthday notifies once a year; a nudge repeats at most weekly until contact is logged. When the
+/// relationship radar is available the same pass first brings last-contact dates up to date from linked chats and
+/// afterwards lets the radar send its own weekly nudge, so people with linked chats keep the check-in running even
+/// without a birthday or cadence.
 /// </summary>
 public sealed class PeopleCheckInService(
     IPeopleRepository people,
     INotificationRepository notifications,
     IDailyBriefingRepository briefings,
-    TimeProvider? timeProvider = null) : IPeopleCheckInService
+    TimeProvider? timeProvider = null,
+    IRelationshipRadarService? radar = null) : IPeopleCheckInService
 {
     public static readonly TimeOnly LocalCheckInTime = new(9, 0);
     public const int NudgeRepeatDays = 7;
@@ -25,13 +30,41 @@ public sealed class PeopleCheckInService(
     {
         var now = clock.GetUtcNow();
         var watched = (await people.ListAsync(ownerId, cancellationToken)).Where(x => x.NeedsCheckIns).ToArray();
-        if (watched.Length == 0) return new PeopleCheckInResult(false, now, 0, 0);
+        var radarWatching = false;
+        if (radar is not null)
+        {
+            try
+            {
+                radarWatching = await radar.HasLinksAsync(ownerId, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // Without the radar this is the classic check-in.
+            }
+        }
+
+        if (watched.Length == 0 && !radarWatching) return new PeopleCheckInResult(false, now, 0, 0);
 
         var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
         var zone = LocalClock.TryFind(zoneId, out var found) ? found : TimeZoneInfo.Utc;
         var today = PeopleCalendar.LocalDate(now, zone);
         var fireToday = LocalClock.Resolve(today.ToDateTime(LocalCheckInTime), zone);
         if (now < fireToday) return new PeopleCheckInResult(true, fireToday, 0, 0);
+
+        var radarNotified = 0;
+        if (radarWatching)
+        {
+            try
+            {
+                // Writing to a linked chat counts as contact, so do this before deciding who is due.
+                await radar!.SyncLastContactAsync(ownerId, cancellationToken);
+                watched = (await people.ListAsync(ownerId, cancellationToken)).Where(x => x.NeedsCheckIns).ToArray();
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // The classic check-in still works from the dates it already has.
+            }
+        }
 
         var birthdays = BirthdaysToday(watched, today);
         foreach (var person in birthdays)
@@ -57,8 +90,20 @@ public sealed class PeopleCheckInService(
             await people.MarkNotifiedAsync(ownerId, birthdayIds, today.Year, nudges.Select(x => x.Id).ToArray(),
                 now, cancellationToken);
 
+        if (radarWatching)
+        {
+            try
+            {
+                radarNotified = (await radar!.DailyAsync(ownerId, cancellationToken)).Notified;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // The radar is a bonus; it never stops birthdays or check-ins.
+            }
+        }
+
         var next = LocalClock.Resolve(today.AddDays(1).ToDateTime(LocalCheckInTime), zone);
-        return new PeopleCheckInResult(true, next, birthdays.Count, nudges.Count);
+        return new PeopleCheckInResult(true, next, birthdays.Count, nudges.Count, radarNotified);
     }
 
     public static IReadOnlyList<Person> BirthdaysToday(IEnumerable<Person> all, DateOnly today) =>

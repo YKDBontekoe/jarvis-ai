@@ -1,10 +1,12 @@
 using Jarvis.Application.Automations;
+using Jarvis.Application.Decisions;
 using Jarvis.Application.Expenses;
 using Jarvis.Application.Finance;
 using Jarvis.Application.Inbox;
 using Jarvis.Application.Library;
 using Jarvis.Application.Missions;
 using Jarvis.Application.Modes;
+using Jarvis.Application.Routines;
 using Jarvis.Infrastructure.Library;
 using Jarvis.Application.Timeline;
 using Jarvis.Infrastructure.Persistence;
@@ -26,6 +28,7 @@ public static class LifeFeaturesRegistration
         services.AddScoped<ITimelineSource, ReminderTimelineSource>();
         services.AddScoped<ITimelineSource, MemoryTimelineSource>();
         services.AddScoped<ITimelineSource, ConversationTimelineSource>();
+        services.AddScoped<ITimelineSource, DecisionTimelineSource>();
         services.AddScoped<ITimelineService, TimelineService>();
 
         // Inbox and commitments ledger.
@@ -36,6 +39,7 @@ public static class LifeFeaturesRegistration
         // Finance autopilot: budgets, subscriptions, forecast, bank import.
         services.AddScoped<IFinanceRepository, FinanceRepository>();
         services.AddScoped<IFinanceService, FinanceService>();
+        services.AddScoped<ISubscriptionNegotiationService, SubscriptionNegotiationService>();
         services.AddScoped<IExpenseObserver, BudgetExpenseObserver>();
 
         // Automation studio: webhooks that start event automations.
@@ -50,6 +54,14 @@ public static class LifeFeaturesRegistration
 
         // Context modes: stored in the owner's settings, so no tables of their own.
         services.AddScoped<IModeService, ModeService>();
+
+        // Decision journal: predictions with a confidence, resolved later and scored for calibration.
+        services.AddScoped<IDecisionRepository, DecisionRepository>();
+        services.AddScoped<IDecisionService, DecisionService>();
+
+        // Routine miner: repeated behaviour turned into suggested automations.
+        services.AddScoped<IRoutineSuggestionRepository, RoutineSuggestionRepository>();
+        services.AddScoped<IRoutineSuggestionService, RoutineSuggestionService>();
 
         // Mission control: a supervised crew of tasks working on one goal.
         services.AddScoped<IMissionRepository, MissionRepository>();

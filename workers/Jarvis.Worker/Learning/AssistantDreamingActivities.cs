@@ -1,4 +1,5 @@
 using Jarvis.Application.Learning;
+using Jarvis.Application.Routines;
 using Jarvis.Application.Settings;
 using Jarvis.Application.Workflows;
 using Jarvis.Worker.Activities;
@@ -25,6 +26,17 @@ internal sealed class AssistantDreamingActivities(IServiceScopeFactory scopeFact
         services.GetRequiredService<WorkerCurrentUser>().SetOwner(input.OwnerId);
         await services.GetRequiredService<Jarvis.Agents.Learning.DreamingService>()
             .SweepAsync(input.OwnerId, force: false, cancellationToken);
+        try
+        {
+            // Spotting routines is a bonus of the nightly pass; it never fails the dream.
+            await services.GetRequiredService<IRoutineSuggestionService>()
+                .RefreshAsync(input.OwnerId, force: false, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            services.GetRequiredService<ILogger<AssistantDreamingActivities>>()
+                .LogWarning(exception, "Routine suggestions could not be refreshed after dreaming.");
+        }
         var briefing = await services.GetRequiredService<IDailyBriefingRepository>()
             .GetAsync(input.OwnerId, cancellationToken);
         var minutes = DreamingClock.MinutesUntilNext(DateTimeOffset.UtcNow,

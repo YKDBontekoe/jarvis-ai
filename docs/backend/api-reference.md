@@ -49,9 +49,9 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | Projects | `GET/POST /projects`, `GET/PUT/DELETE /projects/{id}` (details include its chats, files and tasks; delete keeps them and only clears the project), `PUT /conversations/{id}/project`, `PUT /files/{id}/project`, `PUT /tasks/{id}/project` (`{ projectId }`, null takes it out). `POST /conversations` and `POST /tasks` accept `projectId`; conversation DTOs carry `projectId`. A task belongs to a project through its own conversation |
 | Weekly review | `GET /reviews/weekly?weeks=8` (settings, mood trend, recent reviews), `GET /reviews/weekly/{id}`, `PUT /reviews/weekly/settings` (`enabled`, `localTime`, `timeZoneId`), `POST /reviews/weekly/generate` (current week, no notification) |
 
-## Timeline, inbox, finance, library, modes, missions
+## Timeline, inbox, finance, library, modes, missions, routines, decisions
 
-Described in [life-features.md](life-features.md): `/timeline` (`/on-this-day`, `/insights`), `/inbox` and `/commitments`, `/finance` (`/overview`, `/budgets`, `/subscriptions`, `/import`, `/export`), `/automations` studio routes (`/event-kinds`, `/templates`, `/simulate`, `/webhooks`) and the public `POST /hooks/{token}`, `/library` (`/clip`, `/notes`, `/digest`, `/research`, `/cards`), `/modes`, and `/missions` (`/steps`).
+Described in [life-features.md](life-features.md): `/timeline` (`/on-this-day`, `/insights`), `/inbox` and `/commitments`, `/finance` (`/overview`, `/budgets`, `/subscriptions` with `/{id}/negotiate` and `/{id}/cancel-url`, `/import`, `/export`), `/automations` studio routes (`/event-kinds`, `/templates`, `/simulate`, `/webhooks`) and the public `POST /hooks/{token}`, `/library` (`/clip`, `/notes`, `/digest`, `/research`, `/cards`), `/modes`, `/missions` (`/steps`), `/routines/suggestions` (`/refresh`, `/{id}/accept`, `/{id}/dismiss`), and `/decisions` (`/calibration`, `/{id}/resolve`).
 
 ## Memory and learning
 
@@ -104,8 +104,14 @@ Owner-scoped (`expenses` table). Categories: groceries, dining, transport, shopp
 | GET | `/people/suggestions` (knowledge-graph people not on the list yet, with relationship and birthday when known) |
 | GET/PUT/DELETE | `/people/{id}` (GET returns `person` plus current graph `facts` when linked) |
 | POST | `/people/{id}/contact` (optional `at`; records "last talked") |
+| GET | `/people/radar` (`toneEnabled` and one report per linked person, most worrying first; also brings last-contact dates up to date) |
+| PUT | `/people/radar/settings` (`toneEnabled`) |
+| GET | `/people/link-suggestions` (people and unlinked one-to-one chats whose names match, for the owner to confirm), `/people/link-candidates` (every unlinked one-to-one chat, read-along ones first) |
+| GET/POST | `/people/{id}/links` (POST body `connectionId`, `chatId`; 400 for a group or unknown chat, 409 when the chat belongs to another person) |
+| DELETE | `/people/{id}/links/{linkId}` |
+| GET | `/people/{id}/radar` (the person's linked chats and their report) |
 
-Owner-scoped (`people` table). Names are unique per owner ignoring case and accents. `daysUntilBirthday`, `daysSinceContact` and `contactDue` use the daily-briefing time zone (UTC fallback). A new person links to the graph entity of the same name. Audit events (`people` tool) carry the person id only.
+Owner-scoped (`people` table). Names are unique per owner ignoring case and accents. `daysUntilBirthday`, `daysSinceContact` and `contactDue` use the daily-briefing time zone (UTC fallback). A new person links to the graph entity of the same name. Audit events (`people` tool) carry the person id only. The radar and link routes are described in [life-features.md](life-features.md#relationship-radar).
 
 Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints` and `PersonalAssistantEndpoints` (`/graph/...`).
 

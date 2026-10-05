@@ -49,6 +49,8 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<ExpenseEntity> Expenses => Set<ExpenseEntity>();
     public DbSet<InboxThreadEntity> InboxThreads => Set<InboxThreadEntity>();
     public DbSet<CommitmentEntity> Commitments => Set<CommitmentEntity>();
+    public DbSet<RoutineSuggestionEntity> RoutineSuggestions => Set<RoutineSuggestionEntity>();
+    public DbSet<DecisionEntity> Decisions => Set<DecisionEntity>();
     public DbSet<BudgetEntity> Budgets => Set<BudgetEntity>();
     public DbSet<LibraryItemEntity> LibraryItems => Set<LibraryItemEntity>();
     public DbSet<FlashcardEntity> Flashcards => Set<FlashcardEntity>();
@@ -59,6 +61,7 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<HabitEntity> Habits => Set<HabitEntity>();
     public DbSet<HabitCheckInEntity> HabitCheckIns => Set<HabitCheckInEntity>();
     public DbSet<PersonEntity> People => Set<PersonEntity>();
+    public DbSet<PersonChannelLinkEntity> PersonChannelLinks => Set<PersonChannelLinkEntity>();
     public DbSet<SkillEntity> Skills => Set<SkillEntity>();
     public DbSet<SkillRevisionEntity> SkillRevisions => Set<SkillRevisionEntity>();
     public DbSet<MessageFeedbackEntity> MessageFeedback => Set<MessageFeedbackEntity>();
