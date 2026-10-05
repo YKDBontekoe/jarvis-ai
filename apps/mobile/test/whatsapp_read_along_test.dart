@@ -376,8 +376,8 @@ void main() {
         pollInterval: const Duration(hours: 1),
       ),
     );
-    final requested = http.sent('GET', '$_piet/messages').single.query['chatId']
-        as String;
+    final requested =
+        http.sent('GET', '$_piet/messages').single.query['chatId'] as String;
     expect(requested.startsWith('b64.'), isTrue);
     expect(requested.contains('@'), isFalse);
     expect(find.text('Eten we vrijdag bij oma?'), findsOneWidget);
@@ -448,5 +448,104 @@ void main() {
       ).initials,
       '#',
     );
+  });
+
+  const catchUpJson = {
+    'summary': 'Piet wil vrijdag eten en vraagt om een tijd.',
+    'toReply': [
+      {'who': 'Piet', 'about': 'Welke tijd past?'},
+    ],
+    'messageCount': 3,
+  };
+
+  testWidgets('read along list shows a catch-up digest and opens the chat', (
+    tester,
+  ) async {
+    http.on('GET', _chats, {
+      'live': true,
+      'chats': [
+        {
+          'chatId': '+31611111111',
+          'name': 'Piet de Vries',
+          'isGroup': false,
+          'readAlong': true,
+          'autoReminders': true,
+          'unreadCount': 3,
+          'lastMessageAt': DateTime.now().toUtc().toIso8601String(),
+          'catchUp': catchUpJson,
+        },
+      ],
+    });
+    http.on('GET', '$_piet/messages', <Object>[]);
+    await show(
+      tester,
+      ReadAlongScreen(
+        http: http.client(),
+        channelId: _channel,
+        selecting: false,
+      ),
+    );
+
+    expect(find.byKey(const Key('whatsapp-catch-up-digest')), findsOneWidget);
+    expect(find.textContaining('Piet wil vrijdag eten'), findsOneWidget);
+    expect(find.text('1 to reply'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('whatsapp-catch-up-+31611111111')));
+    await tester.pumpAndSettle();
+    expect(find.byType(WhatsAppChatScreen), findsOneWidget);
+    expect(find.byKey(const Key('whatsapp-catch-up')), findsOneWidget);
+    await close(tester);
+  });
+
+  testWidgets('chat catch-up drafts a reply about one item and can be hidden', (
+    tester,
+  ) async {
+    http.on('GET', '$_piet/messages', <Object>[]);
+    http.on('POST', '$_piet/suggest', {'text': 'Zeven uur?'});
+    await show(
+      tester,
+      WhatsAppChatScreen(
+        http: http.client(),
+        channelId: _channel,
+        chat: WhatsAppChat.fromJson({
+          'chatId': '+31611111111',
+          'name': 'Piet de Vries',
+          'readAlong': true,
+          'catchUp': catchUpJson,
+        })!,
+        pollInterval: const Duration(hours: 1),
+      ),
+    );
+
+    expect(find.text('Catch up · 3 unread'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const Key('whatsapp-catch-up-draft-Welke tijd past?')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      (http.sent('POST', '$_piet/suggest').single.body! as Map)['instruction'],
+      'Reply to Piet about: Welke tijd past?',
+    );
+    expect(find.text('Zeven uur?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('whatsapp-catch-up-dismiss')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('whatsapp-catch-up')), findsNothing);
+    await close(tester);
+  });
+
+  testWidgets('chats without a catch-up show no card', (tester) async {
+    http.on('GET', '$_piet/messages', <Object>[]);
+    await show(
+      tester,
+      WhatsAppChatScreen(
+        http: http.client(),
+        channelId: _channel,
+        chat: _pietChat,
+        pollInterval: const Duration(hours: 1),
+      ),
+    );
+    expect(find.byKey(const Key('whatsapp-catch-up')), findsNothing);
+    await close(tester);
   });
 }

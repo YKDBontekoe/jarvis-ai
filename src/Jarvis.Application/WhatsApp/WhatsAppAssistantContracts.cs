@@ -47,7 +47,26 @@ public sealed record WhatsAppScanBatch(WhatsAppChatSettings Chat, IReadOnlyList<
 public sealed record WhatsAppSearchHit(WhatsAppChatSettings Chat, WhatsAppChatMessage Message);
 
 /// <summary>Activity already saved in Jarvis; unread counts do not change WhatsApp read receipts.</summary>
-public sealed record WhatsAppChatActivity(string ChatId, string? Preview, bool? FromMe, int UnreadCount);
+/// <param name="CatchUp">Summary of the unread messages, only while it still covers something unread.</param>
+public sealed record WhatsAppChatActivity(string ChatId, string? Preview, bool? FromMe, int UnreadCount,
+    WhatsAppCatchUp? CatchUp = null);
+
+/// <summary>Something in a chat the owner should answer: who asked, and what about.</summary>
+public sealed record WhatsAppReplyItem(string Who, string About);
+
+/// <summary>
+/// A short summary of the unread messages in one read-along chat and what the owner should reply to. Written in
+/// the background once a chat goes quiet; it disappears when the owner reads past it.
+/// </summary>
+public sealed record WhatsAppCatchUp(string Summary, IReadOnlyList<WhatsAppReplyItem> ToReply, int MessageCount,
+    DateTimeOffset GeneratedAt);
+
+/// <summary>
+/// Unread messages in one chat to summarize, with a little context before them. Completing with
+/// <see cref="Through"/> marks exactly these messages as summarized.
+/// </summary>
+public sealed record WhatsAppCatchUpBatch(WhatsAppChatSettings Chat, IReadOnlyList<WhatsAppChatMessage> Context,
+    IReadOnlyList<WhatsAppChatMessage> Unread, DateTimeOffset Through);
 
 public interface IWhatsAppAssistantRepository
 {
@@ -105,6 +124,18 @@ public interface IWhatsAppAssistantRepository
     Task<IReadOnlyList<WhatsAppScanBatch>> ClaimScanBatchesAsync(TimeSpan quiet, int limit, int contextSize,
         CancellationToken cancellationToken);
     Task CompleteScanAsync(Guid chatSettingsId, DateTimeOffset scannedThrough, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Claims read-along chats that have been quiet for <paramref name="quiet"/>, received something since their
+    /// last catch-up, and have at least <paramref name="minUnread"/> unread messages from other people. Chats
+    /// below that bar are completed without a summary so they are not looked at again until a new message.
+    /// </summary>
+    Task<IReadOnlyList<WhatsAppCatchUpBatch>> ClaimCatchUpBatchesAsync(TimeSpan quiet, int minUnread, int limit,
+        int contextSize, CancellationToken cancellationToken);
+
+    /// <summary>Stores the catch-up (or clears it when null) and releases the claim.</summary>
+    Task CompleteCatchUpAsync(Guid chatSettingsId, DateTimeOffset through, WhatsAppCatchUp? catchUp,
+        CancellationToken cancellationToken);
 }
 
 /// <summary>A reminder the scan found in a chat.</summary>
@@ -120,6 +151,10 @@ public interface IWhatsAppAssistant
     /// <summary>Finds appointments and promises in the new messages that deserve a reminder.</summary>
     Task<IReadOnlyList<WhatsAppReminderSuggestion>> FindRemindersAsync(Guid ownerId, WhatsAppScanBatch batch,
         IReadOnlyList<string> existingReminders, DateTimeOffset now, string timeZoneId,
+        CancellationToken cancellationToken);
+
+    /// <summary>Summarizes unread messages and lists what the owner should reply to; null when it could not.</summary>
+    Task<WhatsAppCatchUp?> SummarizeUnreadAsync(Guid ownerId, WhatsAppCatchUpBatch batch,
         CancellationToken cancellationToken);
 }
 

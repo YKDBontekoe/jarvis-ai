@@ -8,6 +8,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import 'catch_up_card.dart';
 import 'whatsapp_chat_screen.dart';
 import 'whatsapp_models.dart';
 
@@ -419,6 +420,28 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
                   ),
                 ),
               ),
+              if (!widget.selecting)
+                ContentWidth(
+                  child: CatchUpDigest(
+                    margin: const EdgeInsets.only(top: 12),
+                    entries: [
+                      for (final chat in reading)
+                        if (chat.catchUp != null)
+                          CatchUpDigestEntry(
+                            id: chat.chatId,
+                            title: chat.name,
+                            catchUp: chat.catchUp!,
+                            onOpen: () => unawaited(_open(chat)),
+                            leading: ChatAvatar(
+                              chat: chat,
+                              http: widget.http,
+                              channelId: widget.channelId,
+                              size: 36,
+                            ),
+                          ),
+                    ],
+                  ),
+                ),
               if (!widget.selecting)
                 ContentWidth(
                   child: Padding(

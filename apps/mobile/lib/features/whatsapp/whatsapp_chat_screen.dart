@@ -7,6 +7,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import 'catch_up_card.dart';
 import 'read_along_screen.dart';
 import 'whatsapp_media.dart';
 import 'whatsapp_models.dart';
@@ -55,6 +56,10 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
   String? _markedMessage;
   bool _requestingHistory = false;
 
+  /// Kept from when the chat opened: reading the chat moves the unread mark, so
+  /// the next list refresh would otherwise drop the card while you read it.
+  WhatsAppCatchUp? _catchUp;
+
   String _path([String? action]) =>
       whatsAppChatPath(widget.channelId, action: action);
 
@@ -64,6 +69,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
   @override
   void initState() {
     super.initState();
+    _catchUp = widget.chat.catchUp;
     unawaited(_load());
     unawaited(_loadStatus());
     _poll = Timer.periodic(widget.pollInterval, (_) {
@@ -89,6 +95,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     // The wide layout reuses this screen when another chat is opened. Keep the
     // new group's id, or the list keeps showing the previous conversation.
     _chat = widget.chat;
+    _catchUp = widget.chat.catchUp;
     _messages = const [];
     _loading = true;
     _error = null;
@@ -353,14 +360,16 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     }
   }
 
-  Future<void> _draft() async {
+  Future<void> _draft({String? preset}) async {
     if (_drafting) return;
-    final instruction = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (_) => _DraftSheet(name: _chat.name),
-    );
+    final instruction =
+        preset ??
+        await showModalBottomSheet<String>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (_) => _DraftSheet(name: _chat.name),
+        );
     if (instruction == null || !mounted) return;
     setState(() => _drafting = true);
     try {
@@ -600,6 +609,20 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
               child: const Text('Start reading this chat'),
             ),
           ],
+          if (_catchUp != null && _chat.readAlong)
+            ContentWidth(
+              child: CatchUpCard(
+                catchUp: _catchUp!,
+                onDismiss: () => setState(() => _catchUp = null),
+                onDraft: (item) => unawaited(
+                  _draft(
+                    preset: item == null
+                        ? null
+                        : 'Reply to ${item.who.isEmpty ? 'them' : item.who} about: ${item.about}',
+                  ),
+                ),
+              ),
+            ),
           Expanded(
             child: _loading
                 ? const LoadingState()

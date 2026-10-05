@@ -4,6 +4,50 @@ import 'package:flutter/widgets.dart';
 
 import '../../json_maps.dart';
 
+/// Something in a chat the owner should answer.
+class WhatsAppReplyItem {
+  const WhatsAppReplyItem({required this.who, required this.about});
+
+  final String who;
+  final String about;
+
+  static WhatsAppReplyItem? fromJson(Map<String, dynamic>? json) {
+    final about = asJsonString(json?['about']);
+    if (json == null || about == null) return null;
+    return WhatsAppReplyItem(
+      who: asJsonString(json['who']) ?? '',
+      about: about,
+    );
+  }
+}
+
+/// A short summary of a chat's unread messages and what to reply to, written
+/// by Jarvis in the background. It goes away once the chat is read.
+class WhatsAppCatchUp {
+  const WhatsAppCatchUp({
+    required this.summary,
+    this.toReply = const [],
+    this.messageCount = 0,
+  });
+
+  final String summary;
+  final List<WhatsAppReplyItem> toReply;
+  final int messageCount;
+
+  static WhatsAppCatchUp? fromJson(Map<String, dynamic>? json) {
+    final summary = asJsonString(json?['summary']);
+    if (json == null || summary == null) return null;
+    return WhatsAppCatchUp(
+      summary: summary,
+      toReply: [
+        for (final item in jsonMaps(json['toReply']))
+          ?WhatsAppReplyItem.fromJson(item),
+      ],
+      messageCount: (json['messageCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 /// A chat on the owner's linked WhatsApp, with their read-along choices.
 class WhatsAppChat {
   const WhatsAppChat({
@@ -16,6 +60,7 @@ class WhatsAppChat {
     this.preview,
     this.previewFromMe,
     this.unreadCount = 0,
+    this.catchUp,
   });
 
   final String chatId;
@@ -27,6 +72,7 @@ class WhatsAppChat {
   final String? preview;
   final bool? previewFromMe;
   final int unreadCount;
+  final WhatsAppCatchUp? catchUp;
 
   static WhatsAppChat? fromJson(Map<String, dynamic>? json) {
     final chatId = asJsonString(json?['chatId']);
@@ -43,6 +89,7 @@ class WhatsAppChat {
           ? json['previewFromMe'] as bool
           : null,
       unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
+      catchUp: WhatsAppCatchUp.fromJson(jsonObject(json['catchUp'])),
     );
   }
 
@@ -56,6 +103,7 @@ class WhatsAppChat {
     preview: preview,
     previewFromMe: previewFromMe,
     unreadCount: unreadCount,
+    catchUp: catchUp,
   );
 
   /// The phone number for one-to-one chats, shown under a contact name.
@@ -177,9 +225,10 @@ class WhatsAppMedia {
       place: asJsonString(json['place']),
       contactName: asJsonString(json['contactName']),
       pollOptions: [
-        for (final option in json['pollOptions'] is List
-            ? json['pollOptions'] as List
-            : const [])
+        for (final option
+            in json['pollOptions'] is List
+                ? json['pollOptions'] as List
+                : const [])
           if (option is String && option.trim().isNotEmpty) option.trim(),
       ],
       hasContent: asJsonBool(json['hasContent']),
@@ -258,7 +307,11 @@ WhatsAppMedia? whatsAppLegacyMedia(String text) {
     kind: kind,
     voice: label == 'Voice message',
     fileName: kind == 'document' ? caption : null,
-    place: kind == 'location' ? caption : label == 'Live location' ? caption : null,
+    place: kind == 'location'
+        ? caption
+        : label == 'Live location'
+        ? caption
+        : null,
     contactName: kind == 'contact' ? caption : null,
   );
 }
@@ -327,8 +380,10 @@ String whatsAppConnectionMessage(String state) => switch (state) {
   'connecting' =>
     'WhatsApp is reconnecting. Saved messages are still available.',
   'paused' => 'This account is paused. New messages are not being collected.',
-  'none' || 'logged_out' || 'qr' => 'This account needs to be linked again. Open account settings to reconnect.',
-  _ => 'WhatsApp could not be reached. Showing saved messages; Jarvis will retry automatically.',
+  'none' || 'logged_out' || 'qr' =>
+    'This account needs to be linked again. Open account settings to reconnect.',
+  _ =>
+    'WhatsApp could not be reached. Showing saved messages; Jarvis will retry automatically.',
 };
 
 /// Path of one chat action. The chat id is passed separately as the `chatId`

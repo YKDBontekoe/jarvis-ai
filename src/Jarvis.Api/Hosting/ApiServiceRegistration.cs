@@ -45,6 +45,7 @@ internal static class ApiServiceRegistration
         services.AddSingleton<Channels.WhatsAppReadAlongReceiver>();
         services.AddHostedService(provider => provider.GetRequiredService<Channels.WhatsAppReadAlongReceiver>());
         services.AddHostedService<Channels.WhatsAppReminderScanner>();
+        services.AddHostedService<Channels.WhatsAppCatchUpScanner>();
         return services;
     }
 

@@ -14,7 +14,8 @@ public sealed record WhatsAppChatListDto(bool Live, IReadOnlyList<WhatsAppChatDt
     string Account, string State);
 
 public sealed record WhatsAppChatDto(string ChatId, string Name, bool IsGroup, DateTimeOffset? LastMessageAt,
-    bool ReadAlong, bool AutoReminders, string? Preview = null, bool? PreviewFromMe = null, int UnreadCount = 0);
+    bool ReadAlong, bool AutoReminders, string? Preview = null, bool? PreviewFromMe = null, int UnreadCount = 0,
+    WhatsAppCatchUp? CatchUp = null);
 
 public sealed record WhatsAppConnectionDto(string Account, string State);
 public sealed record WhatsAppMarkReadRequest(Guid MessageId);
@@ -79,7 +80,11 @@ internal static class WhatsAppAssistantEndpoints
             }
             var activity = (await chats.ListActivityAsync(currentUser.OwnerId, id, ct)).ToDictionary(x => x.ChatId);
             var merged = Merge(saved, phone).Select(chat => activity.TryGetValue(chat.ChatId, out var item)
-                ? chat with { Preview = item.Preview, PreviewFromMe = item.FromMe, UnreadCount = item.UnreadCount }
+                ? chat with
+                {
+                    Preview = item.Preview, PreviewFromMe = item.FromMe, UnreadCount = item.UnreadCount,
+                    CatchUp = item.CatchUp
+                }
                 : chat).ToArray();
             return Results.Ok(new WhatsAppChatListDto(state == "open", merged, connection.Account, state));
         }).WithName("ListWhatsAppChats");

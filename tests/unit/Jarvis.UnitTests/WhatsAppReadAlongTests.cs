@@ -345,5 +345,12 @@ public sealed class WhatsAppReadAlongTests
 
         public Task CompleteScanAsync(Guid chatSettingsId, DateTimeOffset scannedThrough,
             CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<IReadOnlyList<WhatsAppCatchUpBatch>> ClaimCatchUpBatchesAsync(TimeSpan quiet, int minUnread,
+            int limit, int contextSize, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<WhatsAppCatchUpBatch>>([]);
+
+        public Task CompleteCatchUpAsync(Guid chatSettingsId, DateTimeOffset through, WhatsAppCatchUp? catchUp,
+            CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }
