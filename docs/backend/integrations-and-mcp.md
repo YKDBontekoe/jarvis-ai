@@ -64,6 +64,11 @@ runner. Operator host binaries such as `github-mcp-server` still run in the API 
 In the production deployment the runner has no database networks and no Docker socket. It runs as `JARVIS_UID` on a
 read-only root with dropped capabilities, a PID and memory limit, and tmpfs for work and package caches. It
 reaches the internet through `mcp-egress`, and the API and worker reach it through the internal `mcp` network.
+Its `/cache` and `/tmp` tmpfs mounts explicitly allow execution: npm package entrypoints, uv tools and downloaded
+Python run from those directories. Docker's default `noexec` would make a downloaded connector stop with exit
+code 126 before MCP initialization. This permission applies only to the runner; its root remains read-only and
+it still drops all capabilities, runs as the service user, and uses `nosuid`, `nodev` and `no-new-privileges`.
+Nonzero connector exit codes are logged without stderr or credential values so startup failures can be diagnosed.
 Aspire starts the same runner as the `mcp-runner` resource. Without `McpRunner:Url`, connectors run in-process
 as before (tests).
 
