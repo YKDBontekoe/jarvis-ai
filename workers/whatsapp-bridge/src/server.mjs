@@ -163,7 +163,7 @@ class Session {
       if (observed) {
         observed.historical = type === 'history';
         await this.attachMedia(entry, observed);
-        if (!this.watched.has(observed.chatId)) continue;
+        if (!this.watched.has(observed.chatId) && !this.watched.has(chatIdOf(jidFromChatId(observed.chatId), resolvePhone))) continue;
         const dropped = this.observed.push(observed);
         forwarded++;
         if (dropped) this.media.drop(dropped);
@@ -187,9 +187,10 @@ class Session {
   async requestHistory(chatId, before) {
     if (!isChatId(chatId) || !this.watched.has(chatId)) throw new HttpError(403, 'Turn on read along for this chat first.');
     if (this.state !== 'open') throw new HttpError(409, 'WhatsApp is not connected.');
-    const resolvePhone = await phonesFor(this.socket, [jidFromChatId(chatId)]);
+    const resolvePhone = await phonesFor(this.socket, [chatId, ...this.chats.chats.keys()].map(jidFromChatId));
     const directoryId = chatIdOf(jidFromChatId(chatId), resolvePhone);
-    const anchor = before ?? this.chats.chats.get(chatId)?.anchor ?? this.chats.chats.get(directoryId)?.anchor;
+    const anchor = before ?? this.chats.chats.get(chatId)?.anchor ?? this.chats.chats.get(directoryId)?.anchor
+      ?? this.chats.list(resolvePhone).find(chat => chat.id === directoryId)?.anchor;
     if (!anchor?.id || !/^[A-Za-z0-9_-]{6,80}$/.test(anchor.id) || !Number.isFinite(anchor.timestamp) || anchor.timestamp <= 0)
       throw new HttpError(409, 'The phone has not supplied a message for this chat yet. Send or receive a message, then retry history.');
     await this.socket.fetchMessageHistory(100, { remoteJid: jidFromChatId(chatId), id: anchor.id,
@@ -225,10 +226,13 @@ class Session {
   }
 
   async setWatched(ids) {
+    const resolvePhone = await phonesFor(this.socket, this.observed.items.map(item => jidFromChatId(item.chatId)));
     this.watched = normalizeWatchList(ids);
     // Drop buffered messages of chats that were turned off, so nothing from them reaches Jarvis afterwards.
-    const dropped = this.observed.items.filter((item) => !this.watched.has(item.chatId)).map((item) => item.id);
-    this.observed.items = this.observed.items.filter((item) => this.watched.has(item.chatId));
+    // A verified LID moving to its watched phone identity is still the same enabled chat.
+    const keep = item => this.watched.has(item.chatId) || this.watched.has(chatIdOf(jidFromChatId(item.chatId), resolvePhone));
+    const dropped = this.observed.items.filter((item) => !keep(item)).map((item) => item.id);
+    this.observed.items = this.observed.items.filter(keep);
     this.media.drop(dropped);
     await writeJsonFile(path.join(this.dir, WATCH_FILE), { chats: [...this.watched] });
     return this.watched.size;
@@ -480,7 +484,10 @@ async function route(request) {
     if (!image) throw new HttpError(404, 'No picture.');
     return new Picture(image.bytes, image.type);
   }
-  if (action === 'chats' && request.method === 'GET') return { chats: session.chats.list().filter((chat) => chat.id !== session.phone) };
+  if (action === 'chats' && request.method === 'GET') {
+    const resolvePhone = await phonesFor(session.socket, [...session.chats.chats.keys(), ...session.watched].map(jidFromChatId));
+    return { chats: session.chats.list(resolvePhone).filter((chat) => chat.id !== session.phone) };
+  }
   if (action === 'watch' && request.method === 'GET') return { chats: [...session.watched] };
   if (action === 'history' && request.method === 'POST') {
     const body = await readJson(request);
@@ -490,7 +497,12 @@ async function route(request) {
     const body = await readJson(request);
     return { watched: await session.setWatched(body.chats) };
   }
-  if (action === 'observed' && request.method === 'GET' && !parts[3]) return { messages: session.observed.list() };
+  if (action === 'observed' && request.method === 'GET' && !parts[3]) {
+    const messages = session.observed.list();
+    const resolvePhone = await phonesFor(session.socket, messages.map(m => jidFromChatId(m.chatId)));
+    return { messages: messages.map(message => ({ ...message,
+      canonicalChatId: chatIdOf(jidFromChatId(message.chatId), resolvePhone) })) };
+  }
   if (action === 'observed' && parts[3] === 'ack' && request.method === 'POST') {
     const body = await readJson(request);
     const ids = Array.isArray(body.ids) ? body.ids.map(String) : [];

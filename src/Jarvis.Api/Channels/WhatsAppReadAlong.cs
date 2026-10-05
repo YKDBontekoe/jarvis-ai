@@ -144,7 +144,10 @@ public sealed class WhatsAppReadAlongReceiver(IServiceScopeFactory scopes, Whats
         if (bus is null) return;
         foreach (var message in messages.Where(x => !x.FromMe && !x.Historical).Take(20))
         {
-            var chat = await chats.GetChatAsync(connection.OwnerId, connection.Id, message.ChatId, cancellationToken);
+            var chat = await chats.GetChatAsync(connection.OwnerId, connection.Id,
+                message.CanonicalChatId ?? message.ChatId, cancellationToken)
+                ?? await chats.GetChatAsync(connection.OwnerId, connection.Id, message.ChatId, cancellationToken);
+            if (chat is not { ReadAlong: true }) continue;
             await bus.TryPublishAsync(connection.OwnerId, new Jarvis.Application.Automations.AutomationEvent(
                 Jarvis.Application.Automations.AutomationEventKinds.MessageReceived,
                 chat?.DisplayName ?? WhatsAppChatIds.FallbackName(message.ChatId), message.Text, "whatsapp", null,
@@ -160,7 +163,7 @@ public sealed class WhatsAppReadAlongReceiver(IServiceScopeFactory scopes, Whats
         return new(ExternalId(message.Id), message.ChatId, message.FromMe, sender, message.Text,
             message.Timestamp > 0 ? DateTimeOffset.FromUnixTimeSeconds(message.Timestamp) : DateTimeOffset.UtcNow,
             WhatsAppChatIds.Normalize(message.SenderId), stored?.Json, stored?.Content, stored?.ContentType,
-            message.Historical);
+            message.Historical, WhatsAppChatIds.Normalize(message.CanonicalChatId));
     }
 
     private static async Task<ObservedWhatsAppMessage> ToObservedAsync(WhatsAppBridgeClient bridge, Guid connectionId,
