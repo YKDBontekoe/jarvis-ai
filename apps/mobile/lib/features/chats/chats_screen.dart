@@ -75,6 +75,34 @@ class _ChatsScreenState extends State<ChatsScreen> {
               final key = (item.source, item.title.toLowerCase());
               titleCounts.update(key, (count) => count + 1, ifAbsent: () => 1);
             }
+            // One row for all catch-ups, not a card per chat. Hidden on the
+            // Jarvis tab and while searching, where it would be in the way.
+            final catchUp =
+                _filter == ChatFilter.jarvis || _query.text.trim().isNotEmpty
+                ? const <CatchUpDigestEntry>[]
+                : [
+                    for (final item in widget.chats.all)
+                      if (item.whatsApp?.catchUp != null)
+                        CatchUpDigestEntry(
+                          id: item.key,
+                          title: item.title,
+                          catchUp: item.whatsApp!.catchUp!,
+                          onOpen: () => widget.onOpen(item),
+                          leading: item.channelId == null
+                              ? null
+                              : ChatAvatar(
+                                  chat: item.whatsApp,
+                                  http: widget.http,
+                                  channelId: item.channelId,
+                                  size: 36,
+                                ),
+                        ),
+                  ];
+            final catchUpTime = widget.chats.all
+                .where((item) => item.whatsApp?.catchUp != null)
+                .map((item) => item.time)
+                .nonNulls
+                .firstOrNull;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -170,27 +198,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
                     setState(() => _filter = filter);
                   },
                 ),
-                if (_filter != ChatFilter.jarvis && _query.text.trim().isEmpty)
-                  CatchUpDigest(
-                    entries: [
-                      for (final item in widget.chats.all)
-                        if (item.whatsApp?.catchUp != null)
-                          CatchUpDigestEntry(
-                            id: item.key,
-                            title: item.title,
-                            catchUp: item.whatsApp!.catchUp!,
-                            onOpen: () => widget.onOpen(item),
-                            leading: item.channelId == null
-                                ? null
-                                : ChatAvatar(
-                                    chat: item.whatsApp,
-                                    http: widget.http,
-                                    channelId: item.channelId,
-                                    size: 36,
-                                  ),
-                          ),
-                    ],
-                  ),
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: widget.onRefresh,
@@ -214,21 +221,36 @@ class _ChatsScreenState extends State<ChatsScreen> {
                                   16,
                                   24,
                                 ),
-                                itemCount: items.length,
-                                itemBuilder: (context, index) => _ChatRow(
-                                  item: items[index],
-                                  selected:
-                                      items[index].key == widget.selectedKey,
-                                  http: widget.http,
-                                  duplicate:
-                                      (titleCounts[(
-                                            items[index].source,
-                                            items[index].title.toLowerCase(),
-                                          )] ??
-                                          0) >
-                                      1,
-                                  onTap: () => widget.onOpen(items[index]),
-                                ),
+                                itemCount:
+                                    items.length + (catchUp.isEmpty ? 0 : 1),
+                                itemBuilder: (context, index) {
+                                  if (catchUp.isNotEmpty) {
+                                    if (index == 0) {
+                                      return CatchUpRow(
+                                        entries: catchUp,
+                                        time: catchUpTime,
+                                        onTap: () => unawaited(
+                                          showCatchUpSheet(context, catchUp),
+                                        ),
+                                      );
+                                    }
+                                    index--;
+                                  }
+                                  return _ChatRow(
+                                    item: items[index],
+                                    selected:
+                                        items[index].key == widget.selectedKey,
+                                    http: widget.http,
+                                    duplicate:
+                                        (titleCounts[(
+                                              items[index].source,
+                                              items[index].title.toLowerCase(),
+                                            )] ??
+                                            0) >
+                                        1,
+                                    onTap: () => widget.onOpen(items[index]),
+                                  );
+                                },
                               ),
                       ),
                     ),

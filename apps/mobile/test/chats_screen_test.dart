@@ -133,6 +133,65 @@ void main() {
     expect(family, lessThan(lisbon));
   });
 
+  testWidgets('catch-ups are one row that opens every summary in full', (
+    tester,
+  ) async {
+    const long =
+        'Jarvis heeft de trainingsskill adaptief-trainingsschema verbeterd. '
+        'Om 14:30 kreeg je een melding over je schema van deze week.';
+    http.on('GET', '/api/v1/channels', [
+      {'id': 'wa', 'kind': 'whatsapp_linked'},
+    ]);
+    http.on('GET', '/api/v1/channels/wa/chats', {
+      'chats': [
+        {
+          'chatId': '+31611',
+          'name': 'Jarvis AI',
+          'lastMessageAt': _iso(now.subtract(const Duration(minutes: 5))),
+          'catchUp': {'summary': long, 'messageCount': 2},
+        },
+        {
+          'chatId': '+31622',
+          'name': 'rosa',
+          'lastMessageAt': _iso(now.subtract(const Duration(minutes: 9))),
+          'catchUp': {
+            'summary': 'Rosa belde per ongeluk.',
+            'toReply': [
+              {'who': 'Rosa', 'about': 'Hoe laat kom je?'},
+            ],
+          },
+        },
+      ],
+    });
+    await tester.runAsync(() => chats.loadWhatsApp(http.client()));
+    await show(tester);
+
+    expect(find.byKey(const Key('whatsapp-catch-up-digest')), findsNothing);
+    expect(find.byKey(const Key('whatsapp-catch-up-row')), findsOneWidget);
+    expect(find.text('Jarvis AI, rosa'), findsOneWidget);
+    expect(find.text('2 chats · 1 to reply'), findsOneWidget);
+    expect(find.text(long), findsNothing);
+
+    await tester.tap(find.byKey(const Key('whatsapp-catch-up-row')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('whatsapp-catch-up-sheet')), findsOneWidget);
+    expect(find.text(long), findsOneWidget);
+    expect(find.text('Rosa: Hoe laat kom je?'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const Key('whatsapp-catch-up-whatsapp:wa:+31622')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('whatsapp-catch-up-sheet')), findsNothing);
+    expect(opened.single.title, 'rosa');
+  });
+
+  testWidgets('no catch-up row when no chat has a catch-up', (tester) async {
+    await linkWhatsApp(tester);
+    await show(tester);
+    expect(find.byKey(const Key('whatsapp-catch-up-row')), findsNothing);
+  });
+
   testWidgets('repeated names show session and channel context', (
     tester,
   ) async {
