@@ -253,3 +253,56 @@ public sealed class WhatsAppReminderScanner(IServiceScopeFactory scopes, TimePro
             .CompleteScanAsync(batch.Chat.Id, batch.ScannedThrough, cancellationToken);
     }
 }
+
+/// <summary>
+/// Summarizes unread messages in read-along chats once a chat has been quiet for a moment, and lists what the owner
+/// should reply to. The summary is shown in the app until the owner reads past it; nothing is ever sent.
+/// </summary>
+public sealed class WhatsAppCatchUpScanner(IServiceScopeFactory scopes, ILogger<WhatsAppCatchUpScanner> logger)
+    : BackgroundService
+{
+    internal static readonly TimeSpan Quiet = TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(20);
+    internal const int MinUnread = 2;
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(Interval);
+        while (await timer.WaitForNextTickAsync(stoppingToken))
+        {
+            try
+            {
+                IReadOnlyList<WhatsAppCatchUpBatch> batches;
+                await using (var scope = scopes.CreateAsyncScope())
+                    batches = await scope.ServiceProvider.GetRequiredService<IWhatsAppAssistantRepository>()
+                        .ClaimCatchUpBatchesAsync(Quiet, MinUnread, 5, 10, stoppingToken);
+                foreach (var batch in batches) await SummarizeAsync(batch, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "WhatsApp catch-up scan failed; it will be retried.");
+            }
+        }
+    }
+
+    internal async Task SummarizeAsync(WhatsAppCatchUpBatch batch, CancellationToken cancellationToken)
+    {
+        var ownerId = batch.Chat.OwnerId;
+        await using var scope = scopes.CreateOwnerScope(ownerId);
+        var services = scope.ServiceProvider;
+        var catchUp = await services.GetRequiredService<IWhatsAppAssistant>()
+            .SummarizeUnreadAsync(ownerId, batch, cancellationToken);
+        // A failed summary still completes, so a broken model does not make the same chat retry every tick.
+        await services.GetRequiredService<IWhatsAppAssistantRepository>()
+            .CompleteCatchUpAsync(batch.Chat.Id, batch.Through, catchUp, cancellationToken);
+        if (catchUp is not null)
+            await EndpointHelpers.TryAppendAuditAsync(services.GetRequiredService<IAuditEventStore>(), logger,
+                ownerId, "whatsapp", "whatsapp.catch_up_created", "low", true, null,
+                JsonSerializer.Serialize(new { resourceId = batch.Chat.Id, messages = catchUp.MessageCount }),
+                cancellationToken);
+    }
+}

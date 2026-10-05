@@ -86,6 +86,64 @@ public sealed class WhatsAppReadAlongRepositoryTests : IAsyncLifetime
         Assert.Equal(0, await database.WhatsAppMessages.CountAsync(x => x.ConnectionId == connection));
     }
 
+    [Fact]
+    public async Task Catch_up_needs_quiet_unread_messages_and_disappears_once_read()
+    {
+        var owner = Guid.CreateVersion7();
+        var connection = await LinkAsync(owner, "+31600000003");
+        await using var database = CreateDbContext();
+        var chats = new WhatsAppAssistantRepository(database);
+        var piet = await chats.SaveChatAsync(owner, connection, "+31611111111", "Piet", true, true,
+            CancellationToken.None);
+        await chats.SaveChatAsync(owner, connection, "+31622222222", "Sanne", false, true, CancellationToken.None);
+        var sent = DateTimeOffset.UtcNow.AddMinutes(-2);
+        await chats.StoreObservedAsync(connection,
+        [
+            new("wa:c1", "+31611111111", false, "Piet", "Etentje vrijdag?", sent),
+            new("wa:c2", "+31611111111", true, null, "Misschien", sent.AddSeconds(5)),
+            new("wa:c3", "+31611111111", false, "Piet", "Welke tijd past?", sent.AddSeconds(10)),
+            new("wa:c4", "+31622222222", false, "Sanne", "Not read along", sent),
+            new("wa:c5", "+31622222222", false, "Sanne", "Still not", sent)
+        ], CancellationToken.None);
+
+        // Not quiet yet, and read-along-off chats are never claimed.
+        Assert.Empty(await chats.ClaimCatchUpBatchesAsync(TimeSpan.FromMinutes(5), 2, 5, 10, CancellationToken.None));
+        var batch = Assert.Single(await chats.ClaimCatchUpBatchesAsync(TimeSpan.Zero, 2, 5, 10, CancellationToken.None));
+        Assert.Equal(piet!.Id, batch.Chat.Id);
+        Assert.Equal(3, batch.Unread.Count);
+        // A second replica cannot claim the same chat while the lease holds.
+        Assert.Empty(await chats.ClaimCatchUpBatchesAsync(TimeSpan.Zero, 2, 5, 10, CancellationToken.None));
+
+        var summary = new WhatsAppCatchUp("Piet wil vrijdag eten.", [new WhatsAppReplyItem("Piet", "Welke tijd past?")],
+            2, DateTimeOffset.UtcNow);
+        await chats.CompleteCatchUpAsync(batch.Chat.Id, batch.Through, summary, CancellationToken.None);
+        Assert.Empty(await chats.ClaimCatchUpBatchesAsync(TimeSpan.Zero, 2, 5, 10, CancellationToken.None));
+
+        var shown = Assert.Single(await chats.ListActivityAsync(owner, connection, CancellationToken.None),
+            x => x.ChatId == "+31611111111");
+        Assert.Equal("Piet wil vrijdag eten.", shown.CatchUp?.Summary);
+        Assert.Equal("Welke tijd past?", Assert.Single(shown.CatchUp!.ToReply).About);
+
+        // Reading past the summary hides it without any further write.
+        var newest = (await chats.ListMessagesAsync(owner, connection, "+31611111111", 1, null, CancellationToken.None)).Single();
+        Assert.True(await chats.MarkReadAsync(owner, connection, "+31611111111", newest.Id, CancellationToken.None));
+        Assert.Null(Assert.Single(await chats.ListActivityAsync(owner, connection, CancellationToken.None),
+            x => x.ChatId == "+31611111111").CatchUp);
+
+        // A single new message is below the bar: it completes without a summary.
+        await chats.StoreObservedAsync(connection,
+            [new ObservedWhatsAppMessage("wa:c6", "+31611111111", false, "Piet", "Hoi", DateTimeOffset.UtcNow)],
+            CancellationToken.None);
+        Assert.Empty(await chats.ClaimCatchUpBatchesAsync(TimeSpan.Zero, 2, 5, 10, CancellationToken.None));
+        Assert.Empty(await chats.ClaimCatchUpBatchesAsync(TimeSpan.Zero, 2, 5, 10, CancellationToken.None));
+
+        // Clearing the history clears the stored summary too.
+        await chats.CompleteCatchUpAsync(batch.Chat.Id, DateTimeOffset.UtcNow, summary, CancellationToken.None);
+        await chats.ClearHistoryAsync(owner, connection, "+31611111111", CancellationToken.None);
+        Assert.Null(await database.WhatsAppChats.AsNoTracking().Where(x => x.Id == batch.Chat.Id)
+            .Select(x => x.CatchUpJson).SingleAsync());
+    }
+
     private async Task<Guid> LinkAsync(Guid owner, string phone)
     {
         await using var database = CreateDbContext();

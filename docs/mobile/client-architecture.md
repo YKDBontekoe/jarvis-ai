@@ -39,7 +39,7 @@ root. It shares the existing account and owner-scoped data. See
 | `features/settings/` | Models (Codex/OpenRouter), voice, nested settings hub |
 | `features/skills/`, `persona/`, `profiles/`, `learning/` | Owner tuning surfaces |
 | `features/channels/` | WhatsApp & Signal |
-| `features/whatsapp/` | WhatsApp page (Everything → WhatsApp) with account switching in the header and All/Unread/Groups filters; separate Choose chats screen for read-along selection; saved previews, unread counts, paginated conversations, reply drafts and Ask Jarvis |
+| `features/whatsapp/` | WhatsApp page (Everything → WhatsApp) with account switching in the header and All/Unread/Groups filters; separate Choose chats screen for read-along selection; saved previews, unread counts, a Catch up card (summary and things to reply to, with Draft reply) at the top of a chat and a Catch up digest on the WhatsApp list and Chats tab, paginated conversations, reply drafts and Ask Jarvis |
 | `features/devices/` | This-device capabilities and telemetry |
 | `features/agents/` | Remote agent registry |
 | `features/coding/` | Coding runs list |

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../whatsapp/catch_up_card.dart';
 import '../whatsapp/read_along_screen.dart';
 import '../whatsapp/whatsapp_models.dart';
 import 'chat_list.dart';
@@ -169,6 +170,27 @@ class _ChatsScreenState extends State<ChatsScreen> {
                     setState(() => _filter = filter);
                   },
                 ),
+                if (_filter != ChatFilter.jarvis && _query.text.trim().isEmpty)
+                  CatchUpDigest(
+                    entries: [
+                      for (final item in widget.chats.all)
+                        if (item.whatsApp?.catchUp != null)
+                          CatchUpDigestEntry(
+                            id: item.key,
+                            title: item.title,
+                            catchUp: item.whatsApp!.catchUp!,
+                            onOpen: () => widget.onOpen(item),
+                            leading: item.channelId == null
+                                ? null
+                                : ChatAvatar(
+                                    chat: item.whatsApp,
+                                    http: widget.http,
+                                    channelId: item.channelId,
+                                    size: 36,
+                                  ),
+                          ),
+                    ],
+                  ),
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: widget.onRefresh,

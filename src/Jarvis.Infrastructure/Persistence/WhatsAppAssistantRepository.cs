@@ -23,6 +23,11 @@ public sealed class WhatsAppChatEntity
     /// <summary>Messages stored after this moment have not been scanned for reminders yet.</summary>
     public DateTimeOffset? ScannedThrough { get; set; }
     public DateTimeOffset? ScanLeaseUntil { get; set; }
+    /// <summary>JSON of the latest <see cref="WhatsAppCatchUp"/>: a summary of unread messages and what to reply to.</summary>
+    public string? CatchUpJson { get; set; }
+    /// <summary>Messages stored after this moment have not been summarized yet.</summary>
+    public DateTimeOffset? CatchUpThrough { get; set; }
+    public DateTimeOffset? CatchUpLeaseUntil { get; set; }
     /// <summary>The Jarvis conversation used for "Ask Jarvis" about this chat.</summary>
     public Guid? AskConversationId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
@@ -69,6 +74,7 @@ public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider
 {
     private static readonly TimeSpan ScanLease = TimeSpan.FromMinutes(5);
     private const int MaxNewMessagesPerScan = 40;
+    private const int MaxUnreadPerCatchUp = 60;
     private readonly TimeProvider time = clock ?? TimeProvider.System;
 
     public async Task<bool> MergeChatAliasesAsync(Guid ownerId, Guid connectionId, string phoneId,
@@ -92,7 +98,7 @@ public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider
             ids.Contains(c.ChatId)).ToListAsync(cancellationToken);
         if (!rows.Any(c => lids.Contains(c.ChatId))) return false;
         // Do not move a chat while its reminder scan is using the old identity.
-        if (rows.Any(c => c.ScanLeaseUntil > time.GetUtcNow())) return false;
+        if (rows.Any(c => c.ScanLeaseUntil > time.GetUtcNow() || c.CatchUpLeaseUntil > time.GetUtcNow())) return false;
         var target = rows.FirstOrDefault(c => c.ChatId == phoneId) ?? rows.OrderBy(c => c.CreatedAt).First();
         // Honor the owner's latest choice, including turning reading/reminders off on either identity.
         var choice = rows.OrderByDescending(c => c.UpdatedAt).First();
@@ -106,6 +112,8 @@ public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider
         // An empty duplicate must not make an already read conversation unread again.
         target.ReadThrough = history.Any(c => c.ReadThrough is null) ? null : history.Min(c => c.ReadThrough);
         target.ScannedThrough = history.Max(c => c.ScannedThrough);
+        target.CatchUpJson = null; // The merged conversation is summarized again from what is unread now.
+        target.CatchUpThrough = null;
         target.LastMessageAt = rows.Max(c => c.LastMessageAt);
         target.LastReceivedAt = rows.Max(c => c.LastReceivedAt);
         target.CreatedAt = rows.Min(c => c.CreatedAt);
@@ -143,18 +151,27 @@ public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider
             cancellationToken))?.ToRecord();
 
     public async Task<IReadOnlyList<WhatsAppChatActivity>> ListActivityAsync(Guid ownerId, Guid connectionId,
-        CancellationToken cancellationToken) =>
-        await (from chat in db.WhatsAppChats.AsNoTracking()
+        CancellationToken cancellationToken)
+    {
+        var rows = await (from chat in db.WhatsAppChats.AsNoTracking()
                where chat.OwnerId == ownerId && chat.ConnectionId == connectionId && chat.ReadAlong
                let latest = db.WhatsAppMessages.Where(m => m.OwnerId == ownerId &&
                    m.ConnectionId == connectionId && m.ChatId == chat.ChatId)
                    .OrderByDescending(m => m.SentAt).ThenByDescending(m => m.Id).FirstOrDefault()
-               select new WhatsAppChatActivity(chat.ChatId,
-                   latest == null ? null : latest.Text.Substring(0, Math.Min(latest.Text.Length, 160)),
-                   latest == null ? null : (bool?)latest.FromMe,
-                   db.WhatsAppMessages.Count(m => m.OwnerId == ownerId && m.ConnectionId == connectionId &&
-                       m.ChatId == chat.ChatId && !m.FromMe && (chat.ReadThrough == null || m.CreatedAt > chat.ReadThrough))))
-            .ToListAsync(cancellationToken);
+               select new
+               {
+                   chat.ChatId,
+                   Preview = latest == null ? null : latest.Text.Substring(0, Math.Min(latest.Text.Length, 160)),
+                   FromMe = latest == null ? null : (bool?)latest.FromMe,
+                   Unread = db.WhatsAppMessages.Count(m => m.OwnerId == ownerId && m.ConnectionId == connectionId &&
+                       m.ChatId == chat.ChatId && !m.FromMe && (chat.ReadThrough == null || m.CreatedAt > chat.ReadThrough)),
+                   // A summary only counts while it covers something the owner has not read yet.
+                   chat.CatchUpJson,
+                   Covers = chat.CatchUpThrough != null && (chat.ReadThrough == null || chat.CatchUpThrough > chat.ReadThrough)
+               }).ToListAsync(cancellationToken);
+        return rows.Select(x => new WhatsAppChatActivity(x.ChatId, x.Preview, x.FromMe, x.Unread,
+            x.Covers && x.Unread > 0 ? WhatsAppCatchUpJson.Read(x.CatchUpJson) : null)).ToArray();
+    }
 
     public async Task<bool> MarkReadAsync(Guid ownerId, Guid connectionId, string chatId, Guid messageId,
         CancellationToken cancellationToken)
@@ -312,10 +329,16 @@ public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider
     }
 
     public async Task<int> ClearHistoryAsync(Guid ownerId, Guid connectionId, string chatId,
-        CancellationToken cancellationToken) =>
-        await db.WhatsAppMessages
+        CancellationToken cancellationToken)
+    {
+        var removed = await db.WhatsAppMessages
             .Where(x => x.OwnerId == ownerId && x.ConnectionId == connectionId && x.ChatId == chatId)
             .ExecuteDeleteAsync(cancellationToken);
+        // A summary of deleted messages must not outlive them.
+        await db.WhatsAppChats.Where(x => x.OwnerId == ownerId && x.ConnectionId == connectionId && x.ChatId == chatId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.CatchUpJson, (string?)null), cancellationToken);
+        return removed;
+    }
 
     public async Task SetAskConversationAsync(Guid ownerId, Guid chatSettingsId, Guid conversationId,
         CancellationToken cancellationToken) =>
@@ -370,4 +393,80 @@ public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(x => x.ScannedThrough, scannedThrough)
                 .SetProperty(x => x.ScanLeaseUntil, (DateTimeOffset?)null), cancellationToken);
+
+    public async Task<IReadOnlyList<WhatsAppCatchUpBatch>> ClaimCatchUpBatchesAsync(TimeSpan quiet, int minUnread,
+        int limit, int contextSize, CancellationToken cancellationToken)
+    {
+        var now = time.GetUtcNow();
+        var settledBefore = now - quiet;
+        var candidates = await db.WhatsAppChats.AsNoTracking()
+            .Where(x => x.ReadAlong && x.LastReceivedAt != null && x.LastReceivedAt < settledBefore &&
+                        (x.CatchUpThrough == null || x.LastReceivedAt > x.CatchUpThrough) &&
+                        (x.CatchUpLeaseUntil == null || x.CatchUpLeaseUntil < now))
+            .OrderBy(x => x.LastReceivedAt)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+        var batches = new List<WhatsAppCatchUpBatch>();
+        foreach (var chat in candidates)
+        {
+            // Claim with a conditional update so two API replicas never summarize the same chat at once.
+            var claimed = await db.WhatsAppChats
+                .Where(x => x.Id == chat.Id && (x.CatchUpLeaseUntil == null || x.CatchUpLeaseUntil < now))
+                .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.CatchUpLeaseUntil, now + ScanLease),
+                    cancellationToken);
+            if (claimed == 0) continue;
+            var readThrough = chat.ReadThrough ?? DateTimeOffset.UnixEpoch;
+            var unread = await db.WhatsAppMessages.AsNoTracking()
+                .Where(x => x.ConnectionId == chat.ConnectionId && x.ChatId == chat.ChatId && x.CreatedAt > readThrough)
+                .OrderByDescending(x => x.CreatedAt).Take(MaxUnreadPerCatchUp)
+                .ToListAsync(cancellationToken);
+            if (unread.Count(x => !x.FromMe) < minUnread)
+            {
+                await CompleteCatchUpAsync(chat.Id, unread.Count == 0 ? now : unread.Max(x => x.CreatedAt), null,
+                    cancellationToken);
+                continue;
+            }
+            unread = unread.OrderBy(x => x.SentAt).ThenBy(x => x.Id).ToList();
+            var firstUnread = unread.Min(x => x.SentAt);
+            var context = await db.WhatsAppMessages.AsNoTracking()
+                .Where(x => x.ConnectionId == chat.ConnectionId && x.ChatId == chat.ChatId &&
+                            x.CreatedAt <= readThrough && x.SentAt <= firstUnread)
+                .OrderByDescending(x => x.SentAt).Take(contextSize)
+                .ToListAsync(cancellationToken);
+            batches.Add(new WhatsAppCatchUpBatch(chat.ToRecord(),
+                context.OrderBy(x => x.SentAt).Select(x => x.ToRecord()).ToArray(),
+                unread.Select(x => x.ToRecord()).ToArray(), unread.Max(x => x.CreatedAt)));
+        }
+        return batches;
+    }
+
+    public async Task CompleteCatchUpAsync(Guid chatSettingsId, DateTimeOffset through, WhatsAppCatchUp? catchUp,
+        CancellationToken cancellationToken)
+    {
+        var json = catchUp is null ? null : WhatsAppCatchUpJson.Write(catchUp);
+        await db.WhatsAppChats.Where(x => x.Id == chatSettingsId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.CatchUpThrough, through)
+                .SetProperty(x => x.CatchUpJson, json)
+                .SetProperty(x => x.CatchUpLeaseUntil, (DateTimeOffset?)null), cancellationToken);
+    }
+}
+
+/// <summary>Stores a catch-up as JSON on the chat row; unreadable JSON reads as no catch-up.</summary>
+internal static class WhatsAppCatchUpJson
+{
+    public static string Write(WhatsAppCatchUp catchUp) => System.Text.Json.JsonSerializer.Serialize(catchUp);
+
+    public static WhatsAppCatchUp? Read(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<WhatsAppCatchUp>(json);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
 }
