@@ -19,4 +19,5 @@ public static class SettingsSections
     public const string StandingApprovals = "standing-approvals";
     public const string Modes = "context-modes";
     public const string Routines = "routines";
+    public const string PeopleRadar = "people-radar";
 }

@@ -99,6 +99,7 @@ api.MapLearningEndpoints(app.Logger);
 api.MapUsageEndpoints();
 api.MapKnowledgeGraphEndpoints();
 api.MapPeopleEndpoints(app.Logger);
+api.MapPeopleRadarEndpoints(app.Logger);
 api.MapChannelEndpoints(app.Logger);
 api.MapWhatsAppAssistantEndpoints(app.Logger);
 api.MapSurfaceEndpoints();

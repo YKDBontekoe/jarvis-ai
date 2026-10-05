@@ -1,4 +1,5 @@
 using Jarvis.Application.Channels;
+using Jarvis.Application.People.Radar;
 using Jarvis.Application.WhatsApp;
 using Microsoft.EntityFrameworkCore;
 
@@ -70,7 +71,7 @@ public sealed class WhatsAppMessageMediaEntity
 }
 
 public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider? clock = null)
-    : IWhatsAppAssistantRepository
+    : IWhatsAppAssistantRepository, IChatActivityStats
 {
     private static readonly TimeSpan ScanLease = TimeSpan.FromMinutes(5);
     private const int MaxNewMessagesPerScan = 40;
@@ -126,9 +127,42 @@ public sealed class WhatsAppAssistantRepository(JarvisDbContext db, TimeProvider
         await db.WhatsAppMessages.Where(m => m.OwnerId == ownerId && m.ConnectionId == connectionId &&
             lids.Contains(m.ChatId)).ExecuteUpdateAsync(s => s.SetProperty(m => m.ChatId, phoneId), cancellationToken);
         db.WhatsAppChats.RemoveRange(rows.Where(c => c != target));
+
+        // A person linked to the old @lid chat follows the conversation to the phone number. When the phone
+        // number is already linked (or several @lid chats were linked) the oldest link wins and the rest go.
+        var lidLinks = await db.PersonChannelLinks.Where(l => l.OwnerId == ownerId &&
+            l.ConnectionId == connectionId && lids.Contains(l.ChatId)).OrderBy(l => l.CreatedAt)
+            .ToListAsync(cancellationToken);
+        if (lidLinks.Count > 0)
+        {
+            var phoneLinked = await db.PersonChannelLinks.AnyAsync(l => l.OwnerId == ownerId &&
+                l.ConnectionId == connectionId && l.ChatId == phoneId, cancellationToken);
+            var keep = phoneLinked ? null : lidLinks[0];
+            if (keep is not null) keep.ChatId = phoneId;
+            db.PersonChannelLinks.RemoveRange(lidLinks.Where(l => l != keep));
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return true;
+    }
+
+    /// <summary>Message directions and times for some chats, without their text, newest first.</summary>
+    public async Task<IReadOnlyList<ChatActivityStat>> ListAsync(Guid ownerId, IReadOnlyCollection<ChatKey> chats,
+        DateTimeOffset since, CancellationToken cancellationToken)
+    {
+        if (chats.Count == 0) return [];
+        var connectionIds = chats.Select(c => c.ConnectionId).Distinct().ToArray();
+        var chatIds = chats.Select(c => c.ChatId).Distinct().ToArray();
+        var rows = await db.WhatsAppMessages.AsNoTracking()
+            .Where(m => m.OwnerId == ownerId && m.SentAt > since && connectionIds.Contains(m.ConnectionId) &&
+                        chatIds.Contains(m.ChatId))
+            .OrderByDescending(m => m.SentAt).Take(RadarRules.MaxStatRows)
+            .Select(m => new { m.ConnectionId, m.ChatId, m.FromMe, m.SentAt })
+            .ToListAsync(cancellationToken);
+        var wanted = chats.ToHashSet();
+        return rows.Where(r => wanted.Contains(new ChatKey(r.ConnectionId, r.ChatId)))
+            .Select(r => new ChatActivityStat(r.ConnectionId, r.ChatId, r.FromMe, r.SentAt)).ToArray();
     }
 
     // Serialize consolidation with setting changes and arrivals so a queued message keeps its history.

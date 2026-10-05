@@ -315,7 +315,7 @@ public sealed record PeopleCheckInInput(Guid OwnerId);
 /// Result of one check-in pass: whether the workflow should keep running and when to look again.
 /// </summary>
 public sealed record PeopleCheckInResult(bool Continue, DateTimeOffset NextRunAt, int BirthdaysNotified,
-    int CheckInsNotified);
+    int CheckInsNotified, int RadarNotified = 0);
 
 public interface IPeopleCheckInService
 {

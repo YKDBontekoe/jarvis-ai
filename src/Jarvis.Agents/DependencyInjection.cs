@@ -86,6 +86,8 @@ public static class DependencyInjection
         services.AddScoped<IAgentContextContributor, Missions.MissionContextContributor>();
         services.AddScoped<Jarvis.Application.Missions.IMissionPlanner, Missions.ModelMissionPlanner>();
         services.AddScoped<IAgentToolContributor, People.PeopleToolContributor>();
+        services.AddScoped<IAgentToolContributor, People.RadarToolContributor>();
+        services.AddScoped<Jarvis.Application.People.Radar.IRadarToneAnalyzer, People.ModelRadarToneAnalyzer>();
         services.AddScoped<IAgentContextContributor, People.PeopleContextContributor>();
         services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();
         services.AddScoped<IAgentContextContributor, Persona.PersonaContextContributor>();

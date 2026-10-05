@@ -1,6 +1,6 @@
 # Timeline, inbox, finance, studio, library, modes, missions
 
-Seven owner-scoped features built on the existing domains. Each follows the usual layering (Domain → Application → Infrastructure; agent tools call Application services) and each has an agent tool set, an HTTP group under `/api/v1`, and a Flutter screen. Registrations live in `Jarvis.Infrastructure/LifeFeaturesRegistration.cs` and `Jarvis.Agents/DependencyInjection.cs`.
+Owner-scoped features built on the existing domains. Each follows the usual layering (Domain → Application → Infrastructure; agent tools call Application services) and each has an agent tool set, an HTTP group under `/api/v1`, and a Flutter screen. Registrations live in `Jarvis.Infrastructure/LifeFeaturesRegistration.cs` and `Jarvis.Agents/DependencyInjection.cs`.
 
 | Feature | Code | Storage | Flutter |
 |---------|------|---------|---------|
@@ -11,6 +11,7 @@ Seven owner-scoped features built on the existing domains. Each follows the usua
 | [Library and deep research](#library-and-deep-research) | `Application/Library`, `Agents/Library` | `library_items`, `flashcards` | `features/library` |
 | [Context modes](#context-modes) | `Application/Modes`, `Agents/Modes` | owner settings (`context-modes`) | `features/modes` |
 | [Mission control](#mission-control) | `Application/Missions`, `Agents/Missions` | `missions`, `mission_steps`, `mission_notes` | `features/missions` |
+| [Relationship radar](#relationship-radar) | `Application/People/Radar`, `Agents/People` | `person_channel_links` | `features/people` |
 | [Decision journal](#decision-journal) | `Application/Decisions`, `Agents/Decisions` | `decisions` | `features/decisions` |
 | [Routine miner](#routine-miner) | `Application/Routines`, `Agents/Routines` | `routine_suggestions`, owner settings (`routines`) | `features/automations` |
 
@@ -86,6 +87,25 @@ A mission splits a goal into up to 8 steps with roles (`researcher`, `planner`, 
 - Owner control: pause/resume, cancel (stops running tasks), edit a waiting step, skip a step (dependents carry on), retry a failed step (blocked steps come back).
 - Endpoints: `GET/POST /missions`, `GET/DELETE /missions/{id}`, `POST /missions/{id}/start|pause|resume|cancel`, `PUT /missions/steps/{id}`, `POST /missions/steps/{id}/skip|retry`. At most 5 active missions per owner.
 - Tools: `PlanMission`, `RunMission` (approval), `GetMissions`, `PauseOrResumeMission`, `CancelMission`.
+
+## Relationship radar
+
+Link a person to their one-to-one WhatsApp chat and Jarvis can tell when you drift apart. The radar only looks at **when** messages were sent and by whom, never at what they said (the optional tone check below is the one exception).
+
+- **Links**: `person_channel_links` ties a person to a chat by connection and canonical chat id (a phone number or an @lid); a chat belongs to one person, a person can have up to 5 chats, an owner up to 200 links. Groups cannot be linked, and the chat must be known to Jarvis. Removing a person or the WhatsApp connection removes the links (database cascade), never the messages. When `MergeChatAliasesAsync` moves an @lid chat onto the phone number the link follows it; if the phone number is already linked, or several @lid chats were linked, the oldest link wins.
+- **Messages only exist for chats the owner reads along with**, so a link to any other chat shows no data. The link screen says so. `IChatActivityStats` reads only direction and time, at most 50,000 rows over 120 days.
+- **Suggestions**: `LinkMatcher` offers a person for a chat when the full name matches ignoring case and accents, or when exactly one unlinked person and one chat share a first name of at least three letters. A suggestion is only ever shown; nothing is linked until the owner confirms.
+- **Engine**: `RelationshipRadarEngine` is pure. It compares the last 30 days with the 90 days before and reports, with the thresholds as constants:
+  - `quiet`: messages a week fell to 40% of before or less (needs at least 12 earlier messages); severity 2 at 15% or less.
+  - `reply_slower`: the owner's median reply time is at least twice as long and at least an hour longer (needs 5 replies in each period). A reply only counts when they opened the conversation, so an owner who always writes first is not "slow".
+  - `you_initiate` / `they_initiate`: the owner started at least 85% (or at most 15%) of conversations lately against at most 65% (or at least 35%) before; a conversation starts after a gap of six hours; needs 4 starts in each period.
+  - `unanswered`: the chat ends with messages from them, the first at least 48 hours ago and at most 45 days; severity 2 after 5 days.
+  - `tone`: only when the tone check scored the chat -1 or lower; always worded as a guess.
+  Severity 1 is a note on the radar screen; severity 2 is worth a notification.
+- **Tone (off by default)**: when the owner turns it on, the daily pass sends up to 40 recent messages of a linked chat to the background model (at most 10 chats per run, each at most weekly, and only chats with at least 10 recent text messages) and stores only a score from -2 to 2 with a one-sentence reason on the link. The messages are fenced as untrusted data, never stored, and a failing call is simply skipped.
+- **Daily pass**: inside the 09:00 `PeopleCheckInWorkflow`. It first marks people as contacted when the owner wrote to a linked chat, so the keep-in-touch nudge does not nag someone you just messaged; then refreshes tone if enabled; then sends one `people.radar` notification for the people with a severity 2 signal, at most once every 7 days. Linking a chat starts the workflow for owners with no birthday or cadence. A radar failure never stops birthdays and check-ins.
+- Endpoints: `GET /people/radar`, `PUT /people/radar/settings`, `GET /people/link-suggestions`, `GET /people/link-candidates`, `GET /people/{id}/radar`, `GET/POST /people/{id}/links`, `DELETE /people/{id}/links/{linkId}`. Audit events carry the person id only. Tool: `GetRelationshipRadar` (read-only; linking and the tone switch stay in the app).
+- Flutter: People shows a "Drifting" (or "Relationship radar") section with the tone switch and a "Link a WhatsApp chat?" section for suggestions; a person's page has a "Staying in touch" card with the linked chats, a weekly message sparkline, reply time, tone and the signals, and a searchable chat picker.
 
 ## Decision journal
 

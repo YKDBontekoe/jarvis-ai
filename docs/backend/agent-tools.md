@@ -41,6 +41,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Finance | `FinanceAgentTools` `GetFinanceOverview`, `GetBudgets`, `SetBudget`, `RemoveBudget`, `GetSubscriptions`, `SetSubscriptionStatus`, `RemindBeforeCharge`, `ImportBankStatement` | No approval; `ImportBankStatement` previews first. Setters are hidden during background task turns |
 | Routines | `RoutineAgentTools` `GetRoutineSuggestions` | Read-only. Accepting or dismissing a suggestion is done in the app |
 | Decisions | `DecisionAgentTools` `LogDecision`, `ResolveDecision`, `GetDecisions`, `GetCalibration` | No approval; they only read and write the owner's own decision journal |
+| Relationship radar | `RadarAgentTools` `GetRelationshipRadar` | Read-only. Linking chats and the tone switch are done in the app |
 | Automation studio | `AutomationAgentTools` `PreviewAutomation`, `ListAutomationTemplates`, `CreateAutomationFromTemplate` | Preview saves nothing; templates create a draft that stays off |
 | Library | `LibraryAgentTools` `SearchLibrary`, `GetLibraryItem`, `SaveToLibrary`, `GetLibraryDigest`, `GetDueFlashcards`, `GradeFlashcard`, `AddFlashcards`, `ClipUrlToLibrary`, `StartDeepResearch` | **ClipUrlToLibrary** requires approval (outbound fetch). `StartDeepResearch` and the clip tool are hidden in background tasks so research cannot start more research |
 | Modes | `ModeAgentTools` `GetCurrentMode`, `SetMode` | No approval; `SetMode` hidden in background tasks. `ModeContextContributor` (order 3) adds the current mode and tone |

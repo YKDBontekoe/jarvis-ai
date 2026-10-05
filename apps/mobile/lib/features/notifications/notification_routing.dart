@@ -10,7 +10,9 @@ bool opensWeeklyReview(String? type) => type == 'briefing.weekly';
 bool opensRoutineSuggestions(String? type) => type == 'routine.suggested';
 bool opensHabits(String? type) => type == 'habit.checkin';
 bool opensPeople(String? type) =>
-    type == 'people.birthday' || type == 'people.checkin';
+    type == 'people.birthday' ||
+    type == 'people.checkin' ||
+    type == 'people.radar';
 
 bool opensTaskDetails(String? type) =>
     type == 'task.completed' || type == 'task.failed';

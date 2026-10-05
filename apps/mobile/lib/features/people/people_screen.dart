@@ -10,6 +10,8 @@ import '../../ui/phosphor_icons.dart';
 import 'people_models.dart';
 import 'person_detail_screen.dart';
 import 'person_widgets.dart';
+import 'radar_models.dart';
+import 'radar_widgets.dart';
 
 /// The people in the owner's life: upcoming birthdays, who is due for a
 /// check-in, and everyone else. Jarvis sends a notification on birthdays and
@@ -33,6 +35,9 @@ class _PeopleScreenState extends State<PeopleScreen>
 
   List<PersonData> _people = const [];
   List<PersonSuggestionData> _suggestions = const [];
+  RadarOverviewData? _radar;
+  List<LinkSuggestionData> _linkSuggestions = const [];
+  final Set<String> _linking = {};
   bool _loading = true;
   String? _error;
   int _requestRevision = 0;
@@ -70,6 +75,7 @@ class _PeopleScreenState extends State<PeopleScreen>
         _error = null;
       });
       unawaited(_loadSuggestions());
+      unawaited(_loadRadar());
       final open = _pendingOpen;
       if (open != null) {
         _pendingOpen = null;
@@ -100,6 +106,77 @@ class _PeopleScreenState extends State<PeopleScreen>
     } on DioException {
       if (mounted) setState(() => _suggestions = const []);
     }
+  }
+
+  // The radar is a bonus too: without it the list just has no radar section.
+  Future<void> _loadRadar() async {
+    try {
+      final response = await widget.http.get<dynamic>('/api/v1/people/radar');
+      if (!mounted) return;
+      setState(() => _radar = RadarOverviewData.fromJson(response.data));
+    } on DioException {
+      if (mounted) setState(() => _radar = null);
+    }
+    try {
+      final response = await widget.http.get<dynamic>(
+        '/api/v1/people/link-suggestions',
+      );
+      if (!mounted) return;
+      setState(
+        () => _linkSuggestions = LinkSuggestionData.listFromJson(response.data),
+      );
+    } on DioException {
+      if (mounted) setState(() => _linkSuggestions = const []);
+    }
+  }
+
+  Future<void> _setTone(bool enabled) async {
+    final before = _radar;
+    if (before == null) return;
+    setState(
+      () => _radar = RadarOverviewData(
+        toneEnabled: enabled,
+        people: before.people,
+      ),
+    );
+    try {
+      await widget.http.put<dynamic>(
+        '/api/v1/people/radar/settings',
+        data: {'toneEnabled': enabled},
+      );
+    } on DioException catch (error) {
+      if (mounted) setState(() => _radar = before);
+      _toast(
+        firstProblemMessage(error.response?.data) ?? 'Could not save that.',
+      );
+    }
+  }
+
+  Future<void> _link(LinkSuggestionData suggestion) async {
+    setState(() => _linking.add(suggestion.key));
+    try {
+      await widget.http.post<dynamic>(
+        '/api/v1/people/${suggestion.personId}/links',
+        data: {
+          'connectionId': suggestion.connectionId,
+          'chatId': suggestion.chatId,
+        },
+      );
+      _toast('Linked ${suggestion.personName} to ${suggestion.chatName}.');
+      await _loadRadar();
+    } on DioException catch (error) {
+      _toast(
+        firstProblemMessage(error.response?.data) ??
+            'Could not link that chat.',
+      );
+    } finally {
+      if (mounted) setState(() => _linking.remove(suggestion.key));
+    }
+  }
+
+  void _openById(String personId) {
+    final person = _people.where((x) => x.id == personId).firstOrNull;
+    if (person != null) unawaited(_open(person));
   }
 
   Future<void> _open(PersonData person) async {
@@ -285,6 +362,28 @@ class _PeopleScreenState extends State<PeopleScreen>
                           ),
                       ],
                     ),
+                  ),
+                ),
+              ),
+            if (_radar case final radar? when radar.people.isNotEmpty)
+              ContentWidth(
+                child: FadeSlideIn(
+                  index: index++,
+                  child: RadarSection(
+                    overview: radar,
+                    onOpen: _openById,
+                    onToneChanged: (value) => unawaited(_setTone(value)),
+                  ),
+                ),
+              ),
+            if (_linkSuggestions.isNotEmpty)
+              ContentWidth(
+                child: FadeSlideIn(
+                  index: index++,
+                  child: LinkSuggestionsSection(
+                    suggestions: _linkSuggestions,
+                    busy: _linking,
+                    onLink: (suggestion) => unawaited(_link(suggestion)),
                   ),
                 ),
               ),
