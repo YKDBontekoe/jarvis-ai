@@ -78,8 +78,9 @@ public sealed class ExpenseRepository(JarvisDbContext db) : IExpenseRepository
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var pattern = "%" + query.Search.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
-            rows = rows.Where(x => EF.Functions.ILike(x.Merchant ?? "", pattern) ||
-                                   EF.Functions.ILike(x.Note ?? "", pattern));
+            // The escape character must be passed: without it Npgsql emits ESCAPE '' and "\%" stops escaping.
+            rows = rows.Where(x => EF.Functions.ILike(x.Merchant ?? "", pattern, "\\") ||
+                                   EF.Functions.ILike(x.Note ?? "", pattern, "\\"));
         }
         return (await rows.OrderByDescending(x => x.SpentOn).ThenByDescending(x => x.CreatedAt)
                 .Skip(query.Offset).Take(query.Limit).ToListAsync(cancellationToken))

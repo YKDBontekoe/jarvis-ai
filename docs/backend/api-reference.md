@@ -51,7 +51,7 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 
 ## Timeline, inbox, finance, library, modes, missions, routines, decisions
 
-Described in [life-features.md](life-features.md): `/timeline` (`/on-this-day`, `/insights`), `/inbox` and `/commitments`, `/finance` (`/overview`, `/budgets`, `/subscriptions` with `/{id}/negotiate` and `/{id}/cancel-url`, `/import`, `/export`), `/automations` studio routes (`/event-kinds`, `/templates`, `/simulate`, `/webhooks`) and the public `POST /hooks/{token}`, `/library` (`/clip`, `/notes`, `/digest`, `/research`, `/cards`), `/modes`, `/missions` (`/steps`), `/routines/suggestions` (`/refresh`, `/{id}/accept`, `/{id}/dismiss`), and `/decisions` (`/calibration`, `/{id}/resolve`).
+Described in [life-features.md](life-features.md): `/timeline` (`/on-this-day`, `/insights`), `/inbox` and `/commitments`, `/finance` (`/overview`, `/budgets`, `/subscriptions` with `/{id}/negotiate` and `/{id}/cancel-url`, `/import`, `/export`, `/wealth`, `/accounts` with `/{id}/reconcile` and `/{id}/import`, `/portfolio` with `/holdings`, `/trades` and `/refresh`), `/transactions`, `/automations` studio routes (`/event-kinds`, `/templates`, `/simulate`, `/webhooks`) and the public `POST /hooks/{token}`, `/library` (`/clip`, `/notes`, `/digest`, `/research`, `/cards`), `/modes`, `/missions` (`/steps`), `/routines/suggestions` (`/refresh`, `/{id}/accept`, `/{id}/dismiss`), and `/decisions` (`/calibration`, `/{id}/resolve`).
 
 ## Memory and learning
 
@@ -90,7 +90,7 @@ Body: `entryDate`, `content` (≤ 6,000), `highlights`, `gratitude` (≤ 1,000 e
 | Method | Path |
 |--------|------|
 | GET | `/expenses?month=YYYY-MM&category=` (month summary in the main currency: total, previous month, per category, per day, top merchants, other currencies, plus the expenses) |
-| POST | `/expenses` (body: `amount` > 0, optional `currency` ISO 4217, `merchant` ≤ 80, `category`, `note` ≤ 200, `spentOn`, `receiptFileId`) |
+| POST | `/expenses` (body: `amount` > 0, optional `currency` ISO 4217, `merchant` ≤ 80, `category`, `note` ≤ 200, `spentOn`, `receiptFileId`, `kind` expense/income/transfer, `accountId`, `transferAccountId`) |
 | GET/PUT/DELETE | `/expenses/{id}` |
 | POST | `/expenses/scan` (`fileId` of an uploaded JPEG/PNG/WebP ≤ 8 MB; returns a draft read by the Vision model, saves nothing) |
 

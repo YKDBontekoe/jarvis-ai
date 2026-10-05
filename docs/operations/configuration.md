@@ -28,6 +28,7 @@ setting is built into the client; no additional storage secrets or environment v
 | `Codex__Access__AllowNetwork` | Network for commands Codex runs, and proxy/CA variables passed to the child (default `true`) |
 | `Codex__Access__WritableRoots__0` | Extra absolute directories writable in `workspace-write` mode, besides the per-turn scratch directory |
 | `Codex__Access__DisabledFeatures__0` | Extra Codex features to turn off (for example `image_generation`, `apps`, `plugins`, `skill_search`) |
+| `Finance__Quotes__ApiKey` | Optional [Finnhub](https://finnhub.io) API key. With it the stock portfolio fetches live prices (reused for 15 minutes; sent in a header, never logged). Without it prices are the ones the owner types in |
 
 To restore the old locked-down behavior set `Codex__Access__Sandbox=read-only`, `Codex__Access__AllowShell=false`, `Codex__Access__AllowNetwork=false` and disable `skill_search`, `image_generation`, `apps`, `plugins`. Codex's browser, computer-use and multi-agent features always stay off; Jarvis's approval-gated browser is the only browser.
 | `Codex__Model`, `Jarvis__ModelClass` | Default model selection |

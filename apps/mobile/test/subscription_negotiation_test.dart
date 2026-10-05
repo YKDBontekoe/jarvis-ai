@@ -86,6 +86,7 @@ void main() {
                     builder: (_) => FinanceScreen(
                       http: http.client(),
                       now: _now,
+                      initialTab: FinanceTab.budgets,
                       onAskInChat: withChat ? asked.add : null,
                     ),
                   ),

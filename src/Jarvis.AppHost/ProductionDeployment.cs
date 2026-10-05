@@ -374,6 +374,7 @@ internal static class ProductionDeployment
         foreach (var modelClass in new[] { "Fast", "Standard", "Reasoning", "Coding", "Vision", "Realtime" })
             yield return ($"Codex__ModelClasses__{modelClass}", $"${{CODEX_MODEL_{modelClass.ToUpperInvariant()}:-}}");
         yield return ("Jarvis__ModelClass", "${JARVIS_MODEL_CLASS:-}");
+        yield return ("Finance__Quotes__ApiKey", "${FINANCE_QUOTES_API_KEY:-}");
         yield return ("Embeddings__BaseUrl", "${EMBEDDINGS_BASE_URL-http://embeddings:80/v1}");
         yield return ("Embeddings__Model", $"${{EMBEDDINGS_MODEL:-{JarvisImages.EmbeddingsModel}}}");
         yield return ("ConnectionStrings__jarvis", ConnectionString);
