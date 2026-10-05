@@ -4,11 +4,12 @@
 #
 # It creates ENV_FILE when missing and fills in every setting Jarvis manages itself: database, object storage,
 # account, LiveKit, voice and MCP runner secrets; the service account ids; the data directories; and the Garage
-# config. Values already in the file are never changed (a database password only applies when the database is
-# first created), so existing deployments keep working.
+# config. Generated values already in the file are preserved (a database password only applies when the database
+# is first created). An explicitly supplied quotes key is updated from the deployment secret.
 #
-# The only input is the public hostname: JARVIS_DOMAIN in the environment (the deploy workflow passes the
-# repository variable) or already in the env file. Everything else derives from it or is generated.
+# The required input is the public hostname: JARVIS_DOMAIN in the environment (the deploy workflow passes the
+# repository variable) or already in the env file. Optional FINANCE_QUOTES_API_KEY is supplied by the deployment
+# secret and replaces the saved quotes key when non-empty. Other settings derive from the hostname or are generated.
 #
 #   JARVIS_DATA_DIR   where generated state lives (default: $HOME/jarvis-data)
 set -euo pipefail
@@ -94,6 +95,16 @@ ensure_directory() {
     echo "Created ${current}."
   fi
 }
+
+# Optional Finnhub key from the approved deployment. Persist it so manual Compose operations use the same key.
+# An absent repository secret preserves an existing host key. Validate before writing unquoted dotenv syntax.
+if [[ -n "${FINANCE_QUOTES_API_KEY:-}" ]]; then
+  if [[ ! "${FINANCE_QUOTES_API_KEY}" =~ ^[A-Za-z0-9]+$ ]]; then
+    echo "FINANCE_QUOTES_API_KEY must be an alphanumeric Finnhub key." >&2
+    exit 1
+  fi
+  env_set FINANCE_QUOTES_API_KEY "${FINANCE_QUOTES_API_KEY}"
+fi
 
 # The public hostname is the one thing Jarvis cannot pick for you.
 domain="$(env_get JARVIS_DOMAIN)"
