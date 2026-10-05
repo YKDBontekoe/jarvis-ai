@@ -640,10 +640,24 @@ export class ChatBook {
     }
   }
 
-  list() {
-    return [...this.chats.values()]
-      .map((chat) => ({ ...chat, name: chat.name ?? this.names.get(chat.id) ?? null }))
-      .sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+  list(resolvePhone = () => null) {
+    const result = new Map();
+    for (const chat of this.chats.values()) {
+      const id = chatIdOf(jidFromChatId(chat.id), resolvePhone) ?? chat.id;
+      const name = chat.name ?? this.names.get(chat.id) ?? null;
+      const previous = result.get(id);
+      if (!previous) {
+        result.set(id, { ...chat, id, name, ...(id !== chat.id ? { aliases: [chat.id] } : {}) });
+        continue;
+      }
+      if (chat.id !== id) previous.aliases = [...new Set([...(previous.aliases ?? []), chat.id])];
+      if (chat.lastMessageAt > previous.lastMessageAt) {
+        previous.lastMessageAt = chat.lastMessageAt;
+        if (chat.anchor) previous.anchor = chat.anchor;
+        if (name) previous.name = name;
+      } else if (!previous.name && name) previous.name = name;
+    }
+    return [...result.values()].sort((a, b) => b.lastMessageAt - a.lastMessageAt);
   }
 }
 

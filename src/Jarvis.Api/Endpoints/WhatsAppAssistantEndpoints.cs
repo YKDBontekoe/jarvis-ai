@@ -47,7 +47,7 @@ internal static class WhatsAppAssistantEndpoints
         var group = api.MapGroup("/channels/{id:guid}/chats");
 
         group.MapGet("", async (Guid id, IChannelRepository channels, IWhatsAppAssistantRepository chats,
-            WhatsAppBridgeClient bridge, ICurrentUser currentUser, CancellationToken ct) =>
+            WhatsAppBridgeClient bridge, WhatsAppReadAlongReceiver receiver, ICurrentUser currentUser, CancellationToken ct) =>
         {
             var connection = await LinkedAsync(channels, currentUser.OwnerId, id, ct);
             if (connection is null) return Results.NotFound();
@@ -66,6 +66,16 @@ internal static class WhatsAppAssistantEndpoints
                     if (state == "open") state = "unreachable";
                     logger.LogDebug(exception, "Could not read the WhatsApp chat list for {ConnectionId}.", id);
                 }
+            }
+            var consolidated = false;
+            foreach (var chat in phone.Where(c => c.Aliases?.Any(saved.ContainsKey) == true))
+                consolidated |= await chats.MergeChatAliasesAsync(currentUser.OwnerId, id, chat.Id, chat.Aliases!, ct);
+            if (consolidated)
+            {
+                saved = (await chats.ListChatsAsync(currentUser.OwnerId, id, ct)).ToDictionary(x => x.ChatId);
+                try { await receiver.SyncWatchAsync(id, await chats.ListWatchedChatIdsAsync(id, ct), ct); }
+                catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
+                { /* The receiver retries the saved watch list. */ }
             }
             var activity = (await chats.ListActivityAsync(currentUser.OwnerId, id, ct)).ToDictionary(x => x.ChatId);
             var merged = Merge(saved, phone).Select(chat => activity.TryGetValue(chat.ChatId, out var item)
@@ -92,8 +102,8 @@ internal static class WhatsAppAssistantEndpoints
 
         Task<IResult> Save(Guid id, string chatId, SaveWhatsAppChatRequest request, IChannelRepository channels,
             IWhatsAppAssistantRepository chats, WhatsAppReadAlongReceiver receiver, IAuditEventStore audit,
-            ICurrentUser currentUser, CancellationToken ct) =>
-            SaveAsync(id, chatId, request, channels, chats, receiver, audit, currentUser, logger, ct);
+            WhatsAppBridgeClient bridge, ICurrentUser currentUser, CancellationToken ct) =>
+            SaveAsync(id, chatId, request, channels, chats, receiver, audit, bridge, currentUser, logger, ct);
         group.MapPut("/open", Save);
         group.MapPut("/{chatId}", Save).WithName("SaveWhatsAppChat");
 
@@ -200,12 +210,26 @@ internal static class WhatsAppAssistantEndpoints
 
     private static async Task<IResult> SaveAsync(Guid id, string chatId, SaveWhatsAppChatRequest request,
         IChannelRepository channels, IWhatsAppAssistantRepository chats, WhatsAppReadAlongReceiver receiver,
-        IAuditEventStore audit, ICurrentUser currentUser, ILogger logger, CancellationToken ct)
+        IAuditEventStore audit, WhatsAppBridgeClient bridge, ICurrentUser currentUser, ILogger logger, CancellationToken ct)
     {
         var normalized = WhatsAppChatIds.Normalize(chatId);
         if (normalized is null) return EndpointHelpers.Invalid("chatId", "That is not a WhatsApp chat.");
         var connection = await LinkedAsync(channels, currentUser.OwnerId, id, ct);
         if (connection is null) return Results.NotFound();
+        if (bridge.Configured && normalized.EndsWith("@lid", StringComparison.Ordinal))
+        {
+            try
+            {
+                var mapped = (await bridge.ListChatsAsync(id, ct)).FirstOrDefault(c => c.Aliases?.Contains(normalized) == true);
+                if (mapped is not null && WhatsAppChatIds.Normalize(mapped.Id) is { } phone && phone.StartsWith('+'))
+                {
+                    await chats.MergeChatAliasesAsync(currentUser.OwnerId, id, phone, mapped.Aliases!, ct);
+                    normalized = phone;
+                }
+            }
+            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or JsonException)
+            { /* Keep the saved identity while the bridge is unreachable. */ }
+        }
         if (normalized == ChannelAddresses.Normalize(connection.Account))
             return EndpointHelpers.Invalid("chatId",
                 "This is your own chat with Jarvis. It is always on and Jarvis answers there.");

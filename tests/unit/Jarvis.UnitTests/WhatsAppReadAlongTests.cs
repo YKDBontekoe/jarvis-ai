@@ -278,6 +278,9 @@ public sealed class WhatsAppReadAlongTests
         public List<WhatsAppChatSettings> Chats { get; } = [];
         public List<WhatsAppChatMessage> Messages { get; } = [];
 
+        public Task<bool> MergeChatAliasesAsync(Guid ownerId, Guid connectionId, string phoneId,
+            IReadOnlyList<string> aliases, CancellationToken cancellationToken) => Task.FromResult(false);
+
         public Task<WhatsAppChatMessage?> GetMessageAsync(Guid ownerId, Guid connectionId, string chatId,
             Guid messageId, CancellationToken cancellationToken) =>
             Task.FromResult(Chats.Any(x => x.OwnerId == ownerId && x.ConnectionId == connectionId && x.ChatId == chatId)

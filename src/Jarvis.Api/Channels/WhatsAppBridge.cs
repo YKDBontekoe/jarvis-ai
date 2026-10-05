@@ -11,12 +11,13 @@ public sealed record BridgeSessionStatus(string State, string? Qr, string? Phone
 public sealed record BridgeInboundMessage(string Id, string From, string Text);
 
 /// <summary>A chat on the linked phone, for the read-along picker. <c>LastMessageAt</c> is in Unix seconds.</summary>
-public sealed record BridgeChat(string Id, string? Name, bool Group, long LastMessageAt);
+public sealed record BridgeChat(string Id, string? Name, bool Group, long LastMessageAt,
+    IReadOnlyList<string>? Aliases = null);
 
 /// <summary>A message in a chat on the watch list; <c>Timestamp</c> is in Unix seconds.</summary>
 public sealed record BridgeObservedMessage(string Id, string ChatId, bool FromMe, string? Sender, string Text,
     long Timestamp, string? SenderId = null, WhatsAppIncomingMedia? Media = null, WhatsAppQuote? Quote = null,
-    bool Historical = false);
+    bool Historical = false, string? CanonicalChatId = null);
 
 public sealed record BridgePicture(byte[] Bytes, string ContentType);
 
