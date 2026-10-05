@@ -42,6 +42,21 @@ public static class LifeFeaturesRegistration
         services.AddScoped<ISubscriptionNegotiationService, SubscriptionNegotiationService>();
         services.AddScoped<IExpenseObserver, BudgetExpenseObserver>();
 
+        // Accounts, transaction ledger, and the stock portfolio. Quotes need Finance:Quotes:ApiKey; without it
+        // prices are the ones the owner types in.
+        services.AddScoped<IAccountRepository, AccountRepository>();
+        services.AddScoped<IAccountService, AccountService>();
+        services.AddScoped<IPortfolioRepository, PortfolioRepository>();
+        services.AddScoped<IPortfolioService, PortfolioService>();
+        services.AddScoped<IWealthService, WealthService>();
+        services.AddHttpClient<Jarvis.Infrastructure.Finance.FinnhubQuoteProvider>(client =>
+            client.Timeout = TimeSpan.FromSeconds(15));
+        services.AddScoped<IQuoteProvider>(sp =>
+        {
+            var finnhub = sp.GetRequiredService<Jarvis.Infrastructure.Finance.FinnhubQuoteProvider>();
+            return finnhub.IsConfigured ? finnhub : new NullQuoteProvider();
+        });
+
         // Automation studio: webhooks that start event automations.
         services.AddScoped<IAutomationWebhookRepository, AutomationWebhookRepository>();
         services.AddScoped<IAutomationWebhookService, AutomationWebhookService>();

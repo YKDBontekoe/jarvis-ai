@@ -112,6 +112,8 @@ api.MapPlannerEndpoints();
 api.MapTimelineEndpoints();
 api.MapInboxEndpoints(app.Logger);
 api.MapFinanceEndpoints(app.Logger);
+api.MapAccountEndpoints(app.Logger);
+api.MapPortfolioEndpoints(app.Logger);
 api.MapLibraryEndpoints(app.Logger);
 api.MapModeEndpoints(app.Logger);
 api.MapRoutineEndpoints(app.Logger);

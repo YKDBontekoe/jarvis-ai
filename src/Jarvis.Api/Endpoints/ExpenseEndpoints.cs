@@ -10,11 +10,14 @@ using Jarvis.Domain.Expenses;
 namespace Jarvis.Api.Endpoints;
 
 public sealed record ExpenseRequest(decimal? Amount, string? Currency, string? Merchant, string? Category,
-    string? Note, DateOnly? SpentOn, Guid? ReceiptFileId);
+    string? Note, DateOnly? SpentOn, Guid? ReceiptFileId, string? Kind = null, Guid? AccountId = null,
+    Guid? TransferAccountId = null);
 
 public sealed record ExpenseDto(Guid Id, decimal Amount, string Currency, string? Merchant, string Category,
     string? Note, DateOnly SpentOn, Guid? ReceiptFileId, string Source, DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt, string Kind = "expense", Guid? AccountId = null, Guid? TransferAccountId = null);
+
+public sealed record TransactionPageDto(IReadOnlyList<ExpenseDto> Items, bool HasMore);
 
 public sealed record ExpenseMonthDto(int Year, int Month, string Currency, decimal Total, int Count,
     decimal PreviousTotal, IReadOnlyList<CategoryTotal> Categories, IReadOnlyList<DayTotal> Days,
@@ -49,6 +52,32 @@ internal static class ExpenseEndpoints
                 summary.Count, summary.PreviousTotal, summary.Categories, summary.Days, summary.TopMerchants,
                 summary.OtherCurrencies, list.Select(ToDto).ToArray()));
         }).WithName("ListExpenses");
+
+        // The ledger across every kind and account, paged with offset and limit.
+        api.MapGet("/transactions", async (string? from, string? to, Guid? accountId, string? kind, string? category,
+            string? q, int? offset, int? limit, IExpenseService expenses, ICurrentUser currentUser,
+            CancellationToken ct) =>
+        {
+            DateOnly? start = null, end = null;
+            if (!string.IsNullOrWhiteSpace(from))
+            {
+                if (!DateOnly.TryParseExact(from, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var f))
+                    return EndpointHelpers.Invalid("from", "Use the date format YYYY-MM-DD.");
+                start = f;
+            }
+            if (!string.IsNullOrWhiteSpace(to))
+            {
+                if (!DateOnly.TryParseExact(to, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var t))
+                    return EndpointHelpers.Invalid("to", "Use the date format YYYY-MM-DD.");
+                end = t;
+            }
+            if (kind is not null && !TransactionKinds.IsValid(kind))
+                return EndpointHelpers.Invalid("kind", "Use expense, income, or transfer.");
+            var size = Math.Clamp(limit ?? 50, 1, 100);
+            var page = await expenses.QueryAsync(currentUser.OwnerId,
+                new TransactionQuery(start, end, accountId, kind, category, q, offset ?? 0, size + 1), ct);
+            return Results.Ok(new TransactionPageDto(page.Take(size).Select(ToDto).ToArray(), page.Count > size));
+        }).WithName("ListTransactions");
 
         group.MapGet("/{id:guid}", async (Guid id, IExpenseService expenses, ICurrentUser currentUser,
             CancellationToken ct) =>
@@ -123,11 +152,11 @@ internal static class ExpenseEndpoints
 
     internal static ExpenseDto ToDto(Expense expense) => new(expense.Id, expense.Amount, expense.Currency,
         expense.Merchant, expense.Category, expense.Note, expense.SpentOn, expense.ReceiptFileId, expense.Source,
-        expense.CreatedAt, expense.UpdatedAt);
+        expense.CreatedAt, expense.UpdatedAt, expense.Kind, expense.AccountId, expense.TransferAccountId);
 
     private static ExpenseDraft ToDraft(ExpenseRequest request, string source) => new(request.Amount,
         request.Currency, request.Merchant, request.Category, request.Note, request.SpentOn, request.ReceiptFileId,
-        source);
+        source, request.Kind, request.AccountId, request.TransferAccountId);
 
     private static async Task<(int Year, int Month)?> ResolveMonthAsync(string? month,
         IDailyBriefingRepository briefings, ICurrentUser currentUser, CancellationToken ct)

@@ -52,6 +52,10 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<RoutineSuggestionEntity> RoutineSuggestions => Set<RoutineSuggestionEntity>();
     public DbSet<DecisionEntity> Decisions => Set<DecisionEntity>();
     public DbSet<BudgetEntity> Budgets => Set<BudgetEntity>();
+    public DbSet<FinancialAccountEntity> FinancialAccounts => Set<FinancialAccountEntity>();
+    public DbSet<HoldingEntity> Holdings => Set<HoldingEntity>();
+    public DbSet<InvestmentTradeEntity> InvestmentTrades => Set<InvestmentTradeEntity>();
+    public DbSet<PricePointEntity> PricePoints => Set<PricePointEntity>();
     public DbSet<LibraryItemEntity> LibraryItems => Set<LibraryItemEntity>();
     public DbSet<FlashcardEntity> Flashcards => Set<FlashcardEntity>();
     public DbSet<MissionEntity> Missions => Set<MissionEntity>();

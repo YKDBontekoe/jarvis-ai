@@ -132,10 +132,12 @@ public sealed record FinanceOverview(
     decimal SubscriptionsPerMonth,
     IReadOnlyList<FinanceAlert> Alerts);
 
-public sealed record ImportRow(DateOnly Date, decimal Amount, string Currency, string? Merchant, string? Note);
+public sealed record ImportRow(DateOnly Date, decimal Amount, string Currency, string? Merchant, string? Note,
+    string Kind = "expense");
 
+/// <summary><see cref="Income"/> holds the incoming payments; the spending-only import skips them.</summary>
 public sealed record CsvParseResult(IReadOnlyList<ImportRow> Spending, int IncomeSkipped, int Unreadable,
-    string? Problem);
+    string? Problem, IReadOnlyList<ImportRow>? Income = null);
 
 public sealed record ImportReport(
     bool Committed,

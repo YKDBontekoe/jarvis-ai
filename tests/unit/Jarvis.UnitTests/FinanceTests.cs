@@ -480,6 +480,22 @@ public sealed class FinanceTests
         public Task<Expense?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
             Task.FromResult(Expenses.FirstOrDefault(x => x.Id == id && x.OwnerId == ownerId));
 
+        public Task<IReadOnlyList<Expense>> QueryAsync(Guid ownerId, TransactionQuery query,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Expense>>(Expenses
+                .Where(x => x.OwnerId == ownerId && (query.From is null || x.SpentOn >= query.From) &&
+                            (query.To is null || x.SpentOn <= query.To) &&
+                            (query.AccountId is null || x.AccountId == query.AccountId ||
+                             x.TransferAccountId == query.AccountId) &&
+                            (query.Kind is null || x.Kind == query.Kind))
+                .OrderByDescending(x => x.SpentOn).Skip(query.Offset).Take(query.Limit).ToArray());
+
+        public Task<IReadOnlyList<Expense>> ListAccountMovementsAsync(Guid ownerId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Expense>>(Expenses
+                .Where(x => x.OwnerId == ownerId && (x.AccountId is not null || x.TransferAccountId is not null))
+                .ToArray());
+
         public Task AddAsync(Expense expense, CancellationToken cancellationToken)
         {
             Expenses.Add(expense);
