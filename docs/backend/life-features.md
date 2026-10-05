@@ -11,11 +11,12 @@ Seven owner-scoped features built on the existing domains. Each follows the usua
 | [Library and deep research](#library-and-deep-research) | `Application/Library`, `Agents/Library` | `library_items`, `flashcards` | `features/library` |
 | [Context modes](#context-modes) | `Application/Modes`, `Agents/Modes` | owner settings (`context-modes`) | `features/modes` |
 | [Mission control](#mission-control) | `Application/Missions`, `Agents/Missions` | `missions`, `mission_steps`, `mission_notes` | `features/missions` |
+| [Decision journal](#decision-journal) | `Application/Decisions`, `Agents/Decisions` | `decisions` | `features/decisions` |
 | [Routine miner](#routine-miner) | `Application/Routines`, `Agents/Routines` | `routine_suggestions`, owner settings (`routines`) | `features/automations` |
 
 ## Life timeline
 
-One chronological list of what happened: journal entries, expenses, habit check-ins, people (last contact, birthdays), finished tasks, delivered reminders, learned memories, and chats. Each area is an `ITimelineSource`; `TimelineService` merges them newest first. Sources run one after another because they share a database context, and one failing source is reported in `failedKinds` without blanking the rest. Journal-mirrored memories are skipped.
+One chronological list of what happened: journal entries, expenses, habit check-ins, people (last contact, birthdays), finished tasks, delivered reminders, learned memories, chats, and decisions (when logged and when answered). Each area is an `ITimelineSource`; `TimelineService` merges them newest first. Sources run one after another because they share a database context, and one failing source is reported in `failedKinds` without blanking the rest. Journal-mirrored memories are skipped.
 
 - `GET /timeline?from=&to=&kinds=&q=&limit=` (default last 30 days, at most 400 days, 500 moments)
 - `GET /timeline/on-this-day?years=` (earlier years on today's month and day)
@@ -85,6 +86,16 @@ A mission splits a goal into up to 8 steps with roles (`researcher`, `planner`, 
 - Owner control: pause/resume, cancel (stops running tasks), edit a waiting step, skip a step (dependents carry on), retry a failed step (blocked steps come back).
 - Endpoints: `GET/POST /missions`, `GET/DELETE /missions/{id}`, `POST /missions/{id}/start|pause|resume|cancel`, `PUT /missions/steps/{id}`, `POST /missions/steps/{id}/skip|retry`. At most 5 active missions per owner.
 - Tools: `PlanMission`, `RunMission` (approval), `GetMissions`, `PauseOrResumeMission`, `CancelMission`.
+
+## Decision journal
+
+Write down a call with a prediction and how sure you are, answer on the review date whether it came true, and see how well your confidence matches reality.
+
+- A `Decision` has a title, optional context, a **prediction** (a statement that turns out true or false), a **probability** (1–99%, the chance you gave that it comes true), a **review date**, and later an **outcome** with an optional note. A review date can be today or up to 700 days ahead; an owner can have at most 200 unresolved decisions. A resolved decision cannot be edited, but the answer can be changed.
+- `DecisionService` schedules an ordinary reminder ("Check outcome: …") at 09:00 on the review date in the owner's time zone (15 minutes from now when that has already passed today). Moving the date or renaming the decision replaces the reminder; answering or deleting cancels it. If the reminder cannot be created the decision is still saved. The reminder carries no link back to the decision, so it opens the usual reminder details; the Decisions screen and its Home tile show what is due.
+- `CalibrationCalculator` is pure. The **Brier score** is the mean squared gap between stated chance and outcome (0 perfect, 0.25 is what always saying 50% scores). It also groups answers into bands (under 30%, 30–50%, 50–70%, 70–90%, 90%+; an edge belongs to the higher band) comparing what you said with how often it happened, and reports a trend (`improving`, `steady`, `worsening`) comparing the latest 10 answers with the 10 before, once both sides have at least 5.
+- **Weekly review**: `WeeklyReviewStats` gains `DecisionsResolved`, `BrierScore` (decisions settled that week) and `PreviousBrierScore` (the latest 20 settled before it). The fields are optional, so reviews stored earlier still read back. The composed story and the narrator both get a sentence on how predictions scored.
+- Endpoints: `GET /decisions?status=open|due|resolved&limit=`, `GET /decisions/calibration`, `GET/PUT/DELETE /decisions/{id}`, `POST /decisions`, `POST /decisions/{id}/resolve` (`outcome`, `note`). Audit events carry the id only, never the prediction or outcome. Tools: `LogDecision`, `ResolveDecision`, `GetDecisions`, `GetCalibration`; they only touch the owner's own journal, so none needs approval.
 
 ## Routine miner
 

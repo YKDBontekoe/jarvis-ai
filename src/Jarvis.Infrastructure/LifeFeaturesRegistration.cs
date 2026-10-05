@@ -1,4 +1,5 @@
 using Jarvis.Application.Automations;
+using Jarvis.Application.Decisions;
 using Jarvis.Application.Expenses;
 using Jarvis.Application.Finance;
 using Jarvis.Application.Inbox;
@@ -27,6 +28,7 @@ public static class LifeFeaturesRegistration
         services.AddScoped<ITimelineSource, ReminderTimelineSource>();
         services.AddScoped<ITimelineSource, MemoryTimelineSource>();
         services.AddScoped<ITimelineSource, ConversationTimelineSource>();
+        services.AddScoped<ITimelineSource, DecisionTimelineSource>();
         services.AddScoped<ITimelineService, TimelineService>();
 
         // Inbox and commitments ledger.
@@ -51,6 +53,10 @@ public static class LifeFeaturesRegistration
 
         // Context modes: stored in the owner's settings, so no tables of their own.
         services.AddScoped<IModeService, ModeService>();
+
+        // Decision journal: predictions with a confidence, resolved later and scored for calibration.
+        services.AddScoped<IDecisionRepository, DecisionRepository>();
+        services.AddScoped<IDecisionService, DecisionService>();
 
         // Routine miner: repeated behaviour turned into suggested automations.
         services.AddScoped<IRoutineSuggestionRepository, RoutineSuggestionRepository>();

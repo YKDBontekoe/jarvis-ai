@@ -15,6 +15,7 @@ const timelineKinds = [
   'reminder',
   'memory',
   'conversation',
+  'decision',
 ];
 
 String timelineKindLabel(String kind) => switch (kind) {
@@ -27,6 +28,7 @@ String timelineKindLabel(String kind) => switch (kind) {
   'reminder' => 'Reminders',
   'memory' => 'Learned',
   'conversation' => 'Chats',
+  'decision' => 'Decisions',
   _ => 'Other',
 };
 
@@ -40,6 +42,7 @@ IconData timelineKindIcon(String kind) => switch (kind) {
   'reminder' => PhosphorIconsRegular.bell,
   'memory' => PhosphorIconsRegular.brain,
   'conversation' => PhosphorIconsRegular.chatCircle,
+  'decision' => PhosphorIconsRegular.hourglassMedium,
   _ => PhosphorIconsRegular.circle,
 };
 
@@ -48,7 +51,7 @@ Color timelineKindColor(JarvisColors colors, String kind) => switch (kind) {
   'expense' => colors.warning,
   'habit' => colors.success,
   'contact' || 'birthday' => colors.rose,
-  'task' => colors.info,
+  'task' || 'decision' => colors.info,
   'reminder' => colors.sky,
   'memory' => colors.accent,
   _ => colors.inkSoft,

@@ -49,9 +49,9 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | Projects | `GET/POST /projects`, `GET/PUT/DELETE /projects/{id}` (details include its chats, files and tasks; delete keeps them and only clears the project), `PUT /conversations/{id}/project`, `PUT /files/{id}/project`, `PUT /tasks/{id}/project` (`{ projectId }`, null takes it out). `POST /conversations` and `POST /tasks` accept `projectId`; conversation DTOs carry `projectId`. A task belongs to a project through its own conversation |
 | Weekly review | `GET /reviews/weekly?weeks=8` (settings, mood trend, recent reviews), `GET /reviews/weekly/{id}`, `PUT /reviews/weekly/settings` (`enabled`, `localTime`, `timeZoneId`), `POST /reviews/weekly/generate` (current week, no notification) |
 
-## Timeline, inbox, finance, library, modes, missions, routines
+## Timeline, inbox, finance, library, modes, missions, routines, decisions
 
-Described in [life-features.md](life-features.md): `/timeline` (`/on-this-day`, `/insights`), `/inbox` and `/commitments`, `/finance` (`/overview`, `/budgets`, `/subscriptions`, `/import`, `/export`), `/automations` studio routes (`/event-kinds`, `/templates`, `/simulate`, `/webhooks`) and the public `POST /hooks/{token}`, `/library` (`/clip`, `/notes`, `/digest`, `/research`, `/cards`), `/modes`, `/missions` (`/steps`), and `/routines/suggestions` (`/refresh`, `/{id}/accept`, `/{id}/dismiss`).
+Described in [life-features.md](life-features.md): `/timeline` (`/on-this-day`, `/insights`), `/inbox` and `/commitments`, `/finance` (`/overview`, `/budgets`, `/subscriptions`, `/import`, `/export`), `/automations` studio routes (`/event-kinds`, `/templates`, `/simulate`, `/webhooks`) and the public `POST /hooks/{token}`, `/library` (`/clip`, `/notes`, `/digest`, `/research`, `/cards`), `/modes`, `/missions` (`/steps`), `/routines/suggestions` (`/refresh`, `/{id}/accept`, `/{id}/dismiss`), and `/decisions` (`/calibration`, `/{id}/resolve`).
 
 ## Memory and learning
 

@@ -26,6 +26,7 @@ root. It shares the existing account and owner-scoped data. See
 | `features/everything/` | Everything: compact feature launchers by category, pinned shortcuts, and the size preview / pin-to-Home sheet |
 | `features/projects/` | Projects list, project page (instructions, chats, files, tasks), editor, and the move-to-project sheet; reached from the Projects tile |
 | `features/review/` | Weekly review screen and mood trend chart |
+| `features/decisions/` | Decision journal: list, editor, answer sheet, calibration card |
 | `features/memory/` | Memory list/editor, knowledge graph map |
 | `features/journal/` | Journal list + summary, entry editor (text, ratings, tags), "Talk about my day" hand-off to chat |
 | `features/tasks/` | `tasks_screen.dart`, `task_details_screen.dart`, editors |

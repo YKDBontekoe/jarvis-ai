@@ -114,6 +114,7 @@ api.MapFinanceEndpoints(app.Logger);
 api.MapLibraryEndpoints(app.Logger);
 api.MapModeEndpoints(app.Logger);
 api.MapRoutineEndpoints(app.Logger);
+api.MapDecisionEndpoints(app.Logger);
 api.MapMissionEndpoints(app.Logger);
 
 app.MapA2AProtocol();

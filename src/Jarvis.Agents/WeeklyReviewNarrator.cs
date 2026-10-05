@@ -54,6 +54,12 @@ public sealed class WeeklyReviewNarrator(
             tasks_completed = new { count = stats.TasksCompleted, titles = facts.CompletedTasks },
             reminders = new { handled = stats.RemindersHandled, coming_up_next_week = stats.RemindersUpcoming },
             new_memories = new { count = stats.NewMemories, examples = facts.NewMemories },
+            decisions = new
+            {
+                settled = stats.DecisionsResolved,
+                brier_score = stats.BrierScore,
+                previous_brier_score = stats.PreviousBrierScore
+            },
             persona = new
             {
                 profile.PreferredName,

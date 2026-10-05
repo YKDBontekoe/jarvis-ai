@@ -19,7 +19,11 @@ public sealed record WeeklyReviewSettings(bool Enabled, TimeOnly LocalTime, stri
 /// <summary>One journaled day inside a week; values are null when the entry left them out.</summary>
 public sealed record WeeklyReviewDay(DateOnly Date, int? Mood, int? Energy, int? Stress, int? Rating);
 
-/// <summary>The numbers a weekly review is written from. Averages are null when no entry carried that value.</summary>
+/// <summary>
+/// The numbers a weekly review is written from. Averages are null when no entry carried that value.
+/// <see cref="BrierScore"/> scores the decisions settled this week (lower is better) and
+/// <see cref="PreviousBrierScore"/> the latest settled before it; both are null without any.
+/// </summary>
 public sealed record WeeklyReviewStats(
     int JournalEntries,
     double? Mood,
@@ -34,7 +38,10 @@ public sealed record WeeklyReviewStats(
     int RemindersUpcoming,
     int NewMemories,
     IReadOnlyList<string> TopTags,
-    IReadOnlyList<WeeklyReviewDay> Days);
+    IReadOnlyList<WeeklyReviewDay> Days,
+    int DecisionsResolved = 0,
+    double? BrierScore = null,
+    double? PreviousBrierScore = null);
 
 /// <summary>
 /// Everything the narrator may see about one week. Highlights, task titles and memory snippets are owner data and

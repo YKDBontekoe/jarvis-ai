@@ -8,6 +8,7 @@ import '../../schedule_format.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../decisions/decision_format.dart';
 import '../journal/journal_format.dart';
 import 'mood_trend_chart.dart';
 import 'weekly_review_format.dart';
@@ -495,6 +496,17 @@ class _StatGrid extends StatelessWidget {
         value: '${asJsonInt(stats['newMemories'])}',
         label: 'New memories',
       ),
+      if (asJsonInt(stats['decisionsResolved']) > 0)
+        _Stat(
+          icon: PhosphorIconsRegular.hourglassMedium,
+          color: colors.success,
+          value: '${asJsonInt(stats['decisionsResolved'])}',
+          label: 'Decisions settled',
+          detail: brierChangeLabel(
+            stats['brierScore'],
+            stats['previousBrierScore'],
+          ),
+        ),
       _Stat(
         icon: PhosphorIconsRegular.notebook,
         color: colors.sky,

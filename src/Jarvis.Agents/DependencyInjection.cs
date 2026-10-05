@@ -76,6 +76,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Finance.FinanceToolContributor>();
         services.AddScoped<IAgentContextContributor, Finance.FinanceContextContributor>();
         services.AddScoped<IAgentToolContributor, Routines.RoutineToolContributor>();
+        services.AddScoped<IAgentToolContributor, Decisions.DecisionToolContributor>();
         services.AddScoped<IAgentToolContributor, Library.LibraryToolContributor>();
         services.AddScoped<IAgentContextContributor, Library.LibraryContextContributor>();
         services.AddScoped<Jarvis.Application.Library.ILibraryDigester, Library.ModelLibraryDigester>();
