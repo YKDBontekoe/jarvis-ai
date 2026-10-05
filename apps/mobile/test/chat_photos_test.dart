@@ -1,9 +1,9 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/chat/chat_entries.dart';
 import 'package:jarvis_mobile/features/chat/chat_widgets.dart';
+import 'package:jarvis_mobile/features/chat/incoming_photos.dart';
 import 'package:jarvis_mobile/theme.dart';
 
 // A 1x1 transparent PNG.
@@ -26,6 +26,7 @@ Widget _composer({
   required List<PendingPhoto> photos,
   required VoidCallback onSend,
   ValueChanged<PendingPhoto>? onRemove,
+  ValueChanged<List<IncomingPhoto>>? onImages,
 }) => ChatComposer(
   controller: controller,
   onSend: onSend,
@@ -36,6 +37,7 @@ Widget _composer({
   photos: photos,
   onRemovePhoto: onRemove,
   onPhoto: () {},
+  onImages: onImages,
 );
 
 IconButton _sendButton(WidgetTester tester) => tester.widget<IconButton>(
@@ -171,5 +173,59 @@ void main() {
 
     expect(photos.map((photo) => photo.fileId), ['f1']);
     expect(MessagePhoto.listFromJson(null), isEmpty);
+  });
+
+  testWidgets('pasting an image into the composer queues it', (tester) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    final pasted = <IncomingPhoto>[];
+    await tester.pumpWidget(
+      _host(
+        _composer(
+          controller: controller,
+          onSend: () {},
+          photos: const [],
+          onImages: pasted.addAll,
+        ),
+      ),
+    );
+
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.contentInsertionConfiguration, isNotNull);
+    field.contentInsertionConfiguration!.onContentInserted(
+      KeyboardInsertedContent(
+        mimeType: 'image/png',
+        uri: 'content://pasted',
+        data: _png,
+      ),
+    );
+
+    expect(pasted, hasLength(1));
+    expect(pasted.single.bytes, _png);
+    expect(pasted.single.mimeType, 'image/png');
+  });
+
+  testWidgets('the composer does not accept keyboard images without a handler', (
+    tester,
+  ) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      _host(
+        ChatComposer(
+          controller: controller,
+          onSend: () {},
+          onVoice: null,
+          sending: false,
+          voiceActive: false,
+          voiceStarting: false,
+        ),
+      ),
+    );
+
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).contentInsertionConfiguration,
+      isNull,
+    );
   });
 }

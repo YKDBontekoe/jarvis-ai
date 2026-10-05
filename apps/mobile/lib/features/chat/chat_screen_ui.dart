@@ -656,6 +656,9 @@ mixin _ChatScreenUi on _ChatScreenController {
                   photos: _pendingPhotos,
                   onRemovePhoto: _removePendingPhoto,
                   onPhoto: _conversationId == null ? null : _showPhotoSources,
+                  onImages: _conversationId == null
+                      ? null
+                      : (images) => unawaited(_enqueueIncomingPhotos(images)),
                 ),
               ),
             ),

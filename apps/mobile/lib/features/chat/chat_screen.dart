@@ -57,6 +57,9 @@ import 'chat_entries.dart';
 import 'chat_widgets.dart';
 import 'composer_drafts.dart';
 import 'conversation_summary.dart';
+import 'image_paste_stub.dart'
+    if (dart.library.js_interop) 'image_paste_web.dart';
+import 'incoming_photos.dart';
 import 'outbox_store.dart';
 import 'generative_ui.dart';
 import 'mcp_setup.dart';

@@ -18,6 +18,7 @@ class ChatComposer extends StatefulWidget {
     this.photos = const [],
     this.onRemovePhoto,
     this.onPhoto,
+    this.onImages,
     super.key,
   });
 
@@ -46,6 +47,9 @@ class ChatComposer extends StatefulWidget {
   /// Opens the camera or photo library; hidden when null.
   final VoidCallback? onPhoto;
 
+  /// Photos pasted, dropped, or inserted from the keyboard.
+  final ValueChanged<List<IncomingPhoto>>? onImages;
+
   @override
   State<ChatComposer> createState() => _ChatComposerState();
 }
@@ -53,12 +57,18 @@ class ChatComposer extends StatefulWidget {
 class _ChatComposerState extends State<ChatComposer> {
   late final FocusNode _focus = FocusNode(onKeyEvent: _onKey)
     ..addListener(_changed);
+  late final _paste = ImagePasteListener(
+    shouldHandlePaste: () => _canAcceptImages && !_anotherTextFieldHasFocus(),
+    shouldHandleDrop: () => _canAcceptImages,
+    onImages: (images) => widget.onImages?.call(images),
+  );
 
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_changed);
     widget.focusRequests?.addListener(_requestFocus);
+    _paste.attach();
   }
 
   @override
@@ -90,6 +100,31 @@ class _ChatComposerState extends State<ChatComposer> {
 
   bool get _inputEnabled => !widget.voiceActive && !widget.voiceStarting;
 
+  bool get _canAcceptImages =>
+      widget.onImages != null &&
+      _inputEnabled &&
+      !widget.sending &&
+      !widget.awaitingApproval;
+
+  bool _anotherTextFieldHasFocus() {
+    if (_focus.hasFocus) return false;
+    final primary = FocusManager.instance.primaryFocus;
+    if (primary == null || !primary.hasFocus) return false;
+    final ctx = primary.context;
+    if (ctx == null) return false;
+    if (ctx.widget is EditableText) return true;
+    return ctx.findAncestorWidgetOfExactType<EditableText>() != null;
+  }
+
+  void _acceptInsertedContent(KeyboardInsertedContent content) {
+    if (!_canAcceptImages) return;
+    final data = content.data;
+    if (data == null || data.isEmpty) return;
+    widget.onImages!([
+      IncomingPhoto(bytes: data, name: content.uri, mimeType: content.mimeType),
+    ]);
+  }
+
   bool get _photosReady =>
       widget.photos.isNotEmpty &&
       widget.photos.every((photo) => photo.fileId != null);
@@ -105,6 +140,7 @@ class _ChatComposerState extends State<ChatComposer> {
   void dispose() {
     widget.controller.removeListener(_changed);
     widget.focusRequests?.removeListener(_requestFocus);
+    _paste.detach();
     _focus.dispose();
     super.dispose();
   }
@@ -269,6 +305,17 @@ class _ChatComposerState extends State<ChatComposer> {
             maxLines: 6,
             textInputAction: TextInputAction.newline,
             keyboardType: TextInputType.multiline,
+            contentInsertionConfiguration: widget.onImages == null
+                ? null
+                : ContentInsertionConfiguration(
+                    allowedMimeTypes: const [
+                      'image/png',
+                      'image/jpeg',
+                      'image/jpg',
+                      'image/webp',
+                    ],
+                    onContentInserted: _acceptInsertedContent,
+                  ),
             style: TextStyle(fontSize: 16, color: JarvisColors.of(context).ink),
             decoration: InputDecoration(
               hintText: widget.voiceActive
