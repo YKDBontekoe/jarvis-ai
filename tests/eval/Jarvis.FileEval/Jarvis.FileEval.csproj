@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../../src/Jarvis.Application/Jarvis.Application.csproj" />
+    <ProjectReference Include="../../../src/Jarvis.Infrastructure/Jarvis.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The worker's chunker and options, compiled in so the eval indexes exactly like StoredFileProcessor does. -->
+    <Compile Include="../../../workers/Jarvis.Worker/Files/FileTextChunker.cs" Link="Worker/FileTextChunker.cs" />
+    <Compile Include="../../../workers/Jarvis.Worker/Files/FileProcessingOptions.cs" Link="Worker/FileProcessingOptions.cs" />
+  </ItemGroup>
+</Project>
