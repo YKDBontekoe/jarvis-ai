@@ -174,3 +174,93 @@ A bigger embedding model helps only a little here: multilingual-e5-base gives re
   as a per-turn rerank over 11 candidates: hit@1 0.55 against 0.58 for the hybrid order, so no better and slower.
 - **Fusion weights** (semantic x0.7 to x1.4, keyword x0.7 to x1.0): all within about 0.02 recall / 0.05 hit@1, which is
   within the noise of 60 queries, so the weights stay as they are.
+
+## Embedding model comparison: MiniLM vs EmbeddingGemma 2 (CPU, 2026-10-06)
+
+Compares the production model (`paraphrase-multilingual-MiniLM-L12-v2`, 384 dimensions) with Google's
+[EmbeddingGemma 2](https://huggingface.co/google/embeddinggemma-2) (Apache 2.0, 768 dimensions, Matryoshka 768/512/256/128,
+8K context). EmbeddingGemma 2 is a 740M multimodal model; Jarvis only needs text, so it is loaded text-only (vision and audio
+encoders off, 271M parameters). Machine: 4 vCPU Intel Xeon 2.8 GHz (AVX-512 VNNI, no bf16/AMX), 16 GB RAM, no GPU, PyTorch 2.14
+CPU, sentence-transformers 6.1, fp32. Raw numbers: `results/embedding-bench-cpu-2026-10-06.json`.
+
+```sh
+pip install sentence-transformers pillow psutil
+EMBED_DIM=512 DATASET=dataset-large.json python3 embed_dataset.py google/embeddinggemma-2 /tmp/eg2.json   # EMBED_PROMPTS=none, EMBED_QUANT=int8
+dotnet run --project tests/eval/Jarvis.MemoryEval -- hybrid --dataset dataset-large.json --embeddings /tmp/eg2.json
+python3 dense_metrics.py dataset-large.json /tmp/eg2.json     # embedding only, no keyword path
+python3 bench_embedding.py --repeat 2 /tmp/perf.json           # CPU performance, one subprocess per configuration
+```
+
+### Retrieval quality (real hybrid ranking, raw user message, no hints)
+
+| Set | Retrieval | Recall@8 | Hit@1 | MRR | nDCG@8 | Noise |
+|-----|-----------|---------:|------:|----:|-------:|------:|
+| Large (1,000 / 60 q) | keyword | 0.29 | 0.27 | 0.33 | 0.30 | 0.91 |
+| Large | + MiniLM | 0.45 | 0.33 | 0.46 | 0.43 | 0.85 |
+| Large | **+ EmbeddingGemma 2 (768)** | **0.63** | **0.45** | **0.59** | **0.59** | 0.81 |
+| Tuning (32) | + MiniLM | 0.82 | 0.78 | 0.85 | 0.84 | 0.46 |
+| Tuning (32) | **+ EmbeddingGemma 2** | **0.95** | **0.88** | **0.91** | **0.92** | 0.74 |
+| Held-out (20) | + MiniLM | 0.81 | 0.85 | 0.88 | 0.83 | 0.36 |
+| Held-out (20) | **+ EmbeddingGemma 2** | **0.93** | 0.85 | **0.92** | **0.93** | 0.78 |
+| Updates (15) | + MiniLM | 0.87 | 0.73 | 0.79 | 0.81 | 0.38 |
+| Updates (15) | **+ EmbeddingGemma 2** | **1.00** | **0.87** | **0.93** | **0.95** | 0.84 |
+
+No expired or other-owner memory leaked in any run. Embedding only (dense, no keyword fusion, large set): MiniLM recall@8 0.50 /
+hit@1 0.32 / MRR 0.44; EmbeddingGemma 2 0.63 / 0.45 / 0.58. A paired bootstrap over the 60 large-set queries gives a gain of
++0.13 recall@8 (95% CI +0.06 to +0.21), +0.15 MRR (+0.05 to +0.24) and +0.13 hit@1 (+0.02 to +0.27); EmbeddingGemma 2 is better on
+23, worse on 7 and equal on 30 queries for recall@8.
+
+Noise is higher on the small sets because the current similarity floor (0.3 cosine) was tuned on MiniLM: MiniLM returns about 2
+hits per query there, EmbeddingGemma 2 about 6. Raising the floor to 0.4 to 0.6 did not change the large-set result and cut
+held-out noise only from 0.78 to 0.76 at the cost of recall (0.93 to 0.91 at 0.6), so the model rerank in `SearchMemory` is still the noise fix.
+
+### Variants (large set, hybrid)
+
+| Variant | Recall@8 | Hit@1 | MRR | Note |
+|---------|---------:|------:|----:|------|
+| EmbeddingGemma 2, 768d, task prompts | 0.63 | 0.45 | 0.59 | |
+| 512d | 0.63 | 0.45 | 0.60 | no loss |
+| 256d | 0.61 | 0.42 | 0.57 | small loss |
+| 128d | 0.56 | 0.38 | 0.50 | clear loss |
+| 768d, **no prompts** | 0.54 | 0.40 | 0.52 | loses most of the gain |
+| 768d, dynamic int8 (PyTorch) | 0.54 | 0.38 | 0.51 | loses most of the gain |
+| MiniLM, dynamic int8 | 0.44 | 0.35 | 0.46 | about equal to fp32 |
+
+The task prompts matter: EmbeddingGemma 2 expects `task: search result | query: ...` on queries and `title: none | text: ...` on
+memories. `IMemoryEmbedder.EmbedAsync(texts)` does not distinguish the two roles, so adopting the model needs a query/document
+parameter (or the prefixes added in the embedder). Dynamic int8 hurts EmbeddingGemma 2 far more than MiniLM.
+
+### CPU performance (4 threads unless stated; best of two rounds)
+
+| | MiniLM fp32 | MiniLM int8 | EmbeddingGemma 2 fp32 (text-only) | EG2 int8 | EG2 full multimodal |
+|---|---:|---:|---:|---:|---:|
+| Parameters | 118M | 96M | 271M | 134M | 744M |
+| Output dimensions | 384 | 384 | 768 (MRL to 128) | 768 | 768 |
+| Mean tokens per memory / question | 22 / 17 | | 28 / 25 | | |
+| Query embed, p50 / p95 | 23 / 33 ms | 14 / 22 ms | 128 / 165 ms | 73 / 100 ms | 142 / 180 ms |
+| Query embed, 1 thread, p50 | 33 ms | | 186 ms | | |
+| Indexing, 1,000 memories (batch 32) | 4.7 s | 3.4 s | 39.5 s | 28.9 s | 40.1 s |
+| Indexing throughput, 1 thread | 78 docs/s | | 8 docs/s | | |
+| Process RSS after load (incl. about 420 MB torch) | 1.0 GB | | 1.8 GB | | 3.6 GB |
+| Peak RSS | 1.2 GB | | 2.1 GB | | 4.7 GB |
+| Weights to download | 471 MB | | 1.49 GB (full checkpoint; text-only ONNX fp32 1.08 GB) | | 1.49 GB |
+
+EmbeddingGemma 2 is about 5.5x slower per query and 8x slower to index than MiniLM in PyTorch. Every search embeds the query
+once (twice when the previous message is merged in), so a search adds about 130 ms instead of 25 ms; re-embedding after a
+model switch takes 40 s per 1,000 memories (2 min on one thread). bf16 is 1.5x slower than fp32 here (126 vs 193 ms p50;
+fp16 is unusable, it produces NaNs). int8 RSS figures are not meaningful: `quantize_dynamic` keeps the fp32 copy resident.
+
+Storage: the column is `vector(1536)` and vectors are zero-padded, so 768d (or 512d) costs the same 6 KB per memory as
+MiniLM today; the Matryoshka saving only materialises if the column and HNSW index are resized.
+
+### Reading the numbers
+
+- Quality: EmbeddingGemma 2 is better or equal on every metric and set (held-out hit@1 ties), mainly on vocabulary-gap questions (large set: +0.18 recall@8).
+  The datasets are model-written, the large set has 60 queries, and fusion weights and the similarity floor were tuned with
+  MiniLM, which if anything favours MiniLM. Search hints and agent-written queries (not in the repo) lift MiniLM a lot
+  (README above: 0.45 to 0.78 recall@8) and were not re-run, so the gap in the production path may be smaller.
+- Cost: about 5x latency and 2x RAM per query path on CPU. Fine for the `SearchMemory` tool and background indexing, noticeable for the
+  automatic per-turn memory context.
+- Not measured: the Hugging Face Text Embeddings Inference image Jarvis deploys (no Docker daemon here; support for the
+  `embedding_gemma2` architecture is unverified), ONNX/llama.cpp builds (GGUF and q4 ONNX checkpoints exist and are likely
+  faster than eager PyTorch), non-Dutch/English languages, and concurrent request load.
