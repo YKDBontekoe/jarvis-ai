@@ -182,7 +182,16 @@ public sealed class LearningTests
             Fake<IReminderRepository>.Create(("ListRemindersAsync", _ => reminders)),
             Fake<IToolApprovalStore>.Create(("ListActionableAsync", _ => approvals)),
             Fake<IJarvisTaskRepository>.Create(("ListAsync", _ => tasks)),
-            notifications, new NullAudit(), NullLogger<HeartbeatService>.Instance, clock);
+            notifications, new NullAudit(),
+            Fake<Jarvis.Application.Integrations.ICalendarFeed>.Create(("ListUpcomingAsync",
+                _ => (IReadOnlyList<Jarvis.Application.Integrations.CalendarEventRecord>)[])),
+            Fake<IJarvisTaskService>.Create(),
+            Fake<Jarvis.Application.Inbox.IInboxService>.Create(
+                ("SyncAsync", _ => new Jarvis.Application.Inbox.InboxSyncResult(0, 0, 0)),
+                ("ListAsync", _ => new Jarvis.Application.Inbox.InboxListing([], new Dictionary<string, int>()))),
+            Fake<Jarvis.Application.Inbox.ICommitmentService>.Create(
+                ("ListAsync", _ => (IReadOnlyList<Jarvis.Domain.Inbox.Commitment>)[])),
+            NullLogger<HeartbeatService>.Instance, clock);
     }
 
     private static ToolApprovalRecord Approval(string tool, DateTimeOffset createdAt) =>

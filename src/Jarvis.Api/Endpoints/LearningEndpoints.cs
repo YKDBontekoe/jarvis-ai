@@ -49,6 +49,24 @@ internal static class LearningEndpoints
             return Results.Ok(normalized);
         }).WithName("SaveLearningSettings");
 
+        api.MapGet("/settings/autonomy", async (IOwnerSettingsStore settings, ICurrentUser currentUser,
+                CancellationToken ct) =>
+            Results.Ok(await settings.GetAsync<AutonomySettings>(currentUser.OwnerId, SettingsSections.Autonomy, ct)
+                       ?? AutonomySettings.Default))
+            .WithName("GetAutonomySettings");
+
+        api.MapPut("/settings/autonomy", async (AutonomySettings request, IOwnerSettingsStore settings,
+            IAuditEventStore audit, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            AutonomySettings normalized;
+            try { normalized = request.Normalize(); }
+            catch (ArgumentException exception) { return EndpointHelpers.Invalid("autonomy", exception.Message); }
+            await settings.SaveAsync(currentUser.OwnerId, SettingsSections.Autonomy, normalized, ct);
+            await audit.AppendAsync(currentUser.OwnerId, "learning", "autonomy.settings_updated", "medium", true, null,
+                System.Text.Json.JsonSerializer.Serialize(normalized), ct);
+            return Results.Ok(normalized);
+        }).WithName("SaveAutonomySettings");
+
         api.MapGet("/learning/status", async (IOwnerSettingsStore settings, IAuditEventStore audit,
             ICurrentUser currentUser, CancellationToken ct) =>
         {

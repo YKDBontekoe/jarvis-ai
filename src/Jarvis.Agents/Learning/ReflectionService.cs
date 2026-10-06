@@ -32,6 +32,7 @@ public sealed class ReflectionService(
     internal const string PromptMarker = "You are Jarvis reflecting on recent work with your user";
     private const int MaxMessages = 60;
     private const int MaxMessageCharacters = 900;
+    private const int MaxInsightCharacters = 200;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true
@@ -102,8 +103,22 @@ public sealed class ReflectionService(
         if (outcome.LearnedAnything)
             await notifications.CreateAsync(ownerId, "learning.reflected", "Jarvis learned from your recent chats",
                 Describe(outcome), null, cancellationToken);
-        return (outcome, messages.Count > 0 ? messages[^1].CreatedAt : null);
+        // Insights are follow-ups worth mentioning, not stored learning: they ride along on the outcome for the
+        // heartbeat to offer once, and stay out of the audit record above.
+        var insights = CleanInsights(parsed.Insights);
+        return (insights.Count == 0 ? outcome : outcome with { Insights = insights },
+            messages.Count > 0 ? messages[^1].CreatedAt : null);
     }
+
+    internal static IReadOnlyList<string> CleanInsights(IEnumerable<string>? insights) =>
+    [
+        .. (insights ?? [])
+            .Select(text => Normalize(text ?? string.Empty))
+            .Where(text => text.Length >= 8)
+            .Select(text => text.Length <= MaxInsightCharacters ? text : text[..(MaxInsightCharacters - 1)] + "…")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(2)
+    ];
 
     internal static string Describe(ReflectionOutcome outcome)
     {

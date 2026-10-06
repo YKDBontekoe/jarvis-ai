@@ -9,25 +9,37 @@ public sealed record HeartbeatState(
     DateTimeOffset? LastRunAt = null,
     DateTimeOffset? LastReflectedMessageAt = null,
     IReadOnlyList<string>? NotifiedKeys = null,
-    string? LastSummary = null)
+    string? LastSummary = null,
+    IReadOnlyList<DateTimeOffset>? TaskStartedAt = null)
 {
     public const int MaxRememberedKeys = 200;
+    public const int MaxRememberedTaskStarts = 30;
 
     public IReadOnlyList<string> Keys => NotifiedKeys ?? [];
+
+    /// <summary>Background tasks the heartbeat started within the last day, which its daily budget counts.</summary>
+    public int TasksStartedSince(DateTimeOffset since) => (TaskStartedAt ?? []).Count(at => at > since);
 }
 
 public sealed record ReflectionOutcome(int NewPersonaTraits, int ReinforcedPersonaTraits, int SkillsSaved,
-    int MemoriesSaved, int FeedbackProcessed, int MessagesReviewed)
+    int MemoriesSaved, int FeedbackProcessed, int MessagesReviewed, IReadOnlyList<string>? Insights = null)
 {
     public static ReflectionOutcome Nothing { get; } = new(0, 0, 0, 0, 0, 0);
 
     public bool LearnedAnything => NewPersonaTraits + ReinforcedPersonaTraits + SkillsSaved + MemoriesSaved > 0;
 }
 
-public sealed record CheckInItem(string Key, string Text);
+/// <summary>A background task the heartbeat could start for a check-in instead of only telling the owner.</summary>
+public sealed record HeartbeatTaskProposal(string Title, string Prompt);
+
+/// <summary>
+/// One thing the heartbeat noticed. <see cref="Task"/> is set when Jarvis can do something useful about it on its own;
+/// when the autonomy budget does not allow that, the owner is told with <see cref="Text"/> instead.
+/// </summary>
+public sealed record CheckInItem(string Key, string Text, HeartbeatTaskProposal? Task = null);
 
 public sealed record HeartbeatOutcome(ReflectionOutcome Reflection, IReadOnlyList<CheckInItem> CheckIns,
-    bool QuietHours, string Summary);
+    bool QuietHours, string Summary, int TasksStarted = 0);
 
 public interface IHeartbeatScheduler
 {
