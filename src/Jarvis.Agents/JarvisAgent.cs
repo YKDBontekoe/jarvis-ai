@@ -271,7 +271,8 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
         {
             var category = ApprovalCategories.Resolve(functionCall.Name, SerializeArguments(functionCall));
             if (category.CanRemember &&
-                await standingApprovals.IsGrantedAsync(currentUser.OwnerId, category.Key, cancellationToken))
+                await standingApprovals.IsGrantedAsync(currentUser.OwnerId, category.Key, cancellationToken,
+                    _backgroundTask))
             {
                 await standingApprovals.RecordAutomaticUseAsync(currentUser.OwnerId, functionCall.Name, category,
                     conversationId, cancellationToken);

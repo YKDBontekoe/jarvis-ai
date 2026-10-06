@@ -46,7 +46,7 @@ public sealed class RemoteQueryExecutor(
     }
 
     public async Task<ConversationTurnResult> DecideAsync(Guid ownerId, Guid approvalId, bool approved,
-        bool rememberCategory = false)
+        bool rememberCategory = false, Jarvis.Application.Approvals.GrantTerms? terms = null)
     {
         await using var scope = scopes.CreateOwnerScope(ownerId);
         var approvals = scope.ServiceProvider.GetRequiredService<Jarvis.Application.Approvals.IToolApprovalStore>();
@@ -57,7 +57,7 @@ public sealed class RemoteQueryExecutor(
         var decisions = scope.ServiceProvider.GetRequiredService<ApprovalDecisionService>();
         try
         {
-            return await decisions.DecideAsync(ownerId, approvalId, approved, query.Token, rememberCategory);
+            return await decisions.DecideAsync(ownerId, approvalId, approved, query.Token, rememberCategory, terms);
         }
         catch (OperationCanceledException) when (query.StoppedByOwner)
         {

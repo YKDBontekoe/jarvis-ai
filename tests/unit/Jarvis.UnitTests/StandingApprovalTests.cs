@@ -52,6 +52,89 @@ public sealed class StandingApprovalTests
         Assert.True(category.CanRemember);
     }
 
+    private sealed class MutableTime(DateTimeOffset now) : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = now;
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
+
+    [Fact]
+    public async Task A_time_limited_grant_stops_working_and_disappears_when_it_expires()
+    {
+        var time = new MutableTime(new DateTimeOffset(2026, 10, 6, 9, 0, 0, TimeSpan.Zero));
+        var service = new StandingApprovalService(new InMemorySettingsStore(), new RecordingAudit(), time);
+        var category = ApprovalCategories.Resolve("ForgetMemory", "{}");
+
+        Assert.Equal(StandingApprovalGrantResult.Granted,
+            await service.GrantAsync(Owner, category, default, new GrantTerms(TimeSpan.FromHours(2))));
+        time.Now = time.Now.AddHours(1);
+        Assert.True(await service.IsGrantedAsync(Owner, category.Key, default));
+        Assert.Equal(time.Now.AddHours(1), Assert.Single(await service.ListAsync(Owner, default)).ExpiresAt);
+
+        time.Now = time.Now.AddHours(1);
+        Assert.False(await service.IsGrantedAsync(Owner, category.Key, default));
+        Assert.Empty(await service.ListAsync(Owner, default));
+    }
+
+    [Fact]
+    public async Task A_task_scoped_grant_covers_background_runs_but_not_chats()
+    {
+        var service = new StandingApprovalService(new InMemorySettingsStore(), new RecordingAudit());
+        var category = ApprovalCategories.Resolve("ForgetMemory", "{}");
+
+        await service.GrantAsync(Owner, category, default, new GrantTerms(Scope: StandingApprovalScopes.Tasks));
+
+        Assert.False(await service.IsGrantedAsync(Owner, category.Key, default));
+        Assert.True(await service.IsGrantedAsync(Owner, category.Key, default, backgroundTask: true));
+        Assert.Equal(StandingApprovalScopes.Tasks, Assert.Single(await service.ListAsync(Owner, default)).Scope);
+    }
+
+    [Fact]
+    public async Task Granting_again_without_limits_makes_it_permanent_and_everywhere()
+    {
+        var service = new StandingApprovalService(new InMemorySettingsStore(), new RecordingAudit());
+        var category = ApprovalCategories.Resolve("ForgetMemory", "{}");
+        await service.GrantAsync(Owner, category, default,
+            new GrantTerms(TimeSpan.FromHours(1), StandingApprovalScopes.Tasks));
+
+        await service.GrantAsync(Owner, category, default);
+
+        var grant = Assert.Single(await service.ListAsync(Owner, default));
+        Assert.Null(grant.ExpiresAt);
+        Assert.Null(grant.Scope);
+        Assert.True(await service.IsGrantedAsync(Owner, category.Key, default));
+    }
+
+    [Theory]
+    [InlineData(0, null)]
+    [InlineData(-5, null)]
+    [InlineData(24 * 366, null)]
+    [InlineData(1, "everywhere")]
+    public async Task Nonsense_terms_are_refused_and_store_nothing(int hours, string? scope)
+    {
+        var service = new StandingApprovalService(new InMemorySettingsStore(), new RecordingAudit());
+        var category = ApprovalCategories.Resolve("ForgetMemory", "{}");
+
+        var result = await service.GrantAsync(Owner, category, default, new GrantTerms(TimeSpan.FromHours(hours), scope));
+
+        Assert.Equal(StandingApprovalGrantResult.InvalidTerms, result);
+        Assert.Empty(await service.ListAsync(Owner, default));
+    }
+
+    [Fact]
+    public async Task Grants_stored_before_expiry_existed_keep_working()
+    {
+        var settings = new InMemorySettingsStore();
+        var category = ApprovalCategories.Resolve("ForgetMemory", "{}");
+        await settings.SaveAsync(Owner, Jarvis.Application.Settings.SettingsSections.StandingApprovals,
+            new StandingApprovalSettings([new StandingApprovalGrant(category.Key, category.Label, DateTimeOffset.UtcNow)]),
+            default);
+
+        var service = new StandingApprovalService(settings, new RecordingAudit());
+
+        Assert.True(await service.IsGrantedAsync(Owner, category.Key, default));
+    }
+
     [Fact]
     public async Task Grants_are_owner_scoped_and_can_be_revoked()
     {

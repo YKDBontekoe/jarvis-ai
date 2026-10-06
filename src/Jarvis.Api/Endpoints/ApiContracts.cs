@@ -32,8 +32,14 @@ public sealed record MessageDto(Guid Id, string Role, string Content, DateTimeOf
 public sealed record FileCitationDto(Guid FileId, string DisplayName, Guid ChunkId, int ChunkIndex, string Excerpt,
     int? PageNumber, string SourceStatus = "available");
 public sealed record MessagePageDto(IReadOnlyList<MessageDto> Items, string? NextCursor, bool HasMore);
-public sealed record ApprovalDecisionRequest(bool Approved, bool RememberCategory = false);
-public sealed record StandingApprovalDto(string Category, string Label, DateTimeOffset GrantedAt);
+/// <summary>
+/// <paramref name="RememberHours"/> limits an always-allow to that many hours; <paramref name="RememberScope"/> is
+/// <c>all</c> (default) or <c>tasks</c>, which only covers background task and automation runs.
+/// </summary>
+public sealed record ApprovalDecisionRequest(bool Approved, bool RememberCategory = false, int? RememberHours = null,
+    string? RememberScope = null);
+public sealed record StandingApprovalDto(string Category, string Label, DateTimeOffset GrantedAt,
+    DateTimeOffset? ExpiresAt = null, string? Scope = null);
 
 public sealed record OpenPullRequestRequest(string? Title, string? Body);
 public sealed record ToolApprovalDto(Guid Id, Guid ConversationId, string ToolName, string ArgumentsJson,

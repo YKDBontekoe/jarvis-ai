@@ -8,10 +8,41 @@ public enum StandingApprovalGrantResult
 {
     Granted,
     NotAllowed,
-    TooMany
+    TooMany,
+    InvalidTerms
 }
 
-public sealed record StandingApprovalGrant(string Category, string Label, DateTimeOffset GrantedAt);
+public static class StandingApprovalScopes
+{
+    /// <summary>The grant applies everywhere, including chats the owner is watching.</summary>
+    public const string All = "all";
+
+    /// <summary>The grant applies only to background task and automation runs.</summary>
+    public const string Tasks = "tasks";
+
+    public static bool IsValid(string? scope) => scope is null or All or Tasks;
+}
+
+/// <summary>
+/// Optional limits on a standing grant: how long it lasts and where it applies. Without them a grant is permanent
+/// and applies everywhere, as before.
+/// </summary>
+public sealed record GrantTerms(TimeSpan? Lifetime = null, string? Scope = null)
+{
+    public static readonly TimeSpan MaxLifetime = TimeSpan.FromDays(365);
+
+    public bool IsValid =>
+        StandingApprovalScopes.IsValid(Scope) && (Lifetime is null || (Lifetime > TimeSpan.Zero && Lifetime <= MaxLifetime));
+}
+
+public sealed record StandingApprovalGrant(string Category, string Label, DateTimeOffset GrantedAt,
+    DateTimeOffset? ExpiresAt = null, string? Scope = null)
+{
+    public bool IsActive(DateTimeOffset now) => ExpiresAt is not { } expires || expires > now;
+
+    /// <summary>True when the grant covers this kind of run.</summary>
+    public bool Covers(bool backgroundTask) => Scope != StandingApprovalScopes.Tasks || backgroundTask;
+}
 
 public sealed record StandingApprovalSettings(IReadOnlyList<StandingApprovalGrant>? Grants)
 {
@@ -25,16 +56,19 @@ public sealed record StandingApprovalSettings(IReadOnlyList<StandingApprovalGran
 public interface IStandingApprovalService
 {
     Task<IReadOnlyList<StandingApprovalGrant>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
-    Task<bool> IsGrantedAsync(Guid ownerId, string categoryKey, CancellationToken cancellationToken);
+    Task<bool> IsGrantedAsync(Guid ownerId, string categoryKey, CancellationToken cancellationToken,
+        bool backgroundTask = false);
     Task<StandingApprovalGrantResult> GrantAsync(Guid ownerId, ApprovalCategory category,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken, GrantTerms? terms = null);
     Task<bool> RevokeAsync(Guid ownerId, string categoryKey, CancellationToken cancellationToken);
     Task RecordAutomaticUseAsync(Guid ownerId, string toolName, ApprovalCategory category, Guid? conversationId,
         CancellationToken cancellationToken);
 }
 
-public sealed class StandingApprovalService(IOwnerSettingsStore settings, IAuditEventStore audit) : IStandingApprovalService
+public sealed class StandingApprovalService(IOwnerSettingsStore settings, IAuditEventStore audit,
+    TimeProvider? timeProvider = null) : IStandingApprovalService
 {
+    private readonly TimeProvider _clock = timeProvider ?? TimeProvider.System;
     public const int MaxGrants = 100;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -48,19 +82,21 @@ public sealed class StandingApprovalService(IOwnerSettingsStore settings, IAudit
             .ToArray();
     }
 
-    public async Task<bool> IsGrantedAsync(Guid ownerId, string categoryKey, CancellationToken cancellationToken)
+    public async Task<bool> IsGrantedAsync(Guid ownerId, string categoryKey, CancellationToken cancellationToken,
+        bool backgroundTask = false)
     {
         if (!ApprovalCategories.IsSafeKey(categoryKey)) return false;
         var grants = await LoadAsync(ownerId, cancellationToken);
-        return grants.Any(grant => grant.Category == categoryKey);
+        return grants.Any(grant => grant.Category == categoryKey && grant.Covers(backgroundTask));
     }
 
     public async Task<StandingApprovalGrantResult> GrantAsync(Guid ownerId, ApprovalCategory category,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, GrantTerms? terms = null)
     {
         if (ownerId == Guid.Empty) throw new ArgumentException("An owner is required.", nameof(ownerId));
         if (!category.CanRemember || !ApprovalCategories.IsSafeKey(category.Key))
             return StandingApprovalGrantResult.NotAllowed;
+        if (terms is { IsValid: false }) return StandingApprovalGrantResult.InvalidTerms;
 
         var grants = await LoadAsync(ownerId, cancellationToken);
         var existing = grants.FindIndex(grant => grant.Category == category.Key);
@@ -68,14 +104,17 @@ public sealed class StandingApprovalService(IOwnerSettingsStore settings, IAudit
 
         var label = category.Label.Trim();
         if (label.Length > 80) label = label[..80].TrimEnd();
-        var stored = new StandingApprovalGrant(category.Key, label, DateTimeOffset.UtcNow);
+        var now = _clock.GetUtcNow();
+        var scope = terms?.Scope is null or StandingApprovalScopes.All ? null : terms.Scope;
+        var stored = new StandingApprovalGrant(category.Key, label, now,
+            terms?.Lifetime is { } lifetime ? now + lifetime : null, scope);
         if (existing >= 0) grants[existing] = stored;
         else grants.Add(stored);
 
         await settings.SaveAsync(ownerId, SettingsSections.StandingApprovals, new StandingApprovalSettings(grants),
             cancellationToken);
         await TryAuditAsync(ownerId, category.Key, "approval.category_granted",
-            new { category = category.Key, label }, cancellationToken);
+            new { category = category.Key, label, expiresAt = stored.ExpiresAt, scope = stored.Scope }, cancellationToken);
         return StandingApprovalGrantResult.Granted;
     }
 
@@ -103,15 +142,18 @@ public sealed class StandingApprovalService(IOwnerSettingsStore settings, IAudit
             cancellationToken);
         var grants = new List<StandingApprovalGrant>();
         if (stored?.Grants is null) return grants;
+        var now = _clock.GetUtcNow();
         foreach (var grant in stored.Grants)
         {
+            // Expired grants are dropped here, so the next save also clears them from storage.
             if (grant is null || !ApprovalCategories.IsSafeKey(grant.Category) ||
-                string.IsNullOrWhiteSpace(grant.Label))
+                string.IsNullOrWhiteSpace(grant.Label) || !grant.IsActive(now) ||
+                !StandingApprovalScopes.IsValid(grant.Scope))
                 continue;
             var label = grant.Label.Trim();
             if (label.Length > 80) label = label[..80].TrimEnd();
             grants.RemoveAll(existing => existing.Category == grant.Category);
-            grants.Add(new StandingApprovalGrant(grant.Category, label, grant.GrantedAt));
+            grants.Add(new StandingApprovalGrant(grant.Category, label, grant.GrantedAt, grant.ExpiresAt, grant.Scope));
         }
 
         return grants;

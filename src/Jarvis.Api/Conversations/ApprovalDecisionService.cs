@@ -32,7 +32,7 @@ public sealed class ApprovalDecisionService(
     private const string CancelledMessage = "This task was cancelled.";
 
     public async Task<ConversationTurnResult> DecideAsync(Guid ownerId, Guid approvalId, bool approved,
-        CancellationToken ct, bool rememberCategory = false)
+        CancellationToken ct, bool rememberCategory = false, GrantTerms? terms = null)
     {
         var pending = await approvals.GetActionableAsync(approvalId, ownerId, ct);
         if (pending is null) return new ConversationTurnResult.NotFound();
@@ -58,10 +58,12 @@ public sealed class ApprovalDecisionService(
         if (pending.Status == "pending" && approved && rememberCategory)
         {
             var grant = await standingApprovals.GrantAsync(ownerId,
-                ApprovalCategories.Resolve(pending.ToolName, pending.ArgumentsJson), ct);
+                ApprovalCategories.Resolve(pending.ToolName, pending.ArgumentsJson), ct, terms);
             if (grant == StandingApprovalGrantResult.TooMany)
                 return new ConversationTurnResult.Conflict(
                     "You already always-allow as many actions as Jarvis can store. Turn one off in Approvals first.");
+            if (grant == StandingApprovalGrantResult.InvalidTerms)
+                return new ConversationTurnResult.Conflict("Choose a duration of at most a year and the scope all or tasks.");
             if (grant == StandingApprovalGrantResult.NotAllowed)
                 return new ConversationTurnResult.Conflict("This action cannot be always allowed.");
         }

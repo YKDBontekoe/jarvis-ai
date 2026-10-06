@@ -76,7 +76,8 @@ public sealed class AutomationRunExecutor(
                 var arguments = ApprovalArguments(rule, definition.Actions, index, ev);
                 var category = ApprovalCategories.Resolve(toolName, arguments);
                 if (category.CanRemember &&
-                    await standingApprovals.IsGrantedAsync(input.OwnerId, category.Key, cancellationToken))
+                    await standingApprovals.IsGrantedAsync(input.OwnerId, category.Key, cancellationToken,
+                        backgroundTask: true))
                 {
                     await standingApprovals.RecordAutomaticUseAsync(input.OwnerId, toolName, category,
                         rule.ConversationId, cancellationToken);
