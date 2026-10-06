@@ -23,6 +23,9 @@ class LearningScreen extends StatefulWidget {
 /// Holds learning fields so the cards mixin can share state.
 abstract class _LearningController extends State<LearningScreen> {
   Map<String, dynamic> _settings = const {};
+
+  /// How much Jarvis may do on its own. Empty until loaded, which hides the card.
+  Map<String, dynamic> _autonomy = const {};
   Map<String, dynamic> _state = const {};
   Map<String, dynamic> _dreaming = const {};
   List<Map<String, dynamic>> _activity = const [];
@@ -35,6 +38,7 @@ abstract class _LearningController extends State<LearningScreen> {
   int _requestRevision = 0;
 
   Future<void> _update(String key, Object value);
+  Future<void> _updateAutonomy(String key, Object value);
   Future<void> _runNow();
   Future<void> _dreamNow();
   bool _flag(String key, [bool fallback = false]);
@@ -54,8 +58,18 @@ class _LearningScreenState extends _LearningController with _LearningCards {
         '/api/v1/learning/status',
       );
       final data = jsonObject(response.data) ?? const {};
+      var autonomy = const <String, dynamic>{};
+      try {
+        final loaded = await widget.http.get<dynamic>(
+          '/api/v1/settings/autonomy',
+        );
+        autonomy = jsonObject(loaded.data) ?? const {};
+      } catch (_) {
+        // An older server has no autonomy settings; the card stays hidden.
+      }
       if (!mounted || revision != _requestRevision) return;
       setState(() {
+        _autonomy = autonomy;
         _settings = jsonObject(data['settings']) ?? const {};
         _state = jsonObject(data['state']) ?? const {};
         _dreaming = jsonObject(data['dreaming']) ?? const {};
@@ -95,6 +109,39 @@ class _LearningScreenState extends _LearningController with _LearningCards {
       );
       if (mounted) {
         setState(() => _settings = jsonObject(response.data) ?? next);
+      }
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
+            'Jarvis could not save that setting.',
+      );
+      await _load();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Jarvis could not save that setting.');
+      await _load();
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Future<void> _updateAutonomy(String key, Object value) async {
+    final next = {..._autonomy, key: value};
+    setState(() {
+      _autonomy = next;
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final response = await widget.http.put<dynamic>(
+        '/api/v1/settings/autonomy',
+        data: next,
+      );
+      if (mounted) {
+        setState(() => _autonomy = jsonObject(response.data) ?? next);
       }
     } on DioException catch (error) {
       if (!mounted) return;
@@ -198,6 +245,11 @@ class _LearningScreenState extends _LearningController with _LearningCards {
                       _heartbeatCard(),
                       const SizedBox(height: 16),
                       _dreamingCard(),
+                      if (_autonomy.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        const SectionHeader('Acting on its own'),
+                        _autonomyCard(),
+                      ],
                       if (_error != null)
                         InlineNotice(
                           message: _error!,

@@ -160,6 +160,7 @@ internal static class ApiServiceRegistration
         services.AddSingleton<CodexSignIn>();
         services.AddHttpClient("firebase-messaging", client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddHostedService<NotificationPushWorker>();
+        services.AddHostedService<PushDigestWorker>();
         services.AddHostedService<NotificationRealtimeWorker>();
         services.AddJarvisChannels(configuration);
         services.AddSignalR();

@@ -32,6 +32,11 @@ internal sealed class ConditionWatchConfiguration : IEntityTypeConfiguration<Con
             builder.Property(x => x.LastCheckedAt).HasColumnName("last_checked_at");
             builder.Property(x => x.LastValue).HasColumnName("last_value");
             builder.Property(x => x.CompletedAt).HasColumnName("completed_at");
+            builder.Property(x => x.Repeat).HasColumnName("repeat").HasDefaultValue(false);
+            builder.Property(x => x.CooldownMinutes).HasColumnName("cooldown_minutes").HasDefaultValue(0);
+            builder.Property(x => x.Armed).HasColumnName("armed").HasDefaultValue(true);
+            builder.Property(x => x.LastTriggeredAt).HasColumnName("last_triggered_at");
+            builder.Property(x => x.TriggerCount).HasColumnName("trigger_count").HasDefaultValue(0);
             builder.HasIndex(x => x.WorkflowId).IsUnique();
             builder.HasIndex(x => new { x.OwnerId, x.Status, x.CreatedAt });
             builder.HasIndex(x => new { x.Status, x.ScheduleDispatchedAt });

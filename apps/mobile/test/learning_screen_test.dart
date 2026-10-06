@@ -150,4 +150,79 @@ void main() {
       findsNothing,
     );
   });
+
+  Map<String, Object?> autonomy({bool enabled = true}) => {
+    'enabled': enabled,
+    'heartbeatMayStartTasks': true,
+    'maxHeartbeatTasksPerDay': 3,
+    'maxHeartbeatTasksPerRun': 1,
+    'triageInbox': true,
+    'digestInsteadOfDrop': true,
+  };
+
+  void serveLearning() => http.on('GET', '/api/v1/learning/status', {
+    'settings': _settings(),
+    'state': {'lastSummary': null},
+    'dreaming': {'lastSummary': null, 'diary': <Object>[]},
+    'activity': <Object>[],
+  });
+
+  testWidgets(
+    'switching off background tasks saves the whole autonomy record',
+    (tester) async {
+      serveLearning();
+      http.on('GET', '/api/v1/settings/autonomy', autonomy());
+      http.on('PUT', '/api/v1/settings/autonomy', {
+        ...autonomy(),
+        'heartbeatMayStartTasks': false,
+      });
+      await show(tester);
+
+      await tester.ensureVisible(
+        find.byKey(const Key('autonomy-heartbeatMayStartTasks')),
+      );
+      await tester.tap(
+        find.byKey(const Key('autonomy-heartbeatMayStartTasks')),
+      );
+      await tester.pumpAndSettle();
+
+      final body =
+          http.sent('PUT', '/api/v1/settings/autonomy').single.body!
+              as Map<String, dynamic>;
+      expect(body['heartbeatMayStartTasks'], false);
+      expect(body['enabled'], true);
+      expect(body['maxHeartbeatTasksPerDay'], 3);
+    },
+  );
+
+  testWidgets('the master switch off greys out the other autonomy switches', (
+    tester,
+  ) async {
+    serveLearning();
+    http.on('GET', '/api/v1/settings/autonomy', autonomy(enabled: false));
+    await show(tester);
+
+    await tester.ensureVisible(find.byKey(const Key('autonomy-triageInbox')));
+    final triage = tester.widget<SwitchListTile>(
+      find.byKey(const Key('autonomy-triageInbox')),
+    );
+    final master = tester.widget<SwitchListTile>(
+      find.byKey(const Key('autonomy-enabled')),
+    );
+
+    expect(triage.onChanged, isNull);
+    expect(master.onChanged, isNotNull);
+    expect(master.value, false);
+  });
+
+  testWidgets('an older server without autonomy settings hides the card', (
+    tester,
+  ) async {
+    serveLearning();
+    await show(tester);
+
+    expect(find.byKey(const Key('autonomy-enabled')), findsNothing);
+    expect(find.text('Acting on its own'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

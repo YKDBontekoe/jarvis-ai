@@ -14,7 +14,7 @@ public sealed class ConditionWatchRepository(JarvisDbContext db) : IConditionWat
         var watch = new ConditionWatch(ownerId, request.Title.Trim(), request.Url ?? string.Empty,
             request.JsonPath ?? string.Empty, request.Comparison, request.Threshold, request.IntervalMinutes,
             request.Kind ?? WatchKinds.PublicJson, request.CredentialProvider, request.Latitude, request.Longitude,
-            request.RadiusMeters, request.MinutesBefore);
+            request.RadiusMeters, request.MinutesBefore, request.Repeat, request.CooldownMinutes ?? 0);
         db.ConditionWatches.Add(watch);
         db.AuditEvents.Add(new AuditEvent(ownerId, "condition_watches", "watch.created", "low", true,
             metadataJson: JsonSerializer.Serialize(new { resourceId = watch.Id })));
@@ -120,5 +120,6 @@ internal static class ConditionWatchMapping
     public static ConditionWatchRecord ToRecord(this ConditionWatch watch) => new(watch.Id, watch.OwnerId,
         watch.Title, watch.Url, watch.JsonPath, watch.Comparison, watch.Threshold, watch.IntervalMinutes,
         watch.WorkflowId, watch.Status, watch.CreatedAt, watch.LastCheckedAt, watch.LastValue, watch.Kind,
-        watch.CredentialProvider, watch.Latitude, watch.Longitude, watch.RadiusMeters, watch.MinutesBefore);
+        watch.CredentialProvider, watch.Latitude, watch.Longitude, watch.RadiusMeters, watch.MinutesBefore,
+        watch.Repeat, watch.CooldownMinutes, watch.LastTriggeredAt, watch.TriggerCount);
 }

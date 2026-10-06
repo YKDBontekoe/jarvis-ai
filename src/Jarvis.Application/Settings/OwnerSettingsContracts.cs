@@ -30,4 +30,5 @@ public static class SettingsSections
     public const string Routines = "routines";
     public const string PeopleRadar = "people-radar";
     public const string Autonomy = "autonomy";
+    public const string PushDigest = "push-digest";
 }

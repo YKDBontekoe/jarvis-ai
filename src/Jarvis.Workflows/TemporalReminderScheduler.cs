@@ -587,6 +587,12 @@ public sealed class ConditionWatchService(IConditionWatchRepository watches, ICo
         if (request.IntervalMinutes is < 5 or > 1440)
             throw new ArgumentOutOfRangeException(nameof(request), "Check interval must be between 5 minutes and 24 hours.");
 
+        if (request.CooldownMinutes is { } requested &&
+            requested is < ConditionWatch.MinCooldownMinutes or > ConditionWatch.MaxCooldownMinutes)
+            throw new ArgumentOutOfRangeException(nameof(request),
+                $"Cooldown must be between {ConditionWatch.MinCooldownMinutes} minutes and 7 days.");
+        int? cooldown = request.Repeat ? request.CooldownMinutes ?? ConditionWatch.DefaultCooldownMinutes : null;
+
         var url = "";
         var jsonPath = "";
         string? credentialProvider = null;
@@ -646,7 +652,8 @@ public sealed class ConditionWatchService(IConditionWatchRepository watches, ICo
             Latitude = latitude,
             Longitude = longitude,
             RadiusMeters = radius,
-            MinutesBefore = minutesBefore
+            MinutesBefore = minutesBefore,
+            CooldownMinutes = cooldown
         }, cancellationToken);
         try
         {

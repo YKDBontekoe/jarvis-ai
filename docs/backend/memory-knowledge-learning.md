@@ -83,7 +83,7 @@ Owner-defined profiles snapshot persona, skills, collections, model class, and l
 
 | Mechanism | Trigger | Output |
 |-----------|---------|--------|
-| **Heartbeat** | Temporal `AssistantHeartbeatWorkflow` (on by default; opt out in Settings → Learning) | Memories, persona tweaks, skills. Learned skills start as `proposed` and wait for review unless the owner turns on *Activate new skills right away* (`AutoActivateSkills`) |
+| **Heartbeat** | Temporal `AssistantHeartbeatWorkflow` (on by default; opt out in Settings → Learning) | Memories, persona tweaks, skills. Learned skills start as `proposed` and wait for review unless the owner turns on *Activate new skills right away* (`AutoActivateSkills`). Reflection `insights` (up to 2 follow-ups) are offered once as check-ins and are never stored or audited. The heartbeat also keeps the inbox triaged and can start meeting-prep tasks; see [the autonomy envelope](life-features.md#autonomy-envelope) |
 | **Dreaming** | Nightly `AssistantDreamingWorkflow` | Memory promotion/merge, persona, graph facts, **portrait** string for system prompt |
 | **Manual** | `POST /learning/run`, `/learning/dream` | On-demand for testing |
 

@@ -92,8 +92,23 @@ Modes: `normal`, `focus`, `commuting`, `meeting`, `sleep`, `travel`, `weekend`. 
 
 - A mode's policy: `notifications` (`all`, `important` = reminders, approvals, watches, `none`) and a tone hint added to the chat context. Owners can override each mode's policy.
 - `NotificationPushWorker` asks `IModeService.ShouldPushAsync` before sending; a held push is marked delivered and the notification stays in the app. If the mode state cannot be read, pushes go out.
+- **While-you-were-away digest.** A push a mode holds back is not lost: `IPushDigestService.HoldAsync` keeps a short record (id, type, title; at most 50, in owner settings section `push-digest`). `PushDigestWorker` (API, once a minute) calls `FlushIfDueAsync`, and when the mode lets pushes through again one `digest.while_away` notification summarises what came in. Mode policies that only allow `important` keep holding it. Owners opt out with `digestInsteadOfDrop: false` or by switching autonomy off, which restores the old drop behaviour.
 - Stored in owner settings (section `context-modes`), no tables.
 - Endpoints: `GET /modes`, `PUT /modes/active` (`mode`, `minutes`; `auto` clears), `PUT /modes/settings`, `PUT/DELETE /modes/{mode}/policy`. Tools: `GetCurrentMode`, `SetMode`. The Flutter **ambient display** (Modes → Ambient display) shows the time, mode and what is next for a desk or tablet.
+
+## Autonomy envelope
+
+`AutonomySettings` (owner settings section `autonomy`, `GET/PUT /settings/autonomy`) bounds what Jarvis does between conversations. A missing row means the defaults, so it applies to every owner and `enabled: false` switches all of it off at once.
+
+| Key | Default | Effect |
+|---|---|---|
+| `enabled` | true | Master switch for everything below |
+| `heartbeatMayStartTasks` | true | The heartbeat may start read-only background tasks |
+| `maxHeartbeatTasksPerDay` / `maxHeartbeatTasksPerRun` | 3 / 1 | Budget for those tasks (0–10 / 0–3) |
+| `triageInbox` | true | The heartbeat syncs the inbox and has the model triage up to 3 untriaged threads per run (summary and reply draft only) |
+| `digestInsteadOfDrop` | true | See the digest under [Context modes](#context-modes) |
+
+The heartbeat plans with `HeartbeatPlanner`: an item with a task proposal starts a task while the budget lasts, waits for the next heartbeat when this one already used its share, and becomes a plain heads-up when the day's budget is spent. Currently the only proposal is `HeartbeatPlanner.MeetingPrep` for a calendar event starting in 20 minutes to 2 hours; the task is told to use read-only tools, calendar titles are cleaned and framed as untrusted, and the normal approval rules still apply to everything it does. Starts are counted in `HeartbeatState.TaskStartedAt` (no table) and audited as `heartbeat.task_started` (ids only), `heartbeat.budget_exhausted` and `heartbeat.inbox_triaged`.
 
 ## Mission control
 

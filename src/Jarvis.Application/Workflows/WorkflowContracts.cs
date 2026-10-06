@@ -45,14 +45,15 @@ public sealed record ConditionWatchRecord(Guid Id, Guid OwnerId, string Title, s
     string Comparison, double Threshold, int IntervalMinutes, string WorkflowId, string Status,
     DateTimeOffset CreatedAt, DateTimeOffset? LastCheckedAt, double? LastValue,
     string Kind = WatchKinds.PublicJson, string? CredentialProvider = null, double? Latitude = null,
-    double? Longitude = null, double? RadiusMeters = null, int? MinutesBefore = null);
+    double? Longitude = null, double? RadiusMeters = null, int? MinutesBefore = null, bool Repeat = false,
+    int CooldownMinutes = 0, DateTimeOffset? LastTriggeredAt = null, int TriggerCount = 0);
 
 public sealed record ConditionWatchWorkflowInput(Guid WatchId);
 public sealed record ConditionWatchCheckResult(bool Continue, int IntervalMinutes);
 public sealed record CreateConditionWatchRequest(string Title, string Url, string JsonPath,
     string Comparison, double Threshold, int IntervalMinutes = 15, string? Kind = null,
     string? CredentialProvider = null, double? Latitude = null, double? Longitude = null,
-    double? RadiusMeters = null, int? MinutesBefore = null);
+    double? RadiusMeters = null, int? MinutesBefore = null, bool Repeat = false, int? CooldownMinutes = null);
 
 public sealed record DailyBriefingPreferenceRecord(Guid OwnerId, bool Enabled, TimeOnly LocalTime,
     string TimeZoneId, string WorkflowId, DateTimeOffset? ScheduleDispatchedAt, DateOnly? LastDeliveredDate);
