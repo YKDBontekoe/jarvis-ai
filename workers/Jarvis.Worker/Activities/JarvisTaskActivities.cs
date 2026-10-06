@@ -108,8 +108,8 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
         await conversations.AddMessageAsync(assistantMessage, cancellationToken);
         try
         {
-            await services.GetRequiredService<IConversationMemoryExtractor>()
-                .ExtractAndStoreAsync(task.OwnerId, userMessage.Id, userMessage.Content, cancellationToken);
+            await services.GetRequiredService<IConversationMemoryGate>()
+                .ExtractAsync(task.OwnerId, task.ConversationId, userMessage.Id, userMessage.Content, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

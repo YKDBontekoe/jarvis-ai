@@ -69,7 +69,7 @@ public sealed class LearningTests
             """;
         var feedbackId = Guid.NewGuid();
         var service = new ReflectionService(
-            Fake<IConversationHistory>.Create(("ListRecentMessagesAsync", _ => (IReadOnlyList<Message>)[userMessage])),
+            TestHistory.Create([userMessage]),
             Fake<IMessageFeedbackRepository>.Create(
                 ("ListUnprocessedAsync", _ => (IReadOnlyList<MessageFeedbackRecord>)
                     [new MessageFeedbackRecord(feedbackId, Guid.NewGuid(), Guid.NewGuid(), "down", "Too long", "…", Now)]),
@@ -112,7 +112,7 @@ public sealed class LearningTests
     {
         var client = new StaticReplyClient("{}");
         var service = new ReflectionService(
-            Fake<IConversationHistory>.Create(("ListRecentMessagesAsync", _ => (IReadOnlyList<Message>)[])),
+            TestHistory.Create(),
             Fake<IMessageFeedbackRepository>.Create(("ListUnprocessedAsync", _ => (IReadOnlyList<MessageFeedbackRecord>)[])),
             new PersonaService(new InMemorySettingsStore()), new InMemorySkillRepository(),
             Fake<IMemoryService>.Create(), new RecordingNotifications(), new NullAudit(),
@@ -155,7 +155,7 @@ public sealed class LearningTests
         MutableClock clock)
     {
         var reflection = new ReflectionService(
-            Fake<IConversationHistory>.Create(("ListRecentMessagesAsync", _ => (IReadOnlyList<Message>)[])),
+            TestHistory.Create(),
             Fake<IMessageFeedbackRepository>.Create(("ListUnprocessedAsync", _ => (IReadOnlyList<MessageFeedbackRecord>)[])),
             new PersonaService(settings), new InMemorySkillRepository(), Fake<IMemoryService>.Create(), notifications,
             new NullAudit(), new FixedChatClientResolver(new StaticReplyClient("{}")),

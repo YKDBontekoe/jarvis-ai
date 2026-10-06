@@ -31,6 +31,23 @@ public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, 
             .ToArray();
     }
 
+    public async Task<IReadOnlyDictionary<Guid, MessageLearningScope>> GetLearningScopesAsync(Guid ownerId,
+        IReadOnlyCollection<Guid> messageIds, CancellationToken cancellationToken)
+    {
+        if (messageIds.Count == 0) return new Dictionary<Guid, MessageLearningScope>();
+        var rows = await (from message in db.Messages.AsNoTracking()
+                join conversation in db.Conversations.AsNoTracking() on message.ConversationId equals conversation.Id
+                where conversation.OwnerId == ownerId && messageIds.Contains(message.Id)
+                select new { message.Id, conversation.ProfileId, conversation.ProfileSnapshotJson })
+            .ToListAsync(cancellationToken);
+        return rows.ToDictionary(row => row.Id, row =>
+        {
+            var snapshot = ProfileJson.Deserialize(row.ProfileSnapshotJson);
+            return new MessageLearningScope(row.ProfileId, ProfileScope.AllowsRemember(snapshot),
+                snapshot?.AllowPersonaLearning ?? true);
+        });
+    }
+
     public async Task<Conversation> CreateAsync(Guid ownerId, string title, CancellationToken cancellationToken,
         ProfileBinding? profile = null)
     {

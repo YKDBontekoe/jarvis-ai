@@ -70,6 +70,7 @@ public static class DependencyInjection
         services.AddScoped<IToolApprovalStore, ToolApprovalStore>();
         services.AddScoped<IStandingApprovalService, StandingApprovalService>();
         services.AddScoped<IApprovalPolicy, ApprovalPolicy>();
+        services.AddScoped<Jarvis.Application.Memory.IConversationMemoryGate, Jarvis.Application.Memory.ConversationMemoryGate>();
         services.AddScoped<IAuditEventStore, AuditEventStore>();
         services.AddScoped<IReminderRepository, WorkflowRepository>();
         services.AddScoped<INotificationRepository, WorkflowRepository>();

@@ -93,7 +93,10 @@ public sealed class ReflectionService(
 
         var parsed = Parse(response.Text);
         var sourceMessageId = messages.LastOrDefault(message => message.Role == "user")?.Id;
-        var outcome = await ApplyAsync(ownerId, settings, parsed, sourceMessageId, profile, cancellationToken);
+        var learningScope = LearningScope.Of((await history.GetLearningScopesAsync(ownerId,
+            messages.Select(message => message.Id).ToArray(), cancellationToken)).Values);
+        var outcome = await ApplyAsync(ownerId, settings, parsed, sourceMessageId, profile, learningScope,
+            cancellationToken);
         outcome = outcome with { FeedbackProcessed = ratings.Count, MessagesReviewed = messages.Count };
         if (ratings.Count > 0)
             await feedback.MarkProcessedAsync(ownerId, ratings.Select(item => item.Id).ToArray(), cancellationToken);
@@ -131,10 +134,11 @@ public sealed class ReflectionService(
     }
 
     private async Task<ReflectionOutcome> ApplyAsync(Guid ownerId, LearningSettings settings, ReflectionResult parsed,
-        Guid? sourceMessageId, PersonaProfile profile, CancellationToken cancellationToken)
+        Guid? sourceMessageId, PersonaProfile profile, LearningScope learningScope,
+        CancellationToken cancellationToken)
     {
         int added = 0, reinforced = 0, skillsSaved = 0, memoriesSaved = 0;
-        if (settings.LearnPersona)
+        if (settings.LearnPersona && learningScope.AllowsPersona)
         {
             var known = profile.TraitList.Select(trait => trait.Id).ToHashSet();
             foreach (var item in (parsed.Persona ?? []).Take(5))
@@ -176,7 +180,9 @@ public sealed class ReflectionService(
             }
         }
 
-        if (sourceMessageId is { } messageId)
+        // A batch that mixes assistant profiles cannot be traced back to one, so it stores no memories at all rather
+        // than let one profile's facts surface in another.
+        if (sourceMessageId is { } messageId && learningScope.CanStoreMemories)
         {
             var existing = (await memories.ListAsync(ownerId, null, cancellationToken))
                 .Where(memory => memory.ValidUntil is null || memory.ValidUntil > DateTimeOffset.UtcNow)
@@ -191,7 +197,8 @@ public sealed class ReflectionService(
                     MemoryAgentTools.LooksLikeSecret(content) || !existing.Add(Normalize(content)))
                     continue;
                 await memories.CreateAsync(ownerId, kind, content, item.Importance, item.Confidence, null, false,
-                    cancellationToken, sourceType: "conversation", sourceId: messageId);
+                    cancellationToken, sourceType: "conversation", sourceId: messageId,
+                    profileId: learningScope.ProfileId);
                 memoriesSaved++;
             }
         }

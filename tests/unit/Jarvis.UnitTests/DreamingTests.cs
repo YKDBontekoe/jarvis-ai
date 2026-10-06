@@ -241,6 +241,31 @@ public sealed class DreamingTests
     }
 
     [Fact]
+    public async Task Sweep_does_not_learn_persona_from_a_profile_that_forbids_it()
+    {
+        var settings = new InMemorySettingsStore();
+        await settings.SaveAsync(Owner, SettingsSections.Learning, LearningSettings.Default, default);
+        var persona = new PersonaService(settings);
+        var store = new DreamMemoryStore();
+        store.Add(Owner, "fact", "The user lives in Amsterdam.", 0.7f, 0.9f, Now.AddDays(-2));
+        var message = User("Be blunt with me please, skip the small talk.", Now);
+        var history = TestHistory.Create([message], new Dictionary<Guid, MessageLearningScope>
+        {
+            [message.Id] = new(Guid.NewGuid(), AllowRemember: true, AllowPersonaLearning: false)
+        });
+        var reply = """
+            {"persona":[{"category":"tone","statement":"Be direct and skip small talk.","confidence":0.9}]}
+            """;
+        var service = Create(settings, persona, store, new RecordingGraph(), new RecordingNotifications(),
+            new CountingReplyClient(reply), history: history);
+
+        var outcome = await service.SweepAsync(Owner, force: true, default);
+
+        Assert.Equal(0, outcome.PersonaUpdated);
+        Assert.Empty((await persona.GetAsync(Owner, default)).TraitList);
+    }
+
+    [Fact]
     public async Task Sweep_skips_the_model_when_there_is_nothing_to_stage()
     {
         var client = new CountingReplyClient("{}");
@@ -488,8 +513,8 @@ public sealed class DreamingTests
 
     private static DreamingService Create(InMemorySettingsStore settings, PersonaService persona,
         DreamMemoryStore memories, RecordingGraph graph, RecordingNotifications notifications,
-        CountingReplyClient client, FrozenClock? clock = null) =>
-        new(Fake<IConversationHistory>.Create(("ListRecentMessagesAsync", _ => (IReadOnlyList<Message>)[])),
+        CountingReplyClient client, FrozenClock? clock = null, IConversationHistory? history = null) =>
+        new(history ?? TestHistory.Create(),
             memories, persona, graph, settings, notifications, new NullAudit(), new FixedChatClientResolver(client),
             new MemoryRecallTracker(), NullLogger<DreamingService>.Instance, clock ?? new FrozenClock(Now));
 
