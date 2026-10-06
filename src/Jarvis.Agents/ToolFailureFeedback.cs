@@ -15,6 +15,8 @@ internal static class ToolFailureFeedback
     internal const int MaxMessageLength = 400;
     internal const string GenericFailure =
         "The tool failed unexpectedly. Try a different tool or approach, or tell the user it did not work.";
+    internal const string TransientFailure =
+        "The tool could not reach what it needs just now, which is usually temporary. You may try it once more; if it fails again, tell the user it is unavailable right now.";
 
     public static void Configure(FunctionInvokingChatClient? invoker)
     {
@@ -40,9 +42,22 @@ internal static class ToolFailureFeedback
         }
         catch (Exception exception)
         {
-            throw new ToolFailedException(exception);
+            throw new ToolFailedException(exception, IsTransient(exception));
         }
     }
+
+    /// <summary>
+    /// Network and timeout failures are worth one more try; anything else would fail the same way again. Only the
+    /// category reaches the model, never the exception text.
+    /// </summary>
+    internal static bool IsTransient(Exception exception) => exception switch
+    {
+        HttpRequestException or TimeoutException => true,
+        TaskCanceledException or IOException => true,
+        System.Net.Sockets.SocketException => true,
+        AggregateException aggregate => aggregate.InnerExceptions.Any(IsTransient),
+        _ => exception.InnerException is { } inner && IsTransient(inner)
+    };
 
     private static string Describe(Exception exception)
     {
@@ -56,5 +71,9 @@ internal static class ToolFailureFeedback
 
     internal sealed class ToolInputException(string message, Exception inner) : Exception(message, inner);
 
-    internal sealed class ToolFailedException(Exception inner) : Exception(GenericFailure, inner);
+    internal sealed class ToolFailedException(Exception inner, bool transient = false)
+        : Exception(transient ? TransientFailure : GenericFailure, inner)
+    {
+        public bool Transient { get; } = transient;
+    }
 }

@@ -107,6 +107,9 @@ Modes: `normal`, `focus`, `commuting`, `meeting`, `sleep`, `travel`, `weekend`. 
 | `maxHeartbeatTasksPerDay` / `maxHeartbeatTasksPerRun` | 3 / 1 | Budget for those tasks (0–10 / 0–3) |
 | `triageInbox` | true | The heartbeat syncs the inbox and has the model triage up to 3 untriaged threads per run (summary and reply draft only) |
 | `digestInsteadOfDrop` | true | See the digest under [Context modes](#context-modes) |
+| `level` | `full` | `full`, `standard` or `ask_everything`: how far automatic approval of tool calls goes (see [the approval policy](../architecture/chat-agent-runtime.md#tool-approval-flow)) |
+| `autoApproveReadOnly` / `autoApproveMcpReadHints` | true / true | Approve read-only built-in tools, and integration tools their server declares read-only, without a card |
+| `maxAutoApprovalsPerDay` | 200 | Daily limit for those automatic approvals (0–2000); past it calls ask again |
 
 The heartbeat plans with `HeartbeatPlanner`: an item with a task proposal starts a task while the budget lasts, waits for the next heartbeat when this one already used its share, and becomes a plain heads-up when the day's budget is spent. Currently the only proposal is `HeartbeatPlanner.MeetingPrep` for a calendar event starting in 20 minutes to 2 hours; the task is told to use read-only tools, calendar titles are cleaned and framed as untrusted, and the normal approval rules still apply to everything it does. Starts are counted in `HeartbeatState.TaskStartedAt` (no table) and audited as `heartbeat.task_started` (ids only), `heartbeat.budget_exhausted` and `heartbeat.inbox_triaged`.
 

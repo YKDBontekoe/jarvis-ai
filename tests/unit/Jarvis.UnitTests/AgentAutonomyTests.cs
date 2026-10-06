@@ -75,6 +75,39 @@ public sealed class AgentAutonomyTests
     }
 
     [Fact]
+    public async Task Network_failures_tell_the_model_a_retry_may_help_without_leaking_details()
+    {
+        var tool = AIFunctionFactory.Create(new Func<string>(() =>
+            throw new HttpRequestException("connection refused to http://10.0.0.5:8123/internal?key=abc")), "LookUp");
+        var model = new RetryingModel("LookUp", [null]);
+        var agent = CreateAgent(model, tool);
+
+        await agent.RunAsync("Look it up");
+
+        var failure = Assert.Single(model.ResultsSeen);
+        Assert.Contains(ToolFailureFeedback.TransientFailure, failure);
+        Assert.DoesNotContain(ToolFailureFeedback.GenericFailure, failure);
+        Assert.DoesNotContain("10.0.0.5", failure);
+        Assert.DoesNotContain("key=abc", failure);
+    }
+
+    [Theory]
+    [InlineData(typeof(HttpRequestException), true)]
+    [InlineData(typeof(TimeoutException), true)]
+    [InlineData(typeof(TaskCanceledException), true)]
+    [InlineData(typeof(IOException), true)]
+    [InlineData(typeof(InvalidOperationException), false)]
+    [InlineData(typeof(UnauthorizedAccessException), false)]
+    public void Only_network_and_timeout_failures_count_as_transient(Type type, bool transient)
+    {
+        var exception = (Exception)Activator.CreateInstance(type)!;
+
+        Assert.Equal(transient, ToolFailureFeedback.IsTransient(exception));
+        Assert.Equal(transient, ToolFailureFeedback.IsTransient(new InvalidOperationException("wrapped", exception)));
+        Assert.Equal(transient, ToolFailureFeedback.IsTransient(new AggregateException(exception)));
+    }
+
+    [Fact]
     public async Task Approval_required_tools_still_stop_for_approval_before_running()
     {
         var invoked = false;

@@ -334,6 +334,20 @@ mixin _LearningCards on _LearningController {
           enabled: on,
         ),
         toggle(
+          'autoApproveReadOnly',
+          'Skip approvals for looking things up',
+          'Listing and reading from your integrations runs without a card. Anything that sends, spends or deletes still asks.',
+          PhosphorIconsRegular.sealCheck,
+          enabled: on,
+        ),
+        toggle(
+          'autoApproveMcpReadHints',
+          'Trust integrations that say a tool is read-only',
+          'Off: tools from added integrations always ask, even when the integration calls them read-only.',
+          PhosphorIconsRegular.sealCheck,
+          enabled: on,
+        ),
+        toggle(
           'triageInbox',
           'Keep my inbox triaged',
           'Reads new chats in the background and drafts replies. Nothing is sent without you.',

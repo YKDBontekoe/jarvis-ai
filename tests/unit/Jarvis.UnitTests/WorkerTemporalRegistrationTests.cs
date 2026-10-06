@@ -77,4 +77,12 @@ public sealed class WorkerTemporalRegistrationTests
 
         Assert.Equal(expected, discovered);
     }
+
+    [Fact]
+    public void Mission_supervisor_polls_faster_while_a_mission_is_running()
+    {
+        Assert.Equal(Jarvis.Worker.MissionSupervisor.BusyInterval, Jarvis.Worker.MissionSupervisor.NextInterval(1));
+        Assert.Equal(Jarvis.Worker.MissionSupervisor.IdleInterval, Jarvis.Worker.MissionSupervisor.NextInterval(0));
+        Assert.True(Jarvis.Worker.MissionSupervisor.BusyInterval < Jarvis.Worker.MissionSupervisor.IdleInterval);
+    }
 }

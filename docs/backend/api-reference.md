@@ -33,9 +33,9 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | POST | `/conversations/{id}/cancel` | Cancel in-flight run |
 | POST | `/conversations/{id}/summary` | Read-only recap: `summary`, `keyPoints`, `actionItems`, `messageCount`. Nothing is stored. 409 when the chat has fewer than 2 messages, 503 when the model is unavailable |
 | GET | `/approvals` | Pending tool approvals. Each row includes `category`, `categoryLabel`, and `canRememberCategory` |
-| GET | `/approvals/standing` | Categories the owner always allows (`category`, `label`, `grantedAt`) |
+| GET | `/approvals/standing` | Categories the owner always allows (`category`, `label`, `grantedAt`, `expiresAt`, `scope`) |
 | DELETE | `/approvals/standing?category=` | Turn off one standing grant |
-| POST | `/approvals/{id}/decision` | Approve or decline (`approved`). `rememberCategory: true` with an approval also stores a standing grant for that action's category |
+| POST | `/approvals/{id}/decision` | Approve or decline (`approved`). `rememberCategory: true` with an approval also stores a standing grant for that action's category; `rememberHours` (1–8760) makes it expire and `rememberScope` (`all` or `tasks`) limits where it applies |
 
 ## Automation
 
@@ -44,7 +44,7 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | Reminders | `GET/POST /reminders`, `GET/DELETE /reminders/{id}`, `POST /reminders/{id}/snooze` (`minutes` or `until`), `POST /reminders/{id}/complete` (`conversationId` on each reminder). A place reminder posts `place` (`name`, `latitude`, `longitude`, `radiusMeters` 50–5000, `trigger` `arrive`/`leave`, `repeats`) instead of `dueAt` |
 | Owner automations | `GET/POST /automations`, enable/run/history (`conversationId` and `lastRun` on each rule; approvals go through the shared `/approvals` inbox; see [automations.md](../automations.md)) |
 | Condition watches | `GET/POST /watches`, `GET/DELETE /watches/{id}`. `POST` accepts `repeat` (keep watching after an alert) and `cooldownMinutes` (5–10080, default 60); records report `repeat`, `cooldownMinutes`, `lastTriggeredAt`, `triggerCount` |
-| Autonomy settings | `GET/PUT /settings/autonomy` (`enabled`, `heartbeatMayStartTasks`, `maxHeartbeatTasksPerDay`, `maxHeartbeatTasksPerRun`, `triageInbox`, `digestInsteadOfDrop`); see [life-features.md](life-features.md#autonomy-envelope) |
+| Autonomy settings | `GET/PUT /settings/autonomy` (`enabled`, `heartbeatMayStartTasks`, `maxHeartbeatTasksPerDay`, `maxHeartbeatTasksPerRun`, `triageInbox`, `digestInsteadOfDrop`, `level`, `autoApproveReadOnly`, `autoApproveMcpReadHints`, `maxAutoApprovalsPerDay`); see [life-features.md](life-features.md#autonomy-envelope) |
 | Tasks | `GET/POST /tasks`, `GET /tasks/{id}`, `GET /tasks/{id}/messages`, cancel endpoints |
 | Daily briefing | `GET/PUT /briefings/daily` (see `AutomationEndpoints`); `POST /briefings/daily/default` with `{timeZoneId}` turns it on at 08:00 only when the owner has no briefing settings yet (an existing row, even "off", is returned unchanged) |
 | Projects | `GET/POST /projects`, `GET/PUT/DELETE /projects/{id}` (details include its chats, files and tasks; delete keeps them and only clears the project), `PUT /conversations/{id}/project`, `PUT /files/{id}/project`, `PUT /tasks/{id}/project` (`{ projectId }`, null takes it out). `POST /conversations` and `POST /tasks` accept `projectId`; conversation DTOs carry `projectId`. A task belongs to a project through its own conversation |
