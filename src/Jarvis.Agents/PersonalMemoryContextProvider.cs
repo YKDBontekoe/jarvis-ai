@@ -16,8 +16,10 @@ internal sealed class PersonalMemoryContextProvider(
         InvokingContext context,
         CancellationToken cancellationToken = default)
     {
+        // A resumed run ends with an approval response that carries no text; it must not hide the question before it.
         var userMessages = context.RequestMessages?
-            .Where(message => message.Role == ChatRole.User).Select(message => message.Text).ToArray() ?? [];
+            .Where(message => message.Role == ChatRole.User).Select(message => message.Text)
+            .Where(text => !string.IsNullOrWhiteSpace(text)).ToArray() ?? [];
         var query = userMessages.Length == 0 ? null : userMessages[^1];
         if (string.IsNullOrWhiteSpace(query)) return [];
 

@@ -178,8 +178,10 @@ internal sealed class TemporalWorkflowReconciler(
                 var settingsStore = services.GetRequiredService<Jarvis.Application.Settings.IOwnerSettingsStore>();
                 var heartbeatScheduler = services.GetRequiredService<Jarvis.Application.Learning.IHeartbeatScheduler>();
                 var dreamingScheduler = services.GetRequiredService<Jarvis.Application.Learning.IDreamingScheduler>();
-                foreach (var ownerId in await settingsStore.ListOwnersAsync(
-                             Jarvis.Application.Settings.SettingsSections.Learning, cancellationToken))
+                // Owners who never saved a settings row still get the defaults, so walk every account.
+                var owners = await services.GetRequiredService<Jarvis.Application.Settings.IOwnerDirectory>()
+                    .ListOwnersAsync(cancellationToken);
+                foreach (var ownerId in owners)
                 {
                     var learning = await settingsStore.GetAsync<Jarvis.Application.Settings.LearningSettings>(ownerId,
                         Jarvis.Application.Settings.SettingsSections.Learning, cancellationToken)
@@ -195,12 +197,12 @@ internal sealed class TemporalWorkflowReconciler(
                 }
 
                 var weeklyReviewScheduler = services.GetRequiredService<Jarvis.Application.Reviews.IWeeklyReviewScheduler>();
-                foreach (var ownerId in await settingsStore.ListOwnersAsync(
-                             Jarvis.Application.Settings.SettingsSections.WeeklyReview, cancellationToken))
+                foreach (var ownerId in owners)
                 {
                     var review = await settingsStore.GetAsync<Jarvis.Application.Reviews.WeeklyReviewSettings>(ownerId,
-                        Jarvis.Application.Settings.SettingsSections.WeeklyReview, cancellationToken);
-                    if (review?.Enabled == true)
+                        Jarvis.Application.Settings.SettingsSections.WeeklyReview, cancellationToken)
+                        ?? Jarvis.Application.Reviews.WeeklyReviewSettings.Default;
+                    if (review.Enabled)
                         await TryScheduleAsync("weekly review", ownerId,
                             () => weeklyReviewScheduler.ScheduleWeeklyReviewAsync(ownerId, settingsChanged: false,
                                 cancellationToken),

@@ -57,6 +57,7 @@ public sealed record CreateConditionWatchRequest(string Title, string Url, strin
 public sealed record DailyBriefingPreferenceRecord(Guid OwnerId, bool Enabled, TimeOnly LocalTime,
     string TimeZoneId, string WorkflowId, DateTimeOffset? ScheduleDispatchedAt, DateOnly? LastDeliveredDate);
 public sealed record SaveDailyBriefingRequest(bool Enabled, TimeOnly LocalTime, string TimeZoneId);
+public sealed record EnsureDailyBriefingRequest(string TimeZoneId);
 public sealed record DailyBriefingWorkflowInput(Guid OwnerId, string WorkflowId, TimeOnly LocalTime, string TimeZoneId);
 public sealed record DailyBriefingActivityInput(Guid OwnerId, string WorkflowId, DateOnly LocalDate,
     string TimeZoneId, DateTimeOffset LocalDayStart, DateTimeOffset NextLocalDayStart);
@@ -84,6 +85,13 @@ public interface IDailyBriefingService
 {
     Task<DailyBriefingPreferenceRecord?> GetAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<DailyBriefingPreferenceRecord> SaveAsync(Guid ownerId, SaveDailyBriefingRequest request,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Turns the morning briefing on at 08:00 in <paramref name="timeZoneId"/> for an owner who never saved briefing
+    /// settings. An existing row is returned untouched, so an owner's explicit choice (including off) is kept.
+    /// </summary>
+    Task<DailyBriefingPreferenceRecord> EnsureDefaultAsync(Guid ownerId, string timeZoneId,
         CancellationToken cancellationToken);
 }
 

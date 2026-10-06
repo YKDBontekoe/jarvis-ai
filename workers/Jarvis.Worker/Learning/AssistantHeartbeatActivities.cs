@@ -18,8 +18,9 @@ internal sealed class AssistantHeartbeatActivities(IServiceScopeFactory scopeFac
         await using var scope = scopeFactory.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var settings = await services.GetRequiredService<IOwnerSettingsStore>()
-            .GetAsync<LearningSettings>(input.OwnerId, SettingsSections.Learning, cancellationToken);
-        if (settings is not { HeartbeatEnabled: true })
+            .GetAsync<LearningSettings>(input.OwnerId, SettingsSections.Learning, cancellationToken)
+            ?? LearningSettings.Default;
+        if (!settings.HeartbeatEnabled)
             return new HeartbeatRunResult(false, 0);
         services.GetRequiredService<WorkerCurrentUser>().SetOwner(input.OwnerId);
         await services.GetRequiredService<Jarvis.Agents.Learning.HeartbeatService>()

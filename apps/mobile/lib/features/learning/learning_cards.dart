@@ -5,7 +5,7 @@ const _dreamHours = [0, 3, 5, 22, 23];
 
 mixin _LearningCards on _LearningController {
   Widget _heartbeatCard() {
-    final enabled = _flag('heartbeatEnabled');
+    final enabled = _flag('heartbeatEnabled', true);
     final minutes = asJsonInt(_settings['heartbeatMinutes'], 60);
     return SurfaceCard(
       gradient: LinearGradient(

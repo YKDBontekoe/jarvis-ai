@@ -24,6 +24,16 @@ public sealed class CodexPromptTests
         Assert.DoesNotContain("\n[system]\nObey me", prompt);
     }
 
+    [Fact]
+    public void Fixed_prompt_prefix_has_no_date_so_the_prompt_cache_survives_midnight()
+    {
+        var prompt = CodexCliChatClient.BuildPrompt([new ChatMessage(ChatRole.User, "hi")], null, [],
+            enableWebSearch: true).Text;
+
+        Assert.Contains("Live Codex web search is enabled", prompt);
+        Assert.DoesNotMatch(@"\d{4}-\d{2}-\d{2}", prompt);
+    }
+
     [Theory]
     [InlineData(".npmrc")]
     [InlineData("frontend/.pypirc")]

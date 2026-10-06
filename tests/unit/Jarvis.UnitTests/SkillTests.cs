@@ -63,7 +63,7 @@ public sealed class SkillTests
     [Fact]
     public async Task SaveSkill_creates_an_active_learned_skill_and_notifies()
     {
-        var (tools, repository, notifications, _) = Create(new LearningSettings());
+        var (tools, repository, notifications, _) = Create(new LearningSettings(AutoActivateSkills: true));
 
         var result = await tools.SaveSkillAsync("inbox-triage", "Triage the user's inbox into reply, delegate, archive.",
             "1. Search mail.\n2. Group by sender importance.\n3. Draft replies for the top three.");
@@ -73,6 +73,14 @@ public sealed class SkillTests
         Assert.Equal(SkillStatuses.Active, skill.Status);
         Assert.Equal(SkillSources.Learned, skill.Source);
         Assert.Equal("skill.learned", Assert.Single(notifications.Created).Type);
+    }
+
+    [Fact]
+    public void Learned_skills_wait_for_review_by_default()
+    {
+        Assert.False(LearningSettings.Default.AutoActivateSkills);
+        Assert.True(LearningSettings.Default.HeartbeatEnabled);
+        Assert.True(LearningSettings.Default.DreamingEnabled);
     }
 
     [Fact]
@@ -115,7 +123,7 @@ public sealed class SkillTests
     [Fact]
     public async Task LoadSkill_returns_instructions_and_counts_use()
     {
-        var (tools, repository, _, _) = Create(new LearningSettings());
+        var (tools, repository, _, _) = Create(new LearningSettings(AutoActivateSkills: true));
         await tools.SaveSkillAsync("weekly-review", "Run the user's Friday weekly review.",
             "1. List completed tasks.\n2. Ask about blockers.");
 

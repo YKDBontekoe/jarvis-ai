@@ -23,10 +23,13 @@ Defined in `src/Jarvis.Workflows/`:
 | `DailyBriefingWorkflow` | Scheduled morning briefing notification |
 | `WeeklyReviewWorkflow` | Sunday-evening weekly review per owner (`jarvis-weekly-review-{owner}`); re-reads settings at least every 12 hours or on the `SettingsChanged` signal, catches up a missed Sunday within 36 hours, and stops when the owner turns it off |
 | `PeopleCheckInWorkflow` | Daily at 09:00 local: birthday notifications (`people.birthday`, once a year per person) and one keep-in-touch nudge (`people.checkin`, repeats weekly until contact is logged). Before nudging it marks people as contacted when the owner wrote to their linked WhatsApp chat, and afterwards sends the relationship radar's weekly `people.radar` notification. Ends when nobody has a birthday, a cadence or a linked chat; the reconciler restarts it |
-| `AssistantHeartbeatWorkflow` | Periodic reflection → memories/persona/skills |
-| `AssistantDreamingWorkflow` | Nightly dream phases → memory/persona promotion |
+| `AssistantHeartbeatWorkflow` | Periodic reflection → memories/persona/skills. **On by default for every owner.** |
+| `AssistantDreamingWorkflow` | Nightly dream phases → memory/persona promotion. **On by default for every owner.** |
+| `PeopleCheckInWorkflow` | Daily birthday/contact nudges (09:00 local) and the weekly relationship radar |
 
 Workflow IDs are **stable** per owner/resource so schedules are idempotent. Activities heartbeat and honor cancellation.
+
+**Defaults reach every owner.** The reconciler walks `IOwnerDirectory` (every Identity user), not only owners with a stored settings row, so heartbeat, dreaming and the weekly review run for owners who never opened Settings. A missing `learning` or `weekly-review` row means `LearningSettings.Default` / `WeeklyReviewSettings.Default`, and the activities apply the same fallback. Only a saved row with the feature switched off stops it. The morning briefing needs the owner's time zone, so the app calls `POST /briefings/daily/default` once per account with the device zone; the server then creates an enabled 08:00 briefing only when no briefing row exists yet.
 
 ## Worker responsibilities
 

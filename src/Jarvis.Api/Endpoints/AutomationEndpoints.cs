@@ -220,5 +220,14 @@ internal static class AutomationEndpoints
             try { return Results.Ok(await briefings.SaveAsync(currentUser.OwnerId, request, ct)); }
             catch (ArgumentException exception) { return EndpointHelpers.Invalid("timeZoneId", exception.Message); }
         }).WithName("SaveDailyBriefing");
+
+        // Called by the app on startup with the device zone: first-time owners get the briefing on without visiting
+        // Settings, while anyone with saved briefing settings keeps them.
+        api.MapPost("/briefings/daily/default", async (EnsureDailyBriefingRequest request,
+            IDailyBriefingService briefings, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await briefings.EnsureDefaultAsync(currentUser.OwnerId, request.TimeZoneId, ct)); }
+            catch (ArgumentException exception) { return EndpointHelpers.Invalid("timeZoneId", exception.Message); }
+        }).WithName("EnsureDefaultDailyBriefing");
     }
 }

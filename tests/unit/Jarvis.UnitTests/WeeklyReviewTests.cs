@@ -171,10 +171,21 @@ public sealed class WeeklyReviewServiceTests
     [Fact]
     public async Task Turned_off_review_stops_the_workflow()
     {
-        var service = Service(new InMemorySettingsStore(), Repository(), new FixedNarrator(null));
+        var settings = new InMemorySettingsStore();
+        await settings.SaveAsync(Owner, SettingsSections.WeeklyReview,
+            new WeeklyReviewSettings(false, new TimeOnly(19, 0), "UTC"), CancellationToken.None);
+        var service = Service(settings, Repository(), new FixedNarrator(null));
 
         Assert.False((await service.ResolveScheduleAsync(Owner, CancellationToken.None)).Continue);
         Assert.False(await service.DeliverAsync(new WeeklyReviewActivityInput(Owner, Monday), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Owner_without_saved_settings_gets_the_review_by_default()
+    {
+        var service = Service(new InMemorySettingsStore(), Repository(), new FixedNarrator(null));
+
+        Assert.True((await service.ResolveScheduleAsync(Owner, CancellationToken.None)).Continue);
     }
 
     [Fact]

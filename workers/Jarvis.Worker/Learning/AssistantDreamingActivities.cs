@@ -20,8 +20,9 @@ internal sealed class AssistantDreamingActivities(IServiceScopeFactory scopeFact
         await using var scope = scopeFactory.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var settings = await services.GetRequiredService<IOwnerSettingsStore>()
-            .GetAsync<LearningSettings>(input.OwnerId, SettingsSections.Learning, cancellationToken);
-        if (settings is not { DreamingEnabled: true })
+            .GetAsync<LearningSettings>(input.OwnerId, SettingsSections.Learning, cancellationToken)
+            ?? LearningSettings.Default;
+        if (!settings.DreamingEnabled)
             return new DreamingRunResult(false, 0);
         services.GetRequiredService<WorkerCurrentUser>().SetOwner(input.OwnerId);
         await services.GetRequiredService<Jarvis.Agents.Learning.DreamingService>()

@@ -45,7 +45,7 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | Owner automations | `GET/POST /automations`, enable/run/history (`conversationId` and `lastRun` on each rule; approvals go through the shared `/approvals` inbox; see [automations.md](../automations.md)) |
 | Condition watches | `GET/POST /watches`, `GET/DELETE /watches/{id}` |
 | Tasks | `GET/POST /tasks`, `GET /tasks/{id}`, `GET /tasks/{id}/messages`, cancel endpoints |
-| Daily briefing | `GET/PUT /briefings/daily` (see `AutomationEndpoints`) |
+| Daily briefing | `GET/PUT /briefings/daily` (see `AutomationEndpoints`); `POST /briefings/daily/default` with `{timeZoneId}` turns it on at 08:00 only when the owner has no briefing settings yet (an existing row, even "off", is returned unchanged) |
 | Projects | `GET/POST /projects`, `GET/PUT/DELETE /projects/{id}` (details include its chats, files and tasks; delete keeps them and only clears the project), `PUT /conversations/{id}/project`, `PUT /files/{id}/project`, `PUT /tasks/{id}/project` (`{ projectId }`, null takes it out). `POST /conversations` and `POST /tasks` accept `projectId`; conversation DTOs carry `projectId`. A task belongs to a project through its own conversation |
 | Weekly review | `GET /reviews/weekly?weeks=8` (settings, mood trend, recent reviews), `GET /reviews/weekly/{id}`, `PUT /reviews/weekly/settings` (`enabled`, `localTime`, `timeZoneId`), `POST /reviews/weekly/generate` (current week, no notification) |
 

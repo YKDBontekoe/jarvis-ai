@@ -2,11 +2,11 @@ namespace Jarvis.Application.Settings;
 
 /// <summary>Owner controls for continuous learning, self-authored skills, dreaming, and the proactive heartbeat.</summary>
 public sealed record LearningSettings(
-    bool HeartbeatEnabled = false,
+    bool HeartbeatEnabled = true,
     int HeartbeatMinutes = 60,
     bool LearnPersona = true,
     bool AutoCreateSkills = true,
-    bool AutoActivateSkills = true,
+    bool AutoActivateSkills = false,
     bool ProactiveCheckIns = true,
     int QuietHoursStart = 22,
     int QuietHoursEnd = 7,

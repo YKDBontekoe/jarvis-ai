@@ -5,7 +5,7 @@ namespace Jarvis.Application.Reviews;
 /// <summary>When the Sunday look-back arrives. Stored in the owner settings section <c>weekly-review</c>.</summary>
 public sealed record WeeklyReviewSettings(bool Enabled, TimeOnly LocalTime, string TimeZoneId)
 {
-    public static WeeklyReviewSettings Default { get; } = new(false, new TimeOnly(19, 0), "UTC");
+    public static WeeklyReviewSettings Default { get; } = new(true, new TimeOnly(19, 0), "UTC");
 
     public WeeklyReviewSettings Normalize()
     {

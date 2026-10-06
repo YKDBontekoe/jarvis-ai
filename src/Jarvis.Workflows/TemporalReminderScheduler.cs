@@ -765,4 +765,10 @@ public sealed class DailyBriefingService(IDailyBriefingRepository briefings, IDa
         { logger.LogWarning(exception, "Morning briefing {OwnerId} remains pending for Temporal scheduling recovery.", ownerId); }
         return preference;
     }
+
+    public async Task<DailyBriefingPreferenceRecord> EnsureDefaultAsync(Guid ownerId, string timeZoneId,
+        CancellationToken cancellationToken) =>
+        await briefings.GetAsync(ownerId, cancellationToken)
+        ?? await SaveAsync(ownerId, new SaveDailyBriefingRequest(true, new TimeOnly(8, 0), timeZoneId),
+            cancellationToken);
 }

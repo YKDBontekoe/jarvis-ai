@@ -236,7 +236,7 @@ class _LearningScreenState extends _LearningController with _LearningCards {
                             'Activate new skills right away',
                             'Off: learned skills wait for your review in Skills.',
                             PhosphorIconsRegular.sealCheck,
-                            fallback: true,
+                            fallback: false,
                             enabled: _flag('autoCreateSkills', true),
                           ),
                           _switch(
