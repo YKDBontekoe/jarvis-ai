@@ -14,7 +14,7 @@ internal readonly record struct Hit(Guid Id, double Score);
 
 internal interface IRetriever
 {
-    Task<List<Hit>> SearchAsync(int queryIndex, EvalQuery query, int limit);
+    Task<List<Hit>> SearchAsync(int queryIndex, EvalQuery query, int limit, Guid[]? files = null);
 }
 
 internal static class Retrievers
@@ -22,11 +22,21 @@ internal static class Retrievers
     /// <summary>
     /// Variant grammar (all options come from repeated --opt key=value):
     ///   baseline                       production FileSearchService (websearch_to_tsquery, ts_rank, 'simple')
-    ///   lex  q=and|plain|or|mem  rank=ts|cd|bm25  cfg=simple|english|dutch  norm=0  cand=300  k1=1.2  b=0.75
-    ///   sem  model=NAME                pgvector cosine over the chunk embeddings
+    ///   lex  q=and|plain|or|mem  rank=ts|cd|bm25|pgbm25  cfg=simple|english|dutch  norm=0  cand=300  k1=1.2  b=0.75
+    ///        (pgbm25 = the pg_textsearch extension's bm25 index)
+    ///   sem  model=NAME iter=off|relaxed|strict ef=40 maxscan=20000   pgvector cosine over the chunk embeddings
     ///   hyb  (lex options) model=NAME wl=1 ws=1 rrfk=60 depth=30   reciprocal rank fusion of the two lists
     /// </summary>
     public static async Task<IRetriever> CreateAsync(Workspace workspace, NpgsqlDataSource source, string variant,
+        Dictionary<string, string> options, IReadOnlyList<EvalQuery> queries)
+    {
+        var retriever = await CreateCoreAsync(workspace, source, variant, options, queries);
+        if (!options.TryGetValue("rw", out var path)) return retriever;
+        var rewrites = JsonSerializer.Deserialize<Dictionary<string, string[]>>(await File.ReadAllTextAsync(path))!;
+        return new RewritingRetriever(retriever, rewrites, Opt(options, "rwmode", "rrf") != "only");
+    }
+
+    private static async Task<IRetriever> CreateCoreAsync(Workspace workspace, NpgsqlDataSource source, string variant,
         Dictionary<string, string> options, IReadOnlyList<EvalQuery> queries)
     {
         switch (variant)
@@ -55,11 +65,11 @@ internal static class Retrievers
 /// <summary>The code path the agent's SearchFiles tool takes today, through a fresh scoped DbContext per call.</summary>
 internal sealed class BaselineRetriever(Workspace workspace) : IRetriever
 {
-    public async Task<List<Hit>> SearchAsync(int queryIndex, EvalQuery query, int limit)
+    public async Task<List<Hit>> SearchAsync(int queryIndex, EvalQuery query, int limit, Guid[]? files = null)
     {
         await using var db = Indexing.CreateDb(workspace);
         var service = new FileSearchService(new FileContentRepository(db));
-        var hits = await service.SearchAsync(Workspace.Owner, query.Text, CancellationToken.None);
+        var hits = await service.SearchAsync(Workspace.Owner, query.Text, CancellationToken.None, files);
         return hits.Select(hit => new Hit(hit.ChunkId, hit.Score)).ToList();
     }
 }
@@ -93,6 +103,7 @@ internal sealed class LexicalRetriever : IRetriever
     public static async Task<LexicalRetriever> CreateAsync(NpgsqlDataSource source, Dictionary<string, string> options)
     {
         var retriever = new LexicalRetriever(source, options);
+        if (retriever._rank == "pgbm25") await Indexing.EnsureBm25Async(source, retriever._config);
         await using var command = source.CreateCommand(
             "SELECT count(*), coalesce(avg(length(content)), 1) FROM file_content_chunks WHERE owner_id = $1");
         command.Parameters.AddWithValue(Workspace.Owner);
@@ -103,10 +114,15 @@ internal sealed class LexicalRetriever : IRetriever
         return retriever;
     }
 
-    public Task<List<Hit>> SearchAsync(int queryIndex, EvalQuery query, int limit) => SearchAsync(query.Text, limit);
+    public Task<List<Hit>> SearchAsync(int queryIndex, EvalQuery query, int limit, Guid[]? files = null) =>
+        SearchAsync(query.Text, limit, files);
 
-    public async Task<List<Hit>> SearchAsync(string text, int limit)
+    private static NpgsqlParameter FilesParameter(Guid[] files) =>
+        new("files", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = files };
+
+    public async Task<List<Hit>> SearchAsync(string text, int limit, Guid[]? files = null)
     {
+        var scope = files is null ? string.Empty : "AND c.file_id = ANY(@files)";
         // MemoryQuery is the memory pipeline's analysis: stopwords (nl + en) dropped, at most 16 terms, optional prefix
         // forms and Dutch-English expansion. "or" keeps only the literal original terms.
         var parsed = MemoryQuery.Parse(text);
@@ -125,20 +141,37 @@ internal sealed class LexicalRetriever : IRetriever
             default: throw new ArgumentException($"Unknown q={_queryMode}.");
         }
 
-        if (_rank == "bm25") return await Bm25Async(string.Join(' ', literal), limit);
+        if (_rank == "bm25") return await Bm25Async(string.Join(' ', literal), limit, files);
+        if (_rank == "pgbm25")
+        {
+            if (literal.Length == 0) return [];
+            await using var bm25 = _source.CreateCommand($"""
+                SELECT c."Id", -(c.content <@> to_bm25query(@q, @index)) AS score
+                FROM file_content_chunks c JOIN files f ON f."Id" = c.file_id AND f.owner_id = c.owner_id
+                WHERE c.owner_id = @o AND f.processing_status = 'ready' {scope}
+                ORDER BY c.content <@> to_bm25query(@q, @index) LIMIT @limit
+                """);
+            bm25.Parameters.AddWithValue("q", string.Join(' ', literal));
+            bm25.Parameters.AddWithValue("index", $"ix_bm25_{_config}");
+            bm25.Parameters.AddWithValue("o", Workspace.Owner);
+            bm25.Parameters.AddWithValue("limit", limit);
+            if (files is not null) bm25.Parameters.Add(FilesParameter(files));
+            return await ReadHitsAsync(bm25);
+        }
 
         var rankFunction = _rank == "cd" ? "ts_rank_cd" : "ts_rank";
         await using var command = _source.CreateCommand($"""
             WITH q AS MATERIALIZED (SELECT {expression} AS query)
             SELECT c."Id", {rankFunction}(c.{_column}, q.query, {_norm}) AS score
             FROM q, file_content_chunks c JOIN files f ON f."Id" = c.file_id AND f.owner_id = c.owner_id
-            WHERE c.owner_id = @o AND f.processing_status = 'ready' AND c.{_column} @@ q.query
+            WHERE c.owner_id = @o AND f.processing_status = 'ready' AND c.{_column} @@ q.query {scope}
             ORDER BY score DESC LIMIT @limit
             """);
         command.Parameters.AddWithValue("cfg", _config);
         command.Parameters.AddWithValue("q", argument);
         command.Parameters.AddWithValue("o", Workspace.Owner);
         command.Parameters.AddWithValue("limit", limit);
+        if (files is not null) command.Parameters.Add(FilesParameter(files));
         return await ReadHitsAsync(command);
     }
 
@@ -147,8 +180,9 @@ internal sealed class LexicalRetriever : IRetriever
     /// (per-term postings, scored by summed IDF, common terms skipped); stage 2 scores the best candidates with BM25 from
     /// the tsvector's term positions and the chunk length.
     /// </summary>
-    private async Task<List<Hit>> Bm25Async(string literalTerms, int limit)
+    private async Task<List<Hit>> Bm25Async(string literalTerms, int limit, Guid[]? files)
     {
+        var scope = files is null ? string.Empty : "AND c.file_id = ANY(@files)";
         if (literalTerms.Length == 0) return [];
         await using var connection = await _source.OpenConnectionAsync();
         var lexemes = new List<string>();
@@ -186,7 +220,7 @@ internal sealed class LexicalRetriever : IRetriever
                 FROM unnest(@lex::text[], @idf::float8[]) AS t(lexeme, idf)
                 CROSS JOIN LATERAL (
                     SELECT c."Id" FROM file_content_chunks c
-                    WHERE c.owner_id = @o AND c.{_column} @@ ('''' || replace(t.lexeme, '''', '''''') || '''')::tsquery) AS x(id)
+                    WHERE c.owner_id = @o {scope} AND c.{_column} @@ ('''' || replace(t.lexeme, '''', '''''') || '''')::tsquery) AS x(id)
                 GROUP BY x.id ORDER BY s DESC LIMIT @cand) AS hit
             """, connection))
         {
@@ -194,6 +228,7 @@ internal sealed class LexicalRetriever : IRetriever
             candidateCommand.Parameters.AddWithValue("idf", driving.Select(p => p.Value).ToArray());
             candidateCommand.Parameters.AddWithValue("o", Workspace.Owner);
             candidateCommand.Parameters.AddWithValue("cand", _candidates);
+            if (files is not null) candidateCommand.Parameters.Add(FilesParameter(files));
             await using var reader = await candidateCommand.ExecuteReaderAsync();
             while (await reader.ReadAsync()) candidates.Add(reader.GetGuid(0));
         }
@@ -233,11 +268,17 @@ internal sealed class SemanticRetriever : IRetriever
 {
     private readonly NpgsqlDataSource _source;
     private readonly float[][] _queryVectors;
+    private readonly string _settings;
 
-    private SemanticRetriever(NpgsqlDataSource source, float[][] queryVectors)
+    private SemanticRetriever(NpgsqlDataSource source, float[][] queryVectors, Dictionary<string, string> o)
     {
         _source = source;
         _queryVectors = queryVectors;
+        // pgvector 0.8 iterative scans keep walking the HNSW graph until LIMIT rows survive the WHERE clause.
+        var iteration = Retrievers.Opt(o, "iter", "off");
+        _settings = $"SET hnsw.ef_search = {(int)Retrievers.Num(o, "ef", 40)}; " +
+            $"SET hnsw.iterative_scan = '{(iteration == "off" ? "off" : iteration + "_order")}'; " +
+            $"SET hnsw.max_scan_tuples = {(int)Retrievers.Num(o, "maxscan", 20000)}; ";
     }
 
     public static async Task<SemanticRetriever> CreateAsync(Workspace workspace, NpgsqlDataSource source,
@@ -259,18 +300,20 @@ internal sealed class SemanticRetriever : IRetriever
             vectors[i] = new float[1536];
             Buffer.BlockCopy(raw, i * dim * 4, vectors[i], 0, dim * 4);
         }
-        return new SemanticRetriever(source, vectors);
+        return new SemanticRetriever(source, vectors, options);
     }
 
-    public async Task<List<Hit>> SearchAsync(int queryIndex, EvalQuery query, int limit)
+    public async Task<List<Hit>> SearchAsync(int queryIndex, EvalQuery query, int limit, Guid[]? files = null)
     {
-        await using var command = _source.CreateCommand("""
+        var scope = files is null ? string.Empty : "AND c.file_id = ANY(@files)";
+        await using var command = _source.CreateCommand(_settings + $"""
             SELECT c."Id", 1 - (c.embedding <=> @v) AS similarity
             FROM file_content_chunks c
-            WHERE c.owner_id = @o AND c.embedding IS NOT NULL
+            WHERE c.owner_id = @o AND c.embedding IS NOT NULL {scope}
               AND EXISTS (SELECT 1 FROM files f WHERE f."Id" = c.file_id AND f.owner_id = c.owner_id AND f.processing_status = 'ready')
             ORDER BY c.embedding <=> @v LIMIT @limit
             """);
+        if (files is not null) command.Parameters.Add(new NpgsqlParameter("files", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = files });
         command.Parameters.Add(new NpgsqlParameter("v", new Vector(_queryVectors[queryIndex])));
         command.Parameters.AddWithValue("o", Workspace.Owner);
         command.Parameters.AddWithValue("limit", limit);
@@ -289,10 +332,10 @@ internal sealed class HybridRetriever(LexicalRetriever lexical, SemanticRetrieve
     private readonly int _k = (int)Retrievers.Num(o, "rrfk", 60);
     private readonly double _wl = Retrievers.Num(o, "wl", 1), _ws = Retrievers.Num(o, "ws", 1);
 
-    public async Task<List<Hit>> SearchAsync(int queryIndex, EvalQuery query, int limit)
+    public async Task<List<Hit>> SearchAsync(int queryIndex, EvalQuery query, int limit, Guid[]? files = null)
     {
-        var lex = await lexical.SearchAsync(query.Text, _depth);
-        var sem = await semantic.SearchAsync(queryIndex, query, _depth);
+        var lex = await lexical.SearchAsync(query.Text, _depth, files);
+        var sem = await semantic.SearchAsync(queryIndex, query, _depth, files);
         var scores = new Dictionary<Guid, double>();
         Add(lex, _wl);
         Add(sem, _ws);
@@ -303,5 +346,28 @@ internal sealed class HybridRetriever(LexicalRetriever lexical, SemanticRetrieve
             for (var rank = 0; rank < list.Count; rank++)
                 scores[list[rank].Id] = scores.GetValueOrDefault(list[rank].Id) + weight / (_k + rank + 1);
         }
+    }
+}
+
+/// <summary>
+/// Agent-style search: the original question plus the search queries a model wrote for it (from the question alone), each
+/// run through the same retriever and fused with reciprocal rank fusion. The semantic leg of a hybrid keeps the original
+/// question's vector, so only keyword legs see the rewrites. --opt rw=PATH (qid -> [queries]) --opt rwmode=rrf|only.
+/// </summary>
+internal sealed class RewritingRetriever(IRetriever inner, Dictionary<string, string[]> rewrites, bool includeOriginal) : IRetriever
+{
+    public async Task<List<Hit>> SearchAsync(int queryIndex, EvalQuery query, int limit, Guid[]? files = null)
+    {
+        var texts = rewrites.TryGetValue(query.Qid, out var extra) ? extra : [];
+        var variants = (includeOriginal ? new[] { query.Text } : []).Concat(texts).ToArray();
+        if (variants.Length == 0) variants = [query.Text];
+        var scores = new Dictionary<Guid, double>();
+        foreach (var text in variants)
+        {
+            var hits = await inner.SearchAsync(queryIndex, query with { Text = text }, limit, files);
+            for (var rank = 0; rank < hits.Count; rank++)
+                scores[hits[rank].Id] = scores.GetValueOrDefault(hits[rank].Id) + 1d / (60 + rank + 1);
+        }
+        return scores.OrderByDescending(pair => pair.Value).Take(limit).Select(pair => new Hit(pair.Key, pair.Value)).ToList();
     }
 }

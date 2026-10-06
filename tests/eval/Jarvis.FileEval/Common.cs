@@ -92,3 +92,29 @@ internal static class Args
         return options;
     }
 }
+
+/// <summary>
+/// Scoped search (attached files or a profile's collections): every query is limited to the files holding its judged
+/// passages plus random other files, up to <c>size</c> files in total. Stable per query so every variant sees the same scope.
+/// </summary>
+internal static class Scopes
+{
+    public static Guid[][] Build(Workspace workspace, IReadOnlyList<EvalQuery> queries, int size)
+    {
+        var fileIds = JsonSerializer.Deserialize<Guid[]>(File.ReadAllText(Path.Combine(workspace.IndexDir, "files.json")))!;
+        var docOfPassage = new Dictionary<string, int>();
+        var docIndex = 0;
+        foreach (var doc in workspace.Docs())
+        {
+            foreach (var passage in doc.Passages) docOfPassage[passage.Pid] = docIndex;
+            docIndex++;
+        }
+        return queries.Select((query, index) =>
+        {
+            var random = new Random(1000 + index);
+            var chosen = query.Rel.Keys.Select(pid => docOfPassage[pid]).ToHashSet();
+            while (chosen.Count < Math.Min(size, fileIds.Length)) chosen.Add(random.Next(fileIds.Length));
+            return chosen.Select(doc => fileIds[doc]).ToArray();
+        }).ToArray();
+    }
+}

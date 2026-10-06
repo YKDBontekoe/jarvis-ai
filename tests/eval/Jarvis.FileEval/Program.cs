@@ -49,8 +49,9 @@ static async Task RunAsync(Workspace workspace, string[] args)
         .ToDictionary(x => x.Id, x => x.index);
     await using var source = workspace.DataSource();
     var retriever = await Retrievers.CreateAsync(workspace, source, variant, options, queries);
+    var scopes = options.TryGetValue("scope", out var scopeSize) ? Scopes.Build(workspace, queries, int.Parse(scopeSize)) : null;
 
-    for (var warm = 0; warm < Math.Min(20, queries.Count); warm++) await retriever.SearchAsync(warm, queries[warm], Limit);
+    for (var warm = 0; warm < Math.Min(20, queries.Count); warm++) await retriever.SearchAsync(warm, queries[warm], Limit, scopes?[warm]);
 
     Directory.CreateDirectory(workspace.RunsDir);
     await using var output = new StreamWriter(Path.Combine(workspace.RunsDir, name + ".jsonl"), false, new UTF8Encoding(false));
@@ -64,7 +65,7 @@ static async Task RunAsync(Workspace workspace, string[] args)
         for (var run = 0; run < runs; run++)
         {
             var started = Stopwatch.GetTimestamp();
-            hits = await retriever.SearchAsync(index, queries[index], Limit);
+            hits = await retriever.SearchAsync(index, queries[index], Limit, scopes?[index]);
             timings.Add(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
         }
         var median = timings.Order().ElementAt(timings.Count / 2);

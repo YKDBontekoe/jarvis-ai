@@ -6,7 +6,7 @@ puts the chunk vectors into the database. Vectors are L2-normalised float32. Wor
 interrupted run resumes. Texts longer than the model's window are truncated by the model, exactly as a provider would.
 
 Usage: embed.py LIB TAG MODEL_ALIAS [--limit N] [--threads 4]
-Aliases: minilm  (all-MiniLM-L6-v2, 384d, 256 tokens), bge-small (bge-small-en-v1.5, 384d, 512 tokens),
+Aliases: qwen3-0.6b (Qwen3-Embedding-0.6B, 1024d), gemma-300m (EmbeddingGemma, 768d), minilm  (all-MiniLM-L6-v2, 384d, 256 tokens), bge-small (bge-small-en-v1.5, 384d, 512 tokens),
          e5-small (multilingual-e5-small, 384d, 512 tokens), mminilm (paraphrase-multilingual-MiniLM-L12-v2, 128 tokens)
 """
 import argparse
@@ -17,11 +17,14 @@ from pathlib import Path
 
 import numpy as np
 
+# alias -> (hub name, query prefix, passage prefix, max tokens, sentence-transformers prompt names (query, document))
 MODELS = {
-    "minilm": ("sentence-transformers/all-MiniLM-L6-v2", "", "", 256),
-    "bge-small": ("BAAI/bge-small-en-v1.5", "Represent this sentence for searching relevant passages: ", "", 512),
-    "e5-small": ("intfloat/multilingual-e5-small", "query: ", "passage: ", 512),
-    "mminilm": ("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", "", "", 128),
+    "minilm": ("sentence-transformers/all-MiniLM-L6-v2", "", "", 256, (None, None)),
+    "bge-small": ("BAAI/bge-small-en-v1.5", "Represent this sentence for searching relevant passages: ", "", 512, (None, None)),
+    "e5-small": ("intfloat/multilingual-e5-small", "query: ", "passage: ", 512, (None, None)),
+    "mminilm": ("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", "", "", 128, (None, None)),
+    "qwen3-0.6b": ("Qwen/Qwen3-Embedding-0.6B", "", "", 512, ("query", None)),
+    "gemma-300m": ("unsloth/embeddinggemma-300m", "", "", 512, ("query", "document")),
 }
 SHARD = 2048
 
@@ -39,7 +42,7 @@ def main():
     from sentence_transformers import SentenceTransformer
 
     torch.set_num_threads(args.threads)
-    name, query_prefix, passage_prefix, max_len = MODELS[args.alias]
+    name, query_prefix, passage_prefix, max_len, (query_prompt, doc_prompt) = MODELS[args.alias]
     model = SentenceTransformer(name, device="cpu")
     model.max_seq_length = max_len
     lib = Path(args.lib)
@@ -47,7 +50,8 @@ def main():
 
     queries = [json.loads(l)["text"] for l in open(lib / "queries.jsonl", encoding="utf-8")]
     if not (lib / f"qemb-{args.alias}.f32").exists() and args.limit is None:
-        q = model.encode([query_prefix + t for t in queries], batch_size=64, normalize_embeddings=True, convert_to_numpy=True).astype(np.float32)
+        q = model.encode([query_prefix + t for t in queries], batch_size=64, normalize_embeddings=True, convert_to_numpy=True,
+                         prompt_name=query_prompt).astype(np.float32)
         (lib / f"qemb-{args.alias}.f32").write_bytes(q.tobytes())
         (lib / f"qemb-{args.alias}.json").write_text(json.dumps({"model": name, "dim": int(q.shape[1]), "n": len(queries)}))
         print(f"embedded {len(queries)} queries", file=sys.stderr)
@@ -64,7 +68,8 @@ def main():
         if path.exists() and args.limit is None:
             continue
         batch = [passage_prefix + t for t in texts[begin: begin + SHARD]]
-        vectors = model.encode(batch, batch_size=32, normalize_embeddings=True, convert_to_numpy=True).astype(np.float32)
+        vectors = model.encode(batch, batch_size=16, normalize_embeddings=True, convert_to_numpy=True,
+                               prompt_name=doc_prompt).astype(np.float32)
         if args.limit is None:
             np.save(path, vectors)
         done_tokens += len(batch)

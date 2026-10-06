@@ -82,6 +82,7 @@ internal static class Indexing
         await using (var db = CreateDb(workspace))
             await db.Database.ExecuteSqlRawAsync("ANALYZE files; ANALYZE file_content_chunks");
         Console.WriteLine($"Indexed {docs.Count} documents into {chunkCount} chunks in {Stopwatch.GetElapsedTime(started).TotalSeconds:0}s ({workspace.DbName}).");
+        await File.WriteAllTextAsync(Path.Combine(workspace.IndexDir, "files.json"), JsonSerializer.Serialize(fileIds));
         await ExportChunksAsync(workspace, docs, fileIds);
     }
 
@@ -157,6 +158,7 @@ internal static class Indexing
         await using var source = workspace.DataSource();
         await using var connection = await source.OpenConnectionAsync();
         await Execute(connection, "SET maintenance_work_mem = '512MB'");
+        await Execute(connection, "CREATE EXTENSION IF NOT EXISTS pg_textsearch");
         foreach (var (config, column) in new[] { ("simple", "search_text"), ("english", "search_en"), ("dutch", "search_nl") })
         {
             if (column != "search_text")
@@ -177,6 +179,19 @@ internal static class Indexing
         }
         await Execute(connection, "VACUUM ANALYZE file_content_chunks");
         Console.WriteLine("Prepared stemmed columns and document-frequency tables.");
+    }
+
+    /// <summary>pg_textsearch allows one bm25 index per column, so switch it to the requested text config when needed.</summary>
+    public static async Task EnsureBm25Async(NpgsqlDataSource source, string config)
+    {
+        await using var connection = await source.OpenConnectionAsync();
+        var bm25Indexes = await Scalar(connection, "SELECT count(*) FROM pg_indexes WHERE indexdef LIKE '%USING bm25%'");
+        var wanted = await Scalar(connection, $"SELECT count(*) FROM pg_indexes WHERE indexname = 'ix_bm25_{config}'");
+        if (bm25Indexes == 1 && wanted == 1) return;
+        await Execute(connection, "SET maintenance_work_mem = '512MB'");
+        foreach (var other in new[] { "simple", "english", "dutch" })
+            await Execute(connection, $"DROP INDEX IF EXISTS ix_bm25_{other}");
+        await Execute(connection, $"CREATE INDEX ix_bm25_{config} ON file_content_chunks USING bm25(content) WITH (text_config='{config}')");
     }
 
     private static async Task Execute(NpgsqlConnection connection, string sql)

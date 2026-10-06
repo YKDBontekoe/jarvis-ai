@@ -12,7 +12,7 @@ Sources (English: BeIR/*, Dutch: clips/beir-nl-*, machine translated):
   fiqa     57,638 answers,   648 queries              (personal finance questions, the closest to assistant use)
 
 Usage:
-  python3 prepare_corpus.py RAW_DIR OUT_DIR LANG [--fiqa-distractors N] [--extra trec-covid] [--seed 0]
+  python3 prepare_corpus.py RAW_DIR OUT_DIR LANG [--fiqa-distractors N] [--query-limit SRC=N,..] [--keep SRC=N,..] [--extra trec-covid] [--seed 0]
   RAW_DIR contains <lang>/<source>/{corpus.parquet|corpus.jsonl, queries.*, test.tsv} as fetched by README's commands.
 Writes OUT_DIR/docs.jsonl and OUT_DIR/queries.jsonl.
 """
@@ -70,6 +70,8 @@ def main():
     ap.add_argument("lang", choices=["en", "nl"])
     ap.add_argument("--fiqa-distractors", type=int, default=None,
                     help="keep every judged-relevant FiQA passage plus this many random others (default: all)")
+    ap.add_argument("--query-limit", default="", help="SRC=N,... keep only N randomly chosen judged queries per source")
+    ap.add_argument("--keep", default="", help="SRC=N,... keep every judged-relevant passage plus N random others for that source")
     ap.add_argument("--extra", action="append", default=[],
                     help="a corpus (RAW/<lang>/NAME/corpus.parquet) added as distractor documents without queries, for the scale test")
     ap.add_argument("--seed", type=int, default=0)
@@ -79,12 +81,20 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
 
     docs, queries = [], []
+    limits = {k: int(v) for k, v in (kv.split("=") for kv in args.query_limit.split(",") if kv)}
+    keeps = {k: int(v) for k, v in (kv.split("=") for kv in args.keep.split(",") if kv)}
+    if args.fiqa_distractors is not None:
+        keeps.setdefault("fiqa", args.fiqa_distractors)
     for source in SOURCES + args.extra:
         corpus, qtable, qrels = load_source(raw, args.lang, source, distractors_only=source in args.extra)
+        if source in limits:
+            judged = sorted(qrels["query-id"].unique())
+            chosen = set(random.Random(args.seed).sample(judged, min(limits[source], len(judged))))
+            qrels = qrels[qrels["query-id"].isin(chosen)]
         relevant_ids = set(qrels["corpus-id"])
-        if source == "fiqa" and args.fiqa_distractors is not None:
+        if source in keeps:
             others = [i for i in corpus["_id"] if i not in relevant_ids]
-            keep = relevant_ids | set(rng.sample(others, min(args.fiqa_distractors, len(others))))
+            keep = relevant_ids | set(rng.sample(others, min(keeps[source], len(others))))
             corpus = corpus[corpus["_id"].isin(keep)].reset_index(drop=True)
         print(f"{source}: {len(corpus)} passages, {qrels['query-id'].nunique()} judged queries", file=sys.stderr)
 
