@@ -189,6 +189,10 @@ mixin _ChatScreenPush on _ChatScreenController {
       _openUtility('automations');
       return;
     }
+    if (opensImprovementSuggestions(type)) {
+      _openUtility('learning');
+      return;
+    }
     if (opensPeople(type)) {
       if (sourceId == null) {
         _openUtility('people');

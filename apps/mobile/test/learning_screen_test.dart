@@ -225,4 +225,104 @@ void main() {
     expect(find.text('Acting on its own'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  Map<String, Object?> status() => {
+    'settings': _settings(heartbeat: true),
+    'state': {'lastSummary': null},
+    'dreaming': {'lastSummary': null, 'diary': <Object>[]},
+    'activity': <Object>[],
+  };
+
+  Map<String, Object?> proposal(
+    String id,
+    String kind,
+    String status, {
+    bool canUndo = false,
+  }) => {
+    'id': id,
+    'kind': kind,
+    'title': 'Title $id',
+    'evidence': 'Evidence $id',
+    'confidence': 0.7,
+    'status': status,
+    'createdAt': DateTime.now().toIso8601String(),
+    'updatedAt': DateTime.now().toIso8601String(),
+    'canUndo': canUndo,
+  };
+
+  testWidgets('suggestions to review can be accepted or dismissed', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/learning/status', status());
+    http.on('GET', '/api/v1/improvements', [
+      proposal('p1', 'skill', 'pending'),
+      proposal('p2', 'memory', 'pending'),
+    ]);
+    http.on('POST', '/api/v1/improvements/p1/accept', {});
+    http.on('POST', '/api/v1/improvements/p2/dismiss', null, status: 204);
+    await show(tester);
+
+    expect(find.text('Suggestions to review'), findsOneWidget);
+    expect(find.text('Title p1'), findsOneWidget);
+    expect(find.text('Save skill'), findsOneWidget);
+    expect(find.text('Remember it'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('improvement-accept-p1')));
+    await tester.tap(find.byKey(const Key('improvement-accept-p1')));
+    await tester.pumpAndSettle();
+    expect(http.sent('POST', '/api/v1/improvements/p1/accept'), hasLength(1));
+
+    await tester.ensureVisible(find.byKey(const Key('improvement-dismiss-p2')));
+    await tester.tap(find.byKey(const Key('improvement-dismiss-p2')));
+    await tester.pumpAndSettle();
+    expect(http.sent('POST', '/api/v1/improvements/p2/dismiss'), hasLength(1));
+  });
+
+  testWidgets('what Jarvis saved on its own can be undone', (tester) async {
+    http.on('GET', '/api/v1/learning/status', status());
+    http.on('GET', '/api/v1/improvements', [
+      proposal('p3', 'memory', 'applied', canUndo: true),
+    ]);
+    http.on('POST', '/api/v1/improvements/p3/undo', null, status: 204);
+    await show(tester);
+
+    expect(find.text('Jarvis did this'), findsOneWidget);
+    expect(find.text('Saved automatically'), findsOneWidget);
+    expect(find.text('Suggestions to review'), findsNothing);
+
+    await tester.ensureVisible(find.byKey(const Key('improvement-undo-p3')));
+    await tester.tap(find.byKey(const Key('improvement-undo-p3')));
+    await tester.pumpAndSettle();
+
+    expect(http.sent('POST', '/api/v1/improvements/p3/undo'), hasLength(1));
+  });
+
+  testWidgets('an older server without improvements shows no section', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/learning/status', status());
+    await show(tester);
+
+    expect(find.byKey(const Key('improvement-suggestions')), findsNothing);
+  });
+
+  testWidgets('the improvement switches save the full learning settings', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/learning/status', status());
+    http.on('PUT', '/api/v1/settings/learning', _settings(heartbeat: true));
+    await show(tester);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('learning-proposeImprovements')),
+    );
+    await tester.tap(find.byKey(const Key('learning-proposeImprovements')));
+    await tester.pumpAndSettle();
+
+    final body =
+        http.sent('PUT', '/api/v1/settings/learning').single.body
+            as Map<String, dynamic>;
+    expect(body['proposeImprovements'], false);
+    expect(body['heartbeatEnabled'], true);
+  });
 }

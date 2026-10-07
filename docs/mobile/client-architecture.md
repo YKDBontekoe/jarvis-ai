@@ -38,13 +38,13 @@ root. It shares the existing account and owner-scoped data. See
 | `features/automations/`, `watches/`, `briefing/` | Automations, condition watches, daily briefing |
 | `features/notifications/` | Notification details and deep-link routing |
 | `features/settings/` | Models (Codex/OpenRouter), voice, nested settings hub |
-| `features/skills/`, `persona/`, `profiles/`, `learning/` | Owner tuning surfaces |
+| `features/skills/`, `persona/`, `profiles/`, `learning/` | Owner tuning surfaces. The Learning screen lists improvement proposals ("Suggestions to review", "Jarvis did this" with Undo) from `GET /improvements`; the section is hidden on older servers |
 | `features/channels/` | WhatsApp & Signal |
 | `features/whatsapp/` | WhatsApp page (Everything → WhatsApp) with account switching in the header and All/Unread/Groups filters; separate Choose chats screen for read-along selection; saved previews, unread counts, a Catch up card (summary and things to reply to, with Draft reply) at the top of a chat and a Catch up digest on the WhatsApp list and Chats tab, paginated conversations, reply drafts and Ask Jarvis |
 | `features/devices/` | This-device capabilities and telemetry |
 | `features/agents/` | Remote agent registry |
 | `features/coding/` | Coding runs list |
-| `features/usage/` | Usage dashboard |
+| `features/usage/` | Usage dashboard, including the "Jarvis is improving" card (hidden when the server sends no `improvement`) |
 | `features/voice/` | LiveKit stage, hands-free |
 
 Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide code: `main.dart`, `theme.dart`, `appearance.dart`, `app_lock.dart`, `error_reporting.dart`, and small helpers (`json_maps.dart`, `http_urls.dart`, `schedule_format.dart`), plus `api/`, `auth/`, `push/` and `ui/`. Put new screens in a feature folder.

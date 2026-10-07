@@ -206,9 +206,23 @@ Internal routes under `/voice/internal/{conversationId}/...` are for the voice r
 | PUT/DELETE `/push-devices` | FCM registration |
 | GET `/audit` | Append-only audit events |
 
+## Improvements
+
+Owner-scoped; see [memory-knowledge-learning.md](memory-knowledge-learning.md#signals-traces-and-improvement-proposals).
+
+| Route | Purpose |
+|-------|---------|
+| GET `/improvements` | Pending proposals (`id`, `kind`, `title`, `evidence`, `confidence`, `status`, `canUndo`) and recent changes that can still be undone |
+| POST `/improvements/refresh` | Run the skill and review miners now (honours `proposeImprovements`); returns the counts added |
+| POST `/improvements/{id}/accept` | Apply a pending proposal; idempotent. 404 if it is not the caller's or no longer valid |
+| POST `/improvements/{id}/dismiss` | Refuse a pending proposal for good; 404 otherwise |
+| POST `/improvements/{id}/undo` | Reverse an accepted or automatically applied change within 30 days |
+
+Accept, dismiss and undo are audited by id and kind only.
+
 ## Usage
 
-`GET /usage` — token and activity aggregates (see `UsageEndpoints`).
+`GET /usage` — token and activity aggregates (see `UsageEndpoints`). The response includes an `improvement` object (ratings and trend, regenerate rate, weak tools, learned skills, proposal counts).
 
 ## Remote agents (A2A management)
 

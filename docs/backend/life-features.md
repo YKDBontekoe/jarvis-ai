@@ -166,6 +166,8 @@ Jarvis looks for repeated behaviour in the life timeline and offers a ready auto
 - Accepting runs the definition through the validator and creates the automation as a **draft**; the owner still switches it on in the Automations screen. Each suggestion also returns the `AutomationSimulator` result (when, then, approvals) so the owner sees what it would do.
 - Endpoints: `GET /routines/suggestions`, `POST /routines/suggestions/refresh`, `POST /routines/suggestions/{id}/accept`, `POST /routines/suggestions/{id}/dismiss`. Tool: `GetRoutineSuggestions` (read-only; accepting stays in the app). Flutter shows them as "Suggested for you" at the top of Automations.
 
+Jarvis's own suggestions about itself (memories, skills, fixes) use the same pattern; see [Signals, traces and improvement proposals](memory-knowledge-learning.md#signals-traces-and-improvement-proposals). The `improvement.suggested` notification opens the Learning screen.
+
 ## Safety summary
 
 - All data is owner-scoped; audit events carry ids and counts, never message text, amounts, or page content.

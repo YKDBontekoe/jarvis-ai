@@ -8,6 +8,8 @@ bool opensDailyBriefing(String? type) => type == 'briefing.daily';
 
 bool opensWeeklyReview(String? type) => type == 'briefing.weekly';
 bool opensRoutineSuggestions(String? type) => type == 'routine.suggested';
+bool opensImprovementSuggestions(String? type) =>
+    type == 'improvement.suggested';
 bool opensHabits(String? type) => type == 'habit.checkin';
 bool opensPeople(String? type) =>
     type == 'people.birthday' ||

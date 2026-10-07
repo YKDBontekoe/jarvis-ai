@@ -41,6 +41,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Finance | `FinanceAgentTools` `GetFinanceOverview`, `GetBudgets`, `SetBudget`, `RemoveBudget`, `GetSubscriptions`, `SetSubscriptionStatus`, `RemindBeforeCharge`, `StartSubscriptionNegotiation`, `ImportBankStatement` | No approval; `ImportBankStatement` previews first. `StartSubscriptionNegotiation` only starts a drafting task: nothing is sent or contacted. Setters are hidden during background task turns |
 | Wealth | `WealthAgentTools` `GetAccounts`, `GetTransactions`, `GetPortfolio`, `AddAccount`, `LogIncome`, `RecordTrade`, `SetHoldingPrice` | No approval; they only change the owner's own finance data. Writers are hidden during background task turns. No investment advice |
 | Routines | `RoutineAgentTools` `GetRoutineSuggestions` | Read-only. Accepting or dismissing a suggestion is done in the app |
+| Improvements | `ImprovementAgentTools` `GetImprovementProposals` | Read-only. Accepting, dismissing and undoing stay with the owner in the app |
 | Decisions | `DecisionAgentTools` `LogDecision`, `ResolveDecision`, `GetDecisions`, `GetCalibration` | No approval; they only read and write the owner's own decision journal |
 | Relationship radar | `RadarAgentTools` `GetRelationshipRadar` | Read-only. Linking chats and the tone switch are done in the app |
 | Automation studio | `AutomationAgentTools` `PreviewAutomation`, `ListAutomationTemplates`, `CreateAutomationFromTemplate` | Preview saves nothing; templates create a draft that stays off |
