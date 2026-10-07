@@ -1,0 +1,50 @@
+== each route on each true question class (F1 / contains / LLM calls / searches)
+true class direct     n=30
+    run as direct     F1 0.789  contains 0.700  calls 1.00  searches 1.00
+    run as decompose  F1 0.661  contains 0.533  calls 2.00  searches 3.10
+    run as agentic    F1 0.718  contains 0.633  calls 2.10  searches 1.10
+true class decompose  n=30
+    run as direct     F1 0.656  contains 0.633  calls 1.00  searches 1.00
+    run as decompose  F1 0.654  contains 0.633  calls 2.00  searches 3.40
+    run as agentic    F1 0.772  contains 0.800  calls 3.70  searches 2.70
+true class agentic    n=30
+    run as direct     F1 0.275  contains 0.100  calls 1.00  searches 1.00
+    run as decompose  F1 0.270  contains 0.100  calls 2.00  searches 3.97
+    run as agentic    F1 0.480  contains 0.400  calls 5.83  searches 4.83
+
+== policies over all test questions
+policy                                       F1          95% CI  contains  LLM calls  searches  route mix d/c/a  agree w/ label
+always-direct                             0.573 [0.481,0.659]     0.478       1.00      1.00   90/  0/  0             0.33
+always-decompose                          0.528 [0.440,0.615]     0.422       2.00      3.49    0/ 90/  0             0.33
+always-agentic                            0.657 [0.572,0.746]     0.611       3.88      2.88    0/  0/ 90             0.33
+oracle (best F1, then cheapest)           0.760 [0.684,0.836]     0.678       1.76      1.79   63/ 12/ 15             0.41
+hop-count label (training target)         0.641 [0.555,0.720]     0.578       2.94      3.08   30/ 30/ 30             1.00
+router: length-tree                       0.647 [0.556,0.736]     0.567       2.74      3.06   30/ 36/ 24             0.63
+router: tfidf-lr                          0.613 [0.527,0.696]     0.533       2.48      2.92   36/ 37/ 17             0.77
+router: bge-small+lr                      0.643 [0.555,0.730]     0.567       2.60      2.90   31/ 35/ 24             0.72
+router: minilm-ft                         0.630 [0.544,0.715]     0.567       2.73      3.03   32/ 35/ 23             0.90
+router: zero-shot LLM (haiku)             0.581 [0.493,0.668]     0.500       2.24      2.90   36/ 42/ 12             0.71
+
+== paired F1 difference against always-agentic (negative = worse; cost saved in LLM calls)
+always-direct                            dF1 -0.084 [-0.178,+0.012]   LLM calls saved 74.2%
+always-decompose                         dF1 -0.129 [-0.217,-0.042]   LLM calls saved 48.4%
+oracle (best F1, then cheapest)          dF1 +0.103 [+0.051,+0.164]   LLM calls saved 54.7%
+hop-count label (training target)        dF1 -0.016 [-0.087,+0.056]   LLM calls saved 24.1%
+router: length-tree                      dF1 -0.010 [-0.083,+0.064]   LLM calls saved 29.2%
+router: tfidf-lr                         dF1 -0.045 [-0.126,+0.033]   LLM calls saved 36.1%
+router: bge-small+lr                     dF1 -0.014 [-0.082,+0.058]   LLM calls saved 33.0%
+router: minilm-ft                        dF1 -0.026 [-0.104,+0.053]   LLM calls saved 29.5%
+router: zero-shot LLM (haiku)            dF1 -0.076 [-0.162,+0.008]   LLM calls saved 42.1%
+
+== router classification quality (accuracy / macro-F1)
+length-tree    dev 0.699/0.701  test 0.633/0.641  assistant-style (out of domain) 0.528/0.521  0.0 ms/query
+tfidf-lr       dev 0.701/0.695  test 0.767/0.763  assistant-style (out of domain) 0.389/0.335  0.1 ms/query
+bge-small+lr   dev 0.730/0.729  test 0.722/0.722  assistant-style (out of domain) 0.333/0.207  18.6 ms/query
+minilm-ft      dev 0.885/0.885  test 0.900/0.899  assistant-style (out of domain) 0.361/0.250  12.5 ms/query
+zero-shot LLM  test 0.711  assistant-style 0.972
+
+== predicted route mix on BEIR-style single-hop questions (FiQA/NFCorpus), expected mostly direct
+length-tree    direct 88%  decompose 9%  agentic 3%
+tfidf-lr       direct 96%  decompose 3%  agentic 1%
+bge-small+lr   direct 96%  decompose 3%  agentic 0%
+minilm-ft      direct 100%  decompose 0%  agentic 0%

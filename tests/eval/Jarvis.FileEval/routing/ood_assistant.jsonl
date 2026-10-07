@@ -1,0 +1,36 @@
+{"text": "What is the monthly rent in my lease agreement?", "label": "direct"}
+{"text": "When does my car insurance policy expire?", "label": "direct"}
+{"text": "What's the WiFi password mentioned in the apartment welcome guide?", "label": "direct"}
+{"text": "How much was invoice 2024-117 from the plumber?", "label": "direct"}
+{"text": "What is my health insurance deductible?", "label": "direct"}
+{"text": "Which airline is my booking with for the Lisbon trip?", "label": "direct"}
+{"text": "What does the warranty on my dishwasher cover?", "label": "direct"}
+{"text": "What is the notice period in my employment contract?", "label": "direct"}
+{"text": "What time is the dentist appointment on Friday according to the confirmation email?", "label": "direct"}
+{"text": "Who is the landlord's contact person according to the rental contract?", "label": "direct"}
+{"text": "What was the total of my electricity bill in March?", "label": "direct"}
+{"text": "What's the cancellation policy of the hotel in the booking confirmation?", "label": "direct"}
+{"text": "Compare the notice periods in my employment contract and my lease.", "label": "decompose"}
+{"text": "Is my car insurance premium higher than my home insurance premium?", "label": "decompose"}
+{"text": "Which is cheaper, the plumber's quote or the electrician's quote?", "label": "decompose"}
+{"text": "What's the difference between my 2023 and 2024 rent amounts?", "label": "decompose"}
+{"text": "When does the warranty on my laptop end relative to my extended-care plan?", "label": "decompose"}
+{"text": "How much did I pay for utilities in January and in February combined?", "label": "decompose"}
+{"text": "Who signed the contract with the contractor, and what is their role at the company?", "label": "decompose"}
+{"text": "What is the deductible on my health plan and does it apply to dental?", "label": "decompose"}
+{"text": "Do the hotel booking dates match the dates on my flight tickets?", "label": "decompose"}
+{"text": "Which of my two credit cards has the lower annual fee?", "label": "decompose"}
+{"text": "How does the pension plan in the offer letter compare to my current employer's?", "label": "decompose"}
+{"text": "What city is the head office of the company that issued my insurance policy?", "label": "decompose"}
+{"text": "Go through all my contracts and tell me which ones auto-renew in the next six months and what I'd have to do to cancel each.", "label": "agentic"}
+{"text": "Find every document that mentions a payment deadline in the next month and build a prioritized to-do list.", "label": "agentic"}
+{"text": "Figure out why my electricity costs went up this year using my bills, my contract and the tariff change notices.", "label": "agentic"}
+{"text": "Summarize everything I've signed with the contractor, check it against the quote and flag any inconsistencies.", "label": "agentic"}
+{"text": "Which of my subscriptions overlap in features, and which could I cancel with the least penalty?", "label": "agentic"}
+{"text": "Trace the history of the leak problem in the apartment: who I contacted, what was promised, and what is still open.", "label": "agentic"}
+{"text": "Check all my insurance documents for gaps in coverage for the trip I'm planning to Japan.", "label": "agentic"}
+{"text": "Review the tax documents from the last three years and find deductions I might have missed.", "label": "agentic"}
+{"text": "Work out whether I can afford to buy the house given my income documents, loan offers and current expenses.", "label": "agentic"}
+{"text": "Find all the documents related to my father's estate and create a timeline of what needs to happen next.", "label": "agentic"}
+{"text": "Compare all three mortgage offers in detail, including fees and early repayment terms, and recommend one.", "label": "agentic"}
+{"text": "Look through my emails and documents to find out what I agreed to with the landlord about the deposit and whether he is keeping to it.", "label": "agentic"}

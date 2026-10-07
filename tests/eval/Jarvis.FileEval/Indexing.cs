@@ -96,15 +96,16 @@ internal static class Indexing
             """);
         command.Parameters.AddWithValue(Workspace.Owner);
         await using var reader = await command.ExecuteReaderAsync();
-        await using var output = new StreamWriter(workspace.ChunksPath, false, new UTF8Encoding(false));
-        var rows = 0;
+        var exported = new List<ChunkRow>();
         while (await reader.ReadAsync())
-        {
-            var row = new ChunkRow(reader.GetGuid(0), docByFile[reader.GetGuid(1)], reader.GetInt32(2), reader.GetInt32(3),
-                reader.GetInt32(4), reader.GetString(5));
-            await output.WriteLineAsync(JsonSerializer.Serialize(row, Json.Web));
-            rows++;
-        }
+            exported.Add(new ChunkRow(reader.GetGuid(0), docByFile[reader.GetGuid(1)], reader.GetInt32(2), reader.GetInt32(3),
+                reader.GetInt32(4), reader.GetString(5)));
+        // Document order, not file id order: the ids are random, so this keeps row numbers (and every embedding or run file
+        // keyed by them) stable when the same configuration is indexed again.
+        exported.Sort((a, b) => a.Doc != b.Doc ? a.Doc.CompareTo(b.Doc) : a.Index.CompareTo(b.Index));
+        await using var output = new StreamWriter(workspace.ChunksPath, false, new UTF8Encoding(false));
+        foreach (var row in exported) await output.WriteLineAsync(JsonSerializer.Serialize(row, Json.Web));
+        var rows = exported.Count;
         Console.WriteLine($"Exported {rows} chunks to {workspace.ChunksPath}.");
     }
 
