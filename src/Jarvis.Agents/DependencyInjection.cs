@@ -81,6 +81,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Finance.WealthToolContributor>();
         services.AddScoped<IAgentContextContributor, Finance.FinanceContextContributor>();
         services.AddScoped<IAgentToolContributor, Routines.RoutineToolContributor>();
+        services.AddScoped<IAgentToolContributor, Improvements.ImprovementToolContributor>();
         services.AddScoped<IAgentToolContributor, Decisions.DecisionToolContributor>();
         services.AddScoped<IAgentToolContributor, Library.LibraryToolContributor>();
         services.AddScoped<IAgentContextContributor, Library.LibraryContextContributor>();

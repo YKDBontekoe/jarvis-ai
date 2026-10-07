@@ -32,4 +32,5 @@ public static class SettingsSections
     public const string Autonomy = "autonomy";
     public const string PushDigest = "push-digest";
     public const string AutonomyUsage = "autonomy-usage";
+    public const string Improvements = "improvements";
 }

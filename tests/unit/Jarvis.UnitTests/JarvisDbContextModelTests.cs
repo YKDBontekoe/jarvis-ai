@@ -184,4 +184,16 @@ public sealed class JarvisDbContextModelTests
         foreach (var column in new[] { "MemoryIdsJson", "SkillsJson", "ToolsJson" })
             Assert.Equal("jsonb", trace.FindProperty(column)!.GetColumnType());
     }
+
+    [Fact]
+    public void Improvement_proposals_are_unique_per_owner_and_fingerprint_and_keep_their_payload_as_jsonb()
+    {
+        var proposal = Model.FindEntityType(typeof(ImprovementProposalEntity))!;
+        Assert.Equal("improvement_proposals", proposal.GetTableName());
+        Assert.Empty(proposal.GetForeignKeys());
+        Assert.Contains(proposal.GetIndexes(), index => index.IsUnique
+            && index.GetDatabaseName() == "ux_improvement_proposals_owner_fingerprint"
+            && index.Properties.Select(p => p.Name).SequenceEqual(new[] { "OwnerId", "Fingerprint" }));
+        Assert.Equal("jsonb", proposal.FindProperty("PayloadJson")!.GetColumnType());
+    }
 }

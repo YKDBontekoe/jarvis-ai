@@ -2,6 +2,7 @@ using System.Text.Json;
 using Jarvis.Agents.ModelProviders;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Improvements;
 using Jarvis.Application.Learning;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Persona;
@@ -27,7 +28,8 @@ public sealed class ReflectionService(
     INotificationRepository notifications,
     IAuditEventStore audit,
     IChatClientResolver chatClients,
-    ILogger<ReflectionService> logger)
+    ILogger<ReflectionService> logger,
+    IImprovementService? improvements = null)
 {
     internal const string PromptMarker = "You are Jarvis reflecting on recent work with your user";
     private const int MaxMessages = 60;
@@ -192,14 +194,27 @@ public sealed class ReflectionService(
             {
                 var content = item.Content?.Trim();
                 var kind = item.Kind?.Trim().ToLowerInvariant();
+                // With the proposal ledger, anything from 0.6 up is kept: clear ones are saved (and can be undone),
+                // the rest wait for the owner. Without it, only 0.8 and up is saved, as before.
+                var floor = improvements is null ? 0.8f : ImprovementRules.MemoryReviewMinConfidence;
                 if (!MemoryKinds.IsValid(kind) || string.IsNullOrWhiteSpace(content) || content.Length > 500 ||
-                    item.Confidence is < 0.8f or > 1f || item.Importance is < 0f or > 1f ||
+                    item.Confidence < floor || item.Confidence > 1f || item.Importance is < 0f or > 1f ||
                     MemoryAgentTools.LooksLikeSecret(content) || !existing.Add(Normalize(content)))
                     continue;
-                await memories.CreateAsync(ownerId, kind, content, item.Importance, item.Confidence, null, false,
-                    cancellationToken, sourceType: "conversation", sourceId: messageId,
-                    profileId: learningScope.ProfileId);
-                memoriesSaved++;
+                if (improvements is null)
+                {
+                    await memories.CreateAsync(ownerId, kind, content, item.Importance, item.Confidence, null, false,
+                        cancellationToken, sourceType: "conversation", sourceId: messageId,
+                        profileId: learningScope.ProfileId);
+                    memoriesSaved++;
+                    continue;
+                }
+
+                var saved = await improvements.SaveOrProposeMemoryAsync(ownerId,
+                    new MemoryCandidate(kind, content, item.Importance, item.Confidence, learningScope.ProfileId,
+                        messageId, "Noticed in your recent chats."), settings.AutoApplyLowRiskMemory,
+                    cancellationToken);
+                if (saved == MemoryOutcome.Saved) memoriesSaved++;
             }
         }
         return new ReflectionOutcome(added, reinforced, skillsSaved, memoriesSaved, 0, 0);

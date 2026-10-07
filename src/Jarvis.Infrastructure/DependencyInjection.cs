@@ -72,6 +72,8 @@ public static class DependencyInjection
         services.AddScoped<IApprovalPolicy, ApprovalPolicy>();
         services.AddScoped<Jarvis.Application.Memory.IConversationMemoryGate, Jarvis.Application.Memory.ConversationMemoryGate>();
         services.AddScoped<Jarvis.Application.Learning.ILearningStore, LearningStore>();
+        services.AddScoped<Jarvis.Application.Improvements.IImprovementRepository, ImprovementRepository>();
+        services.AddScoped<Jarvis.Application.Improvements.IImprovementService, Jarvis.Application.Improvements.ImprovementService>();
         services.AddScoped<Jarvis.Application.Learning.ITurnTraceCollector, Jarvis.Application.Learning.TurnTraceCollector>();
         services.AddSingleton<Jarvis.Application.Learning.ILearningRecorder, LearningRecorder>();
         services.AddScoped<IAuditEventStore, AuditEventStore>();

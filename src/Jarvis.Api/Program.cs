@@ -117,6 +117,7 @@ api.MapPortfolioEndpoints(app.Logger);
 api.MapLibraryEndpoints(app.Logger);
 api.MapModeEndpoints(app.Logger);
 api.MapRoutineEndpoints(app.Logger);
+api.MapImprovementEndpoints();
 api.MapDecisionEndpoints(app.Logger);
 api.MapMissionEndpoints(app.Logger);
 

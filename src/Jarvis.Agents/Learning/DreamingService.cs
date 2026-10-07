@@ -2,6 +2,7 @@ using System.Text.Json;
 using Jarvis.Agents.ModelProviders;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Improvements;
 using Jarvis.Application.Learning;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Persona;
@@ -30,7 +31,8 @@ public sealed class DreamingService(
     IChatClientResolver chatClients,
     IMemoryRecallTracker recalls,
     ILogger<DreamingService> logger,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    IImprovementService? improvements = null)
 {
     internal const string PromptMarker = "You are Jarvis dreaming: consolidating memory the way sleep consolidates human memory";
     internal const string SummaryPromptMarker =
@@ -455,6 +457,17 @@ public sealed class DreamingService(
                 ? found
                 : MessageLearningScope.Default;
             if (!scope.AllowRemember) continue;
+            if (improvements is not null)
+            {
+                // Through the ledger: saved memories can be undone, and with auto-apply off they wait for review.
+                var outcome = await improvements.SaveOrProposeMemoryAsync(ownerId,
+                    new MemoryCandidate(kind, content, item.Importance, item.Confidence, scope.ProfileId,
+                        candidate.SourceMessageId, "Seen again across several conversations."),
+                    settings.AutoApplyLowRiskMemory, cancellationToken);
+                if (outcome == MemoryOutcome.Saved) promoted++;
+                continue;
+            }
+
             var created = await memories.CreateAsync(ownerId, kind, content, item.Importance, item.Confidence, null,
                 false, cancellationToken, sourceType: "conversation", sourceId: candidate.SourceMessageId,
                 profileId: scope.ProfileId);
