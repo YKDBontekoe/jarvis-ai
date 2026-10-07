@@ -169,7 +169,8 @@ public sealed record UsageDashboard(
     ProviderUsage? Other,
     IReadOnlyList<DailyUsagePoint> Daily,
     string? ChartNote,
-    IReadOnlyList<ModelUsageRow> Models);
+    IReadOnlyList<ModelUsageRow> Models,
+    ImprovementSnapshot? Improvement = null);
 
 public interface IUsageDashboard
 {
