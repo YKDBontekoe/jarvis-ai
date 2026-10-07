@@ -13,6 +13,7 @@ import '../../api/api_config.dart';
 import '../coding/coding_run_detail_screen.dart';
 import '../automations/automations_screen.dart';
 import '../habits/habits_screen.dart';
+import '../learning/learning_screen.dart';
 import '../briefing/daily_briefing_screen.dart';
 import '../devices/device_sensors.dart';
 import '../devices/place_reminder_tracker.dart';
@@ -607,6 +608,12 @@ abstract class _RemindersController extends State<RemindersScreen>
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
           builder: (_) => AutomationsScreen(http: widget.http),
+        ),
+      );
+    } else if (opensImprovementSuggestions(type)) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => LearningScreen(http: widget.http),
         ),
       );
     } else if (opensTaskDetails(type) && sourceId != null) {

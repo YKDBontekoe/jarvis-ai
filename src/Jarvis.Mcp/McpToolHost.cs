@@ -21,6 +21,18 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
     private bool _initialized;
 
     public IReadOnlyList<AITool> Tools => _tools;
+
+    private readonly HashSet<string> _readOnlyTools = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// True for an integration tool whose server declared it read-only (and not destructive). It is a claim by the
+    /// server, so the approval policy only acts on it when the owner allows that.
+    /// </summary>
+    public bool IsReadOnlyTool(string toolName) => _readOnlyTools.Contains(toolName);
+
+    /// <summary>Only an explicit read-only hint counts; the MCP default is "not read-only".</summary>
+    public static bool DeclaresReadOnly(ModelContextProtocol.Protocol.ToolAnnotations? annotations) =>
+        annotations is { ReadOnlyHint: true } && annotations.DestructiveHint != true;
     public IReadOnlyList<McpServerConnectionStatus> Statuses => _statuses;
 
     public async Task<IReadOnlyList<string>> DiscoverToolsAsync(string endpoint,
@@ -182,9 +194,10 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                         ? function
                         : new SecretRedactingAIFunction(function, transportSecrets);
                     protectedFunction = new GuardedMcpTool(protectedFunction, this, serverKey, tool.Name);
-                    return autoApproved.Contains(tool.Name)
-                        ? (AITool)protectedFunction
-                        : new ApprovalRequiredAIFunction(protectedFunction);
+                    if (autoApproved.Contains(tool.Name)) return (AITool)protectedFunction;
+                    if (tool is McpClientTool mcpTool && DeclaresReadOnly(mcpTool.ProtocolTool.Annotations))
+                        _readOnlyTools.Add(tool.Name);
+                    return new ApprovalRequiredAIFunction(protectedFunction);
                 }).ToArray();
                 var missing = allowAllTools || server.OwnerNarrowed
                     ? []

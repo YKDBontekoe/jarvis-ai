@@ -888,6 +888,12 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("Armed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("armed");
+
                     b.Property<string>("Comparison")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -896,6 +902,12 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
+
+                    b.Property<int>("CooldownMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("cooldown_minutes");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -927,6 +939,10 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_checked_at");
 
+                    b.Property<DateTimeOffset?>("LastTriggeredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_triggered_at");
+
                     b.Property<double?>("LastValue")
                         .HasColumnType("double precision")
                         .HasColumnName("last_value");
@@ -951,6 +967,12 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("double precision")
                         .HasColumnName("radius_meters");
 
+                    b.Property<bool>("Repeat")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("repeat");
+
                     b.Property<DateTimeOffset?>("ScheduleDispatchedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("schedule_dispatched_at");
@@ -968,6 +990,12 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<int>("TriggerCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("trigger_count");
 
                     b.Property<string>("Url")
                         .IsRequired()
@@ -2738,6 +2766,82 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.ImprovementProposalEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<double>("Confidence")
+                        .HasColumnType("double precision")
+                        .HasColumnName("confidence");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Evidence")
+                        .IsRequired()
+                        .HasMaxLength(600)
+                        .HasColumnType("character varying(600)")
+                        .HasColumnName("evidence");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("fingerprint");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload_json");
+
+                    b.Property<Guid?>("ResultingRef")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resulting_ref");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "Fingerprint")
+                        .IsUnique()
+                        .HasDatabaseName("ux_improvement_proposals_owner_fingerprint");
+
+                    b.HasIndex("OwnerId", "Status");
+
+                    b.ToTable("improvement_proposals", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_improvement_proposals_kind", "kind IN ('memory', 'skill', 'review')");
+
+                            t.HasCheckConstraint("ck_improvement_proposals_status", "status IN ('pending', 'accepted', 'applied', 'dismissed', 'undone')");
+                        });
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.InboxThreadEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2986,6 +3090,61 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_journal_entries_stress", "stress IS NULL OR stress BETWEEN 1 AND 5");
                         });
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.LearningSignalEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("category");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ErrorKind")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("error_kind");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid?>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<Guid?>("ProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_id");
+
+                    b.Property<string>("Tool")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("tool");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "CreatedAt");
+
+                    b.HasIndex("OwnerId", "Kind", "CreatedAt");
+
+                    b.ToTable("learning_signals", (string)null);
                 });
 
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.LibraryItemEntity", b =>
@@ -4106,6 +4265,71 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_subscriptions_status", "status IN ('active', 'dismissed', 'cancelled')");
                         });
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.TurnTraceEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("MemoryIdsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("memory_ids_json");
+
+                    b.Property<Guid?>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<Guid?>("ProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_id");
+
+                    b.Property<string>("SkillsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("skills_json");
+
+                    b.Property<string>("ToolsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("tools_json");
+
+                    b.Property<int>("TotalMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_ms");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "CreatedAt");
+
+                    b.HasIndex("OwnerId", "MessageId");
+
+                    b.ToTable("turn_traces", (string)null);
                 });
 
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.UiSurfaceEntity", b =>

@@ -26,6 +26,7 @@ public sealed class WorkerTemporalRegistrationTests
             typeof(Jarvis.Worker.AutomationPollActivities),
             typeof(Jarvis.Worker.Activities.WeeklyReviewActivities),
             typeof(Jarvis.Worker.Activities.HabitCheckInActivities),
+            typeof(Jarvis.Worker.Activities.PeopleCheckInActivities),
         };
 
         var discovered = implementationTypes
@@ -60,6 +61,7 @@ public sealed class WorkerTemporalRegistrationTests
             typeof(AutomationPollWorkflow),
             typeof(WeeklyReviewWorkflow),
             typeof(HabitCheckInWorkflow),
+            typeof(PeopleCheckInWorkflow),
         };
 
         var discovered = workflowTypes
@@ -74,5 +76,13 @@ public sealed class WorkerTemporalRegistrationTests
             .ToArray();
 
         Assert.Equal(expected, discovered);
+    }
+
+    [Fact]
+    public void Mission_supervisor_polls_faster_while_a_mission_is_running()
+    {
+        Assert.Equal(Jarvis.Worker.MissionSupervisor.BusyInterval, Jarvis.Worker.MissionSupervisor.NextInterval(1));
+        Assert.Equal(Jarvis.Worker.MissionSupervisor.IdleInterval, Jarvis.Worker.MissionSupervisor.NextInterval(0));
+        Assert.True(Jarvis.Worker.MissionSupervisor.BusyInterval < Jarvis.Worker.MissionSupervisor.IdleInterval);
     }
 }

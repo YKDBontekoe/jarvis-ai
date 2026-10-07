@@ -1,3 +1,4 @@
+using Jarvis.Application.Improvements;
 using Jarvis.Application.Learning;
 using Jarvis.Application.Routines;
 using Jarvis.Application.Settings;
@@ -20,8 +21,9 @@ internal sealed class AssistantDreamingActivities(IServiceScopeFactory scopeFact
         await using var scope = scopeFactory.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var settings = await services.GetRequiredService<IOwnerSettingsStore>()
-            .GetAsync<LearningSettings>(input.OwnerId, SettingsSections.Learning, cancellationToken);
-        if (settings is not { DreamingEnabled: true })
+            .GetAsync<LearningSettings>(input.OwnerId, SettingsSections.Learning, cancellationToken)
+            ?? LearningSettings.Default;
+        if (!settings.DreamingEnabled)
             return new DreamingRunResult(false, 0);
         services.GetRequiredService<WorkerCurrentUser>().SetOwner(input.OwnerId);
         await services.GetRequiredService<Jarvis.Agents.Learning.DreamingService>()
@@ -36,6 +38,28 @@ internal sealed class AssistantDreamingActivities(IServiceScopeFactory scopeFact
         {
             services.GetRequiredService<ILogger<AssistantDreamingActivities>>()
                 .LogWarning(exception, "Routine suggestions could not be refreshed after dreaming.");
+        }
+        try
+        {
+            // Skills worth saving and things worth a second look are offered for review, never applied here.
+            await services.GetRequiredService<IImprovementMiner>().RefreshAsync(input.OwnerId, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            services.GetRequiredService<ILogger<AssistantDreamingActivities>>()
+                .LogWarning(exception, "Improvement proposals could not be mined after dreaming.");
+        }
+        try
+        {
+            // Old run traces and signals are dropped here so they never grow without bound.
+            var now = DateTimeOffset.UtcNow;
+            await services.GetRequiredService<ILearningStore>().PruneAsync(input.OwnerId, settings.TraceCutoff(now),
+                LearningSettings.SignalCutoff(now), cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            services.GetRequiredService<ILogger<AssistantDreamingActivities>>()
+                .LogWarning(exception, "Old learning traces could not be pruned after dreaming.");
         }
         var briefing = await services.GetRequiredService<IDailyBriefingRepository>()
             .GetAsync(input.OwnerId, cancellationToken);

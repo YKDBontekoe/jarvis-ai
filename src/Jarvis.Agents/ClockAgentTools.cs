@@ -17,11 +17,18 @@ internal sealed class ClockAgentTools(TimeProvider clock)
         return Describe(clock.GetUtcNow(), zone);
     }
 
-    internal static string Describe(DateTimeOffset utcNow, TimeZoneInfo zone)
+    /// <summary>
+    /// Without <paramref name="includeSeconds"/> the text only changes once a minute, which keeps the per-turn context
+    /// stable enough for the model's prompt cache.
+    /// </summary>
+    internal static string Describe(DateTimeOffset utcNow, TimeZoneInfo zone, bool includeSeconds = true)
     {
         var local = TimeZoneInfo.ConvertTime(utcNow, zone);
-        return $"{zone.Id}: {local.ToString("dddd yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)} " +
-               $"(ISO {local.ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture)}, UTC offset {FormatOffset(local.Offset)})";
+        var (display, iso) = includeSeconds
+            ? ("dddd yyyy-MM-dd HH:mm:ss", "yyyy-MM-ddTHH:mm:sszzz")
+            : ("dddd yyyy-MM-dd HH:mm", "yyyy-MM-ddTHH:mmzzz");
+        return $"{zone.Id}: {local.ToString(display, CultureInfo.InvariantCulture)} " +
+               $"(ISO {local.ToString(iso, CultureInfo.InvariantCulture)}, UTC offset {FormatOffset(local.Offset)})";
     }
 
     internal static bool TryFindTimeZone(string? timeZoneId, out TimeZoneInfo zone)
@@ -56,11 +63,11 @@ internal sealed class ClockContextProvider(IDailyBriefingRepository briefings, G
         CancellationToken cancellationToken = default)
     {
         var now = clock.GetUtcNow();
-        var text = "Current time reference: " + ClockAgentTools.Describe(now, TimeZoneInfo.Utc) + ".";
+        var text = "Current time reference: " + ClockAgentTools.Describe(now, TimeZoneInfo.Utc, includeSeconds: false) + ".";
         var preference = await briefings.GetAsync(ownerId, cancellationToken);
         if (preference is not null && ClockAgentTools.TryFindTimeZone(preference.TimeZoneId, out var zone) &&
             zone != TimeZoneInfo.Utc)
-            text += " The user's configured local time zone is " + ClockAgentTools.Describe(now, zone) + ".";
+            text += " The user's configured local time zone is " + ClockAgentTools.Describe(now, zone, includeSeconds: false) + ".";
         else
             text += " The user's local time zone is not configured; ask for it when a local time matters.";
         return [new ChatMessage(ChatRole.User, text)];

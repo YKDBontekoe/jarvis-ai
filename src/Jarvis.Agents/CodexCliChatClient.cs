@@ -43,6 +43,8 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
     private const int MaxTotalImageDataLength = 16_000_000;
     private const int MaxImageCount = 4;
     private static readonly TimeSpan ModelCatalogLifetime = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan GracefulExitWait = TimeSpan.FromMilliseconds(300);
+    private static readonly TimeSpan StderrDrainWait = TimeSpan.FromMilliseconds(500);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     // Prompt text is not HTML; keep '+', quotes-in-text, and non-ASCII readable while
     // control characters and newlines stay escaped so a value cannot forge a role marker.
@@ -84,7 +86,8 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         var prompt = BuildPrompt(messages, options, tools, enableWebSearch, _access.AllowShell);
         return await RunCodexAsync(prompt, options?.ModelId ?? model,
             GetReasoningEffort(options),
-            tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal), null, cancellationToken);
+            tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal), null, IsBackground(options),
+            cancellationToken);
     }
 
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
@@ -100,7 +103,8 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         });
         var runTask = RunCodexAsync(prompt, options?.ModelId ?? model,
             GetReasoningEffort(options),
-            tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal), updates.Writer, cancellationToken);
+            tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal), updates.Writer, IsBackground(options),
+            cancellationToken);
         try
         {
             await foreach (var update in updates.Reader.ReadAllAsync(cancellationToken))
@@ -115,6 +119,14 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
 
     public object? GetService(Type serviceType, object? serviceKey = null) =>
         serviceType.IsInstanceOfType(this) ? this : null;
+
+    /// <summary>Set by the model resolver for work that must not take the last process slot from an interactive turn.</summary>
+    internal const string BackgroundPriorityProperty = "jarvis_background";
+
+    private static bool IsBackground(ChatOptions? options) =>
+        options?.AdditionalProperties is not null &&
+        options.AdditionalProperties.TryGetValue(BackgroundPriorityProperty, out var flag) &&
+        flag is true;
 
     private static string? GetReasoningEffort(ChatOptions? options) =>
         options?.AdditionalProperties is not null &&
@@ -140,9 +152,9 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
 
     private async Task<ChatResponse> RunCodexAsync(PromptPayload prompt, string? requestedModel,
         string? reasoningEffort, IReadOnlySet<string> toolNames,
-        ChannelWriter<ChatResponseUpdate>? updates, CancellationToken cancellationToken)
+        ChannelWriter<ChatResponseUpdate>? updates, bool background, CancellationToken cancellationToken)
     {
-        await _processSlots.WaitAsync(cancellationToken);
+        await _processSlots.WaitAsync(background, cancellationToken);
         var scratch = Path.Combine(Path.GetTempPath(), "jarvis-codex-" + Guid.NewGuid().ToString("N"));
         try
         {
@@ -340,8 +352,10 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
                         ModelId = resolvedModel,
                         Contents = [new UsageContent(reportedUsage)]
                     });
+                // The thread is ephemeral and the response is complete, so nothing is left worth waiting for:
+                // give the process a moment to exit on its own, then kill it. This sits on every tool step.
                 writer.Close();
-                using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                using var shutdown = new CancellationTokenSource(GracefulExitWait);
                 try { await process.WaitForExitAsync(shutdown.Token); }
                 catch (OperationCanceledException) { process.Kill(entireProcessTree: true); }
                 return new ChatResponse(assistant) { ModelId = resolvedModel, Usage = reportedUsage };
@@ -351,7 +365,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
                 try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
                 catch (InvalidOperationException) { }
                 catch (System.ComponentModel.Win32Exception) { }
-                try { await stderrTask.WaitAsync(TimeSpan.FromSeconds(2)); }
+                try { await stderrTask.WaitAsync(StderrDrainWait); }
                 catch (TimeoutException) { }
                 catch (OperationCanceledException) { }
             }
@@ -361,7 +375,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
             try { Directory.Delete(scratch, recursive: true); }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
-            _processSlots.Release();
+            _processSlots.Release(background);
             updates?.TryComplete();
         }
     }

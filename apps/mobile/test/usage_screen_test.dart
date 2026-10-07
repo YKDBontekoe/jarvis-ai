@@ -148,4 +148,68 @@ void main() {
     expect(find.byKey(const Key('usage-period-30d')), findsOneWidget);
     expect(http.sent('GET', '/api/v1/usage').length, 2);
   });
+
+  testWidgets('the improvement card summarises ratings, tools and suggestions', (
+    tester,
+  ) async {
+    final http = FixtureHttp()
+      ..on('GET', '/api/v1/usage', {
+        ..._usage(),
+        'improvement': {
+          'thumbsUp': 8,
+          'thumbsDown': 2,
+          'previousThumbsUp': 5,
+          'previousThumbsDown': 5,
+          'trend': 'better',
+          'regenerates': 3,
+          'regenerateRate': 0.25,
+          'denials': 1,
+          'weakTools': [
+            {'tool': 'PostSlack', 'calls': 8, 'failed': 6, 'failureRate': 0.75},
+          ],
+          'skillsLearned': 2,
+          'proposals': {
+            'pending': 2,
+            'accepted': 1,
+            'applied': 2,
+            'dismissed': 1,
+            'undone': 0,
+          },
+          'acceptanceRate': 0.75,
+        },
+      });
+    tester.view.physicalSize = const Size(900, 3000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(home: UsageScreen(http: http.client())),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('usage-improvement')), findsOneWidget);
+    expect(find.text('Jarvis is improving'), findsOneWidget);
+    expect(find.textContaining('8 liked, 2 not'), findsOneWidget);
+    expect(find.textContaining('better than the period before'), findsOneWidget);
+    expect(find.textContaining('Redid 25% of replies'), findsOneWidget);
+    expect(find.textContaining('PostSlack: failed 6 of 8'), findsOneWidget);
+    expect(find.textContaining('accept 75%'), findsOneWidget);
+    expect(find.text('2 to review'), findsOneWidget);
+  });
+
+  testWidgets('an older server without improvement data hides the card', (
+    tester,
+  ) async {
+    final http = FixtureHttp()..on('GET', '/api/v1/usage', _usage());
+    tester.view.physicalSize = const Size(900, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(home: UsageScreen(http: http.client())),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('usage-improvement')), findsNothing);
+  });
 }

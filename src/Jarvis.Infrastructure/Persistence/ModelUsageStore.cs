@@ -1,7 +1,9 @@
 using System.Text.Json;
+using Jarvis.Application.Improvements;
 using Jarvis.Application.Learning;
 using Jarvis.Application.Persona;
 using Jarvis.Application.Settings;
+using Jarvis.Application.Skills;
 using Jarvis.Application.Usage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -136,8 +138,61 @@ public sealed class UsageDashboardService(JarvisDbContext db) : IUsageDashboard
 
         var activity = await LoadActivityAsync(ownerId, from, now, cancellationToken);
         var personalization = await LoadPersonalizationAsync(ownerId, now, cancellationToken);
+        var improvement = await LoadImprovementAsync(ownerId, from, now, activity, cancellationToken);
         return UsageDashboardComposer.Compose(new UsageComposeInput(
-            now, period, zone.Id, models, points, lifetime, activity, personalization));
+            now, period, zone.Id, models, points, lifetime, activity, personalization, improvement));
+    }
+
+    private const int MaxTracesForReliability = 5_000;
+
+    private async Task<ImprovementSnapshot> LoadImprovementAsync(Guid ownerId, DateTimeOffset from,
+        DateTimeOffset now, UsageActivity activity, CancellationToken cancellationToken)
+    {
+        // The period before this one, of the same length. All-time has nothing before it.
+        var previousFrom = from == DateTimeOffset.UnixEpoch ? from : from - (now - from);
+        var signals = await db.LearningSignals.AsNoTracking()
+            .Where(item => item.OwnerId == ownerId && item.CreatedAt >= previousFrom && item.CreatedAt <= now)
+            .GroupBy(item => item.Kind)
+            .Select(group => new
+            {
+                Kind = group.Key,
+                Current = group.Count(item => item.CreatedAt >= from),
+                Previous = group.Count(item => item.CreatedAt < from)
+            })
+            .ToListAsync(cancellationToken);
+        int Current(string kind) => signals.FirstOrDefault(item => item.Kind == kind)?.Current ?? 0;
+        int Previous(string kind) => signals.FirstOrDefault(item => item.Kind == kind)?.Previous ?? 0;
+
+        var toolJson = await db.TurnTraces.AsNoTracking()
+            .Where(item => item.OwnerId == ownerId && item.CreatedAt >= from && item.CreatedAt <= now)
+            .OrderByDescending(item => item.CreatedAt)
+            .Select(item => item.ToolsJson)
+            .Take(MaxTracesForReliability)
+            .ToListAsync(cancellationToken);
+        var tools = toolJson
+            .SelectMany(json => Deserialize<List<TurnToolCall>>(json) ?? [])
+            .GroupBy(call => call.Tool, StringComparer.Ordinal)
+            .Select(group => new ToolReliability(group.Key, group.Count(),
+                group.Count(call => call.Outcome == ToolOutcomes.Failed), 0))
+            .ToArray();
+
+        var learnedSkills = await db.Skills.AsNoTracking().CountAsync(item => item.OwnerId == ownerId
+            && item.Source == SkillSources.Learned && item.Status == SkillStatuses.Active, cancellationToken);
+        var proposalRows = await db.ImprovementProposals.AsNoTracking()
+            .Where(item => item.OwnerId == ownerId)
+            .GroupBy(item => item.Status)
+            .Select(group => new { Status = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
+        int Proposals(string status) => proposalRows.FirstOrDefault(item => item.Status == status)?.Count ?? 0;
+
+        return ImprovementMetrics.Compute(new ImprovementInputs(
+            Current(LearningSignalKinds.ThumbsUp), Current(LearningSignalKinds.ThumbsDown),
+            Previous(LearningSignalKinds.ThumbsUp), Previous(LearningSignalKinds.ThumbsDown),
+            Current(LearningSignalKinds.Regenerate), activity.AssistantReplies.InPeriod,
+            Current(LearningSignalKinds.ApprovalDenied), tools, learnedSkills,
+            new ProposalCounts(Proposals(ImprovementStatuses.Pending), Proposals(ImprovementStatuses.Accepted),
+                Proposals(ImprovementStatuses.Applied), Proposals(ImprovementStatuses.Dismissed),
+                Proposals(ImprovementStatuses.Undone))));
     }
 
     private async Task<PersonalizationSnapshot> LoadPersonalizationAsync(Guid ownerId, DateTimeOffset now,

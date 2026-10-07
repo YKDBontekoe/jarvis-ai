@@ -79,7 +79,9 @@ internal sealed class KnowledgeGraphContextProvider(IKnowledgeGraphRepository gr
     protected override async ValueTask<IEnumerable<ChatMessage>> ProvideMessagesAsync(InvokingContext context,
         CancellationToken cancellationToken = default)
     {
-        var query = context.RequestMessages?.Where(message => message.Role == ChatRole.User).LastOrDefault()?.Text;
+        // A resumed run ends with an approval response that carries no text; it must not hide the question before it.
+        var query = context.RequestMessages?.Where(message => message.Role == ChatRole.User)
+            .Select(message => message.Text).LastOrDefault(text => !string.IsNullOrWhiteSpace(text));
         if (string.IsNullOrWhiteSpace(query)) return [];
         var mentioned = await graph.FindMentionedAsync(ownerId, query, MaxEntities, cancellationToken);
         if (mentioned.Count == 0) return [];

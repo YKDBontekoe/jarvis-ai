@@ -42,4 +42,100 @@ public sealed class AgentFailureMessageTests
         var message = AgentFailureMessage.For(new InvalidOperationException("secret path /home/x"));
         Assert.Equal(ConversationTurnService.FailureMessage, message);
     }
+
+    [Theory]
+    [InlineData("Codex CLI app-server exited unexpectedly: segfault", true)]
+    [InlineData("Codex CLI app-server returned no thread identifier.", true)]
+    [InlineData("Codex CLI streamed a non-prefix assistant response.", true)]
+    [InlineData("Codex CLI app-server rejected the model turn: invalid model", false)]
+    [InlineData("secret path /home/x", false)]
+    public void Only_process_and_connection_failures_are_worth_a_second_attempt(string message, bool retryable) =>
+        Assert.Equal(retryable, AgentFailureMessage.IsRetryable(new InvalidOperationException(message)));
+
+    [Fact]
+    public void Timeouts_and_broken_connections_are_retryable_even_when_nested()
+    {
+        Assert.True(AgentFailureMessage.IsRetryable(new TimeoutException()));
+        Assert.True(AgentFailureMessage.IsRetryable(new IOException("pipe closed")));
+        Assert.True(AgentFailureMessage.IsRetryable(new InvalidOperationException("run", new HttpRequestException("reset"))));
+    }
+
+    [Theory]
+    [InlineData("401 Unauthorized")]
+    [InlineData("429 Too Many Requests")]
+    [InlineData("Could not start the Codex CLI process: No such file or directory")]
+    public void Signed_out_rate_limited_and_missing_cli_failures_are_never_retried(string message) =>
+        Assert.False(AgentFailureMessage.IsRetryable(new TimeoutException(message)));
+
+    [Fact]
+    public async Task A_failure_before_any_output_is_tried_once_more()
+    {
+        var calls = 0;
+        var retried = new List<Exception>();
+
+        var result = await ConversationTurnService.RetryWhenNothingHappenedAsync(_ =>
+        {
+            calls++;
+            return calls == 1 ? throw new TimeoutException() : Task.FromResult("ok");
+        }, retried.Add, CancellationToken.None);
+
+        Assert.Equal("ok", result);
+        Assert.Equal(2, calls);
+        Assert.Single(retried);
+    }
+
+    [Fact]
+    public async Task A_failure_after_output_is_never_repeated_so_nothing_is_said_or_done_twice()
+    {
+        var calls = 0;
+
+        await Assert.ThrowsAsync<TimeoutException>(() => ConversationTurnService.RetryWhenNothingHappenedAsync<string>(
+            produced =>
+            {
+                calls++;
+                produced();
+                throw new TimeoutException();
+            }, null, CancellationToken.None));
+
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task A_second_failure_and_non_retryable_failures_propagate()
+    {
+        var timeouts = 0;
+        await Assert.ThrowsAsync<TimeoutException>(() => ConversationTurnService.RetryWhenNothingHappenedAsync<string>(
+            _ =>
+            {
+                timeouts++;
+                throw new TimeoutException();
+            }, null, CancellationToken.None));
+        Assert.Equal(2, timeouts);
+
+        var permanent = 0;
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            ConversationTurnService.RetryWhenNothingHappenedAsync<string>(_ =>
+            {
+                permanent++;
+                throw new InvalidOperationException("Codex CLI app-server rejected the model turn");
+            }, null, CancellationToken.None));
+        Assert.Equal(1, permanent);
+    }
+
+    [Fact]
+    public async Task A_cancelled_run_is_not_retried()
+    {
+        using var cts = new CancellationTokenSource();
+        var calls = 0;
+
+        await Assert.ThrowsAsync<TimeoutException>(() => ConversationTurnService.RetryWhenNothingHappenedAsync<string>(
+            _ =>
+            {
+                calls++;
+                cts.Cancel();
+                throw new TimeoutException();
+            }, null, cts.Token));
+
+        Assert.Equal(1, calls);
+    }
 }

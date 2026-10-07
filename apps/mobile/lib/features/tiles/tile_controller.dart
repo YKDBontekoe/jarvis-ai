@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../json_maps.dart';
+import '../../schedule_format.dart' show deviceTimeZoneLookup;
 import 'tile_actions.dart';
 import 'tile_layout.dart';
 import 'tile_models.dart';
@@ -106,9 +107,14 @@ class TileLayoutController extends ChangeNotifier {
 /// Loads what tiles show. Tiles that read the home briefing share one request
 /// until [invalidate] is called.
 class TileDataSource {
-  TileDataSource(this.http, {this.clock});
+  TileDataSource(this.http, {this.clock, this.ensureMorningBriefing = false});
 
   final Dio http;
+
+  /// Whether the first successful load also asks the server to turn the
+  /// morning briefing on for an owner who never configured it. Off by default
+  /// so tile tests do not touch the platform time zone.
+  final bool ensureMorningBriefing;
 
   /// Replaces the wall clock in tests.
   final DateTime Function()? clock;
@@ -146,6 +152,7 @@ class TileDataSource {
     try {
       final response = await http.get<dynamic>('/api/v1/home');
       final data = response.data;
+      if (ensureMorningBriefing) unawaited(_ensureMorningBriefing());
       return lastBriefing = data is Map
           ? Map<String, dynamic>.from(data)
           : null;
@@ -153,6 +160,26 @@ class TileDataSource {
       return null;
     } catch (_) {
       return null;
+    }
+  }
+
+  int _briefingEnsuredFor = -1;
+
+  /// Once per account, tells the server this device's time zone so a first-time
+  /// owner gets the morning briefing at 08:00 without visiting Settings. The
+  /// server leaves any saved briefing settings, including "off", untouched.
+  Future<void> _ensureMorningBriefing() async {
+    if (_briefingEnsuredFor == _accountRevision) return;
+    _briefingEnsuredFor = _accountRevision;
+    try {
+      final zone = await deviceTimeZoneLookup();
+      if (zone == null) return;
+      await http.post<dynamic>(
+        '/api/v1/briefings/daily/default',
+        data: {'timeZoneId': zone},
+      );
+    } catch (_) {
+      // The briefing stays as it was; the next account session tries again.
     }
   }
 

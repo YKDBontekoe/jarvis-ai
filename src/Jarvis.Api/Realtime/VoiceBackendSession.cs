@@ -203,9 +203,8 @@ public sealed class VoiceBackendSession(
             {
                 await using var scope = scopes.CreateAsyncScope();
                 using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
-                var profile = await ResolveProfileAsync(scope.ServiceProvider, ownerId, conversationId, timeout.Token);
-                await scope.ServiceProvider.GetRequiredService<IConversationMemoryExtractor>()
-                    .ExtractAndStoreAsync(ownerId, sourceMessageId, source, timeout.Token, profile?.ProfileId);
+                await scope.ServiceProvider.GetRequiredService<IConversationMemoryGate>()
+                    .ExtractAsync(ownerId, conversationId, sourceMessageId, source, timeout.Token);
             }
             catch (OperationCanceledException)
             {

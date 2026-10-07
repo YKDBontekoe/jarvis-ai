@@ -38,6 +38,39 @@ public interface IConversationHistory
 {
     Task<IReadOnlyList<Message>> ListRecentMessagesAsync(Guid ownerId, DateTimeOffset since, int limit,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// What the assistant profile of each message's conversation allows when Jarvis learns from it. Messages the owner
+    /// does not own, or that do not exist, are left out.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, MessageLearningScope>> GetLearningScopesAsync(Guid ownerId,
+        IReadOnlyCollection<Guid> messageIds, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// The learning rules of the profile a message was written under. <see cref="ProfileId"/> is null for the default
+/// assistant, whose memories are not tied to a profile.
+/// </summary>
+public sealed record MessageLearningScope(Guid? ProfileId, bool AllowRemember = true, bool AllowPersonaLearning = true)
+{
+    public static MessageLearningScope Default { get; } = new((Guid?)null);
+}
+
+/// <summary>
+/// The combined rules for a batch of messages that a model reads together. Memories may only be stored from a batch
+/// that is entirely one profile, because the model's output cannot be traced back to a single message; otherwise a
+/// fact from one profile would end up visible to every other.
+/// </summary>
+public sealed record LearningScope(bool CanStoreMemories, Guid? ProfileId, bool AllowsPersona)
+{
+    public static LearningScope Of(IEnumerable<MessageLearningScope> scopes)
+    {
+        var list = scopes.ToArray();
+        if (list.Length == 0) return new LearningScope(true, null, true);
+        var profiles = list.Select(scope => scope.ProfileId).Distinct().ToArray();
+        return new LearningScope(profiles.Length == 1 && list.All(scope => scope.AllowRemember), profiles[0],
+            list.All(scope => scope.AllowPersonaLearning));
+    }
 }
 
 public enum ConversationDeleteResult
@@ -71,6 +104,10 @@ public interface IJarvisAgent
 }
 
 public sealed record AgentToolApprovalRequest(string RequestId, string ToolCallId, string ToolName, string ArgumentsJson);
-public sealed record AgentToolProgress(string ToolCallId, string ToolName, string Phase);
+/// <summary>
+/// <paramref name="ErrorKind"/> names why a tool failed (<c>input</c>, <c>transient</c>, <c>failed</c>) and is only
+/// set with the <c>failed</c> phase. It is a category, never exception text.
+/// </summary>
+public sealed record AgentToolProgress(string ToolCallId, string ToolName, string Phase, string? ErrorKind = null);
 public sealed record AgentStreamEvent(string? TextDelta = null, AgentToolApprovalRequest? ApprovalRequest = null,
     AgentToolProgress? ToolProgress = null);

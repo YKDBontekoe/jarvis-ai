@@ -30,7 +30,8 @@ public sealed class ConversationTurnService(
     IJarvisAgent agent,
     AgentRunCoordinator coordinator,
     IHubContext<JarvisEventsHub> hub,
-    ILogger<ConversationTurnService> logger)
+    ILogger<ConversationTurnService> logger,
+    Jarvis.Application.Learning.ILearningRecorder learning)
 {
     public const string FailureMessage = "Jarvis could not complete this response.";
 
@@ -65,7 +66,13 @@ public sealed class ConversationTurnService(
             ? lastMessage!
             : new Message(conversationId, "user", content, attachmentsJson: attachmentsJson);
         if (!isSameUserTurn)
+        {
             await store.AddMessageAsync(userMessage, cancellationToken);
+            // A message that pushes back on the reply right before it is worth knowing about; only the fact is kept.
+            if (lastMessage is { Role: "assistant" } && Jarvis.Application.Learning.CorrectionDetector.LooksLikeCorrection(content))
+                learning.RecordSignal(ownerId, conversationId, Jarvis.Application.Learning.LearningSignalKinds.Correction,
+                    userMessage.Id);
+        }
         if (ReferenceEquals(userMessage, lastMessage) &&
             await coordinator.TryRecoverCompletedAssistantAsync(conversationId, content, cancellationToken)
                 is { } recovered)
@@ -80,9 +87,8 @@ public sealed class ConversationTurnService(
 
         try
         {
-            var outcome = await coordinator.RunAsync(ownerId, conversationId,
-                agent.StreamReplyAsync(conversationId, userMessage, cancellationToken), userMessage.Content,
-                cancellationToken, memorySourceId: userMessage.Id, onTextDelta: onTextDelta);
+            var outcome = await RunWithOneRetryAsync(ownerId, conversationId, userMessage, userMessage.Content,
+                userMessage.Id, onTextDelta, cancellationToken);
             return outcome.PendingApprovals.Count != 0
                 ? new ConversationTurnResult.AwaitingApproval(outcome.PendingApprovals)
                 : new ConversationTurnResult.Completed(outcome.AssistantMessage!);
@@ -137,12 +143,15 @@ public sealed class ConversationTurnService(
                     return new ConversationTurnResult.Conflict("There is no reply to try again.");
             }
         }
+        // The reply is deleted next, so the signal is written first and refers to it by id only.
+        learning.RecordSignal(ownerId, conversationId, Jarvis.Application.Learning.LearningSignalKinds.Regenerate,
+            reply.Id);
         await store.DeleteMessageAsync(conversationId, reply.Id, cancellationToken);
 
         try
         {
-            var outcome = await coordinator.RunAsync(ownerId, conversationId,
-                agent.StreamReplyAsync(conversationId, userMessage, cancellationToken), null, cancellationToken);
+            var outcome = await RunWithOneRetryAsync(ownerId, conversationId, userMessage, null, null, null,
+                cancellationToken);
             return outcome.PendingApprovals.Count != 0
                 ? new ConversationTurnResult.AwaitingApproval(outcome.PendingApprovals)
                 : new ConversationTurnResult.Completed(outcome.AssistantMessage!);
@@ -157,6 +166,56 @@ public sealed class ConversationTurnService(
             var failure = AgentFailureMessage.For(exception);
             await EndpointHelpers.PublishAgentFailedAsync(hub, logger, conversationId, failure);
             return new ConversationTurnResult.Failed(failure);
+        }
+    }
+
+    /// <summary>
+    /// Runs the agent and, when it fails before producing anything the owner or a tool could have seen, once more.
+    /// See <see cref="RetryWhenNothingHappenedAsync{T}"/>.
+    /// </summary>
+    private Task<AgentRunOutcome> RunWithOneRetryAsync(Guid ownerId, Guid conversationId, Message userMessage,
+        string? memorySource, Guid? memorySourceId, Func<string, CancellationToken, Task>? onTextDelta,
+        CancellationToken cancellationToken) =>
+        RetryWhenNothingHappenedAsync(
+            produced => coordinator.RunAsync(ownerId, conversationId,
+                Observe(agent.StreamReplyAsync(conversationId, userMessage, cancellationToken), produced),
+                memorySource, cancellationToken, memorySourceId: memorySourceId, onTextDelta: onTextDelta),
+            exception => logger.LogWarning(exception,
+                "Agent run failed before producing output for conversation {ConversationId}; trying once more.",
+                conversationId),
+            cancellationToken);
+
+    /// <summary>
+    /// Calls <paramref name="attempt"/> and, when it throws a retryable failure (a model process that died or timed
+    /// out) before calling the <c>produced</c> callback, calls it once more. Nothing has been shown, said or done at
+    /// that point, so repeating it cannot duplicate an action. Any failure after the first output, a second failure,
+    /// and non-retryable failures such as being signed out propagate unchanged.
+    /// </summary>
+    internal static async Task<T> RetryWhenNothingHappenedAsync<T>(Func<Action, Task<T>> attempt,
+        Action<Exception>? onRetry, CancellationToken cancellationToken)
+    {
+        for (var tries = 0; ; tries++)
+        {
+            var anything = false;
+            try
+            {
+                return await attempt(() => anything = true);
+            }
+            catch (Exception exception) when (tries == 0 && !anything && !cancellationToken.IsCancellationRequested &&
+                                              AgentFailureMessage.IsRetryable(exception))
+            {
+                onRetry?.Invoke(exception);
+            }
+        }
+    }
+
+    private static async IAsyncEnumerable<AgentStreamEvent> Observe(IAsyncEnumerable<AgentStreamEvent> source,
+        Action produced)
+    {
+        await foreach (var item in source)
+        {
+            produced();
+            yield return item;
         }
     }
 }

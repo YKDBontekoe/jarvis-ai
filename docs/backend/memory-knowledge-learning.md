@@ -83,7 +83,7 @@ Owner-defined profiles snapshot persona, skills, collections, model class, and l
 
 | Mechanism | Trigger | Output |
 |-----------|---------|--------|
-| **Heartbeat** | Temporal `AssistantHeartbeatWorkflow` | Memories, persona tweaks, skills |
+| **Heartbeat** | Temporal `AssistantHeartbeatWorkflow` (on by default; opt out in Settings → Learning) | Memories, persona tweaks, skills. Learned skills start as `proposed` and wait for review unless the owner turns on *Activate new skills right away* (`AutoActivateSkills`). Reflection `insights` (up to 2 follow-ups) are offered once as check-ins and are never stored or audited. The heartbeat also keeps the inbox triaged and can start meeting-prep tasks; see [the autonomy envelope](life-features.md#autonomy-envelope) |
 | **Dreaming** | Nightly `AssistantDreamingWorkflow` | Memory promotion/merge, persona, graph facts, **portrait** string for system prompt |
 | **Manual** | `POST /learning/run`, `/learning/dream` | On-demand for testing |
 
@@ -95,9 +95,30 @@ bounded set: memories written or changed since the last dream first, then the st
 
 Settings: `/api/v1/settings/learning`.
 
+## Signals, traces and improvement proposals
+
+Jarvis learns from how replies land, not only from what the owner says. All of it is owner-scoped, switchable (`captureSignals`), and stores **ids, tool names and counts only**, never message text, notes, excerpts or tool arguments.
+
+- **Signals** (`learning_signals`, kept 90 days): `regenerate`, `approval_denied`, `thumbs_up`, `thumbs_down`, `correction` (a deterministic detector on a short user message that pushes back on the reply before it; no model call, no text kept) and `tool_failure` (tool name and exception type). They have no foreign key to messages, because regenerate deletes the reply and must not erase its own signal. Recording is fire-and-forget (`ILearningRecorder`) and never fails a turn.
+- **Run traces** (`turn_traces`, kept `traceRetentionDays`, default 30): per interactive or task run, which memories were injected, which skills were loaded, and each tool call's name, outcome and duration. A plain reply that used nothing is not kept.
+- Nothing is written for a conversation whose assistant profile does not contribute to learning (`ProfileScope.ContributesToLearning`). Memory extraction, reflection, dreaming and feedback processing all respect the profile's `AllowsRemember` and `AllowsPersonaLearning`, and memories they create carry the source profile.
+- Both tables are pruned in the nightly dreaming chain.
+
+**Proposals** (`improvement_proposals`, modelled on `routine_suggestions`: unique per owner and `fingerprint`, sticky refusals, pending rows follow the data, at most one `improvement.suggested` notification per week with a generic body). Kinds:
+
+| Kind | Source | Accept does |
+|------|--------|-------------|
+| `memory` | Reflection and dreaming candidates | Saves the memory under its source profile. Confidence >= 0.8 with `autoApplyLowRiskMemory` on (and no secret match) is saved at once as `applied` with an `improvement.applied` audit event and can be undone; 0.6 to 0.8 wait as `pending`; lower is dropped |
+| `skill` | **Skill miner**: a tool sequence of 2 to 5 tools that worked at least 3 times across at least 2 conversations in 30 days (fingerprint `seq:{tool>tool>tool}`). The background model drafts the instructions from tool names only; the draft is validated and screened for secrets; at most 2 drafts a night | Saves it as a learned, active skill. Undo disables it |
+| `review` | **Review miner**: a skill or memory present in at least 3 thumbs-down replies and at most 1 thumbs-up, or a tool failing at least 5 times with a failure rate above 50% over 7 days | `disable_skill` turns the skill off (undo turns it back on); `note` only records that the owner has seen it. Evidence only: retrieval ranking is never changed |
+
+Dismissed and undone fingerprints never come back (tool reports reopen after a month, since a tool can break again). Skill and review proposals never apply on their own. The miners run after the routine refresh in the dreaming chain, each step in its own try/catch, gated by `proposeImprovements`.
+
+Settings (`learning`): `captureSignals`, `traceRetentionDays`, `proposeImprovements`, `autoApplyLowRiskMemory`.
+
 ## Usage tracking
 
-`IMemoryRecallTracker` and usage endpoints feed the personalization level on the usage dashboard.
+`IMemoryRecallTracker` and usage endpoints feed the personalization level on the usage dashboard. `UsageDashboard.Improvement` (pure `ImprovementMetrics.Compute`) adds the "Jarvis is improving" card: thumbs this period against the previous one with a trend, regenerate rate, declined approvals, the three tools that fail most, learned skills, and proposal counts with the acceptance rate. It is optional so older clients ignore it.
 
 ## Code map
 

@@ -65,7 +65,8 @@ internal static class PersonaEndpoints
 
         api.MapPost("/conversations/{conversationId:guid}/messages/{messageId:guid}/feedback", async (
             Guid conversationId, Guid messageId, MessageFeedbackRequest request, IConversationStore conversations,
-            IMessageFeedbackRepository feedback, ICurrentUser currentUser, CancellationToken ct) =>
+            IMessageFeedbackRepository feedback, Jarvis.Application.Learning.ILearningRecorder learning,
+            ICurrentUser currentUser, CancellationToken ct) =>
         {
             if (request.Rating is not ("up" or "down"))
                 return EndpointHelpers.Invalid("rating", "Rate a reply up or down.");
@@ -77,6 +78,11 @@ internal static class PersonaEndpoints
             if (message is not { Role: "assistant" }) return Results.NotFound();
             var saved = await feedback.SaveAsync(currentUser.OwnerId, conversationId, messageId, request.Rating,
                 string.IsNullOrEmpty(note) ? null : note, ct);
+            // The note stays in message_feedback; the signal only says which way the reply was rated. A re-rating
+            // adds a newer signal, and readers use the latest one per message.
+            learning.RecordSignal(currentUser.OwnerId, conversationId,
+                request.Rating == "up" ? Jarvis.Application.Learning.LearningSignalKinds.ThumbsUp
+                    : Jarvis.Application.Learning.LearningSignalKinds.ThumbsDown, messageId);
             return Results.Ok(saved);
         }).WithName("RateMessage");
 

@@ -73,10 +73,12 @@ public sealed class NotificationPushWorker(
             handled++;
             if (claim.Work is not { } work) continue;
 
-            // Modes such as Sleep or Meeting keep a push off the phone. The notification stays in the app.
+            // Modes such as Sleep or Meeting keep a push off the phone. The notification stays in the app, and a
+            // short record of it is held so one "while you were away" digest can follow when pushes resume.
             if (scope.ServiceProvider.GetService<IModeService>() is { } modes &&
                 !await modes.ShouldPushAsync(work.OwnerId, work.Notification.Type, cancellationToken))
             {
+                await HoldForDigestAsync(scope.ServiceProvider, work, cancellationToken);
                 await queue.MarkDeliveredAsync(candidate, cancellationToken);
                 continue;
             }
@@ -110,6 +112,22 @@ public sealed class NotificationPushWorker(
             }
         }
         return handled;
+    }
+
+    private async Task HoldForDigestAsync(IServiceProvider services, PushDeliveryWork work,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (services.GetService<IPushDigestService>() is { } digest)
+                await digest.HoldAsync(work.OwnerId, work.Notification.Id, work.Notification.Type,
+                    work.Notification.Title, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Losing a digest line is no worse than the old behaviour of dropping the push.
+            logger.LogDebug(exception, "Could not hold a suppressed push for the digest.");
+        }
     }
 
     internal static bool IsInvalidTokenResponse(string body) =>

@@ -105,9 +105,9 @@ public sealed class CodexWebSearchTests
         var prompt = CodexCliChatClient.BuildPrompt(
             [new ChatMessage(ChatRole.User, "What is the latest .NET release?")],
             null, [], enableWebSearch: true).Text;
-        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
         Assert.Contains("Live Codex web search is enabled", prompt);
-        Assert.Contains(today, prompt);
+        // The date itself comes from the per-turn time reference so the fixed prompt prefix stays cacheable.
+        Assert.Contains("today's UTC date from the current time reference", prompt);
         Assert.Contains("do not return type=tool_call for web_search", prompt);
         Assert.Contains("never invent current facts", prompt);
         Assert.Contains("earlier replies in this conversation that said search was unavailable do not apply", prompt);

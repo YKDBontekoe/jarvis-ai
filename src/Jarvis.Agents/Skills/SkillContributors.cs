@@ -15,11 +15,12 @@ internal sealed class SkillToolContributor(
     IOwnerSettingsStore settings,
     INotificationRepository notifications,
     IAuditEventStore audit,
-    ICurrentUser currentUser) : IAgentToolContributor
+    ICurrentUser currentUser,
+    Jarvis.Application.Learning.ITurnTraceCollector? trace = null) : IAgentToolContributor
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context)
     {
-        var tools = new SkillAgentTools(skills, settings, notifications, audit, currentUser, context.Profile);
+        var tools = new SkillAgentTools(skills, settings, notifications, audit, currentUser, context.Profile, trace);
         yield return AIFunctionFactory.Create(tools.LoadSkillAsync);
         yield return AIFunctionFactory.Create(tools.ListSkillsAsync);
         yield return AIFunctionFactory.Create(tools.SaveSkillAsync);

@@ -79,7 +79,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   JarvisTab _tab = JarvisTab.home;
   final _chatList = ChatList();
   final _tiles = TileLayoutController.device();
-  late final _tileSource = TileDataSource(_http);
+  late final _tileSource = TileDataSource(_http, ensureMorningBriefing: true);
   Timer? _chatsTimer;
   int _realtimeGeneration = 0;
   final _deltaBuffer = StringBuffer();

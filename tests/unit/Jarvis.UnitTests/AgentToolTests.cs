@@ -227,7 +227,9 @@ public sealed class AgentToolTests
         var response = await agent.RunAsync("What time is it?");
 
         Assert.Contains("America/New_York", response.Text);
-        Assert.Contains("2030-01-01T07:00:00-05:00", response.Text);
+        // Minute precision keeps the per-turn context identical within a minute, so the prompt cache can hit.
+        Assert.Contains("2030-01-01T07:00-05:00", response.Text);
+        Assert.DoesNotContain("07:00:00", response.Text);
     }
 
     [Fact]

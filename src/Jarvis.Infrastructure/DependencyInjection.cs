@@ -69,6 +69,14 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Browser.IBrowserSessionStore, BrowserSessionRepository>();
         services.AddScoped<IToolApprovalStore, ToolApprovalStore>();
         services.AddScoped<IStandingApprovalService, StandingApprovalService>();
+        services.AddScoped<IApprovalPolicy, ApprovalPolicy>();
+        services.AddScoped<Jarvis.Application.Memory.IConversationMemoryGate, Jarvis.Application.Memory.ConversationMemoryGate>();
+        services.AddScoped<Jarvis.Application.Learning.ILearningStore, LearningStore>();
+        services.AddScoped<Jarvis.Application.Improvements.IImprovementRepository, ImprovementRepository>();
+        services.AddScoped<Jarvis.Application.Improvements.IImprovementService, Jarvis.Application.Improvements.ImprovementService>();
+        services.AddScoped<Jarvis.Application.Improvements.IImprovementMiner, Jarvis.Application.Improvements.ImprovementMiner>();
+        services.AddScoped<Jarvis.Application.Learning.ITurnTraceCollector, Jarvis.Application.Learning.TurnTraceCollector>();
+        services.AddSingleton<Jarvis.Application.Learning.ILearningRecorder, LearningRecorder>();
         services.AddScoped<IAuditEventStore, AuditEventStore>();
         services.AddScoped<IReminderRepository, WorkflowRepository>();
         services.AddScoped<INotificationRepository, WorkflowRepository>();
@@ -95,6 +103,7 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Reviews.IWeeklyReviewRepository, WeeklyReviewRepository>();
         services.AddScoped<Jarvis.Application.Reviews.IWeeklyReviewNarrator, Jarvis.Application.Reviews.NoOpWeeklyReviewNarrator>();
         services.AddScoped<Jarvis.Application.Settings.IOwnerSettingsStore, OwnerSettingsStore>();
+        services.AddScoped<Jarvis.Application.Settings.IOwnerDirectory, OwnerDirectory>();
         services.AddScoped<Jarvis.Application.Skills.ISkillRepository, SkillRepository>();
         services.AddScoped<Jarvis.Application.Profiles.IAssistantProfileRepository, AssistantProfileRepository>();
         services.AddScoped<Jarvis.Application.Profiles.IAssistantProfileService, Jarvis.Application.Profiles.AssistantProfileService>();

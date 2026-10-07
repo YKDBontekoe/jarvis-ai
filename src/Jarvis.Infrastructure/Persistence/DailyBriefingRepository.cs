@@ -3,10 +3,17 @@ using Jarvis.Application.Workflows;
 using Jarvis.Domain.Audit;
 using Jarvis.Domain.Workflows;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Jarvis.Infrastructure.Persistence;
 
-public sealed class DailyBriefingRepository(JarvisDbContext db, IDailyBriefingNarrator? narrator = null)
+/// <param name="services">
+/// The section providers are resolved from here when a briefing is delivered, not injected: they read habits, people
+/// and other services that themselves depend on this repository for the owner's time zone.
+/// </param>
+public sealed class DailyBriefingRepository(JarvisDbContext db, IDailyBriefingNarrator? narrator = null,
+    IServiceProvider? services = null, ILogger<DailyBriefingRepository>? logger = null)
     : IDailyBriefingRepository
 {
     public async Task<DailyBriefingPreferenceRecord?> GetAsync(Guid ownerId, CancellationToken cancellationToken) =>
@@ -88,7 +95,8 @@ public sealed class DailyBriefingRepository(JarvisDbContext db, IDailyBriefingNa
             input.LocalDate,
             input.TimeZoneId,
             reminderEntities.Select(item => DailyBriefingComposer.ReminderItem(item.ToRecord(), timeZone)).ToArray(),
-            activeTasks.Select(item => DailyBriefingComposer.TaskItem(item.ToRecord())).ToArray());
+            activeTasks.Select(item => DailyBriefingComposer.TaskItem(item.ToRecord())).ToArray(),
+            await BuildSectionsAsync(input, cancellationToken));
         var factsBody = DailyBriefingComposer.Compose(facts);
         string? narration = null;
         if (narrator is not null)
@@ -117,6 +125,32 @@ public sealed class DailyBriefingRepository(JarvisDbContext db, IDailyBriefingNa
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return true;
+    }
+
+    /// <summary>Runs every section provider in turn. One that throws only costs the briefing that section.</summary>
+    private async Task<IReadOnlyList<DailyBriefingSection>> BuildSectionsAsync(DailyBriefingActivityInput input,
+        CancellationToken cancellationToken)
+    {
+        var sections = new List<DailyBriefingSection>();
+        foreach (var provider in services?.GetServices<IBriefingSectionProvider>() ?? [])
+        {
+            try
+            {
+                if (await provider.BuildAsync(input.OwnerId, input, cancellationToken) is { } section)
+                    sections.Add(section);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                logger?.LogWarning(exception, "Briefing section {Provider} was left out for {OwnerId}.",
+                    provider.GetType().Name, input.OwnerId);
+            }
+        }
+
+        return sections;
     }
 }
 

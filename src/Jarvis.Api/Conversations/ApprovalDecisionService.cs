@@ -27,12 +27,13 @@ public sealed class ApprovalDecisionService(
     IHubContext<JarvisEventsHub> hub,
     VoiceBackendSession voice,
     IAutomationApprovalResolver automations,
-    IStandingApprovalService standingApprovals)
+    IStandingApprovalService standingApprovals,
+    Jarvis.Application.Learning.ILearningRecorder learning)
 {
     private const string CancelledMessage = "This task was cancelled.";
 
     public async Task<ConversationTurnResult> DecideAsync(Guid ownerId, Guid approvalId, bool approved,
-        CancellationToken ct, bool rememberCategory = false)
+        CancellationToken ct, bool rememberCategory = false, GrantTerms? terms = null)
     {
         var pending = await approvals.GetActionableAsync(approvalId, ownerId, ct);
         if (pending is null) return new ConversationTurnResult.NotFound();
@@ -58,10 +59,12 @@ public sealed class ApprovalDecisionService(
         if (pending.Status == "pending" && approved && rememberCategory)
         {
             var grant = await standingApprovals.GrantAsync(ownerId,
-                ApprovalCategories.Resolve(pending.ToolName, pending.ArgumentsJson), ct);
+                ApprovalCategories.Resolve(pending.ToolName, pending.ArgumentsJson), ct, terms);
             if (grant == StandingApprovalGrantResult.TooMany)
                 return new ConversationTurnResult.Conflict(
                     "You already always-allow as many actions as Jarvis can store. Turn one off in Approvals first.");
+            if (grant == StandingApprovalGrantResult.InvalidTerms)
+                return new ConversationTurnResult.Conflict("Choose a duration of at most a year and the scope all or tasks.");
             if (grant == StandingApprovalGrantResult.NotAllowed)
                 return new ConversationTurnResult.Conflict("This action cannot be always allowed.");
         }
@@ -73,6 +76,12 @@ public sealed class ApprovalDecisionService(
         else
             return new ConversationTurnResult.Conflict("Retry must use the decision already recorded for this approval.");
         if (decided is null) return new ConversationTurnResult.Conflict("This approval was already decided.");
+        // Only the first decision counts, so a retry of the same request is not a second denial. The signal names
+        // the tool and its approval category, never the arguments.
+        if (pending.Status == "pending" && !approved)
+            learning.RecordSignal(ownerId, pending.ConversationId,
+                Jarvis.Application.Learning.LearningSignalKinds.ApprovalDenied, tool: pending.ToolName,
+                category: ApprovalCategories.Resolve(pending.ToolName, pending.ArgumentsJson).Key);
         if (!await approvals.TryStartResumeAsync(approvalId, ownerId, ct))
             return new ConversationTurnResult.Conflict("This approval is already being resumed.");
 

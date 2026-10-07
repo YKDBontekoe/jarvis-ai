@@ -8,6 +8,8 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 
+import 'improvement_suggestions.dart';
+
 part 'learning_cards.dart';
 
 /// Heartbeat, dreaming, and continuous-learning controls with a timeline of what Jarvis learned.
@@ -23,9 +25,16 @@ class LearningScreen extends StatefulWidget {
 /// Holds learning fields so the cards mixin can share state.
 abstract class _LearningController extends State<LearningScreen> {
   Map<String, dynamic> _settings = const {};
+
+  /// How much Jarvis may do on its own. Empty until loaded, which hides the card.
+  Map<String, dynamic> _autonomy = const {};
   Map<String, dynamic> _state = const {};
   Map<String, dynamic> _dreaming = const {};
   List<Map<String, dynamic>> _activity = const [];
+
+  /// Changes Jarvis would like to make, and recent ones it made itself. Empty on an older server.
+  List<Map<String, dynamic>> _improvements = const [];
+  final Set<String> _improvementBusy = {};
   bool _loading = true;
   bool _saving = false;
   bool _running = false;
@@ -35,6 +44,7 @@ abstract class _LearningController extends State<LearningScreen> {
   int _requestRevision = 0;
 
   Future<void> _update(String key, Object value);
+  Future<void> _updateAutonomy(String key, Object value);
   Future<void> _runNow();
   Future<void> _dreamNow();
   bool _flag(String key, [bool fallback = false]);
@@ -54,8 +64,26 @@ class _LearningScreenState extends _LearningController with _LearningCards {
         '/api/v1/learning/status',
       );
       final data = jsonObject(response.data) ?? const {};
+      var autonomy = const <String, dynamic>{};
+      try {
+        final loaded = await widget.http.get<dynamic>(
+          '/api/v1/settings/autonomy',
+        );
+        autonomy = jsonObject(loaded.data) ?? const {};
+      } catch (_) {
+        // An older server has no autonomy settings; the card stays hidden.
+      }
+      var improvements = const <Map<String, dynamic>>[];
+      try {
+        final loaded = await widget.http.get<dynamic>('/api/v1/improvements');
+        improvements = jsonMaps(loaded.data);
+      } catch (_) {
+        // An older server has no improvements; the section stays hidden.
+      }
       if (!mounted || revision != _requestRevision) return;
       setState(() {
+        _improvements = improvements;
+        _autonomy = autonomy;
         _settings = jsonObject(data['settings']) ?? const {};
         _state = jsonObject(data['state']) ?? const {};
         _dreaming = jsonObject(data['dreaming']) ?? const {};
@@ -110,6 +138,66 @@ class _LearningScreenState extends _LearningController with _LearningCards {
       await _load();
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Future<void> _updateAutonomy(String key, Object value) async {
+    final next = {..._autonomy, key: value};
+    setState(() {
+      _autonomy = next;
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final response = await widget.http.put<dynamic>(
+        '/api/v1/settings/autonomy',
+        data: next,
+      );
+      if (mounted) {
+        setState(() => _autonomy = jsonObject(response.data) ?? next);
+      }
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
+            'Jarvis could not save that setting.',
+      );
+      await _load();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Jarvis could not save that setting.');
+      await _load();
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _decide(String id, String action) async {
+    setState(() {
+      _improvementBusy.add(id);
+      _error = null;
+    });
+    try {
+      await widget.http.post<dynamic>('/api/v1/improvements/$id/$action');
+      final loaded = await widget.http.get<dynamic>('/api/v1/improvements');
+      if (mounted) setState(() => _improvements = jsonMaps(loaded.data));
+    } on DioException catch (error) {
+      if (mounted) {
+        setState(
+          () => _error =
+              firstProblemMessage(error.response?.data) ??
+              'Jarvis could not do that.',
+        );
+        await _load();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Jarvis could not do that.');
+      }
+    } finally {
+      if (mounted) setState(() => _improvementBusy.remove(id));
     }
   }
 
@@ -198,6 +286,21 @@ class _LearningScreenState extends _LearningController with _LearningCards {
                       _heartbeatCard(),
                       const SizedBox(height: 16),
                       _dreamingCard(),
+                      if (_autonomy.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        const SectionHeader('Acting on its own'),
+                        _autonomyCard(),
+                      ],
+                      if (_improvements.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        ImprovementSuggestionsSection(
+                          items: _improvements,
+                          busy: _improvementBusy,
+                          onAccept: (id) => unawaited(_decide(id, 'accept')),
+                          onDismiss: (id) => unawaited(_decide(id, 'dismiss')),
+                          onUndo: (id) => unawaited(_decide(id, 'undo')),
+                        ),
+                      ],
                       if (_error != null)
                         InlineNotice(
                           message: _error!,
@@ -236,8 +339,30 @@ class _LearningScreenState extends _LearningController with _LearningCards {
                             'Activate new skills right away',
                             'Off: learned skills wait for your review in Skills.',
                             PhosphorIconsRegular.sealCheck,
-                            fallback: true,
+                            fallback: false,
                             enabled: _flag('autoCreateSkills', true),
+                          ),
+                          _switch(
+                            'captureSignals',
+                            'Learn from how replies land',
+                            'Notes 👍/👎, regenerates, denied approvals and failing tools by name only, never what was said.',
+                            PhosphorIconsRegular.chartLine,
+                            fallback: true,
+                          ),
+                          _switch(
+                            'proposeImprovements',
+                            'Suggest improvements',
+                            'Offers skills and fixes it spots overnight for you to review. Nothing changes until you accept.',
+                            PhosphorIconsRegular.lightbulb,
+                            fallback: true,
+                            enabled: _flag('captureSignals', true),
+                          ),
+                          _switch(
+                            'autoApplyLowRiskMemory',
+                            'Save confident memories itself',
+                            'Clear, high-confidence facts are saved right away and listed here so you can undo them. Off: they wait for review.',
+                            PhosphorIconsRegular.brain,
+                            fallback: true,
                           ),
                           _switch(
                             'proactiveCheckIns',

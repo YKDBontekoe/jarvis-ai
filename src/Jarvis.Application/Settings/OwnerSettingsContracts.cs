@@ -8,6 +8,15 @@ public interface IOwnerSettingsStore
     Task<IReadOnlyList<Guid>> ListOwnersAsync(string section, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Every owner on this install. Features that are on by default for owners who never saved a settings row use this
+/// instead of <see cref="IOwnerSettingsStore.ListOwnersAsync"/>, which only lists owners with a stored row.
+/// </summary>
+public interface IOwnerDirectory
+{
+    Task<IReadOnlyList<Guid>> ListOwnersAsync(CancellationToken cancellationToken);
+}
+
 public static class SettingsSections
 {
     public const string Models = "models";
@@ -20,4 +29,8 @@ public static class SettingsSections
     public const string Modes = "context-modes";
     public const string Routines = "routines";
     public const string PeopleRadar = "people-radar";
+    public const string Autonomy = "autonomy";
+    public const string PushDigest = "push-digest";
+    public const string AutonomyUsage = "autonomy-usage";
+    public const string Improvements = "improvements";
 }

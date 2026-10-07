@@ -16,9 +16,10 @@ namespace Jarvis.Agents;
 public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientResolver chatClients, McpToolHost mcpToolHost,
     IConversationStore conversations, IJarvisTaskRepository tasks, IAssistantProfileService profiles,
     IOwnerSettingsStore settings, ICurrentUser currentUser, IFileService files,
-    IStandingApprovalService standingApprovals) : IJarvisAgent
+    IStandingApprovalService standingApprovals, IApprovalPolicy approvalPolicy) : IJarvisAgent
 {
     private const int MaxAutomaticApprovalsPerTurn = 16;
+    private bool _backgroundTask;
     private static readonly JsonSerializerOptions ArgumentsJsonOptions = new(JsonSerializerDefaults.Web);
     private AIAgent? _agent;
 
@@ -110,6 +111,7 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
         var ownerId = currentUser.OwnerId;
         var conversation = await conversations.GetAsync(conversationId, ownerId, cancellationToken);
         var task = await tasks.GetTaskByConversationIdAsync(conversationId, ownerId, cancellationToken);
+        _backgroundTask = task is not null;
         var snapshot = await ResolveProfileAsync(conversation, ownerId, cancellationToken);
         var purpose = ResolvePurpose(task is not null, snapshot);
         var ownerModels = await settings.GetAsync<ModelSettings>(ownerId, SettingsSections.Models, cancellationToken)
@@ -206,7 +208,8 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
                     {
                         if (!activeTools.Remove(result.CallId, out var toolName)) continue;
                         yield return new AgentStreamEvent(ToolProgress: new AgentToolProgress(result.CallId, toolName,
-                            result.Exception is null ? "completed" : "failed"));
+                            result.Exception is null ? "completed" : "failed",
+                            result.Exception is null ? null : ToolFailureFeedback.Kind(result.Exception)));
                         checkpoint = true;
                     }
 
@@ -215,7 +218,7 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
                         .ToArray();
                     // One call per turn. A standing grant answers it here so the tool runs in this same turn.
                     if (calls.Length == 1 && automaticApprovals < MaxAutomaticApprovalsPerTurn &&
-                        await PermanentlyAllowedAsync(calls[0], conversationId, cancellationToken))
+                        await AutoApprovedAsync(calls[0], conversationId, cancellationToken))
                     {
                         granted.Add(calls[0]);
                         checkpoint = true;
@@ -257,19 +260,32 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
         }
     }
 
-    private async Task<bool> PermanentlyAllowedAsync(ToolApprovalRequestContent request, Guid conversationId,
+    /// <summary>
+    /// Answers an approval request without asking when the owner allowed it: first a standing per-category grant, then
+    /// the autonomy policy (read-only tools, and reversible changes inside background tasks).
+    /// </summary>
+    private async Task<bool> AutoApprovedAsync(ToolApprovalRequestContent request, Guid conversationId,
         CancellationToken cancellationToken)
     {
         if (request.ToolCall is not FunctionCallContent functionCall) return false;
         try
         {
             var category = ApprovalCategories.Resolve(functionCall.Name, SerializeArguments(functionCall));
-            if (!category.CanRemember ||
-                !await standingApprovals.IsGrantedAsync(currentUser.OwnerId, category.Key, cancellationToken))
-                return false;
-            await standingApprovals.RecordAutomaticUseAsync(currentUser.OwnerId, functionCall.Name, category,
-                conversationId, cancellationToken);
-            return true;
+            if (category.CanRemember &&
+                await standingApprovals.IsGrantedAsync(currentUser.OwnerId, category.Key, cancellationToken,
+                    _backgroundTask))
+            {
+                await standingApprovals.RecordAutomaticUseAsync(currentUser.OwnerId, functionCall.Name, category,
+                    conversationId, cancellationToken);
+                return true;
+            }
+
+            // A server's read-only claim only counts for its own tools, never for a name that is a built-in.
+            var declaredReadOnly = mcpToolHost.IsReadOnlyTool(functionCall.Name) &&
+                                   ToolRiskPolicy.Classify(functionCall.Name) == ToolRisk.Unknown;
+            var decision = await approvalPolicy.EvaluateAsync(new ApprovalPolicyRequest(currentUser.OwnerId,
+                functionCall.Name, _backgroundTask, declaredReadOnly, conversationId), cancellationToken);
+            return decision.AutoApprove;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

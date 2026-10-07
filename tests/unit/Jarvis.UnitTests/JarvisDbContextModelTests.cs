@@ -159,4 +159,41 @@ public sealed class JarvisDbContextModelTests
         var automationFk = automation.GetForeignKeys().Single(fk => fk.Properties.Single().Name == "ConversationId");
         Assert.Equal(DeleteBehavior.SetNull, automationFk.DeleteBehavior);
     }
+
+    [Fact]
+    public void Learning_signals_have_no_foreign_key_to_messages_so_regenerate_cannot_erase_them()
+    {
+        var signal = Model.FindEntityType(typeof(LearningSignalEntity))!;
+        Assert.Empty(signal.GetForeignKeys());
+        Assert.Equal("learning_signals", signal.GetTableName());
+        Assert.Contains(signal.GetIndexes(),
+            index => index.Properties.Select(p => p.Name).SequenceEqual(new[] { "OwnerId", "CreatedAt" }));
+        Assert.Contains(signal.GetIndexes(),
+            index => index.Properties.Select(p => p.Name).SequenceEqual(new[] { "OwnerId", "Kind", "CreatedAt" }));
+    }
+
+    [Fact]
+    public void Turn_traces_are_owner_scoped_by_time_and_by_reply_and_keep_their_lists_as_jsonb()
+    {
+        var trace = Model.FindEntityType(typeof(TurnTraceEntity))!;
+        Assert.Empty(trace.GetForeignKeys());
+        Assert.Contains(trace.GetIndexes(),
+            index => index.Properties.Select(p => p.Name).SequenceEqual(new[] { "OwnerId", "CreatedAt" }));
+        Assert.Contains(trace.GetIndexes(),
+            index => index.Properties.Select(p => p.Name).SequenceEqual(new[] { "OwnerId", "MessageId" }));
+        foreach (var column in new[] { "MemoryIdsJson", "SkillsJson", "ToolsJson" })
+            Assert.Equal("jsonb", trace.FindProperty(column)!.GetColumnType());
+    }
+
+    [Fact]
+    public void Improvement_proposals_are_unique_per_owner_and_fingerprint_and_keep_their_payload_as_jsonb()
+    {
+        var proposal = Model.FindEntityType(typeof(ImprovementProposalEntity))!;
+        Assert.Equal("improvement_proposals", proposal.GetTableName());
+        Assert.Empty(proposal.GetForeignKeys());
+        Assert.Contains(proposal.GetIndexes(), index => index.IsUnique
+            && index.GetDatabaseName() == "ux_improvement_proposals_owner_fingerprint"
+            && index.Properties.Select(p => p.Name).SequenceEqual(new[] { "OwnerId", "Fingerprint" }));
+        Assert.Equal("jsonb", proposal.FindProperty("PayloadJson")!.GetColumnType());
+    }
 }

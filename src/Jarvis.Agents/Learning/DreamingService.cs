@@ -2,6 +2,7 @@ using System.Text.Json;
 using Jarvis.Agents.ModelProviders;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Improvements;
 using Jarvis.Application.Learning;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Persona;
@@ -30,7 +31,8 @@ public sealed class DreamingService(
     IChatClientResolver chatClients,
     IMemoryRecallTracker recalls,
     ILogger<DreamingService> logger,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    IImprovementService? improvements = null)
 {
     internal const string PromptMarker = "You are Jarvis dreaming: consolidating memory the way sleep consolidates human memory";
     internal const string SummaryPromptMarker =
@@ -120,7 +122,12 @@ public sealed class DreamingService(
             ? candidate with { RemBoost = candidate.RemBoost + 0.04 }
             : candidate).ToList();
 
-        var applied = await DeepAsync(ownerId, settings, staged, stored, rem, now, cancellationToken);
+        var sourceIds = staged.Select(item => item.SourceMessageId).OfType<Guid>().Distinct().ToArray();
+        var sourceScopes = await history.GetLearningScopesAsync(ownerId, sourceIds, cancellationToken);
+        var batchScope = LearningScope.Of((await history.GetLearningScopesAsync(ownerId,
+            messages.Select(message => message.Id).ToArray(), cancellationToken)).Values);
+        var applied = await DeepAsync(ownerId, settings, staged, stored, rem, now, sourceScopes, batchScope,
+            cancellationToken);
         var current = (await memories.ListAsync(ownerId, null, cancellationToken))
             .Where(memory => memory.ValidUntil is null || memory.ValidUntil > now)
             .ToArray();
@@ -388,7 +395,8 @@ public sealed class DreamingService(
 
     private async Task<DreamingOutcome> DeepAsync(Guid ownerId, LearningSettings settings,
         IReadOnlyList<DreamCandidate> staged, IReadOnlyList<MemoryRecord> stored, RemResult rem,
-        DateTimeOffset now, CancellationToken cancellationToken)
+        DateTimeOffset now, IReadOnlyDictionary<Guid, MessageLearningScope> sourceScopes, LearningScope batchScope,
+        CancellationToken cancellationToken)
     {
         int promoted = 0, merged = 0, superseded = 0, deduplicated = 0, personaUpdated = 0, factsMerged = 0;
         var known = stored
@@ -443,13 +451,31 @@ public sealed class DreamingService(
                 item.Kind == kind && DreamingRanker.Jaccard(item.Content, content) >= DreamingRanker.RelatedJaccard);
             var score = candidate is null ? 0 : DreamingRanker.Score(candidate with { RemBoost = candidate.RemBoost + 0.04 }, now);
             if (candidate is null || !DreamingRanker.PassesPromotionGate(candidate, score)) continue;
+            // The memory belongs to the profile its source message was written under, and is skipped when that
+            // profile does not remember.
+            var scope = candidate.SourceMessageId is { } sourceId && sourceScopes.TryGetValue(sourceId, out var found)
+                ? found
+                : MessageLearningScope.Default;
+            if (!scope.AllowRemember) continue;
+            if (improvements is not null)
+            {
+                // Through the ledger: saved memories can be undone, and with auto-apply off they wait for review.
+                var outcome = await improvements.SaveOrProposeMemoryAsync(ownerId,
+                    new MemoryCandidate(kind, content, item.Importance, item.Confidence, scope.ProfileId,
+                        candidate.SourceMessageId, "Seen again across several conversations."),
+                    settings.AutoApplyLowRiskMemory, cancellationToken);
+                if (outcome == MemoryOutcome.Saved) promoted++;
+                continue;
+            }
+
             var created = await memories.CreateAsync(ownerId, kind, content, item.Importance, item.Confidence, null,
-                false, cancellationToken, sourceType: "conversation", sourceId: candidate.SourceMessageId);
+                false, cancellationToken, sourceType: "conversation", sourceId: candidate.SourceMessageId,
+                profileId: scope.ProfileId);
             byId[created.Id] = created;
             promoted++;
         }
 
-        if (settings.LearnPersona)
+        if (settings.LearnPersona && batchScope.AllowsPersona)
         {
             var knownTraits = (await persona.GetAsync(ownerId, cancellationToken)).TraitList.Select(trait => trait.Id)
                 .ToHashSet();

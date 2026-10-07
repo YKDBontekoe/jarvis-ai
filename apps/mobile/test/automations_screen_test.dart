@@ -253,5 +253,7 @@ void main() {
   test('routine suggestion notifications open automations', () {
     expect(opensRoutineSuggestions('routine.suggested'), isTrue);
     expect(opensRoutineSuggestions('people.checkin'), isFalse);
+    expect(opensImprovementSuggestions('improvement.suggested'), isTrue);
+    expect(opensImprovementSuggestions('routine.suggested'), isFalse);
   });
 }

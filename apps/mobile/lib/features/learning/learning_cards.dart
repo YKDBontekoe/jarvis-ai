@@ -5,7 +5,7 @@ const _dreamHours = [0, 3, 5, 22, 23];
 
 mixin _LearningCards on _LearningController {
   Widget _heartbeatCard() {
-    final enabled = _flag('heartbeatEnabled');
+    final enabled = _flag('heartbeatEnabled', true);
     final minutes = asJsonInt(_settings['heartbeatMinutes'], 60);
     return SurfaceCard(
       gradient: LinearGradient(
@@ -296,6 +296,74 @@ mixin _LearningCards on _LearningController {
         ? null
         : (value) => unawaited(_update(key, value)),
   );
+
+  /// What Jarvis may do between conversations. Anything that sends, spends or
+  /// deletes still waits for your approval, whatever these say.
+  Widget _autonomyCard() {
+    final on = asJsonBool(_autonomy['enabled'], true);
+    Widget toggle(
+      String key,
+      String title,
+      String subtitle,
+      IconData icon, {
+      bool enabled = true,
+    }) => SwitchListTile(
+      key: Key('autonomy-$key'),
+      secondary: IconBadge(icon: icon, size: 34),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      value: asJsonBool(_autonomy[key], true),
+      onChanged: _saving || !enabled
+          ? null
+          : (value) => unawaited(_updateAutonomy(key, value)),
+    );
+
+    return GroupedSection(
+      children: [
+        toggle(
+          'enabled',
+          'Let Jarvis act on its own',
+          'Off: it only tells you things and never starts work in the background.',
+          PhosphorIconsRegular.robot,
+        ),
+        toggle(
+          'heartbeatMayStartTasks',
+          'Prepare for meetings',
+          'Starts a read-only background task before an event to gather what you may need. A few per day at most.',
+          PhosphorIconsRegular.lightning,
+          enabled: on,
+        ),
+        toggle(
+          'autoApproveReadOnly',
+          'Skip approvals for looking things up',
+          'Listing and reading from your integrations runs without a card. Anything that sends, spends or deletes still asks.',
+          PhosphorIconsRegular.sealCheck,
+          enabled: on,
+        ),
+        toggle(
+          'autoApproveMcpReadHints',
+          'Trust integrations that say a tool is read-only',
+          'Off: tools from added integrations always ask, even when the integration calls them read-only.',
+          PhosphorIconsRegular.sealCheck,
+          enabled: on,
+        ),
+        toggle(
+          'triageInbox',
+          'Keep my inbox triaged',
+          'Reads new chats in the background and drafts replies. Nothing is sent without you.',
+          PhosphorIconsRegular.sparkle,
+          enabled: on,
+        ),
+        toggle(
+          'digestInsteadOfDrop',
+          'Summarise what I missed',
+          'Quiet modes keep pushes off your phone; you get one summary when they end.',
+          PhosphorIconsRegular.moon,
+          enabled: on,
+        ),
+      ],
+    );
+  }
 
   Widget _quietHours() {
     final start = asJsonInt(_settings['quietHoursStart'], 22);

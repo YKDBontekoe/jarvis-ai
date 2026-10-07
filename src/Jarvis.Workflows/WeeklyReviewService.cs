@@ -71,9 +71,8 @@ public sealed class WeeklyReviewService(
 
     public async Task<WeeklyReviewSchedule> ResolveScheduleAsync(Guid ownerId, CancellationToken cancellationToken)
     {
-        var current = await settings.GetAsync<WeeklyReviewSettings>(ownerId, SettingsSections.WeeklyReview,
-            cancellationToken);
-        if (current is null || !current.Enabled)
+        var current = await LoadSettingsAsync(ownerId, cancellationToken);
+        if (!current.Enabled)
             return new WeeklyReviewSchedule(false, clock.GetUtcNow(), default);
         var lastNotified = await reviews.LastNotifiedWeekAsync(ownerId, cancellationToken);
         var (fireAt, weekStart) = WeeklyReviewClock.ResolveNext(clock.GetUtcNow(), current.LocalTime,
@@ -83,9 +82,8 @@ public sealed class WeeklyReviewService(
 
     public async Task<bool> DeliverAsync(WeeklyReviewActivityInput input, CancellationToken cancellationToken)
     {
-        var current = await settings.GetAsync<WeeklyReviewSettings>(input.OwnerId, SettingsSections.WeeklyReview,
-            cancellationToken);
-        if (current is null || !current.Enabled) return false;
+        var current = await LoadSettingsAsync(input.OwnerId, cancellationToken);
+        if (!current.Enabled) return false;
         if (await reviews.IsNotifiedAsync(input.OwnerId, input.WeekStart, cancellationToken)) return true;
         await WriteAsync(input.OwnerId, input.WeekStart, current.TimeZoneId, notify: true, cancellationToken);
         return true;

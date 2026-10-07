@@ -74,6 +74,9 @@ internal sealed class ChatClientResolver(
             client = new SelectedModelChatClient(codexClient, codexModel);
         if ((purpose is ModelPurpose.Chat or ModelPurpose.Reasoning) && settings.ReasoningEffort is { } effort)
             client = new ReasoningEffortChatClient(client, effort);
+        // Only the Codex client has process slots to share; other providers must not see the marker.
+        if (purpose is ModelPurpose.Background && provider == UsageProviders.Codex)
+            client = new BackgroundPriorityChatClient(client);
         client = new UsageRecordingChatClient(client, usage, prices, ownerId, provider, PurposeName(purpose), logger);
         _chatClients[cacheKey] = client;
         return client;
@@ -162,6 +165,31 @@ internal sealed class ChatClientResolver(
         {
             options ??= new ChatOptions();
             options.ModelId = modelId;
+            return options;
+        }
+    }
+
+    /// <summary>Marks calls as background work so the Codex process limiter keeps a slot free for chat.</summary>
+    private sealed class BackgroundPriorityChatClient(IChatClient inner) : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            inner.GetResponseAsync(messages, Mark(options), cancellationToken);
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+            inner.GetStreamingResponseAsync(messages, Mark(options), cancellationToken);
+
+        public object? GetService(Type serviceType, object? serviceKey = null) =>
+            serviceType.IsInstanceOfType(this) ? this : inner.GetService(serviceType, serviceKey);
+
+        public void Dispose() { }
+
+        private static ChatOptions Mark(ChatOptions? options)
+        {
+            options ??= new ChatOptions();
+            options.AdditionalProperties ??= new AdditionalPropertiesDictionary();
+            options.AdditionalProperties[CodexCliChatClient.BackgroundPriorityProperty] = true;
             return options;
         }
     }

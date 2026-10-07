@@ -27,6 +27,7 @@ internal static class TemporalWorkerRegistration
         nameof(AutomationPollWorkflow),
         nameof(WeeklyReviewWorkflow),
         nameof(HabitCheckInWorkflow),
+        nameof(PeopleCheckInWorkflow),
     ];
 
     public static readonly IReadOnlyList<string> ActivityTypeNames =
@@ -56,6 +57,7 @@ internal static class TemporalWorkerRegistration
         "DeliverWeeklyReview",
         "ResolveHabitCheckIn",
         "DeliverHabitCheckIn",
+        "RunPeopleCheckIn",
     ];
 
     public static TemporalWorker CreateWorker(TemporalClient client, IServiceProvider services)

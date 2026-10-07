@@ -24,7 +24,11 @@ public static class DependencyInjection
         if (turnTimeoutSeconds is < 30 or > 1_800)
             throw new InvalidOperationException("Codex:TurnTimeoutSeconds must be between 30 and 1800.");
         services.AddSingleton(CodexExecutable.From(configuration));
-        services.AddSingleton<CodexProcessLimiter>();
+        var maxCodexProcesses = configuration.GetValue("Codex:MaxConcurrentProcesses",
+            CodexProcessLimiter.MaxConcurrentProcesses);
+        if (maxCodexProcesses is < 1 or > 16)
+            throw new InvalidOperationException("Codex:MaxConcurrentProcesses must be between 1 and 16.");
+        services.AddSingleton(_ => new CodexProcessLimiter(maxCodexProcesses));
         var codexAccess = CodexAccess.From(configuration);
         var recordAiContent = configuration.GetValue("Sentry:RecordAiContent", false);
         services.AddSingleton<IChatClient>(serviceProvider => SentryChatInstrumentation.Instrument(
@@ -77,6 +81,8 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Finance.WealthToolContributor>();
         services.AddScoped<IAgentContextContributor, Finance.FinanceContextContributor>();
         services.AddScoped<IAgentToolContributor, Routines.RoutineToolContributor>();
+        services.AddScoped<IAgentToolContributor, Improvements.ImprovementToolContributor>();
+        services.AddScoped<Jarvis.Application.Improvements.ISkillDrafter, Improvements.ModelSkillDrafter>();
         services.AddScoped<IAgentToolContributor, Decisions.DecisionToolContributor>();
         services.AddScoped<IAgentToolContributor, Library.LibraryToolContributor>();
         services.AddScoped<IAgentContextContributor, Library.LibraryContextContributor>();

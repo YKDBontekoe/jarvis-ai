@@ -40,6 +40,7 @@ To restore the old locked-down behavior set `Codex__Access__Sandbox=read-only`, 
 | `Codex__Model`, `Jarvis__ModelClass` | Default model selection |
 | `Codex__ModelClasses__*` | fast/standard/reasoning/coding/vision/realtime |
 | `Codex__TurnTimeoutSeconds` | 30–1800 |
+| `Codex__MaxConcurrentProcesses` | 1–16, default 2. Cap on concurrent Codex processes. Background work (memory extraction, reranking, triage) can hold all but one slot, so an interactive turn never queues behind it. |
 
 Owner overrides via API `/settings/models` (OpenRouter key encrypted).
 

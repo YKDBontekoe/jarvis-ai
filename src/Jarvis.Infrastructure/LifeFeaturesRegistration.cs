@@ -9,6 +9,7 @@ using Jarvis.Application.Modes;
 using Jarvis.Application.Routines;
 using Jarvis.Infrastructure.Library;
 using Jarvis.Application.Timeline;
+using Jarvis.Application.Workflows;
 using Jarvis.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -30,6 +31,14 @@ public static class LifeFeaturesRegistration
         services.AddScoped<ITimelineSource, ConversationTimelineSource>();
         services.AddScoped<ITimelineSource, DecisionTimelineSource>();
         services.AddScoped<ITimelineService, TimelineService>();
+
+        // What the morning briefing says beyond reminders and tasks, in the order it is written.
+        services.AddScoped<IBriefingSectionProvider, CalendarBriefingSection>();
+        services.AddScoped<IBriefingSectionProvider, InboxBriefingSection>();
+        services.AddScoped<IBriefingSectionProvider, CommitmentsBriefingSection>();
+        services.AddScoped<IBriefingSectionProvider, HabitsBriefingSection>();
+        services.AddScoped<IBriefingSectionProvider, BirthdaysBriefingSection>();
+        services.AddScoped<IBriefingSectionProvider, BudgetsBriefingSection>();
 
         // Inbox and commitments ledger.
         services.AddScoped<IInboxRepository, InboxRepository>();
@@ -69,6 +78,7 @@ public static class LifeFeaturesRegistration
 
         // Context modes: stored in the owner's settings, so no tables of their own.
         services.AddScoped<IModeService, ModeService>();
+        services.AddScoped<IPushDigestService, PushDigestService>();
 
         // Decision journal: predictions with a confidence, resolved later and scored for calibration.
         services.AddScoped<IDecisionRepository, DecisionRepository>();

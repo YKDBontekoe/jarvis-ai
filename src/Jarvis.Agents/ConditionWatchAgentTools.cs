@@ -23,13 +23,16 @@ internal sealed class ConditionWatchAgentTools(IConditionWatchService watches, I
         [Description("Longitude for a location watch.")] double? longitude = null,
         [Description("Geofence radius in meters for a location watch.")] double? radiusMeters = null,
         [Description("Minutes before the next calendar event to alert.")] int? minutesBefore = null,
+        [Description("True to keep watching after an alert, for example before every meeting or each time the battery drops, instead of stopping after the first alert. It alerts again only after the condition cleared and the cooldown passed.")] bool repeat = false,
+        [Description("For repeating watches, the minimum minutes between alerts: 5 through 10080. Defaults to 60.")] int? cooldownMinutes = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
             var watch = await watches.CreateAsync(currentUser.OwnerId,
                 new CreateConditionWatchRequest(title, url ?? "", jsonPath ?? "", comparison, threshold,
-                    intervalMinutes, kind, credentialProvider, latitude, longitude, radiusMeters, minutesBefore),
+                    intervalMinutes, kind, credentialProvider, latitude, longitude, radiusMeters, minutesBefore, repeat,
+                    cooldownMinutes),
                 cancellationToken);
             return $"Condition watch created (id: {watch.Id:D}, kind: {watch.Kind}, status: {watch.Status}).";
         }
@@ -54,6 +57,9 @@ internal sealed class ConditionWatchAgentTools(IConditionWatchService watches, I
                 .Append(": ").Append(AgentText.Limit(watch.Title, 200))
                 .Append(" — alert when ").Append(symbol).Append(' ')
                 .Append(watch.Threshold.ToString(CultureInfo.InvariantCulture));
+            if (watch.Repeat)
+                result.Append(", repeating (cooldown ").Append(watch.CooldownMinutes).Append(" min, alerted ")
+                    .Append(watch.TriggerCount).Append(" times)");
             if (watch.LastValue is { } lastValue)
                 result.Append(", last value ").Append(lastValue.ToString(CultureInfo.InvariantCulture));
             result.AppendLine();

@@ -346,7 +346,8 @@ internal static class ConversationEndpoints
         api.MapGet("/approvals/standing", async (IStandingApprovalService standing, ICurrentUser currentUser,
                 CancellationToken ct) =>
             Results.Ok((await standing.ListAsync(currentUser.OwnerId, ct))
-                .Select(grant => new StandingApprovalDto(grant.Category, grant.Label, grant.GrantedAt))))
+                .Select(grant => new StandingApprovalDto(grant.Category, grant.Label, grant.GrantedAt, grant.ExpiresAt,
+                    grant.Scope))))
             .WithName("ListStandingApprovals");
 
         api.MapDelete("/approvals/standing", async (string? category, IStandingApprovalService standing,
@@ -361,9 +362,17 @@ internal static class ConversationEndpoints
 
         api.MapPost("/approvals/{approvalId:guid}/decision", async (Guid approvalId, ApprovalDecisionRequest request,
                 RemoteQueryExecutor remote, ICurrentUser currentUser) =>
-            await RemoteQueryResults.ExecuteAsync(() =>
-                remote.DecideAsync(currentUser.OwnerId, approvalId, request.Approved, request.RememberCategory)))
-            .WithName("DecideToolApproval");
+        {
+            if (request.RememberHours is < 1)
+                return EndpointHelpers.Invalid("rememberHours", "Choose at least one hour.");
+            var terms = request.RememberHours is null && request.RememberScope is null
+                ? null
+                : new GrantTerms(request.RememberHours is { } hours ? TimeSpan.FromHours(hours) : null,
+                    request.RememberScope);
+            return await RemoteQueryResults.ExecuteAsync(() =>
+                remote.DecideAsync(currentUser.OwnerId, approvalId, request.Approved, request.RememberCategory,
+                    terms));
+        }).WithName("DecideToolApproval");
 
         return api;
     }

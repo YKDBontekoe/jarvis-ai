@@ -140,6 +140,10 @@ class _UsageScreenState extends State<UsageScreen> {
                       ],
                       const SizedBox(height: 16),
                       _personalization(),
+                      if (_usage?['improvement'] is Map) ...[
+                        const SizedBox(height: 16),
+                        _improvement(),
+                      ],
                       const SizedBox(height: 16),
                       _headline(),
                       const SizedBox(height: 16),
@@ -267,6 +271,87 @@ class _UsageScreenState extends State<UsageScreen> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// How Jarvis is doing at getting better: how replies are rated, how often they are redone, which tools struggle,
+  /// and what happened to its own suggestions.
+  Widget _improvement() {
+    final colors = JarvisColors.of(context);
+    final data = _map(_usage?['improvement']);
+    final proposals = _map(data['proposals']);
+    final up = asJsonInt(data['thumbsUp']);
+    final down = asJsonInt(data['thumbsDown']);
+    final trend = asJsonString(data['trend']);
+    final regenerate = asJsonNum(data['regenerateRate']);
+    final acceptance = asJsonNum(data['acceptanceRate']);
+    final weakTools = jsonMaps(data['weakTools']);
+    final pending = asJsonInt(proposals['pending']);
+    final lines = <String>[
+      if (up + down > 0)
+        '$up liked, $down not${switch (trend) {
+          'better' => ' — better than the period before',
+          'worse' => ' — worse than the period before',
+          'steady' => ' — about the same as before',
+          _ => '',
+        }}',
+      if (regenerate != null && asJsonInt(data['regenerates']) > 0)
+        'Redid ${(regenerate * 100).round()}% of replies',
+      if (asJsonInt(data['denials']) > 0)
+        '${_plural(asJsonInt(data['denials']), 'approval', 'approvals')} declined',
+      if (asJsonInt(data['skillsLearned']) > 0)
+        '${_plural(asJsonInt(data['skillsLearned']), 'skill', 'skills')} learned',
+      if (acceptance != null)
+        'You accept ${(acceptance * 100).round()}% of its suggestions',
+    ];
+    return SurfaceCard(
+      key: const Key('usage-improvement'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const IconBadge(icon: PhosphorIconsRegular.chartLine),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  'Jarvis is improving',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              if (pending > 0) _chip('$pending to review'),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (lines.isEmpty && weakTools.isEmpty)
+            Text(
+              'Nothing to report yet. Ratings, redone replies and suggestions will show up here.',
+              style: TextStyle(color: colors.inkSoft, height: 1.35),
+            ),
+          for (final line in lines)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                line,
+                style: TextStyle(color: colors.inkSoft, height: 1.35),
+              ),
+            ),
+          if (weakTools.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Tools that struggled',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(height: 4),
+            for (final tool in weakTools)
+              Text(
+                '${asJsonString(tool['tool']) ?? 'tool'}: failed '
+                '${asJsonInt(tool['failed'])} of ${asJsonInt(tool['calls'])}',
+                style: TextStyle(color: colors.inkSoft, height: 1.35),
+              ),
+          ],
         ],
       ),
     );

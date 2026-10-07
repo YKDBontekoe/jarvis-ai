@@ -9,7 +9,8 @@ public sealed record DailyBriefingFacts(
     DateOnly LocalDate,
     string TimeZoneId,
     IReadOnlyList<DailyBriefingItem> Reminders,
-    IReadOnlyList<DailyBriefingItem> Tasks);
+    IReadOnlyList<DailyBriefingItem> Tasks,
+    IReadOnlyList<DailyBriefingSection>? Sections = null);
 
 public interface IDailyBriefingNarrator
 {
@@ -41,6 +42,14 @@ public static class DailyBriefingComposer
             lines.Add(string.Empty);
             lines.Add("Active tasks:");
             lines.AddRange(facts.Tasks.Select(item => $"• {item.Title} ({item.Detail})"));
+        }
+
+        foreach (var section in facts.Sections ?? [])
+        {
+            if (section.Lines.Count == 0) continue;
+            lines.Add(string.Empty);
+            lines.Add(section.Title + ":");
+            lines.AddRange(section.Lines.Select(line => "• " + line));
         }
 
         return Bound(string.Join('\n', lines));

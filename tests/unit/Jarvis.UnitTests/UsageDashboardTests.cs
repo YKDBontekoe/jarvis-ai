@@ -233,3 +233,67 @@ public sealed class UsageDashboardTests
         }
     }
 }
+
+public sealed class ImprovementMetricsTests
+{
+    private static ImprovementInputs Inputs(int up = 0, int down = 0, int prevUp = 0, int prevDown = 0,
+        int regenerates = 0, int replies = 0, int denials = 0, ToolReliability[]? tools = null, int skills = 0,
+        ProposalCounts? proposals = null) =>
+        new(up, down, prevUp, prevDown, regenerates, replies, denials, tools ?? [], skills,
+            proposals ?? ProposalCounts.None);
+
+    [Fact]
+    public void Nothing_recorded_gives_an_empty_card_without_division_errors()
+    {
+        var snapshot = ImprovementMetrics.Compute(Inputs());
+
+        Assert.Null(snapshot.Trend);
+        Assert.Null(snapshot.RegenerateRate);
+        Assert.Null(snapshot.AcceptanceRate);
+        Assert.Empty(snapshot.WeakTools);
+        Assert.Equal(0, ImprovementSnapshot.Empty.ThumbsUp);
+    }
+
+    [Theory]
+    [InlineData(8, 2, 5, 5, "better")]
+    [InlineData(5, 5, 8, 2, "worse")]
+    [InlineData(6, 4, 6, 4, "steady")]
+    [InlineData(2, 0, 5, 5, null)]
+    [InlineData(5, 5, 1, 1, null)]
+    public void The_trend_compares_the_share_of_thumbs_up_when_both_periods_have_enough_ratings(int up, int down,
+        int prevUp, int prevDown, string? expected) =>
+        Assert.Equal(expected, ImprovementMetrics.Compute(Inputs(up, down, prevUp, prevDown)).Trend);
+
+    [Fact]
+    public void The_regenerate_rate_is_regenerates_per_reply_and_never_above_one()
+    {
+        Assert.Equal(0.25, ImprovementMetrics.Compute(Inputs(regenerates: 5, replies: 20)).RegenerateRate);
+        Assert.Equal(1d, ImprovementMetrics.Compute(Inputs(regenerates: 9, replies: 3)).RegenerateRate);
+    }
+
+    [Fact]
+    public void Only_tools_with_enough_calls_and_a_failure_are_listed_worst_first_and_capped_at_three()
+    {
+        var snapshot = ImprovementMetrics.Compute(Inputs(tools:
+        [
+            new ToolReliability("Fine", 50, 0, 0),
+            new ToolReliability("Rare", 3, 3, 0),
+            new ToolReliability("Bad", 10, 8, 0),
+            new ToolReliability("Meh", 10, 3, 0),
+            new ToolReliability("Worse", 5, 5, 0),
+            new ToolReliability("Slight", 40, 2, 0)
+        ]));
+
+        Assert.Equal(["Worse", "Bad", "Meh"], snapshot.WeakTools.Select(tool => tool.Tool));
+        Assert.Equal(0.8, snapshot.WeakTools[1].FailureRate);
+    }
+
+    [Fact]
+    public void Acceptance_counts_owner_accepts_and_automatic_applies_against_every_decision_and_ignores_pending()
+    {
+        var snapshot = ImprovementMetrics.Compute(Inputs(proposals: new ProposalCounts(4, 2, 3, 1, 1)));
+
+        Assert.Equal(5 / 7d, snapshot.AcceptanceRate);
+        Assert.Equal(4, snapshot.Proposals.Pending);
+    }
+}

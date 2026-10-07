@@ -69,7 +69,7 @@ public sealed class LearningTests
             """;
         var feedbackId = Guid.NewGuid();
         var service = new ReflectionService(
-            Fake<IConversationHistory>.Create(("ListRecentMessagesAsync", _ => (IReadOnlyList<Message>)[userMessage])),
+            TestHistory.Create([userMessage]),
             Fake<IMessageFeedbackRepository>.Create(
                 ("ListUnprocessedAsync", _ => (IReadOnlyList<MessageFeedbackRecord>)
                     [new MessageFeedbackRecord(feedbackId, Guid.NewGuid(), Guid.NewGuid(), "down", "Too long", "…", Now)]),
@@ -112,7 +112,7 @@ public sealed class LearningTests
     {
         var client = new StaticReplyClient("{}");
         var service = new ReflectionService(
-            Fake<IConversationHistory>.Create(("ListRecentMessagesAsync", _ => (IReadOnlyList<Message>)[])),
+            TestHistory.Create(),
             Fake<IMessageFeedbackRepository>.Create(("ListUnprocessedAsync", _ => (IReadOnlyList<MessageFeedbackRecord>)[])),
             new PersonaService(new InMemorySettingsStore()), new InMemorySkillRepository(),
             Fake<IMemoryService>.Create(), new RecordingNotifications(), new NullAudit(),
@@ -155,7 +155,7 @@ public sealed class LearningTests
         MutableClock clock)
     {
         var reflection = new ReflectionService(
-            Fake<IConversationHistory>.Create(("ListRecentMessagesAsync", _ => (IReadOnlyList<Message>)[])),
+            TestHistory.Create(),
             Fake<IMessageFeedbackRepository>.Create(("ListUnprocessedAsync", _ => (IReadOnlyList<MessageFeedbackRecord>)[])),
             new PersonaService(settings), new InMemorySkillRepository(), Fake<IMemoryService>.Create(), notifications,
             new NullAudit(), new FixedChatClientResolver(new StaticReplyClient("{}")),
@@ -182,7 +182,16 @@ public sealed class LearningTests
             Fake<IReminderRepository>.Create(("ListRemindersAsync", _ => reminders)),
             Fake<IToolApprovalStore>.Create(("ListActionableAsync", _ => approvals)),
             Fake<IJarvisTaskRepository>.Create(("ListAsync", _ => tasks)),
-            notifications, new NullAudit(), NullLogger<HeartbeatService>.Instance, clock);
+            notifications, new NullAudit(),
+            Fake<Jarvis.Application.Integrations.ICalendarFeed>.Create(("ListUpcomingAsync",
+                _ => (IReadOnlyList<Jarvis.Application.Integrations.CalendarEventRecord>)[])),
+            Fake<IJarvisTaskService>.Create(),
+            Fake<Jarvis.Application.Inbox.IInboxService>.Create(
+                ("SyncAsync", _ => new Jarvis.Application.Inbox.InboxSyncResult(0, 0, 0)),
+                ("ListAsync", _ => new Jarvis.Application.Inbox.InboxListing([], new Dictionary<string, int>()))),
+            Fake<Jarvis.Application.Inbox.ICommitmentService>.Create(
+                ("ListAsync", _ => (IReadOnlyList<Jarvis.Domain.Inbox.Commitment>)[])),
+            NullLogger<HeartbeatService>.Instance, clock);
     }
 
     private static ToolApprovalRecord Approval(string tool, DateTimeOffset createdAt) =>

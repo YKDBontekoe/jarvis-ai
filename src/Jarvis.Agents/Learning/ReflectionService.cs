@@ -2,6 +2,7 @@ using System.Text.Json;
 using Jarvis.Agents.ModelProviders;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Improvements;
 using Jarvis.Application.Learning;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Persona;
@@ -27,11 +28,13 @@ public sealed class ReflectionService(
     INotificationRepository notifications,
     IAuditEventStore audit,
     IChatClientResolver chatClients,
-    ILogger<ReflectionService> logger)
+    ILogger<ReflectionService> logger,
+    IImprovementService? improvements = null)
 {
     internal const string PromptMarker = "You are Jarvis reflecting on recent work with your user";
     private const int MaxMessages = 60;
     private const int MaxMessageCharacters = 900;
+    private const int MaxInsightCharacters = 200;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true
@@ -92,7 +95,10 @@ public sealed class ReflectionService(
 
         var parsed = Parse(response.Text);
         var sourceMessageId = messages.LastOrDefault(message => message.Role == "user")?.Id;
-        var outcome = await ApplyAsync(ownerId, settings, parsed, sourceMessageId, profile, cancellationToken);
+        var learningScope = LearningScope.Of((await history.GetLearningScopesAsync(ownerId,
+            messages.Select(message => message.Id).ToArray(), cancellationToken)).Values);
+        var outcome = await ApplyAsync(ownerId, settings, parsed, sourceMessageId, profile, learningScope,
+            cancellationToken);
         outcome = outcome with { FeedbackProcessed = ratings.Count, MessagesReviewed = messages.Count };
         if (ratings.Count > 0)
             await feedback.MarkProcessedAsync(ownerId, ratings.Select(item => item.Id).ToArray(), cancellationToken);
@@ -102,8 +108,22 @@ public sealed class ReflectionService(
         if (outcome.LearnedAnything)
             await notifications.CreateAsync(ownerId, "learning.reflected", "Jarvis learned from your recent chats",
                 Describe(outcome), null, cancellationToken);
-        return (outcome, messages.Count > 0 ? messages[^1].CreatedAt : null);
+        // Insights are follow-ups worth mentioning, not stored learning: they ride along on the outcome for the
+        // heartbeat to offer once, and stay out of the audit record above.
+        var insights = CleanInsights(parsed.Insights);
+        return (insights.Count == 0 ? outcome : outcome with { Insights = insights },
+            messages.Count > 0 ? messages[^1].CreatedAt : null);
     }
+
+    internal static IReadOnlyList<string> CleanInsights(IEnumerable<string>? insights) =>
+    [
+        .. (insights ?? [])
+            .Select(text => Normalize(text ?? string.Empty))
+            .Where(text => text.Length >= 8)
+            .Select(text => text.Length <= MaxInsightCharacters ? text : text[..(MaxInsightCharacters - 1)] + "…")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(2)
+    ];
 
     internal static string Describe(ReflectionOutcome outcome)
     {
@@ -116,10 +136,11 @@ public sealed class ReflectionService(
     }
 
     private async Task<ReflectionOutcome> ApplyAsync(Guid ownerId, LearningSettings settings, ReflectionResult parsed,
-        Guid? sourceMessageId, PersonaProfile profile, CancellationToken cancellationToken)
+        Guid? sourceMessageId, PersonaProfile profile, LearningScope learningScope,
+        CancellationToken cancellationToken)
     {
         int added = 0, reinforced = 0, skillsSaved = 0, memoriesSaved = 0;
-        if (settings.LearnPersona)
+        if (settings.LearnPersona && learningScope.AllowsPersona)
         {
             var known = profile.TraitList.Select(trait => trait.Id).ToHashSet();
             foreach (var item in (parsed.Persona ?? []).Take(5))
@@ -161,7 +182,9 @@ public sealed class ReflectionService(
             }
         }
 
-        if (sourceMessageId is { } messageId)
+        // A batch that mixes assistant profiles cannot be traced back to one, so it stores no memories at all rather
+        // than let one profile's facts surface in another.
+        if (sourceMessageId is { } messageId && learningScope.CanStoreMemories)
         {
             var existing = (await memories.ListAsync(ownerId, null, cancellationToken))
                 .Where(memory => memory.ValidUntil is null || memory.ValidUntil > DateTimeOffset.UtcNow)
@@ -171,13 +194,27 @@ public sealed class ReflectionService(
             {
                 var content = item.Content?.Trim();
                 var kind = item.Kind?.Trim().ToLowerInvariant();
+                // With the proposal ledger, anything from 0.6 up is kept: clear ones are saved (and can be undone),
+                // the rest wait for the owner. Without it, only 0.8 and up is saved, as before.
+                var floor = improvements is null ? 0.8f : ImprovementRules.MemoryReviewMinConfidence;
                 if (!MemoryKinds.IsValid(kind) || string.IsNullOrWhiteSpace(content) || content.Length > 500 ||
-                    item.Confidence is < 0.8f or > 1f || item.Importance is < 0f or > 1f ||
+                    item.Confidence < floor || item.Confidence > 1f || item.Importance is < 0f or > 1f ||
                     MemoryAgentTools.LooksLikeSecret(content) || !existing.Add(Normalize(content)))
                     continue;
-                await memories.CreateAsync(ownerId, kind, content, item.Importance, item.Confidence, null, false,
-                    cancellationToken, sourceType: "conversation", sourceId: messageId);
-                memoriesSaved++;
+                if (improvements is null)
+                {
+                    await memories.CreateAsync(ownerId, kind, content, item.Importance, item.Confidence, null, false,
+                        cancellationToken, sourceType: "conversation", sourceId: messageId,
+                        profileId: learningScope.ProfileId);
+                    memoriesSaved++;
+                    continue;
+                }
+
+                var saved = await improvements.SaveOrProposeMemoryAsync(ownerId,
+                    new MemoryCandidate(kind, content, item.Importance, item.Confidence, learningScope.ProfileId,
+                        messageId, "Noticed in your recent chats."), settings.AutoApplyLowRiskMemory,
+                    cancellationToken);
+                if (saved == MemoryOutcome.Saved) memoriesSaved++;
             }
         }
         return new ReflectionOutcome(added, reinforced, skillsSaved, memoriesSaved, 0, 0);

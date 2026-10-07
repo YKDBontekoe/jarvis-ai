@@ -20,11 +20,29 @@ Tools wrapped in `ApprovalRequiredAIFunction` (see `BuiltInAgentContributors.cs`
 
 The owner can choose **Always allow** on that card. `rememberCategory: true` stores a standing grant for the action's category (`ApprovalCategories`: forgetting memories, using the browser, one MCP tool on one server, and so on). Later calls in that category run in the same turn without a new card, including voice and automation actions. Grants are listed and revoked at `GET`/`DELETE /api/v1/approvals/standing`. They are owner settings; assistant profiles cannot add or remove them.
 
+A grant can be limited: `rememberHours` (1 to 8760) makes it expire, and `rememberScope: "tasks"` makes it apply only to background task and automation runs (default `all`). An expired grant stops working at once and is dropped from the list and from storage on the next save; grants stored before this existed are permanent and global as before.
+
+**Automatic approval policy.** Before asking, `JarvisAgent` checks standing grants and then `IApprovalPolicy` (`Application/Approvals/ApprovalPolicy.cs`) with the owner's `AutonomySettings`. `ToolRiskPolicy` gives every built-in gated tool a risk class; anything not listed is `Unknown` and asks.
+
+| Class | Examples | Without asking |
+|---|---|---|
+| `ReadOnly` | `DiscoverMcpServerTools`, `ReadMcpResource`, `GetMcpPrompt` | Yes (switch `autoApproveReadOnly`) |
+| `ReversibleLocal` | `RunAutomation`, `ProposeGraphFact`, `CorrectGraphFact`, `ClipUrlToLibrary` | Only inside a background task at level `full` |
+| `SensitiveRead` | `GetDeviceLocation`, `ReadDeviceClipboard` | Never |
+| `Outbound` | `SendWhatsAppMessage`, `InvokeMcpTool`, browser, coding, MCP server changes | Never |
+| `Destructive` | `ForgetMemory`, `DeleteExpense`, `RemovePerson`, graph merge/forget | Never |
+
+Integration tools whose server sets an explicit `readOnlyHint` without `destructiveHint` count as `ReadOnly` (switch `autoApproveMcpReadHints`). That is the server's own claim, so it is ignored for any name that is also a built-in tool. The level is `full` (default), `standard` (read-only only) or `ask_everything`; `enabled: false` turns the policy off and restores standing-grants-only behaviour. Each automatic approval is audited as `approval.policy_auto_approved` (tool, risk, reason; never arguments) and counted per UTC day against `maxAutoApprovalsPerDay` (default 200); past it, calls ask again. A background task is any durable task conversation, including ones the heartbeat started.
+
 Idempotency: approval rows are guarded by a unique key on owner + request + tool call id.
+
+## Retry after a failed model call
+
+`ConversationTurnService` runs the agent once more when the first attempt fails before producing anything: no text streamed and no tool started (`RetryWhenNothingHappenedAsync`). That covers the Codex process dying, timing out or returning no thread, and broken connections (`AgentFailureMessage.IsRetryable`). Signed-out, rate-limited and missing-CLI failures are never retried, and neither is anything after the first output, so a reply is never duplicated and an action never repeats. The retry applies to chat sends and regenerate; the mission supervisor polls every 3 seconds while any mission runs (10 when idle) so step handoffs are quick.
 
 ## Tool failures and self-correction
 
-`ToolFailureFeedback` (in `Jarvis.Agents`) is the function invoker for every agent turn. Input validation errors thrown by tools (`ArgumentException`, `FormatException`, `JsonException`) are passed back to the model, capped at 400 characters, so it can fix its arguments and retry within the same turn. Every other exception becomes a generic "the tool failed" result; the real exception is only logged. The invoker runs after approval gating, so it never sees a call the user has not approved.
+`ToolFailureFeedback` (in `Jarvis.Agents`) is the function invoker for every agent turn. Input validation errors thrown by tools (`ArgumentException`, `FormatException`, `JsonException`) are passed back to the model, capped at 400 characters, so it can fix its arguments and retry within the same turn. Every other exception becomes a generic "the tool failed" result; the real exception is only logged. Network and timeout failures (`HttpRequestException`, `TimeoutException`, `IOException`, cancelled HTTP calls) use a different generic text that says a retry may help, so the model tries once more instead of giving up or looping on a permanent error. Only the category reaches the model, never the exception text. The invoker runs after approval gating, so it never sees a call the user has not approved.
 
 When Codex names a function that does not exist, `CodexCliChatClient` asks once for a corrected response instead of failing the turn, the same way it already retries malformed `argumentsJson`. Tool results in the Codex prompt carry the tool name, so multi-step chains stay readable.
 
