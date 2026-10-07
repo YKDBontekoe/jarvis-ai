@@ -17,6 +17,9 @@ internal static class ImprovementEndpoints
         group.MapGet("", async (IImprovementService improvements, ICurrentUser user, CancellationToken ct) =>
             Results.Ok(await improvements.ListAsync(user.OwnerId, ct))).WithName("ListImprovements");
 
+        group.MapPost("/refresh", async (IImprovementMiner miner, ICurrentUser user, CancellationToken ct) =>
+            Results.Ok(await miner.RefreshAsync(user.OwnerId, ct))).WithName("RefreshImprovements");
+
         group.MapPost("/{id:guid}/accept", async (Guid id, IImprovementService improvements, ICurrentUser user,
             CancellationToken ct) =>
             await improvements.AcceptAsync(id, user.OwnerId, ct) is { } view
