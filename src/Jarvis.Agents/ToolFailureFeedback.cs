@@ -59,6 +59,14 @@ internal static class ToolFailureFeedback
         _ => exception.InnerException is { } inner && IsTransient(inner)
     };
 
+    /// <summary>A category for a failed tool call: bad arguments, a temporary problem, or any other failure.</summary>
+    internal static string Kind(Exception exception) => exception switch
+    {
+        ToolInputException => "input",
+        ToolFailedException { Transient: true } => "transient",
+        _ => "failed"
+    };
+
     private static string Describe(Exception exception)
     {
         var message = exception is ArgumentException argument && argument.ParamName is { } name

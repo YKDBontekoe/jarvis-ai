@@ -38,6 +38,18 @@ internal sealed class AssistantDreamingActivities(IServiceScopeFactory scopeFact
             services.GetRequiredService<ILogger<AssistantDreamingActivities>>()
                 .LogWarning(exception, "Routine suggestions could not be refreshed after dreaming.");
         }
+        try
+        {
+            // Old run traces and signals are dropped here so they never grow without bound.
+            var now = DateTimeOffset.UtcNow;
+            await services.GetRequiredService<ILearningStore>().PruneAsync(input.OwnerId, settings.TraceCutoff(now),
+                LearningSettings.SignalCutoff(now), cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            services.GetRequiredService<ILogger<AssistantDreamingActivities>>()
+                .LogWarning(exception, "Old learning traces could not be pruned after dreaming.");
+        }
         var briefing = await services.GetRequiredService<IDailyBriefingRepository>()
             .GetAsync(input.OwnerId, cancellationToken);
         var minutes = DreamingClock.MinutesUntilNext(DateTimeOffset.UtcNow,

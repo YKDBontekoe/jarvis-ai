@@ -8,7 +8,8 @@ namespace Jarvis.Agents;
 
 internal sealed class PersonalMemoryContextProvider(
     IMemoryService memories, Guid ownerId,
-    IMemoryRecallTracker? recalls = null, AssistantProfileSnapshot? profile = null) : MessageAIContextProvider
+    IMemoryRecallTracker? recalls = null, AssistantProfileSnapshot? profile = null,
+    Jarvis.Application.Learning.ITurnTraceCollector? trace = null) : MessageAIContextProvider
 {
     private const int MaxContextCharacters = 8_000;
 
@@ -50,6 +51,8 @@ internal sealed class PersonalMemoryContextProvider(
             recalls?.Record(ownerId, hit.Memory.Id, query);
             recalled.Add(hit.Memory.Id);
             if (!AppendMemory(content, hit.Memory.Kind, hit.Memory.Content)) break;
+            // Only a memory that fit in full counts as part of this reply's context.
+            trace?.MemoryInjected(hit.Memory.Id);
         }
         try
         {

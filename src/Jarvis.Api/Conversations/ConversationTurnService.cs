@@ -30,7 +30,8 @@ public sealed class ConversationTurnService(
     IJarvisAgent agent,
     AgentRunCoordinator coordinator,
     IHubContext<JarvisEventsHub> hub,
-    ILogger<ConversationTurnService> logger)
+    ILogger<ConversationTurnService> logger,
+    Jarvis.Application.Learning.ILearningRecorder learning)
 {
     public const string FailureMessage = "Jarvis could not complete this response.";
 
@@ -65,7 +66,13 @@ public sealed class ConversationTurnService(
             ? lastMessage!
             : new Message(conversationId, "user", content, attachmentsJson: attachmentsJson);
         if (!isSameUserTurn)
+        {
             await store.AddMessageAsync(userMessage, cancellationToken);
+            // A message that pushes back on the reply right before it is worth knowing about; only the fact is kept.
+            if (lastMessage is { Role: "assistant" } && Jarvis.Application.Learning.CorrectionDetector.LooksLikeCorrection(content))
+                learning.RecordSignal(ownerId, conversationId, Jarvis.Application.Learning.LearningSignalKinds.Correction,
+                    userMessage.Id);
+        }
         if (ReferenceEquals(userMessage, lastMessage) &&
             await coordinator.TryRecoverCompletedAssistantAsync(conversationId, content, cancellationToken)
                 is { } recovered)
@@ -136,6 +143,9 @@ public sealed class ConversationTurnService(
                     return new ConversationTurnResult.Conflict("There is no reply to try again.");
             }
         }
+        // The reply is deleted next, so the signal is written first and refers to it by id only.
+        learning.RecordSignal(ownerId, conversationId, Jarvis.Application.Learning.LearningSignalKinds.Regenerate,
+            reply.Id);
         await store.DeleteMessageAsync(conversationId, reply.Id, cancellationToken);
 
         try

@@ -2,6 +2,7 @@ using System.Text;
 using Jarvis.Agents;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Learning;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Conversations;
@@ -81,12 +82,37 @@ internal sealed class JarvisTaskActivities(IServiceScopeFactory scopeFactory, IL
         var agent = services.GetRequiredService<IJarvisAgent>();
         var answer = new StringBuilder();
         var approvalRequests = new List<AgentToolApprovalRequest>();
+        var learning = services.GetRequiredService<ILearningRecorder>();
+        var toolCalls = new List<TurnToolCall>();
+        var toolStarts = new Dictionary<string, long>(StringComparer.Ordinal);
+        var runStarted = System.Diagnostics.Stopwatch.GetTimestamp();
         await foreach (var update in agent.StreamReplyAsync(task.ConversationId, userMessage, cancellationToken))
         {
             if (!string.IsNullOrEmpty(update.TextDelta)) answer.Append(update.TextDelta);
             if (update.ApprovalRequest is { } request)
                 approvalRequests.Add(request);
+            if (update.ToolProgress is { ToolName.Length: > 0 } progress)
+            {
+                if (progress.Phase == "started")
+                    toolStarts[progress.ToolCallId] = System.Diagnostics.Stopwatch.GetTimestamp();
+                else if (progress.Phase is "completed" or "failed" &&
+                         toolStarts.Remove(progress.ToolCallId, out var startedAt))
+                {
+                    var failed = progress.Phase == "failed";
+                    toolCalls.Add(new TurnToolCall(progress.ToolName,
+                        failed ? ToolOutcomes.Failed : ToolOutcomes.Completed,
+                        (int)Math.Min(int.MaxValue, System.Diagnostics.Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds)));
+                    if (failed)
+                        learning.RecordSignal(task.OwnerId, task.ConversationId, LearningSignalKinds.ToolFailure,
+                            tool: progress.ToolName, errorKind: progress.ErrorKind);
+                }
+            }
         }
+        var (injectedMemories, loadedSkills) = services.GetRequiredService<ITurnTraceCollector>().Snapshot();
+        learning.RecordTrace(task.OwnerId, new TurnTraceDraft(task.ConversationId, null, TurnKinds.Task,
+            injectedMemories, loadedSkills, toolCalls,
+            (int)Math.Min(int.MaxValue, System.Diagnostics.Stopwatch.GetElapsedTime(runStarted).TotalMilliseconds),
+            approvalRequests.Count != 0 ? "approval_required" : "completed"));
 
         if (approvalRequests.Count != 0)
         {

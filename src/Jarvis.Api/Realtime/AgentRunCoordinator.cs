@@ -6,6 +6,7 @@ using Jarvis.Agents.Telemetry;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
+using Jarvis.Application.Learning;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Profiles;
 using Jarvis.Api.Errors;
@@ -21,7 +22,9 @@ public sealed class AgentRunCoordinator(
     IFileCitationCollector fileCitations,
     IServiceScopeFactory scopes,
     IHubContext<JarvisEventsHub> hub,
-    ILogger<AgentRunCoordinator> logger)
+    ILogger<AgentRunCoordinator> logger,
+    Jarvis.Application.Learning.ILearningRecorder learning,
+    Jarvis.Application.Learning.ITurnTraceCollector turnTrace)
 {
     private static readonly JsonSerializerOptions CitationJsonOptions = new(JsonSerializerDefaults.Web);
     public async Task<Message?> TryRecoverCompletedAssistantAsync(Guid conversationId, string userContent,
@@ -132,6 +135,7 @@ public sealed class AgentRunCoordinator(
         var startedAt = Stopwatch.GetTimestamp();
         var kind = taskId is null ? "interactive" : "durable_task";
         var outcome = "failed";
+        var trace = new RunTrace();
         using var activity = JarvisDiagnostics.ActivitySource.StartActivity("jarvis.agent.run");
         activity?.SetTag("jarvis.run.kind", kind);
         GenAiTelemetry.TagInvokeAgent(activity, conversationId);
@@ -140,7 +144,7 @@ public sealed class AgentRunCoordinator(
         try
         {
             var result = await RunCoreAsync(ownerId, conversationId, events, memorySource, cancellationToken,
-                taskId, memorySourceId, onTextDelta, activity, startedAt);
+                taskId, memorySourceId, onTextDelta, activity, startedAt, trace);
             outcome = result.PendingApprovals.Count > 0 ? "approval_required" : "completed";
             return result;
         }
@@ -171,14 +175,26 @@ public sealed class AgentRunCoordinator(
                 { "run.kind", kind },
                 { "run.outcome", outcome }
             };
-            JarvisDiagnostics.AgentRunDuration.Record(Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, tags);
+            var elapsed = Stopwatch.GetElapsedTime(startedAt);
+            JarvisDiagnostics.AgentRunDuration.Record(elapsed.TotalMilliseconds, tags);
+            var (memories, skills) = turnTrace.Snapshot();
+            learning.RecordTrace(ownerId, new TurnTraceDraft(conversationId, trace.MessageId,
+                taskId is null ? TurnKinds.Interactive : TurnKinds.Task, memories, skills, trace.Tools,
+                (int)Math.Min(int.MaxValue, elapsed.TotalMilliseconds), outcome));
         }
+    }
+
+    /// <summary>What a run did that the learning trace keeps: its tool calls and the reply it produced.</summary>
+    private sealed class RunTrace
+    {
+        public List<TurnToolCall> Tools { get; } = [];
+        public Guid? MessageId { get; set; }
     }
 
     private async Task<AgentRunOutcome> RunCoreAsync(Guid ownerId, Guid conversationId,
         IAsyncEnumerable<AgentStreamEvent> events, string? memorySource, CancellationToken cancellationToken,
         Guid? taskId, Guid? memorySourceId, Func<string, CancellationToken, Task>? onTextDelta,
-        Activity? activity, long runStartedAt)
+        Activity? activity, long runStartedAt, RunTrace trace)
     {
         var messageId = Guid.CreateVersion7();
         var answer = new StringBuilder();
@@ -227,10 +243,16 @@ public sealed class AgentRunCoordinator(
                         {
                             if (toolProgress.Phase == "failed")
                                 toolTiming.Span?.SetStatus(ActivityStatusCode.Error, "tool_failed");
-                            JarvisDiagnostics.ToolDuration.Record(
-                                Stopwatch.GetElapsedTime(toolTiming.StartedAt).TotalMilliseconds, tags);
+                            var toolElapsed = Stopwatch.GetElapsedTime(toolTiming.StartedAt).TotalMilliseconds;
+                            JarvisDiagnostics.ToolDuration.Record(toolElapsed, tags);
                             toolTiming.Span?.Dispose();
+                            trace.Tools.Add(new TurnToolCall(toolProgress.ToolName,
+                                toolProgress.Phase == "failed" ? ToolOutcomes.Failed : ToolOutcomes.Completed,
+                                (int)Math.Min(int.MaxValue, toolElapsed)));
                         }
+                        if (toolProgress.Phase == "failed")
+                            learning.RecordSignal(ownerId, conversationId, LearningSignalKinds.ToolFailure, messageId,
+                                tool: toolProgress.ToolName, errorKind: toolProgress.ErrorKind);
                     }
                 }
 
@@ -274,6 +296,7 @@ public sealed class AgentRunCoordinator(
             if (!string.IsNullOrWhiteSpace(answer.ToString()))
             {
                 preface = new Message(conversationId, "assistant", answer.ToString(), messageId);
+                trace.MessageId = preface.Id;
                 AttachCitations(preface);
                 await conversations.AddMessageAsync(preface, cancellationToken);
                 await PublishSafelyAsync(clients, "message.completed", MessageCompletedPayload(preface),
@@ -310,6 +333,7 @@ public sealed class AgentRunCoordinator(
             throw new InvalidOperationException("The agent completed without an assistant response.");
 
         var assistantMessage = new Message(conversationId, "assistant", answer.ToString(), messageId);
+        trace.MessageId = assistantMessage.Id;
         AttachCitations(assistantMessage);
         await conversations.AddMessageAsync(assistantMessage, cancellationToken);
         if (memorySourceId is { } sourceMessageId && !string.IsNullOrWhiteSpace(memorySource))

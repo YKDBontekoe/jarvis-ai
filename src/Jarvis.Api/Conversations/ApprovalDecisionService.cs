@@ -27,7 +27,8 @@ public sealed class ApprovalDecisionService(
     IHubContext<JarvisEventsHub> hub,
     VoiceBackendSession voice,
     IAutomationApprovalResolver automations,
-    IStandingApprovalService standingApprovals)
+    IStandingApprovalService standingApprovals,
+    Jarvis.Application.Learning.ILearningRecorder learning)
 {
     private const string CancelledMessage = "This task was cancelled.";
 
@@ -75,6 +76,12 @@ public sealed class ApprovalDecisionService(
         else
             return new ConversationTurnResult.Conflict("Retry must use the decision already recorded for this approval.");
         if (decided is null) return new ConversationTurnResult.Conflict("This approval was already decided.");
+        // Only the first decision counts, so a retry of the same request is not a second denial. The signal names
+        // the tool and its approval category, never the arguments.
+        if (pending.Status == "pending" && !approved)
+            learning.RecordSignal(ownerId, pending.ConversationId,
+                Jarvis.Application.Learning.LearningSignalKinds.ApprovalDenied, tool: pending.ToolName,
+                category: ApprovalCategories.Resolve(pending.ToolName, pending.ArgumentsJson).Key);
         if (!await approvals.TryStartResumeAsync(approvalId, ownerId, ct))
             return new ConversationTurnResult.Conflict("This approval is already being resumed.");
 
