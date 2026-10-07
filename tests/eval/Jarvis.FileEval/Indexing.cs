@@ -113,6 +113,10 @@ internal static class Indexing
     {
         var meta = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(workspace.IndexDir, $"emb-{model}.json"))).RootElement;
         var dim = meta.GetProperty("dim").GetInt32();
+        // Re-indexing rewrites chunks.jsonl with a new row order; vectors made for an older export would silently misalign.
+        if (meta.TryGetProperty("chunks_sha", out var expected) &&
+            !string.Equals(expected.GetString(), Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(workspace.ChunksPath))), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"emb-{model} was made for a different chunks.jsonl; embed again after re-indexing.");
         var ids = Json.ReadLines<ChunkRow>(workspace.ChunksPath).Select(row => row.Id).ToArray();
         var raw = await File.ReadAllBytesAsync(Path.Combine(workspace.IndexDir, $"emb-{model}.f32"));
         if (raw.Length != ids.Length * dim * 4)

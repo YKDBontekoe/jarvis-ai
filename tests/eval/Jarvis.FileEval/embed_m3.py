@@ -11,6 +11,7 @@ score_m3.py turns these into run files (sparse, multi-vector, and their fusion).
 Usage: embed_m3.py LIB TAG [--max-length 512] [--threads 4] [--limit N]
 """
 import argparse
+import hashlib
 import json
 import sys
 import time
@@ -70,7 +71,10 @@ def main():
 
     def save(prefix, dense, sparse_out, colbert_out, meta_dir, dense_name):
         (meta_dir / f"{dense_name}.f32").write_bytes(dense.tobytes())
-        (meta_dir / f"{dense_name}.json").write_text(json.dumps({"model": "BAAI/bge-m3", "dim": 1024, "n": len(dense)}))
+        meta = {"model": "BAAI/bge-m3", "dim": 1024, "n": len(dense)}
+        if meta_dir.name.startswith("idx-"):
+            meta["chunks_sha"] = hashlib.sha256((meta_dir / "chunks.jsonl").read_bytes()).hexdigest()
+        (meta_dir / f"{dense_name}.json").write_text(json.dumps(meta))
         (meta_dir / f"{prefix}-sparse.json").write_text(json.dumps([{str(k): v for k, v in d.items()} for d in sparse_out]))
         lengths = np.array([len(v) for v in colbert_out])
         np.save(meta_dir / f"{prefix}-colbert.offsets.npy", np.concatenate([[0], np.cumsum(lengths)]))

@@ -10,6 +10,7 @@ Aliases: qwen3-0.6b (Qwen3-Embedding-0.6B, 1024d), gemma-300m (EmbeddingGemma, 7
          e5-small (multilingual-e5-small, 384d, 512 tokens), mminilm (paraphrase-multilingual-MiniLM-L12-v2, 128 tokens)
 """
 import argparse
+import hashlib
 import json
 import sys
 import time
@@ -81,7 +82,8 @@ def main():
     matrix = np.concatenate([np.load(p) for p in sorted(parts.glob("*.npy"))])
     assert len(matrix) == len(texts), (len(matrix), len(texts))
     (idx / f"emb-{args.alias}.f32").write_bytes(matrix.tobytes())
-    (idx / f"emb-{args.alias}.json").write_text(json.dumps({"model": name, "dim": int(matrix.shape[1]), "n": len(texts)}))
+    (idx / f"emb-{args.alias}.json").write_text(json.dumps({"model": name, "dim": int(matrix.shape[1]), "n": len(texts),
+                                                          "chunks_sha": hashlib.sha256((idx / "chunks.jsonl").read_bytes()).hexdigest()}))
     print(f"done: {len(texts)} chunks in {(time.time() - started) / 60:.1f} min", file=sys.stderr)
 
 
