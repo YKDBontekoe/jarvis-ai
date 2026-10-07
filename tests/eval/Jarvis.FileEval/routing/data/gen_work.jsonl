@@ -1,0 +1,450 @@
+{"text": "What's the sum of my net pay for July and August 2026?", "label": "decompose", "lang": "en"}
+{"text": "What's the total of reimbursed expenses listed on the October payslip?", "label": "direct", "lang": "en"}
+{"text": "What was decided about the release date in the sprint retro notes from last Friday?", "label": "direct", "lang": "en"}
+{"text": "Welk percentage pensioenpremie betaal ik zelf volgens mijn arbeidscontract?", "label": "direct", "lang": "nl"}
+{"text": "Compare my grades for Statistics I and Statistics II.", "label": "decompose", "lang": "en"}
+{"text": "Wat is duurder, de cursus Advanced SQL of Cloud Basics?", "label": "decompose", "lang": "nl"}
+{"text": "waar komt die bezuiniging van 15k vandaan, volg het spoor door de notulen", "label": "agentic", "lang": "nl"}
+{"text": "How does my contracted notice period compare to the statutory minimum mentioned in the HR guide?", "label": "decompose", "lang": "en"}
+{"text": "maak aan de hand van mijn collegeaantekeningen en de reader een lijst met waarschijnlijke tentamenvragen voor Bedrijfskunde", "label": "agentic", "lang": "nl"}
+{"text": "Zoek alle risico's uit de projectrapporten van de magazijnuitrol en groepeer ze", "label": "agentic", "lang": "nl"}
+{"text": "geef een overzicht van mijn studievoortgang en wat ik nog mis om af te studeren", "label": "agentic", "lang": "nl"}
+{"text": "Pull up the date of my next performance review.", "label": "direct", "lang": "en"}
+{"text": "wat staat er in mijn contract over thuiswerken", "label": "direct", "lang": "nl"}
+{"text": "how many vacation days do i get per year", "label": "direct", "lang": "en"}
+{"text": "wat was mijn cijfer voor het tentamen Boekhouden", "label": "direct", "lang": "nl"}
+{"text": "Figure out which of my past projects would fit a case study for my MBA application.", "label": "agentic", "lang": "en"}
+{"text": "Check all my payslips against my contract for errors in allowances.", "label": "agentic", "lang": "en"}
+{"text": "What are the working hours stated in my contract at Brightwave?", "label": "direct", "lang": "en"}
+{"text": "How long does the non-compete clause in my contract last after I leave?", "label": "direct", "lang": "en"}
+{"text": "wanneer verloopt mijn VCA-certificaat", "label": "direct", "lang": "nl"}
+{"text": "What is the deadline to claim the education budget for 2026?", "label": "direct", "lang": "en"}
+{"text": "Wie is de productowner van het project Helios volgens de kickoff-notulen", "label": "direct", "lang": "nl"}
+{"text": "Collect all deadlines from my study and work documents for the next six weeks.", "label": "agentic", "lang": "en"}
+{"text": "Hoeveel meer verdien ik bruto bij Corvex dan bij Pixelforge?", "label": "decompose", "lang": "nl"}
+{"text": "What obligations do I have after leaving, scattered across my contract, NDA and handbook?", "label": "agentic", "lang": "en"}
+{"text": "Compare the standup start time in the team handbook with the one in my calendar invite.", "label": "decompose", "lang": "en"}
+{"text": "How much more is my gross salary at Corvex than at Pixelforge?", "label": "decompose", "lang": "en"}
+{"text": "dig up everything on the lease car arrangement and tell me what I'd owe if I give it back early", "label": "agentic", "lang": "en"}
+{"text": "what is my badge number for the office", "label": "direct", "lang": "en"}
+{"text": "wat is het brutosalaris in mijn contract bij Brinkhuis Techniek", "label": "direct", "lang": "nl"}
+{"text": "wat is mijn functietitel in het huidige contract", "label": "direct", "lang": "nl"}
+{"text": "What is the travel allowance per kilometre in my contract?", "label": "direct", "lang": "en"}
+{"text": "What's the sum of the three milestone payments in my consulting agreement?", "label": "decompose", "lang": "en"}
+{"text": "Vergelijk het budget uit de kickoff-notulen van Atlas met de besteding in de statusrapportage van augustus.", "label": "decompose", "lang": "nl"}
+{"text": "Compare the hourly rate in my student job agreement to the minimum wage figure in the HR memo.", "label": "decompose", "lang": "en"}
+{"text": "What did Lena report as her blocker in yesterday's standup notes?", "label": "direct", "lang": "en"}
+{"text": "What is the deadline for handing in my thesis proposal for the Data Ethics course?", "label": "direct", "lang": "en"}
+{"text": "Open the board update meeting notes and tell me which revenue figure was quoted.", "label": "direct", "lang": "en"}
+{"text": "what's the name of the recruiter who sent me the offer", "label": "direct", "lang": "en"}
+{"text": "What salary scale and step am I at according to my contract?", "label": "direct", "lang": "en"}
+{"text": "What were my total gross earnings across the January, February and March 2026 payslips?", "label": "decompose", "lang": "en"}
+{"text": "Vergelijk het uurloon in mijn bijbaancontract met het minimumloon uit de HR-memo", "label": "decompose", "lang": "nl"}
+{"text": "Zijn er lessen die in meerdere retro's terugkwamen?", "label": "agentic", "lang": "nl"}
+{"text": "Zoek uit of mijn reiskostenvergoeding elke maand dit jaar is uitbetaald", "label": "agentic", "lang": "nl"}
+{"text": "What was the net pay on my September 2026 payslip?", "label": "direct", "lang": "en"}
+{"text": "Investigate whether I was paid for all the overtime I logged this year.", "label": "agentic", "lang": "en"}
+{"text": "Go through the minutes from the works council meetings and tell me what impacts me.", "label": "agentic", "lang": "en"}
+{"text": "Search everything for the reasons given for the rejected leave request in August and what I can do next.", "label": "agentic", "lang": "en"}
+{"text": "When is the deadline to renew my First Aid certificate?", "label": "direct", "lang": "en"}
+{"text": "Wat is de deadline voor het declareren van mijn opleidingsbudget?", "label": "direct", "lang": "nl"}
+{"text": "Find all documents mentioning the layoff rumours and tell me what's actually been confirmed.", "label": "agentic", "lang": "en"}
+{"text": "Find the passing score for the Azure AZ-204 exam in the study guide I saved.", "label": "direct", "lang": "en"}
+{"text": "wat kost de cursus Projectmanagement bij de Academie die ik heb geboekt", "label": "direct", "lang": "nl"}
+{"text": "Scan my documents for anything that says I need to complete before the end of the year, work or study.", "label": "agentic", "lang": "en"}
+{"text": "Wat was mijn netto salaris op de loonstrook van augustus?", "label": "direct", "lang": "nl"}
+{"text": "Is the project deadline in the kickoff document earlier than the one in the latest status update?", "label": "decompose", "lang": "en"}
+{"text": "Which chapters are covered in the midterm for Organizational Behavior?", "label": "direct", "lang": "en"}
+{"text": "Look through my emails and documents and figure out what I still owe HR before the end of the month.", "label": "agentic", "lang": "en"}
+{"text": "Wat is de som van mijn netto loon van juli en augustus?", "label": "decompose", "lang": "nl"}
+{"text": "How much overtime pay was on the May payslip compared to June?", "label": "decompose", "lang": "en"}
+{"text": "How many more weeks until the thesis deadline compared to the internship report deadline?", "label": "decompose", "lang": "en"}
+{"text": "Hoeveel uur werk ik in totaal per week bij mijn twee bijbanen, Lumen en Meridian?", "label": "decompose", "lang": "nl"}
+{"text": "Compare the notice period in my current contract with the one in my previous contract at Halden.", "label": "decompose", "lang": "en"}
+{"text": "Controleer of mijn uren, verlofaanvragen en loonstrook van augustus bij elkaar passen", "label": "agentic", "lang": "nl"}
+{"text": "Which of the two projects, Orion or Helios, has the earlier go-live date?", "label": "decompose", "lang": "en"}
+{"text": "Reconstrueer de tijdlijn van het incident uit de post-mortem en vergaderstukken.", "label": "agentic", "lang": "nl"}
+{"text": "What's the gap between the bonus target in my contract and the bonus actually paid on the March payslip?", "label": "decompose", "lang": "en"}
+{"text": "Which was higher in 2025, my January or my December gross pay?", "label": "decompose", "lang": "en"}
+{"text": "Compare the exam format of the midterm and the final from the course guide sections.", "label": "decompose", "lang": "en"}
+{"text": "Bekijk mijn arbeidsovereenkomst en wijs aan welke bepalingen ongebruikelijk of nadelig zijn.", "label": "agentic", "lang": "nl"}
+{"text": "expiry date of my PMP certificate", "label": "direct", "lang": "en"}
+{"text": "What are the deadlines for the Q4 OKR submission and the annual self-review, and which one is first?", "label": "decompose", "lang": "en"}
+{"text": "What was the main risk flagged in the risk register for the warehouse rollout?", "label": "direct", "lang": "en"}
+{"text": "Do the vacation days in my offer letter match the vacation days in the final contract?", "label": "decompose", "lang": "en"}
+{"text": "Find out whether I'm eligible for the education budget and what the rules are. Check the policies and anything that mentions it.", "label": "agentic", "lang": "en"}
+{"text": "how much holiday allowance is listed on my June payslip", "label": "direct", "lang": "en"}
+{"text": "Which month had the higher net pay, April or May, and what's the difference?", "label": "decompose", "lang": "en"}
+{"text": "Add up the training budget carried over from 2025 and the new 2026 allocation.", "label": "decompose", "lang": "en"}
+{"text": "What's the bonus target percentage in my 2026 compensation letter?", "label": "direct", "lang": "en"}
+{"text": "Zoek uit waarom mijn netto loon in juli lager was.", "label": "agentic", "lang": "nl"}
+{"text": "What was the deadline for the thesis proposal and when is the final thesis due?", "label": "decompose", "lang": "en"}
+{"text": "Hoeveel studiepunten (EC) is de module Bedrijfsrecht waard?", "label": "direct", "lang": "nl"}
+{"text": "Welk examen is eerder, Prince2 of Scrum Master?", "label": "decompose", "lang": "nl"}
+{"text": "Review the job description, my contract and my last evaluation and tell me where my responsibilities have drifted.", "label": "agentic", "lang": "en"}
+{"text": "Summarise everything that has happened with my promotion discussions over the last year.", "label": "agentic", "lang": "en"}
+{"text": "Welke proeftijd is langer, die bij Brinkhuis of die bij Zeeland Logistiek?", "label": "decompose", "lang": "nl"}
+{"text": "Wie heeft de actie over de leveranciersaudit gekregen in de notulen van 3 juni?", "label": "direct", "lang": "nl"}
+{"text": "Which of my learning hours this year count towards the CPD requirement of my certification? Check certificates and logs.", "label": "agentic", "lang": "en"}
+{"text": "Add up the cost of the Kubernetes course and the AWS exam fee.", "label": "decompose", "lang": "en"}
+{"text": "How many days passed between my application email and the offer letter date?", "label": "decompose", "lang": "en"}
+{"text": "What is the employee number on my payslip?", "label": "direct", "lang": "en"}
+{"text": "Vergelijk de opzegtermijn in mijn huidige contract met die in mijn vorige contract bij Halden.", "label": "decompose", "lang": "nl"}
+{"text": "List all stakeholders on the Helios project and what each of them said in the meetings.", "label": "agentic", "lang": "en"}
+{"text": "What grade did I get for the Statistics II exam?", "label": "direct", "lang": "en"}
+{"text": "Wat is er gebeurd met de aanvraag voor ouderschapsverlof? Loop het stap voor stap na.", "label": "agentic", "lang": "nl"}
+{"text": "Could you check my master's programme handbook and tell me the maximum number of resits allowed for a single course before I'd have to petition the examination board?", "label": "direct", "lang": "en"}
+{"text": "Which course is more expensive, Advanced SQL or Cloud Fundamentals?", "label": "decompose", "lang": "en"}
+{"text": "Tel de studiepunten van Bedrijfsrecht en Statistiek bij elkaar op, haal ik zo de 12 EC?", "label": "decompose", "lang": "nl"}
+{"text": "is the pension fund in the welcome pack the same as the one on my payslip", "label": "decompose", "lang": "en"}
+{"text": "Does the notice period in my contract match the one in the employee handbook?", "label": "decompose", "lang": "en"}
+{"text": "Which tasks assigned to me in the last quarter's meetings never made it into the task tracker?", "label": "agentic", "lang": "en"}
+{"text": "Status of the \"Invoice automation\" project in the last weekly update?", "label": "direct", "lang": "en"}
+{"text": "klopt het vakantiegeld op mijn loonstrook van juni met wat er in mijn contract staat?", "label": "decompose", "lang": "nl"}
+{"text": "What is the name of my line manager in the onboarding letter from Corvex?", "label": "direct", "lang": "en"}
+{"text": "Met wie heb ik het meest samengewerkt bij Orion? Kijk in notulen en taaktoewijzingen.", "label": "agentic", "lang": "nl"}
+{"text": "Review my last three performance evaluations and describe how my ratings and comments have changed.", "label": "agentic", "lang": "en"}
+{"text": "Waar vindt de teamdag op 20 november plaats?", "label": "direct", "lang": "nl"}
+{"text": "Summarise my career so far from all the contracts, certificates and reviews in my files.", "label": "agentic", "lang": "en"}
+{"text": "Make me a status report for the Nova project from all the notes and tasks so far.", "label": "agentic", "lang": "en"}
+{"text": "Wat staat er in de aanbiedingsbrief en in het contract over de verhuisvergoeding, zijn ze gelijk?", "label": "decompose", "lang": "nl"}
+{"text": "what does my contract at Ostrander say the maximum carry-over of unused vacation days into next year is", "label": "direct", "lang": "en"}
+{"text": "Are the meeting times for the weekly sync in the invite and in the team handbook the same?", "label": "decompose", "lang": "en"}
+{"text": "What was the amount of the 13th month on the December payslip versus what the contract says?", "label": "decompose", "lang": "en"}
+{"text": "Did my gross salary on the latest payslip go up compared to the one before, and by how much?", "label": "decompose", "lang": "en"}
+{"text": "Check whether the date of my review in the calendar invite matches the date in HR's email.", "label": "decompose", "lang": "en"}
+{"text": "Is there something I forgot to follow up on from last week's meetings or emails?", "label": "agentic", "lang": "en"}
+{"text": "In the contract, how many months is the trial period?", "label": "direct", "lang": "en"}
+{"text": "Wie is mijn leidinggevende volgens de aanstellingsbrief?", "label": "direct", "lang": "nl"}
+{"text": "Welke datum staat er voor de oplevering van fase 2 in het projectplan Orion?", "label": "direct", "lang": "nl"}
+{"text": "which tax code is on my April payslip", "label": "direct", "lang": "en"}
+{"text": "Zijn de werktijden in mijn contract hetzelfde als in de addendum?", "label": "decompose", "lang": "nl"}
+{"text": "Wat zijn de deadlines voor de OKR-indiening en de zelfevaluatie, en welke komt eerst?", "label": "decompose", "lang": "nl"}
+{"text": "What is the hourly rate in my freelance contract with Lumen Studio?", "label": "direct", "lang": "en"}
+{"text": "Wanneer start de opleiding tot Scrum Master?", "label": "direct", "lang": "nl"}
+{"text": "Pull together a summary of my semester: courses, grades, deadlines met and missed.", "label": "agentic", "lang": "en"}
+{"text": "Tell me the date of the CFA Level II exam I registered for.", "label": "direct", "lang": "en"}
+{"text": "tel de bedragen van de drie declaraties van september bij elkaar op", "label": "decompose", "lang": "nl"}
+{"text": "What's my travel allowance per month if you multiply the per-km rate in my contract by the commute distance listed in my address-change form?", "label": "decompose", "lang": "en"}
+{"text": "Welke doelen uit het gesprek van januari zijn klaar, bezig of laten vallen?", "label": "agentic", "lang": "nl"}
+{"text": "Check for inconsistencies between my CV, my contract and my certificates", "label": "agentic", "lang": "en"}
+{"text": "Laat zien hoe mijn salaris zich heeft ontwikkeld sinds ik in dienst kwam, met contracten, addenda en loonstroken.", "label": "agentic", "lang": "nl"}
+{"text": "kun je opzoeken hoeveel dagen bijzonder verlof ik krijg bij een verhuizing volgens de cao", "label": "direct", "lang": "nl"}
+{"text": "What was the final mark for my capstone project?", "label": "direct", "lang": "en"}
+{"text": "Which semester has more contact hours, autumn or spring, based on the two timetables?", "label": "decompose", "lang": "en"}
+{"text": "combine the hours in my August timesheet and my September timesheet", "label": "decompose", "lang": "en"}
+{"text": "Summarise the discussions around the vendor selection: options, pros and cons, final choice.", "label": "agentic", "lang": "en"}
+{"text": "go through all my meeting notes from Q3 and list every open action item that's still unresolved", "label": "agentic", "lang": "en"}
+{"text": "Look through the contract amendments and tell me whether the working hours ever changed and when", "label": "agentic", "lang": "en"}
+{"text": "When does my probation period end?", "label": "direct", "lang": "en"}
+{"text": "Tell me everything relevant for my exit: notice, outstanding leave, non-compete, pension, equipment return.", "label": "agentic", "lang": "en"}
+{"text": "Reconstruct the timeline of the incident review from the postmortem docs and meeting notes.", "label": "agentic", "lang": "en"}
+{"text": "what should I know before signing the new contract? compare it against whatever else I have from this employer", "label": "agentic", "lang": "en"}
+{"text": "bij welk pensioenfonds zit ik, staat in de welkomstmap van HR", "label": "direct", "lang": "nl"}
+{"text": "What do my documents say about my right to a sabbatical, and have I ever asked about it?", "label": "agentic", "lang": "en"}
+{"text": "what are all the open commitments i made in meetings this month", "label": "agentic", "lang": "en"}
+{"text": "Op welke datum begint mijn nieuwe contract bij Zeeland Logistiek?", "label": "direct", "lang": "nl"}
+{"text": "find any mention of overtime compensation rules anywhere in my files and reconcile them", "label": "agentic", "lang": "en"}
+{"text": "Which documents do I need to gather for my mortgage application from the work side: contract, payslips, employer statement? Find them all.", "label": "agentic", "lang": "en"}
+{"text": "What are the exam dates for the Operations Management course?", "label": "direct", "lang": "en"}
+{"text": "Hoeveel vakantiedagen heb ik in juli en augustus samen opgenomen volgens mijn verlofaanvragen?", "label": "decompose", "lang": "nl"}
+{"text": "Welke van mijn certificaten verlopen binnenkort en wat moet ik doen om ze te verlengen?", "label": "agentic", "lang": "nl"}
+{"text": "What is the job title written in my current contract?", "label": "direct", "lang": "en"}
+{"text": "In my employment agreement, is a 13th month paid out?", "label": "direct", "lang": "en"}
+{"text": "What is the difference between my training budget and what I've claimed so far?", "label": "decompose", "lang": "en"}
+{"text": "Trace how my salary has developed since I joined, using contracts, addenda and payslips.", "label": "agentic", "lang": "en"}
+{"text": "What's the full history of the Atlas migration project: decisions, delays, people involved?", "label": "agentic", "lang": "en"}
+{"text": "I'm looking at the offer letter from Quillfeather Analytics dated 14 August 2026 for the senior data analyst role, and I want to know what the annual gross base salary is that they offered me.", "label": "direct", "lang": "en"}
+{"text": "When is the registration deadline for the Scrum Master certification exam?", "label": "direct", "lang": "en"}
+{"text": "Help me work out what I'm owed in unused vacation if I leave at the end of December.", "label": "agentic", "lang": "en"}
+{"text": "Review my timesheets, leave requests and payslips for August and tell me if the hours add up.", "label": "agentic", "lang": "en"}
+{"text": "what's the access code for the Coursera course portal in the welcome email", "label": "direct", "lang": "en"}
+{"text": "total of the signing bonus in my offer letter plus the relocation payment in the relocation email", "label": "decompose", "lang": "en"}
+{"text": "Is the course start date in the confirmation email the same as the one in the syllabus?", "label": "decompose", "lang": "en"}
+{"text": "How long is my Scrum certificate valid for?", "label": "direct", "lang": "en"}
+{"text": "Summarise the whole onboarding process I went through at Nordlicht, including what's still pending.", "label": "agentic", "lang": "en"}
+{"text": "I'm applying for a new job. Gather my key achievements from the last two years' documents.", "label": "agentic", "lang": "en"}
+{"text": "Wat is de stand van zaken rond de verlenging van mijn certificaat?", "label": "agentic", "lang": "nl"}
+{"text": "Why did the exam registration for my certificate fail? Go through the emails and confirmations.", "label": "agentic", "lang": "en"}
+{"text": "Compare the commute allowance in the Vantor offer and the Corvex offer.", "label": "decompose", "lang": "en"}
+{"text": "Compare the gross pay on my first payslip at Corvex with the salary agreed in the offer.", "label": "decompose", "lang": "en"}
+{"text": "Wat is het verschil tussen mijn opleidingsbudget en wat ik al heb gedeclareerd?", "label": "decompose", "lang": "nl"}
+{"text": "what's the total cost of the two conference tickets, DevSummit and CloudDays, from the invoices", "label": "decompose", "lang": "en"}
+{"text": "Who attended both the March sync and the April sync meetings?", "label": "decompose", "lang": "en"}
+{"text": "Read through my team's retro notes and summarise the main morale issues", "label": "agentic", "lang": "en"}
+{"text": "Compare what the offer letter and the contract each say about the relocation package.", "label": "decompose", "lang": "en"}
+{"text": "Go through all my study notes for Corporate Finance and make a revision summary by topic.", "label": "agentic", "lang": "en"}
+{"text": "what's the study leave allowance per year in the collective agreement", "label": "direct", "lang": "en"}
+{"text": "Zoek in mijn mail en documenten uit wat ik nog aan HR verschuldigd ben voor het eind van de maand.", "label": "agentic", "lang": "nl"}
+{"text": "Compare the first-year and second-year salary figures in my contract's pay schedule and the addendum", "label": "decompose", "lang": "en"}
+{"text": "Vat mijn loopbaan tot nu toe samen uit alle contracten, certificaten en beoordelingen", "label": "agentic", "lang": "nl"}
+{"text": "Wat is mijn totale beloning: salaris uit het contract plus de bonus uit de brief van HR?", "label": "decompose", "lang": "nl"}
+{"text": "Give me a briefing on the new manager: everything in my docs and mail that mentions her.", "label": "agentic", "lang": "en"}
+{"text": "Check the full paper trail of my parental leave request and tell me where it stands", "label": "agentic", "lang": "en"}
+{"text": "How much did the DevSummit conference ticket cost, per the receipt I forwarded to HR?", "label": "direct", "lang": "en"}
+{"text": "Vat de discussies over de leverancierskeuze samen: opties, voor- en nadelen, uiteindelijke keuze.", "label": "agentic", "lang": "nl"}
+{"text": "What time zone is the Tokyo sync meeting scheduled in?", "label": "direct", "lang": "en"}
+{"text": "Which is longer, my probation period at Brightwave or the one at Nordlicht?", "label": "decompose", "lang": "en"}
+{"text": "What's the total time between my start date and my probation end date, and is it the same as the probation length in the contract?", "label": "decompose", "lang": "en"}
+{"text": "Maak een tijdlijn van mijn dienstverband bij Corvex, vanaf het eerste gesprek tot nu.", "label": "agentic", "lang": "nl"}
+{"text": "Go through my inbox for anything related to the reorganisation and give me a summary of what it means for my role.", "label": "agentic", "lang": "en"}
+{"text": "hoeveel uur per week werk ik volgens mijn contract", "label": "direct", "lang": "nl"}
+{"text": "How many credits do I still need to graduate according to my study progress overview?", "label": "direct", "lang": "en"}
+{"text": "Compare the leave policy in the 2025 handbook with the 2026 version on carry-over days.", "label": "decompose", "lang": "en"}
+{"text": "Which room is my AWS Solutions Architect exam booked in?", "label": "direct", "lang": "en"}
+{"text": "Compare the exam fees for CFA Level I and Level II.", "label": "decompose", "lang": "en"}
+{"text": "Give me the total ECTS of the three courses I took in spring: Marketing, Finance and Strategy.", "label": "decompose", "lang": "en"}
+{"text": "Look at my learning goals from the development plan and tell me how far along I am on each, based on the courses and notes I have.", "label": "agentic", "lang": "en"}
+{"text": "What's the combined budget of Nova and Helios per their project plans?", "label": "decompose", "lang": "en"}
+{"text": "Draft a handover document for my projects from the notes, tasks and docs I have.", "label": "agentic", "lang": "en"}
+{"text": "what's the name of the course instructor for Advanced SQL", "label": "direct", "lang": "en"}
+{"text": "What did the October payslip and the September payslip each show as taxable benefit for the lease car?", "label": "decompose", "lang": "en"}
+{"text": "In the meeting notes from the quarterly business review with Tessera Foods held in the large conference room last Tuesday, what was the agreed deadline for the revised pricing proposal?", "label": "direct", "lang": "en"}
+{"text": "What's the fee for rescheduling the Google Cloud certification exam?", "label": "direct", "lang": "en"}
+{"text": "Help me voorbereiden op mijn beoordelingsgesprek met feedback, doelen en resultaten van dit jaar", "label": "agentic", "lang": "nl"}
+{"text": "Audit my training records: what mandatory courses are overdue?", "label": "agentic", "lang": "en"}
+{"text": "vergelijk de tentamendatums van Marketing en Financiering, overlappen die?", "label": "decompose", "lang": "nl"}
+{"text": "Compare the budget in the Atlas kickoff notes with the spend in the August status report.", "label": "decompose", "lang": "en"}
+{"text": "Zoek alle documenten over de reorganisatie en vertel me wat er echt bevestigd is.", "label": "agentic", "lang": "nl"}
+{"text": "Compare the pension contribution percentages in my two employment contracts.", "label": "decompose", "lang": "en"}
+{"text": "Review all documents mentioning my probation evaluation and tell me how it went.", "label": "agentic", "lang": "en"}
+{"text": "Wie is de docent van het vak Data-analyse?", "label": "direct", "lang": "nl"}
+{"text": "total the hours I booked on the Atlas project in the weekly timesheets of weeks 14 and 15", "label": "decompose", "lang": "en"}
+{"text": "What's the story behind the change of my job title in March?", "label": "agentic", "lang": "en"}
+{"text": "mn personeelsnummer op de loonstrook?", "label": "direct", "lang": "nl"}
+{"text": "What is the commuting allowance in the employment contract with Vantor?", "label": "direct", "lang": "en"}
+{"text": "Which of my meetings in the last two months had no clear owner for the follow-up?", "label": "agentic", "lang": "en"}
+{"text": "just the net figure on the March 2026 payslip", "label": "direct", "lang": "en"}
+{"text": "summarize all the feedback I got from my manager this year", "label": "agentic", "lang": "en"}
+{"text": "Audit my payslips for 2026 and flag anything that looks off.", "label": "agentic", "lang": "en"}
+{"text": "how much longer is my contract at Pixelforge than the one at Meridian?", "label": "decompose", "lang": "en"}
+{"text": "Find every place where the Q4 launch date was mentioned and tell me how it shifted over time", "label": "agentic", "lang": "en"}
+{"text": "How much will I pay in total for the Azure certification: exam fee from the booking email plus the practice test subscription invoice?", "label": "decompose", "lang": "en"}
+{"text": "Sum up the amounts on the three expense receipts I sent to HR in September.", "label": "decompose", "lang": "en"}
+{"text": "Controleer mijn opleidingsdossier: welke verplichte cursussen zijn te laat?", "label": "agentic", "lang": "nl"}
+{"text": "Which pays more per hour, my freelance contract with Lumen Studio or the one with Pixelforge?", "label": "decompose", "lang": "en"}
+{"text": "Sum the ECTS for Machine Learning and Data Ethics and tell me if it's above the 12 I need.", "label": "decompose", "lang": "en"}
+{"text": "Review the onboarding feedback I gave and everything that came out of it", "label": "agentic", "lang": "en"}
+{"text": "Calculate my annual holiday allowance: the percentage in the contract applied to the annual gross on the payslip", "label": "decompose", "lang": "en"}
+{"text": "Check whether my employer has been paying the right pension contribution all year", "label": "agentic", "lang": "en"}
+{"text": "Review my employment contract and highlight any clauses that are unusual or unfavourable.", "label": "agentic", "lang": "en"}
+{"text": "Wat is het budget voor project Nova volgens de startnotitie?", "label": "direct", "lang": "nl"}
+{"text": "Which of my two job offers has the higher base salary, Nordlicht or Vantor?", "label": "decompose", "lang": "en"}
+{"text": "What did I promise the client in the whole email thread and meeting notes about the Q3 deliverables, and have I delivered it?", "label": "agentic", "lang": "en"}
+{"text": "Look at all of last year's project retros and determine which problems never got fixed.", "label": "agentic", "lang": "en"}
+{"text": "Hoeveel overuren mag ik maximaal maken per maand volgens mijn contract?", "label": "direct", "lang": "nl"}
+{"text": "Hoeveel overwerk stond er op de loonstrook van mei in vergelijking met juni?", "label": "decompose", "lang": "nl"}
+{"text": "what time is the Q4 planning meeting on Thursday", "label": "direct", "lang": "en"}
+{"text": "hoeveel dagen ouderschapsverlof mag ik opnemen volgens het personeelshandboek", "label": "direct", "lang": "nl"}
+{"text": "I want to negotiate a raise. Pull together everything that supports my case.", "label": "agentic", "lang": "en"}
+{"text": "Tel de kosten van de cursus Kubernetes en het examengeld bij elkaar op", "label": "decompose", "lang": "nl"}
+{"text": "Create an overview of my study progress and what's still missing to graduate.", "label": "agentic", "lang": "en"}
+{"text": "What's the total vacation days I took in July and August per my leave requests?", "label": "decompose", "lang": "en"}
+{"text": "How long does the HR policy say payroll documents are retained?", "label": "direct", "lang": "en"}
+{"text": "find the thread of emails about the severance offer and summarise the negotiation", "label": "agentic", "lang": "en"}
+{"text": "Find the weekly hours cap in my student job agreement.", "label": "direct", "lang": "en"}
+{"text": "Which came first, the Q3 planning meeting or the budget review, and how many days apart were they?", "label": "decompose", "lang": "en"}
+{"text": "Look through my meeting notes and see how the discussion about team restructuring evolved", "label": "agentic", "lang": "en"}
+{"text": "Wat verdiende ik in totaal bruto in januari, februari en maart volgens de loonstroken?", "label": "decompose", "lang": "nl"}
+{"text": "Who is the HR contact listed in my offer letter from Nordlicht GmbH?", "label": "direct", "lang": "en"}
+{"text": "what GPA do I need to keep my scholarship", "label": "direct", "lang": "en"}
+{"text": "Hoe is het gegaan met mijn proeftijdbeoordeling? Zoek alle documenten erover.", "label": "agentic", "lang": "nl"}
+{"text": "Wat is de reiskostenvergoeding per kilometer in mijn arbeidsovereenkomst?", "label": "direct", "lang": "nl"}
+{"text": "Find out why my net pay dropped in July.", "label": "agentic", "lang": "en"}
+{"text": "Where did the 15k budget cut come from? Follow the trail through the notes.", "label": "agentic", "lang": "en"}
+{"text": "Which tasks across my projects are overdue, and who is blocking them?", "label": "agentic", "lang": "en"}
+{"text": "Compare the milestone dates for Orion between the original plan and the revised plan from August", "label": "decompose", "lang": "en"}
+{"text": "Is there anything in my documents that conflicts with the new remote work policy?", "label": "agentic", "lang": "en"}
+{"text": "What is the monthly employer contribution to the lease car in my contract?", "label": "direct", "lang": "en"}
+{"text": "Check if all the signed documents from my onboarding are present, and tell me what's missing.", "label": "agentic", "lang": "en"}
+{"text": "Vergelijk het pensioenpercentage in mijn twee arbeidsovereenkomsten", "label": "decompose", "lang": "nl"}
+{"text": "Who have I worked with the most on Orion? Check the meeting notes and task assignments.", "label": "agentic", "lang": "en"}
+{"text": "wat is het bedrag van de eindejaarsuitkering in mijn contract", "label": "direct", "lang": "nl"}
+{"text": "who chaired the steering committee meeting on 5 May", "label": "direct", "lang": "en"}
+{"text": "What's the combined weekly hours I'm contracted for across my two part-time jobs, Lumen and Meridian?", "label": "decompose", "lang": "en"}
+{"text": "Vergelijk het verlofbeleid in het handboek van 2025 met dat van 2026 qua overdracht van dagen.", "label": "decompose", "lang": "nl"}
+{"text": "who is the supervisor for my internship at Meridian Labs", "label": "direct", "lang": "en"}
+{"text": "What's the budget approved for the Atlas migration project in the kickoff notes?", "label": "direct", "lang": "en"}
+{"text": "What's the difference between the employer pension contribution on my payslip and the one in the benefits overview?", "label": "decompose", "lang": "en"}
+{"text": "What percentage of the project budget was spent as of the August status report?", "label": "direct", "lang": "en"}
+{"text": "Prepare me for my performance review by pulling together feedback, goals and achievements from this year.", "label": "agentic", "lang": "en"}
+{"text": "What is the notice period in my employment contract with Brightwave Logistics?", "label": "direct", "lang": "en"}
+{"text": "Wat is er besloten in alle stuurgroepen over de budgetoverschrijding?", "label": "agentic", "lang": "nl"}
+{"text": "my start date at Corvex?", "label": "direct", "lang": "en"}
+{"text": "Any lessons learned across our retrospectives that came up more than once?", "label": "agentic", "lang": "en"}
+{"text": "What did the CEO say about the hiring freeze in the all-hands notes?", "label": "direct", "lang": "en"}
+{"text": "What's the training budget amount listed in my HR benefits overview?", "label": "direct", "lang": "en"}
+{"text": "What was the budget variance for Q2: planned in the budget file minus actual in the finance report?", "label": "decompose", "lang": "en"}
+{"text": "hoeveel vakantiedagen heb ik per jaar", "label": "direct", "lang": "nl"}
+{"text": "Where is the offsite on 14 November being held?", "label": "direct", "lang": "en"}
+{"text": "What does the employment contract say about private use of the company car?", "label": "direct", "lang": "en"}
+{"text": "ik wil om loonsverhoging vragen, zoek alles bij elkaar wat mijn zaak ondersteunt", "label": "agentic", "lang": "nl"}
+{"text": "Heeft mijn werkweek ooit gewijzigd volgens de contractwijzigingen, en wanneer dan?", "label": "agentic", "lang": "nl"}
+{"text": "Check if the education budget in the benefits overview covers the full price of the Advanced SQL course.", "label": "decompose", "lang": "en"}
+{"text": "how many hours a week am I contracted for", "label": "direct", "lang": "en"}
+{"text": "Subtract the tax withheld on my May payslip from the gross to check it equals the net.", "label": "decompose", "lang": "en"}
+{"text": "Compare the training days promised in my contract with the days listed in my education plan", "label": "decompose", "lang": "en"}
+{"text": "What happened with the visa sponsorship paperwork? Walk me through it step by step.", "label": "agentic", "lang": "en"}
+{"text": "Waarom liep project Helios vertraging op? Duik in de notulen en mails.", "label": "agentic", "lang": "nl"}
+{"text": "Vat alle gesprekken met Joost dit jaar samen: thema's en vervolgacties.", "label": "agentic", "lang": "nl"}
+{"text": "how has the scope of the Atlas project changed since kickoff", "label": "agentic", "lang": "en"}
+{"text": "What was the total number of hours I worked in the August timesheet?", "label": "direct", "lang": "en"}
+{"text": "hoeveel vakantiedagen staan er in mijn contract en hoeveel zegt de loonstrook dat ik nog heb", "label": "decompose", "lang": "nl"}
+{"text": "Which pension fund am I enrolled in per the HR welcome pack?", "label": "direct", "lang": "en"}
+{"text": "Do the dates for the Orion beta launch in the project plan and in the steering committee notes match?", "label": "decompose", "lang": "en"}
+{"text": "Heb ik iets vergeten op te volgen uit de vergaderingen en mails van vorige week?", "label": "agentic", "lang": "nl"}
+{"text": "how much is my total compensation: base salary from the contract plus the bonus from the compensation letter", "label": "decompose", "lang": "en"}
+{"text": "wat was de deadline voor het scriptievoorstel en wanneer moet de definitieve scriptie erin", "label": "decompose", "lang": "nl"}
+{"text": "Go through my project folder and tell me what documentation is missing for a proper handover.", "label": "agentic", "lang": "en"}
+{"text": "How far in advance do I have to request vacation per the leave policy?", "label": "direct", "lang": "en"}
+{"text": "What's my gross monthly salary according to the Halden Systems contract?", "label": "direct", "lang": "en"}
+{"text": "Op welke dag valt het tentamen Statistiek 2?", "label": "direct", "lang": "nl"}
+{"text": "wat was de uitkomst van het gesprek met Joost op 2 oktober?", "label": "direct", "lang": "nl"}
+{"text": "What is the deadline for the Q4 OKR submission?", "label": "direct", "lang": "en"}
+{"text": "Build a timeline of my employment at Corvex from the first interview to now.", "label": "agentic", "lang": "en"}
+{"text": "What is the combined length of my two fixed-term contracts at Brightwave in months?", "label": "decompose", "lang": "en"}
+{"text": "Who got assigned the vendor migration task in the notes from the 12 March project sync?", "label": "direct", "lang": "en"}
+{"text": "Wat is mijn loonheffingskorting-status op de loonstrook van januari", "label": "direct", "lang": "nl"}
+{"text": "Pull out every decision made in the architecture working group since January.", "label": "agentic", "lang": "en"}
+{"text": "Compare how my workload evolved month by month this year using timesheets, task lists and meeting counts.", "label": "agentic", "lang": "en"}
+{"text": "What's the deductible for the employer-provided health insurance in my benefits letter?", "label": "direct", "lang": "en"}
+{"text": "how many days of parental leave am I entitled to under the company policy PDF", "label": "direct", "lang": "en"}
+{"text": "Plan my certification path for the next year based on what I have, what my employer reimburses, and what's expiring.", "label": "agentic", "lang": "en"}
+{"text": "Wanneer is mijn volgende functioneringsgesprek?", "label": "direct", "lang": "nl"}
+{"text": "Add the tuition fee for the autumn module to the exam resit fee in the faculty letter.", "label": "decompose", "lang": "en"}
+{"text": "Which has the higher credit value, my capstone or my internship?", "label": "decompose", "lang": "en"}
+{"text": "Add my net pay from the October payslip and the reimbursement from the travel claim.", "label": "decompose", "lang": "en"}
+{"text": "Compile a CV update from my contracts, certificates and project notes.", "label": "agentic", "lang": "en"}
+{"text": "ik solliciteer ergens anders, verzamel mijn belangrijkste prestaties uit de documenten van de laatste twee jaar", "label": "agentic", "lang": "nl"}
+{"text": "Compare the deadlines for the midterm paper in the syllabus and in the announcement email.", "label": "decompose", "lang": "en"}
+{"text": "What did we conclude about API versioning in the architecture meeting from 9 June?", "label": "direct", "lang": "en"}
+{"text": "Hoeveel verlofuren heb ik nog volgens de laatste loonstrook?", "label": "direct", "lang": "nl"}
+{"text": "Wat was het brutoloon in december en hoe verhoudt dat zich tot januari?", "label": "decompose", "lang": "nl"}
+{"text": "Which has the longer validity, my Scrum certificate or my PRINCE2 certificate?", "label": "decompose", "lang": "en"}
+{"text": "catch me up on the last month of the data platform project", "label": "agentic", "lang": "en"}
+{"text": "Which email address do I send sick notifications to, per the employee handbook?", "label": "direct", "lang": "en"}
+{"text": "Create a chronological log of every interaction with the recruiter at Quillfeather.", "label": "agentic", "lang": "en"}
+{"text": "Which recurring meetings do I have, and which of them seem to have no notes or agenda?", "label": "agentic", "lang": "en"}
+{"text": "Who is responsible for the vendor migration in the kickoff notes, and is the same person named in the project plan?", "label": "decompose", "lang": "en"}
+{"text": "Zijn alle getekende stukken van mijn indiensttreding aanwezig? Wat ontbreekt er?", "label": "agentic", "lang": "nl"}
+{"text": "Hoeveel bruto heb ik verdiend volgens de jaaropgave 2025?", "label": "direct", "lang": "nl"}
+{"text": "What laptop model did IT assign to me, per the onboarding email?", "label": "direct", "lang": "en"}
+{"text": "Figure out what happened to my expense reimbursement for the Berlin trip.", "label": "agentic", "lang": "en"}
+{"text": "Wat is de deadline voor het inleveren van mijn scriptie?", "label": "direct", "lang": "nl"}
+{"text": "Vat alles samen wat er het afgelopen jaar is besproken over mijn promotie.", "label": "agentic", "lang": "nl"}
+{"text": "Who is the manager listed in the org chart and does it match the one in my offer letter?", "label": "decompose", "lang": "en"}
+{"text": "Show me the clause on intellectual property assignment in my contract.", "label": "direct", "lang": "en"}
+{"text": "What changed between the first draft and the final version of my employment contract? Go through all the versions I have.", "label": "agentic", "lang": "en"}
+{"text": "what is the title of my dissertation as registered with the faculty", "label": "direct", "lang": "en"}
+{"text": "What's left of the Helios budget if I take the approved amount in the project plan and subtract the invoices in the finance export?", "label": "decompose", "lang": "en"}
+{"text": "Which task has the later due date, \"Migrate DNS\" or \"Update runbook\"?", "label": "decompose", "lang": "en"}
+{"text": "Does my employment contract say anything about working from home days?", "label": "direct", "lang": "en"}
+{"text": "what did Priya and Marcus each report as blockers in Monday's standup notes", "label": "decompose", "lang": "en"}
+{"text": "Go through all the course syllabi in my folder and tell me which ones overlap in content.", "label": "agentic", "lang": "en"}
+{"text": "Compare the salary band for my role in the HR grading table with what I actually earn per the contract.", "label": "decompose", "lang": "en"}
+{"text": "Hoeveel bedraagt de ondertekeningsbonus in mijn aanbiedingsbrief van Vandeberg & Zonen?", "label": "direct", "lang": "nl"}
+{"text": "Compare the termination clauses in my old Halden contract and the new Corvex contract.", "label": "decompose", "lang": "en"}
+{"text": "Doe een check op mijn jaarstukken: jaaropgave, loonstroken en brieven over secundaire arbeidsvoorwaarden.", "label": "agentic", "lang": "nl"}
+{"text": "what's the status of everything related to my certification renewal", "label": "agentic", "lang": "en"}
+{"text": "how many vacation days do i have in my contract vs what the payslip says i have left", "label": "decompose", "lang": "en"}
+{"text": "Hoe is de scope van het Atlas-project veranderd sinds de kickoff?", "label": "agentic", "lang": "nl"}
+{"text": "Remind me what the lunch-and-learn topic is on the 21st.", "label": "direct", "lang": "en"}
+{"text": "Look for any risks mentioned across the project reports for the warehouse rollout and group them.", "label": "agentic", "lang": "en"}
+{"text": "Is the cost centre on my expense claim the same as the one in the project setup doc?", "label": "decompose", "lang": "en"}
+{"text": "Hoe lang is mijn BHV-diploma geldig?", "label": "direct", "lang": "nl"}
+{"text": "What is the reference number on my Prince2 certificate?", "label": "direct", "lang": "en"}
+{"text": "Maak een overdrachtsdocument voor mijn projecten op basis van notities, taken en documenten.", "label": "agentic", "lang": "nl"}
+{"text": "Is the laptop allowance in my contract equal to what the IT policy says?", "label": "decompose", "lang": "en"}
+{"text": "Hoeveel dagen zaten er tussen mijn sollicitatiemail en de datum van de aanbiedingsbrief?", "label": "decompose", "lang": "nl"}
+{"text": "Check if the employer paid my commuting allowance every month this year", "label": "agentic", "lang": "en"}
+{"text": "Which of my certificates are expiring soon and what do I need to do to renew each one?", "label": "agentic", "lang": "en"}
+{"text": "Compare my 2025 annual statement with the 2024 one: how much did my gross income change?", "label": "decompose", "lang": "en"}
+{"text": "Do a sanity check on my year-end tax documents: jaaropgave, payslips and benefit letters.", "label": "agentic", "lang": "en"}
+{"text": "Compare my annual leave balance on the October payslip with the figure in the HR portal export", "label": "decompose", "lang": "en"}
+{"text": "What do I need to prepare for my first week at the new job? Check the onboarding emails and documents.", "label": "agentic", "lang": "en"}
+{"text": "Tel de netto uitbetaling van oktober op bij de declaratie van de dienstreis.", "label": "decompose", "lang": "nl"}
+{"text": "Maak een statusrapport van project Nova op basis van alle notities en taken tot nu toe.", "label": "agentic", "lang": "nl"}
+{"text": "what was the outcome of the one-on-one with Marcus on 2 October", "label": "direct", "lang": "en"}
+{"text": "walk me through the history of my last contract renewal", "label": "agentic", "lang": "en"}
+{"text": "what's the pension contribution percentage in my employment contract", "label": "direct", "lang": "en"}
+{"text": "Find my total vacation entitlement: the statutory days plus the extra seniority days in the contract", "label": "decompose", "lang": "en"}
+{"text": "Do I earn more per hour at the Ostrander job or the Tessera job?", "label": "decompose", "lang": "en"}
+{"text": "What's my annual leave balance on the latest payslip?", "label": "direct", "lang": "en"}
+{"text": "Find all the places where a deadline was moved for my thesis and explain why each time", "label": "agentic", "lang": "en"}
+{"text": "What is the milestone date for the beta launch in the Orion project plan?", "label": "direct", "lang": "en"}
+{"text": "Wat moet ik allemaal regelen als ik per 1 januari ontslag neem? Zoek in contract, handboek en pensioenstukken.", "label": "agentic", "lang": "nl"}
+{"text": "wat is het verschil tussen mijn brutosalaris in het contract en op de laatste loonstrook", "label": "decompose", "lang": "nl"}
+{"text": "Welke regels gelden voor mijn studieverlof? Zoek in cao, handboek en alles wat het noemt.", "label": "agentic", "lang": "nl"}
+{"text": "What is the maximum number of overtime hours allowed per month in my contract?", "label": "direct", "lang": "en"}
+{"text": "Make a list of all the courses I've completed in the past three years with their grades and certificates.", "label": "agentic", "lang": "en"}
+{"text": "Op welk IBAN wordt mijn salaris gestort, volgens mijn loonstrook?", "label": "direct", "lang": "nl"}
+{"text": "How do the exam dates for Operations Management and Corporate Finance compare, do any overlap?", "label": "decompose", "lang": "en"}
+{"text": "Summarise all HR communications from the past quarter.", "label": "agentic", "lang": "en"}
+{"text": "How many days are there between my First Aid certificate expiry and my scheduled renewal course?", "label": "decompose", "lang": "en"}
+{"text": "By how much does my contract's overtime rate exceed the standard hourly rate?", "label": "decompose", "lang": "en"}
+{"text": "komt de opleverdatum van project Orion in het plan overeen met die in de stuurgroepnotulen", "label": "decompose", "lang": "nl"}
+{"text": "Give me an overview of every benefit I'm entitled to, from all HR documents.", "label": "agentic", "lang": "en"}
+{"text": "Wat is het verschil in opzegtermijn voor werkgever en werknemer in mijn contract?", "label": "decompose", "lang": "nl"}
+{"text": "What's the deadline for the Q3 expense report?", "label": "direct", "lang": "en"}
+{"text": "Welke afspraken zijn er gemaakt over de oplevering in het overleg van vorige week vrijdag?", "label": "direct", "lang": "nl"}
+{"text": "Review my one-year goals from the January review and show which are done, in progress or dropped.", "label": "agentic", "lang": "en"}
+{"text": "Welke taken in mijn projecten zijn te laat en wie houdt ze op?", "label": "agentic", "lang": "nl"}
+{"text": "Wanneer is de inschrijfdeadline voor het examen Prince2 Foundation?", "label": "direct", "lang": "nl"}
+{"text": "Is the holiday allowance on my June payslip the same as the amount promised in my contract?", "label": "decompose", "lang": "en"}
+{"text": "Divide the annual budget in the department plan by the headcount in the org chart to get the budget per person.", "label": "decompose", "lang": "en"}
+{"text": "What was the attendance in the March town hall versus the June town hall?", "label": "decompose", "lang": "en"}
+{"text": "Wat is het verhaal achter de wijziging van mijn functietitel in maart?", "label": "agentic", "lang": "nl"}
+{"text": "Which of my course certificates has the higher final score, Python Basics or Data Visualisation?", "label": "decompose", "lang": "en"}
+{"text": "Are the working hours in my contract the same as in the addendum?", "label": "decompose", "lang": "en"}
+{"text": "Go through everything related to the secondment to Rotterdam and summarise the terms and open questions.", "label": "agentic", "lang": "en"}
+{"text": "Compare my planned study hours in the schedule with the hours I logged last week.", "label": "decompose", "lang": "en"}
+{"text": "Welk aanbod heeft het hoogste brutosalaris, Vantor of Nordlicht?", "label": "decompose", "lang": "nl"}
+{"text": "Go through the course materials and my notes and prepare a list of likely exam questions for Organizational Behavior.", "label": "agentic", "lang": "en"}
+{"text": "Compare the course fees of the Python bootcamp with the SQL bootcamp and tell me the cheaper one.", "label": "decompose", "lang": "en"}
+{"text": "Wat is mijn opzegtermijn volgens mijn arbeidsovereenkomst?", "label": "direct", "lang": "nl"}
+{"text": "Why was the Helios project delayed? Dig through the notes and emails.", "label": "agentic", "lang": "en"}
+{"text": "Geef me een overzicht van alle secundaire arbeidsvoorwaarden waar ik recht op heb volgens de HR-documenten", "label": "agentic", "lang": "nl"}
+{"text": "Welke taak heeft de latere einddatum, 'DNS migreren' of 'runbook bijwerken'?", "label": "decompose", "lang": "nl"}
+{"text": "What salary is stated in the contract addendum I signed in January?", "label": "direct", "lang": "en"}
+{"text": "Take every payslip since January and chart how my deductions have evolved", "label": "agentic", "lang": "en"}
+{"text": "Is mijn opzegtermijn in het contract gelijk aan die in het personeelshandboek?", "label": "decompose", "lang": "nl"}
+{"text": "What's the due date of the \"Update onboarding wiki\" task?", "label": "direct", "lang": "en"}
+{"text": "Did the net salary on the September payslip match what the offer letter said it would be?", "label": "decompose", "lang": "en"}
+{"text": "What module do I have on Tuesday mornings this semester?", "label": "direct", "lang": "en"}
+{"text": "Give me a recap of all the one-on-ones with Marcus this year, themes and follow-ups.", "label": "agentic", "lang": "en"}
+{"text": "Beoordeel hoe ver ik ben met de leerdoelen uit mijn ontwikkelplan, op basis van de cursussen en notities die ik heb", "label": "agentic", "lang": "nl"}
+{"text": "Is de starttijd van de wekelijkse sync in de uitnodiging gelijk aan die in het teamhandboek?", "label": "decompose", "lang": "nl"}
+{"text": "Who is the product owner for the Helios project?", "label": "direct", "lang": "en"}
+{"text": "which day is the review of my 360 feedback scheduled", "label": "direct", "lang": "en"}
+{"text": "What has HR told me about the new bonus scheme? Look across emails, PDFs and meeting notes.", "label": "agentic", "lang": "en"}
+{"text": "Controleer of mijn werkgever het hele jaar de juiste pensioenpremie heeft afgedragen", "label": "agentic", "lang": "nl"}
+{"text": "Dekt het opleidingsbudget uit het arbeidsvoorwaardenoverzicht de volledige prijs van de Python-cursus?", "label": "decompose", "lang": "nl"}
+{"text": "What's the difference between the gross salary in my contract and the gross on my latest payslip?", "label": "decompose", "lang": "en"}
+{"text": "Staat dezelfde manager in het organogram als in mijn aanbiedingsbrief?", "label": "decompose", "lang": "nl"}
+{"text": "What time does the daily standup start, according to the team handbook?", "label": "direct", "lang": "en"}
+{"text": "Hoeveel is mijn netto loon van september afgeweken van wat in de aanbiedingsbrief stond?", "label": "decompose", "lang": "nl"}
+{"text": "What's the amount of the signing bonus in my offer letter?", "label": "direct", "lang": "en"}
+{"text": "How many total credits will I have after combining the ones on my transcript and the ones for the course I just enrolled in?", "label": "decompose", "lang": "en"}
+{"text": "In de notulen van het MT-overleg van vorige maand staat volgens mij een besluit over het nieuwe urenregistratiesysteem, wat is er precies besloten?", "label": "direct", "lang": "nl"}
+{"text": "when is the project retrospective scheduled", "label": "direct", "lang": "en"}
+{"text": "Hoeveel dagen zitten er tussen de afloopdatum van mijn BHV-diploma en de geplande herhalingscursus?", "label": "decompose", "lang": "nl"}
+{"text": "what was the action item for Priya in the design review on 3 Sept", "label": "direct", "lang": "en"}
+{"text": "Staat er een concurrentiebeding in mijn contract?", "label": "direct", "lang": "nl"}
+{"text": "How many sick days have I used according to the HR portal export?", "label": "direct", "lang": "en"}
+{"text": "Compare the sick leave policy for the first 6 months in my contract with the policy PDF.", "label": "decompose", "lang": "en"}
+{"text": "Wat zijn de gecombineerde budgetten van Nova en Helios volgens de projectplannen?", "label": "decompose", "lang": "nl"}
+{"text": "Vergelijk de salarisschaal voor mijn functie in de HR-tabel met wat ik volgens mijn contract verdien.", "label": "decompose", "lang": "nl"}
+{"text": "What does the Kubernetes certification course I signed up for cost?", "label": "direct", "lang": "en"}
+{"text": "Hoeveel kostte het totaal om de Azure-certificering te halen: examengeld uit de boekingsmail plus de factuur van de oefentoetsen?", "label": "decompose", "lang": "nl"}
+{"text": "Review every expense claim I submitted this year and tell me which are still unpaid.", "label": "agentic", "lang": "en"}
+{"text": "What did we decide across all the steering committee meetings about the budget overrun?", "label": "agentic", "lang": "en"}
+{"text": "wat is het vakantiegeld op mijn loonstrook van mei", "label": "direct", "lang": "nl"}
+{"text": "what's the final submission date of the group assignment for the Marketing course", "label": "direct", "lang": "en"}
+{"text": "hoeveel maanden duren mijn twee tijdelijke contracten bij Brinkhuis samen", "label": "decompose", "lang": "nl"}
+{"text": "Zoek alle plekken waar de opleverdatum van Q4 genoemd wordt en laat zien hoe die is opgeschoven", "label": "agentic", "lang": "nl"}
+{"text": "which software did we agree to use for the project tracker in the kickoff meeting", "label": "direct", "lang": "en"}
+{"text": "what's the difference in notice period between employee and employer side in my contract? check both sections", "label": "decompose", "lang": "en"}
+{"text": "welk project heeft de eerdere go-live, Helios of Nova", "label": "decompose", "lang": "nl"}
+{"text": "What was the gross amount of my last payslip before tax?", "label": "direct", "lang": "en"}
+{"text": "wat is de einddatum van mijn tijdelijke contract", "label": "direct", "lang": "nl"}
+{"text": "What is the IBAN my salary is paid into according to my payslip?", "label": "direct", "lang": "en"}

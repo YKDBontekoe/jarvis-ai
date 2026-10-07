@@ -1,0 +1,450 @@
+{"text": "What's the monthly rent in my current lease?", "label": "direct", "lang": "en"}
+{"text": "when does the lease on the Kerkstraat flat expire", "label": "direct", "lang": "en"}
+{"text": "How much deposit did I pay to Hendriks Verhuur?", "label": "direct", "lang": "en"}
+{"text": "what is the notice period for terminating my rental contract", "label": "direct", "lang": "en"}
+{"text": "Tell me the interest rate fixed in my ING mortgage offer, and for how many years it applies.", "label": "direct", "lang": "en"}
+{"text": "what's the wifi router model in the Ziggo manual i uploaded", "label": "direct", "lang": "en"}
+{"text": "How often does the Bosch dishwasher manual say to clean the filter?", "label": "direct", "lang": "en"}
+{"text": "When does the warranty on my Miele washing machine run out?", "label": "direct", "lang": "en"}
+{"text": "What's the tyre pressure for the Golf according to the owner's manual?", "label": "direct", "lang": "en"}
+{"text": "What is the policy number on my home insurance document?", "label": "direct", "lang": "en"}
+{"text": "which oil does the Skoda Octavia need, per the manual", "label": "direct", "lang": "en"}
+{"text": "what is my electricity tariff per kWh in the Eneco contract", "label": "direct", "lang": "en"}
+{"text": "How much was the quote from Jansen Dakwerken for replacing the flat roof?", "label": "direct", "lang": "en"}
+{"text": "monthly price of my Netflix subscription", "label": "direct", "lang": "en"}
+{"text": "What is the cancellation period of my gym membership with Basic-Fit?", "label": "direct", "lang": "en"}
+{"text": "When is the next APK due for my Volvo?", "label": "direct", "lang": "en"}
+{"text": "Who is the landlord's contact person for maintenance requests in my lease agreement?", "label": "direct", "lang": "en"}
+{"text": "what was the mortgage amount on the deed from the notary", "label": "direct", "lang": "en"}
+{"text": "Does my lease allow pets? I think there's a clause somewhere about animals.", "label": "direct", "lang": "en"}
+{"text": "What's the boiler's serial number from the Vaillant installation certificate?", "label": "direct", "lang": "en"}
+{"text": "What is the penalty-free early repayment allowance per year in my mortgage terms?", "label": "direct", "lang": "en"}
+{"text": "how many kWh did the annual statement from Vattenfall say I used in 2025", "label": "direct", "lang": "en"}
+{"text": "When does my fixed-rate energy contract end?", "label": "direct", "lang": "en"}
+{"text": "What is the model number of the thermostat in the Nest manual?", "label": "direct", "lang": "en"}
+{"text": "What does the quote from Bakker Installatie say the new radiator costs, excluding labour?", "label": "direct", "lang": "en"}
+{"text": "how long is the warranty on the new kitchen from Keukenstudio Zuid", "label": "direct", "lang": "en"}
+{"text": "What is the licence plate number on my vehicle registration papers?", "label": "direct", "lang": "en"}
+{"text": "Which day of the month is rent due according to my tenancy agreement?", "label": "direct", "lang": "en"}
+{"text": "What's the excess (deductible) on my car insurance policy?", "label": "direct", "lang": "en"}
+{"text": "amount of the annual service charge advance in the VvE statement", "label": "direct", "lang": "en"}
+{"text": "How much did the plumber invoice for the leaking tap on 14 March?", "label": "direct", "lang": "en"}
+{"text": "what temp should the fridge be set to per the Bosch manual", "label": "direct", "lang": "en"}
+{"text": "What's the reference number of my water meter contract with Vitens?", "label": "direct", "lang": "en"}
+{"text": "Does my Spotify family plan renew automatically, and on what date?", "label": "direct", "lang": "en"}
+{"text": "what's the energy label of my house according to the certificate", "label": "direct", "lang": "en"}
+{"text": "How many square meters is the apartment according to the lease?", "label": "direct", "lang": "en"}
+{"text": "What is the VvE contribution per month for my apartment?", "label": "direct", "lang": "en"}
+{"text": "When was the last chimney sweep inspection done?", "label": "direct", "lang": "en"}
+{"text": "What is the phone number for roadside assistance on my ANWB membership card?", "label": "direct", "lang": "en"}
+{"text": "In the Dyson manual, how do I reset the filter indicator?", "label": "direct", "lang": "en"}
+{"text": "What is the lease term for my car lease with Athlon, in months?", "label": "direct", "lang": "en"}
+{"text": "mileage limit per year on my lease car contract", "label": "direct", "lang": "en"}
+{"text": "what is the price per m3 of gas in my Essent contract", "label": "direct", "lang": "en"}
+{"text": "Which person is named as co-signer on the rental agreement?", "label": "direct", "lang": "en"}
+{"text": "What was the purchase price on the koopakte for the house?", "label": "direct", "lang": "en"}
+{"text": "What's the build year of my house according to the valuation report?", "label": "direct", "lang": "en"}
+{"text": "What is the WOZ value for 2025 on the notice from the municipality?", "label": "direct", "lang": "en"}
+{"text": "how much is the monthly premium on my car insurance", "label": "direct", "lang": "en"}
+{"text": "What are the steps to descale my Nespresso machine in the manual?", "label": "direct", "lang": "en"}
+{"text": "When does my Adobe subscription renew?", "label": "direct", "lang": "en"}
+{"text": "What does the lease say about subletting?", "label": "direct", "lang": "en"}
+{"text": "What size are the winter tyres I bought, per the invoice from Kwik-Fit?", "label": "direct", "lang": "en"}
+{"text": "Who was the installer of the solar panels and what is the inverter brand?", "label": "direct", "lang": "en"}
+{"text": "how many panels were in the quote from Zonnig Energie", "label": "direct", "lang": "en"}
+{"text": "Which fuse rating does the washing machine manual specify?", "label": "direct", "lang": "en"}
+{"text": "what is the interest-only portion of my mortgage", "label": "direct", "lang": "en"}
+{"text": "What's the mortgage term in years in the offer from Rabobank?", "label": "direct", "lang": "en"}
+{"text": "How long is the parking permit valid for my street?", "label": "direct", "lang": "en"}
+{"text": "what is the cost of the internet plan from KPN, per month, after the promo period ends", "label": "direct", "lang": "en"}
+{"text": "what is the bank account number I need to pay rent to", "label": "direct", "lang": "en"}
+{"text": "What is the maximum rent increase percentage allowed in my lease for next year?", "label": "direct", "lang": "en"}
+{"text": "When did the move-in inspection report say the carpet was last replaced?", "label": "direct", "lang": "en"}
+{"text": "What's written in the handover report about the kitchen condition?", "label": "direct", "lang": "en"}
+{"text": "Is there a clause on repainting walls when I move out?", "label": "direct", "lang": "en"}
+{"text": "What is the capacity of the water heater listed in the installation manual?", "label": "direct", "lang": "en"}
+{"text": "How long does the extended warranty on my Samsung TV cover?", "label": "direct", "lang": "en"}
+{"text": "what's the VIN of my car", "label": "direct", "lang": "en"}
+{"text": "Which tyre brand is on my car per the last service invoice?", "label": "direct", "lang": "en"}
+{"text": "how much did the last car service at Garage De Wit cost", "label": "direct", "lang": "en"}
+{"text": "What did the roofer quote for gutter replacement at the back of the house?", "label": "direct", "lang": "en"}
+{"text": "does the home insurance cover water damage from burst pipes", "label": "direct", "lang": "en"}
+{"text": "What's the sum insured for contents on my home insurance?", "label": "direct", "lang": "en"}
+{"text": "What is the name of my energy supplier?", "label": "direct", "lang": "en"}
+{"text": "What are the opening hours of the recycling point per the municipal waste calendar?", "label": "direct", "lang": "en"}
+{"text": "what day is the grey bin collected on my street", "label": "direct", "lang": "en"}
+{"text": "When is the next boiler maintenance due according to the service contract?", "label": "direct", "lang": "en"}
+{"text": "What is the monthly fee of my Amazon Prime subscription?", "label": "direct", "lang": "en"}
+{"text": "what was the final price on the invoice for the bathroom renovation by Tegelzetter Mo", "label": "direct", "lang": "en"}
+{"text": "Can you tell me the loan-to-value stated on my mortgage deed?", "label": "direct", "lang": "en"}
+{"text": "What's the postal address of the landlord for sending termination letters?", "label": "direct", "lang": "en"}
+{"text": "What's the wattage of the heat pump in the Daikin manual?", "label": "direct", "lang": "en"}
+{"text": "how often does the air filter in the Zehnder ventilation unit need changing", "label": "direct", "lang": "en"}
+{"text": "What does error code E4 mean on my Vaillant boiler?", "label": "direct", "lang": "en"}
+{"text": "What is the street parking permit fee for a second car?", "label": "direct", "lang": "en"}
+{"text": "What does the lease say about who pays for garden maintenance?", "label": "direct", "lang": "en"}
+{"text": "What is the date of the first mortgage payment?", "label": "direct", "lang": "en"}
+{"text": "Which notary handled the purchase of the house?", "label": "direct", "lang": "en"}
+{"text": "what insurance excess applies to glass damage on the car policy", "label": "direct", "lang": "en"}
+{"text": "How many keys were handed over according to the key handover form?", "label": "direct", "lang": "en"}
+{"text": "What is the cancellation fee if I end my Disney+ subscription early?", "label": "direct", "lang": "en"}
+{"text": "What's the deposit return deadline stated in my rental agreement?", "label": "direct", "lang": "en"}
+{"text": "The Dyson V15 manual - what is the battery runtime in eco mode?", "label": "direct", "lang": "en"}
+{"text": "What is the boiler's working pressure range in bar per the manual?", "label": "direct", "lang": "en"}
+{"text": "What was my total energy bill for August?", "label": "direct", "lang": "en"}
+{"text": "what's the gross annual income stated in my mortgage advice report", "label": "direct", "lang": "en"}
+{"text": "What is the due date on the water bill from last month?", "label": "direct", "lang": "en"}
+{"text": "What is the cost of the extra storage option on my iCloud plan?", "label": "direct", "lang": "en"}
+{"text": "what is the contract number of my Vodafone home internet", "label": "direct", "lang": "en"}
+{"text": "What is the first registration date for my motorbike?", "label": "direct", "lang": "en"}
+{"text": "What are the dimensions of the cabinet in the IKEA assembly manual for the Pax wardrobe?", "label": "direct", "lang": "en"}
+{"text": "What is the cooling-off period stated in the purchase contract for the car?", "label": "direct", "lang": "en"}
+{"text": "how many months of warranty remain on the roof repair done by Dakservice Noord?", "label": "direct", "lang": "en"}
+{"text": "What does the lease say about the heating costs prepayment?", "label": "direct", "lang": "en"}
+{"text": "What's the max towing weight in my Octavia manual?", "label": "direct", "lang": "en"}
+{"text": "Which room is the smoke detector installed in per the fire safety inspection report?", "label": "direct", "lang": "en"}
+{"text": "Wat is de maandelijkse huur in mijn huurcontract?", "label": "direct", "lang": "nl"}
+{"text": "wanneer loopt mijn huurovereenkomst af", "label": "direct", "lang": "nl"}
+{"text": "hoeveel waarborgsom heb ik betaald voor het appartement aan de Lindelaan", "label": "direct", "lang": "nl"}
+{"text": "Wat is de opzegtermijn van mijn Ziggo abonnement?", "label": "direct", "lang": "nl"}
+{"text": "Welke rente staat er in mijn hypotheekofferte van ABN AMRO en hoe lang staat die vast?", "label": "direct", "lang": "nl"}
+{"text": "hoe vaak moet ik het filter van de droger schoonmaken volgens de handleiding", "label": "direct", "lang": "nl"}
+{"text": "Tot wanneer loopt de garantie op mijn Bosch vaatwasser?", "label": "direct", "lang": "nl"}
+{"text": "wat is de bandenspanning van de Peugeot 208 volgens het instructieboekje", "label": "direct", "lang": "nl"}
+{"text": "Wat is het polisnummer van mijn inboedelverzekering?", "label": "direct", "lang": "nl"}
+{"text": "welke olie heeft mijn Toyota Yaris nodig", "label": "direct", "lang": "nl"}
+{"text": "Wat kost een kWh stroom in mijn contract bij Greenchoice?", "label": "direct", "lang": "nl"}
+{"text": "hoeveel was de offerte van de dakdekker voor het vervangen van de dakgoten", "label": "direct", "lang": "nl"}
+{"text": "wat betaal ik per maand voor Videoland", "label": "direct", "lang": "nl"}
+{"text": "Wanneer moet mijn auto weer naar de APK?", "label": "direct", "lang": "nl"}
+{"text": "Wat is het serienummer van de cv-ketel op het onderhoudscontract?", "label": "direct", "lang": "nl"}
+{"text": "Wat is het eigen risico bij mijn autoverzekering?", "label": "direct", "lang": "nl"}
+{"text": "hoe hoog is het voorschot servicekosten per maand in mijn huurcontract", "label": "direct", "lang": "nl"}
+{"text": "Wat was de koopsom in de koopakte van de woning?", "label": "direct", "lang": "nl"}
+{"text": "wat is de WOZ-waarde die op de aanslag van de gemeente staat", "label": "direct", "lang": "nl"}
+{"text": "Wat is mijn energielabel volgens het energieprestatiecertificaat?", "label": "direct", "lang": "nl"}
+{"text": "hoeveel mag ik per jaar boetevrij aflossen op mijn hypotheek", "label": "direct", "lang": "nl"}
+{"text": "Wat is de bijdrage aan de VvE per maand?", "label": "direct", "lang": "nl"}
+{"text": "Wanneer eindigt mijn vaste energiecontract?", "label": "direct", "lang": "nl"}
+{"text": "wat staat er in mijn huurcontract over huisdieren", "label": "direct", "lang": "nl"}
+{"text": "Hoeveel kilometer per jaar mag ik rijden volgens mijn leasecontract?", "label": "direct", "lang": "nl"}
+{"text": "Welke notaris heeft de akte van levering opgemaakt?", "label": "direct", "lang": "nl"}
+{"text": "wat is het kenteken van mijn auto", "label": "direct", "lang": "nl"}
+{"text": "Wat is de looptijd van mijn leaseauto in maanden?", "label": "direct", "lang": "nl"}
+{"text": "hoeveel kost de parkeervergunning voor mijn straat per maand", "label": "direct", "lang": "nl"}
+{"text": "Wat zegt de handleiding van de Nespresso over ontkalken?", "label": "direct", "lang": "nl"}
+{"text": "wanneer is de volgende onderhoudsbeurt van de ketel volgens het contract", "label": "direct", "lang": "nl"}
+{"text": "Wat is de jaarlijkse huurverhoging die in mijn contract is afgesproken", "label": "direct", "lang": "nl"}
+{"text": "Op welke dag van de maand moet de huur betaald zijn?", "label": "direct", "lang": "nl"}
+{"text": "hoeveel panelen zaten er in de offerte van Zonnepanelen Direct", "label": "direct", "lang": "nl"}
+{"text": "Wat zijn de afmetingen van de kledingkast in de IKEA montage-instructie?", "label": "direct", "lang": "nl"}
+{"text": "wat is mijn jaarverbruik aan gas volgens de jaarafrekening van Eneco", "label": "direct", "lang": "nl"}
+{"text": "Wat staat er in het opleveringsrapport over de staat van de badkamer?", "label": "direct", "lang": "nl"}
+{"text": "Hoe lang is de garantie op de nieuwe keuken?", "label": "direct", "lang": "nl"}
+{"text": "Wat is de hoofdsom van mijn hypotheek volgens de hypotheekakte?", "label": "direct", "lang": "nl"}
+{"text": "wat kost mijn Spotify abonnement per maand nu", "label": "direct", "lang": "nl"}
+{"text": "Wat betekent foutcode E2 op mijn wasmachine van Miele?", "label": "direct", "lang": "nl"}
+{"text": "hoe lang loopt de overeenkomst voor mijn glasvezel van Odido", "label": "direct", "lang": "nl"}
+{"text": "wie is de contactpersoon van de verhuurder voor reparatieverzoeken", "label": "direct", "lang": "nl"}
+{"text": "hoeveel bedroeg de factuur van de loodgieter voor de lekkende kraan", "label": "direct", "lang": "nl"}
+{"text": "Wat is de dekking voor glasschade in mijn autoverzekering?", "label": "direct", "lang": "nl"}
+{"text": "Compare the monthly rent in my current lease with the rent in my previous lease from Rotterdam.", "label": "decompose", "lang": "en"}
+{"text": "How much more is my Eneco electricity rate per kWh compared with the Vattenfall offer I got?", "label": "decompose", "lang": "en"}
+{"text": "Add up the quotes from Jansen Dakwerken and Bakker Installatie for the roof and the boiler - what's the total?", "label": "decompose", "lang": "en"}
+{"text": "what's the combined monthly cost of my Netflix and Spotify subscriptions", "label": "decompose", "lang": "en"}
+{"text": "Is the interest rate in my Rabobank offer lower than the one in the ING offer?", "label": "decompose", "lang": "en"}
+{"text": "Which is cheaper per month, the KPN internet plan or the Ziggo one?", "label": "decompose", "lang": "en"}
+{"text": "What's the total of my rent plus service charges plus the parking permit each month?", "label": "decompose", "lang": "en"}
+{"text": "Does the warranty on my dishwasher or on my washing machine expire first?", "label": "decompose", "lang": "en"}
+{"text": "How much did I spend on car maintenance according to the two invoices from Garage De Wit and Kwik-Fit?", "label": "decompose", "lang": "en"}
+{"text": "compare the excess on my car insurance with the one on my home insurance", "label": "decompose", "lang": "en"}
+{"text": "What is the difference between the mortgage amount on the deed and the purchase price on the sale contract?", "label": "decompose", "lang": "en"}
+{"text": "Add the plumber invoices from 3 March, 19 May and 2 August.", "label": "decompose", "lang": "en"}
+{"text": "Compare the tyre pressure in the Octavia manual with the pressure the Michelin invoice says they inflated to.", "label": "decompose", "lang": "en"}
+{"text": "What is the difference between the quoted price for the solar panels from Zonnig Energie and the one from SunnyHome?", "label": "decompose", "lang": "en"}
+{"text": "How much is left of the deposit after subtracting the repair costs listed in the move-out report?", "label": "decompose", "lang": "en"}
+{"text": "Which of my two energy contracts ends later, Essent gas or Eneco electricity?", "label": "decompose", "lang": "en"}
+{"text": "Subtract the fixed-rate period of my mortgage from the total term to see how many years are on variable rate.", "label": "decompose", "lang": "en"}
+{"text": "What do the Daikin heat pump quote and the Itho Daalderop quote say about installation time? Which is shorter?", "label": "decompose", "lang": "en"}
+{"text": "sum of the road tax, the APK fee and the insurance premium for my Golf", "label": "decompose", "lang": "en"}
+{"text": "notice period in my lease vs notice period in my internet contract, which is longer", "label": "decompose", "lang": "en"}
+{"text": "how much higher is this year's rent than last year's according to the two rent increase letters", "label": "decompose", "lang": "en"}
+{"text": "What is the combined sum insured on my home contents policy and my building insurance policy?", "label": "decompose", "lang": "en"}
+{"text": "Compare the monthly premiums on my Allianz and Centraal Beheer car insurance quotes.", "label": "decompose", "lang": "en"}
+{"text": "What is the total cost of the kitchen from the Keukenstudio Zuid quote and the Siemens appliance invoice?", "label": "decompose", "lang": "en"}
+{"text": "Is the boiler under warranty longer than the boiler's service contract runs?", "label": "decompose", "lang": "en"}
+{"text": "Which one has the lower yearly mileage allowance, the lease car or the van?", "label": "decompose", "lang": "en"}
+{"text": "gas consumption 2024 versus 2025 from the annual statements - did it go down?", "label": "decompose", "lang": "en"}
+{"text": "What's the VvE contribution this year compared with the one in the 2024 statement?", "label": "decompose", "lang": "en"}
+{"text": "Add the water bill and the electricity bill from September", "label": "decompose", "lang": "en"}
+{"text": "What was the WOZ value in 2024 versus 2025?", "label": "decompose", "lang": "en"}
+{"text": "Compare the deposit amounts in my old and new rental contracts", "label": "decompose", "lang": "en"}
+{"text": "Does the lease or the VvE rulebook say anything stricter about noise after 10pm?", "label": "decompose", "lang": "en"}
+{"text": "Total monthly outgoings: mortgage payment from the mortgage offer plus the VvE contribution plus the home insurance premium.", "label": "decompose", "lang": "en"}
+{"text": "How many months are left on my Basic-Fit contract and on my Disney+ yearly plan?", "label": "decompose", "lang": "en"}
+{"text": "which was more expensive, the March service on the car or the October one", "label": "decompose", "lang": "en"}
+{"text": "What's the price difference between the Bosch and the Miele washing machine on the two quotes from Coolblue?", "label": "decompose", "lang": "en"}
+{"text": "energy label before and after the insulation work according to the two certificates", "label": "decompose", "lang": "en"}
+{"text": "Compare the payment term on the contractor's invoice with the one in his quote.", "label": "decompose", "lang": "en"}
+{"text": "What is the mortgage rate in the offer versus the rate in the final deed?", "label": "decompose", "lang": "en"}
+{"text": "how much did I pay in total for the sofa and the dining table from the two IKEA receipts", "label": "decompose", "lang": "en"}
+{"text": "Combine the Apple One subscription price with my iCloud storage price and tell me the yearly cost.", "label": "decompose", "lang": "en"}
+{"text": "Which has the longer warranty: the roof repair by Dakservice Noord or the new window frames from Raamdeco?", "label": "decompose", "lang": "en"}
+{"text": "How big is the gap between the plumbing quote and the final invoice for the bathroom?", "label": "decompose", "lang": "en"}
+{"text": "What is the rent due date in my lease and the direct debit date in my bank mandate? Are they the same?", "label": "decompose", "lang": "en"}
+{"text": "Per the Vaillant and the Remeha manuals, which boiler has the higher max output?", "label": "decompose", "lang": "en"}
+{"text": "What's the daily standing charge in the Eneco contract plus the one in the Vattenfall contract, combined?", "label": "decompose", "lang": "en"}
+{"text": "What were my car insurance premium last year and this year, and what's the increase?", "label": "decompose", "lang": "en"}
+{"text": "Two quotes for the garage door, from Poortservice and the Hormann dealer: which is cheaper including installation?", "label": "decompose", "lang": "en"}
+{"text": "total deposit plus first month's rent I need to pay for the new apartment at Dorpsstraat", "label": "decompose", "lang": "en"}
+{"text": "What does the lease say about the notice period, and what does the landlord's email from May say about the move-out date?", "label": "decompose", "lang": "en"}
+{"text": "Sum of the premiums of my three insurance policies (home, car, liability)", "label": "decompose", "lang": "en"}
+{"text": "compare the monthly mortgage payment on the ING offer with the Rabobank offer for a 20-year term", "label": "decompose", "lang": "en"}
+{"text": "How many kilometres have I driven since the last service, using the odometer on the March invoice and the one on the APK report?", "label": "decompose", "lang": "en"}
+{"text": "Which takes longer to assemble per the IKEA manuals, the Pax wardrobe or the Malm bed?", "label": "decompose", "lang": "en"}
+{"text": "Is my fixed energy price in the Greenchoice contract higher than the variable rate in last month's invoice?", "label": "decompose", "lang": "en"}
+{"text": "Are the gas prices in my current contract and in the renewal proposal different?", "label": "decompose", "lang": "en"}
+{"text": "Subtract the VvE reserve fund contribution from the total VvE monthly bill", "label": "decompose", "lang": "en"}
+{"text": "How much would I save per year if I switched from my Ziggo plan to the Odido offer?", "label": "decompose", "lang": "en"}
+{"text": "What do the heating costs and the water costs for 2025 add up to, from the two Techem statements?", "label": "decompose", "lang": "en"}
+{"text": "Which comes first: my road tax due date or my car insurance renewal date?", "label": "decompose", "lang": "en"}
+{"text": "how long is the warranty on the dishwasher vs the oven from the kitchen order", "label": "decompose", "lang": "en"}
+{"text": "compare notice periods: Vodafone contract and the gym membership", "label": "decompose", "lang": "en"}
+{"text": "What's the total quoted for the garden fence, including the separate gate quote?", "label": "decompose", "lang": "en"}
+{"text": "What was the rent in January and what's the rent after the indexation in the letter of July?", "label": "decompose", "lang": "en"}
+{"text": "Can you tell me the cheapest of the three painter quotes: Verfwerk, De Kleurkast and Schilder Pieters?", "label": "decompose", "lang": "en"}
+{"text": "What is the monthly price of the Amazon Prime plan plus the Audible plan?", "label": "decompose", "lang": "en"}
+{"text": "compare the loan amount on the car financing contract with the car's purchase price on the invoice", "label": "decompose", "lang": "en"}
+{"text": "What do I pay in total on heat pump servicing across the contract, using the yearly fee and the contract length?", "label": "decompose", "lang": "en"}
+{"text": "does the cavity wall insulation quote from Isolatie Totaal cost more than the roof insulation quote from Dakplus", "label": "decompose", "lang": "en"}
+{"text": "Which expires earlier, my parking permit or my driving licence?", "label": "decompose", "lang": "en"}
+{"text": "Add the notary fees from the deed invoice to the transfer tax listed in the purchase statement", "label": "decompose", "lang": "en"}
+{"text": "The oil change interval in the Octavia manual versus how often Garage De Wit actually did it per the invoices - are they consistent?", "label": "decompose", "lang": "en"}
+{"text": "What is the difference in service charges between the 2024 and 2025 settlement statements from the landlord?", "label": "decompose", "lang": "en"}
+{"text": "Which covers a longer towing distance, the roadside assistance fee package I bought or the breakdown cover included in my insurance?", "label": "decompose", "lang": "en"}
+{"text": "What would early termination of my KPN contract cost: the remaining months from the contract plus the exit fee?", "label": "decompose", "lang": "en"}
+{"text": "What is the total price of the alarm system quote plus the monthly monitoring fee over three years?", "label": "decompose", "lang": "en"}
+{"text": "How does the rent in my lease compare to the maximum legal rent in the points calculation?", "label": "decompose", "lang": "en"}
+{"text": "Compare the filter replacement intervals in the Dyson and the Philips air purifier manuals.", "label": "decompose", "lang": "en"}
+{"text": "What's the total of the Shell fuel receipt and the car wash receipt from 12 June?", "label": "decompose", "lang": "en"}
+{"text": "What's the base energy price in the Essent offer and what discount does the loyalty letter give? What's the discounted price?", "label": "decompose", "lang": "en"}
+{"text": "Is the roof warranty longer than the 10 years promised for the solar panels?", "label": "decompose", "lang": "en"}
+{"text": "What is my monthly rent minus the rent allowance in the Belastingdienst letter?", "label": "decompose", "lang": "en"}
+{"text": "Compare the glass damage cover in my car policy with the one in the competitor's quote from Unive.", "label": "decompose", "lang": "en"}
+{"text": "Which is bigger: the loan on the deed or the outstanding balance on the latest mortgage statement?", "label": "decompose", "lang": "en"}
+{"text": "sum the invoices from the electrician and the plasterer for the extension", "label": "decompose", "lang": "en"}
+{"text": "How many years of fixed rate does the ING offer have versus the Rabobank offer?", "label": "decompose", "lang": "en"}
+{"text": "Compare internet speeds in my Ziggo contract and my Odido contract.", "label": "decompose", "lang": "en"}
+{"text": "What are the combined costs of the chimney sweep and the boiler service from the two receipts?", "label": "decompose", "lang": "en"}
+{"text": "Does the 2025 insurance policy cover more than the 2024 one for contents theft?", "label": "decompose", "lang": "en"}
+{"text": "What's the total I paid for the Vattenfall bills in June and July?", "label": "decompose", "lang": "en"}
+{"text": "How much is the monthly mortgage payment per the offer, minus the interest portion per the amortization schedule?", "label": "decompose", "lang": "en"}
+{"text": "Which landlord letter came first, the rent increase notice or the maintenance announcement?", "label": "decompose", "lang": "en"}
+{"text": "What's the price of the 55-inch TV on the receipt versus what my insurance valued it at in the contents list?", "label": "decompose", "lang": "en"}
+{"text": "What's my total debt: remaining mortgage balance plus the car loan balance per the latest statements?", "label": "decompose", "lang": "en"}
+{"text": "Does the final invoice from Keukenstudio Zuid match the quote total?", "label": "decompose", "lang": "en"}
+{"text": "Multiply the monthly gas advance on the Essent contract by 12 and compare it with the actual annual cost in the yearly statement.", "label": "decompose", "lang": "en"}
+{"text": "Where is the water shut-off valve according to the home manual, and where does the fuse box guide say the main switch is?", "label": "decompose", "lang": "en"}
+{"text": "tell me the lease start date and the date on the signed handover report", "label": "decompose", "lang": "en"}
+{"text": "What is the difference between the garage's quote for brake pads and the final invoice?", "label": "decompose", "lang": "en"}
+{"text": "What's the gas meter reading on the move-in report and the one on the move-out report, and the difference?", "label": "decompose", "lang": "en"}
+{"text": "Combine the mortgage balance in the January statement with the extra repayment I made in June: what's left?", "label": "decompose", "lang": "en"}
+{"text": "How many weeks are there between the date of the contractor's quote and the completion date on the invoice?", "label": "decompose", "lang": "en"}
+{"text": "How many kWh did the solar panels produce in 2024 and 2025 combined, per the two inverter reports?", "label": "decompose", "lang": "en"}
+{"text": "Which emergency phone number is listed in the lease and which one in the boiler manual?", "label": "decompose", "lang": "en"}
+{"text": "Per the sale contract and the building survey, what are the asking price and the estimated renovation cost together?", "label": "decompose", "lang": "en"}
+{"text": "Vergelijk de huur in mijn huidige huurcontract met die van mijn vorige woning.", "label": "decompose", "lang": "nl"}
+{"text": "Wat is het verschil tussen het tarief per kWh bij Eneco en bij Vattenfall in de twee offertes?", "label": "decompose", "lang": "nl"}
+{"text": "Tel de offerte van de dakdekker en die van de installateur bij elkaar op, wat komt het totaal op?", "label": "decompose", "lang": "nl"}
+{"text": "wat kost Netflix plus Spotify samen per maand", "label": "decompose", "lang": "nl"}
+{"text": "Is de rente in de offerte van Rabobank lager dan die van ING?", "label": "decompose", "lang": "nl"}
+{"text": "wat is goedkoper per maand, KPN internet of Ziggo", "label": "decompose", "lang": "nl"}
+{"text": "Hoeveel betaal ik per maand aan huur, servicekosten en parkeervergunning samen?", "label": "decompose", "lang": "nl"}
+{"text": "Welke garantie loopt eerder af, die van de vaatwasser of die van de wasmachine?", "label": "decompose", "lang": "nl"}
+{"text": "Wat heb ik in totaal uitgegeven aan onderhoud met de facturen van Garage De Wit en Kwik-Fit?", "label": "decompose", "lang": "nl"}
+{"text": "vergelijk het eigen risico van mijn autoverzekering met dat van mijn inboedelverzekering", "label": "decompose", "lang": "nl"}
+{"text": "Wat is het verschil tussen de hypotheek in de akte en de koopsom in de koopovereenkomst?", "label": "decompose", "lang": "nl"}
+{"text": "Tel de loodgieterfacturen van 3 maart, 19 mei en 2 augustus bij elkaar op", "label": "decompose", "lang": "nl"}
+{"text": "hoeveel waarborgsom hou ik over na aftrek van de herstelkosten uit het eindinspectierapport", "label": "decompose", "lang": "nl"}
+{"text": "Welk energiecontract loopt langer door, gas bij Essent of stroom bij Eneco?", "label": "decompose", "lang": "nl"}
+{"text": "Wat is het prijsverschil tussen de zonnepanelenoffertes van Zonnig Energie en SunnyHome?", "label": "decompose", "lang": "nl"}
+{"text": "Hoeveel jaar zit ik op variabele rente als ik de rentevaste periode van de looptijd van mijn hypotheek aftrek?", "label": "decompose", "lang": "nl"}
+{"text": "Wat is mijn totale maandlast: hypotheekbetaling uit de offerte plus VvE-bijdrage plus opstalpremie?", "label": "decompose", "lang": "nl"}
+{"text": "Is mijn gasverbruik in 2025 lager dan in 2024, volgens de twee jaarafrekeningen?", "label": "decompose", "lang": "nl"}
+{"text": "hoeveel hoger is de huur dit jaar dan vorig jaar volgens de twee huurverhogingsbrieven", "label": "decompose", "lang": "nl"}
+{"text": "Vergelijk de premie van de Allianz-offerte met die van Centraal Beheer voor de autoverzekering", "label": "decompose", "lang": "nl"}
+{"text": "Wat was de WOZ-waarde in 2024 en wat in 2025, en wat is het verschil?", "label": "decompose", "lang": "nl"}
+{"text": "Wat kost de keuken uit de offerte van Keukenstudio Zuid plus de apparaten van de Siemens-factuur samen?", "label": "decompose", "lang": "nl"}
+{"text": "welke auto heeft de laagste kilometerlimiet, de leasewagen of de bestelbus", "label": "decompose", "lang": "nl"}
+{"text": "Hoe lang is de opzegtermijn van mijn huurcontract vergeleken met die van mijn internetabonnement?", "label": "decompose", "lang": "nl"}
+{"text": "Tel de waterrekening en de elektriciteitsrekening van september bij elkaar op.", "label": "decompose", "lang": "nl"}
+{"text": "Komt de eindfactuur van de aannemer overeen met de offerte? Vergelijk de totaalbedragen.", "label": "decompose", "lang": "nl"}
+{"text": "hoeveel km heb ik gereden tussen de laatste beurt en de APK, op basis van de twee kilometerstanden", "label": "decompose", "lang": "nl"}
+{"text": "Wat is goedkoper, schilder Verfwerk of De Kleurkast, volgens de twee offertes?", "label": "decompose", "lang": "nl"}
+{"text": "Wat is mijn totale verzekeringspremie per maand voor opstal, auto en aansprakelijkheid?", "label": "decompose", "lang": "nl"}
+{"text": "Hoeveel bespaar ik per jaar als ik van Ziggo naar Odido ga, volgens mijn huidige contract en hun aanbieding?", "label": "decompose", "lang": "nl"}
+{"text": "wat was de meterstand gas bij oplevering en bij de eindinspectie, en wat is het verschil?", "label": "decompose", "lang": "nl"}
+{"text": "Welke ketel heeft het hoogste vermogen volgens de handleidingen, de Remeha of de Vaillant?", "label": "decompose", "lang": "nl"}
+{"text": "Is de garantie op het dak langer dan die op de zonnepanelen?", "label": "decompose", "lang": "nl"}
+{"text": "Hoeveel dagen zitten er tussen de offertedatum en de opleverdatum op de factuur van de dakdekker?", "label": "decompose", "lang": "nl"}
+{"text": "Wat is de totale prijs van de alarminstallatie uit de offerte plus drie jaar abonnementskosten?", "label": "decompose", "lang": "nl"}
+{"text": "vergelijk de verwarmingskosten van Techem over 2024 en 2025", "label": "decompose", "lang": "nl"}
+{"text": "Hoeveel hypotheek moet ik nog aflossen: saldo uit het laatste overzicht minus mijn extra aflossing van juni?", "label": "decompose", "lang": "nl"}
+{"text": "Wat is het maandvoorschot van Greenchoice keer twaalf, en hoeveel scheelt dat met de jaarafrekening?", "label": "decompose", "lang": "nl"}
+{"text": "Wat komt eerst, de verlengingsdatum van mijn autoverzekering of de vervaldatum van de wegenbelasting?", "label": "decompose", "lang": "nl"}
+{"text": "zijn de gasprijzen in mijn huidige contract anders dan in het verlengingsvoorstel?", "label": "decompose", "lang": "nl"}
+{"text": "Hoe groot is het verschil in servicekosten tussen de afrekening van 2024 en die van 2025?", "label": "decompose", "lang": "nl"}
+{"text": "wat kosten de schoorsteenveger en het ketelonderhoud samen volgens de twee bonnetjes", "label": "decompose", "lang": "nl"}
+{"text": "Wat is de totale koopsom als ik de overdrachtsbelasting uit de afrekening van de notaris erbij optel?", "label": "decompose", "lang": "nl"}
+{"text": "Wat geeft meer dekking voor diefstal, mijn polis van 2025 of die van 2024?", "label": "decompose", "lang": "nl"}
+{"text": "Hoeveel stroom hebben mijn zonnepanelen in 2024 en 2025 samen opgewekt?", "label": "decompose", "lang": "nl"}
+{"text": "Go through all my utility bills from the past year and tell me if any of them look unusually high.", "label": "agentic", "lang": "en"}
+{"text": "Build a timeline of everything that happened with the leaking roof, from the first complaint to the repair.", "label": "agentic", "lang": "en"}
+{"text": "summarize my entire rental history based on the contracts I have", "label": "agentic", "lang": "en"}
+{"text": "Which of my subscriptions am I probably paying for but barely using? Check everything.", "label": "agentic", "lang": "en"}
+{"text": "Review my current lease and flag any clauses that look unusual or unfair", "label": "agentic", "lang": "en"}
+{"text": "Find out what's going on with the deposit dispute with my old landlord.", "label": "agentic", "lang": "en"}
+{"text": "Audit all my insurance documents and point out overlaps or gaps in coverage.", "label": "agentic", "lang": "en"}
+{"text": "What do I need to do before my lease ends? Check the contract and everything related to the move-out.", "label": "agentic", "lang": "en"}
+{"text": "Look through my emails and find everything about the boiler breakdown and tell me what was agreed.", "label": "agentic", "lang": "en"}
+{"text": "what warranties are about to expire in the next six months", "label": "agentic", "lang": "en"}
+{"text": "Prepare a complete overview of all costs of owning my car over the last year", "label": "agentic", "lang": "en"}
+{"text": "Is there anything in my documents I should have renewed or cancelled by now?", "label": "agentic", "lang": "en"}
+{"text": "Summarize all communication with the contractor who renovated the bathroom", "label": "agentic", "lang": "en"}
+{"text": "Figure out which of my appliances still have a valid warranty and where the receipts are", "label": "agentic", "lang": "en"}
+{"text": "Why did my energy bill go up so much this year? Dig into it.", "label": "agentic", "lang": "en"}
+{"text": "Compile everything I know about the mortgage: terms, rate, dates, and any changes over time.", "label": "agentic", "lang": "en"}
+{"text": "Check whether the landlord has been charging me the right service costs over the last three years.", "label": "agentic", "lang": "en"}
+{"text": "find all documents related to the solar panels and tell me if anything is outstanding", "label": "agentic", "lang": "en"}
+{"text": "give me an overview of all recurring monthly costs for the house", "label": "agentic", "lang": "en"}
+{"text": "go through the emails about the noisy neighbours and make a log", "label": "agentic", "lang": "en"}
+{"text": "Which contracts are up for renewal this year, and which of those should I look at switching?", "label": "agentic", "lang": "en"}
+{"text": "Look at my car's maintenance history and tell me what's due next.", "label": "agentic", "lang": "en"}
+{"text": "Did the plumber actually fix the issue he was called for in March, or did it come back? Check the emails and invoices.", "label": "agentic", "lang": "en"}
+{"text": "What happened with the delayed kitchen delivery, who said what and when?", "label": "agentic", "lang": "en"}
+{"text": "Review all my quotes for the extension and tell me which contractor looks best and why.", "label": "agentic", "lang": "en"}
+{"text": "I want to refinance - gather everything relevant I have about my current mortgage and property value.", "label": "agentic", "lang": "en"}
+{"text": "Summarise the VvE meeting minutes from the last two years, focusing on decisions that cost me money", "label": "agentic", "lang": "en"}
+{"text": "find everything about my moving costs", "label": "agentic", "lang": "en"}
+{"text": "can you check if all my home repairs this year were covered by insurance or if I missed claims", "label": "agentic", "lang": "en"}
+{"text": "Look for any warranty claim I could still make on the washing machine, given what happened since I bought it.", "label": "agentic", "lang": "en"}
+{"text": "Trace the history of the damp problem in the bedroom across all my notes and emails.", "label": "agentic", "lang": "en"}
+{"text": "what do my documents say about the heat pump, from the first quote through the install to the service. Give me the full story.", "label": "agentic", "lang": "en"}
+{"text": "Do a review of my finances related to the house: mortgage, taxes, insurance, maintenance. What stands out?", "label": "agentic", "lang": "en"}
+{"text": "Which of my receipts and invoices are needed for the tax return deduction for home improvements?", "label": "agentic", "lang": "en"}
+{"text": "Check all my internet and phone contracts and tell me the cheapest combination I could switch to.", "label": "agentic", "lang": "en"}
+{"text": "What do I still owe on anything housing-related?", "label": "agentic", "lang": "en"}
+{"text": "I'm selling the house. What documents and information do I need to collect from my files?", "label": "agentic", "lang": "en"}
+{"text": "Search for what the landlord promised to fix when I moved in and whether it ever happened.", "label": "agentic", "lang": "en"}
+{"text": "Go through my car lease contract and the emails with the lease company and tell me what I'd pay if I returned the car early.", "label": "agentic", "lang": "en"}
+{"text": "find out why the municipality fined me for parking and what I did about it", "label": "agentic", "lang": "en"}
+{"text": "lease clauses explained plz, all of them", "label": "agentic", "lang": "en"}
+{"text": "What did the building survey find, and have I dealt with each issue since?", "label": "agentic", "lang": "en"}
+{"text": "Look at all my energy contracts over the years and tell me when I got the best price.", "label": "agentic", "lang": "en"}
+{"text": "Review the manual for my heat pump and tell me which maintenance tasks I should do myself and which need a professional, then check if I've done them.", "label": "agentic", "lang": "en"}
+{"text": "Tell me everything about the neighbour's fence dispute", "label": "agentic", "lang": "en"}
+{"text": "Is my house properly insured? Compare the policy with the valuation report and the renovations I've done.", "label": "agentic", "lang": "en"}
+{"text": "Compile the key dates from all my housing and vehicle documents into one calendar", "label": "agentic", "lang": "en"}
+{"text": "What repairs have been made to the house since I bought it, and how much did each cost?", "label": "agentic", "lang": "en"}
+{"text": "find all the paperwork i need for the car sale", "label": "agentic", "lang": "en"}
+{"text": "I think I was double charged for something in my subscriptions. Look into it.", "label": "agentic", "lang": "en"}
+{"text": "Review everything related to the roof leak claim with the insurer and tell me where it stands", "label": "agentic", "lang": "en"}
+{"text": "What are all the things the previous owner told us about in the sale documents, and which are still unresolved?", "label": "agentic", "lang": "en"}
+{"text": "Check the last three years of annual energy statements and summarise the trend", "label": "agentic", "lang": "en"}
+{"text": "Which of my quotes for the garden work are still valid and what is the best offer overall?", "label": "agentic", "lang": "en"}
+{"text": "What do I need to bring to the notary appointment? Go through the mortgage and purchase documents.", "label": "agentic", "lang": "en"}
+{"text": "summary of all emails with the energy supplier about the billing error", "label": "agentic", "lang": "en"}
+{"text": "review the whole file about the window replacement, quotes, invoices, warranty and anything else, and flag problems", "label": "agentic", "lang": "en"}
+{"text": "My car made a strange noise last month. Look through the service history and manuals and tell me what could be going on and what the manual says to do.", "label": "agentic", "lang": "en"}
+{"text": "Which expenses this year are unusual compared to previous years?", "label": "agentic", "lang": "en"}
+{"text": "What are the tenant obligations under my contract and have I met all of them? Check my emails with the landlord too.", "label": "agentic", "lang": "en"}
+{"text": "Create a handover checklist from the move-in report and compare it with the current state described in my notes.", "label": "agentic", "lang": "en"}
+{"text": "find any mention of asbestos anywhere in my documents", "label": "agentic", "lang": "en"}
+{"text": "What did the inspection of the electrical installation find and what follow-up did I get quotes for?", "label": "agentic", "lang": "en"}
+{"text": "Summarize the history of my rent increases and check if they were legal", "label": "agentic", "lang": "en"}
+{"text": "Look for old subscriptions I forgot to cancel", "label": "agentic", "lang": "en"}
+{"text": "tell me what has happened since I reported the broken heating", "label": "agentic", "lang": "en"}
+{"text": "Research what all the documents say about the cavity wall insulation and whether I qualify for a subsidy", "label": "agentic", "lang": "en"}
+{"text": "Give me a detailed report on my utility costs split by month and by provider for the last two years.", "label": "agentic", "lang": "en"}
+{"text": "What's the state of the dispute with the garage over the faulty repair?", "label": "agentic", "lang": "en"}
+{"text": "Go through all warranty documents and manuals in the vehicle folder and list what I need to do to keep the warranty valid.", "label": "agentic", "lang": "en"}
+{"text": "What changed between my old and new lease and which changes are bad for me?", "label": "agentic", "lang": "en"}
+{"text": "Which provider should I choose for my next energy contract based on my usage history and the offers I have saved?", "label": "agentic", "lang": "en"}
+{"text": "Find the cause of the high water bill. Check meter readings, bills and any leak reports.", "label": "agentic", "lang": "en"}
+{"text": "What do I know about the boiler's age and whether it should be replaced soon?", "label": "agentic", "lang": "en"}
+{"text": "pull together a dossier on the property for my accountant", "label": "agentic", "lang": "en"}
+{"text": "all the invoices related to the garden this year, summed by supplier and flagged if over budget", "label": "agentic", "lang": "en"}
+{"text": "Did I follow all the steps from the manuals for registering the warranty on the new appliances?", "label": "agentic", "lang": "en"}
+{"text": "Look into the history of the parking permit applications and tell me what I'm missing", "label": "agentic", "lang": "en"}
+{"text": "What are all the open issues in the house according to my notes and emails?", "label": "agentic", "lang": "en"}
+{"text": "Based on the chat with the contractor and the quote, did he change the scope or price at some point?", "label": "agentic", "lang": "en"}
+{"text": "Check my contract and emails: can I leave my gym early because of the move?", "label": "agentic", "lang": "en"}
+{"text": "What's the full history of the flooding in the basement?", "label": "agentic", "lang": "en"}
+{"text": "Make a list of every recurring payment that comes out of my account for housing and cars, from the statements I uploaded.", "label": "agentic", "lang": "en"}
+{"text": "where did the extra 400 euro on the last energy bill come from", "label": "agentic", "lang": "en"}
+{"text": "Evaluate whether it's worth switching from gas to a heat pump given my costs, quotes and subsidies in my files.", "label": "agentic", "lang": "en"}
+{"text": "Collect all the details about my car insurance claim after the accident in August", "label": "agentic", "lang": "en"}
+{"text": "Which documents prove that I paid the deposit?", "label": "agentic", "lang": "en"}
+{"text": "what's the timeline for the building permit application for the dormer", "label": "agentic", "lang": "en"}
+{"text": "Review my mortgage statements for the last year and check whether the interest charged matches the rate in the contract", "label": "agentic", "lang": "en"}
+{"text": "Is there anything about subletting my apartment during the summer in my lease or the VvE rules or any emails?", "label": "agentic", "lang": "en"}
+{"text": "Sum up all my correspondence with the housing association about the maintenance backlog", "label": "agentic", "lang": "en"}
+{"text": "need to find out who is responsible for the broken fence, tenant or landlord, look everywhere", "label": "agentic", "lang": "en"}
+{"text": "audit my home inventory list against my insurance policy", "label": "agentic", "lang": "en"}
+{"text": "What decisions do I still need to make about the house this year?", "label": "agentic", "lang": "en"}
+{"text": "Look at the energy performance certificate and all renovation quotes, and tell me which upgrades give the best improvement per euro.", "label": "agentic", "lang": "en"}
+{"text": "Review whatever we have on the neighbours' extension and whether it affects us", "label": "agentic", "lang": "en"}
+{"text": "Check every car document and tell me whether my car is road-legal right now", "label": "agentic", "lang": "en"}
+{"text": "What went wrong with the first plumber and how did we end up with the second?", "label": "agentic", "lang": "en"}
+{"text": "Figure out the total I've spent on the renovation so far and how it compares with the original budget in the plans.", "label": "agentic", "lang": "en"}
+{"text": "everything about the gas leak incident, who was called, what was found, what it cost", "label": "agentic", "lang": "en"}
+{"text": "What do all my contracts say about price increases and how have prices actually changed?", "label": "agentic", "lang": "en"}
+{"text": "I'm going abroad for a year. Which housing and car contracts should I pause, cancel, or arrange?", "label": "agentic", "lang": "en"}
+{"text": "Look back over the year: what were the big housing events and costs?", "label": "agentic", "lang": "en"}
+{"text": "can you find out if I'm entitled to any compensation for the power outage in july", "label": "agentic", "lang": "en"}
+{"text": "Which of the quotes I received for the new bathroom actually include removing the old tiles?", "label": "agentic", "lang": "en"}
+{"text": "Loop al mijn energierekeningen van het afgelopen jaar na en vertel me of er iets opvallend hoog is.", "label": "agentic", "lang": "nl"}
+{"text": "Maak een tijdlijn van alles wat er met het lekkende dak is gebeurd.", "label": "agentic", "lang": "nl"}
+{"text": "vat mijn hele huurgeschiedenis samen", "label": "agentic", "lang": "nl"}
+{"text": "Welke abonnementen betaal ik waarschijnlijk voor maar gebruik ik nauwelijks?", "label": "agentic", "lang": "nl"}
+{"text": "Bekijk mijn huurcontract en geef aan welke bepalingen ongebruikelijk of oneerlijk lijken", "label": "agentic", "lang": "nl"}
+{"text": "zoek uit wat er speelt met de borg van mijn vorige verhuurder", "label": "agentic", "lang": "nl"}
+{"text": "Controleer al mijn verzekeringsdocumenten op overlap en gaten in de dekking.", "label": "agentic", "lang": "nl"}
+{"text": "Wat moet ik allemaal regelen voordat mijn huurcontract afloopt?", "label": "agentic", "lang": "nl"}
+{"text": "zoek in mijn mail alles over de kapotte cv-ketel en vertel wat er is afgesproken", "label": "agentic", "lang": "nl"}
+{"text": "welke garanties verlopen de komende zes maanden", "label": "agentic", "lang": "nl"}
+{"text": "Maak een overzicht van alle kosten van mijn auto over het afgelopen jaar", "label": "agentic", "lang": "nl"}
+{"text": "Is er iets dat ik inmiddels had moeten verlengen of opzeggen?", "label": "agentic", "lang": "nl"}
+{"text": "Vat alle contact met de aannemer van de badkamerverbouwing samen", "label": "agentic", "lang": "nl"}
+{"text": "Voor welke apparaten loopt de garantie nog en waar staan de bonnetjes?", "label": "agentic", "lang": "nl"}
+{"text": "Waarom is mijn energierekening dit jaar zo gestegen? Zoek het uit.", "label": "agentic", "lang": "nl"}
+{"text": "Zet alles op een rij wat ik weet over mijn hypotheek: voorwaarden, rente, data en wijzigingen", "label": "agentic", "lang": "nl"}
+{"text": "Controleer of de verhuurder de afgelopen drie jaar de juiste servicekosten heeft doorberekend", "label": "agentic", "lang": "nl"}
+{"text": "zoek alle documenten over de zonnepanelen en zeg of er nog iets openstaat", "label": "agentic", "lang": "nl"}
+{"text": "geef me een overzicht van alle terugkerende maandlasten voor het huis", "label": "agentic", "lang": "nl"}
+{"text": "loop de mails over de overlast van de buren door en maak een logboek", "label": "agentic", "lang": "nl"}
+{"text": "Welke contracten kunnen dit jaar worden verlengd en welke zou ik moeten vergelijken?", "label": "agentic", "lang": "nl"}
+{"text": "Kijk naar het onderhoudsverleden van mijn auto en zeg wat er als volgende aan de beurt is.", "label": "agentic", "lang": "nl"}
+{"text": "Heeft de loodgieter het probleem in maart echt opgelost, of kwam het terug? Check de mails en facturen.", "label": "agentic", "lang": "nl"}
+{"text": "Wat is er gebeurd met de vertraagde keukenlevering, wie zei wat en wanneer?", "label": "agentic", "lang": "nl"}
+{"text": "Beoordeel al mijn offertes voor de aanbouw en zeg welke aannemer het beste lijkt", "label": "agentic", "lang": "nl"}
+{"text": "ik wil oversluiten, verzamel alles wat ik heb over mijn hypotheek en de waarde van de woning", "label": "agentic", "lang": "nl"}
+{"text": "Vat de notulen van de VvE-vergaderingen van de laatste twee jaar samen, let vooral op besluiten die mij geld kosten", "label": "agentic", "lang": "nl"}
+{"text": "zoek alles over mijn verhuiskosten", "label": "agentic", "lang": "nl"}
+{"text": "check of alle reparaties dit jaar gedekt waren door de verzekering of dat ik claims gemist heb", "label": "agentic", "lang": "nl"}
+{"text": "Zoek de geschiedenis van het vochtprobleem in de slaapkamer in al mijn notities en mails", "label": "agentic", "lang": "nl"}
+{"text": "Ik ga mijn huis verkopen. Welke documenten moet ik uit mijn bestanden verzamelen?", "label": "agentic", "lang": "nl"}
+{"text": "Wat heeft de verhuurder beloofd te repareren bij mijn intrek en is dat ooit gebeurd?", "label": "agentic", "lang": "nl"}
+{"text": "Wat staat er in de bouwkundige keuring en heb ik alle punten sindsdien aangepakt?", "label": "agentic", "lang": "nl"}
+{"text": "Kijk naar alle energiecontracten door de jaren heen en zeg wanneer ik de beste prijs had", "label": "agentic", "lang": "nl"}
+{"text": "Welke bonnetjes en facturen heb ik nodig voor de aangifte voor verbouwingen?", "label": "agentic", "lang": "nl"}
+{"text": "Is mijn huis goed verzekerd? Vergelijk de polis met het taxatierapport en mijn verbouwingen.", "label": "agentic", "lang": "nl"}
+{"text": "Wat is er allemaal aan het huis gerepareerd sinds de aankoop en wat kostte elke klus?", "label": "agentic", "lang": "nl"}
+{"text": "ik denk dat ik ergens dubbel betaald heb in mijn abonnementen, zoek dat uit", "label": "agentic", "lang": "nl"}
+{"text": "Wat zijn alle openstaande punten in huis volgens mijn notities en mails?", "label": "agentic", "lang": "nl"}
+{"text": "Waar komt die extra 400 euro op de laatste energienota vandaan?", "label": "agentic", "lang": "nl"}
+{"text": "Is het de moeite waard om van gas naar een warmtepomp te gaan, gezien mijn kosten, offertes en subsidies?", "label": "agentic", "lang": "nl"}
+{"text": "Verzamel alles over mijn schadeclaim na het ongeluk in augustus", "label": "agentic", "lang": "nl"}
+{"text": "ik ga een jaar naar het buitenland, welke contracten voor huis en auto moet ik opzeggen of pauzeren", "label": "agentic", "lang": "nl"}
+{"text": "Kijk terug op het jaar: wat waren de grote gebeurtenissen en kosten rond het huis?", "label": "agentic", "lang": "nl"}
+{"text": "Wie is verantwoordelijk voor het kapotte hek, huurder of verhuurder? Zoek overal.", "label": "agentic", "lang": "nl"}

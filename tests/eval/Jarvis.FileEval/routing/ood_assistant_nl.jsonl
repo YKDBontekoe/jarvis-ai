@@ -1,0 +1,18 @@
+{"text": "Wat is de maandelijkse huur in mijn huurcontract?", "label": "direct"}
+{"text": "Wanneer loopt mijn autoverzekering af?", "label": "direct"}
+{"text": "Hoeveel eigen risico heb ik op mijn zorgverzekering?", "label": "direct"}
+{"text": "Wat is het wachtwoord van de wifi uit de welkomstmap van het appartement?", "label": "direct"}
+{"text": "Wat was het totaalbedrag van de factuur van de loodgieter?", "label": "direct"}
+{"text": "Op welke datum vertrekt mijn vlucht naar Lissabon?", "label": "direct"}
+{"text": "Vergelijk de opzegtermijn in mijn arbeidscontract met die in mijn huurcontract.", "label": "decompose"}
+{"text": "Is mijn autoverzekering duurder dan mijn inboedelverzekering?", "label": "decompose"}
+{"text": "Welke offerte is goedkoper, die van de aannemer of die van de elektricien?", "label": "decompose"}
+{"text": "Hoeveel heb ik in januari en februari samen aan energie betaald?", "label": "decompose"}
+{"text": "Komen de data van mijn hotelboeking overeen met die van mijn vliegtickets?", "label": "decompose"}
+{"text": "Welke van mijn twee creditcards heeft de laagste jaarlijkse kosten?", "label": "decompose"}
+{"text": "Zoek uit welke van mijn contracten het komende halfjaar stilzwijgend worden verlengd en wat ik moet doen om op te zeggen.", "label": "agentic"}
+{"text": "Waarom is mijn energierekening dit jaar gestegen? Kijk naar de rekeningen, het contract en de tariefwijzigingen.", "label": "agentic"}
+{"text": "Zoek alle documenten over de nalatenschap van mijn vader en maak een tijdlijn van wat er nog moet gebeuren.", "label": "agentic"}
+{"text": "Loop mijn belastingaangiftes van de laatste drie jaar na en zoek aftrekposten die ik gemist heb.", "label": "agentic"}
+{"text": "Welke abonnementen overlappen elkaar en welke kan ik het goedkoopst opzeggen?", "label": "agentic"}
+{"text": "Zoek in mijn mails en documenten wat ik met de verhuurder heb afgesproken over de waarborgsom en of hij zich daaraan houdt.", "label": "agentic"}
