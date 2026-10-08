@@ -15,14 +15,20 @@ class ToolRunView extends StatelessWidget {
       spacing: 6,
       runSpacing: 6,
       children: [
-        for (final step in run.steps)
-          _ToolChip(
-            step: step,
-            onTap:
-                step.tool == 'CreateTask' &&
-                    step.status == ToolStepStatus.completed
-                ? onOpenTasks
-                : null,
+        // Each step pops in as Jarvis starts it.
+        for (final (index, step) in run.steps.indexed)
+          PopIn(
+            key: ValueKey(index),
+            from: .7,
+            alignment: Alignment.centerLeft,
+            child: _ToolChip(
+              step: step,
+              onTap:
+                  step.tool == 'CreateTask' &&
+                      step.status == ToolStepStatus.completed
+                  ? onOpenTasks
+                  : null,
+            ),
           ),
       ],
     ),
@@ -78,22 +84,36 @@ class _ToolChip extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 7),
-          switch (step.status) {
-            ToolStepStatus.running => SizedBox.square(
-              dimension: 11,
-              child: CircularProgressIndicator(strokeWidth: 1.6, color: color),
+          // The spinner spins into a check (or a cross) when the step ends.
+          AnimatedSwitcher(
+            duration: JarvisMotion.of(
+              context,
+              const Duration(milliseconds: 380),
             ),
-            ToolStepStatus.completed => Icon(
-              PhosphorIconsRegular.check,
-              size: 14,
-              color: color,
-            ),
-            ToolStepStatus.failed => Icon(
-              PhosphorIconsRegular.x,
-              size: 14,
-              color: color,
-            ),
-          },
+            transitionBuilder: JarvisMotion.morph,
+            child: switch (step.status) {
+              ToolStepStatus.running => SizedBox.square(
+                key: const ValueKey('running'),
+                dimension: 11,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.6,
+                  color: color,
+                ),
+              ),
+              ToolStepStatus.completed => Icon(
+                PhosphorIconsRegular.check,
+                key: const ValueKey('completed'),
+                size: 14,
+                color: color,
+              ),
+              ToolStepStatus.failed => Icon(
+                PhosphorIconsRegular.x,
+                key: const ValueKey('failed'),
+                size: 14,
+                color: color,
+              ),
+            },
+          ),
           if (onTap != null) ...[
             const SizedBox(width: 6),
             Text(

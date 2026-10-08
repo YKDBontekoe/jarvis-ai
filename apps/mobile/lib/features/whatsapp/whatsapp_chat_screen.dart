@@ -11,6 +11,7 @@ import 'catch_up_card.dart';
 import 'read_along_screen.dart';
 import 'whatsapp_media.dart';
 import 'whatsapp_models.dart';
+import 'whatsapp_visuals.dart';
 
 /// One read-along chat: the conversation as Jarvis sees it, a reply drafted in
 /// the owner's voice, "Ask Jarvis" about the chat, and sending by tapping Send.
@@ -507,11 +508,17 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
-            ChatAvatar(
-              chat: _chat,
-              http: widget.http,
-              channelId: widget.channelId,
-              size: 40,
+            // A green ring and dot while Jarvis is reading along live.
+            _LiveAvatar(
+              live:
+                  _chat.readAlong &&
+                  (_connectionState == null || _connectionState == 'open'),
+              child: ChatAvatar(
+                chat: _chat,
+                http: widget.http,
+                channelId: widget.channelId,
+                size: 40,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -639,16 +646,29 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
                         ? 'New messages appear as they arrive. Use More → Load WhatsApp history to request older messages from your phone.'
                         : 'Turn on reading to receive messages from this chat.',
                   )
-                : ContentWidth(
-                    child: _MessageList(
-                      messages: _messages,
-                      isGroup: _chat.isGroup,
-                      http: widget.http,
-                      channelId: widget.channelId,
-                      controller: _scroll,
-                      hasOlder: _hasOlder,
-                      loadingOlder: _loadingOlder,
-                      onLoadOlder: () => unawaited(_loadOlder()),
+                : WhatsAppWallpaper(
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: ContentWidth(
+                            child: _MessageList(
+                              messages: _messages,
+                              isGroup: _chat.isGroup,
+                              http: widget.http,
+                              channelId: widget.channelId,
+                              controller: _scroll,
+                              hasOlder: _hasOlder,
+                              loadingOlder: _loadingOlder,
+                              onLoadOlder: () => unawaited(_loadOlder()),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          right: 16,
+                          bottom: 12,
+                          child: JumpToLatest(controller: _scroll),
+                        ),
+                      ],
                     ),
                   ),
           ),
@@ -664,6 +684,53 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LiveAvatar extends StatelessWidget {
+  const _LiveAvatar({required this.live, required this.child});
+
+  final bool live;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        AnimatedContainer(
+          duration: JarvisMotion.of(context, JarvisMotion.slow),
+          curve: JarvisMotion.standard,
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: live ? whatsAppGreen : Colors.transparent,
+              width: 1.6,
+            ),
+          ),
+          child: child,
+        ),
+        if (live)
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: PopIn(
+              delay: const Duration(milliseconds: 200),
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: whatsAppGreen,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colors.canvas, width: 2),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -697,31 +764,54 @@ class _MessageList extends StatelessWidget {
       final message = messages[index];
       final previous = index > 0 ? messages[index - 1] : null;
       final next = index + 1 < messages.length ? messages[index + 1] : null;
-      final grouped =
-          next != null &&
-          next.fromMe == message.fromMe &&
-          next.sender == message.sender &&
-          next.senderId == message.senderId &&
-          next.sentAt.difference(message.sentAt).inMinutes < 5;
+      bool joined(WhatsAppMessage? a, WhatsAppMessage b) =>
+          a != null &&
+          a.fromMe == b.fromMe &&
+          a.sender == b.sender &&
+          a.senderId == b.senderId &&
+          _sameDay(a.sentAt, b.sentAt) &&
+          b.sentAt.difference(a.sentAt).inMinutes.abs() < 5;
+      final grouped = next != null && joined(message, next);
+      // Messages arrive from the bottom up: the newest first, then the rest
+      // in quick succession, each growing out of its own side.
       items.add(
-        _Bubble(
+        FadeSlideIn(
           key: ValueKey(message.id),
-          message: message,
-          isGroup: isGroup,
-          http: http,
-          channelId: channelId,
-          showSender:
-              isGroup &&
-              !message.fromMe &&
-              (previous == null ||
-                  previous.fromMe ||
-                  previous.sender != message.sender ||
-                  previous.senderId != message.senderId),
-          tight: grouped,
+          index: messages.length - 1 - index,
+          offset: 12,
+          scale: .9,
+          alignment: message.fromMe
+              ? Alignment.bottomRight
+              : Alignment.bottomLeft,
+          child: _Bubble(
+            message: message,
+            isGroup: isGroup,
+            http: http,
+            channelId: channelId,
+            showSender:
+                isGroup &&
+                !message.fromMe &&
+                (previous == null ||
+                    previous.fromMe ||
+                    previous.sender != message.sender ||
+                    previous.senderId != message.senderId),
+            tight: grouped,
+            joinedAbove: previous != null && joined(previous, message),
+          ),
         ),
       );
       if (previous == null || !_sameDay(previous.sentAt, message.sentAt)) {
-        items.add(_DaySeparator(time: message.sentAt));
+        items.add(
+          WhatsAppDayPill(
+            key: ValueKey((
+              'day',
+              message.sentAt.year,
+              message.sentAt.month,
+              message.sentAt.day,
+            )),
+            label: whatsAppDayLabel(message.sentAt),
+          ),
+        );
       }
     }
     if (hasOlder) {
@@ -748,35 +838,6 @@ class _MessageList extends StatelessWidget {
       a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
-class _DaySeparator extends StatelessWidget {
-  const _DaySeparator({required this.time});
-
-  final DateTime time;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = JarvisColors.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: colors.surfaceMuted,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            whatsAppDayLabel(time),
-            style: Theme.of(
-              context,
-            ).textTheme.labelSmall?.copyWith(color: colors.inkSoft),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _Bubble extends StatelessWidget {
   const _Bubble({
     required this.message,
@@ -785,7 +846,7 @@ class _Bubble extends StatelessWidget {
     required this.channelId,
     required this.showSender,
     required this.tight,
-    super.key,
+    this.joinedAbove = false,
   });
 
   final WhatsAppMessage message;
@@ -793,7 +854,12 @@ class _Bubble extends StatelessWidget {
   final Dio http;
   final String channelId;
   final bool showSender;
+
+  /// The next (newer) message continues this run from the same sender.
   final bool tight;
+
+  /// The message above is from the same sender, moments earlier.
+  final bool joinedAbove;
 
   @override
   Widget build(BuildContext context) {
@@ -801,11 +867,20 @@ class _Bubble extends StatelessWidget {
     final theme = Theme.of(context);
     final mine = message.fromMe;
     final naked = whatsAppNakedSticker(message);
-    final background = mine ? colors.surfaceRaised : colors.surface;
+    final tint = whatsAppMineBubble(colors);
     const radius = Radius.circular(20);
+    const joinedCorner = Radius.circular(6);
+    // Runs from one sender read as one block: inner corners tighten and only
+    // the last bubble keeps the little tail.
+    final upper = joinedAbove ? joinedCorner : radius;
+    final lower = tight ? joinedCorner : const Radius.circular(4);
     final showFace = isGroup && !mine;
+    final senderColor = whatsAppSenderColor(
+      message.senderId ?? message.sender ?? '',
+      colors,
+    );
     return Padding(
-      padding: EdgeInsets.only(top: tight ? 2 : 8),
+      padding: EdgeInsets.only(top: joinedAbove ? 2 : 8),
       child: Align(
         alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
         child: ConstrainedBox(
@@ -839,20 +914,34 @@ class _Bubble extends StatelessWidget {
                   decoration: naked
                       ? null
                       : BoxDecoration(
-                          color: background,
+                          color: mine ? null : colors.surface,
+                          gradient: mine
+                              ? LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [tint.top, tint.bottom],
+                                )
+                              : null,
                           border: mine
                               ? null
-                              : Border.all(color: colors.outline),
+                              : Border.all(
+                                  color: colors.outline.withValues(alpha: .55),
+                                ),
                           borderRadius: BorderRadius.only(
-                            topLeft: radius,
-                            topRight: radius,
-                            bottomLeft: mine
-                                ? radius
-                                : const Radius.circular(4),
-                            bottomRight: mine
-                                ? const Radius.circular(4)
-                                : radius,
+                            topLeft: mine ? radius : upper,
+                            topRight: mine ? upper : radius,
+                            bottomLeft: mine ? radius : lower,
+                            bottomRight: mine ? lower : radius,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(
+                                alpha: colors.isDark ? .25 : .06,
+                              ),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -863,7 +952,7 @@ class _Bubble extends StatelessWidget {
                           child: Text(
                             message.sender!,
                             style: theme.textTheme.labelMedium?.copyWith(
-                              color: colors.accentDeep,
+                              color: senderColor,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -879,8 +968,9 @@ class _Bubble extends StatelessWidget {
                         child: Text(
                           whatsAppClock(message.sentAt),
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: colors.muted,
+                            color: mine ? tint.meta : colors.muted,
                             fontSize: 10.5,
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                       ),
@@ -971,25 +1061,47 @@ class _Composer extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
-                    IconButton.filled(
-                      key: const Key('whatsapp-send'),
-                      tooltip: 'Send from your WhatsApp',
-                      style: IconButton.styleFrom(
-                        backgroundColor: colors.ink,
-                        foregroundColor: colors.onInk,
-                        disabledBackgroundColor: colors.surfaceMuted,
-                        disabledForegroundColor: colors.muted,
+                    AnimatedScale(
+                      scale: hasText ? 1 : .86,
+                      duration: JarvisMotion.of(
+                        context,
+                        const Duration(milliseconds: 420),
                       ),
-                      onPressed: hasText && !sending && canSend ? onSend : null,
-                      icon: sending
-                          ? SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: colors.onInk,
-                              ),
-                            )
-                          : const Icon(PhosphorIconsBold.arrowUp, size: 20),
+                      curve: hasText ? JarvisSprings.pop : JarvisMotion.exit,
+                      child: IconButton.filled(
+                        key: const Key('whatsapp-send'),
+                        tooltip: 'Send from your WhatsApp',
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xff1daa61),
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: colors.surfaceMuted,
+                          disabledForegroundColor: colors.muted,
+                        ),
+                        onPressed: hasText && !sending && canSend
+                            ? onSend
+                            : null,
+                        icon: AnimatedSwitcher(
+                          duration: JarvisMotion.of(
+                            context,
+                            const Duration(milliseconds: 380),
+                          ),
+                          transitionBuilder: JarvisMotion.morph,
+                          child: sending
+                              ? const SizedBox.square(
+                                  key: ValueKey('sending'),
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(
+                                  PhosphorIconsBold.arrowUp,
+                                  key: ValueKey('send'),
+                                  size: 20,
+                                ),
+                        ),
+                      ),
                     ),
                   ],
                 ),

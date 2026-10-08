@@ -123,4 +123,48 @@ void main() {
     expect(tester.hasRunningAnimations, isFalse);
     expect(find.text('7'), findsOneWidget);
   });
+
+  testWidgets('pages slide toward the side you move to and only the new one '
+      'takes taps', (tester) async {
+    final page = ValueNotifier(0);
+    addTearDown(page.dispose);
+    final taps = <int>[];
+    await tester.pumpWidget(
+      _host(
+        ValueListenableBuilder<int>(
+          valueListenable: page,
+          builder: (context, value, _) => PageSwitcher(
+            index: value,
+            child: SizedBox(
+              key: ValueKey(value),
+              width: 200,
+              height: 200,
+              child: TextButton(
+                onPressed: () => taps.add(value),
+                child: Text('Page $value'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    page.value = 1;
+    await tester.pump(const Duration(milliseconds: 60));
+    final entering = tester.getTopLeft(find.text('Page 1')).dx;
+    final leaving = tester.getTopLeft(find.text('Page 0')).dx;
+    expect(entering, greaterThan(leaving));
+    await tester.tap(find.text('Page 1'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(find.text('Page 0'), findsNothing);
+    await tester.tap(find.text('Page 1'));
+    expect(taps, everyElement(1));
+    page.value = 0;
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(
+      tester.getTopLeft(find.text('Page 0')).dx,
+      lessThan(tester.getTopLeft(find.text('Page 1')).dx),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.hasRunningAnimations, isFalse);
+  });
 }

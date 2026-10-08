@@ -11,6 +11,7 @@ import '../../ui/phosphor_icons.dart';
 import 'catch_up_card.dart';
 import 'whatsapp_chat_screen.dart';
 import 'whatsapp_models.dart';
+import 'whatsapp_visuals.dart';
 
 /// Pick which chats on the owner's own WhatsApp Jarvis may read along with.
 /// Everything starts off, groups included; chats that are on open a chat view
@@ -947,10 +948,15 @@ class _ChatAvatarState extends State<ChatAvatar> {
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
-    final color = colors.inkSoft;
     final group = widget.chat?.isGroup ?? widget.group;
     final letters = widget.initials ?? widget.chat?.initials ?? '#';
     final image = _image;
+    // Without a picture, each contact gets its own colour, softly lit.
+    final hue = whatsAppSenderColor(
+      _subject ?? widget.chat?.name ?? letters,
+      colors,
+    );
+    const color = Colors.white;
     return Container(
       width: widget.size,
       height: widget.size,
@@ -958,7 +964,17 @@ class _ChatAvatarState extends State<ChatAvatar> {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: colors.surfaceRaised,
+        color: image != null ? colors.surfaceRaised : null,
+        gradient: image != null
+            ? null
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color.lerp(hue, Colors.white, colors.isDark ? .05 : .25)!,
+                  Color.lerp(hue, Colors.black, colors.isDark ? .35 : .12)!,
+                ],
+              ),
       ),
       child: image != null
           ? Image.memory(
@@ -968,6 +984,15 @@ class _ChatAvatarState extends State<ChatAvatar> {
               height: widget.size,
               fit: BoxFit.cover,
               gaplessPlayback: true,
+              // Faces fade in over the coloured circle instead of popping.
+              frameBuilder: (context, child, frame, sync) => sync
+                  ? child
+                  : AnimatedOpacity(
+                      opacity: frame == null ? 0 : 1,
+                      duration: JarvisMotion.of(context, JarvisMotion.slow),
+                      curve: JarvisMotion.standard,
+                      child: child,
+                    ),
               errorBuilder: (_, _, _) => _fallback(group, letters, color),
             )
           : _fallback(group, letters, color),

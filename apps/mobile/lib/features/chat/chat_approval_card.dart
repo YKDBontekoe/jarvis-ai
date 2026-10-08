@@ -58,228 +58,237 @@ class ApprovalCard extends StatelessWidget {
     };
     return Padding(
       padding: const EdgeInsets.only(left: 40, bottom: 18),
-      child: AnimatedContainer(
-        duration: JarvisMotion.of(context, JarvisMotion.base),
-        curve: JarvisMotion.standard,
-        decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: BorderRadius.circular(JarvisRadii.lg),
-          border: Border.all(
-            color: pending
-                ? accent.withValues(alpha: .35)
-                : colors.outline.withValues(alpha: .75),
+      // Light crosses the card when it arrives and again when it is decided.
+      child: Sheen(
+        trigger: approval.status,
+        strength: .22,
+        borderRadius: BorderRadius.circular(JarvisRadii.lg),
+        child: AnimatedContainer(
+          duration: JarvisMotion.of(context, JarvisMotion.base),
+          curve: JarvisMotion.standard,
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(JarvisRadii.lg),
+            border: Border.all(
+              color: pending
+                  ? accent.withValues(alpha: .35)
+                  : colors.outline.withValues(alpha: .75),
+            ),
+            boxShadow: pending
+                ? JarvisShadows.soft(colors.brightness)
+                : JarvisShadows.hairline(colors.brightness),
           ),
-          boxShadow: pending
-              ? JarvisShadows.soft(colors.brightness)
-              : JarvisShadows.hairline(colors.brightness),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: accent.withValues(
+                          alpha: colors.isDark ? .18 : .1,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        decided
+                            ? (approval.status == ApprovalStatus.approved
+                                  ? PhosphorIconsFill.shieldCheck
+                                  : PhosphorIconsRegular.prohibit)
+                            : description.icon,
+                        color: accent,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            eyebrow,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12.5,
+                              letterSpacing: .1,
+                              color: accent,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            description.active,
+                            style: TextStyle(
+                              color: colors.ink,
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (arguments.isNotEmpty) ...[
+                  const SizedBox(height: 14),
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
                     decoration: BoxDecoration(
-                      color: accent.withValues(alpha: colors.isDark ? .18 : .1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: colors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(JarvisRadii.md),
                     ),
-                    child: Icon(
-                      decided
-                          ? (approval.status == ApprovalStatus.approved
-                                ? PhosphorIconsFill.shieldCheck
-                                : PhosphorIconsRegular.prohibit)
-                          : description.icon,
-                      color: accent,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          eyebrow,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12.5,
-                            letterSpacing: .1,
-                            color: accent,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          description.active,
-                          style: TextStyle(
-                            color: colors.ink,
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -.2,
-                          ),
-                        ),
+                        for (final entry in arguments.take(6))
+                          if (entry.key == 'memoryId' &&
+                              loadMemoryText != null &&
+                              approval.toolName == 'ForgetMemory')
+                            _MemoryPreview(
+                              memoryId: '${entry.value}',
+                              load: loadMemoryText!,
+                            )
+                          else
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text:
+                                          '${_sentence(humanizeToolName(entry.key))}\n',
+                                      style: TextStyle(
+                                        color: colors.muted,
+                                        fontSize: 12,
+                                        height: 1.5,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: '${entry.value}',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        height: 1.4,
+                                        color: colors.ink,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                maxLines: 4,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                       ],
                     ),
                   ),
                 ],
-              ),
-              if (arguments.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-                  decoration: BoxDecoration(
-                    color: colors.surfaceMuted,
-                    borderRadius: BorderRadius.circular(JarvisRadii.md),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (final entry in arguments.take(6))
-                        if (entry.key == 'memoryId' &&
-                            loadMemoryText != null &&
-                            approval.toolName == 'ForgetMemory')
-                          _MemoryPreview(
-                            memoryId: '${entry.value}',
-                            load: loadMemoryText!,
-                          )
-                        else
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Text.rich(
-                              TextSpan(
+                if (approval.error case final error?) ...[
+                  const SizedBox(height: 12),
+                  InlineNotice(message: error, tone: NoticeTone.danger),
+                ],
+                AnimatedSize(
+                  duration: JarvisMotion.of(context, JarvisMotion.base),
+                  curve: JarvisMotion.standard,
+                  alignment: Alignment.topCenter,
+                  child: decided
+                      ? const SizedBox(width: double.infinity)
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
                                 children: [
-                                  TextSpan(
-                                    text:
-                                        '${_sentence(humanizeToolName(entry.key))}\n',
-                                    style: TextStyle(
-                                      color: colors.muted,
-                                      fontSize: 12,
-                                      height: 1.5,
-                                      fontWeight: FontWeight.w500,
+                                  if (!needsRetry) ...[
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: submitting
+                                            ? null
+                                            : () => onDecide(false),
+                                        style: OutlinedButton.styleFrom(
+                                          minimumSize: const Size(0, 46),
+                                        ),
+                                        child: const Text('Decline'),
+                                      ),
                                     ),
-                                  ),
-                                  TextSpan(
-                                    text: '${entry.value}',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      height: 1.4,
-                                      color: colors.ink,
+                                    const SizedBox(width: 10),
+                                  ],
+                                  Expanded(
+                                    child: FilledButton.icon(
+                                      onPressed: submitting
+                                          ? null
+                                          : () {
+                                              unawaited(
+                                                HapticFeedback.mediumImpact(),
+                                              );
+                                              onDecide(
+                                                needsRetry
+                                                    ? (approval.decision ??
+                                                          true)
+                                                    : true,
+                                              );
+                                            },
+                                      style: FilledButton.styleFrom(
+                                        minimumSize: const Size(0, 46),
+                                      ),
+                                      icon: submitting
+                                          ? SizedBox.square(
+                                              dimension: 14,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: colors.muted,
+                                              ),
+                                            )
+                                          : Icon(
+                                              needsRetry
+                                                  ? PhosphorIconsRegular
+                                                        .arrowsClockwise
+                                                  : PhosphorIconsRegular.check,
+                                              size: 18,
+                                            ),
+                                      label: Text(
+                                        needsRetry ? 'Retry' : 'Approve',
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
-                              maxLines: 4,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                    ],
-                  ),
-                ),
-              ],
-              if (approval.error case final error?) ...[
-                const SizedBox(height: 12),
-                InlineNotice(message: error, tone: NoticeTone.danger),
-              ],
-              AnimatedSize(
-                duration: JarvisMotion.of(context, JarvisMotion.base),
-                curve: JarvisMotion.standard,
-                alignment: Alignment.topCenter,
-                child: decided
-                    ? const SizedBox(width: double.infinity)
-                    : Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                if (!needsRetry) ...[
-                                  Expanded(
-                                    child: OutlinedButton(
-                                      onPressed: submitting
-                                          ? null
-                                          : () => onDecide(false),
-                                      style: OutlinedButton.styleFrom(
-                                        minimumSize: const Size(0, 46),
-                                      ),
-                                      child: const Text('Decline'),
+                              if (showAlways) ...[
+                                const SizedBox(height: 6),
+                                TextButton(
+                                  onPressed: submitting
+                                      ? null
+                                      : () => unawaited(
+                                          _confirmAlwaysAllow(
+                                            context,
+                                            alwaysLabel,
+                                          ),
+                                        ),
+                                  style: TextButton.styleFrom(
+                                    minimumSize: const Size(0, 40),
+                                    alignment: Alignment.centerLeft,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
                                     ),
                                   ),
-                                  const SizedBox(width: 10),
-                                ],
-                                Expanded(
-                                  child: FilledButton.icon(
-                                    onPressed: submitting
-                                        ? null
-                                        : () {
-                                            unawaited(
-                                              HapticFeedback.mediumImpact(),
-                                            );
-                                            onDecide(
-                                              needsRetry
-                                                  ? (approval.decision ?? true)
-                                                  : true,
-                                            );
-                                          },
-                                    style: FilledButton.styleFrom(
-                                      minimumSize: const Size(0, 46),
-                                    ),
-                                    icon: submitting
-                                        ? SizedBox.square(
-                                            dimension: 14,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: colors.muted,
-                                            ),
-                                          )
-                                        : Icon(
-                                            needsRetry
-                                                ? PhosphorIconsRegular
-                                                      .arrowsClockwise
-                                                : PhosphorIconsRegular.check,
-                                            size: 18,
-                                          ),
-                                    label: Text(
-                                      needsRetry ? 'Retry' : 'Approve',
-                                    ),
+                                  child: Text(
+                                    'Always allow $alwaysLabel',
+                                    textAlign: TextAlign.start,
                                   ),
                                 ),
                               ],
-                            ),
-                            if (showAlways) ...[
-                              const SizedBox(height: 6),
-                              TextButton(
-                                onPressed: submitting
-                                    ? null
-                                    : () => unawaited(
-                                        _confirmAlwaysAllow(
-                                          context,
-                                          alwaysLabel,
-                                        ),
-                                      ),
-                                style: TextButton.styleFrom(
-                                  minimumSize: const Size(0, 40),
-                                  alignment: Alignment.centerLeft,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                  ),
-                                ),
-                                child: Text(
-                                  'Always allow $alwaysLabel',
-                                  textAlign: TextAlign.start,
-                                ),
-                              ),
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

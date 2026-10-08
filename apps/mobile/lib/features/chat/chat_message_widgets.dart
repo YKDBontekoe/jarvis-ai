@@ -244,35 +244,56 @@ class _MessageBubbleState extends State<MessageBubble> {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onLongPress: message.pending ? null : _showUserActions,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 11,
-                  ),
-                  decoration: BoxDecoration(
-                    color: message.failed
-                        ? JarvisColors.of(context).dangerSoft
-                        : JarvisColors.of(context).surfaceRaised,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                      bottomLeft: Radius.circular(20),
-                      bottomRight: Radius.circular(6),
+                // While it is on its way the bubble is a touch faded; it
+                // firms up once Jarvis has it.
+                child: AnimatedOpacity(
+                  opacity: message.pending || message.queued ? .72 : 1,
+                  duration: JarvisMotion.of(context, JarvisMotion.slow),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 11,
                     ),
-                    border: message.failed
-                        ? Border.all(
-                            color: JarvisColors.of(
-                              context,
-                            ).danger.withValues(alpha: .35),
-                          )
-                        : null,
-                  ),
-                  child: Text(
-                    message.content,
-                    style: TextStyle(
-                      fontSize: 15.5,
-                      height: 1.45,
-                      color: JarvisColors.of(context).ink,
+                    decoration: BoxDecoration(
+                      color: message.failed
+                          ? JarvisColors.of(context).dangerSoft
+                          : null,
+                      // A faint wash of the accent, so your words read as yours.
+                      gradient: message.failed
+                          ? null
+                          : LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                JarvisColors.of(context).surfaceRaised,
+                                Color.lerp(
+                                  JarvisColors.of(context).surfaceRaised,
+                                  JarvisColors.of(context).accent,
+                                  .09,
+                                )!,
+                              ],
+                            ),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                        bottomLeft: Radius.circular(20),
+                        bottomRight: Radius.circular(6),
+                      ),
+                      border: message.failed
+                          ? Border.all(
+                              color: JarvisColors.of(
+                                context,
+                              ).danger.withValues(alpha: .35),
+                            )
+                          : null,
+                    ),
+                    child: Text(
+                      message.content,
+                      style: TextStyle(
+                        fontSize: 15.5,
+                        height: 1.45,
+                        color: JarvisColors.of(context).ink,
+                      ),
                     ),
                   ),
                 ),

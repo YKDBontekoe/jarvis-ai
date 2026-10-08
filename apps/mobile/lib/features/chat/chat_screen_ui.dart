@@ -552,15 +552,17 @@ mixin _ChatScreenUi on _ChatScreenController {
                               bottom: 8,
                               child: IgnorePointer(
                                 ignoring: _nearBottom || _showApprovalDock,
-                                child: AnimatedSlide(
-                                  offset: _nearBottom || _showApprovalDock
-                                      ? const Offset(0, .4)
-                                      : Offset.zero,
+                                child: AnimatedScale(
+                                  scale: _nearBottom || _showApprovalDock
+                                      ? .4
+                                      : 1,
                                   duration: JarvisMotion.of(
                                     context,
-                                    JarvisMotion.base,
+                                    const Duration(milliseconds: 420),
                                   ),
-                                  curve: JarvisMotion.standard,
+                                  curve: _nearBottom || _showApprovalDock
+                                      ? JarvisMotion.exit
+                                      : JarvisSprings.pop,
                                   child: AnimatedOpacity(
                                     opacity: _nearBottom || _showApprovalDock
                                         ? 0
@@ -796,22 +798,58 @@ class _NewChatWelcome extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Center(child: JarvisOrb(size: 56)),
+                // The orb lands with a ripple, the question sharpens into
+                // focus, then the suggestions rise in.
+                const Center(child: _WelcomeOrb()),
                 const SizedBox(height: 22),
-                Text(
-                  'What do you need?',
-                  textAlign: TextAlign.center,
-                  style: JarvisType.displayOf(context).copyWith(fontSize: 34),
+                BlurIn(
+                  delay: const Duration(milliseconds: 180),
+                  child: Text(
+                    'What do you need?',
+                    textAlign: TextAlign.center,
+                    style: JarvisType.displayOf(context).copyWith(fontSize: 34),
+                  ),
                 ),
                 const SizedBox(height: 22),
                 if (onSuggestion != null)
-                  SuggestionChips(onSelected: onSuggestion),
+                  FadeSlideIn(
+                    index: 8,
+                    offset: 16,
+                    child: SuggestionChips(onSelected: onSuggestion),
+                  ),
               ],
             ),
           ),
         ),
       ],
     ),
+  );
+}
+
+class _WelcomeOrb extends StatefulWidget {
+  const _WelcomeOrb();
+
+  @override
+  State<_WelcomeOrb> createState() => _WelcomeOrbState();
+}
+
+class _WelcomeOrbState extends State<_WelcomeOrb> {
+  int _ripple = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Ripple once the orb has landed.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _ripple++);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Shockwave(
+    trigger: _ripple,
+    size: 56,
+    child: const PopIn(from: .3, child: JarvisOrb(size: 56)),
   );
 }
 
@@ -866,10 +904,10 @@ class _NotificationBell extends StatelessWidget {
             top: 3,
             right: 2,
             child: IgnorePointer(
-              child: AnimatedScale(
-                scale: 1,
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOutBack,
+              // The badge pops again each time the count changes.
+              child: PopIn(
+                key: ValueKey(unread),
+                from: .5,
                 child: Container(
                   constraints: const BoxConstraints(minWidth: 18),
                   padding: const EdgeInsets.symmetric(
