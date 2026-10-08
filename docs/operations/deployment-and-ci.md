@@ -33,7 +33,10 @@ No hand configuration: `scripts/deploy/prepare-host.sh` runs first on every depl
 value (secrets, uid/gid, data directories under `JARVIS_DATA_DIR`, a Garage config, values derived from
 `JARVIS_DOMAIN`). It never changes an existing value, and keeps a template placeholder for a database password or
 storage key when its data volume already exists. `JARVIS_DOMAIN` is the only input (repository variable for
-deploys). Caddy serves LiveKit signaling under `/rtc` on that host, so one DNS record is enough. ChatGPT sign-in for
+deploys, or the existing server env file). An unset repository variable arrives as an empty environment value;
+the shared Compose wrapper removes that empty override so the hostname in the server env file is used. A nonempty
+environment value still takes precedence. New hosts need `JARVIS_DOMAIN` set before the first deploy.
+Caddy serves LiveKit signaling under `/rtc` on that host, so one DNS record is enough. ChatGPT sign-in for
 the server's Codex CLI happens in the app (`/api/v1/settings/models/codex/sign-in`, device code).
 
 Bootstrap and deploy scripts: `scripts/deploy/remote-up.sh` (generate, pull, migrate, replace, health-check), `scripts/deploy/publish-compose.sh`, `scripts/deploy/compose-env.sh`.
