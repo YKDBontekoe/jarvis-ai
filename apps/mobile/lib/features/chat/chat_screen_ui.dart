@@ -97,17 +97,36 @@ mixin _ChatScreenUi on _ChatScreenController {
   }
 
   /// The orb: back to the conversation that is open, or a fresh one.
-  void _openJarvis() => _fromShell(() {
-    if (_selectedDestination != 0) _selectDestination(0);
-    if (_conversationId == null) {
-      setState(() => _inChat = true);
-      unawaited(_createAndOpenConversation());
-    } else if (_hasMessages) {
-      _showTranscript();
-    } else {
-      setState(() => _inChat = true);
+  void _openJarvis() {
+    final source = _tabOrbRect();
+    _fromShell(() {
+      if (_selectedDestination != 0) _selectDestination(0);
+      if (_conversationId == null) {
+        setState(() => _inChat = true);
+        unawaited(_createAndOpenConversation());
+      } else if (_hasMessages) {
+        _showTranscript();
+      } else {
+        setState(() => _inChat = true);
+      }
+    });
+    if (source != null && _inChat && !JarvisMotion.reduced(context)) {
+      setState(() => _orbFlying = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await flyOrb(context: context, from: source, to: _titleOrbKey);
+        if (mounted) setState(() => _orbFlying = false);
+      });
     }
-  });
+  }
+
+  /// Where the tab bar's orb is on screen, or null when it is not showing.
+  Rect? _tabOrbRect() {
+    final box = _tabOrbKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return null;
+    final center = box.localToGlobal(box.size.center(Offset.zero));
+    return Rect.fromCenter(center: center, width: 40, height: 40);
+  }
 
   void _leaveChat() {
     _dismissKeyboard();
@@ -370,6 +389,20 @@ mixin _ChatScreenUi on _ChatScreenController {
                       size: 20,
                     ),
                     const SizedBox(width: 7),
+                  ] else if (!voice) ...[
+                    // Where the tab bar's orb lands when it opens chat.
+                    KeyedSubtree(
+                      key: _titleOrbKey,
+                      child: Opacity(
+                        opacity: _orbFlying ? 0 : 1,
+                        child: JarvisOrb(
+                          size: 22,
+                          glow: false,
+                          thinking: _busy,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                   ],
                   Flexible(
                     child: Text(
@@ -764,6 +797,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     canStart: !_busy && !_hasPendingApproval && _conversationId != null,
     onPrimary: () => unawaited(_toggleVoice()),
     onToggleMute: _voiceActive ? () => unawaited(_toggleVoiceMute()) : null,
+    level: _voiceActive ? _voiceLevel : null,
   );
 
   Widget _settingsBody() => SettingsView(

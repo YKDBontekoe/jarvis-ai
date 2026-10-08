@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -19,12 +20,16 @@ class WhatsAppMessageContent extends StatelessWidget {
     required this.message,
     required this.http,
     required this.channelId,
+    this.selectable = true,
     super.key,
   });
 
   final WhatsAppMessage message;
   final Dio http;
   final String channelId;
+
+  /// Off where holding the message opens reactions instead of selection.
+  final bool selectable;
 
   @override
   Widget build(BuildContext context) {
@@ -57,13 +62,13 @@ class WhatsAppMessageContent extends StatelessWidget {
 
   Widget _text(ThemeData theme, String text) {
     final emoji = whatsAppEmojiOnly(text);
-    return SelectableText(
-      text,
-      style: theme.textTheme.bodyMedium?.copyWith(
-        fontSize: emoji ? (text.characters.length == 1 ? 48 : 34) : 15.5,
-        height: emoji ? 1.15 : 1.45,
-      ),
+    final style = theme.textTheme.bodyMedium?.copyWith(
+      fontSize: emoji ? (text.characters.length == 1 ? 48 : 34) : 15.5,
+      height: emoji ? 1.15 : 1.45,
     );
+    return selectable
+        ? SelectableText(text, style: style)
+        : Text(text, style: style);
   }
 
   bool _captionIsTitle(WhatsAppMedia media, String caption) {
@@ -120,6 +125,14 @@ class _Element extends StatelessWidget {
         sticker: media.kind == 'sticker',
         label: label,
         seconds: media.seconds,
+      );
+    }
+    if (media.kind == 'audio' && media.waveform.isNotEmpty) {
+      return _VoiceNote(
+        media: media,
+        label: label,
+        mine: message.fromMe,
+        onTap: () => _open(context, media, message.id, label),
       );
     }
     final duration = _clock(media.seconds);
@@ -345,6 +358,133 @@ class _Card extends StatelessWidget {
       child: onTap == null ? body : InkWell(onTap: onTap, child: body),
     );
   }
+}
+
+/// A voice note drawn as WhatsApp's own loudness bars. The bars grow in once,
+/// left to right; tapping opens the recording like any other file.
+class _VoiceNote extends StatelessWidget {
+  const _VoiceNote({
+    required this.media,
+    required this.label,
+    required this.mine,
+    required this.onTap,
+  });
+
+  final WhatsAppMedia media;
+  final String label;
+  final bool mine;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final duration = _clock(media.seconds);
+    final tint = mine ? const Color(0xff1daa61) : colors.accent;
+    final reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final samples = media.waveform;
+    return Semantics(
+      container: true,
+      button: true,
+      label: ['Open $label', ?duration].join(', '),
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(color: tint, shape: BoxShape.circle),
+                child: const Icon(
+                  PhosphorIconsRegular.play,
+                  size: 16,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 168,
+                height: 30,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: reduced ? 1 : 0, end: 1),
+                  duration: const Duration(milliseconds: 900),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, t, _) => CustomPaint(
+                    painter: _WaveformPainter(
+                      samples: samples,
+                      progress: t,
+                      color: tint.withValues(alpha: .75),
+                    ),
+                  ),
+                ),
+              ),
+              if (duration != null) ...[
+                const SizedBox(width: 8),
+                Text(
+                  duration,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: colors.inkSoft,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WaveformPainter extends CustomPainter {
+  _WaveformPainter({
+    required this.samples,
+    required this.progress,
+    required this.color,
+  });
+
+  final List<int> samples;
+  final double progress;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (samples.isEmpty) return;
+    const bars = 32;
+    final gap = size.width / bars;
+    final paint = Paint()
+      ..color = color
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = math.max(2, gap * .55);
+    final loudest = samples.reduce(math.max).clamp(1, 100);
+    for (var i = 0; i < bars; i++) {
+      // Average the samples that fall in this bar.
+      final from = i * samples.length ~/ bars;
+      final to = math.max(from + 1, (i + 1) * samples.length ~/ bars);
+      var sum = 0;
+      for (var j = from; j < to && j < samples.length; j++) {
+        sum += samples[j];
+      }
+      final level = sum / (to - from) / loudest;
+      // Each bar starts growing a little after the one before it.
+      final grow = ((progress * 1.6) - i / bars * .6).clamp(0.0, 1.0);
+      final height = math.max(3.0, size.height * level * grow);
+      final x = gap * (i + .5);
+      canvas.drawLine(
+        Offset(x, (size.height - height) / 2),
+        Offset(x, (size.height + height) / 2),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_WaveformPainter old) =>
+      old.progress != progress || old.samples != samples || old.color != color;
 }
 
 class _Quote extends StatelessWidget {

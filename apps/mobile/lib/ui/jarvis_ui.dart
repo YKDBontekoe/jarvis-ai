@@ -1342,9 +1342,12 @@ class _SwipeBackground extends StatelessWidget {
 /// Soft violet and sky light behind a hero (the orb on home), echoing the
 /// sign-in backdrop so the first screen has some atmosphere. Purely visual.
 class HeroGlow extends StatelessWidget {
-  const HeroGlow({required this.child, super.key});
+  const HeroGlow({required this.child, this.parallax, super.key});
 
   final Widget child;
+
+  /// When set, the light lags behind the scroll, so it seems further away.
+  final ScrollController? parallax;
 
   @override
   Widget build(BuildContext context) {
@@ -1375,6 +1378,21 @@ class HeroGlow extends StatelessWidget {
               ),
             ),
           );
+    final scroll = parallax;
+    // The light drifts down against the scroll, so it seems further away.
+    Widget lag(Widget blob) => scroll == null || JarvisMotion.reduced(context)
+        ? blob
+        : AnimatedBuilder(
+            animation: scroll,
+            child: blob,
+            builder: (context, child) => Transform.translate(
+              offset: Offset(
+                0,
+                (scroll.hasClients ? scroll.offset.clamp(0, 400) : 0) * .45,
+              ),
+              child: child,
+            ),
+          );
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
@@ -1385,10 +1403,12 @@ class HeroGlow extends StatelessWidget {
           top: -10,
           left: -170,
           child: IgnorePointer(
-            child: bloom(
-              0,
-              const Offset(-40, -20),
-              blob(380, colors.violet.withValues(alpha: .13 * strength)),
+            child: lag(
+              bloom(
+                0,
+                const Offset(-40, -20),
+                blob(380, colors.violet.withValues(alpha: .13 * strength)),
+              ),
             ),
           ),
         ),
@@ -1396,10 +1416,12 @@ class HeroGlow extends StatelessWidget {
           top: 20,
           right: -190,
           child: IgnorePointer(
-            child: bloom(
-              1,
-              const Offset(50, -10),
-              blob(340, colors.sky.withValues(alpha: .09 * strength)),
+            child: lag(
+              bloom(
+                1,
+                const Offset(50, -10),
+                blob(340, colors.sky.withValues(alpha: .09 * strength)),
+              ),
             ),
           ),
         ),
@@ -1407,10 +1429,12 @@ class HeroGlow extends StatelessWidget {
           top: 170,
           left: -40,
           child: IgnorePointer(
-            child: bloom(
-              2,
-              const Offset(-20, 40),
-              blob(220, colors.rose.withValues(alpha: .10 * strength)),
+            child: lag(
+              bloom(
+                2,
+                const Offset(-20, 40),
+                blob(220, colors.rose.withValues(alpha: .10 * strength)),
+              ),
             ),
           ),
         ),

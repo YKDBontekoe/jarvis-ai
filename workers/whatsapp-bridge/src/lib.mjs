@@ -336,10 +336,49 @@ export function mediaOf(message) {
       place: kind === 'location' ? cleanText(media.name ?? media.address, 120) : null,
       contactName: contacts,
       pollOptions: options,
+      waveform: kind === 'audio' ? waveformOf(media.waveform) : null,
       download: DOWNLOADABLE.has(resolved) ? 'full' : (resolved === 'video' || resolved === 'gif') ? 'thumbnail' : null,
     };
   }
   return null;
+}
+
+/**
+ * A voice note's loudness envelope as WhatsApp sends it (up to 64 bytes, 0-100), as plain numbers.
+ * Anything else, or an envelope that is silent throughout, gives null.
+ */
+export function waveformOf(value) {
+  if (!value || typeof value.length !== 'number' || value.length === 0) return null;
+  const samples = Array.from(value).slice(0, 64).map((sample) => {
+    const number = Number(sample);
+    return Number.isFinite(number) ? Math.max(0, Math.min(100, Math.round(number))) : 0;
+  });
+  return samples.some((sample) => sample > 0) ? samples : null;
+}
+
+const MESSAGE_ID = /^[A-Za-z0-9_-]{4,128}$/;
+
+/**
+ * The WhatsApp key of a message Jarvis saved, for quoting or reacting to it. `ref` comes from Jarvis:
+ * `{ id, fromMe, participant }`, where participant is the sender's chat id in a group.
+ */
+export function messageKey(chatId, ref) {
+  const remoteJid = jidFromChatId(chatId);
+  if (!ref || typeof ref.id !== 'string' || !MESSAGE_ID.test(ref.id)) throw new Error('Invalid message.');
+  const key = { remoteJid, id: ref.id, fromMe: Boolean(ref.fromMe) };
+  if (isGroupJid(remoteJid) && !key.fromMe && typeof ref.participant === 'string' && isChatId(ref.participant)) {
+    key.participant = jidFromChatId(ref.participant);
+  }
+  return key;
+}
+
+/** One emoji (with its modifiers) to react with, or '' to take a reaction back. */
+export function reactionText(value) {
+  if (value === '' || value == null) return '';
+  if (typeof value !== 'string' || value.length > 16 || /[\s\p{L}\p{N}]/u.test(value)) {
+    throw new Error('Invalid reaction.');
+  }
+  return value;
 }
 
 /** The message this one replies to, when WhatsApp included a quote. */
@@ -494,6 +533,7 @@ function publishedMedia(media) {
   if (media.animated) published.animated = true;
   if (media.voice) published.voice = true;
   if (media.pollOptions?.length) published.pollOptions = media.pollOptions;
+  if (media.waveform?.length) published.waveform = media.waveform;
   return published;
 }
 

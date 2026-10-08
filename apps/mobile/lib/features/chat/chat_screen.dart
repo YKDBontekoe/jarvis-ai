@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -31,6 +32,7 @@ import '../files/file_download_stub.dart'
 import '../tasks/task_details_screen.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
+import '../../ui/orb_flight.dart';
 import '../../ui/phosphor_icons.dart';
 import '../devices/device_invoke.dart';
 import '../devices/device_telemetry.dart';
@@ -211,6 +213,7 @@ class _ChatScreenState extends _ChatScreenController
                   onJarvis: _openJarvis,
                   chatsAttention: chatsAttention,
                   jarvisBusy: _busy,
+                  orbKey: _tabOrbKey,
                 )
               : null,
           body: wide

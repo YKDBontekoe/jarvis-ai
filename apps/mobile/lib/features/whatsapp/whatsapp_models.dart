@@ -188,6 +188,7 @@ class WhatsAppMedia {
     this.contactName,
     this.pollOptions = const [],
     this.hasContent = false,
+    this.waveform = const [],
   });
 
   final String kind;
@@ -204,6 +205,9 @@ class WhatsAppMedia {
   final String? contactName;
   final List<String> pollOptions;
   final bool hasContent;
+
+  /// A voice note's loudness envelope from WhatsApp, 0 to 100 per sample.
+  final List<int> waveform;
 
   static WhatsAppMedia? fromJson(Object? value) {
     final json = jsonObject(value);
@@ -232,6 +236,11 @@ class WhatsAppMedia {
           if (option is String && option.trim().isNotEmpty) option.trim(),
       ],
       hasContent: asJsonBool(json['hasContent']),
+      waveform: [
+        if (json['waveform'] case final List<dynamic> samples)
+          for (final sample in samples.take(64))
+            if (sample is num) sample.toInt().clamp(0, 100),
+      ],
     );
   }
 

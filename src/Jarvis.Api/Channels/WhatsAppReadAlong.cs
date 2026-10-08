@@ -22,22 +22,54 @@ public sealed class BridgeWhatsAppSender(WhatsAppBridgeClient bridge, IChannelRe
 {
     public bool Available => bridge.Configured;
 
-    public async Task<WhatsAppSendResult> SendAsync(Guid ownerId, Guid connectionId, string chatId, string text,
-        CancellationToken cancellationToken)
+    public Task<WhatsAppSendResult> SendAsync(Guid ownerId, Guid connectionId, string chatId, string text,
+        CancellationToken cancellationToken) =>
+        SendCoreAsync(ownerId, connectionId, chatId, text, null, cancellationToken);
+
+    public Task<WhatsAppSendResult> ReplyAsync(Guid ownerId, Guid connectionId, string chatId, string text,
+        WhatsAppChatMessage replyTo, CancellationToken cancellationToken) =>
+        SendCoreAsync(ownerId, connectionId, chatId, text, replyTo, cancellationToken);
+
+    public async Task<WhatsAppSendResult> ReactAsync(Guid ownerId, Guid connectionId, string chatId,
+        WhatsAppChatMessage target, string emoji, CancellationToken cancellationToken)
     {
-        if (!bridge.Configured) return new WhatsAppSendResult(false, null, "WhatsApp is not set up on this server.");
-        var connection = await channels.GetAsync(ownerId, connectionId, cancellationToken);
-        if (connection is not { Kind: ChannelKinds.WhatsAppLinked })
-            return new WhatsAppSendResult(false, null, "That WhatsApp account is not linked.");
-        if (!connection.Enabled) return new WhatsAppSendResult(false, null, "This WhatsApp account is paused.");
-        var chat = await chats.GetChatAsync(ownerId, connectionId, chatId, cancellationToken);
-        if (chat is not { ReadAlong: true })
-            return new WhatsAppSendResult(false, null, "Turn on read along for this chat first.");
+        var (chat, problem) = await CheckAsync(ownerId, connectionId, chatId, cancellationToken);
+        if (chat is null) return problem!;
+        if (Reference(target) is not { } reference)
+            return new WhatsAppSendResult(false, null, "This message cannot be reacted to.");
+        try
+        {
+            await bridge.ReactAsync(connectionId, chatId, reference, emoji, cancellationToken);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or JsonException)
+        {
+            logger.LogWarning(exception, "Could not send a WhatsApp reaction for chat {ChatSettingsId}.", chat.Id);
+            await EndpointHelpers.TryAppendAuditAsync(audit, logger, ownerId, "whatsapp", "whatsapp.reaction_sent",
+                "medium", false, null, JsonSerializer.Serialize(new { resourceId = chat.Id }), cancellationToken);
+            return new WhatsAppSendResult(false, null, "WhatsApp is not reachable right now. Try again in a moment.");
+        }
+        await EndpointHelpers.TryAppendAuditAsync(audit, logger, ownerId, "whatsapp", "whatsapp.reaction_sent",
+            "medium", true, null, JsonSerializer.Serialize(new { resourceId = chat.Id }), cancellationToken);
+        return new WhatsAppSendResult(true, null, null);
+    }
+
+    private async Task<WhatsAppSendResult> SendCoreAsync(Guid ownerId, Guid connectionId, string chatId, string text,
+        WhatsAppChatMessage? replyTo, CancellationToken cancellationToken)
+    {
+        var (chat, problem) = await CheckAsync(ownerId, connectionId, chatId, cancellationToken);
+        if (chat is null) return problem!;
+        var quote = replyTo is null ? null : Reference(replyTo) is { } reference
+            ? reference with { Text = Quoted(replyTo) }
+            : null;
+        if (replyTo is not null && quote is null)
+            return new WhatsAppSendResult(false, null, "This message cannot be replied to.");
 
         string? externalId;
         try
         {
-            externalId = await bridge.SendToChatAsync(connectionId, chatId, text, cancellationToken);
+            externalId = quote is null
+                ? await bridge.SendToChatAsync(connectionId, chatId, text, cancellationToken)
+                : await bridge.ReplyInChatAsync(connectionId, chatId, text, quote, cancellationToken);
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or JsonException)
         {
@@ -46,14 +78,51 @@ public sealed class BridgeWhatsAppSender(WhatsAppBridgeClient bridge, IChannelRe
                 "high", false, null, JsonSerializer.Serialize(new { resourceId = chat.Id }), cancellationToken);
             return new WhatsAppSendResult(false, null, "WhatsApp is not reachable right now. Try again in a moment.");
         }
-        // The bridge also echoes the message back; both carry the same id, so it is stored once.
+        // The bridge also echoes the message back; both carry the same id, so it is stored once. A reply keeps
+        // its quote here, because the echo is then ignored as a duplicate.
         if (externalId is not null)
+        {
+            var stored = replyTo is null
+                ? null
+                : WhatsAppMediaCodec.Prepare(null, new WhatsAppQuote(replyTo.FromMe ? null : replyTo.Sender,
+                    Quoted(replyTo)), null);
             await chats.StoreObservedAsync(connectionId,
                 [new ObservedWhatsAppMessage(WhatsAppReadAlongReceiver.ExternalId(externalId), chatId, true, null,
-                    text, clock.GetUtcNow())], cancellationToken);
+                    text, clock.GetUtcNow(), MediaJson: stored?.Json)], cancellationToken);
+        }
         await EndpointHelpers.TryAppendAuditAsync(audit, logger, ownerId, "whatsapp", "whatsapp.message_sent", "high",
             true, null, JsonSerializer.Serialize(new { resourceId = chat.Id }), cancellationToken);
         return new WhatsAppSendResult(true, externalId, null);
+    }
+
+    /// <summary>The chat when sending to it is allowed, or the reason it is not.</summary>
+    private async Task<(WhatsAppChatSettings? Chat, WhatsAppSendResult? Problem)> CheckAsync(Guid ownerId,
+        Guid connectionId, string chatId, CancellationToken cancellationToken)
+    {
+        if (!bridge.Configured) return (null, new WhatsAppSendResult(false, null, "WhatsApp is not set up on this server."));
+        var connection = await channels.GetAsync(ownerId, connectionId, cancellationToken);
+        if (connection is not { Kind: ChannelKinds.WhatsAppLinked })
+            return (null, new WhatsAppSendResult(false, null, "That WhatsApp account is not linked."));
+        if (!connection.Enabled) return (null, new WhatsAppSendResult(false, null, "This WhatsApp account is paused."));
+        var chat = await chats.GetChatAsync(ownerId, connectionId, chatId, cancellationToken);
+        return chat is { ReadAlong: true }
+            ? (chat, null)
+            : (null, new WhatsAppSendResult(false, null, "Turn on read along for this chat first."));
+    }
+
+    /// <summary>WhatsApp's key for a saved message, or null for one that did not come from WhatsApp.</summary>
+    internal static BridgeMessageRef? Reference(WhatsAppChatMessage message)
+    {
+        const string prefix = WhatsAppReadAlongReceiver.ExternalIdPrefix;
+        if (!message.ExternalId.StartsWith(prefix, StringComparison.Ordinal)) return null;
+        return new BridgeMessageRef(message.ExternalId[prefix.Length..], message.FromMe,
+            message.FromMe ? null : message.SenderId);
+    }
+
+    private static string Quoted(WhatsAppChatMessage message)
+    {
+        var text = message.Text.ReplaceLineEndings(" ").Trim();
+        return text.Length <= 300 ? text : text[..300].TrimEnd();
     }
 }
 
@@ -68,7 +137,9 @@ public sealed class WhatsAppReadAlongReceiver(IServiceScopeFactory scopes, Whats
     private static readonly TimeSpan WatchRefresh = TimeSpan.FromMinutes(1);
     private readonly ConcurrentDictionary<Guid, (string Key, DateTimeOffset At)> pushed = new();
 
-    internal static string ExternalId(string bridgeId) => "wa:" + bridgeId;
+    internal const string ExternalIdPrefix = "wa:";
+
+    internal static string ExternalId(string bridgeId) => ExternalIdPrefix + bridgeId;
 
     /// <summary>Pushes the current watch list for one connection now (after the owner changed a chat).</summary>
     public async Task SyncWatchAsync(Guid connectionId, IReadOnlyList<string> watched,

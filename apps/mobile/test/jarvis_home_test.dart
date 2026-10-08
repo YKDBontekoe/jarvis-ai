@@ -699,4 +699,23 @@ void main() {
       expect(http.sent('GET', '/api/v1/tasks').length, greaterThan(before));
     });
   });
+
+  testWidgets('scrolling down swaps the greeting for a compact header', (
+    tester,
+  ) async {
+    await show(tester);
+    tester.view.physicalSize = const Size(400, 640);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('home-compact-header')), findsNothing);
+    await tester.drag(
+      find.byKey(const Key('home-list')),
+      const Offset(0, -400),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('home-compact-header')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('home-compact-header')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('home-compact-header')), findsNothing);
+  });
 }

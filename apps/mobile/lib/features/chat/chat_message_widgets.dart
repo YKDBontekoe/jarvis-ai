@@ -147,7 +147,9 @@ class _MessageBubbleState extends State<MessageBubble> {
               children: [
                 Padding(
                   padding: const EdgeInsets.only(top: 3),
-                  child: JarvisMarkdown(data: message.content),
+                  child: message.pending
+                      ? StreamingMarkdown(data: message.content)
+                      : JarvisMarkdown(data: message.content),
                 ),
                 if (message.pending)
                   const Padding(
@@ -617,7 +619,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const JarvisOrb(size: 28, glow: false, animate: true),
+          const JarvisOrb(size: 28, glow: false, thinking: true),
           const SizedBox(width: 12),
           Flexible(
             child: Container(

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
@@ -46,6 +47,10 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
   Timer? _poll;
   int _requestRevision = 0;
   final _scroll = ScrollController();
+  final _composerFocus = FocusNode();
+
+  /// The message the next send replies to, quoted above the composer.
+  WhatsAppMessage? _replyTo;
   bool _fetching = false;
   bool _loadingOlder = false;
   bool _hasOlder = false;
@@ -113,6 +118,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     _poll?.cancel();
     _composer.dispose();
     _scroll.dispose();
+    _composerFocus.dispose();
     super.dispose();
   }
 
@@ -342,10 +348,11 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
       await widget.http.post<dynamic>(
         _path('send'),
         queryParameters: _query(),
-        data: {'text': text},
+        data: {'text': text, 'replyTo': ?_replyTo?.id},
       );
       if (!mounted) return;
       _composer.clear();
+      setState(() => _replyTo = null);
       unawaited(_load(quiet: true));
     } on DioException catch (error) {
       if (!mounted) return;
@@ -360,6 +367,62 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
       if (mounted) setState(() => _sending = false);
     }
   }
+
+  void _startReply(WhatsAppMessage message) {
+    unawaited(HapticFeedback.lightImpact());
+    setState(() => _replyTo = message);
+    _composerFocus.requestFocus();
+  }
+
+  /// Holding a bubble: react, reply or copy.
+  Future<void> _messageActions(WhatsAppMessage message, Rect anchor) async {
+    final action = await showMessageActions(
+      context,
+      anchor: anchor,
+      mine: message.fromMe,
+      canReply: _canSend,
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case ReactWith(:final emoji):
+        await _react(message, emoji, anchor);
+      case ReplyTo():
+        _startReply(message);
+      case CopyText():
+        await Clipboard.setData(ClipboardData(text: message.text));
+        if (mounted) _snack('Message copied');
+    }
+  }
+
+  Future<void> _react(
+    WhatsAppMessage message,
+    String emoji,
+    Rect anchor,
+  ) async {
+    // The emoji lifts off at once; a failure is reported after.
+    floatEmoji(context, anchor, emoji);
+    unawaited(HapticFeedback.lightImpact());
+    try {
+      await widget.http.post<dynamic>(
+        _path('react'),
+        queryParameters: _query(),
+        data: {'messageId': message.id, 'emoji': emoji},
+      );
+    } on DioException catch (error) {
+      if (!mounted) return;
+      _snack(
+        firstProblemMessage(error.response?.data) ??
+            asJsonString(jsonObject(error.response?.data)?['message']) ??
+            'The reaction was not sent.',
+      );
+    } catch (_) {
+      if (mounted) _snack('The reaction was not sent.');
+    }
+  }
+
+  bool get _canSend =>
+      _chat.readAlong &&
+      (_connectionState == null || _connectionState == 'open');
 
   Future<void> _draft({String? preset}) async {
     if (_drafting) return;
@@ -660,6 +723,9 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
                               hasOlder: _hasOlder,
                               loadingOlder: _loadingOlder,
                               onLoadOlder: () => unawaited(_loadOlder()),
+                              onReply: _canSend ? _startReply : null,
+                              onHold: (message, anchor) =>
+                                  unawaited(_messageActions(message, anchor)),
                             ),
                           ),
                         ),
@@ -674,13 +740,28 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
           ),
           _Composer(
             controller: _composer,
+            focus: _composerFocus,
+            replyTo: _replyTo == null
+                ? null
+                : ReplyPreview(
+                    key: ValueKey(_replyTo!.id),
+                    author: _replyTo!.fromMe
+                        ? 'You'
+                        : _replyTo!.sender ?? _chat.name,
+                    text: _replyTo!.text,
+                    color: _replyTo!.fromMe
+                        ? whatsAppGreen
+                        : whatsAppSenderColor(
+                            _replyTo!.senderId ?? _replyTo!.sender ?? '',
+                            JarvisColors.of(context),
+                          ),
+                    onCancel: () => setState(() => _replyTo = null),
+                  ),
             sending: _sending,
             drafting: _drafting,
             onDraft: () => unawaited(_draft()),
             onSend: () => unawaited(_send()),
-            canSend:
-                _chat.readAlong &&
-                (_connectionState == null || _connectionState == 'open'),
+            canSend: _canSend,
           ),
         ],
       ),
@@ -745,7 +826,15 @@ class _MessageList extends StatelessWidget {
     required this.hasOlder,
     required this.loadingOlder,
     required this.onLoadOlder,
+    this.onReply,
+    this.onHold,
   });
+
+  /// Swipe a bubble right to reply; null when sending is not possible.
+  final ValueChanged<WhatsAppMessage>? onReply;
+
+  /// Hold a bubble for reactions; gets the bubble's place on screen.
+  final void Function(WhatsAppMessage message, Rect anchor)? onHold;
 
   final List<WhatsAppMessage> messages;
   final bool isGroup;
@@ -784,6 +873,10 @@ class _MessageList extends StatelessWidget {
               ? Alignment.bottomRight
               : Alignment.bottomLeft,
           child: _Bubble(
+            onReply: onReply == null ? null : () => onReply!(message),
+            onHold: onHold == null
+                ? null
+                : (anchor) => onHold!(message, anchor),
             message: message,
             isGroup: isGroup,
             http: http,
@@ -847,7 +940,12 @@ class _Bubble extends StatelessWidget {
     required this.showSender,
     required this.tight,
     this.joinedAbove = false,
+    this.onReply,
+    this.onHold,
   });
+
+  final VoidCallback? onReply;
+  final ValueChanged<Rect>? onHold;
 
   final WhatsAppMessage message;
   final bool isGroup;
@@ -879,106 +977,130 @@ class _Bubble extends StatelessWidget {
       message.senderId ?? message.sender ?? '',
       colors,
     );
-    return Padding(
-      padding: EdgeInsets.only(top: joinedAbove ? 2 : 8),
-      child: Align(
-        alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: (MediaQuery.sizeOf(context).width * .86).clamp(0, 620),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (showFace) ...[
-                SizedBox(
-                  width: 28,
-                  child: showSender
-                      ? ChatAvatar(
-                          http: http,
-                          channelId: channelId,
-                          subject: message.senderId,
-                          initials: whatsAppInitials(message.sender ?? ''),
-                          size: 28,
-                        )
-                      : null,
+    return SwipeToReply(
+      onReply: onReply,
+      child: Padding(
+        padding: EdgeInsets.only(top: joinedAbove ? 2 : 8),
+        child: Align(
+          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+          child: Builder(
+            builder: (bubble) => GestureDetector(
+              onLongPress: onHold == null
+                  ? null
+                  : () {
+                      final box = bubble.findRenderObject();
+                      if (box is! RenderBox || !box.hasSize) return;
+                      onHold!(box.localToGlobal(Offset.zero) & box.size);
+                    },
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: (MediaQuery.sizeOf(context).width * .86).clamp(
+                    0,
+                    620,
+                  ),
                 ),
-                const SizedBox(width: 8),
-              ],
-              Flexible(
-                child: Container(
-                  padding: naked
-                      ? const EdgeInsets.only(bottom: 2)
-                      : const EdgeInsets.fromLTRB(16, 11, 16, 8),
-                  decoration: naked
-                      ? null
-                      : BoxDecoration(
-                          color: mine ? null : colors.surface,
-                          gradient: mine
-                              ? LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [tint.top, tint.bottom],
-                                )
-                              : null,
-                          border: mine
-                              ? null
-                              : Border.all(
-                                  color: colors.outline.withValues(alpha: .55),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (showFace) ...[
+                      SizedBox(
+                        width: 28,
+                        child: showSender
+                            ? ChatAvatar(
+                                http: http,
+                                channelId: channelId,
+                                subject: message.senderId,
+                                initials: whatsAppInitials(
+                                  message.sender ?? '',
                                 ),
-                          borderRadius: BorderRadius.only(
-                            topLeft: mine ? radius : upper,
-                            topRight: mine ? upper : radius,
-                            bottomLeft: mine ? radius : lower,
-                            bottomRight: mine ? lower : radius,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(
-                                alpha: colors.isDark ? .25 : .06,
+                                size: 28,
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Flexible(
+                      child: Container(
+                        padding: naked
+                            ? const EdgeInsets.only(bottom: 2)
+                            : const EdgeInsets.fromLTRB(16, 11, 16, 8),
+                        decoration: naked
+                            ? null
+                            : BoxDecoration(
+                                color: mine ? null : colors.surface,
+                                gradient: mine
+                                    ? LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [tint.top, tint.bottom],
+                                      )
+                                    : null,
+                                border: mine
+                                    ? null
+                                    : Border.all(
+                                        color: colors.outline.withValues(
+                                          alpha: .55,
+                                        ),
+                                      ),
+                                borderRadius: BorderRadius.only(
+                                  topLeft: mine ? radius : upper,
+                                  topRight: mine ? upper : radius,
+                                  bottomLeft: mine ? radius : lower,
+                                  bottomRight: mine ? lower : radius,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(
+                                      alpha: colors.isDark ? .25 : .06,
+                                    ),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (showSender && message.sender != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: Text(
+                                  message.sender!,
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    color: senderColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            WhatsAppMessageContent(
+                              message: message,
+                              http: http,
+                              channelId: channelId,
+                              selectable: onHold == null,
+                            ),
+                            const SizedBox(height: 2),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                whatsAppClock(message.sentAt),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: mine ? tint.meta : colors.muted,
+                                  fontSize: 10.5,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (showSender && message.sender != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 2),
-                          child: Text(
-                            message.sender!,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: senderColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      WhatsAppMessageContent(
-                        message: message,
-                        http: http,
-                        channelId: channelId,
                       ),
-                      const SizedBox(height: 2),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          whatsAppClock(message.sentAt),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: mine ? tint.meta : colors.muted,
-                            fontSize: 10.5,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -994,8 +1116,14 @@ class _Composer extends StatelessWidget {
     required this.onDraft,
     required this.onSend,
     required this.canSend,
+    this.focus,
+    this.replyTo,
   });
 
+  final FocusNode? focus;
+
+  /// The message being answered, shown above the text field.
+  final Widget? replyTo;
   final TextEditingController controller;
   final bool sending;
   final bool drafting;
@@ -1023,9 +1151,16 @@ class _Composer extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // The quote slides open above the text when you start a reply.
+                MotionSize(
+                  child: MotionSwitcher(
+                    child: replyTo ?? const SizedBox(width: double.infinity),
+                  ),
+                ),
                 TextField(
                   key: const Key('whatsapp-composer'),
                   controller: controller,
+                  focusNode: focus,
                   minLines: 1,
                   maxLines: 6,
                   maxLength: 4000,

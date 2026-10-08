@@ -24,7 +24,8 @@ public sealed record WhatsAppMedia(
     string? Place,
     string? ContactName,
     IReadOnlyList<string>? PollOptions,
-    bool HasContent);
+    bool HasContent,
+    IReadOnlyList<int>? Waveform = null);
 
 /// <summary>Media as the bridge described it, before the file bytes are checked.</summary>
 public sealed record WhatsAppIncomingMedia(
@@ -41,7 +42,8 @@ public sealed record WhatsAppIncomingMedia(
     string? Place = null,
     string? ContactName = null,
     IReadOnlyList<string>? PollOptions = null,
-    bool HasContent = false);
+    bool HasContent = false,
+    IReadOnlyList<int>? Waveform = null);
 
 /// <summary>What to store for one observed message: the JSON description, and the bytes when they checked out.</summary>
 public sealed record WhatsAppStoredMedia(string Json, byte[]? Content, string? ContentType, WhatsAppMedia? Media,
@@ -106,7 +108,8 @@ public static class WhatsAppMediaCodec
 
     private static WhatsAppMedia? Clean(WhatsAppMedia? media) => media is null ? null : Clean(new WhatsAppIncomingMedia(
         media.Kind, media.Mime, media.FileName, media.Seconds, media.Width, media.Height, media.Animated, media.Voice,
-        media.Latitude, media.Longitude, media.Place, media.ContactName, media.PollOptions, media.HasContent));
+        media.Latitude, media.Longitude, media.Place, media.ContactName, media.PollOptions, media.HasContent,
+        media.Waveform));
 
     private static WhatsAppMedia? Clean(WhatsAppIncomingMedia? incoming)
     {
@@ -125,7 +128,16 @@ public static class WhatsAppMediaCodec
             incoming.Animated && kind is "sticker" or "gif", incoming.Voice && kind == "audio",
             latitude, longitude, kind == "location" ? Compact(incoming.Place, 120) : null,
             kind == "contact" ? Compact(incoming.ContactName, 80) : null,
-            kind == "poll" && options is { Length: > 0 } ? options : null, incoming.HasContent);
+            kind == "poll" && options is { Length: > 0 } ? options : null, incoming.HasContent,
+            kind == "audio" ? Waveform(incoming.Waveform) : null);
+    }
+
+    /// <summary>A voice note's loudness envelope: at most 64 samples from 0 to 100, or null when silent.</summary>
+    private static int[]? Waveform(IReadOnlyList<int>? samples)
+    {
+        if (samples is not { Count: > 0 }) return null;
+        var clean = samples.Take(64).Select(sample => Math.Clamp(sample, 0, 100)).ToArray();
+        return clean.Any(sample => sample > 0) ? clean : null;
     }
 
     private static WhatsAppQuote? CleanQuote(WhatsAppQuote? quote)

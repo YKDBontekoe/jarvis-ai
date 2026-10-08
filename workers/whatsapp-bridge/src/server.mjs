@@ -28,6 +28,8 @@ import {
   isGroupJid,
   jidFromChatId,
   mediaOf,
+  messageKey,
+  reactionText,
   normalizeWatchList,
   observedFrom,
   phoneFromJid,
@@ -321,17 +323,39 @@ class Session {
     }
   }
 
-  async send(chatId, text) {
+  /** Sends text, optionally as a reply to `quote`: `{ id, fromMe, participant, text }` of a saved message. */
+  async send(chatId, text, quote = null) {
     if (this.state !== 'open' || !this.socket) throw new HttpError(409, 'WhatsApp is not connected.');
     let jid;
+    let options;
     try {
       jid = jidFromChatId(chatId);
+      if (quote) {
+        // WhatsApp shows the quoted text from what we send here, so a short copy of it is enough.
+        const quotedText = typeof quote.text === 'string' ? quote.text.slice(0, 300) : '';
+        options = { quoted: { key: messageKey(chatId, quote), message: { conversation: quotedText } } };
+      }
     } catch {
       throw new HttpError(400, 'Invalid chat.');
     }
-    const result = await this.socket.sendMessage(jid, { text });
+    const result = await this.socket.sendMessage(jid, { text }, options);
     this.sent.add(result?.key?.id);
     return result?.key?.id ?? null;
+  }
+
+  /** Reacts to a saved message with one emoji, or removes the reaction with ''. */
+  async react(chatId, ref, emoji) {
+    if (this.state !== 'open' || !this.socket) throw new HttpError(409, 'WhatsApp is not connected.');
+    let jid;
+    let react;
+    try {
+      jid = jidFromChatId(chatId);
+      react = { text: reactionText(emoji), key: messageKey(chatId, ref) };
+    } catch {
+      throw new HttpError(400, 'Invalid reaction.');
+    }
+    const result = await this.socket.sendMessage(jid, { react });
+    this.sent.add(result?.key?.id);
   }
 
   /** Preview profile picture for a chat or participant, or null when WhatsApp has none. */
@@ -471,12 +495,22 @@ async function route(request) {
     if (typeof body.text !== 'string' || body.text.length === 0) throw new HttpError(400, 'Text is required.');
     let id;
     try {
-      id = await session.send(body.chat ?? body.to, body.text);
+      id = await session.send(body.chat ?? body.to, body.text, body.quote ?? null);
     } catch (error) {
       if (error instanceof HttpError) throw error;
       throw new HttpError(502, error?.message ?? 'Send failed.');
     }
     return { ok: true, id };
+  }
+  if (action === 'react' && request.method === 'POST') {
+    const body = await readJson(request);
+    try {
+      await session.react(body.chat, body.message, body.emoji);
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(502, error?.message ?? 'Reaction failed.');
+    }
+    return { ok: true };
   }
   if (action === 'picture' && request.method === 'GET') {
     const subject = url.searchParams.get('jid');

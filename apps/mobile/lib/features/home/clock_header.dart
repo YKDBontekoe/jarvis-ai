@@ -14,8 +14,12 @@ class ClockHeader extends StatelessWidget {
     this.onOpen,
     this.emptyHint,
     this.onEmptyHint,
+    this.scroll,
     super.key,
   });
+
+  /// Home's scroll position: the greeting drifts back and fades as you scroll.
+  final ScrollController? scroll;
 
   final DateTime now;
   final UpNext? next;
@@ -36,66 +40,73 @@ class ClockHeader extends StatelessWidget {
       key: const Key('home-clock'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 16, 4, 0),
-          child: LayoutBuilder(
-            builder: (context, box) {
-              final style = JarvisType.displayOf(context).copyWith(
-                fontSize: box.maxWidth < 330 ? 32 : 38,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -1.2,
-                height: 1.08,
-              );
-              final name = preferredName?.trim();
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  BlurIn(
-                    child: Text(
-                      greetingFor(now),
-                      key: const Key('home-greeting'),
-                      style: style,
+        _Recede(
+          scroll: scroll,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 16, 4, 0),
+            child: LayoutBuilder(
+              builder: (context, box) {
+                final style = JarvisType.displayOf(context).copyWith(
+                  fontSize: box.maxWidth < 330 ? 32 : 38,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -1.2,
+                  height: 1.08,
+                );
+                final name = preferredName?.trim();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    BlurIn(
+                      child: Text(
+                        greetingFor(now),
+                        key: const Key('home-greeting'),
+                        style: style,
+                      ),
                     ),
-                  ),
-                  MotionSwitcher(
-                    resize: true,
-                    child: name != null && name.isNotEmpty
-                        ? Padding(
-                            key: ValueKey(name),
-                            padding: const EdgeInsets.only(top: 2),
-                            child: BlurIn(
-                              delay: const Duration(milliseconds: 140),
-                              // The name catches the orb's iridescence.
-                              child: ShaderMask(
-                                blendMode: BlendMode.srcIn,
-                                shaderCallback: (bounds) => LinearGradient(
-                                  colors: [
-                                    colors.accent,
-                                    colors.violet,
-                                    Color.lerp(colors.violet, colors.rose, .6)!,
-                                  ],
-                                ).createShader(bounds),
-                                child: Text(
-                                  name,
-                                  key: const Key('home-name'),
-                                  style: style.copyWith(color: colors.accent),
+                    MotionSwitcher(
+                      resize: true,
+                      child: name != null && name.isNotEmpty
+                          ? Padding(
+                              key: ValueKey(name),
+                              padding: const EdgeInsets.only(top: 2),
+                              child: BlurIn(
+                                delay: const Duration(milliseconds: 140),
+                                // The name catches the orb's iridescence.
+                                child: ShaderMask(
+                                  blendMode: BlendMode.srcIn,
+                                  shaderCallback: (bounds) => LinearGradient(
+                                    colors: [
+                                      colors.accent,
+                                      colors.violet,
+                                      Color.lerp(
+                                        colors.violet,
+                                        colors.rose,
+                                        .6,
+                                      )!,
+                                    ],
+                                  ).createShader(bounds),
+                                  child: Text(
+                                    name,
+                                    key: const Key('home-name'),
+                                    style: style.copyWith(color: colors.accent),
+                                  ),
                                 ),
                               ),
-                            ),
-                          )
-                        : const SizedBox.shrink(key: ValueKey('no-name')),
-                  ),
-                  const SizedBox(height: 10),
-                  FadeSlideIn(
-                    index: 3,
-                    child: Text(
-                      longDate(now),
-                      style: TextStyle(fontSize: 13, color: colors.inkSoft),
+                            )
+                          : const SizedBox.shrink(key: ValueKey('no-name')),
                     ),
-                  ),
-                ],
-              );
-            },
+                    const SizedBox(height: 10),
+                    FadeSlideIn(
+                      index: 3,
+                      child: Text(
+                        longDate(now),
+                        style: TextStyle(fontSize: 13, color: colors.inkSoft),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
         const SizedBox(height: 24),
@@ -222,6 +233,42 @@ class ClockHeader extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Lets the greeting fall behind as Home scrolls: it moves at a fraction of
+/// the scroll speed, shrinks a little and fades.
+class _Recede extends StatelessWidget {
+  const _Recede({required this.scroll, required this.child});
+
+  final ScrollController? scroll;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = scroll;
+    if (controller == null || JarvisMotion.reduced(context)) return child;
+    return AnimatedBuilder(
+      animation: controller,
+      child: child,
+      builder: (context, child) {
+        final offset = controller.hasClients
+            ? controller.offset.clamp(0.0, 240.0)
+            : 0.0;
+        final t = offset / 240;
+        return Opacity(
+          opacity: 1 - .85 * Curves.easeIn.transform(t),
+          child: Transform.translate(
+            offset: Offset(0, offset * .35),
+            child: Transform.scale(
+              scale: 1 - .06 * t,
+              alignment: Alignment.topLeft,
+              child: child,
+            ),
+          ),
+        );
+      },
     );
   }
 }

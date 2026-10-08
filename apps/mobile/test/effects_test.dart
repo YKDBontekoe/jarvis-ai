@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/theme.dart';
+import 'package:jarvis_mobile/features/chat/chat_widgets.dart';
 import 'package:jarvis_mobile/ui/jarvis_ui.dart';
 
 Widget _host(Widget child, {bool reduced = false}) => MaterialApp(
@@ -165,6 +166,77 @@ void main() {
       lessThan(tester.getTopLeft(find.text('Page 1')).dx),
     );
     await tester.pumpAndSettle();
+    expect(tester.hasRunningAnimations, isFalse);
+  });
+
+  test('streamed replies are let out a few whole words at a time', () {
+    const text = 'One two  three four';
+    expect(StreamingMarkdown.advance(text, 0, 1), 4);
+    expect(StreamingMarkdown.advance(text, 4, 2), 15);
+    expect(StreamingMarkdown.advance(text, 15, 5), text.length);
+    expect(StreamingMarkdown.wordsAfter(text, 4), 3);
+    expect(StreamingMarkdown.wordsAfter(text, text.length), 0);
+  });
+
+  testWidgets('a burst of streamed text flows in and settles complete', (
+    tester,
+  ) async {
+    final text = ValueNotifier('Hello');
+    addTearDown(text.dispose);
+    await tester.pumpWidget(
+      _host(
+        ValueListenableBuilder<String>(
+          valueListenable: text,
+          builder: (context, value, _) => StreamingMarkdown(data: value),
+        ),
+      ),
+    );
+    expect(find.textContaining('Hello'), findsWidgets);
+    text.value = 'Hello there, this arrived all at once';
+    await tester.pump(const Duration(milliseconds: 10));
+    // Only part of the burst is out after the first step.
+    expect(find.textContaining('all at once'), findsNothing);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('all at once'), findsOneWidget);
+    expect(tester.hasRunningAnimations, isFalse);
+  });
+
+  testWidgets('the orb thinks, follows a voice and blooms, then rests', (
+    tester,
+  ) async {
+    final state = ValueNotifier<(bool, int?)>((true, null));
+    addTearDown(state.dispose);
+    var level = .8;
+    await tester.pumpWidget(
+      _host(
+        ValueListenableBuilder<(bool, int?)>(
+          valueListenable: state,
+          builder: (context, value, _) => JarvisOrb(
+            size: 40,
+            thinking: value.$1,
+            pulse: value.$2,
+            level: value.$1 ? () => level : null,
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.hasRunningAnimations, isTrue);
+    level = 0;
+    state.value = (false, 1);
+    await tester.pump();
+    expect(tester.hasRunningAnimations, isTrue);
+    await tester.pumpAndSettle();
+    expect(tester.hasRunningAnimations, isFalse);
+  });
+
+  testWidgets('with Reduce Motion the thinking orb stays still', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(reduced: true, const JarvisOrb(size: 40, thinking: true)),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
     expect(tester.hasRunningAnimations, isFalse);
   });
 }

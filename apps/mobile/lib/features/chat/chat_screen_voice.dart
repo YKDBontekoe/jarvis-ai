@@ -183,6 +183,22 @@ mixin _ChatScreenVoice on _ChatScreenController {
       });
   }
 
+  /// The loudest voice in the room right now: Jarvis while it speaks, you
+  /// while you talk (unless muted).
+  double _voiceLevel() {
+    final room = _voiceRoom;
+    if (room == null) return 0;
+    var level = 0.0;
+    for (final participant in room.remoteParticipants.values) {
+      level = math.max(level, participant.audioLevel);
+    }
+    final local = room.localParticipant;
+    if (local != null && !_voiceMuted) {
+      level = math.max(level, local.audioLevel);
+    }
+    return level;
+  }
+
   /// Ends the session but keeps the voice page open so [message] stays
   /// visible next to the start button.
   void _endVoiceWith(String? message) {

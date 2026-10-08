@@ -10,6 +10,9 @@ import {
   chatIdOf,
   describeMessage,
   mediaOf,
+  messageKey,
+  reactionText,
+  waveformOf,
   quoteOf,
   inboundFrom,
   isChatId,
@@ -280,4 +283,38 @@ test('watch lists keep valid chat ids only', () => {
   assert.deepEqual([...normalizeWatchList(['+31687654321', 'nope', '120363025-1@g.us', '+31687654321'])],
     ['+31687654321', '120363025-1@g.us']);
   assert.equal(normalizeWatchList(null).size, 0);
+});
+
+test('voice notes carry their waveform as numbers', () => {
+  const media = mediaOf({
+    audioMessage: { mimetype: 'audio/ogg', seconds: 4, ptt: true, waveform: new Uint8Array([0, 12, 99, 250, 40]) },
+  });
+  assert.deepEqual(media.waveform, [0, 12, 99, 100, 40]);
+  assert.equal(waveformOf(new Uint8Array(80).fill(5)).length, 64);
+  assert.equal(waveformOf(new Uint8Array(10)), null);
+  assert.equal(waveformOf(undefined), null);
+  assert.equal(mediaOf({ imageMessage: { mimetype: 'image/jpeg' } }).waveform, null);
+});
+
+test('message keys only address saved messages in the given chat', () => {
+  assert.deepEqual(messageKey('+31687654321', { id: 'ABCD1234', fromMe: false }), {
+    remoteJid: '31687654321@s.whatsapp.net', id: 'ABCD1234', fromMe: false,
+  });
+  assert.deepEqual(messageKey('120363000000000000@g.us', { id: 'ABCD1234', fromMe: false, participant: '+31611111111' }), {
+    remoteJid: '120363000000000000@g.us', id: 'ABCD1234', fromMe: false, participant: '31611111111@s.whatsapp.net',
+  });
+  // Your own messages in a group need no participant.
+  assert.equal(messageKey('120363000000000000@g.us', { id: 'ABCD1234', fromMe: true, participant: '+31611111111' }).participant, undefined);
+  assert.throws(() => messageKey('+31687654321', { id: '../x' }));
+  assert.throws(() => messageKey('not a chat', { id: 'ABCD1234' }));
+});
+
+test('reactions are a single emoji or empty to remove', () => {
+  assert.equal(reactionText('👍'), '👍');
+  assert.equal(reactionText('❤️'), '❤️');
+  assert.equal(reactionText(''), '');
+  assert.equal(reactionText(null), '');
+  assert.throws(() => reactionText('ok'));
+  assert.throws(() => reactionText('👍 👍'));
+  assert.throws(() => reactionText('😀'.repeat(10)));
 });

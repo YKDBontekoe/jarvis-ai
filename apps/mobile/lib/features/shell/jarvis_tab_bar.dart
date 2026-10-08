@@ -29,8 +29,12 @@ class JarvisTabBar extends StatelessWidget {
     required this.onJarvis,
     this.chatsAttention = false,
     this.jarvisBusy = false,
+    this.orbKey,
     super.key,
   });
+
+  /// Lets the shell find the orb, to fly it into the chat it opens.
+  final GlobalKey? orbKey;
 
   final JarvisTab selected;
   final ValueChanged<JarvisTab> onSelect;
@@ -119,6 +123,7 @@ class JarvisTabBar extends StatelessWidget {
                               tab(JarvisTab.chats),
                               Expanded(
                                 child: JarvisOrbButton(
+                                  key: orbKey,
                                   onPressed: onJarvis,
                                   busy: jarvisBusy,
                                 ),
@@ -160,6 +165,15 @@ class JarvisOrbButton extends StatefulWidget {
 class _JarvisOrbButtonState extends State<JarvisOrbButton> {
   int _taps = 0;
 
+  /// Counts finished replies, so the orb blooms when Jarvis is done.
+  int _replies = 0;
+
+  @override
+  void didUpdateWidget(JarvisOrbButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.busy && !widget.busy) _replies++;
+  }
+
   @override
   Widget build(BuildContext context) {
     void activate() {
@@ -194,7 +208,8 @@ class _JarvisOrbButtonState extends State<JarvisOrbButton> {
                   child: JarvisOrb(
                     size: widget.size,
                     glow: false,
-                    animate: widget.busy,
+                    thinking: widget.busy,
+                    pulse: _replies == 0 ? null : _replies,
                   ),
                 ),
               ),

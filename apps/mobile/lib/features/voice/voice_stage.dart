@@ -21,8 +21,12 @@ class VoiceStage extends StatelessWidget {
     this.muted = false,
     this.error,
     this.onToggleMute,
+    this.level,
     super.key,
   });
+
+  /// Live loudness of whoever is talking, 0 to 1; the orb moves with it.
+  final ValueGetter<double>? level;
 
   final String phase;
   final String voiceName;
@@ -64,7 +68,9 @@ class VoiceStage extends StatelessWidget {
                         child: JarvisOrb(
                           size: speaking ? 148 : 128,
                           animate: waiting || speaking,
+                          thinking: phase == 'thinking',
                           listening: listening,
+                          level: _live && !waiting ? level : null,
                         ),
                       ),
                     ),
