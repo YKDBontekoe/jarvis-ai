@@ -70,7 +70,7 @@ class _ChannelThreadScreenState extends State<ChannelThreadScreen> {
         title: 'No messages yet',
         message: 'Messages with this number will appear here.',
       ),
-      child: RefreshIndicator(
+      child: OrbRefresh(
         onRefresh: _load,
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),

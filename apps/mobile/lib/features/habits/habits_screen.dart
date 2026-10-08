@@ -143,7 +143,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
     final archived = _archived;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Habits'),
+        title: const PageTitle('Habits'),
         actions: [
           IconButton(
             key: const Key('habit-settings'),
@@ -171,7 +171,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
         empty: _EmptyHabits(
           onCreate: (template) => unawaited(_create(template)),
         ),
-        child: RefreshIndicator(
+        child: OrbRefresh(
           onRefresh: _load,
           child: ListView(
             padding: EdgeInsets.fromLTRB(
@@ -305,90 +305,99 @@ class _TodayHero extends StatelessWidget {
           ? x
           : best,
     );
-    return SurfaceCard(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(18),
-      borderColor: colors.outline,
-      child: Row(
-        children: [
-          SizedBox.square(
-            dimension: 76,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(end: progress),
-              duration: const Duration(milliseconds: 520),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, _) => Stack(
-                fit: StackFit.expand,
-                children: [
-                  CircularProgressIndicator(
-                    value: value,
-                    strokeWidth: 7,
-                    strokeCap: StrokeCap.round,
-                    backgroundColor: colors.surfaceMuted,
-                    color: allDone ? colors.success : colors.accent,
-                  ),
-                  Center(
-                    child: Text(
-                      '$doneCount/${counted.length}',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+    // Light glances across the card the moment the last habit is ticked.
+    return Sheen(
+      trigger: allDone,
+      delay: Duration.zero,
+      borderRadius: BorderRadius.circular(JarvisRadii.lg),
+      child: SurfaceCard(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(18),
+        borderColor: colors.outline,
+        child: Row(
+          children: [
+            SizedBox.square(
+              dimension: 76,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(end: progress),
+                duration: const Duration(milliseconds: 520),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, _) => Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CircularProgressIndicator(
+                      value: value,
+                      strokeWidth: 7,
+                      strokeCap: StrokeCap.round,
+                      backgroundColor: colors.surfaceMuted,
+                      color: allDone ? colors.success : colors.accent,
+                    ),
+                    Center(
+                      child: Text(
+                        '$doneCount/${counted.length}',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 18),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    allDone
+                        ? 'All done today 🎉'
+                        : doneCount == 0
+                        ? 'A fresh day'
+                        : 'Keep it going',
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 26,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -.9,
+                      height: 1.1,
+                      color: colors.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  if (best != null)
+                    Row(
+                      children: [
+                        Icon(
+                          PhosphorIconsFill.fire,
+                          size: 15,
+                          color: colors.warning,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            '${best.currentStreak}-day streak · ${best.name}',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: colors.inkSoft,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: 2),
+                  Text(
+                    settings.eveningCheckIn
+                        ? 'Jarvis checks in at ${settings.checkInTime}'
+                        : 'Evening check-in is off',
+                    style: TextStyle(fontSize: 13, color: colors.muted),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  allDone
-                      ? 'All done today 🎉'
-                      : doneCount == 0
-                      ? 'A fresh day'
-                      : 'Keep it going',
-                  style: TextStyle(
-                    fontFamily: 'Geist',
-                    fontSize: 26,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -.9,
-                    height: 1.1,
-                    color: colors.ink,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                if (best != null)
-                  Row(
-                    children: [
-                      Icon(
-                        PhosphorIconsFill.fire,
-                        size: 15,
-                        color: colors.warning,
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          '${best.currentStreak}-day streak · ${best.name}',
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 13, color: colors.inkSoft),
-                        ),
-                      ),
-                    ],
-                  ),
-                const SizedBox(height: 2),
-                Text(
-                  settings.eveningCheckIn
-                      ? 'Jarvis checks in at ${settings.checkInTime}'
-                      : 'Evening check-in is off',
-                  style: TextStyle(fontSize: 13, color: colors.muted),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -591,34 +600,54 @@ class HabitCheckButton extends StatelessWidget {
         checked: done,
         label: done ? 'Undo today' : 'Mark done today',
         excludeSemantics: true,
-        child: InkResponse(
-          onTap: onPressed,
-          radius: size * .7,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutBack,
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: done ? colors.success : Colors.transparent,
-              border: Border.all(
-                color: done ? colors.success : colors.outlineStrong,
-                width: 2,
+        child: CelebrationBurst(
+          trigger: done,
+          radius: size * .85,
+          child: InkResponse(
+            onTap: onPressed,
+            radius: size * .7,
+            child: AnimatedContainer(
+              duration: JarvisMotion.of(
+                context,
+                const Duration(milliseconds: 420),
               ),
-            ),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              transitionBuilder: (child, animation) =>
-                  ScaleTransition(scale: animation, child: child),
-              child: done
-                  ? Icon(
-                      PhosphorIconsRegular.check,
-                      key: const ValueKey('done'),
-                      size: size * .45,
-                      color: colors.onInk,
-                    )
-                  : const SizedBox.shrink(key: ValueKey('open')),
+              curve: JarvisSprings.pop,
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: done ? colors.success : Colors.transparent,
+                border: Border.all(
+                  color: done ? colors.success : colors.outlineStrong,
+                  width: 2,
+                ),
+              ),
+              child: AnimatedSwitcher(
+                duration: JarvisMotion.of(
+                  context,
+                  const Duration(milliseconds: 480),
+                ),
+                reverseDuration: JarvisMotion.of(context, JarvisMotion.fast),
+                transitionBuilder: (child, animation) => ScaleTransition(
+                  scale: CurvedAnimation(
+                    parent: animation,
+                    curve: JarvisSprings.pop,
+                    reverseCurve: Curves.easeIn,
+                  ),
+                  child: RotationTransition(
+                    turns: Tween(begin: -.12, end: 0.0).animate(animation),
+                    child: child,
+                  ),
+                ),
+                child: done
+                    ? Icon(
+                        PhosphorIconsRegular.check,
+                        key: const ValueKey('done'),
+                        size: size * .45,
+                        color: colors.onInk,
+                      )
+                    : const SizedBox.shrink(key: ValueKey('open')),
+              ),
             ),
           ),
         ),

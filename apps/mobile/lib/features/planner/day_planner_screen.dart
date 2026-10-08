@@ -245,7 +245,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
     ).any((item) => !asJsonBool(item['done']));
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Today'),
+        title: const PageTitle('Today'),
         actions: [
           IconButton(
             tooltip: 'Day hours',

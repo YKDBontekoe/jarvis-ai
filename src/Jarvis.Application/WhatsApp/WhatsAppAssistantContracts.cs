@@ -166,15 +166,31 @@ public interface IWhatsAppSender
     bool Available { get; }
     Task<WhatsAppSendResult> SendAsync(Guid ownerId, Guid connectionId, string chatId, string text,
         CancellationToken cancellationToken);
+
+    /// <summary>Sends <paramref name="text"/> as a WhatsApp reply that quotes <paramref name="replyTo"/>.</summary>
+    Task<WhatsAppSendResult> ReplyAsync(Guid ownerId, Guid connectionId, string chatId, string text,
+        WhatsAppChatMessage replyTo, CancellationToken cancellationToken);
+
+    /// <summary>Reacts to a saved message with one emoji; an empty emoji takes the reaction back.</summary>
+    Task<WhatsAppSendResult> ReactAsync(Guid ownerId, Guid connectionId, string chatId, WhatsAppChatMessage target,
+        string emoji, CancellationToken cancellationToken);
 }
 
 public sealed class NoOpWhatsAppSender : IWhatsAppSender
 {
+    private static readonly Task<WhatsAppSendResult> Unavailable =
+        Task.FromResult(new WhatsAppSendResult(false, null, "Sending WhatsApp messages is not available here."));
+
     public bool Available => false;
 
     public Task<WhatsAppSendResult> SendAsync(Guid ownerId, Guid connectionId, string chatId, string text,
-        CancellationToken cancellationToken) =>
-        Task.FromResult(new WhatsAppSendResult(false, null, "Sending WhatsApp messages is not available here."));
+        CancellationToken cancellationToken) => Unavailable;
+
+    public Task<WhatsAppSendResult> ReplyAsync(Guid ownerId, Guid connectionId, string chatId, string text,
+        WhatsAppChatMessage replyTo, CancellationToken cancellationToken) => Unavailable;
+
+    public Task<WhatsAppSendResult> ReactAsync(Guid ownerId, Guid connectionId, string chatId,
+        WhatsAppChatMessage target, string emoji, CancellationToken cancellationToken) => Unavailable;
 }
 
 public static partial class WhatsAppChatIds

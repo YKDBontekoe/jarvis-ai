@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -31,6 +32,7 @@ import '../files/file_download_stub.dart'
 import '../tasks/task_details_screen.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
+import '../../ui/orb_flight.dart';
 import '../../ui/phosphor_icons.dart';
 import '../devices/device_invoke.dart';
 import '../devices/device_telemetry.dart';
@@ -171,17 +173,30 @@ class _ChatScreenState extends _ChatScreenController
             ),
           ),
         );
-        final content = MotionSwitcher(
+        // Opening chat zooms in from the orb; tabs slide in the direction
+        // of travel.
+        final content = PageSwitcher(
+          motion: PageMotion.zoom,
+          index: showTabs ? 0 : 1,
+          origin: wide ? Alignment.centerLeft : Alignment.bottomCenter,
           child: showTabs
               ? KeyedSubtree(
-                  key: ValueKey('page-${_tab.name}'),
+                  key: const ValueKey('tabs'),
                   child: Scaffold(
                     body: SafeArea(
                       bottom: false,
                       child: Column(
                         children: [
                           _shellNotice(),
-                          Expanded(child: _tabPage()),
+                          Expanded(
+                            child: PageSwitcher(
+                              index: _tab.index,
+                              child: KeyedSubtree(
+                                key: ValueKey('page-${_tab.name}'),
+                                child: _tabPage(),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -198,6 +213,7 @@ class _ChatScreenState extends _ChatScreenController
                   onJarvis: _openJarvis,
                   chatsAttention: chatsAttention,
                   jarvisBusy: _busy,
+                  orbKey: _tabOrbKey,
                 )
               : null,
           body: wide

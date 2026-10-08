@@ -303,7 +303,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
   }
 
   Future<void> _newTask() async {
-    final task = await showDialog<({String title, String prompt})>(
+    final task = await showJarvisDialog<({String title, String prompt})>(
       context: context,
       builder: (_) => const _NewProjectTaskDialog(),
     );
@@ -337,7 +337,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
     final project = _project;
     return Scaffold(
       appBar: AppBar(
-        title: Text(
+        title: PageTitle(
           project == null ? 'Project' : '',
           overflow: TextOverflow.ellipsis,
         ),
@@ -387,7 +387,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
 
   Widget _body(Map<String, dynamic>? project) {
     if (project == null) {
-      if (_loading) return const LoadingState();
+      if (_loading) return const SkeletonList(shape: SkeletonShape.detail);
       if (_missing) {
         return const EmptyState(
           icon: PhosphorIconsRegular.folderOpen,
@@ -401,7 +401,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
         onRetry: _load,
       );
     }
-    return RefreshIndicator(
+    return OrbRefresh(
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),

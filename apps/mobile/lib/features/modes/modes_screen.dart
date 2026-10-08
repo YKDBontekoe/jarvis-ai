@@ -71,7 +71,7 @@ class _ModesScreenState extends State<ModesScreen> {
   );
 
   Future<void> _pickPolicy(ModeInfo mode) async {
-    final level = await showDialog<String>(
+    final level = await showJarvisDialog<String>(
       context: context,
       builder: (context) => SimpleDialog(
         title: Text('${mode.label}: phone notifications'),
@@ -154,7 +154,7 @@ class _ModesScreenState extends State<ModesScreen> {
     final state = _state;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Modes'),
+        title: const PageTitle('Modes'),
         actions: [
           HeaderAction(
             key: const Key('modes-ambient'),

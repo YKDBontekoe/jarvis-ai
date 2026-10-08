@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../api/api_errors.dart';
 import '../../theme.dart';
+import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'quick_commands.dart';
 import 'recent_searches_store.dart';
@@ -26,7 +27,7 @@ Future<void> showJarvisCommandPalette(
 }) async {
   final store = await RecentSearchesStore.open();
   if (!context.mounted) return;
-  await showDialog<void>(
+  await showJarvisDialog<void>(
     context: context,
     barrierColor: Colors.black54,
     builder: (dialogContext) => _CommandPaletteDialog(

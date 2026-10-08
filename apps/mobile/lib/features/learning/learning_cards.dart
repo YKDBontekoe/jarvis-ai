@@ -62,19 +62,14 @@ mixin _LearningCards on _LearningController {
             ],
           ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final option in _intervals)
-                ChoiceChip(
-                  label: Text(_interval(option)),
-                  selected: minutes == option,
-                  onSelected: _saving || !enabled
-                      ? null
-                      : (_) => unawaited(_update('heartbeatMinutes', option)),
-                ),
+          SegmentedPills<int>(
+            options: [
+              for (final option in _intervals) (option, _interval(option)),
             ],
+            selected: minutes,
+            onSelected: _saving || !enabled
+                ? null
+                : (option) => unawaited(_update('heartbeatMinutes', option)),
           ),
           const SizedBox(height: 14),
           Row(
@@ -166,19 +161,14 @@ mixin _LearningCards on _LearningController {
             ],
           ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final option in _dreamHours)
-                ChoiceChip(
-                  label: Text(_clockHour(option)),
-                  selected: hour == option,
-                  onSelected: _saving || !enabled
-                      ? null
-                      : (_) => unawaited(_update('dreamingHour', option)),
-                ),
+          SegmentedPills<int>(
+            options: [
+              for (final option in _dreamHours) (option, _clockHour(option)),
             ],
+            selected: hour,
+            onSelected: _saving || !enabled
+                ? null
+                : (option) => unawaited(_update('dreamingHour', option)),
           ),
           const SizedBox(height: 14),
           Row(

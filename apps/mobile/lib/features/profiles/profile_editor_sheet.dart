@@ -134,7 +134,7 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(_editing ? 'Edit profile' : 'New profile'),
+      title: PageTitle(_editing ? 'Edit profile' : 'New profile'),
       actions: [
         HeaderAction(
           label: 'Save',

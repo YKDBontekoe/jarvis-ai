@@ -199,10 +199,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   },
                 ),
                 Expanded(
-                  child: RefreshIndicator(
+                  child: OrbRefresh(
                     onRefresh: widget.onRefresh,
-                    child: MotionSwitcher(
-                      duration: JarvisMotion.fast,
+                    // Filters slide toward the tab you picked.
+                    child: PageSwitcher(
+                      index: _filter.index,
                       child: KeyedSubtree(
                         key: ValueKey((_filter, items.isEmpty)),
                         child: items.isEmpty
@@ -236,19 +237,26 @@ class _ChatsScreenState extends State<ChatsScreen> {
                                     }
                                     index--;
                                   }
-                                  return _ChatRow(
-                                    item: items[index],
-                                    selected:
-                                        items[index].key == widget.selectedKey,
-                                    http: widget.http,
-                                    duplicate:
-                                        (titleCounts[(
-                                              items[index].source,
-                                              items[index].title.toLowerCase(),
-                                            )] ??
-                                            0) >
-                                        1,
-                                    onTap: () => widget.onOpen(items[index]),
+                                  return FadeSlideIn(
+                                    key: ValueKey(items[index].key),
+                                    index: index,
+                                    offset: 14,
+                                    child: _ChatRow(
+                                      item: items[index],
+                                      selected:
+                                          items[index].key ==
+                                          widget.selectedKey,
+                                      http: widget.http,
+                                      duplicate:
+                                          (titleCounts[(
+                                                items[index].source,
+                                                items[index].title
+                                                    .toLowerCase(),
+                                              )] ??
+                                              0) >
+                                          1,
+                                      onTap: () => widget.onOpen(items[index]),
+                                    ),
                                   );
                                 },
                               ),
@@ -510,13 +518,23 @@ class _ChatRow extends StatelessWidget {
                           ),
                           if (unread) ...[
                             const SizedBox(width: 8),
-                            Container(
-                              key: const Key('chat-unread-dot'),
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: colors.accent,
-                                shape: BoxShape.circle,
+                            PopIn(
+                              child: Container(
+                                key: const Key('chat-unread-dot'),
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: colors.accent,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: colors.accent.withValues(
+                                        alpha: .5,
+                                      ),
+                                      blurRadius: 6,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],

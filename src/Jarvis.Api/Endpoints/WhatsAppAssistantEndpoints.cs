@@ -30,7 +30,11 @@ public sealed record WhatsAppSuggestRequest(string? Instruction);
 
 public sealed record WhatsAppSuggestionDto(string Text);
 
-public sealed record WhatsAppSendRequest(string? Text);
+/// <param name="ReplyTo">A saved message in the same chat to quote, as WhatsApp's swipe-to-reply does.</param>
+public sealed record WhatsAppSendRequest(string? Text, Guid? ReplyTo = null);
+
+/// <param name="Emoji">One emoji, or empty to take a reaction back.</param>
+public sealed record WhatsAppReactRequest(Guid MessageId, string? Emoji);
 
 public sealed record WhatsAppAskRequest(string? Question);
 
@@ -196,6 +200,13 @@ internal static class WhatsAppAssistantEndpoints
         group.MapPost("/open/send", Send);
         group.MapPost("/{chatId}/send", Send).WithName("SendWhatsAppMessage");
 
+        Task<IResult> React(Guid id, string chatId, WhatsAppReactRequest request,
+            IWhatsAppAssistantRepository chats, IWhatsAppSender sender, ICurrentUser currentUser,
+            CancellationToken ct) =>
+            ReactAsync(id, chatId, request, chats, sender, currentUser, ct);
+        group.MapPost("/open/react", React);
+        group.MapPost("/{chatId}/react", React).WithName("ReactToWhatsAppMessage");
+
         Task<IResult> Ask(Guid id, string chatId, WhatsAppAskRequest request, IWhatsAppAssistantRepository chats,
             IConversationStore conversations, RemoteQueryExecutor remote, ICurrentUser currentUser) =>
             AskAsync(id, chatId, request, chats, conversations, remote, currentUser);
@@ -323,10 +334,33 @@ internal static class WhatsAppAssistantEndpoints
             return EndpointHelpers.Invalid("text", "That message is too long for WhatsApp.");
         var chat = await FindAsync(chats, currentUser.OwnerId, id, chatId, ct);
         if (chat is null) return Results.NotFound();
-        var result = await sender.SendAsync(currentUser.OwnerId, id, chat.ChatId, text, ct);
+        WhatsAppChatMessage? replyTo = null;
+        if (request.ReplyTo is { } replyId)
+        {
+            replyTo = await chats.GetMessageAsync(currentUser.OwnerId, id, chat.ChatId, replyId, ct);
+            if (replyTo is null) return EndpointHelpers.Invalid("replyTo", "That message is no longer saved.");
+        }
+        var result = replyTo is null
+            ? await sender.SendAsync(currentUser.OwnerId, id, chat.ChatId, text, ct)
+            : await sender.ReplyAsync(currentUser.OwnerId, id, chat.ChatId, text, replyTo, ct);
         return result.Sent
             ? Results.Ok(new { sent = true })
             : Results.Conflict(new { message = result.Error ?? "The message was not sent." });
+    }
+
+    private static async Task<IResult> ReactAsync(Guid id, string chatId, WhatsAppReactRequest request,
+        IWhatsAppAssistantRepository chats, IWhatsAppSender sender, ICurrentUser currentUser, CancellationToken ct)
+    {
+        var emoji = request.Emoji?.Trim() ?? "";
+        if (!WhatsAppReactions.IsValid(emoji)) return EndpointHelpers.Invalid("emoji", "React with a single emoji.");
+        var chat = await FindAsync(chats, currentUser.OwnerId, id, chatId, ct);
+        if (chat is null) return Results.NotFound();
+        var target = await chats.GetMessageAsync(currentUser.OwnerId, id, chat.ChatId, request.MessageId, ct);
+        if (target is null) return Results.NotFound();
+        var result = await sender.ReactAsync(currentUser.OwnerId, id, chat.ChatId, target, emoji, ct);
+        return result.Sent
+            ? Results.Ok(new { sent = true })
+            : Results.Conflict(new { message = result.Error ?? "The reaction was not sent." });
     }
 
     private static async Task<IResult> AskAsync(Guid id, string chatId, WhatsAppAskRequest request,
@@ -446,4 +480,18 @@ internal static class WhatsAppAssistantEndpoints
     private static WhatsAppMessageDto ToDto(WhatsAppChatMessage message) =>
         new(message.Id, message.ChatId, message.FromMe, message.Sender, message.Text, message.SentAt,
             message.ReceivedAt, message.SenderId, message.Media, message.Quote);
+}
+
+/// <summary>What WhatsApp accepts as a reaction: one emoji (with its modifiers), or empty to remove one.</summary>
+public static class WhatsAppReactions
+{
+    public static bool IsValid(string emoji)
+    {
+        if (emoji.Length == 0) return true;
+        if (emoji.Length > 16) return false;
+        var elements = System.Globalization.StringInfo.GetTextElementEnumerator(emoji);
+        var count = 0;
+        while (elements.MoveNext()) count++;
+        return count == 1 && !emoji.Any(ch => char.IsLetterOrDigit(ch) || char.IsWhiteSpace(ch));
+    }
 }

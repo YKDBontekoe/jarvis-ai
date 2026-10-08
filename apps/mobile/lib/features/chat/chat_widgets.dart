@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +17,7 @@ import 'mcp_setup.dart';
 import 'tool_catalog.dart';
 
 part 'chat_message_widgets.dart';
+part 'chat_streaming.dart';
 part 'chat_tool_run.dart';
 part 'chat_approval_card.dart';
 part 'chat_composer.dart';

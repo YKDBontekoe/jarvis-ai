@@ -48,6 +48,17 @@ public sealed class WhatsAppBridgeClient(HttpClient http, ChannelOptions options
         CancellationToken cancellationToken) =>
         (await SendAsync<BridgeSent>(HttpMethod.Post, sessionId, "send", new { chat, text }, cancellationToken))?.Id;
 
+    /// <summary>Sends <paramref name="text"/> as a reply quoting <paramref name="quote"/>; returns WhatsApp's id.</summary>
+    public async Task<string?> ReplyInChatAsync(Guid sessionId, string chat, string text, BridgeMessageRef quote,
+        CancellationToken cancellationToken) =>
+        (await SendAsync<BridgeSent>(HttpMethod.Post, sessionId, "send", new { chat, text, quote },
+            cancellationToken))?.Id;
+
+    /// <summary>Reacts to a message with one emoji, or removes the reaction when it is empty.</summary>
+    public Task ReactAsync(Guid sessionId, string chat, BridgeMessageRef message, string emoji,
+        CancellationToken cancellationToken) =>
+        SendAsync<JsonElement?>(HttpMethod.Post, sessionId, "react", new { chat, message, emoji }, cancellationToken);
+
     public async Task<IReadOnlyList<BridgeChat>> ListChatsAsync(Guid sessionId, CancellationToken cancellationToken) =>
         (await SendAsync<BridgeChats>(HttpMethod.Get, sessionId, "chats", null, cancellationToken))?.Chats ?? [];
 
@@ -213,3 +224,9 @@ public sealed class WhatsAppLinkedReceiver(IServiceScopeFactory scopes, WhatsApp
         }
     }
 }
+
+/// <summary>
+/// A saved message as the bridge needs it to quote or react: WhatsApp's own id, who sent it (the participant in
+/// a group), and, for quotes, a short copy of its text.
+/// </summary>
+public sealed record BridgeMessageRef(string Id, bool FromMe, string? Participant, string? Text = null);

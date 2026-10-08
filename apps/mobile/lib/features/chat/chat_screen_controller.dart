@@ -76,6 +76,12 @@ abstract class _ChatScreenController extends State<ChatScreen>
 
   /// A Jarvis conversation covers the tab pages. Leaving it returns to [_tab].
   bool _inChat = false;
+
+  /// The orb in the tab bar and its twin in the chat title; opening chat from
+  /// the tab bar flies one into the other.
+  final _tabOrbKey = GlobalKey();
+  final _titleOrbKey = GlobalKey();
+  bool _orbFlying = false;
   JarvisTab _tab = JarvisTab.home;
   final _chatList = ChatList();
   final _tiles = TileLayoutController.device();
@@ -293,6 +299,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
 
   Future<void> _toggleVoice();
   Future<void> _toggleVoiceMute();
+  double _voiceLevel();
   Future<void> _stopVoice();
 
   void _scrollToBottom({bool jump = false, bool force = false});

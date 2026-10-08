@@ -355,10 +355,12 @@ class _ChatComposerState extends State<ChatComposer> {
               ],
               const Spacer(),
               AnimatedSwitcher(
-                duration: JarvisMotion.of(context, JarvisMotion.fast),
-                switchInCurve: JarvisMotion.standard,
-                switchOutCurve: JarvisMotion.exit,
-                transitionBuilder: JarvisMotion.fadeScale,
+                duration: JarvisMotion.of(
+                  context,
+                  const Duration(milliseconds: 420),
+                ),
+                reverseDuration: JarvisMotion.of(context, JarvisMotion.fast),
+                transitionBuilder: JarvisMotion.morph,
                 child: _trailingAction(context, showVoice),
               ),
             ],

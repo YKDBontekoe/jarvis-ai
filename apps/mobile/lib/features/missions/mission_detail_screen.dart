@@ -88,7 +88,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
       _apply(() => widget.http.post<dynamic>('$_base/$path'));
 
   Future<void> _edit(MissionStepData step) async {
-    final text = await showDialog<String>(
+    final text = await showJarvisDialog<String>(
       context: context,
       builder: (_) => _InstructionDialog(step: step),
     );
@@ -106,7 +106,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
     final mission = _mission;
     return Scaffold(
       appBar: AppBar(
-        title: Text(mission?.title ?? 'Mission'),
+        title: PageTitle(mission?.title ?? 'Mission'),
         actions: mission == null ? null : _actions(mission),
       ),
       body: ContentWidth(

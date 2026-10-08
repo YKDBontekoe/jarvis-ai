@@ -120,7 +120,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 
   Future<void> _rename(Map<String, dynamic> conversation) async {
     final current = asJsonString(conversation['title']) ?? 'New conversation';
-    final title = await showDialog<String>(
+    final title = await showJarvisDialog<String>(
       context: context,
       builder: (_) => _RenameDialog(initial: current),
     );
@@ -291,7 +291,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     final searching = _query.trim().isNotEmpty;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Conversations'),
+        title: const PageTitle('Conversations'),
         actions: [
           IconButton(
             onPressed: _loading || _creating ? null : _load,
@@ -314,7 +314,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         onRefresh: _load,
         empty: const EmptyState(
           icon: PhosphorIconsRegular.chatsCircle,
-          title: 'No conversations yet.',
+          title: 'No conversations yet',
           message: 'Start a new conversation and it will appear here.',
         ),
         child: CustomScrollView(

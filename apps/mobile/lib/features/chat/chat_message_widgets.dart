@@ -147,7 +147,9 @@ class _MessageBubbleState extends State<MessageBubble> {
               children: [
                 Padding(
                   padding: const EdgeInsets.only(top: 3),
-                  child: JarvisMarkdown(data: message.content),
+                  child: message.pending
+                      ? StreamingMarkdown(data: message.content)
+                      : JarvisMarkdown(data: message.content),
                 ),
                 if (message.pending)
                   const Padding(
@@ -244,35 +246,56 @@ class _MessageBubbleState extends State<MessageBubble> {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onLongPress: message.pending ? null : _showUserActions,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 11,
-                  ),
-                  decoration: BoxDecoration(
-                    color: message.failed
-                        ? JarvisColors.of(context).dangerSoft
-                        : JarvisColors.of(context).surfaceRaised,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                      bottomLeft: Radius.circular(20),
-                      bottomRight: Radius.circular(6),
+                // While it is on its way the bubble is a touch faded; it
+                // firms up once Jarvis has it.
+                child: AnimatedOpacity(
+                  opacity: message.pending || message.queued ? .72 : 1,
+                  duration: JarvisMotion.of(context, JarvisMotion.slow),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 11,
                     ),
-                    border: message.failed
-                        ? Border.all(
-                            color: JarvisColors.of(
-                              context,
-                            ).danger.withValues(alpha: .35),
-                          )
-                        : null,
-                  ),
-                  child: Text(
-                    message.content,
-                    style: TextStyle(
-                      fontSize: 15.5,
-                      height: 1.45,
-                      color: JarvisColors.of(context).ink,
+                    decoration: BoxDecoration(
+                      color: message.failed
+                          ? JarvisColors.of(context).dangerSoft
+                          : null,
+                      // A faint wash of the accent, so your words read as yours.
+                      gradient: message.failed
+                          ? null
+                          : LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                JarvisColors.of(context).surfaceRaised,
+                                Color.lerp(
+                                  JarvisColors.of(context).surfaceRaised,
+                                  JarvisColors.of(context).accent,
+                                  .09,
+                                )!,
+                              ],
+                            ),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                        bottomLeft: Radius.circular(20),
+                        bottomRight: Radius.circular(6),
+                      ),
+                      border: message.failed
+                          ? Border.all(
+                              color: JarvisColors.of(
+                                context,
+                              ).danger.withValues(alpha: .35),
+                            )
+                          : null,
+                    ),
+                    child: Text(
+                      message.content,
+                      style: TextStyle(
+                        fontSize: 15.5,
+                        height: 1.45,
+                        color: JarvisColors.of(context).ink,
+                      ),
                     ),
                   ),
                 ),
@@ -392,7 +415,7 @@ class _RateButton extends StatelessWidget {
 /// Asks what Jarvis should do differently; returns null when cancelled.
 Future<String?> showFeedbackNoteDialog(BuildContext context) async {
   final controller = TextEditingController();
-  final note = await showDialog<String>(
+  final note = await showJarvisDialog<String>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: const Text('What should Jarvis do differently?'),
@@ -596,7 +619,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const JarvisAvatar(size: 28),
+          const JarvisOrb(size: 28, glow: false, thinking: true),
           const SizedBox(width: 12),
           Flexible(
             child: Container(
@@ -634,15 +657,31 @@ class _TypingIndicatorState extends State<TypingIndicator>
                     const SizedBox(width: 10),
                     Flexible(
                       child: ExcludeSemantics(
-                        child: Text(
-                          _statusText(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: colors.inkSoft,
-                            fontFeatures: const [FontFeature.tabularFigures()],
+                        // Light runs along the words while Jarvis thinks.
+                        child: ShaderMask(
+                          blendMode: BlendMode.srcIn,
+                          shaderCallback: (bounds) => LinearGradient(
+                            begin: Alignment(-3 + 5 * _controller.value, 0),
+                            end: Alignment(-1 + 5 * _controller.value, 0),
+                            colors: [
+                              colors.inkSoft,
+                              colors.accent,
+                              colors.inkSoft,
+                            ],
+                            stops: const [.25, .5, .75],
+                          ).createShader(bounds),
+                          child: Text(
+                            _statusText(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: colors.inkSoft,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
                           ),
                         ),
                       ),

@@ -201,60 +201,95 @@ class SettingsView extends StatelessWidget {
   final ValueChanged<String> onOpen;
   final VoidCallback? onSignOut;
 
+  /// Each group has its own colour, so a long list is easy to scan.
+  static Color _groupColor(JarvisColors colors, String group) =>
+      switch (group) {
+        'General' => colors.accent,
+        'Connections' => colors.info,
+        'Routines' => colors.success,
+        'How Jarvis works with you' => colors.violet,
+        'Privacy & data' => colors.warning,
+        _ => colors.inkSoft,
+      };
+
   @override
-  Widget build(BuildContext context) => SafeArea(
-    child: ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-      children: [
-        ContentWidth(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SurfaceCard(
-                child: Row(
-                  children: [
-                    const JarvisOrb(size: 44, glow: false),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Your assistant',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            connected
-                                ? 'Live updates connected'
-                                : 'Offline — live updates paused',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+        children: [
+          ContentWidth(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _hero(context, colors),
+                for (final (title, items) in settingsGroups)
+                  _group(context, title, [
+                    for (final item in items)
+                      _tile(context, item, _groupColor(colors, title)),
+                  ]),
+                if (onSignOut != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 28),
+                    child: SurfaceCard(
+                      padding: EdgeInsets.zero,
+                      onTap: onSignOut,
+                      child: SizedBox(
+                        height: 52,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              PhosphorIconsRegular.signOut,
+                              size: 18,
+                              color: colors.danger,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Sign out',
+                              style: TextStyle(
+                                color: colors.danger,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              for (final (title, items) in settingsGroups)
-                _group(context, title, [
-                  for (final item in items) _tile(context, item),
-                ]),
-              if (onSignOut != null)
-                _group(context, 'Account', [
-                  ListTile(
-                    leading: IconBadge(
-                      icon: PhosphorIconsRegular.signOut,
-                      color: JarvisColors.of(context).danger,
-                      size: 34,
-                    ),
-                    title: Text(
-                      'Sign out',
-                      style: TextStyle(color: JarvisColors.of(context).danger),
-                    ),
-                    onTap: onSignOut,
                   ),
-                ]),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _hero(BuildContext context, JarvisColors colors) => SurfaceCard(
+    radius: JarvisRadii.xl,
+    padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+    gradient: colors.litSurface(colors.violet, strength: .12),
+    borderColor: colors.outline.withValues(alpha: colors.isDark ? .6 : .35),
+    child: Row(
+      children: [
+        const JarvisOrb(size: 56),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Your assistant',
+                style: JarvisType.displayOf(
+                  context,
+                ).copyWith(fontSize: 20, letterSpacing: -.4),
+              ),
+              const SizedBox(height: 8),
+              StatusChip(
+                label: connected ? 'Live' : 'Offline, updates paused',
+                color: connected ? colors.success : colors.muted,
+              ),
             ],
           ),
         ),
@@ -271,19 +306,21 @@ class SettingsView extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(6, 0, 6, 8),
               child: Text(
-                title.toUpperCase(),
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: JarvisColors.of(context).muted,
-                  letterSpacing: .8,
+                title,
+                style: TextStyle(
+                  fontFamily: 'Geist',
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: JarvisColors.of(context).inkSoft,
                 ),
               ),
             ),
             SurfaceCard(
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: Column(
                 children: [
                   for (final (index, tile) in tiles.indexed) ...[
-                    if (index > 0) const Divider(indent: 64),
+                    if (index > 0) const Divider(indent: 62, height: 1),
                     tile,
                   ],
                 ],
@@ -293,16 +330,28 @@ class SettingsView extends StatelessWidget {
         ),
       );
 
-  Widget _tile(BuildContext context, SettingsDestination item) => ListTile(
-    key: Key('settings-${item.destination}'),
-    leading: IconBadge(icon: item.icon, size: 34),
-    title: Text(item.title),
-    subtitle: Text(item.subtitle),
-    trailing: Icon(
-      PhosphorIconsRegular.caretRight,
-      size: 16,
-      color: JarvisColors.of(context).muted,
-    ),
-    onTap: () => onOpen(item.destination),
-  );
+  Widget _tile(BuildContext context, SettingsDestination item, Color tint) {
+    final colors = JarvisColors.of(context);
+    return ListTile(
+      key: Key('settings-${item.destination}'),
+      contentPadding: const EdgeInsets.fromLTRB(14, 2, 12, 2),
+      leading: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: tint.withValues(alpha: colors.isDark ? .22 : .12),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(item.icon, size: 18, color: tint),
+      ),
+      title: Text(item.title),
+      subtitle: Text(item.subtitle),
+      trailing: Icon(
+        PhosphorIconsRegular.caretRight,
+        size: 16,
+        color: colors.muted,
+      ),
+      onTap: () => onOpen(item.destination),
+    );
+  }
 }

@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../theme.dart';
+import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../../json_maps.dart';
 import '../chat/mcp_setup.dart';
@@ -19,7 +21,7 @@ import '../tiles/tile_registry.dart';
 import '../whatsapp/whatsapp_models.dart';
 import 'clock_header.dart';
 import 'get_started_card.dart';
-import 'next_up.dart';
+import 'next_up.dart' hide greetingFor;
 
 /// Home: the next thing on your day, then the content and shortcuts you chose.
 class JarvisHome extends StatefulWidget {
@@ -75,6 +77,9 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
 
   /// Items an action is running on, so their rows can show it.
   final Set<String> _pending = {};
+
+  /// Drives the parallax glow, the receding greeting and the compact header.
+  final _scroll = ScrollController();
 
   DateTime get _now => widget.clock?.call() ?? DateTime.now();
 
@@ -134,6 +139,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     widget.chats.removeListener(_rebuild);
     _tick?.cancel();
     _generation++;
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -350,10 +356,11 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     final calendar = _briefing?['calendar'];
     final calendarOff =
         calendar is Map && calendar['connected'] == false && _briefing != null;
-    return RefreshIndicator(
+    final list = OrbRefresh(
       onRefresh: _refresh,
       child: ListView(
         key: const Key('home-list'),
+        controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
         children: [
@@ -363,22 +370,29 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ClockHeader(
-                    now: now,
-                    next: upcoming.isEmpty ? null : upcoming.first,
-                    preferredName: _preferredName,
-                    onOpen: () => widget.onOpen('today'),
-                    emptyHint: calendarOff && widget.onSuggestion != null
-                        ? 'Connect a calendar'
-                        : null,
-                    onEmptyHint: () =>
-                        widget.onSuggestion?.call(mcpCalendarPrompt),
+                  HeroGlow(
+                    parallax: _scroll,
+                    child: ClockHeader(
+                      scroll: _scroll,
+                      now: now,
+                      next: upcoming.isEmpty ? null : upcoming.first,
+                      preferredName: _preferredName,
+                      onOpen: () => widget.onOpen('today'),
+                      emptyHint: calendarOff && widget.onSuggestion != null
+                          ? 'Connect a calendar'
+                          : null,
+                      onEmptyHint: () =>
+                          widget.onSuggestion?.call(mcpCalendarPrompt),
+                    ),
                   ),
                   const SizedBox(height: 20),
                   if (!_editing && approvals.isNotEmpty)
-                    _ApprovalsBanner(
-                      approvals: approvals,
-                      onTap: () => widget.onOpen('approvals'),
+                    PopIn(
+                      from: .9,
+                      child: _ApprovalsBanner(
+                        approvals: approvals,
+                        onTap: () => widget.onOpen('approvals'),
+                      ),
                     ),
                   if (widget.ready && _briefing != null) ...[
                     CodexSignInCard(http: widget.source.http),
@@ -485,6 +499,107 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
         ],
       ),
     );
+    return Stack(
+      children: [
+        list,
+        _CompactHeader(
+          scroll: _scroll,
+          title: [
+            greetingFor(now),
+            if (_preferredName?.trim() case final name? when name.isNotEmpty)
+              name,
+          ].join(', '),
+        ),
+      ],
+    );
+  }
+}
+
+/// Once the greeting has scrolled away, a slim frosted bar takes its place
+/// at the top; tapping it glides back up.
+class _CompactHeader extends StatelessWidget {
+  const _CompactHeader({required this.scroll, required this.title});
+
+  final ScrollController scroll;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: AnimatedBuilder(
+        animation: scroll,
+        builder: (context, child) {
+          final offset = scroll.hasClients ? scroll.offset : 0.0;
+          final t = ((offset - 120) / 60).clamp(0.0, 1.0);
+          if (t == 0) return const SizedBox.shrink();
+          return IgnorePointer(
+            ignoring: t < 1,
+            child: Opacity(
+              opacity: t,
+              child: Transform.translate(
+                offset: Offset(0, -8 * (1 - t)),
+                child: child,
+              ),
+            ),
+          );
+        },
+        child: ClipRect(
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Material(
+              color: colors.canvas.withValues(alpha: .78),
+              child: InkWell(
+                key: const Key('home-compact-header'),
+                onTap: () => scroll.animateTo(
+                  0,
+                  duration: JarvisMotion.of(
+                    context,
+                    const Duration(milliseconds: 520),
+                  ),
+                  curve: JarvisMotion.emphasized,
+                ),
+                child: Container(
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: colors.outline.withValues(alpha: .6),
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const JarvisOrb(size: 18, glow: false),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -.2,
+                            color: colors.ink,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -508,57 +623,61 @@ class _ApprovalsBanner extends StatelessWidget {
         .join(' · ');
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Material(
-        color: colors.accentSoft,
+      child: Sheen(
+        trigger: count,
         borderRadius: BorderRadius.circular(tileRadius),
-        child: InkWell(
-          key: const Key('home-approvals'),
+        child: Material(
+          color: colors.accentSoft,
           borderRadius: BorderRadius.circular(tileRadius),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-            child: Row(
-              children: [
-                Icon(
-                  PhosphorIconsRegular.shieldCheck,
-                  size: 22,
-                  color: colors.accent,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$count ${count == 1 ? 'approval' : 'approvals'} waiting',
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w600,
-                          color: colors.ink,
-                        ),
-                      ),
-                      if (names.isNotEmpty)
-                        Text(
-                          names,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: colors.inkSoft,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                Text(
-                  'Review',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
+          child: InkWell(
+            key: const Key('home-approvals'),
+            borderRadius: BorderRadius.circular(tileRadius),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+              child: Row(
+                children: [
+                  Icon(
+                    PhosphorIconsRegular.shieldCheck,
+                    size: 22,
                     color: colors.accent,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$count ${count == 1 ? 'approval' : 'approvals'} waiting',
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600,
+                            color: colors.ink,
+                          ),
+                        ),
+                        if (names.isNotEmpty)
+                          Text(
+                            names,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: colors.inkSoft,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    'Review',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: colors.accent,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

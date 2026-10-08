@@ -227,9 +227,10 @@ class _PortfolioTabState extends State<PortfolioTab>
         children: [
           Text('Portfolio value', style: TextStyle(color: colors.inkSoft)),
           const SizedBox(height: 4),
-          Text(
+          RollingNumber(
             formatMoney(data.totalValue, data.currency),
             key: const Key('portfolio-value'),
+            countUp: true,
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: 4),

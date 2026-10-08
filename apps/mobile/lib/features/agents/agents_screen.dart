@@ -68,7 +68,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
     final url = TextEditingController();
     final token = TextEditingController();
     try {
-      final saved = await showDialog<bool>(
+      final saved = await showJarvisDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Add a remote agent'),
@@ -216,7 +216,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Other agents'),
+      title: const PageTitle('Other agents'),
       actions: [
         HeaderAction(
           label: 'Add',

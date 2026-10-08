@@ -5,7 +5,7 @@ class _RemindersScreenState extends _RemindersController {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Reminders'),
+      title: const PageTitle('Reminders'),
       actions: [
         if (_unreadCount > 0)
           IconButton(
@@ -191,8 +191,8 @@ class _RemindersScreenState extends _RemindersController {
       : _reminders.isEmpty
       ? const EmptyState(
           icon: PhosphorIconsRegular.alarm,
-          title: 'No reminders yet.',
-          message: 'Ask Jarvis to remind you, or create one here.',
+          title: 'Nothing to remember yet',
+          message: 'Ask Jarvis to remind you, or tap New to set one yourself.',
         )
       : ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -545,7 +545,7 @@ class _RemindersScreenState extends _RemindersController {
       : _notifications.isEmpty
       ? const EmptyState(
           icon: PhosphorIconsRegular.bell,
-          title: 'No notifications yet.',
+          title: 'No notifications yet',
           message: 'Alerts from reminders, tasks, and watches will show here.',
         )
       : ListView.builder(

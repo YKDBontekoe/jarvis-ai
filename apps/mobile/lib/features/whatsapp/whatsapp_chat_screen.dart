@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
@@ -11,6 +12,7 @@ import 'catch_up_card.dart';
 import 'read_along_screen.dart';
 import 'whatsapp_media.dart';
 import 'whatsapp_models.dart';
+import 'whatsapp_visuals.dart';
 
 /// One read-along chat: the conversation as Jarvis sees it, a reply drafted in
 /// the owner's voice, "Ask Jarvis" about the chat, and sending by tapping Send.
@@ -45,6 +47,10 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
   Timer? _poll;
   int _requestRevision = 0;
   final _scroll = ScrollController();
+  final _composerFocus = FocusNode();
+
+  /// The message the next send replies to, quoted above the composer.
+  WhatsAppMessage? _replyTo;
   bool _fetching = false;
   bool _loadingOlder = false;
   bool _hasOlder = false;
@@ -112,6 +118,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     _poll?.cancel();
     _composer.dispose();
     _scroll.dispose();
+    _composerFocus.dispose();
     super.dispose();
   }
 
@@ -341,10 +348,11 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
       await widget.http.post<dynamic>(
         _path('send'),
         queryParameters: _query(),
-        data: {'text': text},
+        data: {'text': text, 'replyTo': ?_replyTo?.id},
       );
       if (!mounted) return;
       _composer.clear();
+      setState(() => _replyTo = null);
       unawaited(_load(quiet: true));
     } on DioException catch (error) {
       if (!mounted) return;
@@ -359,6 +367,62 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
       if (mounted) setState(() => _sending = false);
     }
   }
+
+  void _startReply(WhatsAppMessage message) {
+    unawaited(HapticFeedback.lightImpact());
+    setState(() => _replyTo = message);
+    _composerFocus.requestFocus();
+  }
+
+  /// Holding a bubble: react, reply or copy.
+  Future<void> _messageActions(WhatsAppMessage message, Rect anchor) async {
+    final action = await showMessageActions(
+      context,
+      anchor: anchor,
+      mine: message.fromMe,
+      canReply: _canSend,
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case ReactWith(:final emoji):
+        await _react(message, emoji, anchor);
+      case ReplyTo():
+        _startReply(message);
+      case CopyText():
+        await Clipboard.setData(ClipboardData(text: message.text));
+        if (mounted) _snack('Message copied');
+    }
+  }
+
+  Future<void> _react(
+    WhatsAppMessage message,
+    String emoji,
+    Rect anchor,
+  ) async {
+    // The emoji lifts off at once; a failure is reported after.
+    floatEmoji(context, anchor, emoji);
+    unawaited(HapticFeedback.lightImpact());
+    try {
+      await widget.http.post<dynamic>(
+        _path('react'),
+        queryParameters: _query(),
+        data: {'messageId': message.id, 'emoji': emoji},
+      );
+    } on DioException catch (error) {
+      if (!mounted) return;
+      _snack(
+        firstProblemMessage(error.response?.data) ??
+            asJsonString(jsonObject(error.response?.data)?['message']) ??
+            'The reaction was not sent.',
+      );
+    } catch (_) {
+      if (mounted) _snack('The reaction was not sent.');
+    }
+  }
+
+  bool get _canSend =>
+      _chat.readAlong &&
+      (_connectionState == null || _connectionState == 'open');
 
   Future<void> _draft({String? preset}) async {
     if (_drafting) return;
@@ -507,11 +571,17 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
-            ChatAvatar(
-              chat: _chat,
-              http: widget.http,
-              channelId: widget.channelId,
-              size: 40,
+            // A green ring and dot while Jarvis is reading along live.
+            _LiveAvatar(
+              live:
+                  _chat.readAlong &&
+                  (_connectionState == null || _connectionState == 'open'),
+              child: ChatAvatar(
+                chat: _chat,
+                http: widget.http,
+                channelId: widget.channelId,
+                size: 40,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -625,7 +695,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
             ),
           Expanded(
             child: _loading
-                ? const LoadingState()
+                ? const SkeletonList(rows: 7, shape: SkeletonShape.chat)
                 : _error != null && _messages.isEmpty
                 ? ErrorState(
                     message: _error!,
@@ -639,31 +709,109 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
                         ? 'New messages appear as they arrive. Use More → Load WhatsApp history to request older messages from your phone.'
                         : 'Turn on reading to receive messages from this chat.',
                   )
-                : ContentWidth(
-                    child: _MessageList(
-                      messages: _messages,
-                      isGroup: _chat.isGroup,
-                      http: widget.http,
-                      channelId: widget.channelId,
-                      controller: _scroll,
-                      hasOlder: _hasOlder,
-                      loadingOlder: _loadingOlder,
-                      onLoadOlder: () => unawaited(_loadOlder()),
+                : WhatsAppWallpaper(
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: ContentWidth(
+                            child: _MessageList(
+                              messages: _messages,
+                              isGroup: _chat.isGroup,
+                              http: widget.http,
+                              channelId: widget.channelId,
+                              controller: _scroll,
+                              hasOlder: _hasOlder,
+                              loadingOlder: _loadingOlder,
+                              onLoadOlder: () => unawaited(_loadOlder()),
+                              onReply: _canSend ? _startReply : null,
+                              onHold: (message, anchor) =>
+                                  unawaited(_messageActions(message, anchor)),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          right: 16,
+                          bottom: 12,
+                          child: JumpToLatest(controller: _scroll),
+                        ),
+                      ],
                     ),
                   ),
           ),
           _Composer(
             controller: _composer,
+            focus: _composerFocus,
+            replyTo: _replyTo == null
+                ? null
+                : ReplyPreview(
+                    key: ValueKey(_replyTo!.id),
+                    author: _replyTo!.fromMe
+                        ? 'You'
+                        : _replyTo!.sender ?? _chat.name,
+                    text: _replyTo!.text,
+                    color: _replyTo!.fromMe
+                        ? whatsAppGreen
+                        : whatsAppSenderColor(
+                            _replyTo!.senderId ?? _replyTo!.sender ?? '',
+                            JarvisColors.of(context),
+                          ),
+                    onCancel: () => setState(() => _replyTo = null),
+                  ),
             sending: _sending,
             drafting: _drafting,
             onDraft: () => unawaited(_draft()),
             onSend: () => unawaited(_send()),
-            canSend:
-                _chat.readAlong &&
-                (_connectionState == null || _connectionState == 'open'),
+            canSend: _canSend,
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LiveAvatar extends StatelessWidget {
+  const _LiveAvatar({required this.live, required this.child});
+
+  final bool live;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        AnimatedContainer(
+          duration: JarvisMotion.of(context, JarvisMotion.slow),
+          curve: JarvisMotion.standard,
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: live ? whatsAppGreen : Colors.transparent,
+              width: 1.6,
+            ),
+          ),
+          child: child,
+        ),
+        if (live)
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: PopIn(
+              delay: const Duration(milliseconds: 200),
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: whatsAppGreen,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colors.canvas, width: 2),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -678,7 +826,15 @@ class _MessageList extends StatelessWidget {
     required this.hasOlder,
     required this.loadingOlder,
     required this.onLoadOlder,
+    this.onReply,
+    this.onHold,
   });
+
+  /// Swipe a bubble right to reply; null when sending is not possible.
+  final ValueChanged<WhatsAppMessage>? onReply;
+
+  /// Hold a bubble for reactions; gets the bubble's place on screen.
+  final void Function(WhatsAppMessage message, Rect anchor)? onHold;
 
   final List<WhatsAppMessage> messages;
   final bool isGroup;
@@ -697,31 +853,58 @@ class _MessageList extends StatelessWidget {
       final message = messages[index];
       final previous = index > 0 ? messages[index - 1] : null;
       final next = index + 1 < messages.length ? messages[index + 1] : null;
-      final grouped =
-          next != null &&
-          next.fromMe == message.fromMe &&
-          next.sender == message.sender &&
-          next.senderId == message.senderId &&
-          next.sentAt.difference(message.sentAt).inMinutes < 5;
+      bool joined(WhatsAppMessage? a, WhatsAppMessage b) =>
+          a != null &&
+          a.fromMe == b.fromMe &&
+          a.sender == b.sender &&
+          a.senderId == b.senderId &&
+          _sameDay(a.sentAt, b.sentAt) &&
+          b.sentAt.difference(a.sentAt).inMinutes.abs() < 5;
+      final grouped = next != null && joined(message, next);
+      // Messages arrive from the bottom up: the newest first, then the rest
+      // in quick succession, each growing out of its own side.
       items.add(
-        _Bubble(
+        FadeSlideIn(
           key: ValueKey(message.id),
-          message: message,
-          isGroup: isGroup,
-          http: http,
-          channelId: channelId,
-          showSender:
-              isGroup &&
-              !message.fromMe &&
-              (previous == null ||
-                  previous.fromMe ||
-                  previous.sender != message.sender ||
-                  previous.senderId != message.senderId),
-          tight: grouped,
+          index: messages.length - 1 - index,
+          offset: 12,
+          scale: .9,
+          alignment: message.fromMe
+              ? Alignment.bottomRight
+              : Alignment.bottomLeft,
+          child: _Bubble(
+            onReply: onReply == null ? null : () => onReply!(message),
+            onHold: onHold == null
+                ? null
+                : (anchor) => onHold!(message, anchor),
+            message: message,
+            isGroup: isGroup,
+            http: http,
+            channelId: channelId,
+            showSender:
+                isGroup &&
+                !message.fromMe &&
+                (previous == null ||
+                    previous.fromMe ||
+                    previous.sender != message.sender ||
+                    previous.senderId != message.senderId),
+            tight: grouped,
+            joinedAbove: previous != null && joined(previous, message),
+          ),
         ),
       );
       if (previous == null || !_sameDay(previous.sentAt, message.sentAt)) {
-        items.add(_DaySeparator(time: message.sentAt));
+        items.add(
+          WhatsAppDayPill(
+            key: ValueKey((
+              'day',
+              message.sentAt.year,
+              message.sentAt.month,
+              message.sentAt.day,
+            )),
+            label: whatsAppDayLabel(message.sentAt),
+          ),
+        );
       }
     }
     if (hasOlder) {
@@ -748,35 +931,6 @@ class _MessageList extends StatelessWidget {
       a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
-class _DaySeparator extends StatelessWidget {
-  const _DaySeparator({required this.time});
-
-  final DateTime time;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = JarvisColors.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: colors.surfaceMuted,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            whatsAppDayLabel(time),
-            style: Theme.of(
-              context,
-            ).textTheme.labelSmall?.copyWith(color: colors.inkSoft),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _Bubble extends StatelessWidget {
   const _Bubble({
     required this.message,
@@ -785,15 +939,25 @@ class _Bubble extends StatelessWidget {
     required this.channelId,
     required this.showSender,
     required this.tight,
-    super.key,
+    this.joinedAbove = false,
+    this.onReply,
+    this.onHold,
   });
+
+  final VoidCallback? onReply;
+  final ValueChanged<Rect>? onHold;
 
   final WhatsAppMessage message;
   final bool isGroup;
   final Dio http;
   final String channelId;
   final bool showSender;
+
+  /// The next (newer) message continues this run from the same sender.
   final bool tight;
+
+  /// The message above is from the same sender, moments earlier.
+  final bool joinedAbove;
 
   @override
   Widget build(BuildContext context) {
@@ -801,94 +965,142 @@ class _Bubble extends StatelessWidget {
     final theme = Theme.of(context);
     final mine = message.fromMe;
     final naked = whatsAppNakedSticker(message);
-    final background = mine ? colors.surfaceRaised : colors.surface;
+    final tint = whatsAppMineBubble(colors);
     const radius = Radius.circular(20);
+    const joinedCorner = Radius.circular(6);
+    // Runs from one sender read as one block: inner corners tighten and only
+    // the last bubble keeps the little tail.
+    final upper = joinedAbove ? joinedCorner : radius;
+    final lower = tight ? joinedCorner : const Radius.circular(4);
     final showFace = isGroup && !mine;
-    return Padding(
-      padding: EdgeInsets.only(top: tight ? 2 : 8),
-      child: Align(
-        alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: (MediaQuery.sizeOf(context).width * .86).clamp(0, 620),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (showFace) ...[
-                SizedBox(
-                  width: 28,
-                  child: showSender
-                      ? ChatAvatar(
-                          http: http,
-                          channelId: channelId,
-                          subject: message.senderId,
-                          initials: whatsAppInitials(message.sender ?? ''),
-                          size: 28,
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 8),
-              ],
-              Flexible(
-                child: Container(
-                  padding: naked
-                      ? const EdgeInsets.only(bottom: 2)
-                      : const EdgeInsets.fromLTRB(16, 11, 16, 8),
-                  decoration: naked
-                      ? null
-                      : BoxDecoration(
-                          color: background,
-                          border: mine
-                              ? null
-                              : Border.all(color: colors.outline),
-                          borderRadius: BorderRadius.only(
-                            topLeft: radius,
-                            topRight: radius,
-                            bottomLeft: mine
-                                ? radius
-                                : const Radius.circular(4),
-                            bottomRight: mine
-                                ? const Radius.circular(4)
-                                : radius,
-                          ),
-                        ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (showSender && message.sender != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 2),
-                          child: Text(
-                            message.sender!,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: colors.accentDeep,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      WhatsAppMessageContent(
-                        message: message,
-                        http: http,
-                        channelId: channelId,
-                      ),
-                      const SizedBox(height: 2),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          whatsAppClock(message.sentAt),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colors.muted,
-                            fontSize: 10.5,
-                          ),
-                        ),
-                      ),
-                    ],
+    final senderColor = whatsAppSenderColor(
+      message.senderId ?? message.sender ?? '',
+      colors,
+    );
+    return SwipeToReply(
+      onReply: onReply,
+      child: Padding(
+        padding: EdgeInsets.only(top: joinedAbove ? 2 : 8),
+        child: Align(
+          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+          child: Builder(
+            builder: (bubble) => GestureDetector(
+              onLongPress: onHold == null
+                  ? null
+                  : () {
+                      final box = bubble.findRenderObject();
+                      if (box is! RenderBox || !box.hasSize) return;
+                      onHold!(box.localToGlobal(Offset.zero) & box.size);
+                    },
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: (MediaQuery.sizeOf(context).width * .86).clamp(
+                    0,
+                    620,
                   ),
                 ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (showFace) ...[
+                      SizedBox(
+                        width: 28,
+                        child: showSender
+                            ? ChatAvatar(
+                                http: http,
+                                channelId: channelId,
+                                subject: message.senderId,
+                                initials: whatsAppInitials(
+                                  message.sender ?? '',
+                                ),
+                                size: 28,
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Flexible(
+                      child: Container(
+                        padding: naked
+                            ? const EdgeInsets.only(bottom: 2)
+                            : const EdgeInsets.fromLTRB(16, 11, 16, 8),
+                        decoration: naked
+                            ? null
+                            : BoxDecoration(
+                                color: mine ? null : colors.surface,
+                                gradient: mine
+                                    ? LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [tint.top, tint.bottom],
+                                      )
+                                    : null,
+                                border: mine
+                                    ? null
+                                    : Border.all(
+                                        color: colors.outline.withValues(
+                                          alpha: .55,
+                                        ),
+                                      ),
+                                borderRadius: BorderRadius.only(
+                                  topLeft: mine ? radius : upper,
+                                  topRight: mine ? upper : radius,
+                                  bottomLeft: mine ? radius : lower,
+                                  bottomRight: mine ? lower : radius,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(
+                                      alpha: colors.isDark ? .25 : .06,
+                                    ),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (showSender && message.sender != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: Text(
+                                  message.sender!,
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    color: senderColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            WhatsAppMessageContent(
+                              message: message,
+                              http: http,
+                              channelId: channelId,
+                              selectable: onHold == null,
+                            ),
+                            const SizedBox(height: 2),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                whatsAppClock(message.sentAt),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: mine ? tint.meta : colors.muted,
+                                  fontSize: 10.5,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -904,8 +1116,14 @@ class _Composer extends StatelessWidget {
     required this.onDraft,
     required this.onSend,
     required this.canSend,
+    this.focus,
+    this.replyTo,
   });
 
+  final FocusNode? focus;
+
+  /// The message being answered, shown above the text field.
+  final Widget? replyTo;
   final TextEditingController controller;
   final bool sending;
   final bool drafting;
@@ -933,9 +1151,16 @@ class _Composer extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // The quote slides open above the text when you start a reply.
+                MotionSize(
+                  child: MotionSwitcher(
+                    child: replyTo ?? const SizedBox(width: double.infinity),
+                  ),
+                ),
                 TextField(
                   key: const Key('whatsapp-composer'),
                   controller: controller,
+                  focusNode: focus,
                   minLines: 1,
                   maxLines: 6,
                   maxLength: 4000,
@@ -971,25 +1196,47 @@ class _Composer extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
-                    IconButton.filled(
-                      key: const Key('whatsapp-send'),
-                      tooltip: 'Send from your WhatsApp',
-                      style: IconButton.styleFrom(
-                        backgroundColor: colors.ink,
-                        foregroundColor: colors.onInk,
-                        disabledBackgroundColor: colors.surfaceMuted,
-                        disabledForegroundColor: colors.muted,
+                    AnimatedScale(
+                      scale: hasText ? 1 : .86,
+                      duration: JarvisMotion.of(
+                        context,
+                        const Duration(milliseconds: 420),
                       ),
-                      onPressed: hasText && !sending && canSend ? onSend : null,
-                      icon: sending
-                          ? SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: colors.onInk,
-                              ),
-                            )
-                          : const Icon(PhosphorIconsBold.arrowUp, size: 20),
+                      curve: hasText ? JarvisSprings.pop : JarvisMotion.exit,
+                      child: IconButton.filled(
+                        key: const Key('whatsapp-send'),
+                        tooltip: 'Send from your WhatsApp',
+                        style: IconButton.styleFrom(
+                          backgroundColor: whatsAppDeepGreen,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: colors.surfaceMuted,
+                          disabledForegroundColor: colors.muted,
+                        ),
+                        onPressed: hasText && !sending && canSend
+                            ? onSend
+                            : null,
+                        icon: AnimatedSwitcher(
+                          duration: JarvisMotion.of(
+                            context,
+                            const Duration(milliseconds: 380),
+                          ),
+                          transitionBuilder: JarvisMotion.morph,
+                          child: sending
+                              ? const SizedBox.square(
+                                  key: ValueKey('sending'),
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(
+                                  PhosphorIconsBold.arrowUp,
+                                  key: ValueKey('send'),
+                                  size: 20,
+                                ),
+                        ),
+                      ),
                     ),
                   ],
                 ),

@@ -82,7 +82,7 @@ Future<bool> scanReceipt(
     return false;
   }
 
-  final result = await showDialog<ExpenseEditorSeed>(
+  final result = await showJarvisDialog<ExpenseEditorSeed>(
     context: context,
     barrierDismissible: false,
     builder: (_) => _ScanProgressDialog(

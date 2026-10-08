@@ -165,7 +165,7 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(_editing ? 'Edit entry' : 'New entry'),
+      title: PageTitle(_editing ? 'Edit entry' : 'New entry'),
       actions: [
         if (_editing)
           IconButton(

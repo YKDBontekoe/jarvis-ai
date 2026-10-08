@@ -168,4 +168,32 @@ void main() {
       expect(JarvisColors.of(context).canvas, JarvisColors.dark.canvas);
     },
   );
+
+  testWidgets('the motion choice is saved and reduces motion app-wide', (
+    tester,
+  ) async {
+    final store = MemoryAppearanceStore();
+    final appearance = AppearanceController(store: store);
+    await appearance.load();
+    await tester.pumpWidget(
+      JarvisApp(skipAuthentication: true, appearance: appearance),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tab-you')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Appearance'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('motion-reduced')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('motion-reduced')));
+    await tester.pumpAndSettle();
+    expect(appearance.motion, MotionPreference.reduced);
+    expect(store.motion, 'reduced');
+    final context = tester.element(find.byKey(const Key('motion-reduced')));
+    expect(MediaQuery.disableAnimationsOf(context), isTrue);
+
+    final reloaded = AppearanceController(store: store);
+    await reloaded.load();
+    expect(reloaded.motion, MotionPreference.reduced);
+  });
 }

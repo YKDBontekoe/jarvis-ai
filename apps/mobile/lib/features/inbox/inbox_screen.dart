@@ -124,7 +124,7 @@ class _InboxScreenState extends State<InboxScreen> {
   );
 
   Future<void> _addCommitment() async {
-    final result = await showDialog<Map<String, String>>(
+    final result = await showJarvisDialog<Map<String, String>>(
       context: context,
       builder: (_) => const _CommitmentDialog(),
     );
@@ -142,7 +142,7 @@ class _InboxScreenState extends State<InboxScreen> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Inbox'),
+          title: const PageTitle('Inbox'),
           bottom: const TabBar(
             tabs: [
               Tab(key: Key('inbox-tab-threads'), text: 'Conversations'),

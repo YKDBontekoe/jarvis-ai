@@ -58,7 +58,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   Future<void> _create() async {
-    final goal = await showDialog<String>(
+    final goal = await showJarvisDialog<String>(
       context: context,
       builder: (_) => const _GoalDialog(),
     );
@@ -104,7 +104,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
     final colors = JarvisColors.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Missions'),
+        title: const PageTitle('Missions'),
         actions: [
           HeaderAction(
             key: const Key('mission-new'),

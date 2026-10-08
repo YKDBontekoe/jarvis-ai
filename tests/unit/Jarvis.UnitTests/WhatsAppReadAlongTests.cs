@@ -271,6 +271,14 @@ public sealed class WhatsAppReadAlongTests
             Sent.Add((chatId, text));
             return Task.FromResult(new WhatsAppSendResult(true, "id", null));
         }
+
+        public Task<WhatsAppSendResult> ReplyAsync(Guid ownerId, Guid connectionId, string chatId, string text,
+            WhatsAppChatMessage replyTo, CancellationToken cancellationToken) =>
+            SendAsync(ownerId, connectionId, chatId, text, cancellationToken);
+
+        public Task<WhatsAppSendResult> ReactAsync(Guid ownerId, Guid connectionId, string chatId,
+            WhatsAppChatMessage target, string emoji, CancellationToken cancellationToken) =>
+            Task.FromResult(new WhatsAppSendResult(true, null, null));
     }
 
     private sealed class FakeChats : IWhatsAppAssistantRepository

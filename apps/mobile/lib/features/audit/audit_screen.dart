@@ -61,7 +61,7 @@ class _AuditScreenState extends State<AuditScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Activity log'),
+      title: const PageTitle('Activity log'),
       actions: [
         IconButton(
           tooltip: 'Refresh audit log',
@@ -79,11 +79,11 @@ class _AuditScreenState extends State<AuditScreen> {
       onRefresh: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.listChecks,
-        title: 'No audited actions yet.',
+        title: 'Nothing logged yet',
         message:
             'Approvals, tasks, reminders, files, and memory changes are recorded here.',
       ),
-      child: RefreshIndicator(
+      child: OrbRefresh(
         onRefresh: _load,
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),

@@ -97,17 +97,36 @@ mixin _ChatScreenUi on _ChatScreenController {
   }
 
   /// The orb: back to the conversation that is open, or a fresh one.
-  void _openJarvis() => _fromShell(() {
-    if (_selectedDestination != 0) _selectDestination(0);
-    if (_conversationId == null) {
-      setState(() => _inChat = true);
-      unawaited(_createAndOpenConversation());
-    } else if (_hasMessages) {
-      _showTranscript();
-    } else {
-      setState(() => _inChat = true);
+  void _openJarvis() {
+    final source = _tabOrbRect();
+    _fromShell(() {
+      if (_selectedDestination != 0) _selectDestination(0);
+      if (_conversationId == null) {
+        setState(() => _inChat = true);
+        unawaited(_createAndOpenConversation());
+      } else if (_hasMessages) {
+        _showTranscript();
+      } else {
+        setState(() => _inChat = true);
+      }
+    });
+    if (source != null && _inChat && !JarvisMotion.reduced(context)) {
+      setState(() => _orbFlying = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await flyOrb(context: context, from: source, to: _titleOrbKey);
+        if (mounted) setState(() => _orbFlying = false);
+      });
     }
-  });
+  }
+
+  /// Where the tab bar's orb is on screen, or null when it is not showing.
+  Rect? _tabOrbRect() {
+    final box = _tabOrbKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return null;
+    final center = box.localToGlobal(box.size.center(Offset.zero));
+    return Rect.fromCenter(center: center, width: 40, height: 40);
+  }
 
   void _leaveChat() {
     _dismissKeyboard();
@@ -370,6 +389,20 @@ mixin _ChatScreenUi on _ChatScreenController {
                       size: 20,
                     ),
                     const SizedBox(width: 7),
+                  ] else if (!voice) ...[
+                    // Where the tab bar's orb lands when it opens chat.
+                    KeyedSubtree(
+                      key: _titleOrbKey,
+                      child: Opacity(
+                        opacity: _orbFlying ? 0 : 1,
+                        child: JarvisOrb(
+                          size: 22,
+                          glow: false,
+                          thinking: _busy,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                   ],
                   Flexible(
                     child: Text(
@@ -534,6 +567,11 @@ mixin _ChatScreenUi on _ChatScreenController {
                                         width: double.infinity,
                                         child: FadeSlideIn(
                                           animate: index >= _settledEntries,
+                                          offset: 14,
+                                          scale: .94,
+                                          alignment: _entryOrigin(
+                                            _entries[index],
+                                          ),
                                           child: _entryView(_entries[index]),
                                         ),
                                       ),
@@ -547,15 +585,17 @@ mixin _ChatScreenUi on _ChatScreenController {
                               bottom: 8,
                               child: IgnorePointer(
                                 ignoring: _nearBottom || _showApprovalDock,
-                                child: AnimatedSlide(
-                                  offset: _nearBottom || _showApprovalDock
-                                      ? const Offset(0, .4)
-                                      : Offset.zero,
+                                child: AnimatedScale(
+                                  scale: _nearBottom || _showApprovalDock
+                                      ? .4
+                                      : 1,
                                   duration: JarvisMotion.of(
                                     context,
-                                    JarvisMotion.base,
+                                    const Duration(milliseconds: 420),
                                   ),
-                                  curve: JarvisMotion.standard,
+                                  curve: _nearBottom || _showApprovalDock
+                                      ? JarvisMotion.exit
+                                      : JarvisSprings.pop,
                                   child: AnimatedOpacity(
                                     opacity: _nearBottom || _showApprovalDock
                                         ? 0
@@ -668,6 +708,13 @@ mixin _ChatScreenUi on _ChatScreenController {
     ),
   );
 
+  /// New entries grow out of the side they sit on: yours from the right,
+  /// Jarvis's from the left.
+  Alignment _entryOrigin(ChatEntry entry) =>
+      entry is MessageEntry && entry.isUser
+      ? Alignment.bottomRight
+      : Alignment.bottomLeft;
+
   Widget _entryView(ChatEntry entry) => switch (entry) {
     MessageEntry() => MessageBubble(
       key: ObjectKey(entry),
@@ -750,6 +797,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     canStart: !_busy && !_hasPendingApproval && _conversationId != null,
     onPrimary: () => unawaited(_toggleVoice()),
     onToggleMute: _voiceActive ? () => unawaited(_toggleVoiceMute()) : null,
+    level: _voiceActive ? _voiceLevel : null,
   );
 
   Widget _settingsBody() => SettingsView(
@@ -784,22 +832,58 @@ class _NewChatWelcome extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Center(child: JarvisOrb(size: 56)),
+                // The orb lands with a ripple, the question sharpens into
+                // focus, then the suggestions rise in.
+                const Center(child: _WelcomeOrb()),
                 const SizedBox(height: 22),
-                Text(
-                  'What do you need?',
-                  textAlign: TextAlign.center,
-                  style: JarvisType.displayOf(context).copyWith(fontSize: 34),
+                BlurIn(
+                  delay: const Duration(milliseconds: 180),
+                  child: Text(
+                    'What do you need?',
+                    textAlign: TextAlign.center,
+                    style: JarvisType.displayOf(context).copyWith(fontSize: 34),
+                  ),
                 ),
                 const SizedBox(height: 22),
                 if (onSuggestion != null)
-                  SuggestionChips(onSelected: onSuggestion),
+                  FadeSlideIn(
+                    index: 8,
+                    offset: 16,
+                    child: SuggestionChips(onSelected: onSuggestion),
+                  ),
               ],
             ),
           ),
         ),
       ],
     ),
+  );
+}
+
+class _WelcomeOrb extends StatefulWidget {
+  const _WelcomeOrb();
+
+  @override
+  State<_WelcomeOrb> createState() => _WelcomeOrbState();
+}
+
+class _WelcomeOrbState extends State<_WelcomeOrb> {
+  int _ripple = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Ripple once the orb has landed.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _ripple++);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Shockwave(
+    trigger: _ripple,
+    size: 56,
+    child: const PopIn(from: .3, child: JarvisOrb(size: 56)),
   );
 }
 
@@ -854,10 +938,10 @@ class _NotificationBell extends StatelessWidget {
             top: 3,
             right: 2,
             child: IgnorePointer(
-              child: AnimatedScale(
-                scale: 1,
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOutBack,
+              // The badge pops again each time the count changes.
+              child: PopIn(
+                key: ValueKey(unread),
+                from: .5,
                 child: Container(
                   constraints: const BoxConstraints(minWidth: 18),
                   padding: const EdgeInsets.symmetric(

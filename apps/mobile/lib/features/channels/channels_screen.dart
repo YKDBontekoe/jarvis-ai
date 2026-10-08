@@ -180,7 +180,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
     final signalReady = asJsonBool(_signal['configured']);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('WhatsApp & Signal'),
+        title: const PageTitle('WhatsApp & Signal'),
         actions: [
           HeaderAction(
             label: 'Connect',

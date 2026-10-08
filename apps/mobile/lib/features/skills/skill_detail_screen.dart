@@ -147,7 +147,7 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
     final skill = _skill;
     return Scaffold(
       appBar: AppBar(
-        title: Text(asJsonString(skill?['name']) ?? 'Skill'),
+        title: PageTitle(asJsonString(skill?['name']) ?? 'Skill'),
         actions: [
           if (skill != null)
             PopupMenuButton<String>(
@@ -166,7 +166,7 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
       ),
       body: skill == null
           ? (_error == null
-                ? const LoadingState()
+                ? const SkeletonList(shape: SkeletonShape.detail)
                 : ErrorState(
                     message: _error!,
                     onRetry: () => unawaited(_load()),

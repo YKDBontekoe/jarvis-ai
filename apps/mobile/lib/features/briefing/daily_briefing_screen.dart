@@ -141,7 +141,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Morning briefing')),
       body: _loading
-          ? const LoadingState()
+          ? const SkeletonList(shape: SkeletonShape.detail)
           : !_loaded
           ? ErrorState(
               message: _error ?? 'Could not load briefing settings.',

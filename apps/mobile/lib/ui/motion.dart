@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// Shared motion language: short, ease-out movements that settle quietly.
@@ -10,7 +12,7 @@ abstract final class JarvisMotion {
   static const base = Duration(milliseconds: 220);
 
   /// Page and pane changes.
-  static const slow = Duration(milliseconds: 320);
+  static const slow = Duration(milliseconds: 380);
 
   /// Default curve for anything entering or changing.
   static const standard = Curves.easeOutCubic;
@@ -43,6 +45,29 @@ abstract final class JarvisMotion {
       child: ScaleTransition(
         scale: Tween(begin: startScale, end: 1.0).animate(curved),
         child: child,
+      ),
+    );
+  }
+
+  /// Spins and springs the incoming child into place while the outgoing one
+  /// shrinks away; for one control turning into another (send ↔ voice ↔ stop).
+  static Widget morph(Widget child, Animation<double> animation) {
+    final spring = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutBack,
+      reverseCurve: exit,
+    );
+    return FadeTransition(
+      opacity: CurvedAnimation(
+        parent: animation,
+        curve: const Interval(0, .5, curve: Curves.easeOut),
+      ),
+      child: RotationTransition(
+        turns: Tween(begin: -.18, end: 0.0).animate(spring),
+        child: ScaleTransition(
+          scale: Tween(begin: .4, end: 1.0).animate(spring),
+          child: child,
+        ),
       ),
     );
   }
@@ -172,8 +197,8 @@ class _PressFeedbackState extends State<PressFeedback> {
   );
 }
 
-/// Page transition for pushed routes: the new page fades in while it grows from
-/// 98% and rises a few pixels.
+/// Page transition for pushed routes: the new page fades in while it grows
+/// and rises into place, and the page it covers sinks back.
 class JarvisPageTransitionsBuilder extends PageTransitionsBuilder {
   const JarvisPageTransitionsBuilder();
 
@@ -197,22 +222,160 @@ class JarvisPageTransitionsBuilder extends PageTransitionsBuilder {
       curve: JarvisMotion.emphasized,
       reverseCurve: JarvisMotion.exit,
     );
-    return FadeTransition(
-      opacity: CurvedAnimation(
-        parent: animation,
-        curve: const Interval(0, .6, curve: Curves.easeOut),
-        reverseCurve: const Interval(.2, 1, curve: Curves.easeIn),
-      ),
-      child: SlideTransition(
-        position: Tween(
-          begin: const Offset(0, .02),
-          end: Offset.zero,
-        ).animate(enter),
-        child: ScaleTransition(
-          scale: Tween(begin: JarvisMotion.startScale, end: 1.0).animate(enter),
-          child: child,
+    // The page underneath recedes a little while the new one arrives, so
+    // the stack reads as depth rather than a swap.
+    final behind = CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: JarvisMotion.emphasized,
+      reverseCurve: JarvisMotion.standard,
+    );
+    return ScaleTransition(
+      scale: Tween(begin: 1.0, end: .955).animate(behind),
+      child: FadeTransition(
+        opacity: Tween(begin: 1.0, end: .55).animate(behind),
+        child: FadeTransition(
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: const Interval(0, .6, curve: Curves.easeOut),
+            reverseCurve: const Interval(.2, 1, curve: Curves.easeIn),
+          ),
+          child: SlideTransition(
+            position: Tween(
+              begin: const Offset(0, .035),
+              end: Offset.zero,
+            ).animate(enter),
+            child: ScaleTransition(
+              scale: Tween(begin: .965, end: 1.0).animate(enter),
+              child: child,
+            ),
+          ),
         ),
       ),
     );
   }
+}
+
+/// How [PageSwitcher] moves between pages.
+enum PageMotion {
+  /// Sideways, in the direction of travel: for sibling pages such as tabs.
+  axis,
+
+  /// The new page grows out of [PageSwitcher.origin] while the old one
+  /// swells and fades past the viewer: for entering and leaving a mode.
+  zoom,
+}
+
+/// Switches whole pages with direction. With [PageMotion.axis] the new page
+/// slides in from the side of travel (decided by [index] going up or down)
+/// while the old one drifts out the other way. Like [MotionSwitcher], the
+/// outgoing page cannot be tapped, announced or keep its tickers running.
+class PageSwitcher extends StatefulWidget {
+  const PageSwitcher({
+    required this.child,
+    this.index = 0,
+    this.motion = PageMotion.axis,
+    this.origin = Alignment.bottomCenter,
+    super.key,
+  });
+
+  /// The page; give it a key that changes with the page.
+  final Widget child;
+
+  /// Position of the page among its siblings, for [PageMotion.axis].
+  final int index;
+  final PageMotion motion;
+
+  /// Where a [PageMotion.zoom] page grows from.
+  final Alignment origin;
+
+  @override
+  State<PageSwitcher> createState() => _PageSwitcherState();
+}
+
+class _PageSwitcherState extends State<PageSwitcher> {
+  /// 1 when moving to a higher index, -1 when moving back.
+  double _direction = 1;
+
+  /// Zoom forward (into the new page) or back out of it.
+  bool _forward = true;
+
+  @override
+  void didUpdateWidget(PageSwitcher oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.index != widget.index) {
+      _direction = widget.index > oldWidget.index ? 1 : -1;
+      _forward = widget.index > oldWidget.index;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduced = JarvisMotion.reduced(context);
+    final current = widget.child.key;
+    return AnimatedSwitcher(
+      duration: JarvisMotion.of(context, const Duration(milliseconds: 420)),
+      reverseDuration: JarvisMotion.of(
+        context,
+        const Duration(milliseconds: 260),
+      ),
+      layoutBuilder: (current, previous) => Stack(
+        alignment: Alignment.topLeft,
+        children: [
+          for (final old in previous)
+            IgnorePointer(
+              child: ExcludeSemantics(
+                child: TickerMode(enabled: false, child: old),
+              ),
+            ),
+          ?current,
+        ],
+      ),
+      transitionBuilder: (child, animation) {
+        final incoming = child.key == current;
+        if (reduced) {
+          return FadeTransition(opacity: animation, child: child);
+        }
+        return AnimatedBuilder(
+          animation: animation,
+          child: child,
+          builder: (context, child) {
+            final raw = animation.value;
+            final t = incoming
+                ? emphasizedOut.transform(raw)
+                : Curves.easeIn.transform(raw);
+            final opacity = incoming
+                ? const Interval(.1, .7).transform(raw)
+                : const Interval(.25, 1).transform(raw);
+            if (widget.motion == PageMotion.zoom) {
+              // Forward: new page grows in, old one swells away.
+              // Back: new page settles down from large, old one shrinks.
+              final grow = incoming == _forward;
+              final scale = grow ? .9 + .1 * t : 1.06 - .06 * t;
+              return Opacity(
+                opacity: opacity,
+                child: Transform.scale(
+                  scale: scale,
+                  alignment: widget.origin,
+                  child: child,
+                ),
+              );
+            }
+            final width = MediaQuery.sizeOf(context).width;
+            final travel = math.min(56.0, width * .14);
+            final sign = incoming ? _direction : -_direction;
+            return Opacity(
+              opacity: opacity,
+              child: Transform.translate(
+                offset: Offset(sign * travel * (1 - t), 0),
+                child: Transform.scale(scale: .985 + .015 * t, child: child),
+              ),
+            );
+          },
+        );
+      },
+      child: widget.child,
+    );
+  }
+
+  static const emphasizedOut = Cubic(.05, .7, .1, 1);
 }

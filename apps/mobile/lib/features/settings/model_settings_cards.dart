@@ -16,22 +16,14 @@ mixin _ModelSettingsCards on _ModelSettingsController {
           ),
         ),
         const SizedBox(height: 14),
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(
-              value: 'codex',
-              label: Text('ChatGPT (Codex)'),
-              icon: Icon(PhosphorIconsRegular.sparkle, size: 16),
-            ),
-            ButtonSegment(
-              value: 'openrouter',
-              label: Text('OpenRouter'),
-              icon: Icon(PhosphorIconsRegular.shareNetwork, size: 16),
-            ),
+        SegmentedPills<String>(
+          keyPrefix: 'provider',
+          options: const [
+            ('codex', 'ChatGPT (Codex)'),
+            ('openrouter', 'OpenRouter'),
           ],
-          selected: {_provider},
-          onSelectionChanged: (value) =>
-              setState(() => _provider = value.first),
+          selected: _provider,
+          onSelected: (value) => setState(() => _provider = value),
         ),
       ],
     ),

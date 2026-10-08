@@ -148,7 +148,7 @@ class _BudgetsTabState extends State<BudgetsTab> {
   );
 
   Future<void> _addBudget() async {
-    final result = await showDialog<Map<String, Object>>(
+    final result = await showJarvisDialog<Map<String, Object>>(
       context: context,
       builder: (_) => const _BudgetDialog(),
     );

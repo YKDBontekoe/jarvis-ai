@@ -169,7 +169,7 @@ class _DecisionsScreenState extends State<DecisionsScreen> {
     final resolved = _withStatus('resolved');
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Decisions'),
+        title: const PageTitle('Decisions'),
         actions: [
           HeaderAction(
             key: const Key('decision-log'),
@@ -198,7 +198,7 @@ class _DecisionsScreenState extends State<DecisionsScreen> {
             label: const Text('Log a decision'),
           ),
         ),
-        child: RefreshIndicator(
+        child: OrbRefresh(
           onRefresh: _load,
           child: ListView(
             padding: EdgeInsets.fromLTRB(

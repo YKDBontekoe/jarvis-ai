@@ -195,7 +195,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     final colors = JarvisColors.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(account?.name ?? 'Account'),
+        title: PageTitle(account?.name ?? 'Account'),
         actions: [
           if (account != null)
             PopupMenuButton<String>(

@@ -132,7 +132,7 @@ class _IntegrationsScreenState extends _IntegrationsController
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Connected apps'),
+      title: const PageTitle('Connected apps'),
       actions: [
         HeaderAction(
           label: 'Add',
@@ -142,8 +142,8 @@ class _IntegrationsScreenState extends _IntegrationsController
       ],
     ),
     body: _loading
-        ? const LoadingState()
-        : RefreshIndicator(
+        ? const SkeletonList()
+        : OrbRefresh(
             onRefresh: _load,
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),

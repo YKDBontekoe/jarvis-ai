@@ -82,7 +82,7 @@ class _TasksScreenState extends State<TasksScreen> {
 
   /// True when started, null when cancelled, false when it failed.
   Future<bool?> _createTask() async {
-    final created = await showDialog<_NewTask>(
+    final created = await showJarvisDialog<_NewTask>(
       context: context,
       builder: (_) => _NewTaskDialog(http: widget.http),
     );
@@ -179,36 +179,64 @@ class _TasksScreenState extends State<TasksScreen> {
     'needs_approval',
   };
 
+  void _openWatches() => Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(
+      builder: (_) => ConditionWatchesScreen(http: widget.http),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Tasks'),
+      title: const PageTitle('Tasks'),
       actions: [
-        IconButton(
-          tooltip: 'Approvals',
-          onPressed: _openApprovals,
-          icon: const Icon(PhosphorIconsRegular.shieldCheck),
-        ),
-        IconButton(
-          tooltip: 'Condition watches',
-          onPressed: () => Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(
-              builder: (_) => ConditionWatchesScreen(http: widget.http),
-            ),
+        // Narrow phones fold the secondary buttons into one menu, so the
+        // title keeps its room.
+        if (MediaQuery.sizeOf(context).width < 400)
+          PopupMenuButton<String>(
+            tooltip: 'More',
+            icon: const Icon(PhosphorIconsRegular.dotsThree),
+            onSelected: (value) => switch (value) {
+              'approvals' => _openApprovals(),
+              'watches' => _openWatches(),
+              'refresh' => _load(),
+              _ => null,
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'approvals', child: Text('Approvals')),
+              const PopupMenuItem(
+                value: 'watches',
+                child: Text('Condition watches'),
+              ),
+              PopupMenuItem(
+                value: 'refresh',
+                enabled: !_loading,
+                child: const Text('Refresh tasks'),
+              ),
+            ],
+          )
+        else ...[
+          IconButton(
+            tooltip: 'Approvals',
+            onPressed: _openApprovals,
+            icon: const Icon(PhosphorIconsRegular.shieldCheck),
           ),
-          icon: const Icon(PhosphorIconsRegular.pulse),
-        ),
-        IconButton(
-          tooltip: 'Refresh tasks',
-          onPressed: _loading ? null : _load,
-          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
-        ),
+          IconButton(
+            tooltip: 'Condition watches',
+            onPressed: _openWatches,
+            icon: const Icon(PhosphorIconsRegular.pulse),
+          ),
+          IconButton(
+            tooltip: 'Refresh tasks',
+            onPressed: _loading ? null : _load,
+            icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
+          ),
+        ],
         HeaderAction(
           label: 'New task',
           icon: PhosphorIconsRegular.plus,
           onPressed: _createTask,
           busy: _creating,
-          collapsesWhenNarrow: true,
         ),
       ],
     ),
@@ -221,9 +249,10 @@ class _TasksScreenState extends State<TasksScreen> {
       empty: const EmptyState(
         icon: PhosphorIconsRegular.checkCircle,
         title: 'No tasks yet',
-        message: 'No tasks yet. Give Jarvis something to work on.',
+        message:
+            'Hand Jarvis something to work on in the background, like research or a summary. It reports back here.',
       ),
-      child: RefreshIndicator(
+      child: OrbRefresh(
         onRefresh: _load,
         child: ListView(
           padding: EdgeInsets.fromLTRB(
@@ -295,19 +324,34 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Widget _taskCard(Map<String, dynamic> task) {
+    final colors = JarvisColors.of(context);
     final status = asJsonString(task['status']) ?? 'queued';
     final style = statusStyle(status);
     final canCancel = ['queued', 'running', 'needs_approval'].contains(status);
+    final needsYou = status == 'needs_approval';
     final summary = asJsonString(task['summary']);
     final date = _date(task['createdAt']);
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(16, 14, 6, 14),
+      padding: const EdgeInsets.fromLTRB(14, 14, 4, 14),
       onTap: () => _openTask(task),
+      // A task waiting on you stands out; finished ones step back.
+      borderColor: needsYou ? colors.warning.withValues(alpha: .45) : null,
+      color: status == 'completed' || status == 'cancelled'
+          ? Color.lerp(colors.surface, colors.canvas, .5)
+          : null,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          IconBadge(icon: style.icon),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: style.color.withValues(alpha: colors.isDark ? .2 : .1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(style.icon, size: 19, color: style.color),
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -317,18 +361,24 @@ class _TasksScreenState extends State<TasksScreen> {
                   asJsonString(task['title']) ?? 'Task',
                   style: Theme.of(
                     context,
-                  ).textTheme.titleSmall?.copyWith(fontSize: 15),
+                  ).textTheme.titleSmall?.copyWith(fontSize: 15, height: 1.3),
                 ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    StatusPill(label: style.label, color: style.color),
-                    if (date.isNotEmpty)
-                      Text(date, style: Theme.of(context).textTheme.bodySmall),
-                  ],
+                const SizedBox(height: 5),
+                // One quiet line of status and time, in the status colour.
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: style.label,
+                        style: TextStyle(
+                          color: style.color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (date.isNotEmpty) TextSpan(text: '  ·  $date'),
+                    ],
+                  ),
+                  style: TextStyle(fontSize: 12.5, color: colors.muted),
                 ),
                 if (summary?.isNotEmpty == true) ...[
                   const SizedBox(height: 8),
@@ -337,7 +387,7 @@ class _TasksScreenState extends State<TasksScreen> {
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: JarvisColors.of(context).inkSoft,
+                      color: colors.inkSoft,
                       fontSize: 13.5,
                     ),
                   ),
@@ -346,18 +396,25 @@ class _TasksScreenState extends State<TasksScreen> {
             ),
           ),
           if (canCancel)
-            IconButton(
-              tooltip: 'Cancel task',
-              onPressed: () => _cancel(task),
-              icon: const Icon(PhosphorIconsRegular.x, size: 20),
+            PopupMenuButton<String>(
+              tooltip: 'Task actions',
+              icon: Icon(
+                PhosphorIconsRegular.dotsThree,
+                size: 20,
+                color: colors.muted,
+              ),
+              onSelected: (_) => _cancel(task),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'cancel', child: Text('Cancel task')),
+              ],
             )
           else
             Padding(
-              padding: EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               child: Icon(
                 PhosphorIconsRegular.caretRight,
                 size: 16,
-                color: JarvisColors.of(context).muted,
+                color: colors.muted,
               ),
             ),
         ],

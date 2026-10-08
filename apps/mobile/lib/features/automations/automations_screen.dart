@@ -133,7 +133,7 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
   Future<void> _create() async {
     final zone = await deviceTimeZoneLookup() ?? await _savedTimeZone();
     if (!mounted) return;
-    final created = await showDialog<_NewAutomation>(
+    final created = await showJarvisDialog<_NewAutomation>(
       context: context,
       builder: (_) => _NewAutomationDialog(timeZoneId: zone),
     );
@@ -298,7 +298,7 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Automations'),
+      title: const PageTitle('Automations'),
       actions: [
         HeaderAction(
           key: const Key('automations-studio'),

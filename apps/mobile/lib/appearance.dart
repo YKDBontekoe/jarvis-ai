@@ -20,22 +20,45 @@ enum AppearancePreference {
   };
 }
 
+/// How much the app moves: follow the device's Reduce Motion setting, or
+/// choose for Jarvis alone.
+enum MotionPreference {
+  system,
+  full,
+  reduced;
+
+  static MotionPreference parse(String? value) => switch (value) {
+    'full' => MotionPreference.full,
+    'reduced' => MotionPreference.reduced,
+    _ => MotionPreference.system,
+  };
+}
+
 abstract class AppearanceStore {
   Future<String?> read();
   Future<void> write(String value);
+  Future<String?> readMotion();
+  Future<void> writeMotion(String value);
 }
 
 /// In-memory store for tests and when OS storage is unavailable.
 class MemoryAppearanceStore implements AppearanceStore {
-  MemoryAppearanceStore([this.value]);
+  MemoryAppearanceStore([this.value, this.motion]);
 
   String? value;
+  String? motion;
 
   @override
   Future<String?> read() async => value;
 
   @override
   Future<void> write(String next) async => value = next;
+
+  @override
+  Future<String?> readMotion() async => motion;
+
+  @override
+  Future<void> writeMotion(String next) async => motion = next;
 }
 
 class SecureAppearanceStore implements AppearanceStore {
@@ -43,21 +66,32 @@ class SecureAppearanceStore implements AppearanceStore {
     : _storage = storage ?? const FlutterSecureStorage();
 
   static const key = 'jarvis.appearance';
+  static const motionKey = 'jarvis.motion';
   final FlutterSecureStorage _storage;
 
   @override
-  Future<String?> read() async {
+  Future<String?> read() => _read(key);
+
+  @override
+  Future<void> write(String value) => _write(key, value);
+
+  @override
+  Future<String?> readMotion() => _read(motionKey);
+
+  @override
+  Future<void> writeMotion(String value) => _write(motionKey, value);
+
+  Future<String?> _read(String name) async {
     try {
-      return await _storage.read(key: key);
+      return await _storage.read(key: name);
     } catch (_) {
       return null;
     }
   }
 
-  @override
-  Future<void> write(String value) async {
+  Future<void> _write(String name, String value) async {
     try {
-      await _storage.write(key: key, value: value);
+      await _storage.write(key: name, value: value);
     } catch (_) {}
   }
 }
@@ -68,6 +102,7 @@ class AppearanceController extends ChangeNotifier {
 
   final AppearanceStore _store;
   AppearancePreference preference = AppearancePreference.system;
+  MotionPreference motion = MotionPreference.system;
   var _loaded = false;
 
   bool get loaded => _loaded;
@@ -75,9 +110,24 @@ class AppearanceController extends ChangeNotifier {
 
   Future<void> load() async {
     preference = AppearancePreference.parse(await _store.read());
+    motion = MotionPreference.parse(await _store.readMotion());
     _loaded = true;
     notifyListeners();
   }
+
+  Future<void> setMotion(MotionPreference value) async {
+    if (motion == value) return;
+    motion = value;
+    notifyListeners();
+    await _store.writeMotion(value.name);
+  }
+
+  /// Applies [motion] on top of the device setting that [data] carries.
+  MediaQueryData applyMotion(MediaQueryData data) => switch (motion) {
+    MotionPreference.system => data,
+    MotionPreference.full => data.copyWith(disableAnimations: false),
+    MotionPreference.reduced => data.copyWith(disableAnimations: true),
+  };
 
   Future<void> setPreference(AppearancePreference value) async {
     if (preference == value) return;

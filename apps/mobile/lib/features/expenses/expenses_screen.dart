@@ -121,7 +121,7 @@ class _ExpensesScreenState extends State<ExpensesScreen>
     final monthName = monthLabel(_month.year, _month.month, now: _now);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Expenses'),
+        title: const PageTitle('Expenses'),
         actions: [
           HeaderAction(
             key: const Key('expenses-finance'),

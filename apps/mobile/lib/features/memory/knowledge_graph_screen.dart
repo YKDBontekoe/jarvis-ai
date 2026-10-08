@@ -303,7 +303,7 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Knowledge graph'),
+      title: const PageTitle('Knowledge graph'),
       actions: [
         IconButton(
           tooltip: 'Refresh',

@@ -60,7 +60,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
   }
 
   Future<void> _createWatch() async {
-    final created = await showDialog<_NewWatch>(
+    final created = await showJarvisDialog<_NewWatch>(
       context: context,
       builder: (_) => const _NewWatchDialog(),
     );
@@ -153,7 +153,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Condition watches'),
+      title: const PageTitle('Condition watches'),
       actions: [
         IconButton(
           tooltip: 'Refresh watches',
@@ -177,9 +177,9 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
       empty: const EmptyState(
         icon: PhosphorIconsRegular.pulse,
         title: 'No watches yet',
-        message: 'No watches yet. Set a threshold and Jarvis will keep an eye on it.',
+        message: 'Set a threshold, like a price or a temperature, and Jarvis keeps an eye on it for you.',
       ),
-      child: RefreshIndicator(
+      child: OrbRefresh(
         onRefresh: _load,
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),

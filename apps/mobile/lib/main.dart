@@ -103,12 +103,26 @@ class _JarvisAppState extends State<JarvisApp> {
         theme: buildJarvisTheme(),
         darkTheme: buildJarvisTheme(brightness: Brightness.dark),
         themeMode: _appearance.themeMode,
-        builder: appLock == null
-            ? null
-            : (context, child) => AppLockGate(
-                controller: appLock,
-                child: child ?? const SizedBox.shrink(),
-              ),
+        builder: (context, child) {
+          final content = child ?? const SizedBox.shrink();
+          final media = MediaQuery.of(context);
+          final theme = Theme.of(context);
+          // On very narrow phones titles sit closer to the back button.
+          final narrow = media.size.width < 360;
+          return MediaQuery(
+            data: _appearance.applyMotion(media),
+            child: Theme(
+              data: narrow
+                  ? theme.copyWith(
+                      appBarTheme: theme.appBarTheme.copyWith(titleSpacing: 6),
+                    )
+                  : theme,
+              child: appLock == null
+                  ? content
+                  : AppLockGate(controller: appLock, child: content),
+            ),
+          );
+        },
         home: ChatScreen(skipAuthentication: widget.skipAuthentication),
       ),
     );

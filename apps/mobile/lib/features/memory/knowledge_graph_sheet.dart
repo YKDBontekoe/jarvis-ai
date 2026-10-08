@@ -29,7 +29,7 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
           shadowColor: const Color(0x30111113),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
           clipBehavior: Clip.antiAlias,
-          child: RefreshIndicator(
+          child: OrbRefresh(
             onRefresh: _load,
             child: ListView(
               controller: controller,

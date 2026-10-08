@@ -76,7 +76,7 @@ class _CodingRunsScreenState extends State<CodingRunsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Coding runs'),
+      title: const PageTitle('Coding runs'),
       actions: [
         IconButton(
           tooltip: 'Refresh coding runs',
@@ -95,7 +95,7 @@ class _CodingRunsScreenState extends State<CodingRunsScreen> {
         title: 'No coding runs yet',
         message: 'When you approve a coding task, Jarvis records the isolated worktree and diff here.',
       ),
-      child: RefreshIndicator(
+      child: OrbRefresh(
         onRefresh: _load,
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),

@@ -98,7 +98,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Profiles'),
+      title: const PageTitle('Profiles'),
       actions: [
         HeaderAction(
           label: 'New',
@@ -115,7 +115,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
       onRefresh: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.userCircle,
-        title: 'No profiles yet.',
+        title: 'No profiles yet',
         message: 'Jarvis will create a default profile on first use.',
       ),
       child: ListView.builder(
