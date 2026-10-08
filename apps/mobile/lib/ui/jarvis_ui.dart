@@ -672,10 +672,29 @@ class SkeletonList extends StatefulWidget {
 
 class _SkeletonListState extends State<SkeletonList>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _shimmer = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  )..repeat();
+  // Created up front: a lazy controller first made in dispose() would build
+  // its ticker on a deactivated element.
+  late final AnimationController _shimmer;
+
+  @override
+  void initState() {
+    super.initState();
+    _shimmer = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Shimmer only while motion is welcome.
+    if (JarvisMotion.reduced(context)) {
+      _shimmer.stop();
+    } else if (!_shimmer.isAnimating) {
+      _shimmer.repeat();
+    }
+  }
 
   @override
   void dispose() {

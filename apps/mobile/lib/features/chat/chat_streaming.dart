@@ -48,10 +48,16 @@ class StreamingMarkdown extends StatefulWidget {
 
 class _StreamingMarkdownState extends State<StreamingMarkdown>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _fade = AnimationController(
-    vsync: this,
-    duration: StreamingMarkdown.step,
-  )..addStatusListener(_stepDone);
+  // Created up front: a reply that never animates would otherwise first touch
+  // the controller in dispose(), on a deactivated element.
+  late final AnimationController _fade;
+
+  @override
+  void initState() {
+    super.initState();
+    _fade = AnimationController(vsync: this, duration: StreamingMarkdown.step)
+      ..addStatusListener(_stepDone);
+  }
 
   /// Fully shown text.
   late String _settled = widget.data;

@@ -336,13 +336,21 @@ class SwipeToReply extends StatefulWidget {
 
 class _SwipeToReplyState extends State<SwipeToReply>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _back = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 420),
-  )..addListener(_settle);
+  // Created up front: a lazy controller first touched in dispose() would
+  // build its ticker on a deactivated element.
+  late final AnimationController _back;
   double _offset = 0;
   double _releasedAt = 0;
   bool _armed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _back = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    )..addListener(_settle);
+  }
 
   void _settle() => setState(
     () =>
