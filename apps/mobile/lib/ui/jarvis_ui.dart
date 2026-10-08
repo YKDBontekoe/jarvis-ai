@@ -353,63 +353,105 @@ class SectionHeader extends StatelessWidget {
 /// The empty-state icon: it springs in over a soft accent glow while a ring
 /// ripples out once, so an empty screen still feels alive.
 class _EmptyIcon extends StatelessWidget {
-  const _EmptyIcon({required this.icon});
+  const _EmptyIcon({required this.icon, required this.tone});
 
   final IconData icon;
+  final Color tone;
 
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     final tile = Container(
-      width: 52,
-      height: 52,
+      width: 64,
+      height: 64,
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colors.outline),
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colors.surface,
+            Color.lerp(colors.surface, tone, colors.isDark ? .18 : .10)!,
+          ],
+        ),
+        border: Border.all(color: tone.withValues(alpha: .22)),
         boxShadow: [
           ...JarvisShadows.soft(colors.brightness),
           BoxShadow(
-            color: colors.accent.withValues(alpha: colors.isDark ? .22 : .12),
-            blurRadius: 28,
-            spreadRadius: 2,
+            color: tone.withValues(alpha: colors.isDark ? .25 : .16),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-      child: Icon(icon, size: 24, color: colors.inkSoft),
+      child: Icon(icon, size: 28, color: tone),
     );
-    if (JarvisMotion.reduced(context)) return tile;
-    return SizedBox.square(
-      dimension: 52,
+    // A soft pool of light behind the tile, with two small satellites.
+    final scene = SizedBox(
+      width: 140,
+      height: 100,
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: 1),
-            duration: const Duration(milliseconds: 1300),
-            curve: const Interval(.2, 1, curve: Curves.easeOutCubic),
-            builder: (context, t, _) => t >= 1
-                ? const SizedBox.shrink()
-                : IgnorePointer(
-                    child: Container(
-                      width: 52 + 60 * t,
-                      height: 52 + 60 * t,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14 + 30 * t),
-                        border: Border.all(
-                          color: colors.accent.withValues(alpha: .3 * (1 - t)),
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
-                  ),
+          Container(
+            width: 140,
+            height: 140,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  tone.withValues(alpha: colors.isDark ? .16 : .11),
+                  tone.withValues(alpha: 0),
+                ],
+              ),
+            ),
           ),
+          Positioned(left: 22, top: 18, child: _dot(colors.violet, 7)),
+          Positioned(right: 26, bottom: 16, child: _dot(colors.sky, 5)),
+          Positioned(right: 30, top: 10, child: _dot(tone, 4)),
           PopIn(from: .5, child: tile),
         ],
       ),
     );
+    if (JarvisMotion.reduced(context)) return scene;
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1),
+          duration: const Duration(milliseconds: 1300),
+          curve: const Interval(.2, 1, curve: Curves.easeOutCubic),
+          builder: (context, t, _) => t >= 1
+              ? const SizedBox.shrink()
+              : IgnorePointer(
+                  child: Container(
+                    width: 64 + 64 * t,
+                    height: 64 + 64 * t,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20 + 40 * t),
+                      border: Border.all(
+                        color: tone.withValues(alpha: .3 * (1 - t)),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+        scene,
+      ],
+    );
   }
+
+  Widget _dot(Color color, double size) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: color.withValues(alpha: .55),
+    ),
+  );
 }
 
 /// Centered illustration + copy for empty lists.
@@ -419,6 +461,8 @@ class EmptyState extends StatelessWidget {
     required this.title,
     this.message,
     this.action,
+    this.tone,
+    this.hint,
     super.key,
   });
 
@@ -426,6 +470,12 @@ class EmptyState extends StatelessWidget {
   final String title;
   final String? message;
   final Widget? action;
+
+  /// Colours the icon and its halo; the accent when null.
+  final Color? tone;
+
+  /// A quieter line under the action, such as what to check.
+  final String? hint;
 
   @override
   Widget build(BuildContext context) {
@@ -440,12 +490,17 @@ class EmptyState extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _EmptyIcon(icon: icon),
-                const SizedBox(height: 18),
+                _EmptyIcon(
+                  icon: icon,
+                  tone: tone ?? JarvisColors.of(context).accent,
+                ),
+                const SizedBox(height: 20),
                 Text(
                   title,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.titleMedium,
+                  style: JarvisType.displayOf(
+                    context,
+                  ).copyWith(fontSize: 21, letterSpacing: -.4),
                 ),
                 if (message != null) ...[
                   const SizedBox(height: 6),
@@ -457,7 +512,17 @@ class EmptyState extends StatelessWidget {
                     ),
                   ),
                 ],
-                if (action != null) ...[const SizedBox(height: 20), action!],
+                if (action != null) ...[const SizedBox(height: 22), action!],
+                if (hint != null) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    hint!,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: JarvisColors.of(context).muted,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -476,11 +541,15 @@ class ErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) => EmptyState(
     icon: PhosphorIconsRegular.cloudSlash,
-    title: 'Something went wrong',
+    tone: JarvisColors.of(context).warning,
+    title: 'Jarvis couldn’t load this',
     message: message,
+    hint: onRetry == null
+        ? null
+        : 'Check your connection, or try again in a moment.',
     action: onRetry == null
         ? null
-        : OutlinedButton.icon(
+        : FilledButton.tonalIcon(
             onPressed: onRetry,
             icon: const Icon(PhosphorIconsRegular.arrowsClockwise, size: 18),
             label: const Text('Retry'),
@@ -1015,32 +1084,40 @@ class PageTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final base = DefaultTextStyle.of(context).style.merge(style);
+    final size = base.fontSize ?? 26;
     return LayoutBuilder(
       builder: (context, box) {
+        TextStyle at(double scale) => base.copyWith(fontSize: size * scale);
         var scale = 1.0;
         if (box.maxWidth.isFinite) {
-          final painter = TextPainter(
-            text: TextSpan(text: text, style: base),
-            maxLines: 1,
-            textDirection: Directionality.of(context),
-            textScaler: MediaQuery.textScalerOf(context),
-          )..layout();
-          if (painter.width > box.maxWidth) {
-            scale = math.max(minScale, box.maxWidth / painter.width * .99);
+          double width(double scale) {
+            final painter = TextPainter(
+              text: TextSpan(text: text, style: at(scale)),
+              maxLines: 1,
+              textDirection: Directionality.of(context),
+              textScaler: MediaQuery.textScalerOf(context),
+            )..layout();
+            final result = painter.width;
+            painter.dispose();
+            return result;
           }
-          painter.dispose();
+
+          // Letter spacing does not shrink with the font, so step down and
+          // measure again rather than trusting a straight ratio.
+          final full = width(1);
+          if (full > box.maxWidth) {
+            scale = math.max(minScale, box.maxWidth / full);
+            while (scale > minScale && width(scale) > box.maxWidth) {
+              scale = math.max(minScale, scale - .03);
+            }
+          }
         }
-        final size = base.fontSize ?? 26;
         return Text(
           text,
           maxLines: 1,
           softWrap: false,
           overflow: TextOverflow.ellipsis,
-          style: base.copyWith(
-            fontSize: size * scale,
-            // Tighter letters at small sizes would read as cramped.
-            letterSpacing: (base.letterSpacing ?? 0) * scale,
-          ),
+          style: at(scale),
         );
       },
     );
@@ -1239,23 +1316,37 @@ class HeaderAction extends StatelessWidget {
             child: CircularProgressIndicator(strokeWidth: 1.8),
           )
         : Icon(icon, size: iconOnly ? 18 : 16);
+    if (iconOnly && collapsesWhenNarrow) return _iconOnly(leading);
     return Padding(
       padding: const EdgeInsets.only(left: 4, right: 12),
       child: iconOnly ? _iconOnly(leading) : _labelled(leading),
     );
   }
 
-  Widget _iconOnly(Widget leading) => Tooltip(
-    message: label,
-    child: _button(
-      onPressed: busy ? null : onPressed,
-      style: _style().copyWith(
-        minimumSize: const WidgetStatePropertyAll(Size(34, 34)),
-        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
-      ),
-      child: Semantics(label: label, excludeSemantics: true, child: leading),
-    ),
-  );
+  // Secondary actions without a label look like every other header icon;
+  // a primary one stays a filled circle so it still reads as the main action.
+  Widget _iconOnly(Widget leading) => collapsesWhenNarrow
+      ? IconButton(
+          tooltip: label,
+          onPressed: busy ? null : onPressed,
+          icon: Semantics(label: label, excludeSemantics: true, child: leading),
+        )
+      : Tooltip(
+          message: label,
+          child: _button(
+            onPressed: busy ? null : onPressed,
+            style: _style().copyWith(
+              minimumSize: const WidgetStatePropertyAll(Size(36, 36)),
+              padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+              shape: const WidgetStatePropertyAll(CircleBorder()),
+            ),
+            child: Semantics(
+              label: label,
+              excludeSemantics: true,
+              child: leading,
+            ),
+          ),
+        );
 
   Widget _labelled(Widget leading) => _button(
     onPressed: busy ? null : onPressed,
@@ -1288,12 +1379,10 @@ class HeaderAction extends StatelessWidget {
       : FilledButton(onPressed: onPressed, style: style, child: child);
 
   ButtonStyle _style() => FilledButton.styleFrom(
-    minimumSize: const Size(0, 34),
-    padding: const EdgeInsets.symmetric(horizontal: 12),
+    minimumSize: const Size(0, 36),
+    padding: const EdgeInsets.fromLTRB(12, 0, 14, 0),
     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(JarvisRadii.sm + 2),
-    ),
+    shape: const StadiumBorder(),
     textStyle: const TextStyle(
       fontFamily: 'Geist',
       fontSize: 13.5,

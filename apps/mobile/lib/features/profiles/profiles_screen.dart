@@ -115,7 +115,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
       onRefresh: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.userCircle,
-        title: 'No profiles yet.',
+        title: 'No profiles yet',
         message: 'Jarvis will create a default profile on first use.',
       ),
       child: ListView.builder(

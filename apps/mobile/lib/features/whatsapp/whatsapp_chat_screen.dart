@@ -1207,7 +1207,7 @@ class _Composer extends StatelessWidget {
                         key: const Key('whatsapp-send'),
                         tooltip: 'Send from your WhatsApp',
                         style: IconButton.styleFrom(
-                          backgroundColor: const Color(0xff1daa61),
+                          backgroundColor: whatsAppDeepGreen,
                           foregroundColor: Colors.white,
                           disabledBackgroundColor: colors.surfaceMuted,
                           disabledForegroundColor: colors.muted,

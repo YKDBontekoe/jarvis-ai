@@ -10,6 +10,9 @@ import '../../ui/phosphor_icons.dart';
 /// WhatsApp's own green, for the bits of the chat that should feel like it.
 const whatsAppGreen = Color(0xff25d366);
 
+/// WhatsApp's deeper green for filled controls: unread counts, the send button.
+const whatsAppDeepGreen = Color(0xff1daa61);
+
 /// The tint of your own bubbles: WhatsApp's pale green by day, its deep teal
 /// at night, so a WhatsApp chat reads as WhatsApp at a glance.
 ({Color top, Color bottom, Color meta}) whatsAppMineBubble(

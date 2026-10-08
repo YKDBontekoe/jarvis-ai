@@ -648,8 +648,10 @@ class _ConversationRow extends StatelessWidget {
             if (!largeText && chat.lastMessageAt != null)
               Text(
                 whatsAppListTime(chat.lastMessageAt),
+                // Like WhatsApp, the time of an unread chat is green.
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: unread ? colors.inkSoft : colors.muted,
+                  color: unread ? whatsAppDeepGreen : colors.muted,
+                  fontWeight: unread ? FontWeight.w600 : null,
                 ),
               ),
             if (unread) ...[
@@ -658,22 +660,26 @@ class _ConversationRow extends StatelessWidget {
                 message: 'Unread in Jarvis',
                 child: Semantics(
                   label: '${chat.unreadCount} unread messages in Jarvis',
-                  child: Container(
-                    key: Key('whatsapp-unread-${chat.chatId}'),
-                    constraints: const BoxConstraints(
-                      minWidth: 22,
-                      minHeight: 22,
-                    ),
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    decoration: BoxDecoration(
-                      color: colors.ink,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${chat.unreadCount}',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colors.onInk,
+                  child: PopIn(
+                    child: Container(
+                      key: Key('whatsapp-unread-${chat.chatId}'),
+                      constraints: const BoxConstraints(
+                        minWidth: 22,
+                        minHeight: 22,
+                      ),
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      decoration: BoxDecoration(
+                        color: whatsAppDeepGreen,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${chat.unreadCount}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
                     ),
                   ),

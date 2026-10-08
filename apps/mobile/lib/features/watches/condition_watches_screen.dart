@@ -177,7 +177,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
       empty: const EmptyState(
         icon: PhosphorIconsRegular.pulse,
         title: 'No watches yet',
-        message: 'No watches yet. Set a threshold and Jarvis will keep an eye on it.',
+        message: 'Set a threshold, like a price or a temperature, and Jarvis keeps an eye on it for you.',
       ),
       child: OrbRefresh(
         onRefresh: _load,

@@ -79,7 +79,7 @@ class _AuditScreenState extends State<AuditScreen> {
       onRefresh: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.listChecks,
-        title: 'No audited actions yet.',
+        title: 'Nothing logged yet',
         message:
             'Approvals, tasks, reminders, files, and memory changes are recorded here.',
       ),

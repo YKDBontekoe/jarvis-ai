@@ -9,6 +9,7 @@ import '../../theme.dart';
 import '../../ui/phosphor_icons.dart';
 import '../chat/chat_widgets.dart' show PhotoViewerPage;
 import 'whatsapp_models.dart';
+import 'whatsapp_visuals.dart' show whatsAppDeepGreen;
 import 'whatsapp_open_stub.dart'
     if (dart.library.io) 'whatsapp_open_io.dart'
     if (dart.library.js_interop) 'whatsapp_open_web.dart';
@@ -379,7 +380,7 @@ class _VoiceNote extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     final duration = _clock(media.seconds);
-    final tint = mine ? const Color(0xff1daa61) : colors.accent;
+    final tint = mine ? whatsAppDeepGreen : colors.accent;
     final reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final samples = media.waveform;
     return Semantics(

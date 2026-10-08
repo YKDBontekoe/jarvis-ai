@@ -314,7 +314,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         onRefresh: _load,
         empty: const EmptyState(
           icon: PhosphorIconsRegular.chatsCircle,
-          title: 'No conversations yet.',
+          title: 'No conversations yet',
           message: 'Start a new conversation and it will appear here.',
         ),
         child: CustomScrollView(
