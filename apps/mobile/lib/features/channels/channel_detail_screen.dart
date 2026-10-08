@@ -252,7 +252,7 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
     final kind = channelKind(asJsonString(channel?['kind']) ?? '');
     return Scaffold(
       appBar: AppBar(
-        title: Text(asJsonString(channel?['displayName']) ?? 'Channel'),
+        title: PageTitle(asJsonString(channel?['displayName']) ?? 'Channel'),
         actions: [
           IconButton(
             tooltip: 'Send a test message',

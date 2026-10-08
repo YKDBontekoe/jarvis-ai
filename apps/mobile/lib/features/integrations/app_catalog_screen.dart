@@ -203,7 +203,7 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
     final query = _search.text.trim();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Browse apps'),
+        title: const PageTitle('Browse apps'),
         actions: [
           HeaderAction(
             label: 'Paste address',

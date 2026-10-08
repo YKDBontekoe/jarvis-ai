@@ -86,7 +86,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Projects'),
+      title: const PageTitle('Projects'),
       actions: [
         HeaderAction(
           label: 'New',

@@ -111,7 +111,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(
+      title: PageTitle(
         asJsonString(_task?['title']) ?? 'Task',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,

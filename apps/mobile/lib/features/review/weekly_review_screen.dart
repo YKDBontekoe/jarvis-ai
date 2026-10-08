@@ -195,7 +195,7 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Weekly review'),
+      title: const PageTitle('Weekly review'),
       actions: [
         if (_overview != null)
           HeaderAction(

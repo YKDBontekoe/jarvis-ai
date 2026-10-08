@@ -133,7 +133,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Search'),
+        title: const PageTitle('Search'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(52),
           child: Padding(

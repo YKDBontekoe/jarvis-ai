@@ -61,7 +61,7 @@ class _AuditScreenState extends State<AuditScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Activity log'),
+      title: const PageTitle('Activity log'),
       actions: [
         IconButton(
           tooltip: 'Refresh audit log',

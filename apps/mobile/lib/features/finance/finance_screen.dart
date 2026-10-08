@@ -63,7 +63,7 @@ class _FinanceScreenState extends State<FinanceScreen>
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Finance'),
+      title: const PageTitle('Finance'),
       bottom: TabBar(
         controller: _tabs,
         isScrollable: true,

@@ -313,7 +313,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(
+      title: PageTitle(
         widget.conversationId == null ? 'Tool approvals' : 'Task approvals',
       ),
       actions: [

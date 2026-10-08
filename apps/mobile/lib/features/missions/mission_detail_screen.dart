@@ -106,7 +106,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
     final mission = _mission;
     return Scaffold(
       appBar: AppBar(
-        title: Text(mission?.title ?? 'Mission'),
+        title: PageTitle(mission?.title ?? 'Mission'),
         actions: mission == null ? null : _actions(mission),
       ),
       body: ContentWidth(

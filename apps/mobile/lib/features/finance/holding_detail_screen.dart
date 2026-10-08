@@ -169,7 +169,7 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
     final colors = JarvisColors.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(holding?.symbol ?? 'Holding'),
+        title: PageTitle(holding?.symbol ?? 'Holding'),
         actions: [
           if (holding != null)
             IconButton(

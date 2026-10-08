@@ -190,18 +190,11 @@ class _UsageScreenState extends State<UsageScreen> {
           ),
   );
 
-  Widget _periodPicker() => Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    children: [
-      for (final (id, label) in _periods)
-        ChoiceChip(
-          key: Key('usage-period-$id'),
-          label: Text(label),
-          selected: _period == id,
-          onSelected: (_) => unawaited(_selectPeriod(id)),
-        ),
-    ],
+  Widget _periodPicker() => SegmentedPills<String>(
+    keyPrefix: 'usage-period',
+    options: _periods,
+    selected: _period,
+    onSelected: (id) => unawaited(_selectPeriod(id)),
   );
 
   Widget _personalization() {

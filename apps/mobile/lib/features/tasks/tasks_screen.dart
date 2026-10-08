@@ -179,30 +179,59 @@ class _TasksScreenState extends State<TasksScreen> {
     'needs_approval',
   };
 
+  void _openWatches() => Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(
+      builder: (_) => ConditionWatchesScreen(http: widget.http),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Tasks'),
+      title: const PageTitle('Tasks'),
       actions: [
-        IconButton(
-          tooltip: 'Approvals',
-          onPressed: _openApprovals,
-          icon: const Icon(PhosphorIconsRegular.shieldCheck),
-        ),
-        IconButton(
-          tooltip: 'Condition watches',
-          onPressed: () => Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(
-              builder: (_) => ConditionWatchesScreen(http: widget.http),
-            ),
+        // Narrow phones fold the secondary buttons into one menu, so the
+        // title keeps its room.
+        if (MediaQuery.sizeOf(context).width < 400)
+          PopupMenuButton<String>(
+            tooltip: 'More',
+            icon: const Icon(PhosphorIconsRegular.dotsThree),
+            onSelected: (value) => switch (value) {
+              'approvals' => _openApprovals(),
+              'watches' => _openWatches(),
+              'refresh' => _load(),
+              _ => null,
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'approvals', child: Text('Approvals')),
+              const PopupMenuItem(
+                value: 'watches',
+                child: Text('Condition watches'),
+              ),
+              PopupMenuItem(
+                value: 'refresh',
+                enabled: !_loading,
+                child: const Text('Refresh tasks'),
+              ),
+            ],
+          )
+        else ...[
+          IconButton(
+            tooltip: 'Approvals',
+            onPressed: _openApprovals,
+            icon: const Icon(PhosphorIconsRegular.shieldCheck),
           ),
-          icon: const Icon(PhosphorIconsRegular.pulse),
-        ),
-        IconButton(
-          tooltip: 'Refresh tasks',
-          onPressed: _loading ? null : _load,
-          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
-        ),
+          IconButton(
+            tooltip: 'Condition watches',
+            onPressed: _openWatches,
+            icon: const Icon(PhosphorIconsRegular.pulse),
+          ),
+          IconButton(
+            tooltip: 'Refresh tasks',
+            onPressed: _loading ? null : _load,
+            icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
+          ),
+        ],
         HeaderAction(
           label: 'New task',
           icon: PhosphorIconsRegular.plus,

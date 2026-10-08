@@ -154,7 +154,7 @@ class _ModesScreenState extends State<ModesScreen> {
     final state = _state;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Modes'),
+        title: const PageTitle('Modes'),
         actions: [
           HeaderAction(
             key: const Key('modes-ambient'),

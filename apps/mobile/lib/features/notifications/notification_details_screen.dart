@@ -104,7 +104,7 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(
+      title: PageTitle(
         _isReminder
             ? 'Reminder'
             : _isWatch

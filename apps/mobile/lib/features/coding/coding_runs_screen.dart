@@ -76,7 +76,7 @@ class _CodingRunsScreenState extends State<CodingRunsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Coding runs'),
+      title: const PageTitle('Coding runs'),
       actions: [
         IconButton(
           tooltip: 'Refresh coding runs',

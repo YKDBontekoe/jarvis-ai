@@ -99,7 +99,7 @@ class _JournalScreenState extends State<JournalScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Journal'),
+      title: const PageTitle('Journal'),
       actions: [
         if (widget.onTalkAboutDay != null)
           HeaderAction(

@@ -98,7 +98,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Profiles'),
+      title: const PageTitle('Profiles'),
       actions: [
         HeaderAction(
           label: 'New',

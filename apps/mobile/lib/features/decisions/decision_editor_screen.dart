@@ -118,7 +118,7 @@ class _DecisionEditorScreenState extends State<DecisionEditorScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(_editing ? 'Edit decision' : 'Log a decision'),
+      title: PageTitle(_editing ? 'Edit decision' : 'Log a decision'),
       actions: [
         HeaderAction(
           key: const Key('decision-save'),

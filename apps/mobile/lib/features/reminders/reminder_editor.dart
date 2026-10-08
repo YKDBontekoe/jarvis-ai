@@ -241,54 +241,58 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: const Text('Create a reminder'),
-    content: Form(
-      key: _formKey,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.only(top: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextFormField(
-              controller: _title,
-              autofocus: true,
-              maxLength: 300,
-              decoration: const InputDecoration(labelText: 'Remind me about'),
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Enter a reminder.'
-                  : null,
-            ),
-            const SizedBox(height: 4),
-            SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<bool>(
-                key: const Key('reminder-kind'),
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(
-                    value: false,
-                    label: Text('At a time'),
-                    icon: Icon(PhosphorIconsRegular.clock, size: 16),
-                  ),
-                  ButtonSegment(
-                    value: true,
-                    label: Text('At a place'),
-                    icon: Icon(PhosphorIconsRegular.mapPin, size: 16),
-                  ),
-                ],
-                selected: {_atPlace},
-                onSelectionChanged: (value) =>
-                    setState(() => _atPlace = value.first),
+    // Use the dialog's full width so dates and options stay on one line.
+    content: SizedBox(
+      width: 420,
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(top: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: _title,
+                autofocus: true,
+                maxLength: 300,
+                decoration: const InputDecoration(labelText: 'Remind me about'),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter a reminder.'
+                    : null,
               ),
-            ),
-            const SizedBox(height: 14),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.topCenter,
-              child: _atPlace ? _placeFields(context) : _timeFields(context),
-            ),
-          ],
+              const SizedBox(height: 4),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<bool>(
+                  key: const Key('reminder-kind'),
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(
+                      value: false,
+                      label: Text('At a time'),
+                      icon: Icon(PhosphorIconsRegular.clock, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: true,
+                      label: Text('At a place'),
+                      icon: Icon(PhosphorIconsRegular.mapPin, size: 16),
+                    ),
+                  ],
+                  selected: {_atPlace},
+                  onSelectionChanged: (value) =>
+                      setState(() => _atPlace = value.first),
+                ),
+              ),
+              const SizedBox(height: 14),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: _atPlace ? _placeFields(context) : _timeFields(context),
+              ),
+            ],
+          ),
         ),
       ),
     ),
@@ -473,23 +477,16 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final option in const [
-            ('once', 'Once'),
-            ('daily', 'Daily'),
-            ('weekdays', 'Weekdays'),
-            ('weekly', 'Weekly'),
-          ])
-            ChoiceChip(
-              key: Key('recurrence-${option.$1}'),
-              label: Text(option.$2),
-              selected: _recurrence == option.$1,
-              onSelected: (_) => setState(() => _recurrence = option.$1),
-            ),
+      SegmentedPills<String>(
+        keyPrefix: 'recurrence',
+        options: const [
+          ('once', 'Once'),
+          ('daily', 'Daily'),
+          ('weekdays', 'Weekdays'),
+          ('weekly', 'Weekly'),
         ],
+        selected: _recurrence,
+        onSelected: (value) => setState(() => _recurrence = value),
       ),
       if (_recurrence == 'weekly') ...[
         const SizedBox(height: 10),

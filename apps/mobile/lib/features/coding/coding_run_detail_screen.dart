@@ -176,7 +176,7 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
     final run = _run;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Coding run'),
+        title: const PageTitle('Coding run'),
         actions: [
           IconButton(
             tooltip: 'Refresh',

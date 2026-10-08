@@ -292,7 +292,7 @@ class _PeopleScreenState extends State<PeopleScreen>
     var index = 0;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('People'),
+        title: const PageTitle('People'),
         actions: [
           HeaderAction(
             label: 'Add',

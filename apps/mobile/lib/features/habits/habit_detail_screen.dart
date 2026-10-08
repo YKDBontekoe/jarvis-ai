@@ -124,7 +124,7 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
       child: Scaffold(
         appBar: AppBar(
           leading: BackButton(onPressed: _close),
-          title: Text(habit.name),
+          title: PageTitle(habit.name),
           actions: [
             if (!habit.archived)
               IconButton(

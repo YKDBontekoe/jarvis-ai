@@ -252,7 +252,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Memory'),
+      title: const PageTitle('Memory'),
       actions: [
         IconButton(
           tooltip: 'Knowledge graph',
@@ -386,8 +386,11 @@ class _MemoryScreenState extends State<MemoryScreen> {
     final kind = asJsonString(memory['kind']) ?? 'fact';
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(16, 10, 6, 14),
-      borderColor: JarvisColors.of(context).outline,
+      padding: const EdgeInsets.fromLTRB(16, 6, 4, 16),
+      onTap: () => _editMemory(memory),
+      borderColor: isPinned
+          ? JarvisColors.of(context).accent.withValues(alpha: .3)
+          : JarvisColors.of(context).outline,
       color: isSuperseded
           ? JarvisColors.of(context).canvas
           : JarvisColors.of(context).surface,
@@ -405,33 +408,46 @@ class _MemoryScreenState extends State<MemoryScreen> {
                 ),
               ],
               const Spacer(),
-              IconButton(
-                tooltip: isPinned ? 'Unpin memory' : 'Pin memory',
-                onPressed: () => _togglePinned(memory),
-                visualDensity: VisualDensity.compact,
-                style: IconButton.styleFrom(
-                  foregroundColor: isPinned
-                      ? JarvisColors.of(context).ink
-                      : JarvisColors.of(context).muted,
+              if (isPinned)
+                Padding(
+                  padding: const EdgeInsets.only(right: 2),
+                  child: Tooltip(
+                    message: 'Pinned',
+                    child: Icon(
+                      PhosphorIconsFill.pushPin,
+                      size: 15,
+                      color: JarvisColors.of(context).accent,
+                    ),
+                  ),
                 ),
+              // One quiet menu instead of three buttons on every card.
+              PopupMenuButton<String>(
+                tooltip: 'Memory actions',
                 icon: Icon(
-                  isPinned
-                      ? PhosphorIconsFill.pushPin
-                      : PhosphorIconsRegular.pushPin,
-                  size: 19,
+                  PhosphorIconsRegular.dotsThree,
+                  size: 20,
+                  color: JarvisColors.of(context).muted,
                 ),
-              ),
-              IconButton(
-                tooltip: 'Edit memory',
-                onPressed: () => _editMemory(memory),
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 19),
-              ),
-              IconButton(
-                tooltip: 'Delete memory',
-                onPressed: () => _deleteMemory(memory),
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(PhosphorIconsRegular.trash, size: 19),
+                onSelected: (action) => switch (action) {
+                  'pin' => _togglePinned(memory),
+                  'edit' => _editMemory(memory),
+                  'delete' => _deleteMemory(memory),
+                  _ => null,
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'pin',
+                    child: Text(isPinned ? 'Unpin memory' : 'Pin memory'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Text('Edit memory'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Delete memory'),
+                  ),
+                ],
               ),
             ],
           ),

@@ -111,7 +111,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
     final disabled = byStatus('disabled');
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Skills'),
+        title: const PageTitle('Skills'),
         actions: [
           IconButton(
             tooltip: 'Import SKILL.md',

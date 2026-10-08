@@ -143,7 +143,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
     final archived = _archived;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Habits'),
+        title: const PageTitle('Habits'),
         actions: [
           IconButton(
             key: const Key('habit-settings'),

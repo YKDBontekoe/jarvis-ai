@@ -270,7 +270,7 @@ class _FilesScreenState extends State<FilesScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Files'),
+      title: const PageTitle('Files'),
       actions: [
         IconButton(
           onPressed: _load,

@@ -233,7 +233,7 @@ class _AutomationStudioScreenState extends State<AutomationStudioScreen> {
     length: 3,
     child: Scaffold(
       appBar: AppBar(
-        title: const Text('Automation studio'),
+        title: const PageTitle('Automation studio'),
         bottom: const TabBar(
           tabs: [
             Tab(key: Key('studio-tab-templates'), text: 'Templates'),

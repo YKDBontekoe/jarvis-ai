@@ -104,7 +104,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
     final colors = JarvisColors.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Missions'),
+        title: const PageTitle('Missions'),
         actions: [
           HeaderAction(
             key: const Key('mission-new'),

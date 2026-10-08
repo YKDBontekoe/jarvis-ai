@@ -220,7 +220,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     length: 2,
     child: Scaffold(
       appBar: AppBar(
-        title: const Text('Library'),
+        title: const PageTitle('Library'),
         bottom: TabBar(
           tabs: [
             const Tab(key: Key('library-tab-items'), text: 'Saved'),

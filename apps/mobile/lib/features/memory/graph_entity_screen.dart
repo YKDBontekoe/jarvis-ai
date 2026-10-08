@@ -243,7 +243,7 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
     final updated = jsonDate(entity['updatedAt'], local: true);
     return Scaffold(
       appBar: AppBar(
-        title: Text(asJsonString(entity['name']) ?? 'Entity'),
+        title: PageTitle(asJsonString(entity['name']) ?? 'Entity'),
         actions: [
           if (details != null)
             PopupMenuButton<String>(

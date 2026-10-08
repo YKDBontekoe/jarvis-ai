@@ -5,7 +5,7 @@ class _RemindersScreenState extends _RemindersController {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Reminders'),
+      title: const PageTitle('Reminders'),
       actions: [
         if (_unreadCount > 0)
           IconButton(

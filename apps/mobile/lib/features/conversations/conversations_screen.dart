@@ -291,7 +291,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     final searching = _query.trim().isNotEmpty;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Conversations'),
+        title: const PageTitle('Conversations'),
         actions: [
           IconButton(
             onPressed: _loading || _creating ? null : _load,

@@ -101,7 +101,7 @@ class _ProjectEditorScreenState extends State<ProjectEditorScreen> {
     final colors = JarvisColors.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(_editing ? 'Edit project' : 'New project'),
+        title: PageTitle(_editing ? 'Edit project' : 'New project'),
         actions: [
           HeaderAction(
             label: _editing ? 'Save' : 'Create',

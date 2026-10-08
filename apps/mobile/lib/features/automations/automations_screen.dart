@@ -298,7 +298,7 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Automations'),
+      title: const PageTitle('Automations'),
       actions: [
         HeaderAction(
           key: const Key('automations-studio'),

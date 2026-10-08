@@ -337,7 +337,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
     final project = _project;
     return Scaffold(
       appBar: AppBar(
-        title: Text(
+        title: PageTitle(
           project == null ? 'Project' : '',
           overflow: TextOverflow.ellipsis,
         ),

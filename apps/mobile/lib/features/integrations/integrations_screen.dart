@@ -132,7 +132,7 @@ class _IntegrationsScreenState extends _IntegrationsController
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Connected apps'),
+      title: const PageTitle('Connected apps'),
       actions: [
         HeaderAction(
           label: 'Add',

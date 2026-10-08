@@ -153,7 +153,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Condition watches'),
+      title: const PageTitle('Condition watches'),
       actions: [
         IconButton(
           tooltip: 'Refresh watches',

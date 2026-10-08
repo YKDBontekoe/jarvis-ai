@@ -188,7 +188,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Persona'),
+      title: const PageTitle('Persona'),
       actions: [
         HeaderAction(
           label: 'Teach',

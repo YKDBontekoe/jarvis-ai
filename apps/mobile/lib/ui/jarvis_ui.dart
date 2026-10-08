@@ -989,6 +989,215 @@ Future<bool> showJarvisConfirm(
   return confirmed ?? false;
 }
 
+/// An app bar title that keeps the whole word: when the actions leave too
+/// little room, the title gets smaller (down to a little over half its size)
+/// before it is ever cut short with an ellipsis.
+class PageTitle extends StatelessWidget {
+  const PageTitle(
+    this.text, {
+    this.style,
+    this.maxLines,
+    this.overflow,
+    this.minScale = .55,
+    super.key,
+  });
+
+  final String text;
+  final TextStyle? style;
+
+  // Accepted so a Text title can become a PageTitle unchanged; always one line.
+  final int? maxLines;
+  final TextOverflow? overflow;
+
+  /// The smallest the title may get, as a share of its normal size.
+  final double minScale;
+
+  @override
+  Widget build(BuildContext context) {
+    final base = DefaultTextStyle.of(context).style.merge(style);
+    return LayoutBuilder(
+      builder: (context, box) {
+        var scale = 1.0;
+        if (box.maxWidth.isFinite) {
+          final painter = TextPainter(
+            text: TextSpan(text: text, style: base),
+            maxLines: 1,
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context),
+          )..layout();
+          if (painter.width > box.maxWidth) {
+            scale = math.max(minScale, box.maxWidth / painter.width * .99);
+          }
+          painter.dispose();
+        }
+        final size = base.fontSize ?? 26;
+        return Text(
+          text,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
+          style: base.copyWith(
+            fontSize: size * scale,
+            // Tighter letters at small sizes would read as cramped.
+            letterSpacing: (base.letterSpacing ?? 0) * scale,
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// A row of equal options on one track, with a raised pill that slides to
+/// the chosen one. For short, mutually exclusive choices (Once / Daily / …)
+/// that should never wrap onto a second line.
+class SegmentedPills<T> extends StatelessWidget {
+  const SegmentedPills({
+    required this.options,
+    required this.selected,
+    required this.onSelected,
+    this.keyPrefix,
+    super.key,
+  });
+
+  /// Each value with its label.
+  final List<(T, String)> options;
+  final T selected;
+
+  /// Null disables the control; it is shown faded.
+  final ValueChanged<T>? onSelected;
+
+  /// When set, each option gets `Key('$keyPrefix-$value')` for tests and
+  /// automation.
+  final String? keyPrefix;
+
+  static const _labelStyle = TextStyle(fontFamily: 'Geist', fontSize: 13.5);
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final enabled = onSelected != null;
+    final index = math.max(
+      0,
+      options.indexWhere((option) => option.$1 == selected),
+    );
+    // Options share the track in proportion to their labels, so a long one
+    // ("Weekdays") is never squeezed to the size of a short one ("Once").
+    final natural = [
+      for (final (_, label) in options)
+        () {
+          final painter = TextPainter(
+            text: TextSpan(
+              text: label,
+              style: _labelStyle.copyWith(fontWeight: FontWeight.w600),
+            ),
+            maxLines: 1,
+            textDirection: Directionality.of(context),
+          )..layout();
+          final width = painter.width + 24;
+          painter.dispose();
+          return width;
+        }(),
+    ];
+    final total = natural.fold<double>(0, (sum, width) => sum + width);
+    final start = natural.take(index).fold<double>(0, (sum, w) => sum + w);
+    final share = natural[index] / total;
+    final track = Container(
+      height: 40,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: TweenAnimationBuilder<Offset>(
+              tween: Tween(end: Offset(start / total, share)),
+              duration: JarvisMotion.of(
+                context,
+                const Duration(milliseconds: 420),
+              ),
+              curve: JarvisSprings.soft,
+              builder: (context, slot, _) => Align(
+                // Align's x runs -1..1 across the room left beside the pill.
+                alignment: Alignment(
+                  slot.dy >= 1 ? 0 : -1 + 2 * slot.dx / (1 - slot.dy),
+                  0,
+                ),
+                child: FractionallySizedBox(
+                  widthFactor: slot.dy.clamp(0.0, 1.0),
+                  heightFactor: 1,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colors.isDark
+                          ? colors.surfaceRaised
+                          : colors.surface,
+                      borderRadius: BorderRadius.circular(9),
+                      boxShadow: JarvisShadows.hairline(colors.brightness),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              for (var i = 0; i < options.length; i++)
+                Expanded(
+                  flex: (natural[i] * 10).round(),
+                  child: Semantics(
+                    button: true,
+                    selected: options[i].$1 == selected,
+                    child: InkWell(
+                      key: keyPrefix == null
+                          ? null
+                          : Key('$keyPrefix-${options[i].$1}'),
+                      borderRadius: BorderRadius.circular(9),
+                      onTap: enabled
+                          ? () {
+                              if (options[i].$1 != selected) {
+                                HapticFeedback.selectionClick();
+                              }
+                              onSelected!(options[i].$1);
+                            }
+                          : null,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Center(
+                          // On a narrow screen the label shrinks rather than
+                          // being cut short.
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: AnimatedDefaultTextStyle(
+                              duration: JarvisMotion.of(
+                                context,
+                                JarvisMotion.fast,
+                              ),
+                              style: _labelStyle.copyWith(
+                                fontWeight: options[i].$1 == selected
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                                color: options[i].$1 == selected
+                                    ? colors.ink
+                                    : colors.inkSoft,
+                              ),
+                              child: Text(options[i].$2, maxLines: 1),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+    return enabled ? track : Opacity(opacity: .5, child: track);
+  }
+}
+
 /// Compact primary action for app bars, replacing floating action buttons.
 class HeaderAction extends StatelessWidget {
   const HeaderAction({
@@ -1011,15 +1220,19 @@ class HeaderAction extends StatelessWidget {
 
   static const _narrowWidth = 480.0;
 
+  /// Below this even the primary action drops its label, so the title fits.
+  static const _tinyWidth = 360.0;
+
   @override
   Widget build(BuildContext context) {
     // Large text leaves no room for a label next to the title, whatever the
     // screen width, so every action falls back to its icon.
     final bigText = MediaQuery.textScalerOf(context).scale(14) > 14 * 1.3;
+    final width = MediaQuery.sizeOf(context).width;
     final iconOnly =
         bigText ||
-        (collapsesWhenNarrow &&
-            MediaQuery.sizeOf(context).width < _narrowWidth);
+        width < _tinyWidth ||
+        (collapsesWhenNarrow && width < _narrowWidth);
     final leading = busy
         ? const SizedBox.square(
             dimension: 14,

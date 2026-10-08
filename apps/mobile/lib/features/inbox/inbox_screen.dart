@@ -142,7 +142,7 @@ class _InboxScreenState extends State<InboxScreen> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Inbox'),
+          title: const PageTitle('Inbox'),
           bottom: const TabBar(
             tabs: [
               Tab(key: Key('inbox-tab-threads'), text: 'Conversations'),
