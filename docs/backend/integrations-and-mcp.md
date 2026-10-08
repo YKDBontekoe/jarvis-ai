@@ -49,6 +49,36 @@ uv). Set `Mcp__Registry__BaseUrl` to an empty value to turn the catalog off, or 
 
 ### MCP runner
 
+#### iCloud Mail with the reviewed IMAP connector
+
+Register a stdio server named **iCloud Mail** with `npx` and arguments
+`["-y", "imap-mcp-server@2.1.0"]`. This exact name/package combination selects the
+iCloud Mail setup profile; other names and package versions retain normal connector behavior.
+It requires the isolated MCP runner. The owner supplies `icloud_email` and
+`icloud_app_password` through Jarvis's encrypted credential form. Use an Apple
+app-specific password, never the primary Apple Account password. Keep the server
+paused until those fields are saved, then enable it and approve `imap_test_account`
+to check authentication without retrieving messages.
+
+The profile recreates `~/.imap-mcp/accounts.json` in each session's temporary home:
+the directory is private (`0700`) and the file is private (`0600`), with empty credential
+placeholders. Credentials are injected through the package's supported account environment
+overrides; they are not written into that file or passed through agent tool arguments.
+The entire session directory is deleted when the connector stops. No shared configuration
+directory or persistent connector volume is required.
+
+Both Jarvis's tool selection and the connector's own registered tools are restricted to
+account listing/testing, folder listing/status, unread counts, message search/listing, and
+message reading. Sending, deletion, moves, flag changes, attachments and account mutations
+are excluded. These restrictions still require normal Jarvis tool approval. They are
+application restrictions: the Apple app-specific password itself is not scoped to read-only
+mail. Mail results can enter the configured inference provider's context.
+
+The profile is pinned to the reviewed `2.1.0` npm release. Re-audit and review the package
+before supporting another version; pinning the package does not lock its transitive
+dependencies. Catalog installation using the generic package name alone does not select
+this iCloud-specific setup profile.
+
 Owner-installed npm and PyPI connectors do not run inside the API or worker when `McpRunner:Url` is set. The
 `mcp-runner` service (the API image started as `Jarvis.Api.dll mcp-runner`) accepts one authenticated WebSocket
 per connection (`Authorization: Bearer <McpRunner:Token>`). The first text message is the launch spec

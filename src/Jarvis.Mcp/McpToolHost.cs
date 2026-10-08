@@ -258,6 +258,8 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             CredentialProvider = userServer.Id,
             ConnectionTimeoutSeconds = 30
         };
+        if (transport == "stdio" && ICloudMailMcpProfile.Matches(userServer.Name, userServer.Command, userServer.Arguments))
+            server.EnvironmentVariables[ICloudMailMcpProfile.SetupEnvironment] = ICloudMailMcpProfile.SetupValue;
         foreach (var binding in userServer.SecretBindings ?? [])
         {
             if (secrets?.ContainsKey(binding.SecretName) != true)
@@ -345,6 +347,9 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
     {
         if (server.ConnectionTimeoutSeconds is < 1 or > 300)
             throw new InvalidOperationException($"MCP server '{server.Name}' connection timeout must be between 1 and 300 seconds.");
+        if (server.EnvironmentVariables.ContainsKey(ICloudMailMcpProfile.SetupEnvironment) &&
+            McpRunnerOptions.From(configuration) is null)
+            throw new InvalidOperationException("The iCloud Mail profile requires the isolated MCP runner.");
 
         return server.Transport.Trim().ToLowerInvariant() switch
         {
