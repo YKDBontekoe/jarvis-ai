@@ -112,10 +112,10 @@ class _UsageScreenState extends State<UsageScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Usage')),
     body: _loading && _usage == null
-        ? const LoadingState()
+        ? const SkeletonList()
         : _error != null && _usage == null
         ? ErrorState(message: _error!, onRetry: () => unawaited(_load()))
-        : RefreshIndicator(
+        : OrbRefresh(
             onRefresh: _load,
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),

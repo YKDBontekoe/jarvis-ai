@@ -146,7 +146,7 @@ class _JournalScreenState extends State<JournalScreen> {
           ],
         ),
       ),
-      child: RefreshIndicator(
+      child: OrbRefresh(
         onRefresh: _load,
         child: ListView(
           padding: EdgeInsets.fromLTRB(

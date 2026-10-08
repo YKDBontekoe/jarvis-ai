@@ -166,7 +166,7 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
       ),
       body: skill == null
           ? (_error == null
-                ? const LoadingState()
+                ? const SkeletonList(shape: SkeletonShape.detail)
                 : ErrorState(
                     message: _error!,
                     onRetry: () => unawaited(_load()),

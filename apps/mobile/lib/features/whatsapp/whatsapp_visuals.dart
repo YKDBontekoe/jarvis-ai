@@ -26,31 +26,42 @@ const whatsAppGreen = Color(0xff25d366);
         meta: const Color(0xff5c7a66),
       );
 
-/// A stable colour per group member, as WhatsApp does for sender names.
+/// A stable colour per group member, as WhatsApp does for sender names:
+/// twelve hues spaced around the wheel, picked by a hash of their id.
 Color whatsAppSenderColor(String key, JarvisColors colors) {
   const light = [
-    Color(0xff1f7aec),
-    Color(0xffd6336c),
-    Color(0xff0c9d6a),
-    Color(0xffe8590c),
-    Color(0xff7048e8),
-    Color(0xff0b8a9c),
-    Color(0xffc2255c),
-    Color(0xff5c940d),
+    Color(0xff1f6feb), // blue
+    Color(0xffd6336c), // pink
+    Color(0xff0c9d6a), // green
+    Color(0xffe8590c), // orange
+    Color(0xff7048e8), // violet
+    Color(0xff0b8a9c), // teal
+    Color(0xffb8860b), // ochre
+    Color(0xffc92a2a), // red
+    Color(0xff5c940d), // lime
+    Color(0xff1c7ed6), // sky
+    Color(0xffae3ec9), // grape
+    Color(0xff8a5a44), // brown
   ];
   const dark = [
-    Color(0xff74b3ff),
+    Color(0xff74a9ff),
     Color(0xffff8fb5),
     Color(0xff5fe0ad),
     Color(0xffffa94d),
     Color(0xffb197fc),
     Color(0xff66d9e8),
-    Color(0xfff783ac),
+    Color(0xffffd43b),
+    Color(0xffff8787),
     Color(0xffa9e34b),
+    Color(0xff74c0fc),
+    Color(0xffe599f7),
+    Color(0xffd8a48f),
   ];
-  var hash = 0;
+  // A polynomial hash modulo a prime spreads similar ids (phone numbers that
+  // differ in one digit) evenly, and stays exact on the web.
+  var hash = 7;
   for (final unit in key.codeUnits) {
-    hash = (hash * 31 + unit) & 0x7fffffff;
+    hash = (hash * 131 + unit) % 1000003;
   }
   final palette = colors.isDark ? dark : light;
   return palette[hash % palette.length];

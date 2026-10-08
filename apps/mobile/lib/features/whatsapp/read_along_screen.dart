@@ -343,7 +343,7 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
         isEmpty: false,
         onRetry: () => unawaited(_load()),
         empty: const SizedBox.shrink(),
-        child: RefreshIndicator(
+        child: OrbRefresh(
           onRefresh: _load,
           child: ListView(
             key: const Key('read-along-list'),

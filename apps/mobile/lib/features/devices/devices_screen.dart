@@ -111,7 +111,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('This device')),
     body: _loading
-        ? const LoadingState()
+        ? const SkeletonList()
         : ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [

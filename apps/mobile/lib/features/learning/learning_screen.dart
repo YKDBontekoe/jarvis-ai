@@ -273,8 +273,8 @@ class _LearningScreenState extends _LearningController with _LearningCards {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Learning')),
     body: _loading
-        ? const LoadingState()
-        : RefreshIndicator(
+        ? const SkeletonList()
+        : OrbRefresh(
             onRefresh: _load,
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),

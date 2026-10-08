@@ -2,8 +2,10 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme.dart';
+import 'jarvis_ui.dart' show JarvisOrb;
 import 'motion.dart';
 
 /// Expressive effects built on [JarvisMotion]. Every one of them plays once
@@ -186,9 +188,11 @@ class _BlurInState extends State<BlurIn> with SingleTickerProviderStateMixin {
   }
 }
 
-/// Text that counts to its number instead of jumping: "12" rolls up from the
-/// last value it showed. Anything that is not a plain whole number (with an
-/// optional sign or thousands separators) is shown as is.
+/// Text that counts to its number instead of jumping: "12" rolls up from
+/// the last value it showed. A number may carry a prefix and suffix, decimals
+/// and thousands separators ("€1,204.50", "82%", "3 tasks"); the rest of the
+/// text stays put. With [countUp] it also counts up from zero the first time
+/// it is shown. Text with no single number in it is shown as is.
 class RollingNumber extends StatelessWidget {
   const RollingNumber(
     this.text, {
@@ -196,6 +200,7 @@ class RollingNumber extends StatelessWidget {
     this.maxLines,
     this.overflow,
     this.textAlign,
+    this.countUp = false,
     super.key,
   });
 
@@ -204,32 +209,35 @@ class RollingNumber extends StatelessWidget {
   final int? maxLines;
   final TextOverflow? overflow;
   final TextAlign? textAlign;
+  final bool countUp;
 
-  static final _number = RegExp(r'^(-?)(\d{1,3}(?:,\d{3})+|\d+)$');
+  static final _number = RegExp(
+    r'^([^\d-]*?)(-?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?([^\d]*)$',
+  );
 
-  /// The whole number in [text], or null when it is not a plain one.
-  static int? parse(String text) {
+  /// The number in [text] and what surrounds it, or null when there is not
+  /// exactly one.
+  static RollingParts? parse(String text) {
     final match = _number.firstMatch(text.trim());
     if (match == null) return null;
-    final value = int.tryParse(match.group(2)!.replaceAll(',', ''));
+    final whole = match.group(3)!;
+    final fraction = match.group(4);
+    final value = double.tryParse(
+      '${whole.replaceAll(',', '')}${fraction == null ? '' : '.$fraction'}',
+    );
     if (value == null) return null;
-    return match.group(1) == '-' ? -value : value;
-  }
-
-  static String _format(int value, bool grouped) {
-    final digits = value.abs().toString();
-    if (!grouped) return value < 0 ? '-$digits' : digits;
-    final out = StringBuffer();
-    for (var i = 0; i < digits.length; i++) {
-      if (i > 0 && (digits.length - i) % 3 == 0) out.write(',');
-      out.write(digits[i]);
-    }
-    return value < 0 ? '-$out' : out.toString();
+    return RollingParts(
+      prefix: match.group(1)!,
+      value: match.group(2) == '-' ? -value : value,
+      decimals: fraction?.length ?? 0,
+      grouped: whole.contains(','),
+      suffix: match.group(5)!,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final value = parse(text);
+    final parts = parse(text);
     Text plain(String value) => Text(
       value,
       style: style,
@@ -237,19 +245,51 @@ class RollingNumber extends StatelessWidget {
       overflow: overflow,
       textAlign: textAlign,
     );
-    if (value == null || JarvisMotion.reduced(context)) return plain(text);
-    final grouped = text.contains(',');
+    if (parts == null || JarvisMotion.reduced(context)) return plain(text);
     return Semantics(
       label: text,
       excludeSemantics: true,
       child: TweenAnimationBuilder<double>(
-        tween: Tween(end: value.toDouble()),
+        tween: Tween(begin: countUp ? 0 : null, end: parts.value),
         duration: const Duration(milliseconds: 900),
         curve: Curves.easeOutExpo,
-        builder: (context, current, _) =>
-            plain(_format(current.round(), grouped)),
+        builder: (context, current, _) => plain(parts.format(current)),
       ),
     );
+  }
+}
+
+/// A number found by [RollingNumber.parse], and how to write it back.
+class RollingParts {
+  const RollingParts({
+    required this.prefix,
+    required this.value,
+    required this.decimals,
+    required this.grouped,
+    required this.suffix,
+  });
+
+  final String prefix;
+  final double value;
+  final int decimals;
+  final bool grouped;
+  final String suffix;
+
+  String format(double current) {
+    final fixed = current.abs().toStringAsFixed(decimals);
+    final dot = fixed.indexOf('.');
+    var whole = dot < 0 ? fixed : fixed.substring(0, dot);
+    final fraction = dot < 0 ? '' : fixed.substring(dot);
+    if (grouped) {
+      final out = StringBuffer();
+      for (var i = 0; i < whole.length; i++) {
+        if (i > 0 && (whole.length - i) % 3 == 0) out.write(',');
+        out.write(whole[i]);
+      }
+      whole = out.toString();
+    }
+    final sign = current < 0 && fixed.contains(RegExp('[1-9]')) ? '-' : '';
+    return '$prefix$sign$whole$fraction$suffix';
   }
 }
 
@@ -456,6 +496,7 @@ class _CelebrationBurstState extends State<CelebrationBurst>
     if (oldWidget.trigger != widget.trigger &&
         fire &&
         !JarvisMotion.reduced(context)) {
+      HapticFeedback.lightImpact();
       _seed++;
       _controller.forward(from: 0);
     }
@@ -640,6 +681,117 @@ class _ShockwaveState extends State<Shockwave>
           },
         ),
         widget.child,
+      ],
+    );
+  }
+}
+
+/// Pull to refresh with the orb instead of a spinner: it drops in and turns
+/// as you pull, pops when letting go would refresh, then thinks until the
+/// refresh is done.
+class OrbRefresh extends StatefulWidget {
+  const OrbRefresh({required this.onRefresh, required this.child, super.key});
+
+  final RefreshCallback onRefresh;
+  final Widget child;
+
+  @override
+  State<OrbRefresh> createState() => _OrbRefreshState();
+}
+
+class _OrbRefreshState extends State<OrbRefresh> {
+  RefreshIndicatorStatus? _status;
+
+  /// How far past the top the list has been pulled, in logical pixels.
+  double _pull = 0;
+  double _extent = 600;
+
+  bool get _refreshing =>
+      _status == RefreshIndicatorStatus.snap ||
+      _status == RefreshIndicatorStatus.refresh;
+
+  bool _track(ScrollNotification notification) {
+    if (notification.depth != 0) return false;
+    _extent = notification.metrics.viewportDimension;
+    var pull = _pull;
+    if (notification is OverscrollNotification &&
+        notification.overscroll < 0 &&
+        notification.dragDetails != null) {
+      pull -= notification.overscroll;
+    } else if (notification is ScrollUpdateNotification) {
+      final pixels = notification.metrics.pixels;
+      if (pixels < 0) {
+        // Bouncing platforms move the list itself past the top.
+        pull = -pixels;
+      } else if ((notification.scrollDelta ?? 0) > 0) {
+        pull = math.max(0, pull - notification.scrollDelta!);
+      }
+    } else if (notification is ScrollEndNotification && !_refreshing) {
+      pull = 0;
+    }
+    if (pull != _pull) setState(() => _pull = pull);
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // The material indicator arms at about a quarter of the viewport.
+    final progress = (_pull / (_extent * .25)).clamp(0.0, 1.0);
+    final visible = _refreshing || (_status != null && progress > 0);
+    final armed = _status == RefreshIndicatorStatus.armed;
+    final drop = _refreshing ? 56.0 : 8 + 52 * progress;
+    return Stack(
+      children: [
+        RefreshIndicator.noSpinner(
+          onRefresh: widget.onRefresh,
+          onStatusChange: (status) {
+            if (!mounted) return;
+            setState(() {
+              _status = status;
+              if (status == null || status == RefreshIndicatorStatus.done) {
+                _pull = 0;
+              }
+            });
+          },
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _track,
+            child: widget.child,
+          ),
+        ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: visible ? 1 : 0,
+              duration: JarvisMotion.of(context, JarvisMotion.base),
+              child: Center(
+                child: AnimatedContainer(
+                  duration: JarvisMotion.of(context, JarvisMotion.fast),
+                  curve: JarvisMotion.standard,
+                  margin: EdgeInsets.only(top: visible ? drop : 0),
+                  child: AnimatedScale(
+                    scale: armed || _refreshing ? 1.15 : .5 + .5 * progress,
+                    duration: JarvisMotion.of(
+                      context,
+                      const Duration(milliseconds: 380),
+                    ),
+                    curve: armed ? JarvisSprings.pop : JarvisMotion.standard,
+                    child: Transform.rotate(
+                      angle: _refreshing ? 0 : progress * math.pi * 1.5,
+                      child: JarvisOrb(
+                        size: 30,
+                        thinking: _refreshing,
+                        semanticLabel: _refreshing ? 'Refreshing' : null,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

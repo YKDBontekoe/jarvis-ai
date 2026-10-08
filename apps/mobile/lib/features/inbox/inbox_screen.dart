@@ -124,7 +124,7 @@ class _InboxScreenState extends State<InboxScreen> {
   );
 
   Future<void> _addCommitment() async {
-    final result = await showDialog<Map<String, String>>(
+    final result = await showJarvisDialog<Map<String, String>>(
       context: context,
       builder: (_) => const _CommitmentDialog(),
     );

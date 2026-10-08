@@ -197,7 +197,7 @@ class _FilesScreenState extends State<FilesScreen> {
 
   Future<void> _createCollection() async {
     final controller = TextEditingController();
-    final name = await showDialog<String>(
+    final name = await showJarvisDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('New collection'),

@@ -117,9 +117,10 @@ class _OverviewTabState extends State<OverviewTab>
         children: [
           Text('Net worth', style: TextStyle(color: colors.inkSoft)),
           const SizedBox(height: 4),
-          Text(
+          RollingNumber(
             formatSigned(data.netWorth, data.currency),
             key: const Key('finance-net-worth'),
+            countUp: true,
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: 12),

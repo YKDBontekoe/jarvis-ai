@@ -211,7 +211,7 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen> {
   );
 
   Widget _body() {
-    if (_loading && _overview == null) return const LoadingState();
+    if (_loading && _overview == null) return const SkeletonList(shape: SkeletonShape.detail);
     if (_overview == null) {
       return ErrorState(
         message: _error ?? 'Could not load your weekly review.',
@@ -233,7 +233,7 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen> {
           ),
     ];
     final bottom = 32 + MediaQuery.paddingOf(context).bottom;
-    return RefreshIndicator(
+    return OrbRefresh(
       onRefresh: _load,
       child: ListView(
         controller: _scroll,

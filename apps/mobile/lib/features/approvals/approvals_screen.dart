@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../ui/phosphor_icons.dart';
 
@@ -87,9 +90,14 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
   }) async {
     final id = jsonString(approval, 'id');
     if (id == null) return;
+    unawaited(
+      approved
+          ? HapticFeedback.mediumImpact()
+          : HapticFeedback.selectionClick(),
+    );
     final retrying = approval['status'] != 'pending';
     if (approved) {
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showJarvisDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           icon: const Align(
@@ -187,7 +195,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
     final label = _lowerFirst(
       asJsonString(approval['categoryLabel']) ?? 'this kind of action',
     );
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showJarvisDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Always allow this?'),
@@ -214,7 +222,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
     final category = asJsonString(grant['category']);
     if (category == null) return;
     final label = asJsonString(grant['label']) ?? 'this action';
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showJarvisDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Ask again next time?'),

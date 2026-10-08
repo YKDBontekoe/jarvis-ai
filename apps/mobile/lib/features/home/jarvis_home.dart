@@ -356,7 +356,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     final calendar = _briefing?['calendar'];
     final calendarOff =
         calendar is Map && calendar['connected'] == false && _briefing != null;
-    final list = RefreshIndicator(
+    final list = OrbRefresh(
       onRefresh: _refresh,
       child: ListView(
         key: const Key('home-list'),

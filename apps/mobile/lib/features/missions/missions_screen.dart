@@ -58,7 +58,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   Future<void> _create() async {
-    final goal = await showDialog<String>(
+    final goal = await showJarvisDialog<String>(
       context: context,
       builder: (_) => const _GoalDialog(),
     );

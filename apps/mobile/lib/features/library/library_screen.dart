@@ -152,7 +152,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     required List<(String, String)> fields,
     String? multiline,
     String confirm = 'Save',
-  }) => showDialog<Map<String, String>>(
+  }) => showJarvisDialog<Map<String, String>>(
     context: context,
     builder: (_) => _FieldsDialog(
       title: title,

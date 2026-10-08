@@ -1,6 +1,7 @@
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
@@ -309,7 +310,11 @@ class _EditableTile extends StatelessWidget {
 
     final target = DragTarget<int>(
       onWillAcceptWithDetails: (details) {
-        if (details.data != index) onReorder?.call(details.data, index);
+        if (details.data != index) {
+          // A tick each time the tiles shuffle under the one you carry.
+          HapticFeedback.selectionClick();
+          onReorder?.call(details.data, index);
+        }
         return false;
       },
       builder: (context, _, _) => LongPressDraggable<int>(
@@ -318,19 +323,31 @@ class _EditableTile extends StatelessWidget {
         hitTestBehavior: HitTestBehavior.opaque,
         hapticFeedbackOnStart: true,
         dragAnchorStrategy: pointerDragAnchorStrategy,
+        // The carried tile lifts, grows a little and tilts, like a card in
+        // the hand.
         feedback: Material(
           type: MaterialType.transparency,
-          child: Opacity(
-            opacity: .92,
-            child: SizedBox(
-              width: 150,
-              height: 110,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(tileRadius),
-                  boxShadow: JarvisShadows.floating(colors.brightness),
+          child: Transform.rotate(
+            angle: -.035,
+            child: Transform.scale(
+              scale: 1.05,
+              child: Opacity(
+                opacity: .92,
+                child: SizedBox(
+                  width: 150,
+                  height: 110,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(tileRadius),
+                      boxShadow: JarvisShadows.floating(colors.brightness),
+                    ),
+                    child: TileCard(
+                      spec: spec,
+                      size: TileSize.strip,
+                      data: null,
+                    ),
+                  ),
                 ),
-                child: TileCard(spec: spec, size: TileSize.strip, data: null),
               ),
             ),
           ),

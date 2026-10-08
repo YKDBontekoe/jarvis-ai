@@ -132,7 +132,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
   );
 
   Future<void> _teach() async {
-    final result = await showDialog<(String, String)>(
+    final result = await showJarvisDialog<(String, String)>(
       context: context,
       builder: (_) => const _TraitDialog(),
     );
@@ -147,7 +147,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
   }
 
   Future<void> _edit(Map<String, dynamic> trait) async {
-    final result = await showDialog<(String, String)>(
+    final result = await showJarvisDialog<(String, String)>(
       context: context,
       builder: (_) => _TraitDialog(
         category: asJsonString(trait['category']),
@@ -198,8 +198,8 @@ class _PersonaScreenState extends State<PersonaScreen> {
       ],
     ),
     body: _loading
-        ? const LoadingState()
-        : RefreshIndicator(
+        ? const SkeletonList()
+        : OrbRefresh(
             onRefresh: _load,
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),

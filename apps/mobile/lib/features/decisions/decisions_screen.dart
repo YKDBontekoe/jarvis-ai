@@ -198,7 +198,7 @@ class _DecisionsScreenState extends State<DecisionsScreen> {
             label: const Text('Log a decision'),
           ),
         ),
-        child: RefreshIndicator(
+        child: OrbRefresh(
           onRefresh: _load,
           child: ListView(
             padding: EdgeInsets.fromLTRB(

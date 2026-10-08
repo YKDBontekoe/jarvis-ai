@@ -137,7 +137,7 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
   }
 
   Future<void> _pasteAddress() async {
-    final endpoint = await showDialog<String>(
+    final endpoint = await showJarvisDialog<String>(
       context: context,
       builder: (_) => const _AddressDialog(),
     );
@@ -176,7 +176,7 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
     var nextStep = asJsonString(result['nextStep']) ?? 'ready';
     final secrets = jsonMaps(server['secrets']);
     if (nextStep == 'secrets' && serverId.isNotEmpty && secrets.isNotEmpty) {
-      final saved = await showDialog<bool>(
+      final saved = await showJarvisDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (_) => AppKeysDialog(

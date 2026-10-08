@@ -142,8 +142,8 @@ class _IntegrationsScreenState extends _IntegrationsController
       ],
     ),
     body: _loading
-        ? const LoadingState()
-        : RefreshIndicator(
+        ? const SkeletonList()
+        : OrbRefresh(
             onRefresh: _load,
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),

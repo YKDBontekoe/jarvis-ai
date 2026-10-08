@@ -150,7 +150,7 @@ class _AutomationStudioScreenState extends State<AutomationStudioScreen> {
   }
 
   Future<void> _createWebhook() async {
-    final name = await showDialog<String>(
+    final name = await showJarvisDialog<String>(
       context: context,
       builder: (_) => const _NameDialog(),
     );
@@ -163,7 +163,7 @@ class _AutomationStudioScreenState extends State<AutomationStudioScreen> {
       final url = asJsonString(jsonObject(response.data)?['url']);
       await _load();
       if (!mounted || url == null) return;
-      await showDialog<void>(
+      await showJarvisDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Your webhook URL'),

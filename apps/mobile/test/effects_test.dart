@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/theme.dart';
 import 'package:jarvis_mobile/features/chat/chat_widgets.dart';
+import 'package:jarvis_mobile/features/settings/motion_gallery_screen.dart';
 import 'package:jarvis_mobile/ui/jarvis_ui.dart';
 
 Widget _host(Widget child, {bool reduced = false}) => MaterialApp(
@@ -25,13 +28,28 @@ void main() {
     expect(samples.any((value) => value > 1), isTrue);
   });
 
-  test('rolling numbers only roll plain whole numbers', () {
-    expect(RollingNumber.parse('12'), 12);
-    expect(RollingNumber.parse('-3'), -3);
-    expect(RollingNumber.parse('1,204'), 1204);
+  test('rolling numbers find one number and keep what surrounds it', () {
+    expect(RollingNumber.parse('12')!.value, 12);
+    expect(RollingNumber.parse('-3')!.value, -3);
+    final money = RollingNumber.parse('€1,204.50')!;
+    expect(money.value, 1204.5);
+    expect(money.format(987.25), '€987.25');
+    expect(money.format(1234567), '€1,234,567.00');
+    final percent = RollingNumber.parse('82%')!;
+    expect(percent.format(41.4), '41%');
+    expect(RollingNumber.parse('3 tasks')!.format(1), '1 tasks');
     expect(RollingNumber.parse('3/5'), isNull);
-    expect(RollingNumber.parse('€12'), isNull);
-    expect(RollingNumber.parse('1.5'), isNull);
+    expect(RollingNumber.parse('no number'), isNull);
+    expect(RollingNumber.parse('2 of 3'), isNull);
+  });
+
+  testWidgets('a counting number starts at zero the first time', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host(const RollingNumber('€250', countUp: true)));
+    expect(find.text('€0'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('€250'), findsOneWidget);
   });
 
   testWidgets('a rolling number lands on its new value', (tester) async {
@@ -238,5 +256,77 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 300));
     expect(tester.hasRunningAnimations, isFalse);
+  });
+
+  testWidgets('pulling down shows the orb and refreshes once', (tester) async {
+    var refreshes = 0;
+    final done = Completer<void>();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildJarvisTheme(),
+        home: Scaffold(
+          body: OrbRefresh(
+            onRefresh: () {
+              refreshes++;
+              return done.future;
+            },
+            child: ListView(
+              key: const Key('list'),
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: const [SizedBox(height: 2000)],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.fling(
+      find.byKey(const Key('list')),
+      const Offset(0, 400),
+      1000,
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(refreshes, 1);
+    expect(find.bySemanticsLabel('Refreshing'), findsOneWidget);
+    done.complete();
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Refreshing'), findsNothing);
+  });
+
+  testWidgets('loading placeholders take the shape of the page', (
+    tester,
+  ) async {
+    for (final shape in SkeletonShape.values) {
+      await tester.pumpWidget(_host(reduced: true, SkeletonList(shape: shape)));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Loading'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('the effects gallery plays every effect', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 3000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(theme: buildJarvisTheme(), home: const MotionGalleryScreen()),
+    );
+    await tester.pump(const Duration(seconds: 2));
+    await tester.tap(find.byKey(const Key('gallery-replay')));
+    await tester.tap(find.byKey(const Key('gallery-check')));
+    await tester.tap(find.text('Roll'));
+    await tester.tap(find.text('Three'));
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text('Page 3'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('gallery-stream')));
+    // Bursts arrive every 260 ms and each group of words takes a step to
+    // fade in; give the whole story time to flow out.
+    for (var i = 0; i < 80; i++) {
+      await tester.pump(const Duration(milliseconds: 150));
+    }
+    expect(find.textContaining('dentist reminder'), findsOneWidget);
   });
 }

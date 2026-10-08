@@ -269,7 +269,7 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
         ],
       ),
       body: _loading
-          ? const LoadingState()
+          ? const SkeletonList(shape: SkeletonShape.detail)
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [

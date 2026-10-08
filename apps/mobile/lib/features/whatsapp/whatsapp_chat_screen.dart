@@ -695,7 +695,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
             ),
           Expanded(
             child: _loading
-                ? const LoadingState()
+                ? const SkeletonList(rows: 7, shape: SkeletonShape.chat)
                 : _error != null && _messages.isEmpty
                 ? ErrorState(
                     message: _error!,

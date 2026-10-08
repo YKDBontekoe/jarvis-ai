@@ -79,7 +79,7 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
 
   Future<void> _editEntity() async {
     final entity = jsonObject(_details?['entity']) ?? const {};
-    final saved = await showDialog<_EntityEditValues>(
+    final saved = await showJarvisDialog<_EntityEditValues>(
       context: context,
       builder: (_) => _EntityEditDialog(
         name: asJsonString(entity['name']) ?? '',
@@ -113,7 +113,7 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
   Future<void> _addFact() async {
     final entity = jsonObject(_details?['entity']) ?? const {};
     final subject = asJsonString(entity['name']) ?? '';
-    final saved = await showDialog<_FactValues>(
+    final saved = await showJarvisDialog<_FactValues>(
       context: context,
       builder: (_) => const _AddFactDialog(),
     );
@@ -186,7 +186,7 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
         return;
       }
       String? absorbId = asJsonString(others.first['id']);
-      final saved = await showDialog<bool>(
+      final saved = await showJarvisDialog<bool>(
         context: context,
         builder: (dialogContext) => StatefulBuilder(
           builder: (context, setDialog) => AlertDialog(
@@ -270,7 +270,7 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
       ),
       body: details == null
           ? (_error == null
-                ? const LoadingState()
+                ? const SkeletonList(shape: SkeletonShape.detail)
                 : ErrorState(
                     message: _error!,
                     onRetry: () => unawaited(_load()),

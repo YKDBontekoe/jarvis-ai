@@ -192,7 +192,7 @@ class _AccountsTabState extends State<AccountsTab>
 Future<Map<String, Object?>?> showAccountEditor(
   BuildContext context, {
   AccountData? existing,
-}) => showDialog<Map<String, Object?>>(
+}) => showJarvisDialog<Map<String, Object?>>(
   context: context,
   builder: (_) => _AccountDialog(existing: existing),
 );

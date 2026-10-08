@@ -126,7 +126,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
 
   /// True when saved, null when cancelled, false when it failed.
   Future<bool?> _createMemory() async {
-    final draft = await showDialog<_MemoryDraft>(
+    final draft = await showJarvisDialog<_MemoryDraft>(
       context: context,
       builder: (_) =>
           const _MemoryEditorDialog(title: 'Add a memory', saveLabel: 'Save'),
@@ -179,7 +179,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   Future<void> _editMemory(Map<String, dynamic> memory) async {
-    final draft = await showDialog<_MemoryDraft>(
+    final draft = await showJarvisDialog<_MemoryDraft>(
       context: context,
       builder: (_) => _MemoryEditorDialog(
         title: 'Correct this memory',
@@ -343,7 +343,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
           ),
         Expanded(
           child: _loading
-              ? const LoadingState()
+              ? const SkeletonList()
               : _error != null && _memories.isEmpty
               ? ErrorState(
                   message: _error!,

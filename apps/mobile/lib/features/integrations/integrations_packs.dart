@@ -58,7 +58,7 @@ mixin _IntegrationsPacks on _IntegrationsController {
     final id = asJsonString(pack['id']);
     if (id == null) return;
     final supportsIcs = asJsonBool(pack['supportsIcs']);
-    final saved = await showDialog<_PackSetupValues>(
+    final saved = await showJarvisDialog<_PackSetupValues>(
       context: context,
       builder: (_) => _PackSetupDialog(
         name: asJsonString(pack['name']) ?? 'pack',

@@ -103,12 +103,15 @@ class _JarvisAppState extends State<JarvisApp> {
         theme: buildJarvisTheme(),
         darkTheme: buildJarvisTheme(brightness: Brightness.dark),
         themeMode: _appearance.themeMode,
-        builder: appLock == null
-            ? null
-            : (context, child) => AppLockGate(
-                controller: appLock,
-                child: child ?? const SizedBox.shrink(),
-              ),
+        builder: (context, child) {
+          final content = child ?? const SizedBox.shrink();
+          return MediaQuery(
+            data: _appearance.applyMotion(MediaQuery.of(context)),
+            child: appLock == null
+                ? content
+                : AppLockGate(controller: appLock, child: content),
+          );
+        },
         home: ChatScreen(skipAuthentication: widget.skipAuthentication),
       ),
     );

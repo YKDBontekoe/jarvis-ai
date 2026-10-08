@@ -141,7 +141,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
             label: const Text('Write a skill'),
           ),
         ),
-        child: RefreshIndicator(
+        child: OrbRefresh(
           onRefresh: _load,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),

@@ -60,7 +60,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
   }
 
   Future<void> _createWatch() async {
-    final created = await showDialog<_NewWatch>(
+    final created = await showJarvisDialog<_NewWatch>(
       context: context,
       builder: (_) => const _NewWatchDialog(),
     );
@@ -179,7 +179,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
         title: 'No watches yet',
         message: 'No watches yet. Set a threshold and Jarvis will keep an eye on it.',
       ),
-      child: RefreshIndicator(
+      child: OrbRefresh(
         onRefresh: _load,
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),

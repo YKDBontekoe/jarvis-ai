@@ -82,7 +82,7 @@ class _TasksScreenState extends State<TasksScreen> {
 
   /// True when started, null when cancelled, false when it failed.
   Future<bool?> _createTask() async {
-    final created = await showDialog<_NewTask>(
+    final created = await showJarvisDialog<_NewTask>(
       context: context,
       builder: (_) => _NewTaskDialog(http: widget.http),
     );
@@ -223,7 +223,7 @@ class _TasksScreenState extends State<TasksScreen> {
         title: 'No tasks yet',
         message: 'No tasks yet. Give Jarvis something to work on.',
       ),
-      child: RefreshIndicator(
+      child: OrbRefresh(
         onRefresh: _load,
         child: ListView(
           padding: EdgeInsets.fromLTRB(

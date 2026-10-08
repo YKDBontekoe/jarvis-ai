@@ -415,7 +415,7 @@ class _RateButton extends StatelessWidget {
 /// Asks what Jarvis should do differently; returns null when cancelled.
 Future<String?> showFeedbackNoteDialog(BuildContext context) async {
   final controller = TextEditingController();
-  final note = await showDialog<String>(
+  final note = await showJarvisDialog<String>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       title: const Text('What should Jarvis do differently?'),

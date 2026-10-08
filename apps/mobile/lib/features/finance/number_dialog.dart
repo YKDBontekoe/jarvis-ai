@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../ui/jarvis_ui.dart';
+
 /// Asks for one number, such as a bank balance or a share price. The dialog owns its text controller so it
 /// stays valid while the dialog animates out.
 Future<double?> showNumberDialog(
@@ -12,7 +14,7 @@ Future<double?> showNumberDialog(
   String? message,
   String initial = '',
   bool allowNegative = false,
-}) => showDialog<double>(
+}) => showJarvisDialog<double>(
   context: context,
   builder: (_) => _NumberDialog(
     title: title,

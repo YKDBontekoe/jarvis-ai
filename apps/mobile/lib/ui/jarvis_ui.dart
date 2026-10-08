@@ -533,7 +533,7 @@ class ListScreenBody extends StatelessWidget {
             ),
           ),
         Expanded(
-          child: RefreshIndicator(
+          child: OrbRefresh(
             onRefresh:
                 onRefresh ??
                 () async {
@@ -573,12 +573,29 @@ class LoadingState extends StatelessWidget {
   );
 }
 
-/// Placeholder rows shaped like the list that is loading, with a soft shimmer.
+/// What a [SkeletonList] imitates while its content loads.
+enum SkeletonShape {
+  /// Cards with an icon and two lines, like most lists.
+  rows,
+
+  /// Chat bubbles on alternating sides.
+  chat,
+
+  /// A title, then a few blocks of a detail page.
+  detail,
+}
+
+/// Placeholders shaped like the content that is loading, with a soft shimmer.
 /// Waits a beat before appearing so fast loads never flash placeholders.
 class SkeletonList extends StatefulWidget {
-  const SkeletonList({this.rows = 6, super.key});
+  const SkeletonList({
+    this.rows = 6,
+    this.shape = SkeletonShape.rows,
+    super.key,
+  });
 
   final int rows;
+  final SkeletonShape shape;
 
   @override
   State<SkeletonList> createState() => _SkeletonListState();
@@ -612,41 +629,61 @@ class _SkeletonListState extends State<SkeletonList>
         ),
       ),
     );
-    final rows = Column(
-      children: [
-        for (var i = 0; i < widget.rows; i++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: SurfaceCard(
-              padding: const EdgeInsets.all(16),
+    Widget block(double height, {double radius = 12}) => Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: colors.surfaceRaised,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+    final rows = switch (widget.shape) {
+      SkeletonShape.rows => _rows(colors, bar),
+      SkeletonShape.chat => Column(
+        children: [
+          for (var i = 0; i < widget.rows; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
               child: Row(
+                mainAxisAlignment: i.isOdd
+                    ? MainAxisAlignment.end
+                    : MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: colors.surfaceRaised,
-                      borderRadius: BorderRadius.circular(10),
+                  if (i.isEven) ...[
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: colors.surfaceRaised,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Vary the widths so the rows read as content.
-                        bar(.4 + (i * 17 % 30) / 100, 11),
-                        const SizedBox(height: 8),
-                        bar(.6 + (i * 13 % 25) / 100, 9),
-                      ],
-                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  // Bubbles of different lengths, like a real conversation.
+                  SizedBox(
+                    width: 120.0 + (i * 53 % 140),
+                    child: block(i % 3 == 0 ? 58 : 40, radius: 18),
                   ),
                 ],
               ),
             ),
-          ),
-      ],
-    );
+        ],
+      ),
+      SkeletonShape.detail => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          bar(.55, 24),
+          const SizedBox(height: 10),
+          bar(.35, 12),
+          const SizedBox(height: 24),
+          for (var i = 0; i < math.max(1, widget.rows ~/ 2); i++) ...[
+            block(i == 0 ? 120 : 76, radius: JarvisRadii.lg),
+            const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    };
     final shimmering = reduced
         ? rows
         : AnimatedBuilder(
@@ -690,6 +727,43 @@ class _SkeletonListState extends State<SkeletonList>
       ),
     );
   }
+
+  Widget _rows(JarvisColors colors, Widget Function(double, double) bar) =>
+      Column(
+        children: [
+          for (var i = 0; i < widget.rows; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: SurfaceCard(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: colors.surfaceRaised,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Vary the widths so the rows read as content.
+                          bar(.4 + (i * 17 % 30) / 100, 11),
+                          const SizedBox(height: 8),
+                          bar(.6 + (i * 13 % 25) / 100, 9),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      );
 }
 
 class _SlideGradient extends GradientTransform {
@@ -814,6 +888,59 @@ class ContentWidth extends StatelessWidget {
 }
 
 /// A confirmation dialog; [destructive] paints the confirm action red.
+/// [showDialog] with Jarvis's entrance: the dialog fades in while it springs
+/// up from slightly small, and drops away quickly when closed. Takes the
+/// same arguments as [showDialog] for the parts the app uses.
+Future<T?> showJarvisDialog<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool barrierDismissible = true,
+  Color? barrierColor,
+  bool useRootNavigator = true,
+}) {
+  final navigator = Navigator.of(context, rootNavigator: useRootNavigator);
+  final themes = InheritedTheme.capture(from: context, to: navigator.context);
+  final reduced = JarvisMotion.reduced(context);
+  return navigator.push<T>(
+    RawDialogRoute<T>(
+      barrierDismissible: barrierDismissible,
+      barrierColor: barrierColor ?? Colors.black54,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      transitionDuration: reduced
+          ? const Duration(milliseconds: 1)
+          : const Duration(milliseconds: 420),
+      pageBuilder: (context, animation, secondaryAnimation) =>
+          SafeArea(child: themes.wrap(Builder(builder: builder))),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final fade = CurvedAnimation(
+          parent: animation,
+          curve: const Interval(0, .45, curve: Curves.easeOut),
+          reverseCurve: Curves.easeIn,
+        );
+        if (reduced) return FadeTransition(opacity: fade, child: child);
+        final spring = CurvedAnimation(
+          parent: animation,
+          curve: JarvisSprings.soft,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: fade,
+          child: ScaleTransition(
+            scale: Tween(begin: .88, end: 1.0).animate(spring),
+            child: SlideTransition(
+              position: Tween(
+                begin: const Offset(0, .03),
+                end: Offset.zero,
+              ).animate(spring),
+              child: child,
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+
 Future<bool> showJarvisConfirm(
   BuildContext context, {
   required String title,
@@ -823,7 +950,7 @@ Future<bool> showJarvisConfirm(
   bool destructive = false,
   IconData? icon,
 }) async {
-  final confirmed = await showDialog<bool>(
+  final confirmed = await showJarvisDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       icon: icon == null

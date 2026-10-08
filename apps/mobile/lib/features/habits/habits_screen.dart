@@ -171,7 +171,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
         empty: _EmptyHabits(
           onCreate: (template) => unawaited(_create(template)),
         ),
-        child: RefreshIndicator(
+        child: OrbRefresh(
           onRefresh: _load,
           child: ListView(
             padding: EdgeInsets.fromLTRB(

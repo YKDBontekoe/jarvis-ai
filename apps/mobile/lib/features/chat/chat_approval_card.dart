@@ -210,7 +210,12 @@ class ApprovalCard extends StatelessWidget {
                                       child: OutlinedButton(
                                         onPressed: submitting
                                             ? null
-                                            : () => onDecide(false),
+                                            : () {
+                                                unawaited(
+                                                  HapticFeedback.selectionClick(),
+                                                );
+                                                onDecide(false);
+                                              },
                                         style: OutlinedButton.styleFrom(
                                           minimumSize: const Size(0, 46),
                                         ),
@@ -296,7 +301,7 @@ class ApprovalCard extends StatelessWidget {
   }
 
   Future<void> _confirmAlwaysAllow(BuildContext context, String label) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showJarvisDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Always allow this?'),

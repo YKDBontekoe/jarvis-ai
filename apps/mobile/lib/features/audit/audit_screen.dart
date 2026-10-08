@@ -83,7 +83,7 @@ class _AuditScreenState extends State<AuditScreen> {
         message:
             'Approvals, tasks, reminders, files, and memory changes are recorded here.',
       ),
-      child: RefreshIndicator(
+      child: OrbRefresh(
         onRefresh: _load,
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),

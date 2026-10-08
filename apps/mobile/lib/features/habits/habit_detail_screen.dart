@@ -314,6 +314,7 @@ class _StatTile extends StatelessWidget {
             const SizedBox(height: 6),
             RollingNumber(
               value,
+              countUp: true,
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             Text(

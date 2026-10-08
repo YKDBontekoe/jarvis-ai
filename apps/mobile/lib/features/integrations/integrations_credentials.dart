@@ -22,7 +22,7 @@ mixin _IntegrationsCredentials on _IntegrationsController {
     var obscure = true;
     var saving = false;
     String? dialogError;
-    final saved = await showDialog<bool>(
+    final saved = await showJarvisDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(

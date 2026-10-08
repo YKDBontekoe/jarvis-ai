@@ -199,7 +199,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   },
                 ),
                 Expanded(
-                  child: RefreshIndicator(
+                  child: OrbRefresh(
                     onRefresh: widget.onRefresh,
                     // Filters slide toward the tab you picked.
                     child: PageSwitcher(

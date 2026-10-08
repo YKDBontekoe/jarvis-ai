@@ -241,7 +241,7 @@ abstract class _RemindersController extends State<RemindersScreen>
   /// (the editor's caller stays put so nothing typed is lost).
   Future<bool?> _createReminder() async {
     final zoneLookup = _reminderTimeZone();
-    final created = await showDialog<_NewReminder>(
+    final created = await showJarvisDialog<_NewReminder>(
       context: context,
       builder: (_) => _NewReminderDialog(
         timeZone: zoneLookup,

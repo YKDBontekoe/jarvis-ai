@@ -88,7 +88,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
       _apply(() => widget.http.post<dynamic>('$_base/$path'));
 
   Future<void> _edit(MissionStepData step) async {
-    final text = await showDialog<String>(
+    final text = await showJarvisDialog<String>(
       context: context,
       builder: (_) => _InstructionDialog(step: step),
     );

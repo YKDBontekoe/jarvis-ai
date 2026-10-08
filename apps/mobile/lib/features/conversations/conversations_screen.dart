@@ -120,7 +120,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 
   Future<void> _rename(Map<String, dynamic> conversation) async {
     final current = asJsonString(conversation['title']) ?? 'New conversation';
-    final title = await showDialog<String>(
+    final title = await showJarvisDialog<String>(
       context: context,
       builder: (_) => _RenameDialog(initial: current),
     );

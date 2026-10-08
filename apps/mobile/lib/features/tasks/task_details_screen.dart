@@ -126,7 +126,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       ],
     ),
     body: _loading && _task == null
-        ? const LoadingState()
+        ? const SkeletonList(shape: SkeletonShape.detail)
         : _task == null
         ? ErrorState(
             message: _error ?? 'Jarvis could not load the task details.',
@@ -142,7 +142,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     final conversationId = asJsonString(task['conversationId']);
     final summary = asJsonString(task['summary']);
     final theme = Theme.of(context);
-    return RefreshIndicator(
+    return OrbRefresh(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),

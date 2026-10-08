@@ -113,7 +113,7 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
       ),
     ),
     body: _loading
-        ? const LoadingState()
+        ? const SkeletonList(shape: SkeletonShape.detail)
         : _error != null && _item == null
         ? (_error == 'This item is no longer available.' ||
                   _error == 'This notification has no linked item.'
