@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../theme.dart';
+import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../../json_maps.dart';
 import '../chat/mcp_setup.dart';
@@ -363,22 +364,27 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ClockHeader(
-                    now: now,
-                    next: upcoming.isEmpty ? null : upcoming.first,
-                    preferredName: _preferredName,
-                    onOpen: () => widget.onOpen('today'),
-                    emptyHint: calendarOff && widget.onSuggestion != null
-                        ? 'Connect a calendar'
-                        : null,
-                    onEmptyHint: () =>
-                        widget.onSuggestion?.call(mcpCalendarPrompt),
+                  HeroGlow(
+                    child: ClockHeader(
+                      now: now,
+                      next: upcoming.isEmpty ? null : upcoming.first,
+                      preferredName: _preferredName,
+                      onOpen: () => widget.onOpen('today'),
+                      emptyHint: calendarOff && widget.onSuggestion != null
+                          ? 'Connect a calendar'
+                          : null,
+                      onEmptyHint: () =>
+                          widget.onSuggestion?.call(mcpCalendarPrompt),
+                    ),
                   ),
                   const SizedBox(height: 20),
                   if (!_editing && approvals.isNotEmpty)
-                    _ApprovalsBanner(
-                      approvals: approvals,
-                      onTap: () => widget.onOpen('approvals'),
+                    PopIn(
+                      from: .9,
+                      child: _ApprovalsBanner(
+                        approvals: approvals,
+                        onTap: () => widget.onOpen('approvals'),
+                      ),
                     ),
                   if (widget.ready && _briefing != null) ...[
                     CodexSignInCard(http: widget.source.http),
@@ -508,57 +514,61 @@ class _ApprovalsBanner extends StatelessWidget {
         .join(' · ');
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Material(
-        color: colors.accentSoft,
+      child: Sheen(
+        trigger: count,
         borderRadius: BorderRadius.circular(tileRadius),
-        child: InkWell(
-          key: const Key('home-approvals'),
+        child: Material(
+          color: colors.accentSoft,
           borderRadius: BorderRadius.circular(tileRadius),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-            child: Row(
-              children: [
-                Icon(
-                  PhosphorIconsRegular.shieldCheck,
-                  size: 22,
-                  color: colors.accent,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$count ${count == 1 ? 'approval' : 'approvals'} waiting',
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w600,
-                          color: colors.ink,
-                        ),
-                      ),
-                      if (names.isNotEmpty)
-                        Text(
-                          names,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: colors.inkSoft,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                Text(
-                  'Review',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
+          child: InkWell(
+            key: const Key('home-approvals'),
+            borderRadius: BorderRadius.circular(tileRadius),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+              child: Row(
+                children: [
+                  Icon(
+                    PhosphorIconsRegular.shieldCheck,
+                    size: 22,
                     color: colors.accent,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$count ${count == 1 ? 'approval' : 'approvals'} waiting',
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600,
+                            color: colors.ink,
+                          ),
+                        ),
+                        if (names.isNotEmpty)
+                          Text(
+                            names,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: colors.inkSoft,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    'Review',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: colors.accent,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

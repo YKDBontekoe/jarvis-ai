@@ -596,7 +596,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const JarvisAvatar(size: 28),
+          const JarvisOrb(size: 28, glow: false, animate: true),
           const SizedBox(width: 12),
           Flexible(
             child: Container(
@@ -634,15 +634,31 @@ class _TypingIndicatorState extends State<TypingIndicator>
                     const SizedBox(width: 10),
                     Flexible(
                       child: ExcludeSemantics(
-                        child: Text(
-                          _statusText(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: colors.inkSoft,
-                            fontFeatures: const [FontFeature.tabularFigures()],
+                        // Light runs along the words while Jarvis thinks.
+                        child: ShaderMask(
+                          blendMode: BlendMode.srcIn,
+                          shaderCallback: (bounds) => LinearGradient(
+                            begin: Alignment(-3 + 5 * _controller.value, 0),
+                            end: Alignment(-1 + 5 * _controller.value, 0),
+                            colors: [
+                              colors.inkSoft,
+                              colors.accent,
+                              colors.inkSoft,
+                            ],
+                            stops: const [.25, .5, .75],
+                          ).createShader(bounds),
+                          child: Text(
+                            _statusText(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: colors.inkSoft,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
                           ),
                         ),
                       ),

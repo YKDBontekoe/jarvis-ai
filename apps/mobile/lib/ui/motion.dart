@@ -10,7 +10,7 @@ abstract final class JarvisMotion {
   static const base = Duration(milliseconds: 220);
 
   /// Page and pane changes.
-  static const slow = Duration(milliseconds: 320);
+  static const slow = Duration(milliseconds: 380);
 
   /// Default curve for anything entering or changing.
   static const standard = Curves.easeOutCubic;
@@ -43,6 +43,29 @@ abstract final class JarvisMotion {
       child: ScaleTransition(
         scale: Tween(begin: startScale, end: 1.0).animate(curved),
         child: child,
+      ),
+    );
+  }
+
+  /// Spins and springs the incoming child into place while the outgoing one
+  /// shrinks away; for one control turning into another (send ↔ voice ↔ stop).
+  static Widget morph(Widget child, Animation<double> animation) {
+    final spring = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutBack,
+      reverseCurve: exit,
+    );
+    return FadeTransition(
+      opacity: CurvedAnimation(
+        parent: animation,
+        curve: const Interval(0, .5, curve: Curves.easeOut),
+      ),
+      child: RotationTransition(
+        turns: Tween(begin: -.18, end: 0.0).animate(spring),
+        child: ScaleTransition(
+          scale: Tween(begin: .4, end: 1.0).animate(spring),
+          child: child,
+        ),
       ),
     );
   }
@@ -172,8 +195,8 @@ class _PressFeedbackState extends State<PressFeedback> {
   );
 }
 
-/// Page transition for pushed routes: the new page fades in while it grows from
-/// 98% and rises a few pixels.
+/// Page transition for pushed routes: the new page fades in while it grows
+/// and rises into place, and the page it covers sinks back.
 class JarvisPageTransitionsBuilder extends PageTransitionsBuilder {
   const JarvisPageTransitionsBuilder();
 
@@ -197,20 +220,33 @@ class JarvisPageTransitionsBuilder extends PageTransitionsBuilder {
       curve: JarvisMotion.emphasized,
       reverseCurve: JarvisMotion.exit,
     );
-    return FadeTransition(
-      opacity: CurvedAnimation(
-        parent: animation,
-        curve: const Interval(0, .6, curve: Curves.easeOut),
-        reverseCurve: const Interval(.2, 1, curve: Curves.easeIn),
-      ),
-      child: SlideTransition(
-        position: Tween(
-          begin: const Offset(0, .02),
-          end: Offset.zero,
-        ).animate(enter),
-        child: ScaleTransition(
-          scale: Tween(begin: JarvisMotion.startScale, end: 1.0).animate(enter),
-          child: child,
+    // The page underneath recedes a little while the new one arrives, so
+    // the stack reads as depth rather than a swap.
+    final behind = CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: JarvisMotion.emphasized,
+      reverseCurve: JarvisMotion.standard,
+    );
+    return ScaleTransition(
+      scale: Tween(begin: 1.0, end: .955).animate(behind),
+      child: FadeTransition(
+        opacity: Tween(begin: 1.0, end: .55).animate(behind),
+        child: FadeTransition(
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: const Interval(0, .6, curve: Curves.easeOut),
+            reverseCurve: const Interval(.2, 1, curve: Curves.easeIn),
+          ),
+          child: SlideTransition(
+            position: Tween(
+              begin: const Offset(0, .035),
+              end: Offset.zero,
+            ).animate(enter),
+            child: ScaleTransition(
+              scale: Tween(begin: .965, end: 1.0).animate(enter),
+              child: child,
+            ),
+          ),
         ),
       ),
     );

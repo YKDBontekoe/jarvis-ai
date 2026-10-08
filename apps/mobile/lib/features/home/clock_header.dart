@@ -50,10 +50,12 @@ class ClockHeader extends StatelessWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    greetingFor(now),
-                    key: const Key('home-greeting'),
-                    style: style,
+                  BlurIn(
+                    child: Text(
+                      greetingFor(now),
+                      key: const Key('home-greeting'),
+                      style: style,
+                    ),
                   ),
                   MotionSwitcher(
                     resize: true,
@@ -61,18 +63,35 @@ class ClockHeader extends StatelessWidget {
                         ? Padding(
                             key: ValueKey(name),
                             padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              name,
-                              key: const Key('home-name'),
-                              style: style.copyWith(color: colors.accent),
+                            child: BlurIn(
+                              delay: const Duration(milliseconds: 140),
+                              // The name catches the orb's iridescence.
+                              child: ShaderMask(
+                                blendMode: BlendMode.srcIn,
+                                shaderCallback: (bounds) => LinearGradient(
+                                  colors: [
+                                    colors.accent,
+                                    colors.violet,
+                                    Color.lerp(colors.violet, colors.rose, .6)!,
+                                  ],
+                                ).createShader(bounds),
+                                child: Text(
+                                  name,
+                                  key: const Key('home-name'),
+                                  style: style.copyWith(color: colors.accent),
+                                ),
+                              ),
                             ),
                           )
                         : const SizedBox.shrink(key: ValueKey('no-name')),
                   ),
                   const SizedBox(height: 10),
-                  Text(
-                    longDate(now),
-                    style: TextStyle(fontSize: 13, color: colors.inkSoft),
+                  FadeSlideIn(
+                    index: 3,
+                    child: Text(
+                      longDate(now),
+                      style: TextStyle(fontSize: 13, color: colors.inkSoft),
+                    ),
                   ),
                 ],
               );
@@ -80,110 +99,125 @@ class ClockHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-        SurfaceCard(
-          key: const Key('home-clock-tap'),
-          radius: JarvisRadii.xl,
-          gradient: colors.litSurface(colors.accent, strength: .06),
-          borderColor: colors.outline.withValues(
-            alpha: colors.isDark ? .6 : .3,
-          ),
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-          onTap: onOpen,
-          child: MotionSwitcher(
-            resize: true,
-            child: Column(
-              key: ValueKey((
-                item?.title,
-                item?.start,
-                item?.detail,
-                item?.reminder,
-              )),
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        FadeSlideIn(
+          index: 2,
+          offset: 16,
+          scale: .97,
+          child: Sheen(
+            delay: const Duration(milliseconds: 520),
+            strength: .28,
+            borderRadius: BorderRadius.circular(JarvisRadii.xl),
+            child: SurfaceCard(
+              key: const Key('home-clock-tap'),
+              radius: JarvisRadii.xl,
+              gradient: colors.litSurface(colors.accent, strength: .06),
+              borderColor: colors.outline.withValues(
+                alpha: colors.isDark ? .6 : .3,
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+              onTap: onOpen,
+              child: MotionSwitcher(
+                resize: true,
+                child: Column(
+                  key: ValueKey((
+                    item?.title,
+                    item?.start,
+                    item?.detail,
+                    item?.reminder,
+                  )),
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        item == null
-                            ? 'Your day'
-                            : item.start.isAfter(now)
-                            ? 'Next up'
-                            : 'Happening now',
-                        style: JarvisType.sectionOf(
-                          context,
-                        ).copyWith(color: colors.accentDeep),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item == null
+                                ? 'Your day'
+                                : item.start.isAfter(now)
+                                ? 'Next up'
+                                : 'Happening now',
+                            style: JarvisType.sectionOf(
+                              context,
+                            ).copyWith(color: colors.accentDeep),
+                          ),
+                        ),
+                        if (onOpen != null)
+                          Icon(
+                            PhosphorIconsRegular.arrowUpRight,
+                            size: 16,
+                            color: colors.inkSoft,
+                          ),
+                      ],
                     ),
-                    if (onOpen != null)
-                      Icon(
-                        PhosphorIconsRegular.arrowUpRight,
-                        size: 16,
-                        color: colors.inkSoft,
+                    const SizedBox(height: 14),
+                    if (item != null)
+                      _EventHeading(item: item)
+                    else ...[
+                      Text(
+                        'Nothing else today',
+                        key: const Key('home-clock-title'),
+                        style: JarvisType.displayOf(
+                          context,
+                        ).copyWith(fontSize: 26),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        clockTime(now),
+                        key: const Key('home-clock-time'),
+                        style: JarvisType.clock(
+                          colors.inkSoft,
+                        ).copyWith(fontSize: 32, letterSpacing: -1),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    if (item != null) ...[
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          Text(
+                            shortDay(item.start, now),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: colors.inkSoft,
+                            ),
+                          ),
+                          Text('·', style: TextStyle(color: colors.inkSoft)),
+                          Text(
+                            countdownLabel(item.start, now, durationOnly: true),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: colors.accent,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (item.detail != null || item.reminder) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          item.detail ?? 'Reminder',
+                          style: TextStyle(fontSize: 14, color: colors.inkSoft),
+                        ),
+                      ],
+                    ] else if (emptyHint != null)
+                      TextButton(
+                        onPressed: onEmptyHint,
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          alignment: Alignment.centerLeft,
+                          foregroundColor: colors.accent,
+                        ),
+                        child: Text(emptyHint!),
+                      )
+                    else
+                      Text(
+                        'Your calendar and reminders are clear',
+                        style: TextStyle(fontSize: 14, color: colors.inkSoft),
                       ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                if (item != null)
-                  _EventHeading(item: item)
-                else ...[
-                  Text(
-                    'Nothing else today',
-                    key: const Key('home-clock-title'),
-                    style: JarvisType.displayOf(context).copyWith(fontSize: 26),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    clockTime(now),
-                    key: const Key('home-clock-time'),
-                    style: JarvisType.clock(
-                      colors.inkSoft,
-                    ).copyWith(fontSize: 32, letterSpacing: -1),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                if (item != null) ...[
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      Text(
-                        shortDay(item.start, now),
-                        style: TextStyle(fontSize: 14, color: colors.inkSoft),
-                      ),
-                      Text('·', style: TextStyle(color: colors.inkSoft)),
-                      Text(
-                        countdownLabel(item.start, now, durationOnly: true),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: colors.accent,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (item.detail != null || item.reminder) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      item.detail ?? 'Reminder',
-                      style: TextStyle(fontSize: 14, color: colors.inkSoft),
-                    ),
-                  ],
-                ] else if (emptyHint != null)
-                  TextButton(
-                    onPressed: onEmptyHint,
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      alignment: Alignment.centerLeft,
-                      foregroundColor: colors.accent,
-                    ),
-                    child: Text(emptyHint!),
-                  )
-                else
-                  Text(
-                    'Your calendar and reminders are clear',
-                    style: TextStyle(fontSize: 14, color: colors.inkSoft),
-                  ),
-              ],
+              ),
             ),
           ),
         ),

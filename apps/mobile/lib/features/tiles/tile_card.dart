@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../theme.dart';
+import '../../ui/effects.dart';
 import '../../ui/motion.dart';
 import '../../ui/phosphor_icons.dart';
 import '../home/next_up.dart' show countdownLabel;
@@ -203,13 +204,21 @@ class _Dot extends StatelessWidget {
   const _Dot();
 
   @override
-  Widget build(BuildContext context) => Container(
-    key: const Key('tile-attention'),
-    width: 8,
-    height: 8,
-    decoration: BoxDecoration(
-      color: JarvisColors.of(context).accent,
-      shape: BoxShape.circle,
+  Widget build(BuildContext context) => PopIn(
+    child: Container(
+      key: const Key('tile-attention'),
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: JarvisColors.of(context).accent,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: JarvisColors.of(context).accent.withValues(alpha: .45),
+            blurRadius: 6,
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -1112,35 +1121,44 @@ class _RowCheck extends StatelessWidget {
       label: '${action.label}: ${row.text}',
       excludeSemantics: true,
       onTap: onTap,
-      child: InkResponse(
-        onTap: onTap,
-        radius: 20,
-        child: SizedBox.square(
-          dimension: 28,
-          child: Center(
-            child: AnimatedContainer(
-              duration: JarvisMotion.of(context, JarvisMotion.fast),
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: filled ? colors.accent : Colors.transparent,
-                border: Border.all(
-                  color: filled ? colors.accent : colors.outlineStrong,
-                  width: 1.6,
+      child: CelebrationBurst(
+        trigger: filled,
+        radius: 24,
+        particles: 10,
+        child: InkResponse(
+          onTap: onTap,
+          radius: 20,
+          child: SizedBox.square(
+            dimension: 28,
+            child: Center(
+              child: AnimatedContainer(
+                duration: JarvisMotion.of(context, JarvisMotion.base),
+                curve: JarvisSprings.pop,
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: filled ? colors.accent : Colors.transparent,
+                  border: Border.all(
+                    color: filled ? colors.accent : colors.outlineStrong,
+                    width: 1.6,
+                  ),
                 ),
+                child: filled || !checkbox
+                    ? PopIn(
+                        key: ValueKey(filled),
+                        child: Icon(
+                          checkbox
+                              ? PhosphorIconsRegular.check
+                              : (action.icon ?? PhosphorIconsRegular.x),
+                          size: 13,
+                          color: filled
+                              ? (colors.isDark ? colors.canvas : Colors.white)
+                              : colors.muted,
+                        ),
+                      )
+                    : null,
               ),
-              child: filled || !checkbox
-                  ? Icon(
-                      checkbox
-                          ? PhosphorIconsRegular.check
-                          : (action.icon ?? PhosphorIconsRegular.x),
-                      size: 13,
-                      color: filled
-                          ? (colors.isDark ? colors.canvas : Colors.white)
-                          : colors.muted,
-                    )
-                  : null,
             ),
           ),
         ),

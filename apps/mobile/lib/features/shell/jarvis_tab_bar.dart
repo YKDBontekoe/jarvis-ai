@@ -47,6 +47,7 @@ class JarvisTabBar extends StatelessWidget {
         selected: value == selected,
         attention: value == JarvisTab.chats && chatsAttention,
         onTap: () => onSelect(value),
+        pill: false,
       ),
     );
     return SafeArea(
@@ -77,18 +78,56 @@ class JarvisTabBar extends StatelessWidget {
                   type: MaterialType.transparency,
                   child: SizedBox(
                     height: 60,
-                    child: Row(
+                    child: Stack(
                       children: [
-                        tab(JarvisTab.home),
-                        tab(JarvisTab.chats),
-                        Expanded(
-                          child: JarvisOrbButton(
-                            onPressed: onJarvis,
-                            busy: jarvisBusy,
+                        // One pill glides between tabs on a spring instead of
+                        // each tab fading its own background in and out.
+                        Positioned.fill(
+                          child: LayoutBuilder(
+                            builder: (context, box) {
+                              final slot = box.maxWidth / 5;
+                              final index = switch (selected) {
+                                JarvisTab.home => 0,
+                                JarvisTab.chats => 1,
+                                JarvisTab.everything => 3,
+                                JarvisTab.you => 4,
+                              };
+                              return Stack(
+                                children: [
+                                  AnimatedPositioned(
+                                    key: const Key('tab-indicator'),
+                                    duration: JarvisMotion.of(
+                                      context,
+                                      const Duration(milliseconds: 560),
+                                    ),
+                                    curve: JarvisSprings.soft,
+                                    left: slot * index + (slot - 48) / 2,
+                                    top: 8,
+                                    width: 48,
+                                    height: 44,
+                                    child: _SelectionPill(colors: colors),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ),
-                        tab(JarvisTab.everything),
-                        tab(JarvisTab.you),
+                        Positioned.fill(
+                          child: Row(
+                            children: [
+                              tab(JarvisTab.home),
+                              tab(JarvisTab.chats),
+                              Expanded(
+                                child: JarvisOrbButton(
+                                  onPressed: onJarvis,
+                                  busy: jarvisBusy,
+                                ),
+                              ),
+                              tab(JarvisTab.everything),
+                              tab(JarvisTab.you),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -102,7 +141,7 @@ class JarvisTabBar extends StatelessWidget {
   }
 }
 
-class JarvisOrbButton extends StatelessWidget {
+class JarvisOrbButton extends StatefulWidget {
   const JarvisOrbButton({
     required this.onPressed,
     this.size = 40,
@@ -115,13 +154,21 @@ class JarvisOrbButton extends StatelessWidget {
   final bool busy;
 
   @override
+  State<JarvisOrbButton> createState() => _JarvisOrbButtonState();
+}
+
+class _JarvisOrbButtonState extends State<JarvisOrbButton> {
+  int _taps = 0;
+
+  @override
   Widget build(BuildContext context) {
     void activate() {
       unawaited(HapticFeedback.lightImpact());
-      onPressed();
+      setState(() => _taps++);
+      widget.onPressed();
     }
 
-    final label = busy ? 'Jarvis is replying. Open chat' : 'Ask Jarvis';
+    final label = widget.busy ? 'Jarvis is replying. Open chat' : 'Ask Jarvis';
     return Semantics(
       button: true,
       label: label,
@@ -131,7 +178,7 @@ class JarvisOrbButton extends StatelessWidget {
         message: label,
         excludeFromSemantics: true,
         child: PressFeedback(
-          scale: .92,
+          scale: .88,
           builder: (context, highlight) => InkResponse(
             key: const Key('tab-jarvis'),
             onTap: activate,
@@ -141,7 +188,15 @@ class JarvisOrbButton extends StatelessWidget {
               height: 52,
               width: 52,
               child: Center(
-                child: JarvisOrb(size: size, glow: false, animate: busy),
+                child: Shockwave(
+                  trigger: _taps,
+                  size: widget.size,
+                  child: JarvisOrb(
+                    size: widget.size,
+                    glow: false,
+                    animate: widget.busy,
+                  ),
+                ),
               ),
             ),
           ),
@@ -151,18 +206,56 @@ class JarvisOrbButton extends StatelessWidget {
   }
 }
 
+/// The selected-tab background: a soft tinted capsule with a faint top light.
+class _SelectionPill extends StatelessWidget {
+  const _SelectionPill({required this.colors});
+
+  final JarvisColors colors;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(24),
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: colors.isDark
+            ? [
+                colors.surfaceRaised,
+                Color.lerp(colors.surfaceRaised, colors.accent, .08)!,
+              ]
+            : [
+                Color.lerp(colors.surfaceMuted, colors.accent, .05)!,
+                colors.surfaceMuted,
+              ],
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: colors.accent.withValues(alpha: colors.isDark ? .18 : .10),
+          blurRadius: 14,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+  );
+}
+
 class _TabButton extends StatelessWidget {
   const _TabButton({
     required this.tab,
     required this.selected,
     required this.attention,
     required this.onTap,
+    this.pill = true,
   });
 
   final JarvisTab tab;
   final bool selected;
   final bool attention;
   final VoidCallback onTap;
+
+  /// Draws its own selected background; off when the bar's gliding pill does.
+  final bool pill;
 
   @override
   Widget build(BuildContext context) {
@@ -195,7 +288,7 @@ class _TabButton extends StatelessWidget {
                 width: 48,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: selected
+                  color: selected && pill
                       ? (colors.isDark
                             ? colors.surfaceRaised
                             : colors.surfaceMuted)
@@ -207,7 +300,27 @@ class _TabButton extends StatelessWidget {
                     clipBehavior: Clip.none,
                     children: [
                       AnimatedSwitcher(
-                        duration: JarvisMotion.of(context, JarvisMotion.fast),
+                        duration: JarvisMotion.of(
+                          context,
+                          const Duration(milliseconds: 460),
+                        ),
+                        reverseDuration: JarvisMotion.of(
+                          context,
+                          JarvisMotion.fast,
+                        ),
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: ScaleTransition(
+                            scale: Tween(begin: .55, end: 1.0).animate(
+                              CurvedAnimation(
+                                parent: animation,
+                                curve: JarvisSprings.pop,
+                                reverseCurve: Curves.easeIn,
+                              ),
+                            ),
+                            child: child,
+                          ),
+                        ),
                         child: TabIcon(
                           key: ValueKey((tab.glyph, selected)),
                           glyph: tab.glyph,
@@ -219,16 +332,18 @@ class _TabButton extends StatelessWidget {
                         Positioned(
                           top: -2,
                           right: -4,
-                          child: Container(
-                            key: const Key('tab-attention'),
-                            width: 7,
-                            height: 7,
-                            decoration: BoxDecoration(
-                              color: colors.accent,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: colors.surface,
-                                width: 1.5,
+                          child: PopIn(
+                            child: Container(
+                              key: const Key('tab-attention'),
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                color: colors.accent,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: colors.surface,
+                                  width: 1.5,
+                                ),
                               ),
                             ),
                           ),

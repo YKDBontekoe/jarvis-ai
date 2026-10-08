@@ -534,6 +534,11 @@ mixin _ChatScreenUi on _ChatScreenController {
                                         width: double.infinity,
                                         child: FadeSlideIn(
                                           animate: index >= _settledEntries,
+                                          offset: 14,
+                                          scale: .94,
+                                          alignment: _entryOrigin(
+                                            _entries[index],
+                                          ),
                                           child: _entryView(_entries[index]),
                                         ),
                                       ),
@@ -667,6 +672,13 @@ mixin _ChatScreenUi on _ChatScreenController {
       ),
     ),
   );
+
+  /// New entries grow out of the side they sit on: yours from the right,
+  /// Jarvis's from the left.
+  Alignment _entryOrigin(ChatEntry entry) =>
+      entry is MessageEntry && entry.isUser
+      ? Alignment.bottomRight
+      : Alignment.bottomLeft;
 
   Widget _entryView(ChatEntry entry) => switch (entry) {
     MessageEntry() => MessageBubble(

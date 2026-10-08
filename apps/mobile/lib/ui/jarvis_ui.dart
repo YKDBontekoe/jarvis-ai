@@ -5,11 +5,13 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'effects.dart';
 import 'motion.dart';
 import 'phosphor_icons.dart';
 
 import '../theme.dart';
 
+export 'effects.dart';
 export 'motion.dart';
 
 part 'jarvis_orb.dart';
@@ -22,10 +24,18 @@ class FadeSlideIn extends StatefulWidget {
     this.index = 0,
     this.offset = JarvisMotion.travel,
     this.animate = true,
+    this.scale = 1,
+    this.alignment = Alignment.center,
     super.key,
   });
 
   final Widget child;
+
+  /// Scale the child grows from; 1 keeps it full size.
+  final double scale;
+
+  /// Where the growth is anchored, such as the side a chat bubble sits on.
+  final Alignment alignment;
 
   /// When false the child starts in place; for rows that were already on
   /// screen before (history, restored state).
@@ -86,13 +96,21 @@ class _FadeSlideInState extends State<FadeSlideIn>
     return AnimatedBuilder(
       animation: _progress,
       child: widget.child,
-      builder: (context, child) => Opacity(
-        opacity: _progress.value,
-        child: Transform.translate(
-          offset: Offset(0, (1 - _progress.value) * widget.offset),
+      builder: (context, child) {
+        final t = _progress.value;
+        Widget moved = Transform.translate(
+          offset: Offset(0, (1 - t) * widget.offset),
           child: child,
-        ),
-      ),
+        );
+        if (widget.scale != 1) {
+          moved = Transform.scale(
+            scale: widget.scale + (1 - widget.scale) * t,
+            alignment: widget.alignment,
+            child: moved,
+          );
+        }
+        return Opacity(opacity: t, child: moved);
+      },
     );
   }
 }
@@ -332,6 +350,68 @@ class SectionHeader extends StatelessWidget {
   );
 }
 
+/// The empty-state icon: it springs in over a soft accent glow while a ring
+/// ripples out once, so an empty screen still feels alive.
+class _EmptyIcon extends StatelessWidget {
+  const _EmptyIcon({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final tile = Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.outline),
+        boxShadow: [
+          ...JarvisShadows.soft(colors.brightness),
+          BoxShadow(
+            color: colors.accent.withValues(alpha: colors.isDark ? .22 : .12),
+            blurRadius: 28,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Icon(icon, size: 24, color: colors.inkSoft),
+    );
+    if (JarvisMotion.reduced(context)) return tile;
+    return SizedBox.square(
+      dimension: 52,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 1300),
+            curve: const Interval(.2, 1, curve: Curves.easeOutCubic),
+            builder: (context, t, _) => t >= 1
+                ? const SizedBox.shrink()
+                : IgnorePointer(
+                    child: Container(
+                      width: 52 + 60 * t,
+                      height: 52 + 60 * t,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14 + 30 * t),
+                        border: Border.all(
+                          color: colors.accent.withValues(alpha: .3 * (1 - t)),
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
+          PopIn(from: .5, child: tile),
+        ],
+      ),
+    );
+  }
+}
+
 /// Centered illustration + copy for empty lists.
 class EmptyState extends StatelessWidget {
   const EmptyState({
@@ -360,23 +440,7 @@ class EmptyState extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: JarvisColors.of(context).surface,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: JarvisColors.of(context).outline),
-                    boxShadow: JarvisShadows.soft(
-                      JarvisColors.of(context).brightness,
-                    ),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 24,
-                    color: JarvisColors.of(context).inkSoft,
-                  ),
-                ),
+                _EmptyIcon(icon: icon),
                 const SizedBox(height: 18),
                 Text(
                   title,
@@ -1294,6 +1358,23 @@ class HeroGlow extends StatelessWidget {
       ),
     );
     final strength = colors.isDark ? 1.4 : 1.0;
+    // The light blooms in once: each blob swells and drifts into its spot.
+    Widget bloom(int order, Offset drift, Widget blob) =>
+        JarvisMotion.reduced(context)
+        ? blob
+        : TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: Duration(milliseconds: 1400 + order * 250),
+            curve: Curves.easeOutCubic,
+            child: blob,
+            builder: (context, t, child) => Opacity(
+              opacity: t,
+              child: Transform.translate(
+                offset: drift * (1 - t),
+                child: Transform.scale(scale: .6 + .4 * t, child: child),
+              ),
+            ),
+          );
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
@@ -1304,21 +1385,33 @@ class HeroGlow extends StatelessWidget {
           top: -10,
           left: -170,
           child: IgnorePointer(
-            child: blob(380, colors.violet.withValues(alpha: .13 * strength)),
+            child: bloom(
+              0,
+              const Offset(-40, -20),
+              blob(380, colors.violet.withValues(alpha: .13 * strength)),
+            ),
           ),
         ),
         Positioned(
           top: 20,
           right: -190,
           child: IgnorePointer(
-            child: blob(340, colors.sky.withValues(alpha: .09 * strength)),
+            child: bloom(
+              1,
+              const Offset(50, -10),
+              blob(340, colors.sky.withValues(alpha: .09 * strength)),
+            ),
           ),
         ),
         Positioned(
           top: 170,
           left: -40,
           child: IgnorePointer(
-            child: blob(220, colors.rose.withValues(alpha: .10 * strength)),
+            child: bloom(
+              2,
+              const Offset(-20, 40),
+              blob(220, colors.rose.withValues(alpha: .10 * strength)),
+            ),
           ),
         ),
         child,

@@ -312,7 +312,10 @@ class _StatTile extends StatelessWidget {
           children: [
             Icon(icon, size: 20, color: color),
             const SizedBox(height: 6),
-            Text(value, style: Theme.of(context).textTheme.headlineSmall),
+            RollingNumber(
+              value,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
             Text(
               label,
               textAlign: TextAlign.center,

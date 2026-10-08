@@ -84,7 +84,13 @@ class TileGrid extends StatelessWidget {
                   top: spot.row * (cell + gap),
                   width: spot.columns * cell + (spot.columns - 1) * gap,
                   height: spot.rows * cell + (spot.rows - 1) * gap,
-                  child: _tile(context, layout[spot.index], spot),
+                  // Tiles rise into place one after another on first show.
+                  child: FadeSlideIn(
+                    index: spot.index + 2,
+                    offset: 18,
+                    scale: .94,
+                    child: _tile(context, layout[spot.index], spot),
+                  ),
                 ),
             ],
           ),
@@ -121,7 +127,7 @@ class TileGrid extends StatelessWidget {
               : onEdit == null
               ? null
               : (_) => onEdit!(),
-          child: card,
+          child: TiltOnPress(child: card),
         ),
       );
     }
