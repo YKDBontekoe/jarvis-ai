@@ -9,6 +9,7 @@ import '../../http_urls.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../entities/entity_ref.dart';
 import 'chat_entries.dart';
 import 'image_paste_stub.dart'
     if (dart.library.js_interop) 'image_paste_web.dart';

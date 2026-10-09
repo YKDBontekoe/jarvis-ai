@@ -8,6 +8,7 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 
+import 'autonomy_level.dart';
 import 'improvement_suggestions.dart';
 
 part 'learning_cards.dart';

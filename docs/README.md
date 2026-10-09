@@ -11,6 +11,7 @@ This folder is the canonical reference for humans and coding agents working in t
 | System purpose and major subsystems | [architecture/overview.md](architecture/overview.md) |
 | Layering and project dependencies | [architecture/layers-and-dependencies.md](architecture/layers-and-dependencies.md) |
 | Chat, tools, approvals, SignalR | [architecture/chat-agent-runtime.md](architecture/chat-agent-runtime.md) |
+| Event spine, entity refs and links, reactions, autonomy levels | [architecture/event-spine.md](architecture/event-spine.md) |
 | Auth, owner scope, secrets | [architecture/security-and-ownership.md](architecture/security-and-ownership.md) |
 
 ## Backend

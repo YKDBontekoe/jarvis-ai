@@ -119,13 +119,15 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       _scrollToBottom();
     });
     _onHub(hub, 'tool.completed', (arguments) {
-      final tool = asJsonString(_payload(arguments)?['tool']);
+      final payload = _payload(arguments);
+      final tool = asJsonString(payload?['tool']);
       if (tool == null ||
           !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
+      final refs = jsonStrings(payload?['refs']);
       setState(() {
-        _toolEvent(tool, success: true);
+        _toolEvent(tool, success: true, refs: refs);
         _settleSubmittingApprovals();
       });
     });
@@ -152,6 +154,28 @@ mixin _ChatScreenRealtime on _ChatScreenController {
         _finishRemoteQuery();
       });
       _scrollToBottom();
+    });
+    // Something happened across Jarvis: refresh Home's activity when it is
+    // the kind the person would want to see without pulling.
+    _onHub(hub, 'event.created', (arguments) {
+      final event = _payload(arguments);
+      if (event == null ||
+          !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        return;
+      }
+      final kind = asJsonString(event['kind']);
+      final origin = asJsonString(event['origin']);
+      if (origin == 'Agent' ||
+          origin == 'AgentReaction' ||
+          const {
+            'watch.fired',
+            'task.failed',
+            'commitment.created',
+            'inbox.needs_reply',
+            'reminder.due',
+          }.contains(kind)) {
+        setState(() => _homeRevision++);
+      }
     });
     _onHub(hub, 'notification.created', (arguments) {
       final event = _payload(arguments);

@@ -71,9 +71,6 @@ public sealed class RelatedEntityService(JarvisDbContext db, IEntityLinkReposito
                 foreach (var step in await db.MissionSteps.Where(x => x.OwnerId == ownerId && x.TaskId == id)
                              .Select(x => x.MissionId).Distinct().Take(5).ToListAsync(ct))
                     Add(EntityTypes.Mission, step, LinkRelations.PartOf, "out");
-                foreach (var m in await db.Memories.Where(x => x.OwnerId == ownerId && x.SourceId == id)
-                             .Select(x => new { x.Id, x.CreatedAt }).Take(10).ToListAsync(ct))
-                    Add(EntityTypes.Memory, m.Id, LinkRelations.Source, "out", m.CreatedAt);
                 break;
             }
             case EntityTypes.Conversation:
@@ -87,7 +84,9 @@ public sealed class RelatedEntityService(JarvisDbContext db, IEntityLinkReposito
                 foreach (var t in await db.Tasks.Where(x => x.OwnerId == ownerId && x.ConversationId == id)
                              .Select(x => x.Id).Take(10).ToListAsync(ct))
                     Add(EntityTypes.Task, t, LinkRelations.Created, "out");
-                foreach (var m in await db.Memories.Where(x => x.OwnerId == ownerId && x.SourceId == id)
+                foreach (var m in await db.Memories.Where(x => x.OwnerId == ownerId && x.SourceType == "conversation" &&
+                                 db.Messages.Any(message => message.Id == x.SourceId && message.ConversationId == id))
+                             .OrderByDescending(x => x.CreatedAt)
                              .Select(x => new { x.Id, x.CreatedAt }).Take(10).ToListAsync(ct))
                     Add(EntityTypes.Memory, m.Id, LinkRelations.Created, "out", m.CreatedAt);
                 break;
@@ -96,7 +95,12 @@ public sealed class RelatedEntityService(JarvisDbContext db, IEntityLinkReposito
             {
                 var memory = await db.Memories.Where(x => x.OwnerId == ownerId && x.Id == id)
                     .Select(x => new { x.SourceType, x.SourceId }).FirstOrDefaultAsync(ct);
-                if (memory?.SourceId is { } sourceId && SourceTypeToEntity(memory.SourceType) is { } sourceType)
+                // Memories learned in chat point at the message; the related thing is its conversation, whose
+                // owner is checked when its title is read.
+                if (memory?.SourceType == "conversation" && memory.SourceId is { } messageId)
+                    Add(EntityTypes.Conversation, await db.Messages.Where(x => x.Id == messageId)
+                        .Select(x => (Guid?)x.ConversationId).FirstOrDefaultAsync(ct), LinkRelations.Source, "in");
+                else if (memory?.SourceId is { } sourceId && SourceTypeToEntity(memory.SourceType) is { } sourceType)
                     Add(sourceType, sourceId, LinkRelations.Source, "in");
                 Add(EntityTypes.Journal, await db.JournalEntries.Where(x => x.OwnerId == ownerId && x.MemoryId == id)
                     .Select(x => (Guid?)x.Id).FirstOrDefaultAsync(ct), LinkRelations.Source, "in");
@@ -157,7 +161,6 @@ public sealed class RelatedEntityService(JarvisDbContext db, IEntityLinkReposito
     /// <summary>Memory sources are written by several features with their own words; map the ones that are refs.</summary>
     private static string? SourceTypeToEntity(string? sourceType) => sourceType?.ToLowerInvariant() switch
     {
-        "conversation" or "chat" => EntityTypes.Conversation,
         "task" => EntityTypes.Task,
         "journal" => EntityTypes.Journal,
         "file" => EntityTypes.File,

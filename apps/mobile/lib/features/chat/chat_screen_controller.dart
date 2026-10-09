@@ -292,7 +292,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
     String? id,
     List<MessageCitation>? citations,
   });
-  void _toolEvent(String tool, {bool? success});
+  void _toolEvent(String tool, {bool? success, List<String> refs});
   void _settleSubmittingApprovals({ApprovalStatus? fallback});
   void _addApprovals(Iterable<ApprovalEntry> approvals);
   Future<void> _syncConversationApprovals();
