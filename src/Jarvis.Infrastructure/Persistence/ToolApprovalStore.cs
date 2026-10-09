@@ -1,4 +1,5 @@
 using Jarvis.Application.Approvals;
+using Jarvis.Application.Events;
 using Jarvis.Domain.Audit;
 using Jarvis.Domain.Approvals;
 using Jarvis.Domain.Workflows;
@@ -9,7 +10,7 @@ using System.Text.Json.Nodes;
 
 namespace Jarvis.Infrastructure.Persistence;
 
-public sealed class ToolApprovalStore(JarvisDbContext db) : IToolApprovalStore
+public sealed class ToolApprovalStore(JarvisDbContext db, IJarvisEventBus? events = null) : IToolApprovalStore
 {
     private static readonly TimeSpan ResumeRecoveryAge = TimeSpan.FromMinutes(15);
 
@@ -46,6 +47,10 @@ public sealed class ToolApprovalStore(JarvisDbContext db) : IToolApprovalStore
             return new ToolApprovalCreateResult(
                 EnsureSameRequest(existing, conversationId, taskId, toolName, argumentsJson).ToRecord(), false, null);
         }
+        await events.TryPublishAsync(new JarvisEvent(ownerId, JarvisEventKinds.ApprovalRequested,
+            $"Waiting for your approval: {toolName}", new EntityRef(EntityTypes.Approval, approval.Id),
+            new Dictionary<string, string> { ["tool"] = toolName }, conversationId,
+            EventOrigin.Agent, taskId), cancellationToken);
         return new ToolApprovalCreateResult(approval.ToRecord(), true, notification.Id);
     }
 
@@ -134,6 +139,10 @@ public sealed class ToolApprovalStore(JarvisDbContext db) : IToolApprovalStore
             metadataJson: JsonSerializer.Serialize(new { approvalId = approval.Id, conversationId = approval.ConversationId })));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        await events.TryPublishAsync(new JarvisEvent(ownerId, JarvisEventKinds.ApprovalDecided,
+            $"{(approved ? "Approved" : "Declined")}: {approval.ToolName}", new EntityRef(EntityTypes.Approval, approval.Id),
+            new Dictionary<string, string> { ["tool"] = approval.ToolName, ["approved"] = approved ? "true" : "false" },
+            approval.ConversationId, EventOrigin.Owner, approval.TaskId), cancellationToken);
         return approval.ToRecord();
     }
 

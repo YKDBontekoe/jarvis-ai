@@ -4,7 +4,8 @@ using Jarvis.Domain.Inbox;
 namespace Jarvis.Application.Inbox;
 
 public sealed class CommitmentService(IInboxRepository repository, IReminderService reminders,
-    IDailyBriefingRepository briefings, TimeProvider? timeProvider = null) : ICommitmentService
+    IDailyBriefingRepository briefings, TimeProvider? timeProvider = null,
+    Events.IJarvisEventBus? events = null) : ICommitmentService
 {
     public const int DueSoonDays = 7;
     private static readonly TimeOnly ReminderTime = new(9, 0);
@@ -56,6 +57,7 @@ public sealed class CommitmentService(IInboxRepository repository, IReminderServ
             ReminderId = await TryRemindAsync(commitment, today, cancellationToken)
         };
         await repository.AddCommitmentAsync(commitment, cancellationToken);
+        await PublishCreatedAsync(commitment, cancellationToken);
         return InboxOperation<Commitment>.Ok(commitment);
     }
 
@@ -78,10 +80,28 @@ public sealed class CommitmentService(IInboxRepository repository, IReminderServ
                 description, suggestion.DueOn, CommitmentStatuses.Open, true,
                 CommitmentSources.IsValid(source) ? source : CommitmentSources.Manual, threadId, null, null, now, now);
             await repository.AddCommitmentAsync(commitment, cancellationToken);
+            await PublishCreatedAsync(commitment, cancellationToken);
             added.Add(commitment);
         }
         return added;
     }
+
+    private Task PublishCreatedAsync(Commitment commitment, CancellationToken cancellationToken) =>
+        Events.JarvisEventPublishing.TryPublishAsync(events, new Events.JarvisEvent(commitment.OwnerId,
+            Events.JarvisEventKinds.CommitmentCreated,
+            (commitment.Direction == CommitmentDirections.IOwe ? "You promised " : "Promised to you by ") +
+            $"{commitment.Counterparty}: {commitment.Description}",
+            new Events.EntityRef(Events.EntityTypes.Commitment, commitment.Id),
+            new Dictionary<string, string>
+            {
+                ["direction"] = commitment.Direction,
+                ["counterparty"] = commitment.Counterparty,
+                ["description"] = commitment.Description,
+                ["dueOn"] = commitment.DueOn?.ToString("yyyy-MM-dd") ?? "",
+                ["suggested"] = commitment.Suggested ? "true" : "false",
+                ["source"] = commitment.Source
+            },
+            Origin: commitment.Suggested ? Events.EventOrigin.System : Events.EventOrigin.Owner), cancellationToken);
 
     public async Task<InboxOperation<Commitment>> AcceptAsync(Guid id, Guid ownerId, DateOnly today,
         CancellationToken cancellationToken)

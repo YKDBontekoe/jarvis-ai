@@ -123,6 +123,7 @@ public static class DependencyInjection
         services.AddScoped<IFileCitationResolver, FileCitationResolver>();
         services.AddJarvisFederatedSearch(configuration);
         services.AddJarvisLifeFeatures();
+        Events.EventSpineRegistration.AddJarvisEventSpine(services);
         services.AddScoped<IObjectStorage, S3ObjectStorage>();
         var objectStorage = configuration.GetSection("ObjectStorage");
         var serviceUrl = objectStorage["ServiceUrl"] ?? throw new InvalidOperationException("ObjectStorage:ServiceUrl is required.");

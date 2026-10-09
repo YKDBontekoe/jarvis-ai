@@ -5,7 +5,7 @@ namespace Jarvis.Application.Missions;
 
 public sealed class MissionService(IMissionRepository repository, IMissionPlanner planner,
     IJarvisTaskRepository taskRepository, IJarvisTaskService tasks, INotificationRepository notifications,
-    TimeProvider? timeProvider = null) : IMissionService
+    TimeProvider? timeProvider = null, Events.IJarvisEventBus? events = null) : IMissionService
 {
     private const string BlockedError = "An earlier step did not finish.";
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
@@ -200,6 +200,16 @@ public sealed class MissionService(IMissionRepository repository, IMissionPlanne
             if (updated is null) continue;
             await repository.UpdateStepAsync(updated, cancellationToken);
             steps[i] = updated;
+            var completed = updated.Status == StepStatuses.Completed;
+            await Events.JarvisEventPublishing.TryPublishAsync(events, new Events.JarvisEvent(mission.OwnerId,
+                completed ? Events.JarvisEventKinds.MissionStepCompleted : Events.JarvisEventKinds.MissionStepFailed,
+                $"{mission.Title}: {updated.Title} {(completed ? "done" : "failed")}",
+                new Events.EntityRef(Events.EntityTypes.Mission, mission.Id),
+                new Dictionary<string, string>
+                {
+                    ["step"] = updated.Title,
+                    ["error"] = updated.Error ?? ""
+                }, Origin: Events.EventOrigin.Agent, CausedByTaskId: updated.TaskId), cancellationToken);
         }
 
         // 2. Stop what can no longer happen because an earlier step failed.
