@@ -73,10 +73,12 @@ flowchart LR
 | Devices / home | `Devices/`, `Home/` | `DeviceToolContributor` | `DeviceEndpoints`, `/home` |
 | A2A / remote agents | `Agents/` (app) | `RemoteAgentToolContributor` | `A2AEndpoints` |
 | Surfaces (generative UI) | `Surfaces/` | `SurfaceToolContributor` | `SurfaceEndpoints` |
+| Event spine (events, links, reactions) | `Events/` | `Situation/` (situation context, cross-feature tools) | `EventEndpoints` (see [event-spine.md](event-spine.md)) |
 | Timeline, inbox, finance, library, modes, missions | `Timeline/`, `Inbox/`, `Finance/`, `Library/`, `Modes/`, `Missions/` | matching folders | `TimelineEndpoints`, `InboxEndpoints`, `FinanceEndpoints`, `LibraryEndpoints`, `ModeEndpoints`, `MissionEndpoints` (see [life-features.md](../backend/life-features.md)) |
 
 ## Related documents
 
 - [layers-and-dependencies.md](layers-and-dependencies.md) — project graph and dependency rules
 - [chat-agent-runtime.md](chat-agent-runtime.md) — turn lifecycle, Codex adapter, SignalR
+- [event-spine.md](event-spine.md) — one event stream and `type:id` refs across features, related things, Jarvis's own reactions and autonomy levels
 - [security-and-ownership.md](security-and-ownership.md) — auth, data protection, fail-closed behavior

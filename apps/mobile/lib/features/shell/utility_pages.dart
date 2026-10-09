@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../activity/activity_screen.dart';
 import '../approvals/approvals_screen.dart';
 import '../audit/audit_screen.dart';
 import '../watches/condition_watches_screen.dart';
@@ -19,6 +20,8 @@ import '../agents/agents_screen.dart';
 import '../channels/channels_screen.dart';
 import '../coding/coding_runs_screen.dart';
 import '../decisions/decisions_screen.dart';
+import '../entities/entity_ref.dart';
+import '../entities/entity_screen.dart';
 import '../devices/devices_screen.dart';
 import '../expenses/expenses_screen.dart';
 import '../habits/habits_screen.dart';
@@ -84,7 +87,20 @@ Widget? utilityPageFor(
       projectId: project.substring(projectDestinationPrefix.length),
       onOpenConversation: onOpenConversation,
     ),
-  'memory' => MemoryScreen(http: http),
+  'activity' => ActivityScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+  ),
+  final entity when entity.startsWith(entityDestinationPrefix) =>
+    switch (EntityRef.fromDestination(entity)) {
+      final ref? => EntityScreen(
+        http: http,
+        entity: ref,
+        onOpenConversation: onOpenConversation,
+      ),
+      null => null,
+    },
+  'memory' => MemoryScreen(http: http, onOpenConversation: onOpenConversation),
   'memory$createDestinationSuffix' => MemoryScreen(
     http: http,
     startCreating: true,

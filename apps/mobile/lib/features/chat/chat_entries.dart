@@ -196,10 +196,13 @@ String thinkingLabel(List<ChatEntry> entries) {
 enum ToolStepStatus { running, completed, failed }
 
 class ToolStep {
-  const ToolStep(this.tool, this.status);
+  const ToolStep(this.tool, this.status, {this.refs = const []});
 
   final String tool;
   final ToolStepStatus status;
+
+  /// What a completed call made or changed, as `type:id` refs, shown as cards.
+  final List<String> refs;
 }
 
 /// Tools Jarvis used while working on one reply.
@@ -214,22 +217,26 @@ class ToolRunEntry extends ChatEntry {
   ToolRunEntry started(String tool) =>
       ToolRunEntry([...steps, ToolStep(tool, ToolStepStatus.running)]);
 
-  ToolRunEntry finished(String tool, {required bool success}) {
+  ToolRunEntry finished(
+    String tool, {
+    required bool success,
+    List<String> refs = const [],
+  }) {
     final index = steps.lastIndexWhere(
       (step) => step.tool == tool && step.status == ToolStepStatus.running,
     );
     final status = success ? ToolStepStatus.completed : ToolStepStatus.failed;
-    if (index < 0) return ToolRunEntry([...steps, ToolStep(tool, status)]);
+    final done = ToolStep(tool, status, refs: success ? refs : const []);
+    if (index < 0) return ToolRunEntry([...steps, done]);
     return ToolRunEntry([
-      for (var i = 0; i < steps.length; i++)
-        i == index ? ToolStep(tool, status) : steps[i],
+      for (var i = 0; i < steps.length; i++) i == index ? done : steps[i],
     ]);
   }
 
   ToolRunEntry settle() => ToolRunEntry([
     for (final step in steps)
       step.status == ToolStepStatus.running
-          ? ToolStep(step.tool, ToolStepStatus.completed)
+          ? ToolStep(step.tool, ToolStepStatus.completed, refs: step.refs)
           : step,
   ]);
 }

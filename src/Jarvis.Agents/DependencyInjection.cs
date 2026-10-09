@@ -52,6 +52,9 @@ public static class DependencyInjection
         services.AddScoped<MemoryReranker>();
         services.AddScoped<IAgentToolContributor, CoreAgentTools>();
         services.AddScoped<IAgentContextContributor, CoreAgentContext>();
+        // Cross-feature: the situation every turn sees, and tools that search, relate and arrange across features.
+        services.AddScoped<IAgentContextContributor, Situation.SituationContextContributor>();
+        services.AddScoped<IAgentToolContributor, Situation.ConnectedToolContributor>();
         services.AddScoped<IAgentToolContributor, McpSetupToolContributor>();
         services.AddScoped<IAgentContextContributor, McpContextContributor>();
         services.AddScoped<Jarvis.Application.Integrations.IMcpOAuthService, Jarvis.Mcp.McpOAuthService>();

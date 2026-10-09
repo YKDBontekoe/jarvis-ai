@@ -104,6 +104,14 @@ Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide
 - **Quick actions** (`tile_actions.dart`): reminders Done / +10 min, habits Check in / Undo, approvals Decline. `applyTileAction` updates the tile at once, then `runTileAction` calls the API and Home reloads; a failure restores the tile and shows a snackbar. Approvals can only be declined or reviewed on a tile; approving always happens on the approvals page.
 - Long-press a tile for a menu (resize, edit Home, remove). In edit mode drag to reorder. Home waits for the saved layout (`TileLayoutController.ready`) before drawing the grid.
 
+**Connected things** (`features/entities/`, `features/activity/`):
+- `EntityRef` is the client side of the server's `type:id` refs. The destination `entity:<type>:<id>` opens `EntityScreen`: the thing's title, an "Open in <feature>" button, the `RelatedPanel` (from `/entities/{type}/{id}/related`) and its event history.
+- `RelatedPanel` also appears in task details. Memory's "Learned from a conversation" opens the memory's page, which leads back to the chat.
+- Chat turns completed tool steps that carry refs into `EntityResultCard`s.
+- The **Activity** tile and page (`/api/v1/events`) show what happened and what Jarvis did on its own; rows open their subject.
+- Home refreshes on the realtime `event.created`.
+- The Learning page's autonomy card holds the level picker, including the opt-in autonomous level and its per-category outside-action switches.
+
 **Everything** uses grouped rows within one surface per category (Plan, Talk, Know, Money, Automate, System), following Settings' hierarchy. Each row shows the feature's name, a practical description from `TileSpec.description`, its existing Phosphor icon, and a quiet disclosure indicator. Names and descriptions wrap without ellipses at all text sizes. Search matches purpose as well as name and category. The “On Home” strip uses icon shortcuts, reflects the saved pinned layout, and disappears while searching. Tapping a row or favorite keeps the existing live tile preview, sizing, pinning and Open controls; the preview explains the feature too. Home uses a restrained `JarvisColors.litSurface` treatment for its next event, with neutral edges rather than colored frames.
 
 Home icon-size tiles are flat shortcuts; content and summary tiles keep their rounded surfaces. Edit, resize, drag and long-press menus use the same saved layout. The shared `JarvisOrb` uses the transparent generated glass asset in `assets/brand/jarvis-orb-v1.png`, decoded at its display size, with the original procedural mark as a decode fallback. Generation prompts and the optional app-icon master are documented in `assets/brand/README.md`. Its animation respects reduced motion. The orb retains its iridescent purple/blue appearance and “Ask Jarvis” tooltip and accessibility label, without persistent navigation text.

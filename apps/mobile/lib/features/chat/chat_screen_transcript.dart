@@ -117,7 +117,7 @@ mixin _ChatScreenTranscript on _ChatScreenController {
     _settleToolRuns();
   }
 
-  void _toolEvent(String tool, {bool? success}) {
+  void _toolEvent(String tool, {bool? success, List<String> refs = const []}) {
     final runIndex = _entries.lastIndexWhere((entry) => entry is ToolRunEntry);
     final lastUser = _entries.lastIndexWhere(
       (entry) => entry is MessageEntry && entry.isUser,
@@ -131,7 +131,11 @@ mixin _ChatScreenTranscript on _ChatScreenController {
         : null;
     final updated = success == null
         ? (current ?? const ToolRunEntry([])).started(tool)
-        : (current ?? const ToolRunEntry([])).finished(tool, success: success);
+        : (current ?? const ToolRunEntry([])).finished(
+            tool,
+            success: success,
+            refs: refs,
+          );
     if (current != null) {
       _entries[runIndex] = updated;
     } else {

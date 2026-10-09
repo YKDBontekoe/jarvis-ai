@@ -6,7 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Jarvis.Infrastructure.Persistence;
 
-public sealed class ConditionWatchRepository(JarvisDbContext db) : IConditionWatchRepository
+public sealed class ConditionWatchRepository(JarvisDbContext db,
+    Jarvis.Application.Events.IJarvisEventBus? events = null) : IConditionWatchRepository
 {
     public async Task<ConditionWatchRecord> CreateAsync(Guid ownerId, CreateConditionWatchRequest request,
         CancellationToken cancellationToken)
@@ -91,6 +92,19 @@ public sealed class ConditionWatchRepository(JarvisDbContext db) : IConditionWat
         }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        if (triggered)
+            await Jarvis.Application.Events.JarvisEventPublishing.TryPublishAsync(events,
+                new Jarvis.Application.Events.JarvisEvent(watch.OwnerId, Jarvis.Application.Events.JarvisEventKinds.WatchFired,
+                    $"Condition met: {watch.Title}",
+                    new Jarvis.Application.Events.EntityRef(Jarvis.Application.Events.EntityTypes.Watch, watch.Id),
+                    new Dictionary<string, string>
+                    {
+                        ["title"] = watch.Title,
+                        ["kind"] = watch.Kind,
+                        ["value"] = value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        ["comparison"] = watch.Comparison,
+                        ["threshold"] = watch.Threshold.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    }, At: checkedAt), cancellationToken);
         return new ConditionWatchCheckResult(watch.Status == "active", watch.IntervalMinutes);
     }
 

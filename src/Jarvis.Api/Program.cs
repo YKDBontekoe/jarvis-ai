@@ -120,6 +120,7 @@ api.MapRoutineEndpoints(app.Logger);
 api.MapImprovementEndpoints();
 api.MapDecisionEndpoints(app.Logger);
 api.MapMissionEndpoints(app.Logger);
+api.MapEventEndpoints();
 
 app.MapA2AProtocol();
 

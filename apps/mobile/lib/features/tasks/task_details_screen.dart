@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../../ui/phosphor_icons.dart';
 import '../approvals/approvals_screen.dart';
 import '../chat/chat_widgets.dart';
+import '../entities/entity_ref.dart';
+import '../entities/entity_screen.dart';
 import '../../theme.dart';
 import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';
@@ -236,6 +238,16 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                   const SizedBox(height: 16),
                   Text(summary!, style: theme.textTheme.bodyLarge),
                 ],
+                // Missions it belongs to, what it follows up, links Jarvis drew.
+                if (EntityRef.tryParse('task:${widget.taskId}') case final ref?)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 20),
+                    child: RelatedPanel(
+                      key: const Key('task-related'),
+                      http: widget.http,
+                      entity: ref,
+                    ),
+                  ),
                 if (_messages.isNotEmpty) ...[
                   const SizedBox(height: 24),
                   const SectionHeader('Activity'),

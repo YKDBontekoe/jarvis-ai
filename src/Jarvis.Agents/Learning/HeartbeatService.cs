@@ -30,7 +30,8 @@ public sealed class HeartbeatService(
     IInboxService inbox,
     ICommitmentService commitments,
     ILogger<HeartbeatService> logger,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    Jarvis.Application.Events.IJarvisEventBus? events = null)
 {
     private static readonly TimeSpan MeetingPrepLead = TimeSpan.FromMinutes(20);
     private static readonly TimeSpan MeetingPrepHorizon = TimeSpan.FromHours(2);
@@ -100,6 +101,11 @@ public sealed class HeartbeatService(
                 await notifications.CreateAsync(ownerId, "heartbeat.checkin",
                     notified.Count == 1 ? "Heads up" : $"Heads up — {notified.Count} things need you",
                     string.Join("\n", notified.Select(item => "• " + item.Text)), null, cancellationToken);
+            foreach (var item in notified)
+                await Jarvis.Application.Events.JarvisEventPublishing.TryPublishAsync(events,
+                    new Jarvis.Application.Events.JarvisEvent(ownerId, Jarvis.Application.Events.JarvisEventKinds.HeartbeatCheckIn,
+                        item.Text, Data: new Dictionary<string, string> { ["key"] = item.Key },
+                        Origin: Jarvis.Application.Events.EventOrigin.Agent), cancellationToken);
         }
 
         var summary = Summarize(reflected, notified.Count, quiet, started);

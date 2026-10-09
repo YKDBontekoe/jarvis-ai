@@ -15,7 +15,7 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
     IConditionWatchScheduler, IDailyBriefingScheduler, Jarvis.Application.Learning.IHeartbeatScheduler,
     Jarvis.Application.Learning.IDreamingScheduler, IAutomationScheduler,
     Jarvis.Application.Reviews.IWeeklyReviewScheduler, Jarvis.Application.Habits.IHabitCheckInScheduler,
-    Jarvis.Application.People.IPeopleCheckInScheduler
+    Jarvis.Application.People.IPeopleCheckInScheduler, Jarvis.Application.Events.IAgentReactionScheduler
 {
     public const string TaskQueue = "jarvis-workflows";
     private readonly SemaphoreSlim _clientLock = new(1, 1);
@@ -157,6 +157,18 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
         await client.StartWorkflowAsync(
             (WeeklyReviewWorkflow workflow) => workflow.RunAsync(
                 new Jarvis.Application.Reviews.WeeklyReviewWorkflowInput(ownerId)), options);
+    }
+
+    public async Task EnqueueAsync(Guid ownerId, Guid eventId, CancellationToken cancellationToken)
+    {
+        var client = await GetClientAsync(cancellationToken);
+        var options = new WorkflowOptions(id: AgentReactionWorkflowIds.For(ownerId), taskQueue: TaskQueue)
+        {
+            IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate
+        };
+        options.SignalWithStart((AgentReactionWorkflow workflow) => workflow.EventAsync(eventId));
+        await client.StartWorkflowAsync(
+            (AgentReactionWorkflow workflow) => workflow.RunAsync(new AgentReactionWorkflowInput(ownerId)), options);
     }
 
     public async Task ScheduleHabitCheckInAsync(Guid ownerId, CancellationToken cancellationToken)

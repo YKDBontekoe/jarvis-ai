@@ -20,6 +20,7 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
 {
     private const int MaxAutomaticApprovalsPerTurn = 16;
     private bool _backgroundTask;
+    private Guid? _executingTaskId;
     private static readonly JsonSerializerOptions ArgumentsJsonOptions = new(JsonSerializerDefaults.Web);
     private AIAgent? _agent;
 
@@ -112,6 +113,7 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
         var conversation = await conversations.GetAsync(conversationId, ownerId, cancellationToken);
         var task = await tasks.GetTaskByConversationIdAsync(conversationId, ownerId, cancellationToken);
         _backgroundTask = task is not null;
+        _executingTaskId = task?.Id;
         var snapshot = await ResolveProfileAsync(conversation, ownerId, cancellationToken);
         var purpose = ResolvePurpose(task is not null, snapshot);
         var ownerModels = await settings.GetAsync<ModelSettings>(ownerId, SettingsSections.Models, cancellationToken)
@@ -209,7 +211,8 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
                         if (!activeTools.Remove(result.CallId, out var toolName)) continue;
                         yield return new AgentStreamEvent(ToolProgress: new AgentToolProgress(result.CallId, toolName,
                             result.Exception is null ? "completed" : "failed",
-                            result.Exception is null ? null : ToolFailureFeedback.Kind(result.Exception)));
+                            result.Exception is null ? null : ToolFailureFeedback.Kind(result.Exception),
+                            result.Exception is null ? ToolResultRefs.Extract(result.Result) : null));
                         checkpoint = true;
                     }
 
@@ -284,7 +287,8 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
             var declaredReadOnly = mcpToolHost.IsReadOnlyTool(functionCall.Name) &&
                                    ToolRiskPolicy.Classify(functionCall.Name) == ToolRisk.Unknown;
             var decision = await approvalPolicy.EvaluateAsync(new ApprovalPolicyRequest(currentUser.OwnerId,
-                functionCall.Name, _backgroundTask, declaredReadOnly, conversationId), cancellationToken);
+                functionCall.Name, _backgroundTask, declaredReadOnly, conversationId, category.Key, _executingTaskId),
+                cancellationToken);
             return decision.AutoApprove;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)

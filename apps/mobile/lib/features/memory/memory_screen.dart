@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -7,6 +9,8 @@ import 'knowledge_graph_screen.dart';
 import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
+import '../entities/entity_ref.dart';
+import '../entities/entity_screen.dart';
 
 part 'memory_editor.dart';
 
@@ -28,10 +32,14 @@ class MemoryScreen extends StatefulWidget {
     required this.http,
     this.startCreating = false,
     this.onCreateDone,
+    this.onOpenConversation,
     super.key,
   });
 
   final Dio http;
+
+  /// Opens the chat a memory was learned in.
+  final Future<void> Function(String conversationId)? onOpenConversation;
 
   /// Opens the "new" editor as soon as the page has settled.
   final bool startCreating;
@@ -45,6 +53,23 @@ class MemoryScreen extends StatefulWidget {
 }
 
 class _MemoryScreenState extends State<MemoryScreen> {
+  /// Opens the memory's own page: the chat it was learned in and anything
+  /// else it is linked to.
+  void _openRelated(Map<String, dynamic> memory) {
+    final id = jsonId(memory);
+    if (id == null) return;
+    final ref = EntityRef.tryParse('memory:$id');
+    if (ref == null) return;
+    unawaited(
+      openEntity(
+        context,
+        widget.http,
+        ref,
+        onOpenConversation: widget.onOpenConversation,
+      ),
+    );
+  }
+
   final _query = TextEditingController();
   List<Map<String, dynamic>> _memories = [];
   bool _loading = true;
@@ -429,12 +454,17 @@ class _MemoryScreenState extends State<MemoryScreen> {
                   color: JarvisColors.of(context).muted,
                 ),
                 onSelected: (action) => switch (action) {
+                  'related' => _openRelated(memory),
                   'pin' => _togglePinned(memory),
                   'edit' => _editMemory(memory),
                   'delete' => _deleteMemory(memory),
                   _ => null,
                 },
                 itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'related',
+                    child: Text('Where it came from'),
+                  ),
                   PopupMenuItem(
                     value: 'pin',
                     child: Text(isPinned ? 'Unpin memory' : 'Pin memory'),
@@ -468,25 +498,36 @@ class _MemoryScreenState extends State<MemoryScreen> {
             ),
           ),
           if (memory['sourceType'] == 'conversation')
-            Padding(
-              padding: EdgeInsets.only(top: 10),
-              child: Row(
-                children: [
-                  Icon(
-                    PhosphorIconsRegular.sparkle,
-                    size: 14,
-                    color: JarvisColors.of(context).muted,
-                  ),
-                  SizedBox(width: 6),
-                  Text(
-                    'Learned from a conversation',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: JarvisColors.of(context).inkSoft,
-                      fontWeight: FontWeight.w500,
+            InkWell(
+              key: Key('memory-source-${jsonId(memory)}'),
+              onTap: () => _openRelated(memory),
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: EdgeInsets.only(top: 10, bottom: 2),
+                child: Row(
+                  children: [
+                    Icon(
+                      PhosphorIconsRegular.sparkle,
+                      size: 14,
+                      color: JarvisColors.of(context).muted,
                     ),
-                  ),
-                ],
+                    SizedBox(width: 6),
+                    Text(
+                      'Learned from a conversation',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: JarvisColors.of(context).inkSoft,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      PhosphorIconsRegular.caretRight,
+                      size: 12,
+                      color: JarvisColors.of(context).muted,
+                    ),
+                  ],
+                ),
               ),
             ),
         ],

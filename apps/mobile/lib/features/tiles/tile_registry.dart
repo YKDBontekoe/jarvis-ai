@@ -4,6 +4,7 @@ import '../../json_maps.dart';
 import '../../ui/phosphor_icons.dart';
 import '../chat/tool_catalog.dart' show humanizeToolName;
 import '../expenses/expense_models.dart';
+import '../entities/entity_ref.dart';
 import '../home/next_up.dart';
 import '../usage/usage_screen.dart' show formatTokenCount;
 import 'tile_models.dart';
@@ -18,6 +19,19 @@ const _large = TileSize.large;
 /// Chats and Settings read live app state, so they have no loader.
 final List<TileSpec> tileSpecs = [
   // Plan
+  const TileSpec(
+    id: 'activity',
+    description:
+        'What happened across Jarvis and what Jarvis did on its own, newest '
+        'first.',
+    name: 'Activity',
+    icon: PhosphorIconsRegular.pulse,
+    category: TileCategory.plan,
+    sizes: [_icon, _strip, _square, _wide, _large],
+    destination: 'activity',
+    load: _activity,
+    fallback: 'What Jarvis noticed and did',
+  ),
   const TileSpec(
     id: 'today',
     description: 'Your calendar, reminders and plan for today.',
@@ -1194,6 +1208,55 @@ Future<TileData?> _notifications(TileEnv env) async {
     rows: [
       for (final item in unread.take(_maxRows))
         TileRow(_first(item, ['title', 'body']) ?? 'Notification'),
+    ],
+  );
+}
+
+/// Kinds that are noise on Home: every read-along message would drown the rest.
+const _quietKinds = {'message.received', 'approval.decided'};
+
+Future<TileData?> _activity(TileEnv env) async {
+  final response = await env.http.get<dynamic>(
+    '/api/v1/events',
+    queryParameters: {'limit': 30},
+  );
+  final events = [
+    for (final event in _items(response))
+      if (!_quietKinds.contains(asJsonString(event['kind']))) event,
+  ];
+  if (events.isEmpty) {
+    return const TileData(subtitle: 'Nothing happened yet');
+  }
+  bool byJarvis(Map<String, dynamic> event) =>
+      const {'Agent', 'AgentReaction'}.contains(asJsonString(event['origin']));
+  final now = env.clock;
+  final since = now.subtract(const Duration(hours: 24));
+  final acted = events.where((event) {
+    final at = jsonDate(event['at'], local: true);
+    return byJarvis(event) && at != null && at.isAfter(since);
+  }).length;
+  final waiting = events
+      .where((event) => asJsonString(event['kind']) == 'approval.requested')
+      .length;
+  return TileData(
+    stat: acted > 0 ? '$acted' : null,
+    unit: acted > 0 ? 'by Jarvis today' : null,
+    subtitle: asJsonString(events.first['summary']),
+    attention: waiting > 0,
+    rows: [
+      for (final event in events.take(_maxRows))
+        TileRow(
+          (byJarvis(event) ? '✦ ' : '') +
+              (asJsonString(event['summary']) ?? 'Event'),
+          meta: switch (jsonDate(event['at'], local: true)) {
+            final at? => clockTime(at),
+            null => null,
+          },
+          attention: asJsonString(event['kind']) == 'approval.requested',
+          target: EntityRef.tryParse(
+            asJsonString(event['subjectRef']),
+          )?.destination,
+        ),
     ],
   );
 }

@@ -128,7 +128,16 @@ internal static class ApiServiceRegistration
         services.AddScoped<IAutomationRuleService, AutomationRuleService>();
         services.AddScoped<IAutomationApprovalResolver, AutomationApprovalResolver>();
         services.AddScoped<IAutomationTriggerPublisher, AutomationTriggerPublisher>();
-        services.AddScoped<IAutomationEventBus, AutomationEventBus>();
+        // Jarvis reacts to events on its own (watch fired, task failed, new commitment, a reply needed).
+        services.AddSingleton<Jarvis.Application.Events.IAgentReactionScheduler>(sp =>
+            sp.GetRequiredService<TemporalReminderScheduler>());
+        services.AddScoped<Jarvis.Application.Events.IJarvisEventHandler, Jarvis.Application.Events.AgentReactionHandler>();
+        services.AddScoped<Jarvis.Application.Events.AgentReactionRunner>();
+        services.AddScoped<AutomationEventBus>();
+        // Automation events also feed the event spine (activity feed, links, Jarvis's reactions).
+        services.AddScoped<IAutomationEventBus>(sp => new Jarvis.Application.Events.AutomationEventBridge(
+            sp.GetRequiredService<AutomationEventBus>(),
+            sp.GetRequiredService<Jarvis.Application.Events.IJarvisEventBus>()));
         services.AddSingleton<IAutomationScheduler>(provider => provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddScoped<IJarvisTaskRepository, WorkflowRepository>();
         services.AddScoped<IJarvisTaskService, JarvisTaskService>();

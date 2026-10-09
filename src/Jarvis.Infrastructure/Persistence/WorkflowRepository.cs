@@ -1,4 +1,5 @@
 using Jarvis.Application.Automations;
+using Jarvis.Application.Events;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Workflows;
@@ -12,7 +13,8 @@ using System.Text.Json;
 namespace Jarvis.Infrastructure.Persistence;
 
 public sealed class WorkflowRepository(JarvisDbContext db,
-    Jarvis.Application.Automations.IAutomationEventBus? events = null) : IReminderRepository, INotificationRepository,
+    Jarvis.Application.Automations.IAutomationEventBus? events = null,
+    Jarvis.Application.Events.IJarvisEventBus? spine = null) : IReminderRepository, INotificationRepository,
     IPushDeviceRepository, IJarvisTaskRepository
 {
     public async Task<PushDeviceRecord> RegisterAsync(Guid ownerId, string token, string platform,
@@ -222,6 +224,12 @@ public sealed class WorkflowRepository(JarvisDbContext db,
         }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        await spine.TryPublishAsync(new Jarvis.Application.Events.JarvisEvent(task.OwnerId,
+            Jarvis.Application.Events.JarvisEventKinds.TaskFailed, $"Task failed: {task.Title}",
+            new Jarvis.Application.Events.EntityRef(Jarvis.Application.Events.EntityTypes.Task, task.Id),
+            new Dictionary<string, string> { ["title"] = task.Title, ["error"] = summary },
+            task.ConversationId == Guid.Empty ? null : task.ConversationId,
+            Jarvis.Application.Events.EventOrigin.Agent, CausedByTaskId: task.Id), cancellationToken);
     }
 
     public async Task<bool> CancelTaskAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
@@ -416,6 +424,11 @@ public sealed class WorkflowRepository(JarvisDbContext db,
         await PostReminderMessageAsync(reminder, LinkedConversationCopy.ReminderDue(reminder.Title), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        await spine.TryPublishAsync(new Jarvis.Application.Events.JarvisEvent(input.OwnerId,
+            Jarvis.Application.Events.JarvisEventKinds.ReminderDue, $"Reminder due: {reminder.Title}",
+            new Jarvis.Application.Events.EntityRef(Jarvis.Application.Events.EntityTypes.Reminder, reminder.Id),
+            new Dictionary<string, string> { ["title"] = reminder.Title, ["dueAt"] = input.DueAt.ToString("O") },
+            reminder.ConversationId), cancellationToken);
         return new ReminderDeliveryResult(reminder.Status == "pending" && nextDueAt is not null,
             nextDueAt ?? reminder.DueAt, reminder.Title, true);
     }

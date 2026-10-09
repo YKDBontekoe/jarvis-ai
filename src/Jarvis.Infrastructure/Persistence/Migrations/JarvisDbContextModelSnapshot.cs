@@ -2192,6 +2192,55 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.ToTable("document_collection_files", (string)null);
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.EntityLinkEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("FromId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("from_id");
+
+                    b.Property<string>("FromType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("from_type");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("Relation")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("relation");
+
+                    b.Property<Guid>("ToId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("to_id");
+
+                    b.Property<string>("ToType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("to_type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "ToType", "ToId");
+
+                    b.HasIndex("OwnerId", "FromType", "FromId", "ToType", "ToId", "Relation")
+                        .IsUnique();
+
+                    b.ToTable("entity_links", (string)null);
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.ExpenseEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3652,6 +3701,67 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.HasIndex("OwnerId", "CreatedAt");
 
                     b.ToTable("model_usage_events", (string)null);
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.OwnerEventEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<Guid?>("CausedByTaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("caused_by_task_id");
+
+                    b.Property<Guid?>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<string>("DataJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("data");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("origin");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<Guid?>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<string>("SubjectType")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("subject_type");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("summary");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "At");
+
+                    b.HasIndex("OwnerId", "SubjectType", "SubjectId");
+
+                    b.ToTable("owner_events", (string)null);
                 });
 
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.OwnerSettingEntity", b =>

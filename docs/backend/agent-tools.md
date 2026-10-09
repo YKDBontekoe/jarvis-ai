@@ -15,6 +15,7 @@ Tools are exposed to the model through **Microsoft Agent Framework** `AITool` in
 | **RemoteAgentToolContributor** | Delegate to registered HTTPS agents (approval-gated) |
 | **DeviceToolContributor** | Location, battery, clipboard, open URL, notifications on connected nodes |
 | **BrowserToolContributor** | `BrowseTheWeb` session + Playwright tools |
+| **ConnectedToolContributor** | Cross-feature: `SearchEverything`, `GetRelated`, `LinkEntities`, `ListRecentEvents`, `ListNotifications`, `MarkNotificationRead`, `ListProjects`, `CreateProject`, `AssignToProject`, `ListAssistantProfiles`, `GetWeeklyReview` (see [event-spine.md](../architecture/event-spine.md)) |
 
 Registration: `src/Jarvis.Agents/DependencyInjection.cs`.
 
@@ -54,6 +55,10 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 Browser, surface, device, skill, persona, graph, and remote-agent tools are defined in their respective folders under `src/Jarvis.Agents/`.
 
 ## Context providers (not tools)
+
+`SituationContextContributor` (order 5) gives every turn one compact view across features: reminders due within 24 hours, pending approvals, due decisions, routine suggestions, unread notifications and recent events, each with its `type:id` ref.
+
+When a tool creates something, include its id in the result as a ref (`task:<id>`) or in the existing prose form ("reminder ID <id>"). `ToolResultRefs` reads it, and the app shows a result card for it.
 
 `IAgentContextContributor` supplies system-side context without function calling:
 

@@ -316,6 +316,20 @@ mixin _LearningCards on _LearningController {
           'Off: it only tells you things and never starts work in the background.',
           PhosphorIconsRegular.robot,
         ),
+        AutonomyLevelSection(
+          key: const Key('autonomy-level'),
+          http: widget.http,
+          autonomy: _autonomy,
+          saving: _saving,
+          onUpdate: _updateAutonomy,
+        ),
+        toggle(
+          'reactToEvents',
+          'Follow up on what happens',
+          'When a watch fires, a task fails, you make a promise or someone needs a reply, Jarvis looks into it in the background. A daily limit applies.',
+          PhosphorIconsRegular.pulse,
+          enabled: on,
+        ),
         toggle(
           'heartbeatMayStartTasks',
           'Prepare for meetings',

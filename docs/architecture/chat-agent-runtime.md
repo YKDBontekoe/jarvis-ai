@@ -52,6 +52,8 @@ When Codex names a function that does not exist, `CodexCliChatClient` asks once 
 
 Temporal runs task workflows (`JarvisTaskWorkflow`); the worker hosts activities that invoke the same agent stack with `WorkerCurrentUser`.
 
+Jarvis also starts background tasks on its own when events happen: a watch fires, a task fails, a commitment is made, or someone needs a reply. These go through `AgentReactionWorkflow`, within `AutonomySettings`, quiet hours and a daily budget. `tool.completed` carries `toolCallId` and `refs` (the things the call made) for result cards. See [event-spine.md](event-spine.md).
+
 ## Voice parallel path
 
 Voice uses LiveKit rooms and an in-process C# runtime (`Jarvis.Api/Realtime`). Codex realtime bridges PCM over WebRTC; tools call back into the API via internal routes secured with `Voice__WorkerSecret`. A separate stdio MCP child can be started with `dotnet Jarvis.Api.dll voice-mcp`.
