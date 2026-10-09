@@ -15,6 +15,7 @@ internal sealed class BrowserStepEntityConfiguration : IEntityTypeConfiguration<
             builder.Property(x => x.Tool).HasColumnName("tool").HasMaxLength(80).IsRequired();
             builder.Property(x => x.Summary).HasColumnName("summary").HasMaxLength(1_000).IsRequired();
             builder.Property(x => x.Success).HasColumnName("success");
+            builder.Property(x => x.ScreenshotKey).HasColumnName("screenshot_key").HasMaxLength(200);
             builder.Property(x => x.CreatedAt).HasColumnName("created_at");
             builder.HasIndex(x => new { x.SessionId, x.Ordinal }).IsUnique();
         }

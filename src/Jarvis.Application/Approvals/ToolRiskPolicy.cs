@@ -70,6 +70,8 @@ public static class ToolRiskPolicy
         ["ForgetGraphEntity"] = ToolRisk.Destructive,
         ["MergeGraphEntities"] = ToolRisk.Destructive,
 
+        ["UseComputer"] = ToolRisk.Outbound,
+
         // Starting a crew of background tasks is a bigger decision than any single tool.
         ["RunMission"] = ToolRisk.Unknown
     };
@@ -79,6 +81,7 @@ public static class ToolRiskPolicy
         var name = ApprovalCategories.CanonicalName(toolName);
         if (name.Length == 0) return ToolRisk.Unknown;
         if (name.StartsWith("browser_", StringComparison.OrdinalIgnoreCase)) return ToolRisk.Outbound;
+        if (name.StartsWith("computer_", StringComparison.Ordinal)) return ToolRisk.Outbound;
         if (name.StartsWith("automation_", StringComparison.Ordinal)) return ToolRisk.Outbound;
         return Classes.TryGetValue(name, out var risk) ? risk : ToolRisk.Unknown;
     }

@@ -72,11 +72,15 @@ public sealed class JarvisAgentFactory(
 
     private List<AITool> CollectTools(IEnumerable<AITool> mcpTools, AgentBuildContext context)
     {
-        var tools = Browser.BrowserToolWrapping.Wrap(mcpTools,
-            services.GetRequiredService<Jarvis.Application.Browser.IBrowserSessionStore>(),
-            context.ConversationId,
-            services.GetRequiredService<Jarvis.Application.Realtime.IRealtimePublisher>(),
-            services.GetRequiredService<ICurrentUser>()).ToList();
+        var sessions = services.GetRequiredService<Jarvis.Application.Browser.IBrowserSessionStore>();
+        var realtime = services.GetRequiredService<Jarvis.Application.Realtime.IRealtimePublisher>();
+        var currentUser = services.GetRequiredService<ICurrentUser>();
+        var tools = (services.GetService<Jarvis.Application.Computer.IComputerSandbox>()?.IsConfigured == true
+            ? Computer.ComputerToolWrapping.Wrap(mcpTools, sessions,
+                services.GetRequiredService<Jarvis.Application.Files.IObjectStorage>(), context.ConversationId,
+                realtime, currentUser)
+            : Browser.BrowserToolWrapping.Wrap(mcpTools, sessions, context.ConversationId, realtime, currentUser))
+            .ToList();
         var toolNames = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
         foreach (var tool in toolContributors.SelectMany(contributor => contributor.GetTools(context)))
         {

@@ -20,6 +20,8 @@ internal static class ProductionDeployment
         "Host=postgres;Port=5432;Database=jarvis;Username=jarvis;Password=" + PostgresPassword;
     private const string KeysDirectory = "${JARVIS_DATA_PROTECTION_KEYS_DIR:?Set JARVIS_DATA_PROTECTION_KEYS_DIR}";
     private const string McpRunnerToken = "${MCP_RUNNER_TOKEN:?Set MCP_RUNNER_TOKEN}";
+    private const string ComputerSandboxToken =
+        "${COMPUTER_SANDBOX_TOKEN:?Set COMPUTER_SANDBOX_TOKEN for the computer feature}";
 
     /// <summary>Compose settings Aspire's model has no property for; added to the file after publishing.</summary>
     public static readonly IReadOnlyDictionary<string, (int? PidsLimit, string? Platform)> ExtraSettings =
@@ -30,6 +32,7 @@ internal static class ProductionDeployment
             ["mcp-runner"] = (512, null),
             ["playwright-mcp"] = (256, null),
             ["browser-egress-proxy"] = (128, null),
+            ["computer-sandbox"] = (512, null),
         };
 
     public static void AddProductionDeployment(this IDistributedApplicationBuilder builder, JarvisFeatures features)
@@ -54,7 +57,7 @@ internal static class ProductionDeployment
                 // API and worker reach the MCP runner here; the runner reaches the internet only via mcp-egress.
                 file.AddNetwork(new Network { Name = "mcp", Internal = true });
                 file.AddNetwork(new Network { Name = "mcp-egress" });
-                if (features.Browser)
+                if (features.AgentsNetwork)
                 {
                     file.AddNetwork(new Network { Name = "agents", Driver = "bridge", Internal = true });
                     file.AddNetwork(new Network { Name = "browser-egress", Driver = "bridge" });
@@ -241,12 +244,17 @@ internal static class ProductionDeployment
                 s.Env(JarvisMcpServers.HomeAssistant(
                     "${HOME_ASSISTANT_MCP_URL:?Set HOME_ASSISTANT_MCP_URL to an HTTPS Home Assistant /api/mcp URL}"));
             if (features.Coding) s.AddCodingCheckout();
-            if (features.Browser)
+            if (features.HeadlessBrowser)
             {
                 s.Env(JarvisMcpServers.Browser("http://playwright-mcp:8931/mcp"));
                 s.After("playwright-mcp", Healthy).After("browser-egress-proxy", Started);
-                s.Networks.Add("agents");
             }
+            if (features.Computer)
+            {
+                s.Env(JarvisMcpServers.Computer("computer-sandbox", ComputerSandboxToken));
+                s.After("computer-sandbox", Healthy).After("browser-egress-proxy", Started);
+            }
+            if (features.AgentsNetwork) s.Networks.Add("agents");
         });
 
         // One-shot deployment task, profile-gated so a normal `up` never reruns migrations; remote-up invokes it
@@ -326,7 +334,9 @@ internal static class ProductionDeployment
             s.Networks = ["edge", "application"];
         });
 
-        if (features.Browser) builder.AddBrowser();
+        if (features.AgentsNetwork) builder.AddBrowserEgressProxy();
+        if (features.HeadlessBrowser) builder.AddBrowser();
+        if (features.Computer) builder.AddComputerSandbox();
     }
 
     private static void AddBrowser(this IDistributedApplicationBuilder builder)
@@ -349,7 +359,40 @@ internal static class ProductionDeployment
                 "5s", "3s", 20, "30s");
             s.Networks = ["agents"];
         });
+    }
 
+    /// <summary>
+    /// Computer use: a small desktop with a visible Chromium, desktop tools and a shell. It sits only on the internal
+    /// agents network, so its one way out is the filtering proxy and nothing else in the stack is reachable from it.
+    /// The API proxies the live view; no port is published.
+    /// </summary>
+    private static void AddComputerSandbox(this IDistributedApplicationBuilder builder)
+    {
+        builder.Service("computer-sandbox", null, s =>
+        {
+            s.Build = new Build { Context = "./" + JarvisImages.ComputerSandboxContext };
+            s.PullPolicy = "build";
+            s.Restart = "unless-stopped";
+            s.Init = true;
+            s.ReadOnly = true;
+            s.Tmpfs = ["/tmp:size=512m,mode=1777", "/home/node:size=1g,mode=1777,uid=1000,gid=1000"];
+            s.ShmSize = "1gb";
+            s.Limit("2g", "2.0");
+            s.CapDrop = ["ALL"];
+            s.SecurityOpt = ["no-new-privileges:true"];
+            s.Env(("COMPUTER_SANDBOX_TOKEN", ComputerSandboxToken),
+                ("BROWSER_PROXY", "http://browser-egress-proxy:3128"),
+                ("PLAYWRIGHT_ALLOWED_HOSTS", "computer-sandbox:8931"));
+            s.Healthcheck = Check(["CMD", "node", "-e",
+                "fetch('http://127.0.0.1:8932/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"],
+                "10s", "3s", 12, "30s");
+            s.After("browser-egress-proxy", Started);
+            s.Networks = ["agents"];
+        });
+    }
+
+    private static void AddBrowserEgressProxy(this IDistributedApplicationBuilder builder)
+    {
         builder.Service("browser-egress-proxy", $"{JarvisImages.Squid}:latest", s =>
         {
             s.Restart = "unless-stopped";

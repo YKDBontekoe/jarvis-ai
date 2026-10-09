@@ -1644,6 +1644,14 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ControlMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("agent")
+                        .HasColumnName("control_mode");
+
                     b.Property<Guid>("ConversationId")
                         .HasColumnType("uuid")
                         .HasColumnName("conversation_id");
@@ -1657,6 +1665,14 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("goal");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("browser")
+                        .HasColumnName("kind");
 
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")
@@ -1681,6 +1697,11 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ConversationId");
 
+                    b.HasIndex("Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ix_browser_sessions_active_computer")
+                        .HasFilter("kind = 'computer' AND status = 'active'");
+
                     b.HasIndex("OwnerId", "ConversationId", "Status");
 
                     b.ToTable("browser_sessions", (string)null);
@@ -1698,6 +1719,11 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.Property<int>("Ordinal")
                         .HasColumnType("integer")
                         .HasColumnName("ordinal");
+
+                    b.Property<string>("ScreenshotKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("screenshot_key");
 
                     b.Property<Guid>("SessionId")
                         .HasColumnType("uuid")

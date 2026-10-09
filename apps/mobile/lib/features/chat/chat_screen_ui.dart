@@ -762,7 +762,13 @@ mixin _ChatScreenUi on _ChatScreenController {
       loadMemoryText: _loadMemoryText,
     ),
     UiSurfaceEntry() => _surfaceView(entry),
-    BrowserSessionEntry() => BrowserTimelineView(session: entry),
+    BrowserSessionEntry() => BrowserTimelineView(
+      session: entry,
+      loadScreenshot: _loadComputerScreenshot,
+      onWatch: () => unawaited(_watchComputer(entry)),
+      onTakeOver: () => unawaited(_watchComputer(entry, takeOver: true)),
+      onHandBack: () => unawaited(_handBackComputer(entry)),
+    ),
   };
 
   Widget _surfaceView(UiSurfaceEntry entry) {

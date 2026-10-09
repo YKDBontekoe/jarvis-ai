@@ -58,12 +58,14 @@ public sealed class BrowserSessionEntity
     public string Goal { get; set; } = string.Empty;
     public string? StartUrl { get; set; }
     public string Status { get; set; } = "active";
+    public string Kind { get; set; } = BrowserSessionKinds.Browser;
+    public string ControlMode { get; set; } = ComputerControlModes.Agent;
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public List<BrowserStepEntity> Steps { get; set; } = [];
 
     public BrowserSessionRecord ToRecord() => new(Id, OwnerId, ConversationId, Goal, StartUrl, Status, CreatedAt,
-        UpdatedAt, Steps.OrderBy(step => step.Ordinal).Select(step => step.ToRecord()).ToArray());
+        UpdatedAt, Steps.OrderBy(step => step.Ordinal).Select(step => step.ToRecord()).ToArray(), Kind, ControlMode);
 }
 
 public sealed class BrowserStepEntity
@@ -74,9 +76,10 @@ public sealed class BrowserStepEntity
     public string Tool { get; set; } = string.Empty;
     public string Summary { get; set; } = string.Empty;
     public bool Success { get; set; }
+    public string? ScreenshotKey { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
-    public BrowserStepRecord ToRecord() => new(Id, Ordinal, Tool, Summary, Success, CreatedAt);
+    public BrowserStepRecord ToRecord() => new(Id, Ordinal, Tool, Summary, Success, CreatedAt, ScreenshotKey);
 }
 
 public sealed class UiSurfaceRepository(JarvisDbContext db) : IUiSurfaceRepository
@@ -279,30 +282,56 @@ public sealed class BrowserSessionRepository(JarvisDbContext db) : IBrowserSessi
     public async Task<BrowserSessionRecord> StartAsync(Guid ownerId, Guid conversationId, string goal, string? startUrl,
         CancellationToken cancellationToken)
     {
-        var active = await db.BrowserSessions
-            .Where(x => x.OwnerId == ownerId && x.ConversationId == conversationId && x.Status == "active")
-            .ToListAsync(cancellationToken);
-        foreach (var previous in active)
-        {
-            previous.Status = "superseded";
-            previous.UpdatedAt = DateTimeOffset.UtcNow;
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        var entity = new BrowserSessionEntity
-        {
-            Id = Guid.CreateVersion7(),
-            OwnerId = ownerId,
-            ConversationId = conversationId,
-            Goal = goal,
-            StartUrl = startUrl,
-            Status = "active",
-            CreatedAt = now,
-            UpdatedAt = now
-        };
+        await SupersedeActiveAsync(ownerId, conversationId, cancellationToken);
+        var entity = NewSession(ownerId, conversationId, goal, startUrl, BrowserSessionKinds.Browser);
         db.BrowserSessions.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
         return entity.ToRecord();
+    }
+
+    public async Task<BrowserSessionRecord?> TryStartComputerAsync(Guid ownerId, Guid conversationId, string goal,
+        string? startUrl, TimeSpan idleTimeout, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var activeComputers = await db.BrowserSessions
+            .Where(x => x.Kind == BrowserSessionKinds.Computer && x.Status == "active")
+            .ToListAsync(cancellationToken);
+        foreach (var session in activeComputers)
+        {
+            var mine = session.OwnerId == ownerId && session.ConversationId == conversationId;
+            if (!mine && session.UpdatedAt > now - idleTimeout) return null;
+            session.Status = mine ? "superseded" : "expired";
+            session.UpdatedAt = now;
+        }
+
+        await SupersedeActiveAsync(ownerId, conversationId, cancellationToken);
+        var entity = NewSession(ownerId, conversationId, goal, startUrl, BrowserSessionKinds.Computer);
+        db.BrowserSessions.Add(entity);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // Another conversation claimed the sandbox at the same moment (unique active-computer index).
+            db.ChangeTracker.Clear();
+            return null;
+        }
+
+        return entity.ToRecord();
+    }
+
+    public async Task<bool> SetControlModeAsync(Guid ownerId, Guid sessionId, string controlMode,
+        CancellationToken cancellationToken)
+    {
+        if (!ComputerControlModes.IsKnown(controlMode)) return false;
+        var session = await db.BrowserSessions.SingleOrDefaultAsync(x => x.Id == sessionId && x.OwnerId == ownerId &&
+            x.Kind == BrowserSessionKinds.Computer && x.Status == "active", cancellationToken);
+        if (session is null) return false;
+        session.ControlMode = controlMode;
+        session.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async Task<BrowserSessionRecord?> GetAsync(Guid ownerId, Guid id, CancellationToken cancellationToken) =>
@@ -322,13 +351,13 @@ public sealed class BrowserSessionRepository(JarvisDbContext db) : IBrowserSessi
             .OrderByDescending(x => x.CreatedAt).Take(20).ToListAsync(cancellationToken))
         .Select(x => x.ToRecord()).ToArray();
 
-    public async Task RecordStepAsync(Guid sessionId, string tool, string summary, bool success,
-        CancellationToken cancellationToken)
+    public async Task<BrowserStepRecord?> RecordStepAsync(Guid sessionId, string tool, string summary, bool success,
+        CancellationToken cancellationToken, string? screenshotKey = null)
     {
         var session = await db.BrowserSessions.Include(x => x.Steps)
             .SingleOrDefaultAsync(x => x.Id == sessionId, cancellationToken);
-        if (session is null) return;
-        session.Steps.Add(new BrowserStepEntity
+        if (session is null) return null;
+        var step = new BrowserStepEntity
         {
             Id = Guid.CreateVersion7(),
             SessionId = sessionId,
@@ -336,10 +365,26 @@ public sealed class BrowserSessionRepository(JarvisDbContext db) : IBrowserSessi
             Tool = tool.Length > 80 ? tool[..80] : tool,
             Summary = summary.Length > 1_000 ? summary[..1_000] : summary,
             Success = success,
+            ScreenshotKey = screenshotKey,
             CreatedAt = DateTimeOffset.UtcNow
-        });
+        };
+        session.Steps.Add(step);
         session.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
+        return step.ToRecord();
+    }
+
+    public async Task<IReadOnlyList<string>> TrimScreenshotsAsync(Guid sessionId, int keep,
+        CancellationToken cancellationToken)
+    {
+        var old = await db.BrowserSteps
+            .Where(x => x.SessionId == sessionId && x.ScreenshotKey != null)
+            .OrderByDescending(x => x.Ordinal).Skip(keep).ToListAsync(cancellationToken);
+        if (old.Count == 0) return [];
+        var keys = old.Select(x => x.ScreenshotKey!).ToArray();
+        foreach (var step in old) step.ScreenshotKey = null;
+        await db.SaveChangesAsync(cancellationToken);
+        return keys;
     }
 
     public async Task CompleteAsync(Guid sessionId, string status, CancellationToken cancellationToken)
@@ -349,5 +394,36 @@ public sealed class BrowserSessionRepository(JarvisDbContext db) : IBrowserSessi
         session.Status = status;
         session.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task SupersedeActiveAsync(Guid ownerId, Guid conversationId, CancellationToken cancellationToken)
+    {
+        var active = await db.BrowserSessions
+            .Where(x => x.OwnerId == ownerId && x.ConversationId == conversationId && x.Status == "active")
+            .ToListAsync(cancellationToken);
+        foreach (var previous in active)
+        {
+            previous.Status = "superseded";
+            previous.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+    }
+
+    private static BrowserSessionEntity NewSession(Guid ownerId, Guid conversationId, string goal, string? startUrl,
+        string kind)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return new BrowserSessionEntity
+        {
+            Id = Guid.CreateVersion7(),
+            OwnerId = ownerId,
+            ConversationId = conversationId,
+            Goal = goal,
+            StartUrl = startUrl,
+            Status = "active",
+            Kind = kind,
+            ControlMode = ComputerControlModes.Agent,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
     }
 }

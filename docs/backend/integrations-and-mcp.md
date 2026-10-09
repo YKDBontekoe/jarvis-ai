@@ -142,6 +142,36 @@ Opt-in AppHost feature `browser`:
 - `BrowseTheWeb` starts session; navigation/interaction approval-gated; read-only tools allowlisted.
 - Timeline API: `/conversations/{id}/browser-sessions`.
 
+## Computer use (sandbox desktop)
+
+Opt-in AppHost feature `computer` (`JARVIS_FEATURES=computer`). It replaces the headless `browser` container when both are on.
+
+- **Sandbox** (`infra/computer/`): one container with Xvfb + openbox, a visible Chromium, xdotool, a shell and noVNC. Its
+  Node control process (`server/src/server.mjs`) supervises Chromium and Playwright MCP and serves three ports, all on
+  the internal `agents` network only:
+  - `8931` — Playwright MCP attached to the visible Chromium over CDP (`browser_*` tools, MCP server `computer-browser`).
+  - `8932` — the desktop MCP server (`computer_screenshot`, `computer_click`, `computer_type`, `computer_key`,
+    `computer_scroll`, `computer_drag`, `computer_wait`, `computer_shell`, …), `POST /reset` and `GET /health`. Requires
+    `Authorization: Bearer $COMPUTER_SANDBOX_TOKEN`.
+  - `6080` — websockify + noVNC for the live view.
+- **Egress**: Chromium and shell commands use the same Squid proxy as the browser (`infra/compose/browser/squid.conf`);
+  private, loopback and local-only hosts are refused, and nothing else in the stack is reachable from the sandbox.
+- **Agent tools** (`src/Jarvis.Agents/Computer/`): `UseComputer(goal, startUrl?)` is approval-gated and is the approval
+  for the session; it claims the sandbox, resets it (fresh profile, empty home) and opens a `computer` session.
+  `StopComputer` finishes and wipes it. `ComputerStepFunction` wraps every `browser_*`/`computer_*` tool: it refuses
+  without an active computer session in the conversation, pauses while the owner has control, records the step, stores
+  the screenshot in object storage (`computer-screenshots/{owner}/{session}/…`, newest 30 kept per session) and hands it
+  to the model as an image. Only the newest screenshot of a conversation is sent to Codex
+  (`CodexCliChatClient.SplitToolResultImage`).
+- **Approvals**: inside a session the browser and desktop tools are auto-approved, except `computer_shell` (category
+  `computer.shell`) and `browser_fill_form`, which ask every time. Category `computer` can be allowed for autonomy.
+- **One sandbox, one driver**: a partial unique index allows one active computer session per deployment. A session
+  unused for `Computer:IdleTimeoutMinutes` (default 30) can be taken over by another conversation.
+- **Live view and takeover**: `POST /browser-sessions/{id}/view` returns a one-time viewer URL (60 s ticket). The
+  viewer redeems it for an HttpOnly cookie scoped to `/api/v1/computer-view` (30 min), which authorizes the noVNC files
+  and the WebSocket the API proxies to the sandbox. `POST /browser-sessions/{id}/control {"mode":"user"|"agent"}` hands
+  control to the owner (Jarvis's tools then wait) and back; the app shows **Watch live**, **Take over** and **Hand back**.
+
 ## Agent2Agent
 
 - Public card at `/.well-known/agent-card.json`.

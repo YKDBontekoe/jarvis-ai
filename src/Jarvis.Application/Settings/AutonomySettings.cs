@@ -34,6 +34,7 @@ public static class AutonomousOutboundCategories
         ("whatsapp.send", "Send WhatsApp messages"),
         ("automations.channel_message", "Send messages for automations"),
         ("browser", "Use the browser"),
+        ("computer", "Use the sandbox computer"),
         ("mcp.invoke", "Use integration tools"),
         ("devices.open_url", "Open links on your devices"),
         ("agents.delegate", "Ask other agents")

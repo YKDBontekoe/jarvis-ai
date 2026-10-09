@@ -240,10 +240,8 @@ mixin _ChatScreenSend on _ChatScreenController {
     );
     if (existing >= 0) {
       final current = _entries[existing] as BrowserSessionEntry;
-      _entries[existing] = BrowserSessionEntry(
-        id: session.id,
-        goal: session.goal,
-        steps: current.steps,
+      _entries[existing] = session.copyWith(
+        steps: session.steps.isEmpty ? current.steps : session.steps,
       );
     } else {
       _entries.add(session);
@@ -348,13 +346,12 @@ mixin _ChatScreenSend on _ChatScreenController {
             BrowserSessionEntry(
               id: id,
               goal: goal,
+              kind: asJsonString(session['kind']) ?? 'browser',
+              status: asJsonString(session['status']) ?? 'active',
+              controlMode: asJsonString(session['controlMode']) ?? 'agent',
               steps: [
                 for (final step in jsonMaps(session['steps']))
-                  BrowserStepItem(
-                    tool: asJsonString(step['tool']) ?? 'browser',
-                    summary: asJsonString(step['summary']) ?? '',
-                    success: step['success'] != false,
-                  ),
+                  BrowserStepItem.fromJson(step),
               ],
             ),
           );

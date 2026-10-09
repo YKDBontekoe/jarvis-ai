@@ -151,7 +151,7 @@ internal static class LocalDevelopment
         if (features.HomeAssistant)
             api.WithEnvironment(JarvisMcpServers.HomeAssistant(builder.Configuration["HOME_ASSISTANT_MCP_URL"]
                 ?? throw new InvalidOperationException("Set HOME_ASSISTANT_MCP_URL for the home-assistant feature.")));
-        if (features.Browser)
+        if (features.HeadlessBrowser)
         {
             // Locally the browser runs without the production egress proxy; use it only on trusted networks.
             var playwright = builder.AddContainer("playwright-mcp", JarvisImages.Playwright, "latest")
@@ -160,6 +160,20 @@ internal static class LocalDevelopment
                     "--host", "0.0.0.0", "--block-service-workers")
                 .WithHttpEndpoint(port: 8931, targetPort: 8931, name: "mcp");
             api.WithEnvironment(JarvisMcpServers.Browser("http://localhost:8931/mcp")).WaitFor(playwright);
+        }
+        if (features.Computer)
+        {
+            // Locally the sandbox has no egress proxy either. The token only keeps other local processes out.
+            var computerToken = builder.Configuration["COMPUTER_SANDBOX_TOKEN"] ?? "local-computer-sandbox-token";
+            var sandbox = builder.AddDockerfile("computer-sandbox",
+                    Path.Combine(workspaceRoot, JarvisImages.ComputerSandboxContext))
+                .WithEnvironment("COMPUTER_SANDBOX_TOKEN", computerToken)
+                .WithContainerRuntimeArgs("--shm-size=1g")
+                .WithHttpEndpoint(port: 8931, targetPort: 8931, name: "browser-mcp")
+                .WithHttpEndpoint(port: 8932, targetPort: 8932, name: "control")
+                .WithHttpEndpoint(port: 6080, targetPort: 6080, name: "view");
+            // Playwright MCP only answers requests addressed to localhost:8931, which is what the API sends here.
+            api.WithEnvironment(JarvisMcpServers.Computer("localhost", computerToken)).WaitFor(sandbox);
         }
         if (features.Verification)
         {

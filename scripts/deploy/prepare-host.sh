@@ -130,6 +130,7 @@ ensure_persisted TEMPORAL_PASSWORD jarvis_temporal-postgres-data "$(random_hex 3
 ensure_secret AUTH_SIGNING_KEY
 ensure_secret VOICE_WORKER_SECRET
 ensure_secret MCP_RUNNER_TOKEN
+ensure_secret COMPUTER_SANDBOX_TOKEN
 ensure_secret LIVEKIT_API_SECRET
 ensure LIVEKIT_API_KEY "jarvis$(random_hex 6)"
 # Garage access key ids are GK followed by 24 hex characters.

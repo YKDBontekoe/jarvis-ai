@@ -20,6 +20,12 @@ public static partial class ApprovalCategories
             name.StartsWith("browser_", StringComparison.OrdinalIgnoreCase))
             return Remember("browser", "Using the browser");
 
+        if (name.Equals("computer_shell", StringComparison.Ordinal))
+            return Remember("computer.shell", "Running commands on the sandbox computer");
+        if (name.Equals("UseComputer", StringComparison.Ordinal) ||
+            name.StartsWith("computer_", StringComparison.Ordinal))
+            return Remember("computer", "Using the sandbox computer");
+
         if (Known.TryGetValue(name, out var known))
             return Remember(known.Key, known.Label);
 

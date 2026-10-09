@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:signalr_netcore/iretry_policy.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 
 import '../../api/api_config.dart';
@@ -77,6 +78,7 @@ part 'chat_screen_catchup.dart';
 part 'chat_screen_transcript.dart';
 part 'chat_screen_voice.dart';
 part 'chat_screen_photos.dart';
+part 'chat_screen_computer.dart';
 part 'chat_screen_outbox.dart';
 part 'chat_screen_summary.dart';
 part 'chat_screen_ui.dart';
@@ -116,6 +118,7 @@ class _ChatScreenState extends _ChatScreenController
         _ChatScreenSources,
         _ChatScreenSearch,
         _ChatScreenPhotos,
+        _ChatScreenComputer,
         _ChatScreenOutbox,
         _ChatScreenSummary {
   @override

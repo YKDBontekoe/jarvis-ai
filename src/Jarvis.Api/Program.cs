@@ -57,6 +57,7 @@ app.UseExceptionHandler();
 app.UseJarvisApiProblemResponses();
 app.UseJarvisWebClient();
 app.UseCors();
+app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(20) });
 app.UseAuthentication();
 app.Use(async (context, next) =>
 {
@@ -106,6 +107,8 @@ api.MapSurfaceEndpoints();
 api.MapA2AManagementEndpoints();
 api.MapDeviceEndpoints();
 api.MapBrowserEndpoints();
+api.MapComputerEndpoints();
+app.MapComputerViewEndpoints();
 api.MapPersonalAssistantEndpoints();
 api.MapSearchEndpoints();
 api.MapPlannerEndpoints();

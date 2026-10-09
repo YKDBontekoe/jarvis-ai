@@ -14,7 +14,8 @@ Tools are exposed to the model through **Microsoft Agent Framework** `AITool` in
 | **SurfaceToolContributor** | `RenderUi` generative cards |
 | **RemoteAgentToolContributor** | Delegate to registered HTTPS agents (approval-gated) |
 | **DeviceToolContributor** | Location, battery, clipboard, open URL, notifications on connected nodes |
-| **BrowserToolContributor** | `BrowseTheWeb` session + Playwright tools |
+| **BrowserToolContributor** | `BrowseTheWeb` session + Playwright tools (off when the computer sandbox is configured) |
+| **ComputerToolContributor** | `UseComputer` (approval-gated session start) and `StopComputer` on the sandbox desktop; `ComputerStepFunction` gates and records the sandbox's `browser_*`/`computer_*` MCP tools |
 | **ConnectedToolContributor** | Cross-feature: `SearchEverything`, `GetRelated`, `LinkEntities`, `ListRecentEvents`, `ListNotifications`, `MarkNotificationRead`, `ListProjects`, `CreateProject`, `AssignToProject`, `ListAssistantProfiles`, `GetWeeklyReview` (see [event-spine.md](../architecture/event-spine.md)) |
 
 Registration: `src/Jarvis.Agents/DependencyInjection.cs`.

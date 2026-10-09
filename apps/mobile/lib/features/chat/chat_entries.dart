@@ -397,11 +397,27 @@ class BrowserStepItem {
     required this.tool,
     required this.summary,
     required this.success,
+    this.ordinal,
+    this.hasScreenshot = false,
   });
 
   final String tool;
   final String summary;
   final bool success;
+
+  /// Position in the session; with [hasScreenshot] it addresses the step's
+  /// screenshot (computer sessions).
+  final int? ordinal;
+  final bool hasScreenshot;
+
+  static BrowserStepItem fromJson(Map<Object?, Object?> json) =>
+      BrowserStepItem(
+        tool: asJsonString(json['tool']) ?? 'browser',
+        summary: asJsonString(json['summary']) ?? '',
+        success: json['success'] != false,
+        ordinal: json['ordinal'] is int ? json['ordinal'] as int : null,
+        hasScreenshot: json['hasScreenshot'] == true,
+      );
 }
 
 /// Isolated browser/computer-use timeline for one goal.
@@ -410,12 +426,49 @@ class BrowserSessionEntry extends ChatEntry {
     required this.id,
     required this.goal,
     required this.steps,
+    this.kind = 'browser',
+    this.status = 'active',
+    this.controlMode = 'agent',
   });
 
   final String id;
   final String goal;
   final List<BrowserStepItem> steps;
 
+  /// `browser` (headless BrowseTheWeb) or `computer` (the sandbox desktop).
+  final String kind;
+  final String status;
+
+  /// `agent` while Jarvis drives the computer, `user` after taking over.
+  final String controlMode;
+
+  bool get isComputer => kind == 'computer';
+  bool get isLive => status == 'active';
+  bool get userHasControl => controlMode == 'user';
+
+  /// The newest step that has a screenshot, if any.
+  BrowserStepItem? get latestScreenshot {
+    for (final step in steps.reversed) {
+      if (step.hasScreenshot && step.ordinal != null) return step;
+    }
+    return null;
+  }
+
   BrowserSessionEntry withStep(BrowserStepItem step) =>
-      BrowserSessionEntry(id: id, goal: goal, steps: [...steps, step]);
+      copyWith(steps: [...steps, step]);
+
+  BrowserSessionEntry copyWith({
+    String? goal,
+    List<BrowserStepItem>? steps,
+    String? kind,
+    String? status,
+    String? controlMode,
+  }) => BrowserSessionEntry(
+    id: id,
+    goal: goal ?? this.goal,
+    steps: steps ?? this.steps,
+    kind: kind ?? this.kind,
+    status: status ?? this.status,
+    controlMode: controlMode ?? this.controlMode,
+  );
 }

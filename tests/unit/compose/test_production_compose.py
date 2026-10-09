@@ -2,7 +2,7 @@
 """Checks the production Compose file the Aspire AppHost generates (scripts/deploy/publish-compose.sh).
 
 The file is generated once per run into artifacts/compose-test/ (or taken from JARVIS_GENERATED_COMPOSE_DIR, which
-must hold base/ and all/ subdirectories) and rendered with `docker compose config` so assertions see what Docker
+must hold base/, all/ and browser/ subdirectories) and rendered with `docker compose config` so assertions see what Docker
 would run. Needs a .NET 10 SDK (or Docker) and the docker compose plugin.
 """
 from __future__ import annotations
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-ALL_FEATURES = "browser github home-assistant coding tunnel"
+ALL_FEATURES = "browser computer github home-assistant coding tunnel"
 
 REQUIRED_ENV = {
     "POSTGRES_PASSWORD": "postgres-test-secret",
@@ -41,6 +41,7 @@ REQUIRED_ENV = {
     "VOICE_WORKER_SECRET": "voice-test-secret",
     "HOME_ASSISTANT_MCP_URL": "https://ha.example.com/api/mcp",
     "CODING_REPO_PATH": "/tmp/repo",
+    "COMPUTER_SANDBOX_TOKEN": "computer-sandbox-test-token-0123456789",
 }
 
 
@@ -78,8 +79,10 @@ class ProductionComposeTests(unittest.TestCase):
         root = Path(os.environ.get("JARVIS_GENERATED_COMPOSE_DIR", REPO_ROOT / "artifacts" / "compose-test"))
         cls.base_file = _publish(root / "base", "")
         cls.all_file = _publish(root / "all", ALL_FEATURES)
+        cls.browser_file = _publish(root / "browser", "browser")
         cls.base = _render(cls.base_file, profiles=("migration",))
         cls.all = _render(cls.all_file, profiles=("migration", "direct-edge"))
+        cls.browser = _render(cls.browser_file)
 
     def mounts(self, name: str, path: str, project: dict) -> bool:
         return any(volume.get("source", "").endswith(path) for volume in self.service(name, project).get("volumes", []))
@@ -159,6 +162,9 @@ class ProductionComposeTests(unittest.TestCase):
         api = self.service("jarvis-api")["environment"]
         self.assertNotIn("Mcp__Servers__github__Name", api)
         self.assertNotIn("playwright-mcp", self.base["services"])
+        self.assertNotIn("computer-sandbox", self.base["services"])
+        self.assertNotIn("browser-egress-proxy", self.base["services"])
+        self.assertNotIn("Computer__ControlUrl", api)
         caddy = self.service("caddy")
         self.assertNotIn("profiles", caddy)
 
@@ -195,10 +201,43 @@ class ProductionComposeTests(unittest.TestCase):
         self.assertEqual("https://ha.example.com/api/mcp", api["environment"]["Mcp__Servers__home-assistant__Endpoint"])
         self.assertEqual("/coding/repo", api["environment"]["Coding__Repositories__0__Path"])
         self.assertIn("agents", api["networks"])
-        self.assertIn("playwright-mcp", api["depends_on"])
         self.assertTrue(self.all["networks"]["agents"].get("internal"))
         self.assertEqual(["direct-edge"], self.service("caddy", self.all)["profiles"])
         self.assertEqual("15082", str(api["ports"][0]["published"]))
+
+    def test_browser_feature_adds_the_headless_browser(self) -> None:
+        api = self.service("jarvis-api", self.browser)
+        self.assertIn("agents", api["networks"])
+        self.assertIn("playwright-mcp", api["depends_on"])
+        self.assertEqual("playwright", api["environment"]["Mcp__Servers__0__Name"])
+        self.assertNotIn("computer-sandbox", self.browser["services"])
+
+    def test_computer_sandbox_is_isolated_and_replaces_the_headless_browser(self) -> None:
+        self.assertNotIn("playwright-mcp", self.all["services"])
+        sandbox = self.service("computer-sandbox", self.all)
+        self.assertEqual(["agents"], list(sandbox["networks"]))
+        self.assertNotIn("ports", sandbox)
+        self.assertEqual(["ALL"], sandbox["cap_drop"])
+        self.assertTrue(sandbox["read_only"])
+        self.assertIn("no-new-privileges:true", sandbox["security_opt"])
+        self.assertEqual(512, sandbox["deploy"]["resources"]["limits"]["pids"])
+        self.assertTrue(sandbox["build"]["context"].endswith("infra/computer"))
+        self.assertEqual("http://browser-egress-proxy:3128", sandbox["environment"]["BROWSER_PROXY"])
+        self.assertEqual(["agents", "browser-egress"], sorted(self.service("browser-egress-proxy", self.all)["networks"]))
+
+        api = self.service("jarvis-api", self.all)
+        self.assertIn("computer-sandbox", api["depends_on"])
+        environment = api["environment"]
+        self.assertEqual("http://computer-sandbox:8932", environment["Computer__ControlUrl"])
+        self.assertEqual("http://computer-sandbox:6080", environment["Computer__ViewUrl"])
+        self.assertEqual("http://computer-sandbox:8931/mcp", environment["Mcp__Servers__computer-browser__Endpoint"])
+        self.assertEqual("Bearer computer-sandbox-test-token-0123456789",
+                         environment["Mcp__Servers__computer__Headers__Authorization"])
+        auto_approved = {value for key, value in environment.items() if "__AutoApprovedTools__" in key}
+        self.assertIn("computer_click", auto_approved)
+        self.assertNotIn("computer_shell", auto_approved)
+        self.assertNotIn("browser_fill_form", auto_approved)
+        self.assertNotIn("Computer__ControlUrl", self.service("jarvis-worker", self.all)["environment"])
 
 
 if __name__ == "__main__":

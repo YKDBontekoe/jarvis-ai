@@ -125,6 +125,9 @@ internal static class ApiServiceRegistration
             provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddScoped<Jarvis.Application.Reviews.IWeeklyReviewService, WeeklyReviewService>();
         services.TryAddSingleton(TimeProvider.System);
+        services.AddMemoryCache();
+        services.AddSingleton<Jarvis.Api.Computer.ComputerViewAccess>();
+        services.AddHttpClient("computer-view", client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddScoped<IAutomationRuleService, AutomationRuleService>();
         services.AddScoped<IAutomationApprovalResolver, AutomationApprovalResolver>();
         services.AddScoped<IAutomationTriggerPublisher, AutomationTriggerPublisher>();

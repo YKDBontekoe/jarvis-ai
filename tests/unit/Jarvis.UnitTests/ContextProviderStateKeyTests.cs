@@ -1,6 +1,7 @@
 using System.Reflection;
 using Jarvis.Agents;
 using Jarvis.Agents.Browser;
+using Jarvis.Agents.Computer;
 using Jarvis.Agents.Expenses;
 using Jarvis.Agents.Journal;
 using Jarvis.Agents.Planner;
@@ -33,14 +34,15 @@ public sealed class ContextProviderStateKeyTests
     [Fact]
     public async Task Sending_a_message_accepts_every_static_guidance_provider()
     {
-        var context = new AgentBuildContext(OwnerId, ExecutingTaskId: null);
+        var context = new AgentBuildContext(OwnerId, ExecutingTaskId: null, ConversationId: Guid.NewGuid());
         AIContextProvider[] providers =
         [
             .. new ExpenseContextContributor().CreateProviders(context),
             .. new WhatsAppContextContributor().CreateProviders(context),
             .. new JournalContextContributor().CreateProviders(context),
             .. new PlannerContextContributor().CreateProviders(context),
-            .. new BrowserContextContributor().CreateProviders(context),
+            .. new BrowserContextContributor(new StubComputerSandbox(configured: false)).CreateProviders(context),
+            .. new ComputerContextContributor(new StubComputerSandbox(configured: true)).CreateProviders(context),
             .. new SurfaceContextContributor().CreateProviders(context)
         ];
         var keys = providers.SelectMany(provider => provider.StateKeys).ToArray();
@@ -57,6 +59,8 @@ public sealed class ContextProviderStateKeyTests
         Assert.Contains("WhatsApp:", response.Text);
         Assert.Contains("Journaling:", response.Text);
         Assert.Contains("Day planner:", response.Text);
+        Assert.Contains("Browser agent:", response.Text);
+        Assert.Contains("Sandbox computer:", response.Text);
         Assert.Contains("hello", response.Text);
     }
 

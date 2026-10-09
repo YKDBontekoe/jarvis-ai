@@ -163,6 +163,9 @@ public sealed partial class CodexCliChatClient
         }
         prompt.AppendLine("\nConversation:");
         var toolNamesByCallId = new Dictionary<string, string>(StringComparer.Ordinal);
+        // Only the newest tool screenshot (computer use) is sent as an image; older ones are stale and costly.
+        var latestScreenshot = messages.SelectMany(message => message.Contents).OfType<FunctionResultContent>()
+            .LastOrDefault(result => SplitToolResultImage(result.Result).Image is not null);
         foreach (var message in messages)
         {
             prompt.Append("\n[").Append(message.Role.Value).AppendLine("]");
@@ -197,7 +200,21 @@ public sealed partial class CodexCliChatClient
                     prompt.Append("Jarvis tool result");
                     if (toolNamesByCallId.TryGetValue(result.CallId, out var resultToolName))
                         prompt.Append(" (").Append(resultToolName).Append(')');
-                    prompt.Append(": ").AppendLine(JsonSerializer.Serialize(result.Result, PromptJsonOptions));
+                    var (textual, image) = SplitToolResultImage(result.Result);
+                    prompt.Append(": ").AppendLine(JsonSerializer.Serialize(textual, PromptJsonOptions));
+                    if (image is not null)
+                    {
+                        var dataUri = image.Uri;
+                        if (ReferenceEquals(result, latestScreenshot) && images.Count < MaxImageCount &&
+                            dataUri.Length <= MaxImageDataUriLength &&
+                            images.Sum(item => (long)item.Length) + dataUri.Length <= MaxTotalImageDataLength)
+                        {
+                            images.Add(dataUri);
+                            prompt.Append("[Screenshot attached as image ").Append(images.Count).AppendLine("]");
+                        }
+                        else
+                            prompt.AppendLine("[Earlier screenshot omitted]");
+                    }
                 }
                 else
                     prompt.Append(content.GetType().Name).Append(": ").AppendLine(JsonSerializer.Serialize(content, PromptJsonOptions));
@@ -210,4 +227,48 @@ public sealed partial class CodexCliChatClient
     }
 
     internal sealed record PromptPayload(string Text, IReadOnlyList<string> Images);
+
+    /// <summary>
+    /// Separates an image a tool returned (a computer-use screenshot) from the rest of its result. The result is a
+    /// list of AI contents during the turn, and their JSON form once the conversation was stored and reloaded.
+    /// </summary>
+    internal static (object? Textual, DataContent? Image) SplitToolResultImage(object? result)
+    {
+        switch (result)
+        {
+            case IEnumerable<AIContent> contents:
+            {
+                var list = contents.ToList();
+                var image = list.OfType<DataContent>().LastOrDefault(IsPromptImage);
+                if (image is null) return (result, null);
+                return (string.Join("\n", list.OfType<TextContent>().Select(text => text.Text)), image);
+            }
+            case JsonElement { ValueKind: JsonValueKind.Array } array:
+            {
+                DataContent? image = null;
+                var texts = new List<string>();
+                foreach (var item in array.EnumerateArray())
+                {
+                    if (item.ValueKind != JsonValueKind.Object) return (result, null);
+                    if (item.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
+                        texts.Add(text.GetString()!);
+                    else if (item.TryGetProperty("uri", out var uri) && uri.ValueKind == JsonValueKind.String &&
+                             uri.GetString()!.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var candidate = new DataContent(uri.GetString()!);
+                        if (IsPromptImage(candidate)) image = candidate;
+                    }
+                }
+
+                return image is null ? (result, null) : (string.Join("\n", texts), image);
+            }
+            default:
+                return (result, null);
+        }
+    }
+
+    private static bool IsPromptImage(DataContent data) =>
+        data.MediaType.Equals("image/jpeg", StringComparison.OrdinalIgnoreCase) ||
+        data.MediaType.Equals("image/png", StringComparison.OrdinalIgnoreCase) ||
+        data.MediaType.Equals("image/webp", StringComparison.OrdinalIgnoreCase);
 }

@@ -4,8 +4,9 @@ using Jarvis.Application.Conversations;
 namespace Jarvis.Api.Endpoints;
 
 public sealed record BrowserSessionDto(Guid Id, Guid ConversationId, string Goal, string? StartUrl, string Status,
-    DateTimeOffset CreatedAt, IReadOnlyList<BrowserStepDto> Steps);
-public sealed record BrowserStepDto(int Ordinal, string Tool, string Summary, bool Success, DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt, IReadOnlyList<BrowserStepDto> Steps, string Kind, string ControlMode);
+public sealed record BrowserStepDto(int Ordinal, string Tool, string Summary, bool Success, DateTimeOffset CreatedAt,
+    bool HasScreenshot);
 
 internal static class BrowserEndpoints
 {
@@ -34,5 +35,5 @@ internal static class BrowserEndpoints
     internal static BrowserSessionDto ToDto(BrowserSessionRecord session) =>
         new(session.Id, session.ConversationId, session.Goal, session.StartUrl, session.Status, session.CreatedAt,
             session.Steps.Select(step => new BrowserStepDto(step.Ordinal, step.Tool, step.Summary, step.Success,
-                step.CreatedAt)).ToArray());
+                step.CreatedAt, step.ScreenshotKey is not null)).ToArray(), session.Kind, session.ControlMode);
 }

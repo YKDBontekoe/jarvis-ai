@@ -283,7 +283,14 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       setState(() {
         _showHome = false;
         _upsertBrowserSession(
-          BrowserSessionEntry(id: id, goal: goal, steps: const []),
+          BrowserSessionEntry(
+            id: id,
+            goal: goal,
+            steps: const [],
+            kind: asJsonString(event?['kind']) ?? 'browser',
+            status: asJsonString(event?['status']) ?? 'active',
+            controlMode: asJsonString(event?['controlMode']) ?? 'agent',
+          ),
         );
       });
       _scrollToBottom();
@@ -298,16 +305,20 @@ mixin _ChatScreenRealtime on _ChatScreenController {
         return;
       }
       setState(() {
-        _appendBrowserStep(
-          sessionId,
-          BrowserStepItem(
-            tool: asJsonString(event?['tool']) ?? 'browser',
-            summary: summary,
-            success: event?['success'] != false,
-          ),
-        );
+        _appendBrowserStep(sessionId, BrowserStepItem.fromJson(event!));
       });
       _scrollToBottom();
+    });
+    _onHub(hub, 'computer.control', (arguments) {
+      final event = _payload(arguments);
+      final sessionId = asJsonString(event?['sessionId']);
+      final mode = asJsonString(event?['controlMode']);
+      if (sessionId == null ||
+          mode == null ||
+          !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        return;
+      }
+      setState(() => _setComputerControl(sessionId, mode));
     });
     _onHub(hub, 'device.invoke', (arguments) {
       final event = _payload(arguments);

@@ -5,6 +5,8 @@ using Microsoft.Extensions.Configuration;
 /// are switched on by name with <c>Jarvis:Features</c> (or <c>JARVIS_FEATURES</c>), comma- or space-separated:
 /// <list type="bullet">
 /// <item><c>browser</c> — isolated Playwright browser with a filtering egress proxy (BrowseTheWeb).</item>
+/// <item><c>computer</c> — computer use: a sandbox Linux desktop with a visible browser, desktop tools, a shell and a
+/// live view (UseComputer), behind the same egress proxy. It replaces <c>browser</c> when both are on.</item>
 /// <item><c>github</c> — the GitHub MCP server bundled in the API image.</item>
 /// <item><c>home-assistant</c> — Home Assistant's MCP endpoint (HOME_ASSISTANT_MCP_URL).</item>
 /// <item><c>coding</c> — the approval-gated coding tool on a mounted checkout (CODING_REPO_PATH).</item>
@@ -14,9 +16,16 @@ using Microsoft.Extensions.Configuration;
 /// </list>
 /// </summary>
 internal sealed record JarvisFeatures(bool Browser, bool GitHub, bool HomeAssistant, bool Coding, bool Tunnel,
-    bool Verification)
+    bool Verification, bool Computer = false)
 {
-    private static readonly string[] Known = ["browser", "github", "home-assistant", "coding", "tunnel", "verification"];
+    private static readonly string[] Known =
+        ["browser", "computer", "github", "home-assistant", "coding", "tunnel", "verification"];
+
+    /// <summary>The headless browser container; the computer sandbox brings its own browser instead.</summary>
+    public bool HeadlessBrowser => Browser && !Computer;
+
+    /// <summary>The internal agents network and its egress proxy, shared by the browser and the computer sandbox.</summary>
+    public bool AgentsNetwork => Browser || Computer;
 
     public static JarvisFeatures From(IConfiguration configuration)
     {
@@ -30,7 +39,7 @@ internal sealed record JarvisFeatures(bool Browser, bool GitHub, bool HomeAssist
                 $"Unknown Jarvis feature(s): {string.Join(", ", unknown)}. Known: {string.Join(", ", Known)}.");
         return new JarvisFeatures(names.Contains("browser"), names.Contains("github"),
             names.Contains("home-assistant"), names.Contains("coding"), names.Contains("tunnel"),
-            names.Contains("verification"));
+            names.Contains("verification"), names.Contains("computer"));
     }
 }
 
@@ -44,6 +53,7 @@ internal static class JarvisImages
     public const string EmbeddingsModel = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
     public const string Playwright = "mcr.microsoft.com/playwright/mcp";
     public const string Squid = "ubuntu/squid";
+    public const string ComputerSandboxContext = "infra/computer";
     public const string DefaultSentryDsn =
         "https://8404fd3049a3ad459533f7630bc7be42@o4512185266339840.ingest.de.sentry.io/4512185388302416";
 }
@@ -93,6 +103,49 @@ internal static class JarvisMcpServers
             yield return new($"Mcp__Servers__0__AllowedTools__{i}", BrowserTools[i]);
         for (var i = 0; i < BrowserReadOnlyTools.Length; i++)
             yield return new($"Mcp__Servers__0__AutoApprovedTools__{i}", BrowserReadOnlyTools[i]);
+    }
+
+    private static readonly string[] ComputerBrowserTools =
+    [
+        "browser_navigate", "browser_navigate_back", "browser_snapshot", "browser_find", "browser_click",
+        "browser_type", "browser_fill_form", "browser_select_option", "browser_press_key", "browser_wait_for",
+        "browser_take_screenshot", "browser_console_messages", "browser_hover", "browser_drag", "browser_tabs",
+        "browser_handle_dialog",
+    ];
+
+    private static readonly string[] ComputerDesktopTools =
+    [
+        "computer_screenshot", "computer_click", "computer_double_click", "computer_move", "computer_drag",
+        "computer_scroll", "computer_type", "computer_key", "computer_wait", "computer_shell",
+    ];
+
+    /// <summary>Starting a session (UseComputer) is the approval; inside it these still ask every time.</summary>
+    private static readonly string[] ComputerAlwaysAsk = ["browser_fill_form", "computer_shell"];
+
+    /// <summary>The sandbox's Playwright server (visible Chromium) and its desktop server.</summary>
+    public static IEnumerable<KeyValuePair<string, string>> Computer(string sandboxHost, string token)
+    {
+        yield return new("Computer__ControlUrl", $"http://{sandboxHost}:8932");
+        yield return new("Computer__ViewUrl", $"http://{sandboxHost}:6080");
+        yield return new("Computer__Token", token);
+        foreach (var setting in ComputerServer("computer-browser", $"http://{sandboxHost}:8931/mcp", ComputerBrowserTools))
+            yield return setting;
+        foreach (var setting in ComputerServer("computer", $"http://{sandboxHost}:8932/mcp", ComputerDesktopTools))
+            yield return setting;
+        yield return new("Mcp__Servers__computer__Headers__Authorization", $"Bearer {token}");
+    }
+
+    private static IEnumerable<KeyValuePair<string, string>> ComputerServer(string name, string endpoint,
+        string[] tools)
+    {
+        yield return new($"Mcp__Servers__{name}__Name", name);
+        yield return new($"Mcp__Servers__{name}__Transport", "streamableHttp");
+        yield return new($"Mcp__Servers__{name}__Endpoint", endpoint);
+        for (var i = 0; i < tools.Length; i++)
+            yield return new($"Mcp__Servers__{name}__AllowedTools__{i}", tools[i]);
+        var autoApproved = tools.Except(ComputerAlwaysAsk).ToArray();
+        for (var i = 0; i < autoApproved.Length; i++)
+            yield return new($"Mcp__Servers__{name}__AutoApprovedTools__{i}", autoApproved[i]);
     }
 
     public static IEnumerable<KeyValuePair<string, string>> Verification(string fakeMcpScript) =>

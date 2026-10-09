@@ -9,6 +9,7 @@ Jarvis is a self-hosted personal assistant built as a modular .NET monolith with
 - Flutter chat shell with Markdown replies (tables, code blocks, links) and copy, a typing indicator, live tool-activity chips per reply, inline approve/decline cards for approval-gated tool calls, retry for messages that failed to send, a new-chat action, suggested prompts, Enter-to-send, and a navigation rail on wide screens
 - Native generative UI cards (`RenderUi`) for choices, forms, status, and lists. Only the latest card stays interactive and sits above the composer; earlier cards collapse to a one-line receipt. Tapping an action continues the conversation
 - Isolated Playwright browser/computer-use sessions (`BrowseTheWeb`) with an in-chat step timeline; navigation stays approval-gated and private/local hosts are blocked
+- Computer use in a sandbox Linux desktop (`UseComputer`, feature `computer`): a visible Chromium, mouse/keyboard, screenshots and a shell, with step screenshots in chat, a live view and take-over from the app
 - Agent2Agent: a public agent card at `/.well-known/agent-card.json`, JSON-RPC `POST /a2a` with hashed inbound bearer tokens, and a Settings → Agents registry that can delegate (after approval) to HTTPS peers
 - Connected device nodes over SignalR: the signed-in app can honor location, battery, clipboard, open-URL, and local notification requests, with per-capability toggles under Settings → This device. After the app registers, it posts a battery and (when already permitted) location snapshot so device watches and the home briefing can use this phone without a live invoke
 - WhatsApp and Signal messaging channels linked by scanning a QR code in the app (WhatsApp through the bundled Baileys bridge, Signal through signal-cli REST), with your own number allowed automatically, an editable allowlist, test send, per-peer thread history, and approval-gated replies; the WhatsApp Cloud API remains available as an advanced option
@@ -135,6 +136,7 @@ JARVIS_FEATURES="github home-assistant browser" dotnet run --project src/Jarvis.
 | `github` | The official GitHub MCP server (locally it needs `github-mcp-server` on `PATH`; the API image bundles it) |
 | `home-assistant` | Home Assistant's MCP endpoint; set `HOME_ASSISTANT_MCP_URL` |
 | `browser` | Isolated Playwright MCP browser (production adds its filtering egress proxy) |
+| `computer` | Computer use: sandbox Linux desktop (`infra/computer`) with a visible browser, desktop tools, a shell and a live view; production sets `COMPUTER_SANDBOX_TOKEN`. Replaces `browser` |
 | `coding` | Production only: the coding tool on a mounted checkout (`CODING_REPO_PATH`); Aspire already registers the current checkout |
 | `tunnel` | Production only: Caddy behind an existing host proxy or Cloudflare Tunnel |
 | `verification` | Local only: the fake Codex app server and fake MCP server used by the e2e scripts |

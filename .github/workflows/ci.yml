@@ -110,6 +110,39 @@ jobs:
       - name: Test
         run: npm test
 
+  computer-sandbox:
+    name: Computer sandbox tests and image
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/computer/server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: infra/computer
+          push: false
+          tags: jarvis-ci-computer-sandbox:test
+          cache-from: type=gha,scope=ci-computer-sandbox
+          cache-to: type=gha,mode=max,scope=ci-computer-sandbox
+
   mobile:
     name: Mobile analyze and tests
     runs-on: ubuntu-latest
@@ -202,6 +235,7 @@ jobs:
       - integration
       - python
       - whatsapp-bridge
+      - computer-sandbox
       - mobile
       - container-images
     if: always()
@@ -221,5 +255,6 @@ jobs:
           check integration "${{ needs.integration.result }}"
           check python "${{ needs.python.result }}"
           check whatsapp-bridge "${{ needs.whatsapp-bridge.result }}"
+          check computer-sandbox "${{ needs.computer-sandbox.result }}"
           check mobile "${{ needs.mobile.result }}"
           check container-images "${{ needs.container-images.result }}"

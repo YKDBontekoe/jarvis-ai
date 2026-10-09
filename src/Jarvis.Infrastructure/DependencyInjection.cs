@@ -67,6 +67,10 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Agents.IRemoteAgentRepository, RemoteAgentRepository>();
         services.AddScoped<Jarvis.Application.Agents.IA2ATokenRepository, A2ATokenRepository>();
         services.AddScoped<Jarvis.Application.Browser.IBrowserSessionStore, BrowserSessionRepository>();
+        var computerSandbox = Jarvis.Infrastructure.Computer.ComputerSandboxOptions.From(configuration);
+        services.AddSingleton(computerSandbox);
+        services.AddHttpClient<Jarvis.Application.Computer.IComputerSandbox, Jarvis.Infrastructure.Computer.ComputerSandbox>(
+            client => client.Timeout = TimeSpan.FromSeconds(30));
         services.AddScoped<IToolApprovalStore, ToolApprovalStore>();
         services.AddScoped<IStandingApprovalService, StandingApprovalService>();
         services.AddScoped<IApprovalPolicy, ApprovalPolicy>();

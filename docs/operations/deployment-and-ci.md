@@ -22,6 +22,8 @@ the same features (`scripts/deploy/compose-env.sh`).
 - **Garage** S3-compatible storage
 - **embeddings**: a CPU Text Embeddings Inference container with the local embedding model (see [configuration.md](configuration.md#local-embedding-model))
 - **ClamAV**, **LiveKit**, private **signal-cli** and **whatsapp-bridge** (built on the host from `workers/whatsapp-bridge`)
+- With the `computer` feature: **computer-sandbox** (built on the host from `infra/computer`), behind the browser egress
+  proxy on the internal `agents` network; `prepare-host.sh` generates `COMPUTER_SANDBOX_TOKEN`
 - Only ports 80 and 443 are public; databases stay on private networks. TCP 80/443 go to Caddy. LiveKit voice media
   uses UDP 443 directly (single-port mode, `infra/livekit/production.yaml`), and its ICE-TCP fallback shares TCP 443:
   Caddy passes any connection that does not start with a TLS handshake to LiveKit. Caddy therefore serves no HTTP/3.

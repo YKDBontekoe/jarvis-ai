@@ -240,6 +240,13 @@ abstract class _ChatScreenController extends State<ChatScreen>
   void _showConversationSummary();
   void _removePendingPhoto(PendingPhoto photo);
   Future<Uint8List?> _loadPhoto(String fileId);
+  Future<Uint8List?> _loadComputerScreenshot(String sessionId, int ordinal);
+  Future<void> _watchComputer(
+    BrowserSessionEntry session, {
+    bool takeOver = false,
+  });
+  Future<void> _handBackComputer(BrowserSessionEntry session);
+  void _setComputerControl(String sessionId, String mode);
   Future<void> _retryConnection();
   Future<void> _loadRecent();
   void _startNewChat();

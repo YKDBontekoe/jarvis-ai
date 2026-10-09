@@ -28,6 +28,7 @@ Configure `DataProtection:KeysDirectory` to a persistent `0700` directory in pro
 
 - **Condition watches** (public JSON): HTTPS only, no redirects to private IPs, JSON size cap, no local hostnames.
 - **Browser MCP** (optional `browser` feature): isolated container, Squid egress deny private ranges, navigation tools approval-gated.
+- **Computer sandbox** (optional `computer` feature): one hardened desktop container (read-only root, no capabilities, internal `agents` network only, egress through the same Squid proxy). Starting a session is approval-gated; shell commands and form fills ask every time. One active session per deployment, reset on start and stop, so one owner's files and logins never reach the next session. The live view is proxied by the API with one-time tickets and an owner-bound cookie; no sandbox port is published. Screenshots are stored under the owner's object-storage prefix and served only to that owner. The sandbox holds no Jarvis credentials; on the `agents` network it can reach the API port, which offers nothing beyond what Caddy already serves publicly.
 - **File uploads**: MIME/extension/signature allowlist, ClamAV scan **before** S3 put; fail closed if scanner unavailable.
 
 ## Approvals and risk

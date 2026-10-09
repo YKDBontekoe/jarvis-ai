@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Jarvis.Application.Browser;
+using Jarvis.Application.Computer;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Realtime;
 using Jarvis.Mcp;
@@ -50,23 +51,26 @@ internal sealed class BrowserAgentTools(
     }
 }
 
+/// <remarks>With the computer feature on, the browser lives in the sandbox and UseComputer replaces BrowseTheWeb.</remarks>
 internal sealed class BrowserToolContributor(
     IBrowserSessionStore sessions,
     IRealtimePublisher realtime,
     McpToolHost mcp,
-    ICurrentUser currentUser) : IAgentToolContributor
+    ICurrentUser currentUser,
+    IComputerSandbox computer) : IAgentToolContributor
 {
-    public IEnumerable<AITool> GetTools(AgentBuildContext context) =>
-        [new ApprovalRequiredAIFunction(AIFunctionFactory.Create(
+    public IEnumerable<AITool> GetTools(AgentBuildContext context) => computer.IsConfigured
+        ? []
+        : [new ApprovalRequiredAIFunction(AIFunctionFactory.Create(
             new BrowserAgentTools(sessions, context.ConversationId, realtime, mcp, currentUser).BrowseTheWebAsync))];
 }
 
-internal sealed class BrowserContextContributor : IAgentContextContributor
+internal sealed class BrowserContextContributor(IComputerSandbox computer) : IAgentContextContributor
 {
     public int Order => 55;
 
     public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
-        [new BrowserContextProvider()];
+        computer.IsConfigured ? [] : [new BrowserContextProvider()];
 }
 
 internal sealed class BrowserContextProvider : MessageAIContextProvider

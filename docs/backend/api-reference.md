@@ -182,7 +182,9 @@ Internal routes under `/voice/internal/{conversationId}/...` are for the voice r
 
 ## Browser
 
-`GET /conversations/{id}/browser-sessions`, `GET /browser-sessions/{id}`.
+`GET /conversations/{id}/browser-sessions`, `GET /browser-sessions/{id}`. Sessions carry `kind` (`browser` or `computer`) and `controlMode`; steps carry `ordinal` and `hasScreenshot`.
+
+Computer use: `GET /browser-sessions/{id}/steps/{ordinal}/screenshot` (image), `POST /browser-sessions/{id}/view` (one-time `viewerUrl` for the live noVNC view), `POST /browser-sessions/{id}/control` with `{"mode":"user"|"agent"}` (take over / hand back; SignalR `computer.control`). The viewer itself lives under `/api/v1/computer-view/` and is authorized by its ticket and cookie, not the bearer token.
 
 ## Surfaces (generative UI)
 
