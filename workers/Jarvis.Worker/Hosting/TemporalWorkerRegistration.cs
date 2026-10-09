@@ -28,6 +28,7 @@ internal static class TemporalWorkerRegistration
         nameof(WeeklyReviewWorkflow),
         nameof(HabitCheckInWorkflow),
         nameof(PeopleCheckInWorkflow),
+        nameof(AgentReactionWorkflow),
     ];
 
     public static readonly IReadOnlyList<string> ActivityTypeNames =
@@ -58,6 +59,7 @@ internal static class TemporalWorkerRegistration
         "ResolveHabitCheckIn",
         "DeliverHabitCheckIn",
         "RunPeopleCheckIn",
+        "RunAgentReaction",
     ];
 
     public static TemporalWorker CreateWorker(TemporalClient client, IServiceProvider services)
@@ -76,6 +78,7 @@ internal static class TemporalWorkerRegistration
         var automationPolls = services.GetRequiredService<AutomationPollActivities>();
         var weeklyReviews = services.GetRequiredService<WeeklyReviewActivities>();
         var habitCheckIns = services.GetRequiredService<HabitCheckInActivities>();
+        var reactions = services.GetRequiredService<AgentReactionActivities>();
 
         return new TemporalWorker(client, new TemporalWorkerOptions(TemporalReminderScheduler.TaskQueue)
             .AddWorkflow<ReminderWorkflow>()
@@ -91,6 +94,7 @@ internal static class TemporalWorkerRegistration
             .AddWorkflow<AutomationPollWorkflow>()
             .AddWorkflow<WeeklyReviewWorkflow>()
             .AddWorkflow<HabitCheckInWorkflow>()
+            .AddWorkflow<AgentReactionWorkflow>()
             .AddActivity(reminders.DeliverReminderAsync)
             .AddActivity(reminders.DeliverReminderOccurrenceAsync)
             .AddActivity(reminders.FailReminderAsync)
@@ -116,6 +120,7 @@ internal static class TemporalWorkerRegistration
             .AddActivity(weeklyReviews.ResolveScheduleAsync)
             .AddActivity(weeklyReviews.DeliverAsync)
             .AddActivity(habitCheckIns.ResolveAsync)
-            .AddActivity(habitCheckIns.DeliverAsync));
+            .AddActivity(habitCheckIns.DeliverAsync)
+            .AddActivity(reactions.RunAsync));
     }
 }

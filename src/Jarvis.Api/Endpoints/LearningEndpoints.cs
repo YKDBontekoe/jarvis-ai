@@ -55,6 +55,10 @@ internal static class LearningEndpoints
                        ?? AutonomySettings.Default))
             .WithName("GetAutonomySettings");
 
+        api.MapGet("/settings/autonomy/outbound-categories", () => Results.Ok(
+                AutonomousOutboundCategories.Eligible.Select(x => new { key = x.Key, label = x.Label })))
+            .WithName("ListAutonomousOutboundCategories");
+
         api.MapPut("/settings/autonomy", async (AutonomySettings request, IOwnerSettingsStore settings,
             IAuditEventStore audit, ICurrentUser currentUser, CancellationToken ct) =>
         {

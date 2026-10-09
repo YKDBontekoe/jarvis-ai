@@ -33,7 +33,7 @@ public sealed class ToolRiskPolicyTests
         Assert.Equal(ToolRisk.Unknown, ToolRiskPolicy.Classify(tool));
 
     [Fact]
-    public void Only_read_only_and_reversible_classes_can_ever_run_without_asking()
+    public void Only_read_only_and_reversible_classes_can_run_without_asking_below_the_autonomous_level()
     {
         foreach (var risk in Enum.GetValues<ToolRisk>())
             Assert.Equal(risk is ToolRisk.ReadOnly or ToolRisk.ReversibleLocal, ToolRiskPolicy.CanAutoApprove(risk));
