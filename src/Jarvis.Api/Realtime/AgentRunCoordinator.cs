@@ -221,7 +221,11 @@ public sealed class AgentRunCoordinator(
                     };
                     if (eventName is not null)
                         await PublishSafelyAsync(clients, eventName,
-                            new { conversationId, tool = toolProgress.ToolName }, conversationId, cancellationToken);
+                            new
+                            {
+                                conversationId, tool = toolProgress.ToolName, toolCallId = toolProgress.ToolCallId,
+                                refs = toolProgress.Refs ?? []
+                            }, conversationId, cancellationToken);
 
                     if (toolProgress.Phase == "started")
                     {

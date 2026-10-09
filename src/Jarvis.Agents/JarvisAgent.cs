@@ -209,7 +209,8 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
                         if (!activeTools.Remove(result.CallId, out var toolName)) continue;
                         yield return new AgentStreamEvent(ToolProgress: new AgentToolProgress(result.CallId, toolName,
                             result.Exception is null ? "completed" : "failed",
-                            result.Exception is null ? null : ToolFailureFeedback.Kind(result.Exception)));
+                            result.Exception is null ? null : ToolFailureFeedback.Kind(result.Exception),
+                            result.Exception is null ? ToolResultRefs.Extract(result.Result) : null));
                         checkpoint = true;
                     }
 

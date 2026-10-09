@@ -108,6 +108,8 @@ public sealed record AgentToolApprovalRequest(string RequestId, string ToolCallI
 /// <paramref name="ErrorKind"/> names why a tool failed (<c>input</c>, <c>transient</c>, <c>failed</c>) and is only
 /// set with the <c>failed</c> phase. It is a category, never exception text.
 /// </summary>
-public sealed record AgentToolProgress(string ToolCallId, string ToolName, string Phase, string? ErrorKind = null);
+/// <param name="Refs">The things a completed call made or changed, as refs (<c>type:id</c>), for result cards.</param>
+public sealed record AgentToolProgress(string ToolCallId, string ToolName, string Phase, string? ErrorKind = null,
+    IReadOnlyList<string>? Refs = null);
 public sealed record AgentStreamEvent(string? TextDelta = null, AgentToolApprovalRequest? ApprovalRequest = null,
     AgentToolProgress? ToolProgress = null);
