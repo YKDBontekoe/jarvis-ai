@@ -21,6 +21,7 @@ public sealed class ConversationMemoryExtractorTests
     private sealed class Harness
     {
         public List<MemoryRecord> Stored { get; } = [];
+        public List<DateTimeOffset?> StoredValidity { get; } = [];
         public List<(Guid Target, string Content, float Importance)> Replaced { get; } = [];
         public List<Guid> Expired { get; } = [];
         public List<string> Audit { get; } = [];
@@ -42,6 +43,7 @@ public sealed class ConversationMemoryExtractorTests
                 {
                     var record = Memory((string)args[1]!, (string)args[2]!);
                     Stored.Add(record);
+                    StoredValidity.Add((DateTimeOffset?)args[5]);
                     return record;
                 }),
                 ("ReplaceAsync", args =>
@@ -63,13 +65,89 @@ public sealed class ConversationMemoryExtractorTests
                 return null;
             }));
             var extractor = new ConversationMemoryExtractor(resolver, memories, audit,
-                NullLogger<ConversationMemoryExtractor>.Instance);
+                NullLogger<ConversationMemoryExtractor>.Instance, clock: new FixedClock(Now));
 
             await extractor.ExtractAndStoreAsync(Owner, Guid.NewGuid(), userMessage, default, context: context);
         }
     }
 
+    private static readonly DateTimeOffset Now = new(2026, 10, 10, 9, 0, 0, TimeSpan.Zero);
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
+
     private static string Reply(params object[] candidates) => JsonSerializer.Serialize(candidates);
+
+    [Fact]
+    public async Task The_prompt_carries_todays_date_so_relative_dates_can_be_resolved()
+    {
+        var harness = new Harness();
+
+        await harness.RunAsync("[]", "I start my new job next month.", [Memory("fact", "Anything.")]);
+
+        Assert.Contains("Saturday 2026-10-10", harness.Prompt);
+    }
+
+    [Fact]
+    public async Task A_temporary_situation_is_stored_until_the_end_of_its_last_day()
+    {
+        var harness = new Harness();
+
+        await harness.RunAsync(Reply(new
+        {
+            kind = "event", content = "Is in Paris for work until 2026-10-14.", importance = 0.5, confidence = 0.9,
+            action = "add", targetMemoryId = (Guid?)null, validUntil = "2026-10-14"
+        }), "I'm in Paris for work until Wednesday.", [Memory("fact", "Anything.")]);
+
+        Assert.Equal(new DateTimeOffset(2026, 10, 15, 0, 0, 0, TimeSpan.Zero), Assert.Single(harness.StoredValidity));
+    }
+
+    [Fact]
+    public async Task A_temporary_situation_never_replaces_a_lasting_memory()
+    {
+        var home = Memory("fact", "Lives in Delft.");
+        var harness = new Harness();
+
+        await harness.RunAsync(Reply(new
+        {
+            kind = "fact", content = "Stays in Paris until 2026-10-14.", importance = 0.5, confidence = 0.9,
+            action = "supersede", targetMemoryId = home.Id, validUntil = "2026-10-14"
+        }), "I'm staying in Paris until Wednesday.", [home]);
+
+        Assert.Empty(harness.Replaced);
+        Assert.NotNull(Assert.Single(harness.StoredValidity));
+    }
+
+    [Theory]
+    [InlineData("2026-10-09")]
+    [InlineData("2028-01-01")]
+    [InlineData("next week")]
+    public async Task A_temporary_situation_with_an_unusable_end_date_is_not_stored(string validUntil)
+    {
+        var harness = new Harness();
+
+        await harness.RunAsync(Reply(new
+        {
+            kind = "event", content = "Is travelling.", importance = 0.5, confidence = 0.9, action = "add",
+            targetMemoryId = (Guid?)null, validUntil
+        }), "I'm travelling for a while.", [Memory("fact", "Anything.")]);
+
+        Assert.Empty(harness.Stored);
+    }
+
+    [Fact]
+    public void The_end_of_a_local_day_follows_the_owners_time_zone()
+    {
+        var amsterdam = TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam");
+
+        Assert.Equal(new DateTimeOffset(2026, 10, 14, 22, 0, 0, TimeSpan.Zero),
+            ConversationMemoryExtractor.EndOfLocalDay("2026-10-14", amsterdam, Now));
+        // Winter time starts on 2026-10-25, so that day ends an hour later in UTC.
+        Assert.Equal(new DateTimeOffset(2026, 10, 25, 23, 0, 0, TimeSpan.Zero),
+            ConversationMemoryExtractor.EndOfLocalDay("2026-10-25", amsterdam, Now));
+    }
 
     [Fact]
     public async Task Enrich_replaces_the_memory_with_the_combined_statement_and_keeps_its_importance()

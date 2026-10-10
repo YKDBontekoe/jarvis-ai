@@ -15,6 +15,11 @@ Jarvis combines **structured memory**, **semantic search**, a **temporal knowled
   `memory.enriched`), `supersede` (an explicit correction, `memory.superseded`) or `expire` (the user says it no longer
   holds; the memory ends without a replacement and its graph facts close, confidence ≥ 0.9, `memory.expired`). Enrich,
   supersede and expire never touch pinned memories, and replacements keep the recall counts.
+- Extraction sees today's date in the owner's time zone (the daily briefing zone, UTC otherwise) and writes relative
+  dates as real ones ("next month" becomes the month and year). A temporary situation ("in Lisbon until Wednesday") is
+  stored with `validUntil` at the end of its last local day, at most a year out, and never replaces a lasting memory; a
+  temporary memory without a usable end date is not stored. Extraction quality is measured with
+  `tests/eval/Jarvis.ExtractionEval` (see its README).
 
 ### Search pipeline
 
@@ -50,7 +55,8 @@ Jarvis combines **structured memory**, **semantic search**, a **temporal knowled
    own hits.
 9. Pinned unexpired memories are always included in the bounded agent context.
 
-Retrieval quality and speed are measured offline with `tests/eval/Jarvis.MemoryEval` (see its README).
+Retrieval quality and speed are measured offline with `tests/eval/Jarvis.MemoryEval`, extraction decisions with
+`tests/eval/Jarvis.ExtractionEval` (see their READMEs).
 
 Agent tools: `SearchMemory`, `ListMemories`, `Remember`, `Forget` (approval). See [agent-tools.md](agent-tools.md).
 
