@@ -334,7 +334,7 @@ public sealed class DreamingService(
         return ParseUserSummary(response.Text);
     }
 
-    private async Task<RemResult> RemAsync(Guid ownerId, LearningSettings settings,
+    internal async Task<RemResult> RemAsync(Guid ownerId, LearningSettings settings,
         IReadOnlyList<DreamCandidate> staged, IReadOnlyList<MemoryRecord> stored, PersonaProfile profile,
         IReadOnlyList<Jarvis.Domain.Conversations.Message> messages, CancellationToken cancellationToken)
     {

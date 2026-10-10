@@ -45,6 +45,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jarvis.CompactionEval", "te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jarvis.GraphEval", "tests\eval\Jarvis.GraphEval\Jarvis.GraphEval.csproj", "{A81531D1-08A8-4CE4-9448-B4E7AB43F443}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jarvis.DreamingEval", "tests\eval\Jarvis.DreamingEval\Jarvis.DreamingEval.csproj", "{46F4EC9B-DDB1-4A7E-B885-66BBB9852B05}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -259,6 +261,18 @@ Global
 		{A81531D1-08A8-4CE4-9448-B4E7AB43F443}.Release|x64.Build.0 = Release|Any CPU
 		{A81531D1-08A8-4CE4-9448-B4E7AB43F443}.Release|x86.ActiveCfg = Release|Any CPU
 		{A81531D1-08A8-4CE4-9448-B4E7AB43F443}.Release|x86.Build.0 = Release|Any CPU
+		{46F4EC9B-DDB1-4A7E-B885-66BBB9852B05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{46F4EC9B-DDB1-4A7E-B885-66BBB9852B05}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{46F4EC9B-DDB1-4A7E-B885-66BBB9852B05}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{46F4EC9B-DDB1-4A7E-B885-66BBB9852B05}.Debug|x64.Build.0 = Debug|Any CPU
+		{46F4EC9B-DDB1-4A7E-B885-66BBB9852B05}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{46F4EC9B-DDB1-4A7E-B885-66BBB9852B05}.Debug|x86.Build.0 = Debug|Any CPU
+		{46F4EC9B-DDB1-4A7E-B885-66BBB9852B05}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{46F4EC9B-DDB1-4A7E-B885-66BBB9852B05}.Release|Any CPU.Build.0 = Release|Any CPU
+		{46F4EC9B-DDB1-4A7E-B885-66BBB9852B05}.Release|x64.ActiveCfg = Release|Any CPU
+		{46F4EC9B-DDB1-4A7E-B885-66BBB9852B05}.Release|x64.Build.0 = Release|Any CPU
+		{46F4EC9B-DDB1-4A7E-B885-66BBB9852B05}.Release|x86.ActiveCfg = Release|Any CPU
+		{46F4EC9B-DDB1-4A7E-B885-66BBB9852B05}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -282,5 +296,6 @@ Global
 		{D8301893-6C8D-4A31-8AC6-84156F085D4F} = {1C8B2A20-2122-0F0C-E3DC-3AE7C1E384F0}
 		{36FDD145-779F-425D-BDFF-54E26D57CF01} = {1C8B2A20-2122-0F0C-E3DC-3AE7C1E384F0}
 		{A81531D1-08A8-4CE4-9448-B4E7AB43F443} = {1C8B2A20-2122-0F0C-E3DC-3AE7C1E384F0}
+		{46F4EC9B-DDB1-4A7E-B885-66BBB9852B05} = {1C8B2A20-2122-0F0C-E3DC-3AE7C1E384F0}
 	EndGlobalSection
 EndGlobal
