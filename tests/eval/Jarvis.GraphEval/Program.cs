@@ -90,9 +90,17 @@ internal sealed class SimulatedGraph
             var subject = Upsert(fact.Subject, fact.SubjectType);
             var obj = fact.ObjectIsEntity ? Upsert(fact.Object, fact.ObjectType ?? "thing") : fact.Object.Trim();
             if (subject == obj) continue;
+            if (fact.Ends)
+            {
+                var open = Relations.Where(r => r.Current && Key(r.Subject) == Key(subject) && Key(r.Object) == Key(obj)).ToList();
+                foreach (var relation in open.Where(r => r.Predicate == predicate).ToList() is { Count: > 0 } same ? same : open)
+                    relation.Current = false;
+                continue;
+            }
             var current = Relations.Where(r => r.Current && Key(r.Subject) == Key(subject) && r.Predicate == predicate).ToList();
             if (current.Any(r => string.Equals(Key(r.Object), Key(obj), StringComparison.Ordinal))) continue;
-            if (fact.Exclusive) foreach (var previous in current) previous.Current = false;
+            if (fact.Exclusive && !GraphNames.ManyValued.Contains(predicate))
+                foreach (var previous in current) previous.Current = false;
             Relations.Add(new Relation(subject, predicate, obj, fact.Exclusive, fact.ValidFrom));
         }
     }
