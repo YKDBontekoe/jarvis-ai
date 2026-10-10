@@ -43,3 +43,16 @@ ended that the case did not name), stored relative dates, and latency. A case pa
 no extra or harmful write and no forbidden phrase.
 
 All cases are invented. Never add real memories or messages.
+
+## Results (2026-10-10, Codex account default model, `--codex --runs 2`, 44 cases)
+
+| Extractor | Cases passed | Write recall | Extra | Harmful | Relative dates | p50 |
+|-----------|-------------:|-------------:|------:|--------:|---------------:|----:|
+| Before (message only, add/duplicate/supersede) | 63/88 (0.72) | 41/66 | 6 | 0 | 0 | 6.1 s |
+| After (context, enrich, expire, dates, validUntil) | 88/88 (1.00) | 66/66 | 0 | 0 | 0 | 5.9 s |
+
+Many of the old extractor's misses need what it did not have: short replies that only make sense with the question
+before them, temporary situations without an end date, and memories it could not enrich or end. It also missed a plain
+correction ("I quit coffee, it's tea only now" became a second memory instead of replacing the first) and a project
+detail. The new actions caused no harmful writes. The set is written by the same author as the prompt, so a perfect
+score means these behaviours work, not that extraction is solved: add cases whenever a real conversation goes wrong.
