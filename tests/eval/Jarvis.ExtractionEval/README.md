@@ -11,7 +11,7 @@ exist, the turns before a message and the message, and lists the writes extracti
 | `expired` | an existing memory ended without a replacement |
 
 An expectation can accept several ops (`"op": ["expired", "superseded"]`), names its `target` memory, lists text the
-stored memory must `contains` (all of it, ignoring case) and can check `validUntil` (`"yyyy-MM-dd"`, `"set"` or
+stored memory must `contains` (every entry, ignoring case; `"a|b"` accepts either) and can check `validUntil` (`"yyyy-MM-dd"`, `"set"` or
 `"none"`). `"expect": []` means nothing may be stored. `mustNotContain` catches relative dates that should have been
 resolved, and `allowExtra` tolerates additional memories. Every case runs at the dataset's fixed `today` in its
 `timeZone`, and search returns all of a case's memories, so the eval measures the extraction decision only; retrieval

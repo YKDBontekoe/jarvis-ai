@@ -136,8 +136,12 @@ CaseResult Score(EvalCase item, IReadOnlyList<Write> writes, TimeSpan elapsed)
 bool Matches(Expectation expectation, Write write)
 {
     if (!expectation.Ops.Contains(write.Op)) return false;
-    if (expectation.Target is not null && expectation.Target != write.Target) return false;
-    if (expectation.Contains?.Any(part => !write.Content.Contains(part, StringComparison.OrdinalIgnoreCase)) == true)
+    // A new memory has no target, so an expectation that also accepts "extracted" only checks targets of replacements.
+    if (expectation.Target is not null && write.Target is not null && expectation.Target != write.Target) return false;
+    if (expectation.Target is not null && write.Target is null && write.Op != "extracted") return false;
+    // "a|b" accepts either spelling, such as "November|2026-11".
+    if (expectation.Contains?.Any(part => !part.Split('|').Any(option =>
+            write.Content.Contains(option, StringComparison.OrdinalIgnoreCase))) == true)
         return false;
     return expectation.ValidUntil switch
     {
