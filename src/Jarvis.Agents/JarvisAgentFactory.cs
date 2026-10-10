@@ -46,7 +46,7 @@ public sealed class JarvisAgentFactory(
         List<AIContextProvider> contextProviders = [.. contextContributors
             .OrderBy(contributor => contributor.Order)
             .SelectMany(contributor => contributor.CreateProviders(context))];
-        contextProviders.Add(CreateCompactionProvider(loggerFactory));
+        contextProviders.Add(CreateCompactionProvider(loggerFactory, context.OwnerId));
 
         var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
@@ -105,12 +105,25 @@ public sealed class JarvisAgentFactory(
     }
 
 #pragma warning disable MAAI001 // Compaction APIs are experimental; the package is pinned and this bounds persisted chat context.
-    private static AIContextProvider CreateCompactionProvider(ILoggerFactory loggerFactory) =>
-        new CurrentContextCompactionProvider(
-            new TruncationCompactionStrategy(
-                CompactionTriggers.TokensExceed(80_000),
-                minimumPreservedGroups: 4,
-                target: CompactionTriggers.TokensBelow(64_000)),
-            loggerFactory.CreateLogger<CurrentContextCompactionProvider>());
+    /// <summary>
+    /// Long conversations first get their oldest turns summarized (<see cref="RollingSummaryCompaction"/>). When that is
+    /// not enough or no summary is ready yet, old tool results are collapsed, and only then are the oldest turns dropped.
+    /// </summary>
+    private AIContextProvider CreateCompactionProvider(ILoggerFactory loggerFactory, Guid ownerId)
+    {
+        var trigger = CompactionTriggers.TokensExceed(RollingSummaryCompaction.TriggerTokens);
+        var target = CompactionTriggers.TokensBelow(64_000);
+        var logger = loggerFactory.CreateLogger<CurrentContextCompactionProvider>();
+        return new CurrentContextCompactionProvider(
+            new PipelineCompactionStrategy(
+            [
+                new ToolResultCompactionStrategy(trigger, minimumPreservedGroups: 4, target: target),
+                new TruncationCompactionStrategy(trigger, minimumPreservedGroups: 4, target: target)
+            ]),
+            logger,
+            services.GetService<IRollingSummaryCache>() is null
+                ? null
+                : RollingSummaryCompaction.ForOwner(services, ownerId, logger));
+    }
 #pragma warning restore MAAI001
 }
