@@ -90,6 +90,33 @@ public sealed class KnowledgeMemoryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Expiring_a_memory_ends_it_and_closes_its_graph_facts()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var graph = new KnowledgeGraphRepository(database);
+        var memories = new MemoryRepository(database);
+        var car = await memories.CreateAsync(owner, "fact", "The user owns a red Volvo.", 0.5f, 0.9f, "user", null,
+            null, false, CancellationToken.None);
+        var pinned = await memories.CreateAsync(owner, "fact", "The user lives in Delft.", 0.5f, 0.9f, "user", null,
+            null, true, CancellationToken.None);
+        await graph.MergeAsync(owner,
+            [new GraphFact("user", "person", "owns", "Volvo", "thing", true, true, DateTimeOffset.UtcNow, 0.9f)],
+            car.Id, CancellationToken.None);
+
+        Assert.Null(await memories.ExpireAsync(car.Id, Guid.CreateVersion7(), CancellationToken.None));
+        Assert.Null(await memories.ExpireAsync(pinned.Id, owner, CancellationToken.None));
+
+        var expired = await memories.ExpireAsync(car.Id, owner, CancellationToken.None);
+        Assert.NotNull(expired!.ValidUntil);
+        Assert.Null(await memories.ExpireAsync(car.Id, owner, CancellationToken.None));
+        var volvo = await graph.FindEntityAsync(owner, "Volvo", null, CancellationToken.None);
+        Assert.Empty(volvo!.Current);
+        Assert.Contains(volvo.History, relation => relation.ValidTo is not null);
+        Assert.Null((await memories.GetAsync(pinned.Id, owner, CancellationToken.None))!.ValidUntil);
+    }
+
+    [Fact]
     public async Task Semantic_search_ranks_by_cosine_similarity_within_the_same_model()
     {
         var owner = Guid.CreateVersion7();

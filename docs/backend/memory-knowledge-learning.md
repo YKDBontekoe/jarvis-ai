@@ -7,7 +7,14 @@ Jarvis combines **structured memory**, **semantic search**, a **temporal knowled
 - PostgreSQL tables with **full-text** and **trigram** indexes; optional **pgvector** embeddings for semantic search.
 - Owner-scoped categories (preference, fact, project, …).
 - **Pin** and **expiry**; **supersede** chain for explicit corrections (unpinned targets only).
-- Chat extraction (`IConversationMemoryExtractor`) deduplicates and transactionally supersedes on user corrections.
+- Chat extraction (`IConversationMemoryExtractor`, behind `ConversationMemoryGate`) reads the user message together with
+  the four turns before it (long turns keep their last 1,000 characters), so a short reply such as "no, Thursdays now"
+  is understood; a reply of eight words or fewer is also searched together with the end of the turn it answers. Memories
+  still come only from what the user said. For each candidate the model picks an action against the related memories:
+  `add`, `duplicate` (skipped), `enrich` (replaced by the combined statement, importance never lowered, audited as
+  `memory.enriched`), `supersede` (an explicit correction, `memory.superseded`) or `expire` (the user says it no longer
+  holds; the memory ends without a replacement and its graph facts close, confidence ≥ 0.9, `memory.expired`). Enrich,
+  supersede and expire never touch pinned memories, and replacements keep the recall counts.
 
 ### Search pipeline
 

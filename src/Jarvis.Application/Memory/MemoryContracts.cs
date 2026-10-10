@@ -10,6 +10,11 @@ public interface IMemoryRepository
         Guid? profileId = null);
     Task<MemoryRecord?> ReplaceAsync(Guid existingId, Guid ownerId, string kind, string content, float importance,
         float confidence, string? sourceType, Guid? sourceId, CancellationToken cancellationToken);
+    /// <summary>
+    /// Ends an active, unpinned memory now without a replacement, closing the graph facts learned from it. Null when
+    /// there is no such memory.
+    /// </summary>
+    Task<MemoryRecord?> ExpireAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<MemoryRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<MemoryRecord>> ListAsync(Guid ownerId, string? kind, CancellationToken cancellationToken);
     Task<IReadOnlyList<MemoryRecord>> ListPinnedAsync(Guid ownerId, CancellationToken cancellationToken);
@@ -33,6 +38,8 @@ public interface IMemoryService
     Task<MemoryRecord?> ReplaceAsync(Guid existingId, Guid ownerId, string kind, string content,
         float importance, float confidence, CancellationToken cancellationToken,
         string sourceType = "conversation", Guid? sourceId = null);
+    /// <summary>Ends an active, unpinned memory now without a replacement (the user said it no longer holds).</summary>
+    Task<MemoryRecord?> ExpireAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<MemoryRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<MemoryRecord>> ListAsync(Guid ownerId, string? kind, CancellationToken cancellationToken);
     Task<IReadOnlyList<MemoryRecord>> ListPinnedAsync(Guid ownerId, CancellationToken cancellationToken);
@@ -46,9 +53,16 @@ public interface IMemoryService
 
 public interface IConversationMemoryExtractor
 {
+    /// <param name="context">
+    /// The turns just before the user message, oldest first. They only resolve what a short reply refers to; memories
+    /// still come from what the user said.
+    /// </param>
     Task ExtractAndStoreAsync(Guid ownerId, Guid sourceMessageId, string userMessage, CancellationToken cancellationToken,
-        Guid? profileId = null);
+        Guid? profileId = null, IReadOnlyList<MemoryExtractionTurn>? context = null);
 }
+
+/// <summary>One earlier conversation turn shown to memory extraction (role is "user" or "assistant").</summary>
+public sealed record MemoryExtractionTurn(string Role, string Content);
 
 public static class MemoryKinds
 {

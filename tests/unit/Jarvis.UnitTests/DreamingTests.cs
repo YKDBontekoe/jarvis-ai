@@ -613,6 +613,9 @@ public sealed class DreamingTests
             return Task.FromResult<MemoryRecord?>(replacement);
         }
 
+        public Task<MemoryRecord?> ExpireAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public Task<MemoryRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
             Task.FromResult(Items.FirstOrDefault(item => item.Id == id && item.OwnerId == ownerId));
 

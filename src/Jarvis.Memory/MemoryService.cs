@@ -36,6 +36,9 @@ public sealed class MemoryService(IMemoryRepository repository, IMemoryIndexRepo
             sourceType, sourceId, cancellationToken);
     }
 
+    public Task<MemoryRecord?> ExpireAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
+        repository.ExpireAsync(id, ownerId, cancellationToken);
+
     public Task<MemoryRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
         repository.GetAsync(id, ownerId, cancellationToken);
 

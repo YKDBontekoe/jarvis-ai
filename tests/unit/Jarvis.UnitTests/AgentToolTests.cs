@@ -543,6 +543,8 @@ public sealed class AgentToolTests
         public Task<MemoryRecord?> ReplaceAsync(Guid existingId, Guid ownerId, string kind, string content, float importance,
             float confidence, CancellationToken cancellationToken, string sourceType = "conversation", Guid? sourceId = null) =>
             throw new NotSupportedException();
+        public Task<MemoryRecord?> ExpireAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
         public Task<IReadOnlyList<MemoryRecord>> ListAsync(Guid ownerId, string? kind, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<MemoryRecord>>(Items.Where(item => item.OwnerId == ownerId &&
                 (kind is null || item.Kind == kind)).ToArray());
