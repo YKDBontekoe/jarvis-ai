@@ -33,14 +33,28 @@ foreach (var item in dataset.Cases) Validate(item);
 Console.WriteLine($"{dataset.Cases.Length} cases are valid.");
 if (args.Contains("--dry-run")) return;
 
-var apiKey = Environment.GetEnvironmentVariable("EXTRACTION_EVAL_API_KEY")
-    ?? throw new InvalidOperationException("Set EXTRACTION_EVAL_API_KEY (and EXTRACTION_EVAL_MODEL).");
-var model = Environment.GetEnvironmentVariable("EXTRACTION_EVAL_MODEL")
-    ?? throw new InvalidOperationException("Set EXTRACTION_EVAL_MODEL, for example openai/gpt-5-mini.");
-var baseUrl = Environment.GetEnvironmentVariable("EXTRACTION_EVAL_BASE_URL") ?? "https://openrouter.ai/api/v1";
-var chat = new OpenAIClient(new ApiKeyCredential(apiKey),
-        new OpenAIClientOptions { Endpoint = new Uri(baseUrl.TrimEnd('/') + "/") })
-    .GetChatClient(model).AsIChatClient();
+// "--codex" uses Jarvis's own Codex app-server client, as production does by default: the signed-in ChatGPT account of
+// CODEX_HOME, its default model unless EXTRACTION_EVAL_MODEL names one, and EXTRACTION_EVAL_CODEX the executable.
+IChatClient chat;
+string model;
+if (args.Contains("--codex"))
+{
+    model = Environment.GetEnvironmentVariable("EXTRACTION_EVAL_MODEL") ?? "codex account default";
+    var executable = Environment.GetEnvironmentVariable("EXTRACTION_EVAL_CODEX") ?? "codex";
+    chat = new CodexCliChatClient(new CodexExecutable(executable, CodexExecutable.DefaultManagedDirectory()),
+        Environment.GetEnvironmentVariable("EXTRACTION_EVAL_MODEL"), enableWebSearch: false);
+}
+else
+{
+    var apiKey = Environment.GetEnvironmentVariable("EXTRACTION_EVAL_API_KEY")
+        ?? throw new InvalidOperationException("Set EXTRACTION_EVAL_API_KEY (and EXTRACTION_EVAL_MODEL), or pass --codex.");
+    model = Environment.GetEnvironmentVariable("EXTRACTION_EVAL_MODEL")
+        ?? throw new InvalidOperationException("Set EXTRACTION_EVAL_MODEL, for example openai/gpt-5-mini.");
+    var baseUrl = Environment.GetEnvironmentVariable("EXTRACTION_EVAL_BASE_URL") ?? "https://openrouter.ai/api/v1";
+    chat = new OpenAIClient(new ApiKeyCredential(apiKey),
+            new OpenAIClientOptions { Endpoint = new Uri(baseUrl.TrimEnd('/') + "/") })
+        .GetChatClient(model).AsIChatClient();
+}
 
 var results = new List<CaseResult>();
 for (var run = 0; run < runs; run++)

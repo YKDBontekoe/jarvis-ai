@@ -25,9 +25,18 @@ dotnet run --project tests/eval/Jarvis.ExtractionEval -- --runs 3         # repe
 dotnet run --project tests/eval/Jarvis.ExtractionEval -- --case expire-car
 ```
 
-`EXTRACTION_EVAL_BASE_URL` points it at any other OpenAI-compatible endpoint, such as a local model server. Production
-extraction uses the owner's background model, which is Codex by default, so a result through another provider shows how
-the prompt and rules behave, not exactly what a Codex install will do. Keep the model ID with every result.
+`EXTRACTION_EVAL_BASE_URL` points it at any other OpenAI-compatible endpoint, such as a local model server.
+
+`--codex` runs extraction through Jarvis's own Codex app-server client instead, the default production path. It uses the
+ChatGPT account signed in under `CODEX_HOME` (`codex login --device-auth`), the account's default model unless
+`EXTRACTION_EVAL_MODEL` names one, and `EXTRACTION_EVAL_CODEX` as the executable (default `codex`):
+
+```sh
+CODEX_HOME=/path/to/codex-home dotnet run --project tests/eval/Jarvis.ExtractionEval -- --codex --runs 3
+```
+
+A result through another provider shows how the prompt and rules behave, not exactly what a Codex install will do. Keep
+the model ID with every result.
 
 Metrics: cases passed, write recall (expected writes that happened), extra writes, harmful writes (a memory replaced or
 ended that the case did not name), stored relative dates, and latency. A case passes only with every expected write,
