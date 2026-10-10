@@ -10,5 +10,8 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Jarvis.UnitTests" />
+    <InternalsVisibleTo Include="Jarvis.ExtractionEval" />
+    <InternalsVisibleTo Include="Jarvis.CompactionEval" />
+    <InternalsVisibleTo Include="Jarvis.DreamingEval" />
   </ItemGroup>
 </Project>

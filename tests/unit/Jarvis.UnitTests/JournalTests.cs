@@ -383,6 +383,9 @@ public sealed class JournalTests
             float importance, float confidence, CancellationToken cancellationToken,
             string sourceType = "conversation", Guid? sourceId = null) => throw new NotSupportedException();
 
+        public Task<MemoryRecord?> ExpireAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public Task<IReadOnlyList<MemoryRecord>> ListAsync(Guid ownerId, string? kind,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 

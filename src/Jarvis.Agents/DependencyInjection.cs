@@ -49,6 +49,7 @@ public static class DependencyInjection
             provider.GetRequiredService<OpenRouterCatalog>());
         services.AddScoped<IChatClientResolver, ChatClientResolver>();
         services.AddScoped<IConversationMemoryExtractor, ConversationMemoryExtractor>();
+        services.AddSingleton<IRollingSummaryCache, RollingSummaryCache>();
         services.AddScoped<MemoryReranker>();
         services.AddScoped<IAgentToolContributor, CoreAgentTools>();
         services.AddScoped<IAgentContextContributor, CoreAgentContext>();

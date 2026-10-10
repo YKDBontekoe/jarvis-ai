@@ -7,7 +7,19 @@ Jarvis combines **structured memory**, **semantic search**, a **temporal knowled
 - PostgreSQL tables with **full-text** and **trigram** indexes; optional **pgvector** embeddings for semantic search.
 - Owner-scoped categories (preference, fact, project, …).
 - **Pin** and **expiry**; **supersede** chain for explicit corrections (unpinned targets only).
-- Chat extraction (`IConversationMemoryExtractor`) deduplicates and transactionally supersedes on user corrections.
+- Chat extraction (`IConversationMemoryExtractor`, behind `ConversationMemoryGate`) reads the user message together with
+  the four turns before it (long turns keep their last 1,000 characters), so a short reply such as "no, Thursdays now"
+  is understood; a reply of eight words or fewer is also searched together with the end of the turn it answers. Memories
+  still come only from what the user said. For each candidate the model picks an action against the related memories:
+  `add`, `duplicate` (skipped), `enrich` (replaced by the combined statement, importance never lowered, audited as
+  `memory.enriched`), `supersede` (an explicit correction, `memory.superseded`) or `expire` (the user says it no longer
+  holds; the memory ends without a replacement and its graph facts close, confidence ≥ 0.9, `memory.expired`). Enrich,
+  supersede and expire never touch pinned memories, and replacements keep the recall counts.
+- Extraction sees today's date in the owner's time zone (the daily briefing zone, UTC otherwise) and writes relative
+  dates as real ones ("next month" becomes the month and year). A temporary situation ("in Lisbon until Wednesday") is
+  stored with `validUntil` at the end of its last local day, at most a year out, and never replaces a lasting memory; a
+  temporary memory without a usable end date is not stored. Extraction quality is measured with
+  `tests/eval/Jarvis.ExtractionEval` (see its README).
 
 ### Search pipeline
 
@@ -43,7 +55,8 @@ Jarvis combines **structured memory**, **semantic search**, a **temporal knowled
    own hits.
 9. Pinned unexpired memories are always included in the bounded agent context.
 
-Retrieval quality and speed are measured offline with `tests/eval/Jarvis.MemoryEval` (see its README).
+Retrieval quality and speed are measured offline with `tests/eval/Jarvis.MemoryEval`, extraction decisions with
+`tests/eval/Jarvis.ExtractionEval` (see their READMEs).
 
 Agent tools: `SearchMemory`, `ListMemories`, `Remember`, `Forget` (approval). See [agent-tools.md](agent-tools.md).
 

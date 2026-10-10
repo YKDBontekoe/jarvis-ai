@@ -90,6 +90,78 @@ public sealed class KnowledgeMemoryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task An_ended_fact_closes_the_open_relation_it_names_or_any_with_that_object()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var graph = new KnowledgeGraphRepository(database);
+        var day = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero);
+        await graph.MergeAsync(owner,
+        [
+            new GraphFact("user", "person", "drives", "Volvo V60", "thing", true, true, day, 0.9f),
+            new GraphFact("user", "person", "likes", "jazz", "topic", true, false, day, 0.9f)
+        ], null, CancellationToken.None);
+
+        // "Sold the Volvo" names a different predicate than the open one; the open relation to the Volvo still ends.
+        await graph.MergeAsync(owner,
+        [
+            new GraphFact("user", "person", "owns", "Volvo V60", "thing", true, false, day.AddDays(30), 0.9f, Ends: true),
+            new GraphFact("user", "person", "drives", "Tesla Model 3", "thing", true, true, day.AddDays(30), 0.9f)
+        ], null, CancellationToken.None);
+
+        var user = await graph.FindEntityAsync(owner, "user", null, CancellationToken.None);
+        Assert.DoesNotContain(user!.Current, relation => relation.ObjectName == "Volvo V60");
+        Assert.Contains(user.History, relation => relation.ObjectName == "Volvo V60" && relation.ValidTo == day.AddDays(30));
+        Assert.Contains(user.Current, relation => relation.ObjectName == "Tesla Model 3");
+        Assert.Contains(user.Current, relation => relation.ObjectName == "jazz");
+    }
+
+    [Fact]
+    public async Task A_many_valued_predicate_marked_exclusive_keeps_the_other_values()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var graph = new KnowledgeGraphRepository(database);
+        var day = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero);
+        await graph.MergeAsync(owner,
+            [new GraphFact("user", "person", "likes", "sushi", "thing", true, true, day, 0.9f)], null, CancellationToken.None);
+        await graph.MergeAsync(owner,
+            [new GraphFact("user", "person", "likes", "jazz", "topic", true, true, day.AddDays(1), 0.9f)], null,
+            CancellationToken.None);
+
+        var user = await graph.FindEntityAsync(owner, "user", null, CancellationToken.None);
+        Assert.Contains(user!.Current, relation => relation.ObjectName == "sushi");
+        Assert.Contains(user.Current, relation => relation.ObjectName == "jazz");
+    }
+
+    [Fact]
+    public async Task Expiring_a_memory_ends_it_and_closes_its_graph_facts()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var graph = new KnowledgeGraphRepository(database);
+        var memories = new MemoryRepository(database);
+        var car = await memories.CreateAsync(owner, "fact", "The user owns a red Volvo.", 0.5f, 0.9f, "user", null,
+            null, false, CancellationToken.None);
+        var pinned = await memories.CreateAsync(owner, "fact", "The user lives in Delft.", 0.5f, 0.9f, "user", null,
+            null, true, CancellationToken.None);
+        await graph.MergeAsync(owner,
+            [new GraphFact("user", "person", "owns", "Volvo", "thing", true, true, DateTimeOffset.UtcNow, 0.9f)],
+            car.Id, CancellationToken.None);
+
+        Assert.Null(await memories.ExpireAsync(car.Id, Guid.CreateVersion7(), CancellationToken.None));
+        Assert.Null(await memories.ExpireAsync(pinned.Id, owner, CancellationToken.None));
+
+        var expired = await memories.ExpireAsync(car.Id, owner, CancellationToken.None);
+        Assert.NotNull(expired!.ValidUntil);
+        Assert.Null(await memories.ExpireAsync(car.Id, owner, CancellationToken.None));
+        var volvo = await graph.FindEntityAsync(owner, "Volvo", null, CancellationToken.None);
+        Assert.Empty(volvo!.Current);
+        Assert.Contains(volvo.History, relation => relation.ValidTo is not null);
+        Assert.Null((await memories.GetAsync(pinned.Id, owner, CancellationToken.None))!.ValidUntil);
+    }
+
+    [Fact]
     public async Task Semantic_search_ranks_by_cosine_similarity_within_the_same_model()
     {
         var owner = Guid.CreateVersion7();

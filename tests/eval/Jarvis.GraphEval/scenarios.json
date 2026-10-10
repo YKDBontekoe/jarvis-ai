@@ -1,0 +1,29 @@
+{
+  "scenarios": [
+    { "id": "move-nl-en", "memories": ["Woont in Utrecht.", "Moved to Leiden in August 2026."],
+      "checks": [{ "subject": "user", "current": ["Leiden"] }, { "subject": "user", "notCurrent": ["Utrecht"] }] },
+    { "id": "likes-stay", "memories": ["Likes hiking in the mountains.", "Loves sushi.", "Enjoys listening to jazz."],
+      "checks": [{ "subject": "user", "current": ["hiking", "sushi", "jazz"] }] },
+    { "id": "job-change", "memories": ["Werkt bij Philips als software engineer.", "Started at ASML as team lead in September 2026."],
+      "checks": [{ "subject": "user", "current": ["ASML"] }, { "subject": "user", "notCurrent": ["Philips"] }] },
+    { "id": "sister-moves", "memories": ["Sister Lotte lives in Rotterdam.", "Lotte moved to Delft last spring."],
+      "checks": [{ "subject": "Lotte", "current": ["Delft"] }, { "subject": "Lotte", "notCurrent": ["Rotterdam"] },
+                 { "subject": "user", "related": ["Lotte"] }] },
+    { "id": "two-pets", "memories": ["Has a cat named Miso.", "Adopted a dog called Pip."],
+      "checks": [{ "subject": "user", "current": ["Miso", "Pip"] }] },
+    { "id": "partner-married", "memories": ["Partner is Sam.", "Sam and the user got married in June 2026."],
+      "checks": [{ "subject": "user", "related": ["Sam"] }] },
+    { "id": "manager-reuse", "memories": ["Mark is the user's manager.", "Had a one-on-one with Mark about a promotion."],
+      "checks": [{ "entities": ["Mark"], "maxEntitiesMatching": 1 }] },
+    { "id": "languages", "memories": ["Spreekt Nederlands en Engels.", "Is learning Japanese."],
+      "checks": [{ "subject": "user", "current": ["Dutch|Nederlands", "English|Engels", "Japanese|Japans"] }] },
+    { "id": "two-children", "memories": ["Daughter Emma is 7 years old.", "Son Noah was born in 2023."],
+      "checks": [{ "subject": "user", "related": ["Emma", "Noah"] }] },
+    { "id": "car-replaced", "memories": ["Drives a Volvo V60.", "Sold the Volvo and bought a Tesla Model 3."],
+      "checks": [{ "subject": "user", "current": ["Tesla"] }, { "subject": "user", "notCurrent": ["Volvo"] }] },
+    { "id": "hobbies-and-gym", "memories": ["Plays tennis on Tuesdays.", "Goes to the gym on Thursdays.", "Started rock climbing."],
+      "checks": [{ "subject": "user", "current": ["tennis", "gym", "climbing"] }] },
+    { "id": "friend-city", "memories": ["Friend Daan lives in Amsterdam and works at Booking.com.", "Daan is verhuisd naar Utrecht."],
+      "checks": [{ "subject": "Daan", "current": ["Utrecht", "Booking"] }, { "subject": "Daan", "notCurrent": ["Amsterdam"] }] }
+  ]
+}

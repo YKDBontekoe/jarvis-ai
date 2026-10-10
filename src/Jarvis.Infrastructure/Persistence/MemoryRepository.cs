@@ -55,6 +55,24 @@ public sealed class MemoryRepository(JarvisDbContext db) : IMemoryRepository
         return replacement.ToRecord();
     }
 
+    public async Task<MemoryRecord?> ExpireAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var memory = await db.Memories.SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId &&
+            (x.ValidUntil == null || x.ValidUntil > DateTimeOffset.UtcNow), cancellationToken);
+        if (memory is null || memory.IsPinned) return null;
+
+        var now = DateTimeOffset.UtcNow;
+        memory.ValidUntil = now;
+        memory.UpdatedAt = now;
+        await db.SaveChangesAsync(cancellationToken);
+        await db.GraphRelations
+            .Where(x => x.OwnerId == ownerId && x.SourceMemoryId == memory.Id && x.ValidTo == null)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.ValidTo, now), cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return memory.ToRecord();
+    }
+
     public async Task<MemoryRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
         (await db.Memories.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId, cancellationToken))?.ToRecord();
 

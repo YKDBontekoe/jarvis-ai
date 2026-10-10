@@ -134,6 +134,20 @@ but loses the helpful-but-secondary memories. Skipping the rerank when the top h
 calls and cost noise, so the tool always reranks. Hints and queries are written by the same family of model that
 wrote the memories and questions, which probably flatters these numbers; real usage will show less.
 
+### Hints written by Codex (production path)
+
+The rows above use hints written by Sonnet. With hints written by `SearchHintGenerator` itself through Codex (account
+default model, production batches of 8, all 1,000 memories, 2026-10-10), keyword retrieval on the same 60 questions:
+
+| Retrieval | Recall@8 | Hit@1 | MRR | Noise | p50 |
+|-----------|---------:|------:|----:|------:|----:|
+| Raw message, keyword | 0.29 | 0.27 | 0.33 | 0.91 | 11 ms |
+| Raw message, keyword + Codex hints | 0.43 | 0.38 | 0.48 | 0.87 | 12 ms |
+
+Codex hints help clearly (+0.14 recall, +0.11 hit@1) but less than the Sonnet hints (0.51 / 0.48). Codex keeps close to
+the memory's own wording (a moved release gets "gepland" and "uitstel" but not the "deadline" the question uses). A
+prompt asking for the words people ask with could not be measured: the account hit its usage limit halfway through.
+
 ### Follow-up messages and a larger embedding model
 
 24 short follow-ups ("And which school is she at?") whose subject sits in the previous user message (written by Sonnet from

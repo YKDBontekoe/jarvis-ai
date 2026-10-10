@@ -32,9 +32,12 @@ public sealed record GraphOverview(IReadOnlyList<GraphEntityRecord> Entities, IR
 public sealed record GraphEntityDetails(GraphEntityRecord Entity, IReadOnlyList<GraphRelationRecord> Current,
     IReadOnlyList<GraphRelationRecord> History);
 
-/// <summary>An extracted fact to merge into the graph.</summary>
+/// <summary>
+/// An extracted fact to merge into the graph. <paramref name="Ends"/> marks a fact that stopped holding ("sold the
+/// car"): merging closes the matching current relation instead of adding one.
+/// </summary>
 public sealed record GraphFact(string Subject, string SubjectType, string Predicate, string Object, string? ObjectType,
-    bool ObjectIsEntity, bool Exclusive, DateTimeOffset ValidFrom, float Confidence);
+    bool ObjectIsEntity, bool Exclusive, DateTimeOffset ValidFrom, float Confidence, bool Ends = false);
 
 public interface IKnowledgeGraphRepository
 {
@@ -80,6 +83,17 @@ public static class GraphNames
             return UserKey;
         return new string(trimmed.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
     }
+
+    /// <summary>
+    /// Predicates that can hold several values at once. A model sometimes marks one of them exclusive, which would
+    /// close every other value ("likes jazz" ending "likes sushi"), so they are never treated as exclusive.
+    /// </summary>
+    public static readonly IReadOnlySet<string> ManyValued = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "likes", "dislikes", "loves", "enjoys", "owns", "uses", "knows", "speaks", "learns", "plays", "practices",
+        "does", "visits", "friend_of", "has_child", "has_pet", "has_sibling", "member_of", "interested_in",
+        "allergic_to", "studies", "collaborates_with", "attends", "supports", "follows", "reads", "watches"
+    };
 
     public static string Predicate(string predicate)
     {

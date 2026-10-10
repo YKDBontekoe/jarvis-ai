@@ -1,0 +1,37 @@
+{
+  "scenarios": [
+    { "id": "visit-is-not-a-move", "memories": [{ "key": "home", "kind": "fact", "content": "Lives in Utrecht." }],
+      "messages": ["I'm in Amsterdam for a work trip this week.", "Amsterdam is so busy today, can't wait to get home."] },
+    { "id": "clear-move", "memories": [{ "key": "home", "kind": "fact", "content": "Lives in Utrecht." }],
+      "messages": ["We finally moved to Leiden last weekend!", "Still unpacking boxes in our new Leiden apartment."],
+      "required": [{ "target": "home", "contains": ["Leiden"] }] },
+    { "id": "pinned-move", "memories": [{ "key": "home", "kind": "fact", "content": "Lives in Utrecht.", "pinned": true }],
+      "messages": ["We finally moved to Leiden last weekend!", "Still unpacking boxes in our new Leiden apartment."] },
+    { "id": "related-coffee", "memories": [{ "key": "coffee", "kind": "preference", "content": "Likes coffee." },
+                                           { "key": "flatwhite", "kind": "routine", "content": "Drinks a flat white every morning." }],
+      "messages": ["Morning! First flat white of the day is the best one."],
+      "allowed": [{ "target": "coffee", "contains": ["coffee|flat white"] }, { "target": "flatwhite", "contains": ["flat white"] }] },
+    { "id": "new-job-implied", "memories": [{ "key": "job", "kind": "fact", "content": "Works at Philips as a software engineer." }],
+      "messages": ["My first week at ASML went great.", "The ASML onboarding is intense but fun."],
+      "allowed": [{ "target": "job", "contains": ["ASML"] }] },
+    { "id": "unrelated-chat", "memories": [
+        { "key": "home", "kind": "fact", "content": "Lives in Delft." },
+        { "key": "partner", "kind": "relationship", "content": "Partner is Sam." },
+        { "key": "dog", "kind": "fact", "content": "Has a dog named Pip." },
+        { "key": "tennis", "kind": "routine", "content": "Plays tennis on Tuesday evenings." },
+        { "key": "veg", "kind": "preference", "content": "Is vegetarian." },
+        { "key": "job", "kind": "fact", "content": "Works at ASML as a team lead." }],
+      "messages": ["How long should I boil fresh pasta?", "And how much salt goes in the water?"] },
+    { "id": "shorter-answers", "memories": [{ "key": "style", "kind": "preference", "content": "Prefers long, detailed answers." }],
+      "messages": ["Please keep your answers short from now on.", "Again, shorter please, just the key point."],
+      "allowed": [{ "target": "style", "contains": ["short"] }] },
+    { "id": "sensitive-health", "memories": [{ "key": "home", "kind": "fact", "content": "Lives in Delft." }],
+      "messages": ["My therapist says I should rest more.", "Therapy is really helping with my anxiety lately."],
+      "forbiddenContent": ["therap", "anxiety"] },
+    { "id": "neighbour-dog", "memories": [{ "key": "dog", "kind": "fact", "content": "Has a dog named Pip." }],
+      "messages": ["The neighbour's dog barked all night.", "I barely slept because of that dog next door."] },
+    { "id": "sister-correction", "memories": [{ "key": "anna", "kind": "relationship", "content": "Anna is the user's sister." }],
+      "messages": ["Anna is my cousin actually, not my sister.", "Yes, cousin Anna is coming over Saturday."],
+      "required": [{ "target": "anna", "contains": ["cousin"] }] }
+  ]
+}

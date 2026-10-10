@@ -137,6 +137,28 @@ public sealed class KnowledgeGraphRepository(JarvisDbContext db) : IKnowledgeGra
             if (subject is null || (objectEntity is null && objectValue is null) || objectEntity?.Id == subject.Id)
                 continue;
 
+            if (fact.Ends)
+            {
+                // The same predicate when it is open, else any open relation between the two ("sold" ends "drives").
+                var open = await db.GraphRelations
+                    .Where(x => x.OwnerId == ownerId && x.SubjectId == subject.Id && x.ValidTo == null &&
+                                (objectEntity != null
+                                    ? x.ObjectId == objectEntity.Id
+                                    : x.ObjectId == null && x.ObjectValue != null &&
+                                      x.ObjectValue.ToLower() == objectValue!.ToLower()))
+                    .ToListAsync(cancellationToken);
+                var ending = open.Where(x => x.Predicate == predicate).ToList() is { Count: > 0 } samePredicate
+                    ? samePredicate
+                    : open;
+                foreach (var relation in ending)
+                {
+                    relation.ValidTo = fact.ValidFrom > relation.ValidFrom ? fact.ValidFrom : now;
+                    changed++;
+                }
+                await db.SaveChangesAsync(cancellationToken);
+                continue;
+            }
+
             var currentValues = await db.GraphRelations
                 .Where(x => x.OwnerId == ownerId && x.SubjectId == subject.Id && x.Predicate == predicate &&
                             x.ValidTo == null)
@@ -149,7 +171,7 @@ public sealed class KnowledgeGraphRepository(JarvisDbContext db) : IKnowledgeGra
                 same.Confidence = Math.Min(1f, Math.Max(same.Confidence, fact.Confidence) + 0.05f);
                 continue;
             }
-            if (fact.Exclusive)
+            if (fact.Exclusive && !GraphNames.ManyValued.Contains(predicate))
                 foreach (var previous in currentValues)
                     previous.ValidTo = fact.ValidFrom > previous.ValidFrom ? fact.ValidFrom : now;
 

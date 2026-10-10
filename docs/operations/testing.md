@@ -62,6 +62,10 @@ dotnet run --project workers/Jarvis.Worker --no-launch-profile &
 
 Model-agnostic scenarios: `evals/jarvis-core-v1.jsonl` — see [evals/README.md](../../evals/README.md). Run against a disposable deployment through the public API.
 
+Component evals for memory (no deployment needed): `tests/eval/Jarvis.MemoryEval` scores retrieval against a scratch
+PostgreSQL database, and `tests/eval/Jarvis.ExtractionEval` scores memory extraction against a real model (`--dry-run`
+only validates its dataset).
+
 ## CI expectations
 
 [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs on every pull request to `main`: backend unit and integration tests (the backend job also publishes the AppHost and checks the generated production Compose with `tests/unit/compose/test_production_compose.py`), Python release/AltStore tests, Flutter analyze and widget tests, and API/worker image builds (no push). Release tags start `release.yml`, which checks `deploy-backend.yml` and `release-ios.yml` before the single production approval.

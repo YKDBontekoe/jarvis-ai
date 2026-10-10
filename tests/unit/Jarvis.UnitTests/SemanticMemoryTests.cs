@@ -201,6 +201,20 @@ public sealed class SemanticMemoryTests
     }
 
     [Fact]
+    public void An_ended_fact_is_parsed_as_ending_and_never_exclusive()
+    {
+        var memory = Memory("Sold the Volvo.");
+        var facts = KnowledgeGraphExtractor.Parse("""
+            {"facts":[{"memory":0,"subject":"user","subjectType":"person","predicate":"drives","object":"Volvo",
+              "objectType":"thing","objectIsEntity":true,"exclusive":true,"ended":true,"validFrom":null}]}
+            """, [memory]);
+
+        var ended = Assert.Single(facts[memory.Id]);
+        Assert.True(ended.Ends);
+        Assert.False(ended.Exclusive);
+    }
+
+    [Fact]
     public void Graph_extraction_maps_facts_to_memories_and_rejects_bad_items()
     {
         var first = Memory("The user moved to Amsterdam in 2026.");
