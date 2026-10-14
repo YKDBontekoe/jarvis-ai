@@ -379,6 +379,14 @@ class _FilesScreenState extends State<FilesScreen> {
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                             StatusPill.forStatus(status),
+                            if (file['partiallyIndexed'] == true)
+                              Tooltip(
+                                message: 'Only the first part of this file is searchable.',
+                                child: StatusPill(
+                                  label: 'Partly indexed',
+                                  color: JarvisColors.of(context).warning,
+                                ),
+                              ),
                           ],
                         ),
                       ],

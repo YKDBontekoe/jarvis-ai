@@ -25,8 +25,8 @@ public sealed class SemanticMemoryTests
             searchedModel = ((MemoryEmbedding)args[1]!).Model;
             return (IReadOnlyList<MemorySearchHit>)[new(semanticOnly, 0.72), new(keyword, 0.7)];
         }));
-        var embedder = Fake<IMemoryEmbedder>.Create(("EmbedAsync", _ =>
-            (IReadOnlyList<MemoryEmbedding>?)[new MemoryEmbedding("openrouter:embed", [1f, 0f])]));
+        var embedder = Embedder(_ => Task.FromResult<IReadOnlyList<MemoryEmbedding>>(
+            [new MemoryEmbedding("openrouter:embed", [1f, 0f])]));
 
         var hits = await new MemoryService(repository, index, embedder).SearchAsync(Owner, "bread hobby", default);
 
@@ -42,8 +42,8 @@ public sealed class SemanticMemoryTests
         var repository = Fake<IMemoryRepository>.Create(
             ("HasActiveMemoriesAsync", _ => true),
             ("SearchLexicalAsync", _ => (IReadOnlyList<MemoryLexicalMatch>)[new(keyword, 1, 0)]));
-        var embedder = Fake<IMemoryEmbedder>.Create(("EmbedAsync", _ =>
-            Task.FromException<IReadOnlyList<MemoryEmbedding>?>(new HttpRequestException("provider down"))));
+        var embedder = Embedder(_ =>
+            Task.FromException<IReadOnlyList<MemoryEmbedding>>(new HttpRequestException("provider down")));
 
         var hits = await new MemoryService(repository, Fake<IMemoryIndexRepository>.Create(), embedder)
             .SearchAsync(Owner, "window", default);
@@ -272,6 +272,84 @@ public sealed class SemanticMemoryTests
         Assert.Contains("You lives in Utrecht (2026-03-01 → 2026-05-01)", text);
     }
 
+    [Fact]
+    public async Task Search_embeds_the_query_while_the_keyword_query_runs()
+    {
+        var keyword = Memory("The user prefers window seats.");
+        var embeddingStarted = new TaskCompletionSource();
+        var repository = Fake<IMemoryRepository>.Create(
+            ("HasActiveMemoriesAsync", _ => true),
+            ("SearchLexicalAsync", _ => WaitThenReturn()));
+        var index = Fake<IMemoryIndexRepository>.Create(("SearchSemanticAsync", _ => (IReadOnlyList<MemorySearchHit>)[]));
+        var embedder = Embedder(_ =>
+        {
+            embeddingStarted.TrySetResult();
+            return Task.FromResult<IReadOnlyList<MemoryEmbedding>>([new MemoryEmbedding("m", [1f])]);
+        });
+
+        var hits = await new MemoryService(repository, index, embedder).SearchAsync(Owner, "window", default);
+
+        Assert.Equal(keyword.Id, Assert.Single(hits).Memory.Id);
+
+        async Task<IReadOnlyList<MemoryLexicalMatch>> WaitThenReturn()
+        {
+            // The keyword query only finishes once the provider call has started, so this deadlocks if they run in turn.
+            await embeddingStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            return [new(keyword, 1, 0)];
+        }
+    }
+
+    [Fact]
+    public void Query_embedding_cache_is_keyed_by_owner_model_and_text_and_expires()
+    {
+        var time = new ManualTime();
+        var cache = new QueryEmbeddingCache(time);
+        cache.Set(Owner, "m1", "where do I live", [1f]);
+
+        Assert.Equal([1f], cache.TryGet(Owner, "m1", "where do I live")!);
+        Assert.Null(cache.TryGet(Owner, "m2", "where do I live"));
+        Assert.Null(cache.TryGet(Guid.NewGuid(), "m1", "where do I live"));
+        Assert.Null(cache.TryGet(Owner, "m1", "where do I work"));
+
+        time.Now += QueryEmbeddingCache.Lifetime + TimeSpan.FromSeconds(1);
+        Assert.Null(cache.TryGet(Owner, "m1", "where do I live"));
+    }
+
+    [Fact]
+    public void Query_embedding_cache_drops_the_oldest_entries_past_capacity()
+    {
+        var cache = new QueryEmbeddingCache();
+        for (var index = 0; index <= QueryEmbeddingCache.Capacity; index++)
+            cache.Set(Owner, "m", "query " + index, [index]);
+
+        Assert.Null(cache.TryGet(Owner, "m", "query 0"));
+        Assert.Equal([QueryEmbeddingCache.Capacity], cache.TryGet(Owner, "m", "query " + QueryEmbeddingCache.Capacity)!);
+    }
+
     private static MemoryRecord Memory(string content) => new(Guid.NewGuid(), Owner, "fact", content, 0.5f, 0.9f,
         "user", null, Recorded, Recorded, null, false);
+
+    private static IMemoryEmbedder Embedder(Func<IReadOnlyList<string>, Task<IReadOnlyList<MemoryEmbedding>>> embed) =>
+        new TestEmbedder(embed);
+
+    private sealed class TestEmbedder(Func<IReadOnlyList<string>, Task<IReadOnlyList<MemoryEmbedding>>> embed)
+        : IMemoryEmbedder, IResolvedEmbedder
+    {
+        public string Model => "test";
+
+        public async Task<IReadOnlyList<MemoryEmbedding>?> EmbedAsync(Guid ownerId, IReadOnlyList<string> texts,
+            CancellationToken cancellationToken) => await embed(texts);
+
+        public Task<IResolvedEmbedder?> ResolveAsync(Guid ownerId, CancellationToken cancellationToken) =>
+            Task.FromResult<IResolvedEmbedder?>(this);
+
+        public Task<IReadOnlyList<MemoryEmbedding>> EmbedAsync(IReadOnlyList<string> texts,
+            CancellationToken cancellationToken) => embed(texts);
+    }
+
+    private sealed class ManualTime : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = new(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
 }

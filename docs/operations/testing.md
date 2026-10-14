@@ -64,7 +64,8 @@ Model-agnostic scenarios: `evals/jarvis-core-v1.jsonl` — see [evals/README.md]
 
 Component evals for memory (no deployment needed): `tests/eval/Jarvis.MemoryEval` scores retrieval against a scratch
 PostgreSQL database, and `tests/eval/Jarvis.ExtractionEval` scores memory extraction against a real model (`--dry-run`
-only validates its dataset).
+only validates its dataset). `tests/eval/Jarvis.FileEval` scores file search (chunking, keyword and hybrid retrieval)
+against a scratch database.
 
 ## CI expectations
 

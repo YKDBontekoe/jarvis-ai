@@ -13,6 +13,10 @@ public sealed class FileContentChunkEntity
     public int StartOffset { get; set; }
     public int EndOffset { get; set; }
     public int? PageNumber { get; set; }
+    /// <summary>Nearest heading above the chunk; part of the keyword index and the embedded text.</summary>
+    public string? Heading { get; set; }
     public Vector? Embedding { get; set; }
+    /// <summary>Model that produced <see cref="Embedding"/>; semantic search only compares vectors of the same model.</summary>
+    public string? EmbeddingModel { get; set; }
     public NpgsqlTsVector SearchText { get; set; } = null!;
 }

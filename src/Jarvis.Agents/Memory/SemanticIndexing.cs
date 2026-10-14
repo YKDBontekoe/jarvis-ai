@@ -7,16 +7,80 @@ using Microsoft.Extensions.Logging;
 
 namespace Jarvis.Agents.Memory;
 
-internal sealed class ResolverMemoryEmbedder(IChatClientResolver resolver) : IMemoryEmbedder
+internal sealed class ResolverMemoryEmbedder(IChatClientResolver resolver, QueryEmbeddingCache? cache = null)
+    : IMemoryEmbedder
 {
     public async Task<IReadOnlyList<MemoryEmbedding>?> EmbedAsync(Guid ownerId, IReadOnlyList<string> texts,
         CancellationToken cancellationToken)
     {
         if (texts.Count == 0) return [];
+        var model = await ResolveAsync(ownerId, cancellationToken);
+        return model is null ? null : await model.EmbedAsync(texts, cancellationToken);
+    }
+
+    public async Task<IResolvedEmbedder?> ResolveAsync(Guid ownerId, CancellationToken cancellationToken)
+    {
         var model = await resolver.GetEmbeddingModelAsync(ownerId, cancellationToken);
-        if (model is null) return null;
-        var generated = await model.Generator.GenerateAsync(texts, cancellationToken: cancellationToken);
-        return generated.Select(embedding => new MemoryEmbedding(model.Name, embedding.Vector.ToArray())).ToArray();
+        return model is null ? null : new Resolved(ownerId, model, cache);
+    }
+
+    private sealed class Resolved(Guid ownerId, EmbeddingModel model, QueryEmbeddingCache? cache) : IResolvedEmbedder
+    {
+        public string Model => model.Name;
+
+        public async Task<IReadOnlyList<MemoryEmbedding>> EmbedAsync(IReadOnlyList<string> texts,
+            CancellationToken cancellationToken)
+        {
+            if (texts.Count == 0) return [];
+            // Only single texts are cached: those are search queries (a regenerated reply or the SearchMemory tool
+            // repeats the chat context's query). Batches are indexing work and never repeat.
+            if (texts.Count == 1 && cache?.TryGet(ownerId, model.Name, texts[0]) is { } cached)
+                return [new MemoryEmbedding(model.Name, cached)];
+            var generated = await model.Generator.GenerateAsync(texts, cancellationToken: cancellationToken);
+            var embeddings = generated.Select(embedding => new MemoryEmbedding(model.Name, embedding.Vector.ToArray()))
+                .ToArray();
+            if (texts.Count == 1 && embeddings.Length == 1) cache?.Set(ownerId, model.Name, texts[0], embeddings[0].Vector);
+            return embeddings;
+        }
+    }
+}
+
+/// <summary>
+/// Small in-process cache of query embeddings, keyed by owner, model and exact text. Entries live for
+/// <see cref="Lifetime"/> and the oldest are dropped past <see cref="Capacity"/>, so it never grows unbounded.
+/// </summary>
+public sealed class QueryEmbeddingCache(TimeProvider? time = null)
+{
+    internal const int Capacity = 512;
+    internal static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(15);
+    private const int MaxTextLength = 4_000;
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
+    private readonly Lock _lock = new();
+    private readonly Dictionary<(Guid, string, string), (float[] Vector, DateTimeOffset Expires)> _entries = [];
+    private readonly Queue<(Guid, string, string)> _order = new();
+
+    public float[]? TryGet(Guid ownerId, string model, string text)
+    {
+        lock (_lock)
+        {
+            // Expired entries stay until capacity pushes them out, which keeps the queue and the map in step.
+            return _entries.TryGetValue((ownerId, model, text), out var entry) && entry.Expires > _time.GetUtcNow()
+                ? entry.Vector
+                : null;
+        }
+    }
+
+    public void Set(Guid ownerId, string model, string text, float[] vector)
+    {
+        if (text.Length > MaxTextLength) return;
+        var key = (ownerId, model, text);
+        lock (_lock)
+        {
+            if (!_entries.ContainsKey(key)) _order.Enqueue(key);
+            _entries[key] = (vector, _time.GetUtcNow() + Lifetime);
+            while (_entries.Count > Capacity && _order.TryDequeue(out var oldest))
+                _entries.Remove(oldest);
+        }
     }
 }
 

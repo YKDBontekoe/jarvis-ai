@@ -117,6 +117,7 @@ public static class DependencyInjection
         services.AddHttpClient();
         services.AddScoped<IFileMalwareScanner, ClamAvVirusScanner>();
         services.AddScoped<IFileSearchService, FileSearchService>();
+        services.AddScoped<FileChunkIndexer>();
         services.AddScoped<IConversationFileContextRepository, ConversationFileContextRepository>();
         services.AddScoped<IConversationFileScopeService, ConversationFileScopeService>();
         services.AddScoped<IFileCitationCollector, FileCitationCollector>();

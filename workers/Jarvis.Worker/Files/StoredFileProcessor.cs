@@ -37,9 +37,10 @@ internal sealed class StoredFileProcessor(IOptions<FileProcessingOptions> option
 
             var isImage = file.ContentType is "image/jpeg" or "image/png" or "image/webp";
             var extracted = isImage
-                ? await ExtractImageTextAsync(services, file, buffer, cancellationToken)
+                ? new ExtractedText(await ExtractImageTextAsync(services, file, buffer, cancellationToken), null, false)
                 : await ExtractTextAsync(file, buffer, cancellationToken);
-            if (string.IsNullOrWhiteSpace(extracted))
+            var text = extracted.Text;
+            if (string.IsNullOrWhiteSpace(text))
             {
                 if (!isImage)
                 {
@@ -47,19 +48,24 @@ internal sealed class StoredFileProcessor(IOptions<FileProcessingOptions> option
                     return;
                 }
 
-                extracted = $"Image {file.FileName} contained no legible text.";
+                text = $"Image {file.FileName} contained no legible text.";
             }
 
-            extracted = extracted.Length > Options.MaxExtractedCharacters
-                ? extracted[..Options.MaxExtractedCharacters]
-                : extracted;
-            var chunks = FileTextChunker.SplitIntoChunks(extracted, Options);
-            var indexed = new List<FileContentChunk>(chunks.Count);
-            for (var index = 0; index < chunks.Count; index++)
-                indexed.Add(new FileContentChunk(input.FileId, input.OwnerId, index, chunks[index]));
+            var cutOff = extracted.CutOff || text.Length > Options.MaxExtractedCharacters;
+            if (text.Length > Options.MaxExtractedCharacters) text = text[..Options.MaxExtractedCharacters];
+            var result = FileTextChunker.Split(text, Options, extracted.PageStarts);
+            var indexed = new List<FileContentChunk>(result.Chunks.Count);
+            for (var index = 0; index < result.Chunks.Count; index++)
+            {
+                var chunk = result.Chunks[index];
+                indexed.Add(new FileContentChunk(input.FileId, input.OwnerId, index, chunk.Content, chunk.StartOffset,
+                    chunk.EndOffset, chunk.PageNumber, chunk.Heading));
+            }
 
             await services.GetRequiredService<IFileContentRepository>()
                 .ReplaceChunksAsync(input.FileId, input.OwnerId, indexed, cancellationToken);
+            await files.SetPartiallyIndexedAsync(input.FileId, input.OwnerId, cutOff || result.Truncated,
+                cancellationToken);
             await files.SetProcessingStatusAsync(input.FileId, input.OwnerId, "ready", cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -74,27 +80,39 @@ internal sealed class StoredFileProcessor(IOptions<FileProcessingOptions> option
         }
     }
 
-    private async Task<string> ExtractTextAsync(StoredFile file, Stream content, CancellationToken cancellationToken)
+    /// <summary>Extracted text, the offset where each page starts (PDF only), and whether pages were left out.</summary>
+    private sealed record ExtractedText(string Text, IReadOnlyList<int>? PageStarts, bool CutOff);
+
+    private async Task<ExtractedText> ExtractTextAsync(StoredFile file, Stream content, CancellationToken cancellationToken)
     {
         if (file.ContentType == "application/pdf")
         {
             using var document = PdfDocument.Open(content);
             var output = new StringBuilder();
+            var pageStarts = new List<int>();
+            var cutOff = false;
             foreach (var page in document.GetPages())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                output.AppendLine(ContentOrderTextExtractor.GetText(page));
-                if (output.Length >= Options.MaxExtractedCharacters) break;
+                if (output.Length >= Options.MaxExtractedCharacters)
+                {
+                    cutOff = true;
+                    break;
+                }
+                // Pages are separated by a blank line so a chunk boundary prefers the page break.
+                if (output.Length > 0) output.Append("\n\n");
+                pageStarts.Add(output.Length);
+                output.Append(ContentOrderTextExtractor.GetText(page).TrimEnd());
             }
-            return output.ToString();
+            return new ExtractedText(output.ToString(), pageStarts, cutOff);
         }
 
         if (!file.ContentType.StartsWith("text/", StringComparison.Ordinal) && file.ContentType != "application/json")
-            return string.Empty;
+            return new ExtractedText(string.Empty, null, false);
         using var reader = new StreamReader(content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false,
             throwOnInvalidBytes: false), detectEncodingFromByteOrderMarks: true,
             bufferSize: 8192, leaveOpen: true);
-        return await reader.ReadToEndAsync(cancellationToken);
+        return new ExtractedText(await reader.ReadToEndAsync(cancellationToken), null, false);
     }
 
     private async Task<string> ExtractImageTextAsync(IServiceProvider services, StoredFile file,

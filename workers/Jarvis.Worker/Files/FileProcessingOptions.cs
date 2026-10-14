@@ -8,11 +8,13 @@ public sealed class FileProcessingOptions
 
     public int MaxExtractedCharacters { get; set; } = 300_000;
 
-    public int ChunkLength { get; set; } = 3_200;
+    /// <summary>About 400 tokens: small enough for a focused embedding and excerpt, large enough to keep a passage whole.</summary>
+    public int ChunkLength { get; set; } = 1_600;
 
-    public int ChunkOverlap { get; set; } = 320;
+    public int ChunkOverlap { get; set; } = 200;
 
-    public int MaxChunks { get; set; } = 120;
+    /// <summary>Enough for <see cref="MaxExtractedCharacters"/> at the default chunk length, so only extraction caps a file.</summary>
+    public int MaxChunks { get; set; } = 400;
 
     public long MaxDownloadBytes { get; set; } = 20 * 1024 * 1024;
 

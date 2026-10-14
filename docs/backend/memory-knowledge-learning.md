@@ -31,10 +31,13 @@ Jarvis combines **structured memory**, **semantic search**, a **temporal knowled
    document frequency within the owner's active memories and by memory length (BM25-style), normalised so 1 means all
    original terms matched. Terms the keyword match missed get a pg_trgm word-similarity score, which catches typos and
    Dutch compounds (`gesprek` in `salarisgesprek`). Each term is looked up through the GIN indexes.
-3. **Semantic retrieval** (when an embedding model is configured): after lexical retrieval completes, the embedding
-   model is resolved and the query is embedded, then pgvector returns cosine similarities. These operations are awaited
-   sequentially because model settings, embedding usage recording, and memory repositories share a scoped database
-   context. If the embedding provider is unavailable, keyword results still answer.
+3. **Semantic retrieval** (when an embedding model is configured): the embedding model is resolved first
+   (`IMemoryEmbedder.ResolveAsync`, the only step that reads the scoped database context), then the query is embedded
+   while the keyword query runs, and pgvector returns cosine similarities. Usage recording uses its own scope, so the
+   provider call never touches the shared context. Query embeddings are cached in-process for 15 minutes
+   (`QueryEmbeddingCache`, keyed by owner, model and text, at most 512 entries), so a regenerated reply or a
+   `SearchMemory` call repeating the chat context's query costs no second call. Only vectors from the same model are
+   compared. If the embedding provider is unavailable, keyword results still answer.
 4. **Hybrid ranking** (`MemoryRanking`): keyword and semantic relevance are fused as a probabilistic OR, then scaled by
    importance, a recency curve (90-day half-life) that recall refreshes, and a log-scaled recall count. A
    score-adaptive cut drops hits below 35% of the best one, near duplicates are skipped, and at most eight remain.
@@ -61,6 +64,43 @@ Retrieval quality and speed are measured offline with `tests/eval/Jarvis.MemoryE
 Agent tools: `SearchMemory`, `ListMemories`, `Remember`, `Forget` (approval). See [agent-tools.md](agent-tools.md).
 
 HTTP CRUD: `/api/v1/memory/*` (`MemoryEndpoints`).
+
+## Uploaded files
+
+Files (PDF, text, JSON, images) are indexed by the worker (`FileProcessingWorkflow`, `StoredFileProcessor`) and searched
+with the same building blocks as memory.
+
+**Indexing**
+
+- Text is extracted with PdfPig (pages joined by a blank line, with each page's start offset kept) or, for images, by the
+  vision model. At most 300,000 characters are kept.
+- `FileTextChunker` cuts windows of 1,600 characters with 200 overlap, ending at a paragraph break, sentence end, line
+  break or space in the window's second half. Each chunk stores its offsets, the page its first character is on, and
+  the nearest Markdown heading above it (`file_content_chunks.heading`, part of the keyword index).
+- When extraction or the chunk limit cut text off, the file is marked `partiallyIndexed`; the API returns it, the
+  Files screen shows "Partly indexed", and `ListFiles` tells the model.
+- `FileChunkIndexer` (run by `MemoryIndexingWorker` every 15 seconds) embeds chunks with the owner's embedding model,
+  file name, page and heading in front of the passage (`FileChunkText.ForIndex`). It backfills older files, re-embeds
+  chunks after a model change (`embedding_model`), and does nothing without an embedding model. Files indexed before
+  page numbers and headings existed get them when they are indexed again (Retry indexing).
+
+**Search** (`FileSearchService`)
+
+1. Keyword retrieval (`FileContentRepository.SearchTextAsync`): the query is analysed by `MemoryQuery` (stopwords
+   dropped, OR-ed terms, prefixes, Dutch–English lexicon) and scored BM25-style over the owner's ready chunks in scope.
+   Only when the keywords find fewer than three chunks do original terms that no chunk contains get a pg_trgm
+   word-similarity pass (typos, compounds), capped at 100 candidates per term, because long chunks make it costly.
+2. Semantic retrieval when the owner has an embedding model and embedded chunks in scope; the query embedding runs
+   alongside the keyword query. pgvector iterative HNSW scans keep owner and scope filters from shortening the list.
+3. `FileRanking` fuses both like `MemoryRanking` (probabilistic OR, relative 35% cut, at most eight) without the memory
+   priors. Scores are 0–1, so file hits now rank fairly against other results in `SearchEverything`.
+4. `SearchFiles` pulls 15 candidates and `FileReranker` (background model, 8 s timeout) keeps up to eight, best first;
+   an unusable answer falls back to the hybrid order.
+5. When a conversation has attached files or collections, `FileContextContributor` searches the latest user message
+   in those sources before every turn and adds up to three passages scoring at least 0.25 (1,500 characters each) with
+   their chunk ids and citations. It never reranks, and a failed search only drops the excerpts.
+
+Quality and speed are measured with `tests/eval/Jarvis.FileEval` (see its README).
 
 ## Journal
 

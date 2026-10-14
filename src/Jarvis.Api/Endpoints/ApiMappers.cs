@@ -67,7 +67,7 @@ internal static class ApiMappers
         item.Action, item.RiskClass, item.ApprovalId, item.Timestamp, item.Success, item.MetadataJson);
 
     public static FileDto ToDto(this Jarvis.Domain.Files.StoredFile file) => new(file.Id, file.FileName,
-        file.ContentType, file.SizeBytes, file.Sha256, file.CreatedAt, file.ProcessingStatus);
+        file.ContentType, file.SizeBytes, file.Sha256, file.CreatedAt, file.ProcessingStatus, file.PartiallyIndexed);
 
     public static MemoryDto ToDto(this Jarvis.Domain.Memory.MemoryRecord memory) => new(memory.Id, memory.Kind,
         memory.Content, memory.Importance, memory.Confidence, memory.CreatedAt, memory.UpdatedAt, memory.ValidUntil,

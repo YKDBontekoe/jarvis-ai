@@ -67,13 +67,22 @@ internal sealed class MemoryReranker(IChatClientResolver chatClients, ILogger<Me
         }
     }
 
+    /// <summary>Applies the model's choice; an unusable answer falls back to the top of the hybrid order.</summary>
+    internal static IReadOnlyList<MemorySearchHit> Select(IReadOnlyList<MemorySearchHit> candidates, string? modelText) =>
+        RerankSelection.Select(candidates, hit => hit.Memory.Id, modelText, MaxKept, FallbackKept);
+}
+
+/// <summary>Parses a reranking model's answer: a JSON array of candidate IDs, most useful first.</summary>
+internal static class RerankSelection
+{
     /// <summary>
-    /// Applies the model's choice: only known IDs, each once, at most <see cref="MaxKept"/>. An unusable or empty
-    /// answer falls back to the top of the hybrid order instead of returning nothing.
+    /// Applies the model's choice: only known IDs, each once, at most <paramref name="maxKept"/>. An unusable or empty
+    /// answer falls back to the top <paramref name="fallbackKept"/> candidates instead of returning nothing.
     /// </summary>
-    internal static IReadOnlyList<MemorySearchHit> Select(IReadOnlyList<MemorySearchHit> candidates, string? modelText)
+    public static IReadOnlyList<T> Select<T>(IReadOnlyList<T> candidates, Func<T, Guid> idOf, string? modelText,
+        int maxKept, int fallbackKept)
     {
-        var chosen = new List<MemorySearchHit>();
+        var chosen = new List<T>();
         try
         {
             var text = modelText ?? string.Empty;
@@ -82,11 +91,12 @@ internal sealed class MemoryReranker(IChatClientResolver chatClients, ILogger<Me
             if (start >= 0 && end > start)
             {
                 using var document = JsonDocument.Parse(text[start..(end + 1)]);
-                var byId = candidates.ToDictionary(hit => hit.Memory.Id);
+                var byId = new Dictionary<Guid, T>();
+                foreach (var candidate in candidates) byId.TryAdd(idOf(candidate), candidate);
                 var included = new HashSet<Guid>();
                 foreach (var item in document.RootElement.EnumerateArray())
                 {
-                    if (chosen.Count >= MaxKept) break;
+                    if (chosen.Count >= maxKept) break;
                     if (item.ValueKind != JsonValueKind.String || !Guid.TryParse(item.GetString(), out var id) ||
                         !included.Add(id) || !byId.TryGetValue(id, out var hit)) continue;
                     chosen.Add(hit);
@@ -97,6 +107,6 @@ internal sealed class MemoryReranker(IChatClientResolver chatClients, ILogger<Me
         {
             chosen.Clear();
         }
-        return chosen.Count > 0 ? chosen : candidates.Take(FallbackKept).ToArray();
+        return chosen.Count > 0 ? chosen : candidates.Take(fallbackKept).ToArray();
     }
 }
