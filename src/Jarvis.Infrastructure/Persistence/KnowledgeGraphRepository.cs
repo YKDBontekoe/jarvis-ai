@@ -88,11 +88,15 @@ public sealed class KnowledgeGraphRepository(JarvisDbContext db) : IKnowledgeGra
 
     public async Task<GraphOverview> GetOverviewAsync(Guid ownerId, int limit, CancellationToken cancellationToken)
     {
+        limit = Math.Clamp(limit, 1, KnowledgeGraphLimits.MaxOverviewEntities);
+        // Roughly what a well-connected graph of this size carries, with the old 400 as the floor.
+        var edgeLimit = Math.Clamp(limit * 8, 400, 8000);
+        var literalLimit = Math.Clamp(limit * 4, 400, 4000);
         var current = db.GraphRelations.AsNoTracking().Where(x => x.OwnerId == ownerId && x.ValidTo == null);
         var degrees = await current.Select(x => x.SubjectId)
             .Concat(current.Where(x => x.ObjectId != null).Select(x => x.ObjectId!.Value))
             .GroupBy(id => id).Select(group => new { Id = group.Key, Count = group.Count() })
-            .OrderByDescending(x => x.Count).Take(Math.Clamp(limit, 1, 150)).ToListAsync(cancellationToken);
+            .OrderByDescending(x => x.Count).Take(limit).ToListAsync(cancellationToken);
         var ids = degrees.Select(x => x.Id).ToHashSet();
         var entities = await db.GraphEntities.AsNoTracking().Where(x => x.OwnerId == ownerId && ids.Contains(x.Id))
             .ToListAsync(cancellationToken);
@@ -100,12 +104,12 @@ public sealed class KnowledgeGraphRepository(JarvisDbContext db) : IKnowledgeGra
             .Where(x => x.ObjectId != null && ids.Contains(x.SubjectId) && ids.Contains(x.ObjectId!.Value))
             .OrderByDescending(x => x.Confidence)
             .Select(x => new { x.SubjectId, ObjectId = x.ObjectId!.Value, x.Predicate, x.Confidence, x.ValidFrom })
-            .Take(400).ToListAsync(cancellationToken);
+            .Take(edgeLimit).ToListAsync(cancellationToken);
         var literalRows = await current
             .Where(x => x.ObjectId == null && !string.IsNullOrEmpty(x.ObjectValue) && ids.Contains(x.SubjectId))
             .OrderByDescending(x => x.Confidence)
             .Select(x => new { x.SubjectId, x.Predicate, x.ObjectValue, x.Confidence, x.ValidFrom })
-            .Take(400).ToListAsync(cancellationToken);
+            .Take(literalLimit).ToListAsync(cancellationToken);
         var edges = edgeRows.Select(x => new GraphEdge(x.SubjectId, x.ObjectId, x.Predicate, x.Confidence, x.ValidFrom))
             .ToArray();
         var literals = literalRows
@@ -319,9 +323,16 @@ public sealed class KnowledgeGraphRepository(JarvisDbContext db) : IKnowledgeGra
                         (ids.Contains(x.SubjectId) || (x.ObjectId != null && ids.Contains(x.ObjectId.Value))))
             .Select(x => new { x.SubjectId, x.ObjectId })
             .ToListAsync(cancellationToken);
+        // One pass instead of a scan per entity: the overview can return a thousand entities.
+        var degree = new Dictionary<Guid, int>();
+        foreach (var row in counts)
+        {
+            degree[row.SubjectId] = degree.GetValueOrDefault(row.SubjectId) + 1;
+            if (row.ObjectId is { } objectId && objectId != row.SubjectId)
+                degree[objectId] = degree.GetValueOrDefault(objectId) + 1;
+        }
         return entities.Select(entity => new GraphEntityRecord(entity.Id, entity.Name, entity.Type, entity.Summary,
-            ParseAliases(entity.AliasesJson),
-            counts.Count(x => x.SubjectId == entity.Id || x.ObjectId == entity.Id), entity.UpdatedAt)).ToArray();
+            ParseAliases(entity.AliasesJson), degree.GetValueOrDefault(entity.Id), entity.UpdatedAt)).ToArray();
     }
 
     private static List<string> ParseAliases(string json)

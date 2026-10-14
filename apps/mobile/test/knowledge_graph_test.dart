@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/memory/graph_layout.dart';
@@ -16,6 +17,7 @@ Future<void> settle(WidgetTester tester) {
 
 void main() {
   graphInsightTests();
+  bigGraphTests();
   test(
     'layout is deterministic, bounded, and keeps the pinned node centered',
     () {
@@ -544,4 +546,114 @@ void graphInsightTests() {
       (type: 'place', count: 1),
     ]);
   });
+}
+
+Map<String, dynamic> _bigOverview(int count) {
+  final types = ['person', 'place', 'organization', 'thing', 'topic'];
+  return {
+    'entities': [
+      {
+        'id': 'n0',
+        'name': 'You',
+        'type': 'person',
+        'aliases': [],
+        'relationCount': count,
+      },
+      for (var i = 1; i < count; i++)
+        {
+          'id': 'n$i',
+          'name': 'Entity $i',
+          'type': types[i % types.length],
+          'aliases': [],
+          'relationCount': 2,
+        },
+    ],
+    'edges': [
+      for (var i = 1; i < count; i++)
+        {'from': 'n0', 'to': 'n$i', 'predicate': 'knows', 'confidence': 0.9},
+      for (var i = 1; i + 7 < count; i += 3)
+        {
+          'from': 'n$i',
+          'to': 'n${i + 7}',
+          'predicate': 'near',
+          'confidence': 0.5,
+        },
+    ],
+  };
+}
+
+void bigGraphTests() {
+  test('big layouts run on a background isolate', () async {
+    final nodes = [for (var i = 0; i < 400; i++) 'n$i'];
+    final GraphLayoutJob job = (
+      nodes: nodes,
+      edges: [for (var i = 1; i < 400; i++) ('n0', 'n$i')],
+      pinned: 'n0',
+      groups: const {},
+    );
+    final layout = await KnowledgeGraphScreen.runLargeLayout(job);
+    expect(layout, hasLength(400));
+    expect(layout['n0'], const Offset(.5, .5));
+    expect(layout, layoutGraphJob(job));
+  });
+
+  testWidgets(
+    'a graph of hundreds of entities paints minor nodes and pages the list',
+    (tester) async {
+      tester.view.physicalSize = const Size(430, 932);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final http = FixtureHttp();
+      http.on('GET', '/api/v1/graph/overview', _bigOverview(800));
+      http.on('GET', '/api/v1/memory/index-status', {
+        'active': 1,
+        'embedded': 1,
+        'graphIndexed': 1,
+        'embeddingModel': 'x',
+      });
+      final runLayout = KnowledgeGraphScreen.runLargeLayout;
+      KnowledgeGraphScreen.runLargeLayout = (job) async => layoutGraphJob(job);
+      addTearDown(() => KnowledgeGraphScreen.runLargeLayout = runLayout);
+
+      // Dio decodes large responses on an isolate, which never finishes under the fake test clock.
+      final client = http.client()..transformer = FusedTransformer();
+      await tester.pumpWidget(
+        MaterialApp(home: KnowledgeGraphScreen(http: client)),
+      );
+      await settle(tester);
+
+      expect(
+        http.sent('GET', '/api/v1/graph/overview').single.query['limit'],
+        1000,
+      );
+      expect(find.textContaining('800 entities'), findsOneWidget);
+      final nodeWidgets = find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.startsWith('node-'),
+      );
+      expect(nodeWidgets, findsWidgets);
+      expect(nodeWidgets.evaluate().length, lessThan(200));
+      expect(find.byKey(const Key('node-You')), findsOneWidget);
+
+      await tester.drag(
+        find.byType(DraggableScrollableSheet),
+        const Offset(0, -500),
+        warnIfMissed: false,
+      );
+      await settle(tester);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('graph-list-more')),
+        400,
+        scrollable: find
+            .descendant(
+              of: find.byType(DraggableScrollableSheet),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(find.text('Show 80 more of 720'), findsOneWidget);
+    },
+  );
 }

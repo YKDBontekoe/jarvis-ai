@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
@@ -20,8 +21,17 @@ part 'knowledge_graph_viewport.dart';
 part 'knowledge_graph_sheet.dart';
 
 const _sheetPeek = 0.34;
-const _minScale = 0.12;
+const _minScale = 0.04;
+
+/// Matches the server's cap (`KnowledgeGraphLimits.MaxOverviewEntities`).
+const _overviewLimit = 1000;
+
+/// Layouts bigger than this run on a background isolate so the screen stays responsive.
+const _isolateLayoutAbove = 250;
 const _maxScale = 3.2;
+
+/// Entity rows built per page; big graphs would otherwise build a thousand tiles on every rebuild.
+const _listPage = 80;
 
 /// Highlights only help once a graph is too big to take in at a glance.
 const _highlightsMinimum = 6;
@@ -58,6 +68,12 @@ class KnowledgeGraphScreen extends StatefulWidget {
   const KnowledgeGraphScreen({required this.http, super.key});
 
   final Dio http;
+
+  /// Lays out big graphs off the UI thread. Widget tests swap in a synchronous runner because isolates don't finish
+  /// under the fake test clock.
+  @visibleForTesting
+  static Future<Map<String, Offset>> Function(GraphLayoutJob job)
+  runLargeLayout = (job) => compute(layoutGraphJob, job);
 
   @override
   State<KnowledgeGraphScreen> createState() => _KnowledgeGraphScreenState();
@@ -96,6 +112,7 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
   int _reveal = 0;
   int _revealed = 0;
   int _requestRevision = 0;
+  int _listLimit = _listPage;
 
   Future<void> _load() async {
     final revision = ++_requestRevision;
@@ -103,7 +120,7 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
       final responses = await Future.wait([
         widget.http.get<dynamic>(
           '/api/v1/graph/overview',
-          queryParameters: const {'limit': 120},
+          queryParameters: const {'limit': _overviewLimit},
         ),
         widget.http.get<dynamic>('/api/v1/memory/index-status'),
       ]);
@@ -122,6 +139,15 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
         pairs,
         hubs: {for (final node in yous) node.id},
       );
+      final GraphLayoutJob job = (
+        nodes: ids,
+        edges: pairs,
+        pinned: yous.firstOrNull?.id,
+        groups: communities,
+      );
+      final layout = ids.length > _isolateLayoutAbove
+          ? await KnowledgeGraphScreen.runLargeLayout(job)
+          : layoutGraphJob(job);
       if (!mounted || revision != _requestRevision) return;
       _replay.stop();
       setState(() {
@@ -130,12 +156,7 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
         _firstSeen = nodeFirstSeen(snapshot);
         _range = graphTimeRange(snapshot);
         if (_range == null) _timeTravel = false;
-        _layout = layoutGraph(
-          ids,
-          pairs,
-          pinned: yous.firstOrNull?.id,
-          groups: communities,
-        );
+        _layout = layout;
         _applyTime(_timeTravel ? _asOf : null);
         _status = jsonObject(responses[1].data);
         _world = _worldFor(snapshot.nodes.length);
@@ -222,15 +243,18 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
   }
 
   /// Node diameter in screen pixels: hubs read bigger, the user's own node biggest.
-  /// Grows a little as you zoom in so the overview stays uncluttered and close-ups get room for icons.
+  /// Grows a little as you zoom in so the overview stays uncluttered and close-ups get room for icons. Dense graphs
+  /// shrink nodes toward the typical on-screen gap between them, so hundreds of entities read as a map, not a blob.
   double _nodeDiameter(GraphNode node) {
-    final zoom = math
-        .sqrt(_transform.value.getMaxScaleOnAxis() / .6)
-        .clamp(.72, 1.25);
-    if (node.isYou) return 30 * zoom;
+    final scale = _scale;
+    final zoom = math.sqrt(scale / .6).clamp(.72, 1.25);
+    final spacing =
+        _world * scale * .8 / math.sqrt(math.max(1, _snapshot.nodes.length));
+    final density = (spacing / 34).clamp(.28, 1.0);
+    if (node.isYou) return math.max(16, 30 * zoom * density);
     final degree = _degrees[node.id] ?? 0;
     final weight = math.sqrt(degree / _maxDegree).clamp(0.0, 1.0);
-    return (11 + weight * 15) * zoom;
+    return math.max(4, (11 + weight * 15) * zoom * density);
   }
 
   bool _isRecent(GraphNode node) {
@@ -242,19 +266,53 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
 
   double _worldFor(int count) {
     final n = math.max(count, 1);
-    return (860 + math.sqrt(n) * 120).clamp(980, 1760).toDouble();
+    return (860 + math.sqrt(n) * 120).clamp(980, 5000).toDouble();
   }
 
   bool _passesType(GraphNode node) =>
       _types == null || _types!.contains(node.type);
 
-  List<GraphNode> get _typedNodes => sortedGraphNodes(
-    _snapshot.nodes.where(_passesType).toList(growable: false),
-  );
+  /// Visible nodes, cached until the time slice or type filter changes: the map asks on every pan frame.
+  List<GraphNode> get _typedNodes {
+    if (!identical(_typedFor, _snapshot) || _typedTypes != _types) {
+      _typedFor = _snapshot;
+      _typedTypes = _types;
+      _typedCache = sortedGraphNodes(
+        _snapshot.nodes.where(_passesType).toList(growable: false),
+      );
+    }
+    return _typedCache;
+  }
 
-  List<GraphNode> get _listedNodes => _typedNodes
-      .where((node) => nodeMatchesQuery(node, _snapshot, _query.text))
-      .toList(growable: false);
+  GraphSnapshot? _typedFor;
+  Set<String>? _typedTypes;
+  List<GraphNode> _typedCache = const [];
+
+  /// Ids of visible nodes matching the search, cached per query.
+  Set<String> get _matched {
+    final query = _query.text.trim();
+    final nodes = _typedNodes;
+    if (_matchedQuery != query || !identical(_matchedNodes, nodes)) {
+      _matchedQuery = query;
+      _matchedNodes = nodes;
+      _matchedCache = {
+        for (final node in nodes)
+          if (nodeMatchesQuery(node, _snapshot, query)) node.id,
+      };
+    }
+    return _matchedCache;
+  }
+
+  String? _matchedQuery;
+  List<GraphNode>? _matchedNodes;
+  Set<String> _matchedCache = const {};
+
+  List<GraphNode> get _listedNodes {
+    final matched = _matched;
+    return _typedNodes
+        .where((node) => matched.contains(node.id))
+        .toList(growable: false);
+  }
 
   Offset _worldPoint(String id) {
     final point = _layout[id] ?? const Offset(.5, .5);
@@ -262,6 +320,9 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
     final span = math.max(_world - pad * 2, 1.0);
     return Offset(pad + point.dx * span, pad + point.dy * span);
   }
+
+  /// Current zoom. Not `getMaxScaleOnAxis`, which also counts the untouched z axis and so never reports below 1.
+  double get _scale => _transform.value.storage[0];
 
   Matrix4 _placed(double scale, double dx, double dy) {
     final matrix = Matrix4.identity();
@@ -310,7 +371,7 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
 
   void _zoomBy(double factor) {
     if (_viewport.isEmpty) return;
-    final current = _transform.value.getMaxScaleOnAxis();
+    final current = _scale;
     final next = (current * factor).clamp(_minScale, _maxScale);
     if ((next - current).abs() < 0.01) return;
     final focal = Offset(_viewport.width / 2, _viewport.height * .32);
@@ -331,7 +392,7 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
   void _focusOn(String id) {
     if (_viewport.isEmpty) return;
     final scene = _worldPoint(id);
-    final current = _transform.value.getMaxScaleOnAxis();
+    final current = _scale;
     final next = math.max(current, math.min(1.15, _maxScale));
     final focal = Offset(_viewport.width / 2, _viewport.height * .3);
     _animateTo(

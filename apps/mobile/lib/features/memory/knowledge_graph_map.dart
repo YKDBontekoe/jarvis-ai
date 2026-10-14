@@ -325,30 +325,34 @@ class _MapEdge {
   final String? label;
 }
 
+/// Edges past which the base layer drops gradients and dashes: both cost a lot per edge at thousands of edges.
+const _simpleEdgesAbove = 1500;
+
+/// The static map: background grid, circle halos, and every edge that isn't highlighted.
 class _GraphPainter extends CustomPainter {
   _GraphPainter({
     required this.edges,
     required this.halos,
     required this.colors,
-    required this.flow,
+    this.flow,
   }) : super(repaint: flow);
 
   final List<_MapEdge> edges;
   final List<_Halo> halos;
   final JarvisColors colors;
-  final Animation<double> flow;
+  final Animation<double>? flow;
 
   @override
   void paint(Canvas canvas, Size size) {
     final dot = Paint()..color = colors.outline.withValues(alpha: .7);
-    for (var x = 22.0; x < size.width; x += 28) {
-      for (var y = 22.0; y < size.height; y += 28) {
+    final spacing = math.max(28.0, size.width / 70);
+    for (var x = 22.0; x < size.width; x += spacing) {
+      for (var y = 22.0; y < size.height; y += spacing) {
         canvas.drawCircle(Offset(x, y), 1.1, dot);
       }
     }
     _paintHalos(canvas, size);
-    final flowing = flow.value < 1;
-    final labelRects = <Rect>[];
+    final simple = edges.length > _simpleEdgesAbove;
     for (final edge in edges) {
       final control = _control(edge);
       final path = Path()
@@ -357,57 +361,76 @@ class _GraphPainter extends CustomPainter {
       final paint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = edge.width
-        ..strokeCap = StrokeCap.round
-        ..shader = ui.Gradient.linear(edge.from, edge.to, [
+        ..strokeCap = StrokeCap.round;
+      if (simple) {
+        paint.color = Color.lerp(
+          edge.fromColor,
+          edge.toColor,
+          .5,
+        )!.withValues(alpha: edge.alpha * (edge.dashed ? .6 : 1));
+      } else {
+        paint.shader = ui.Gradient.linear(edge.from, edge.to, [
           edge.fromColor.withValues(alpha: edge.alpha),
           edge.toColor.withValues(alpha: edge.alpha),
         ]);
-      canvas.drawPath(edge.dashed ? _dash(path) : path, paint);
-      if (!edge.prominent) continue;
-      _arrow(canvas, edge, control);
-      if (flowing) _particles(canvas, edge, control);
-      final label = edge.label;
-      if (label == null || label.isEmpty) continue;
-      final painter = TextPainter(
-        text: TextSpan(
-          text: label,
-          style: TextStyle(
-            fontFamily: 'Geist',
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: colors.inkSoft,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout(maxWidth: 120);
-      // Away from the selection, so labels of a busy hub don't stack up around it.
-      final mid = _point(
-        edge.from,
-        control,
-        edge.to,
-        edge.flowsOut ? .62 : .38,
-      );
-      final origin = mid - Offset(painter.width / 2, painter.height / 2);
-      final rect = Rect.fromLTWH(
-        origin.dx - 5,
-        origin.dy - 2,
-        painter.width + 10,
-        painter.height + 4,
-      );
-      if (labelRects.any(rect.inflate(3).overlaps)) continue;
-      labelRects.add(rect);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(6)),
-        Paint()..color = colors.surface.withValues(alpha: .94),
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(6)),
-        Paint()
-          ..color = edge.toColor.withValues(alpha: .5)
-          ..style = PaintingStyle.stroke,
-      );
-      painter.paint(canvas, origin);
+      }
+      canvas.drawPath(edge.dashed && !simple ? _dash(path) : path, paint);
     }
+  }
+
+  void _paintEdge(Canvas canvas, _MapEdge edge, List<Rect> labelRects) {
+    final flowing = (flow?.value ?? 1) < 1;
+    final control = _control(edge);
+    final path = Path()
+      ..moveTo(edge.from.dx, edge.from.dy)
+      ..quadraticBezierTo(control.dx, control.dy, edge.to.dx, edge.to.dy);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = edge.width
+      ..strokeCap = StrokeCap.round
+      ..shader = ui.Gradient.linear(edge.from, edge.to, [
+        edge.fromColor.withValues(alpha: edge.alpha),
+        edge.toColor.withValues(alpha: edge.alpha),
+      ]);
+    canvas.drawPath(edge.dashed ? _dash(path) : path, paint);
+    _arrow(canvas, edge, control);
+    if (flowing) _particles(canvas, edge, control);
+    final label = edge.label;
+    if (label == null || label.isEmpty) return;
+    final painter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          fontFamily: 'Geist',
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: colors.inkSoft,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: 120);
+    // Away from the selection, so labels of a busy hub don't stack up around it.
+    final mid = _point(edge.from, control, edge.to, edge.flowsOut ? .62 : .38);
+    final origin = mid - Offset(painter.width / 2, painter.height / 2);
+    final rect = Rect.fromLTWH(
+      origin.dx - 5,
+      origin.dy - 2,
+      painter.width + 10,
+      painter.height + 4,
+    );
+    if (labelRects.any(rect.inflate(3).overlaps)) return;
+    labelRects.add(rect);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(6)),
+      Paint()..color = colors.surface.withValues(alpha: .94),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(6)),
+      Paint()
+        ..color = edge.toColor.withValues(alpha: .5)
+        ..style = PaintingStyle.stroke,
+    );
+    painter.paint(canvas, origin);
   }
 
   void _paintHalos(Canvas canvas, Size size) {
@@ -434,10 +457,11 @@ class _GraphPainter extends CustomPainter {
   }
 
   void _particles(Canvas canvas, _MapEdge edge, Offset control) {
-    final fade = 1 - Curves.easeIn.transform(flow.value);
+    final value = flow?.value ?? 1;
+    final fade = 1 - Curves.easeIn.transform(value);
     final paint = Paint()..color = edge.toColor.withValues(alpha: .9 * fade);
     for (var index = 0; index < 3; index++) {
-      var t = (flow.value * 2.4 + index / 3) % 1;
+      var t = (value * 2.4 + index / 3) % 1;
       if (!edge.flowsOut) t = 1 - t;
       canvas.drawCircle(
         _point(edge.from, control, edge.to, t),
@@ -502,4 +526,61 @@ class _GraphPainter extends CustomPainter {
       oldDelegate.halos != halos ||
       oldDelegate.colors != colors ||
       oldDelegate.flow != flow;
+}
+
+/// Highlighted edges of the selection, repainted on their own while particles flow along them.
+class _HighlightPainter extends _GraphPainter {
+  _HighlightPainter({
+    required super.edges,
+    required super.colors,
+    required Animation<double> super.flow,
+  }) : super(halos: const []);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final labelRects = <Rect>[];
+    for (final edge in edges) {
+      _paintEdge(canvas, edge, labelRects);
+    }
+  }
+}
+
+class _Dot {
+  const _Dot({
+    required this.center,
+    required this.radius,
+    required this.color,
+    required this.alpha,
+  });
+
+  final Offset center;
+  final double radius;
+  final Color color;
+  final double alpha;
+}
+
+/// Minor nodes of a crowded map, drawn in one pass in screen space instead of as widgets.
+class _DotPainter extends CustomPainter {
+  const _DotPainter({required this.dots, required this.outline});
+
+  final List<_Dot> dots;
+  final Color outline;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final fill = Paint();
+    for (final dot in dots) {
+      fill.color = dot.color.withValues(alpha: dot.alpha);
+      ring.color = outline.withValues(alpha: dot.alpha);
+      canvas.drawCircle(dot.center, dot.radius, fill);
+      canvas.drawCircle(dot.center, dot.radius, ring);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotPainter oldDelegate) =>
+      oldDelegate.dots != dots || oldDelegate.outline != outline;
 }

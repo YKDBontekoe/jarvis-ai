@@ -2,6 +2,10 @@ part of 'knowledge_graph_screen.dart';
 
 const _maxSatellites = 7;
 
+/// Above this many on-screen nodes, only the ones that matter right now (selection, neighbours, labelled, search hits)
+/// are widgets; the rest are painted as dots in one pass, which keeps a thousand-node graph smooth to pan.
+const _widgetNodeLimit = 160;
+
 mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
   Widget _map(double coveredBySheet) => LayoutBuilder(
     builder: (context, constraints) {
@@ -30,16 +34,8 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
                   height: _world,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: _clearSelection,
-                    child: CustomPaint(
-                      painter: _GraphPainter(
-                        edges: _mapEdges(),
-                        halos: _halos(),
-                        colors: colors,
-                        flow: _pulse,
-                      ),
-                      size: Size(_world, _world),
-                    ),
+                    onTapUp: (details) => _tapWorld(details.localPosition),
+                    child: _edgeLayers(colors),
                   ),
                 ),
               ),
@@ -80,23 +76,67 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
     },
   );
 
+  /// Static edges sit behind a repaint boundary so panning never repaints them; only the highlighted edges animate.
+  Widget _edgeLayers(JarvisColors colors) {
+    final edges = _mapEdges();
+    final size = Size(_world, _world);
+    return Stack(
+      children: [
+        RepaintBoundary(
+          child: CustomPaint(
+            size: size,
+            painter: _GraphPainter(
+              edges: [
+                for (final edge in edges)
+                  if (!edge.prominent) edge,
+              ],
+              halos: _halos(),
+              colors: colors,
+            ),
+          ),
+        ),
+        CustomPaint(
+          size: size,
+          painter: _HighlightPainter(
+            edges: [
+              for (final edge in edges)
+                if (edge.prominent) edge,
+            ],
+            colors: colors,
+            flow: _pulse,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Taps on the map select the nearest painted node, or clear the selection on empty space.
+  void _tapWorld(Offset world) {
+    final scale = _scale;
+    GraphNode? best;
+    var bestDistance = double.infinity;
+    for (final node in _typedNodes) {
+      final reach = (_nodeDiameter(node) / 2 + 8) / scale;
+      final distance = (_worldPoint(node.id) - world).distance;
+      if (distance <= reach && distance < bestDistance) {
+        best = node;
+        bestDistance = distance;
+      }
+    }
+    if (best == null) {
+      _clearSelection();
+    } else {
+      _select(best.id);
+    }
+  }
+
   Widget _nodeLayer(Size viewport) {
     final query = _query.text;
-    final matched = {
-      for (final node in _typedNodes)
-        if (nodeMatchesQuery(node, _snapshot, query)) node.id,
-    };
+    final matched = _matched;
     final hops = _hops;
-    final ranked = [..._typedNodes]
-      ..sort((a, b) {
-        final rankA = _labelRank(a, matched, query, hops);
-        final rankB = _labelRank(b, matched, query, hops);
-        if (rankA != rankB) return rankA.compareTo(rankB);
-        return (_degrees[b.id] ?? 0).compareTo(_degrees[a.id] ?? 0);
-      });
     final positions = <String, Offset>{};
-    final obstacles = <Rect>[];
-    for (final node in ranked) {
+    final onScreen = <GraphNode>[];
+    for (final node in _typedNodes) {
       final screen = MatrixUtils.transformPoint(
         _transform.value,
         _worldPoint(node.id),
@@ -108,11 +148,23 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
         continue;
       }
       positions[node.id] = screen;
-      if (_emphasis(node, matched, query, hops) >= .5) {
-        // Only the core of each dot blocks a label, so dense areas still get some names.
-        obstacles.add(
-          Rect.fromCircle(center: screen, radius: _nodeDiameter(node) * .3),
-        );
+      onScreen.add(node);
+    }
+    final ranked = onScreen
+      ..sort((a, b) {
+        final rankA = _labelRank(a, matched, query, hops);
+        final rankB = _labelRank(b, matched, query, hops);
+        if (rankA != rankB) return rankA.compareTo(rankB);
+        return (_degrees[b.id] ?? 0).compareTo(_degrees[a.id] ?? 0);
+      });
+    final obstacles = <Rect>[];
+    for (final node in ranked) {
+      final screen = positions[node.id]!;
+      final diameter = _nodeDiameter(node);
+      if (_emphasis(node, matched, query, hops) >= .5 && diameter >= 10) {
+        // Only the core of each real-sized dot blocks a label, so dense areas still get some names; the label's
+        // backdrop covers the tiny dots of a zoomed-out crowd.
+        obstacles.add(Rect.fromCircle(center: screen, radius: diameter * .3));
       }
     }
 
@@ -124,17 +176,16 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
     obstacles.addAll(satellites.map((satellite) => satellite.rect));
 
     // Fewer names when zoomed out so the map reads as shapes first, then detail as you zoom in.
-    final scale = _transform.value.getMaxScaleOnAxis();
-    final budget = scale < .45 ? 10 : (scale < .8 ? 22 : 1 << 20);
+    final scale = _scale;
+    final budget = scale < .45 ? 12 : (scale < .8 ? 24 : null);
     final anchors = <({String id, Offset anchor, bool force})>[];
-    var unforced = 0;
     for (final node in ranked) {
+      // Candidates beyond the first few hundred never win a spot; skipping them keeps panning cheap.
+      if (anchors.length >= 300) break;
       final screen = positions[node.id];
       if (screen == null) continue;
       if (_emphasis(node, matched, query, hops) < .5) continue;
       final force = node.id == _selectedId || node.isYou;
-      if (!force && unforced >= budget) continue;
-      if (!force) unforced++;
       anchors.add((
         id: node.id,
         anchor: screen + Offset(0, _hitExtent(node) / 2 - 13),
@@ -143,6 +194,7 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
     }
     final labels = chooseLabelIds(
       anchors,
+      maxLabels: budget,
       obstacles: obstacles,
       widths: {
         for (final anchor in anchors)
@@ -153,8 +205,41 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
       },
     );
     final colors = JarvisColors.of(context);
+    final crowded = ranked.length > _widgetNodeLimit;
+    final widgets = <GraphNode>[];
+    final dots = <_Dot>[];
+    for (final node in ranked.reversed) {
+      final emphasis = _emphasis(node, matched, query, hops);
+      final featured =
+          !crowded ||
+          node.id == _selectedId ||
+          node.isYou ||
+          labels.contains(node.id) ||
+          (_selectedId != null && hops[node.id] == 1) ||
+          (query.trim().isNotEmpty && matched.contains(node.id));
+      if (featured) {
+        widgets.add(node);
+      } else {
+        dots.add(
+          _Dot(
+            center: positions[node.id]!,
+            radius: _nodeDiameter(node) / 2,
+            color: graphTypeColor(node.type, context),
+            alpha: emphasis,
+          ),
+        );
+      }
+    }
     return Stack(
       children: [
+        if (dots.isNotEmpty)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _DotPainter(dots: dots, outline: colors.surface),
+              ),
+            ),
+          ),
         if (selectedAt != null && satellites.isNotEmpty)
           Positioned.fill(
             child: IgnorePointer(
@@ -174,7 +259,7 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
             ),
           ),
         // Least important first so labels and the selection are painted on top.
-        for (final node in ranked.reversed)
+        for (final node in widgets)
           if (positions[node.id] case final screen?)
             Positioned(
               left: screen.dx - 56,
@@ -322,10 +407,7 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
   List<_MapEdge> _mapEdges() {
     final shown = _typedNodes.map((node) => node.id).toSet();
     final query = _query.text.trim();
-    final matched = {
-      for (final node in _typedNodes)
-        if (nodeMatchesQuery(node, _snapshot, query)) node.id,
-    };
+    final matched = _matched;
     final selected = _selectedId;
     final hops = _hops;
     final prominent = <int>[];

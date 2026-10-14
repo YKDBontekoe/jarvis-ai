@@ -12,6 +12,12 @@ public static class GraphEntityTypes
     }
 }
 
+public static class KnowledgeGraphLimits
+{
+    /// <summary>Most entities the graph overview returns; the mobile map is built to stay smooth at this size.</summary>
+    public const int MaxOverviewEntities = 1000;
+}
+
 public sealed record GraphEntityRecord(Guid Id, string Name, string Type, string? Summary,
     IReadOnlyList<string> Aliases, int RelationCount, DateTimeOffset UpdatedAt);
 

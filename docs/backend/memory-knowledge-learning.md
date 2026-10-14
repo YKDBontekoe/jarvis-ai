@@ -81,6 +81,10 @@ Entities (people, places, projects, …) with facts, relations, and timelines.
   shared halo and pull together in the layout. Selecting a node highlights its two-step neighbourhood and rings its
   literal details around it. "Time travel" replays the graph by fact `validFrom`; the sheet's Highlights list hubs,
   circles, and recently learned facts.
+- Scale: `GET /api/v1/graph/overview?limit=` returns up to `KnowledgeGraphLimits.MaxOverviewEntities` (1000) entities;
+  edge and literal caps grow with the limit. The map lays out graphs above 250 nodes on a background isolate with a
+  grid-accelerated force layout, paints minor nodes on a canvas once more than 160 are on screen (selection,
+  neighbours, labelled hubs, and search hits stay widgets), shrinks dots with density, and pages the entity list.
 
 Embeddings and graph persistence live in Infrastructure + `Jarvis.Memory` helpers.
 

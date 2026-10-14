@@ -9,7 +9,7 @@ internal static class KnowledgeGraphEndpoints
     {
         api.MapGet("/graph/overview", async (int? limit, IKnowledgeGraphRepository graph, ICurrentUser currentUser,
                 CancellationToken ct) =>
-                Results.Ok(await graph.GetOverviewAsync(currentUser.OwnerId, Math.Clamp(limit ?? 60, 1, 150), ct)))
+                Results.Ok(await graph.GetOverviewAsync(currentUser.OwnerId, Math.Clamp(limit ?? 60, 1, KnowledgeGraphLimits.MaxOverviewEntities), ct)))
             .WithName("GetKnowledgeGraphOverview");
 
         api.MapGet("/graph/entities", async (string? search, IKnowledgeGraphRepository graph, ICurrentUser currentUser,

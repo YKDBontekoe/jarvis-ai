@@ -70,11 +70,27 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
                       style: TextStyle(color: JarvisColors.of(context).inkSoft),
                     ),
                   )
-                else
+                else ...[
                   GroupedSection(
                     dividerIndent: 60,
-                    children: [for (final node in listed) _entityTile(node)],
+                    children: [
+                      for (final node in listed.take(_listLimit))
+                        _entityTile(node),
+                    ],
                   ),
+                  if (listed.length > _listLimit)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: TextButton(
+                        key: const Key('graph-list-more'),
+                        onPressed: () =>
+                            setState(() => _listLimit += _listPage),
+                        child: Text(
+                          'Show ${math.min(_listPage, listed.length - _listLimit)} more of ${listed.length - _listLimit}',
+                        ),
+                      ),
+                    ),
+                ],
               ],
             ),
           ),

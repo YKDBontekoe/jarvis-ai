@@ -150,12 +150,14 @@ class GraphSnapshot {
 
   GraphNode? node(String? id) {
     if (id == null) return null;
-    for (final node in nodes) {
-      if (node.id == id) return node;
-    }
-    return null;
+    return (_nodeIndex[this] ??= {for (final node in nodes) node.id: node})[id];
   }
 }
+
+// Lookups are cached per snapshot so graphs with a thousand entities stay linear instead of quadratic.
+final _nodeIndex = Expando<Map<String, GraphNode>>('graphNodeIndex');
+final _factIndex = Expando<Map<String, List<GraphFactView>>>('graphFactIndex');
+final _searchText = Expando<Map<String, String>>('graphSearchText');
 
 GraphSnapshot parseGraphOverview(Map<String, dynamic> overview) {
   final nodes = <GraphNode>[];
@@ -247,30 +249,37 @@ List<String> graphTypesPresent(List<GraphNode> nodes) {
   ];
 }
 
-List<GraphFactView> factsFor(String id, GraphSnapshot snapshot) {
-  final self = snapshot.node(id);
-  if (self == null) return const [];
-  final facts = <GraphFactView>[];
+List<GraphFactView> factsFor(String id, GraphSnapshot snapshot) =>
+    (_factIndex[snapshot] ??= _indexFacts(snapshot))[id] ?? const [];
+
+Map<String, List<GraphFactView>> _indexFacts(GraphSnapshot snapshot) {
+  final index = <String, List<GraphFactView>>{};
+  void add(String id, GraphFactView fact) =>
+      (index[id] ??= <GraphFactView>[]).add(fact);
   for (final link in snapshot.links) {
-    if (link.fromId == id) {
-      facts.add(
+    final from = snapshot.node(link.fromId);
+    final to = snapshot.node(link.toId);
+    if (from != null) {
+      add(
+        link.fromId,
         GraphFactView(
-          subjectName: self.name,
+          subjectName: from.name,
           predicate: link.predicate,
-          objectLabel: snapshot.node(link.toId)?.name ?? 'Unknown',
+          objectLabel: to?.name ?? 'Unknown',
           incoming: false,
           otherId: link.toId,
           confidence: link.confidence,
           validFrom: link.validFrom,
         ),
       );
-    } else if (link.toId == id) {
-      final subject = snapshot.node(link.fromId);
-      facts.add(
+    }
+    if (to != null) {
+      add(
+        link.toId,
         GraphFactView(
-          subjectName: subject?.name ?? 'Unknown',
+          subjectName: from?.name ?? 'Unknown',
           predicate: link.predicate,
-          objectLabel: self.name,
+          objectLabel: to.name,
           incoming: true,
           otherId: link.fromId,
           confidence: link.confidence,
@@ -280,8 +289,10 @@ List<GraphFactView> factsFor(String id, GraphSnapshot snapshot) {
     }
   }
   for (final literal in snapshot.literals) {
-    if (literal.entityId != id) continue;
-    facts.add(
+    final self = snapshot.node(literal.entityId);
+    if (self == null) continue;
+    add(
+      literal.entityId,
       GraphFactView(
         subjectName: self.name,
         predicate: literal.predicate,
@@ -293,13 +304,15 @@ List<GraphFactView> factsFor(String id, GraphSnapshot snapshot) {
       ),
     );
   }
-  facts.sort((a, b) {
-    if (a.incoming != b.incoming) return a.incoming ? 1 : -1;
-    final byConfidence = (b.confidence ?? 0).compareTo(a.confidence ?? 0);
-    if (byConfidence != 0) return byConfidence;
-    return a.compact.compareTo(b.compact);
-  });
-  return facts;
+  for (final facts in index.values) {
+    facts.sort((a, b) {
+      if (a.incoming != b.incoming) return a.incoming ? 1 : -1;
+      final byConfidence = (b.confidence ?? 0).compareTo(a.confidence ?? 0);
+      if (byConfidence != 0) return byConfidence;
+      return a.compact.compareTo(b.compact);
+    });
+  }
+  return index;
 }
 
 String factPreview(List<GraphFactView> facts, {int limit = 2}) => facts
@@ -315,28 +328,24 @@ String factPreview(List<GraphFactView> facts, {int limit = 2}) => facts
 bool nodeMatchesQuery(GraphNode node, GraphSnapshot snapshot, String query) {
   final needle = query.trim().toLowerCase();
   if (needle.isEmpty) return true;
-  bool has(String? value) =>
-      value != null && value.toLowerCase().contains(needle);
-  if (has(node.name) ||
-      has(node.type) ||
-      has(graphTypeLabel(node.type)) ||
-      has(node.summary)) {
-    return true;
-  }
-  if (node.aliases.any((alias) => alias.toLowerCase().contains(needle))) {
-    return true;
-  }
-  for (final fact in factsFor(node.id, snapshot)) {
-    if (has(fact.predicate) ||
-        has(humanPredicate(fact.predicate)) ||
-        has(fact.objectLabel) ||
-        has(fact.subjectName) ||
-        has(fact.sentence)) {
-      return true;
-    }
-  }
-  return false;
+  final haystacks = _searchText[snapshot] ??= {};
+  final text = haystacks[node.id] ??= _searchableText(node, snapshot);
+  return text.contains(needle);
 }
+
+/// Everything a search can hit for [node], lower-cased once. Fields are joined with a separator no query contains,
+/// so a match never spans two fields.
+String _searchableText(GraphNode node, GraphSnapshot snapshot) => [
+  node.name,
+  node.type,
+  graphTypeLabel(node.type),
+  ?node.summary,
+  ...node.aliases,
+  for (final fact in factsFor(node.id, snapshot)) ...[
+    fact.predicate,
+    fact.sentence,
+  ],
+].map((value) => value.toLowerCase()).join('\u0000');
 
 String graphStatsLabel({
   required int entities,
@@ -382,10 +391,13 @@ Set<String> chooseLabelIds(
   double gap = 6,
   List<Rect> obstacles = const [],
   Map<String, double> widths = const {},
+  int? maxLabels,
 }) {
   final occupied = <Rect>[];
   final chosen = <String>{};
+  var optional = 0;
   for (final anchor in anchors) {
+    if (!anchor.force && maxLabels != null && optional >= maxLabels) continue;
     final rect = Rect.fromCenter(
       center: anchor.anchor + const Offset(0, 24),
       width: widths[anchor.id] ?? labelWidth,
@@ -395,6 +407,7 @@ Set<String> chooseLabelIds(
         occupied.any(rect.overlaps) ||
         obstacles.any((obstacle) => obstacle.deflate(2).overlaps(rect));
     if (!anchor.force && blocked) continue;
+    if (!anchor.force) optional++;
     chosen.add(anchor.id);
     occupied.add(rect);
   }
@@ -522,8 +535,8 @@ Map<String, int> graphNeighborhood(
 
 /// Groups nodes that know each other, ignoring [hubs] (usually "You", who links to everything).
 ///
-/// Deterministic label propagation: each node repeatedly adopts the label most common among its neighbours, ties
-/// broken by the smallest label. Returns a group index per node; nodes without links outside [hubs] get none.
+/// Deterministic label propagation: each node repeatedly adopts the label most common among its neighbours, keeping
+/// its own label on a tie. Returns a group index per node; nodes without links outside [hubs] get none.
 Map<String, int> graphCommunities(
   List<String> nodes,
   List<(String, String)> edges, {
@@ -548,10 +561,12 @@ Map<String, int> graphCommunities(
         final value = label[other]!;
         counts[value] = (counts[value] ?? 0) + 1;
       }
+      // Keeping the current label on ties stops one label from snowballing across a large, loosely knit graph.
       var best = label[node]!;
-      var bestCount = 0;
+      var bestCount = counts[best] ?? 0;
       for (final MapEntry(key: value, value: count) in counts.entries) {
-        if (count > bestCount || (count == bestCount && value < best)) {
+        if (count > bestCount ||
+            (count == bestCount && value < best && bestCount == 0)) {
           best = value;
           bestCount = count;
         }
@@ -577,15 +592,22 @@ class GraphCluster {
   final List<String> memberIds;
 }
 
-/// Groups of three or more, largest first.
-List<GraphCluster> graphClusters(Map<String, int> communities) {
+/// Groups of three or more, largest first. A group holding more than [maxShare] of all grouped nodes says nothing
+/// ("everyone knows everyone") and is dropped.
+List<GraphCluster> graphClusters(
+  Map<String, int> communities, {
+  double maxShare = .5,
+}) {
   final members = <int, List<String>>{};
   for (final MapEntry(key: id, value: group) in communities.entries) {
     members.putIfAbsent(group, () => []).add(id);
   }
   final clusters = [
     for (final MapEntry(key: index, value: ids) in members.entries)
-      if (ids.length >= 3) GraphCluster(index: index, memberIds: ids),
+      if (ids.length >= 3 &&
+          (communities.length < 12 ||
+              ids.length <= communities.length * maxShare))
+        GraphCluster(index: index, memberIds: ids),
   ];
   clusters.sort((a, b) {
     final bySize = b.memberIds.length.compareTo(a.memberIds.length);
