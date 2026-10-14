@@ -76,7 +76,11 @@ Entities (people, places, projects, …) with facts, relations, and timelines.
 
 - Extracted from conversations (`KnowledgeGraphExtractor`).
 - Chat tools propose writes behind approval; owners edit via API/graph UI.
-- Mobile map: `apps/mobile/lib/features/memory/knowledge_graph_*.dart`.
+- Mobile map: `apps/mobile/lib/features/memory/knowledge_graph_*.dart`. Nodes are sized by connections and coloured
+  per type; circles of related entities (found without the "You" hub, `graphCommunities` in `graph_model.dart`) get a
+  shared halo and pull together in the layout. Selecting a node highlights its two-step neighbourhood and rings its
+  literal details around it. "Time travel" replays the graph by fact `validFrom`; the sheet's Highlights list hubs,
+  circles, and recently learned facts.
 
 Embeddings and graph persistence live in Infrastructure + `Jarvis.Memory` helpers.
 

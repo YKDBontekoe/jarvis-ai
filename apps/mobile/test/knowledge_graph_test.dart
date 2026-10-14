@@ -15,6 +15,7 @@ Future<void> settle(WidgetTester tester) {
 }
 
 void main() {
+  graphInsightTests();
   test(
     'layout is deterministic, bounded, and keeps the pinned node centered',
     () {
@@ -379,5 +380,168 @@ void main() {
       (id: 'c', anchor: Offset(8, 0), force: true),
     ]);
     expect(labels, {'a', 'c'});
+  });
+}
+
+GraphSnapshot _timedSnapshot() => parseGraphOverview(_timedOverview());
+
+Map<String, dynamic> _timedOverview() => {
+  'entities': [
+    for (final (id, name, type) in [
+      ('u', 'You', 'person'),
+      ('r', 'Rosa', 'person'),
+      ('c', 'Celia', 'person'),
+      ('a', 'Arjan', 'person'),
+      ('g', 'Gym', 'place'),
+      ('l', 'Leg press', 'thing'),
+      ('b', 'Bench press', 'thing'),
+      ('s', 'Squat', 'thing'),
+    ])
+      {'id': id, 'name': name, 'type': type, 'aliases': [], 'relationCount': 1},
+  ],
+  'edges': [
+    for (final (from, to, predicate, day) in [
+      ('u', 'r', 'knows', '2026-01-01'),
+      ('u', 'c', 'knows', '2026-01-05'),
+      ('r', 'c', 'sister_of', '2026-02-01'),
+      ('r', 'a', 'married_to', '2026-02-10'),
+      ('c', 'a', 'knows', '2026-03-01'),
+      ('u', 'g', 'trains_at', '2026-04-01'),
+      ('l', 'g', 'done_at', '2026-05-01'),
+      ('b', 'g', 'done_at', '2026-05-02'),
+      ('s', 'g', 'done_at', '2026-05-03'),
+      ('l', 'b', 'paired_with', '2026-05-04'),
+    ])
+      {
+        'from': from,
+        'to': to,
+        'predicate': predicate,
+        'confidence': 0.9,
+        'validFrom': '${day}T00:00:00Z',
+      },
+  ],
+  'literals': [
+    {
+      'entityId': 'u',
+      'predicate': 'job_title',
+      'value': 'designer',
+      'confidence': 0.8,
+      'validFrom': '2026-06-01T00:00:00Z',
+    },
+  ],
+};
+
+void graphInsightTests() {
+  test('time travel hides facts and entities learned later', () {
+    final snapshot = _timedSnapshot();
+    final range = graphTimeRange(snapshot)!;
+    expect(range.first, DateTime.utc(2026, 1, 1));
+    expect(range.last, DateTime.utc(2026, 6, 1));
+
+    final february = snapshotAsOf(snapshot, DateTime.utc(2026, 2, 5));
+    expect(february.nodes.map((node) => node.name), ['You', 'Rosa', 'Celia']);
+    expect(february.links.map((link) => link.predicate), [
+      'knows',
+      'knows',
+      'sister_of',
+    ]);
+    expect(february.literals, isEmpty);
+    expect(snapshotAsOf(snapshot, range.last).literals, hasLength(1));
+  });
+
+  test('circles ignore the user hub and neighbourhoods stop at it', () {
+    final snapshot = _timedSnapshot();
+    final ids = [for (final node in snapshot.nodes) node.id];
+    final pairs = [for (final link in snapshot.links) (link.fromId, link.toId)];
+    final communities = graphCommunities(ids, pairs, hubs: {'u'});
+    expect(communities.containsKey('u'), isFalse);
+    expect(communities['r'], communities['c']);
+    expect(communities['r'], communities['a']);
+    expect(communities['l'], communities['g']);
+    expect(communities['r'], isNot(communities['g']));
+    final clusters = graphClusters(communities);
+    expect(clusters, hasLength(2));
+    expect(clusters.first.memberIds, hasLength(4));
+
+    final hops = graphNeighborhood('r', snapshot.links, barriers: {'u'});
+    expect(hops['u'], 1);
+    expect(hops.containsKey('g'), isFalse);
+    expect(graphNeighborhood('r', snapshot.links)['g'], 2);
+
+    final layout = layoutGraph(ids, pairs, pinned: 'u', groups: communities);
+    expect(layout['u'], const Offset(.5, .5));
+    final family = (layout['r']! - layout['c']!).distance;
+    final across = (layout['r']! - layout['s']!).distance;
+    expect(family, lessThan(across));
+  });
+
+  testWidgets('highlights, detail satellites, and time travel', (tester) async {
+    tester.view.physicalSize = const Size(900, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final http = FixtureHttp();
+    http.on('GET', '/api/v1/graph/overview', _timedOverview());
+    http.on('GET', '/api/v1/memory/index-status', {
+      'active': 1,
+      'embedded': 1,
+      'graphIndexed': 1,
+      'embeddingModel': 'x',
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(home: KnowledgeGraphScreen(http: http.client())),
+    );
+    await settle(tester);
+
+    expect(find.byKey(const Key('graph-highlights')), findsOneWidget);
+    expect(find.byKey(const Key('hub-Gym')), findsOneWidget);
+    expect(find.byKey(const Key('circle-Rosa')), findsOneWidget);
+    expect(find.text('You job title designer'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('hub-Gym')));
+    await settle(tester);
+    expect(find.byKey(const Key('graph-highlights')), findsNothing);
+    expect(find.byKey(const Key('graph-reach')), findsOneWidget);
+    expect(find.textContaining('3 things · 1 person'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('entity-You')));
+    await settle(tester);
+    expect(
+      find.byKey(const Key('satellite-job title designer')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('graph-time-travel')));
+    await settle(tester);
+    expect(find.byKey(const Key('graph-timeline')), findsOneWidget);
+    expect(find.text('1 Jun 2026'), findsOneWidget);
+    await tester.drag(
+      find.byKey(const Key('graph-time-slider')),
+      const Offset(-2000, 0),
+    );
+    await settle(tester);
+    expect(find.text('2 entities · 1 link'), findsOneWidget);
+    expect(find.byKey(const Key('node-Gym')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('graph-time-travel')));
+    await settle(tester);
+    expect(find.byKey(const Key('graph-timeline')), findsNothing);
+    expect(find.byKey(const Key('node-Gym')), findsOneWidget);
+  });
+
+  test('highlights rank hubs, recent facts, and neighbour mix', () {
+    final snapshot = _timedSnapshot();
+    final degrees = graphDegrees(snapshot);
+    expect(degrees['g'], 4);
+    expect(degrees['u'], 4);
+    expect(
+      recentGraphFacts(snapshot, limit: 2).map((item) => item.fact.sentence),
+      ['You job title designer', 'Leg press paired with Bench press'],
+    );
+    expect(neighborTypeMix('u', snapshot), [
+      (type: 'person', count: 2),
+      (type: 'place', count: 1),
+    ]);
   });
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -22,21 +23,35 @@ const _sheetPeek = 0.34;
 const _minScale = 0.12;
 const _maxScale = 3.2;
 
+/// Highlights only help once a graph is too big to take in at a glance.
+const _highlightsMinimum = 6;
+
+/// Categorical colours for entity types. The app's semantic colours are deliberately close to the indigo accent,
+/// which makes a map of eight types unreadable, so the graph gets its own palette tuned per brightness.
 Color graphTypeColor(String? type, [BuildContext? context]) {
-  final colors = context != null
-      ? JarvisColors.of(context)
-      : JarvisColors.light;
+  final dark = context != null && JarvisColors.of(context).isDark;
   return switch (type) {
-    'person' => colors.accent,
-    'place' => colors.success,
-    'organization' => colors.info,
-    'project' => colors.warning,
-    'event' => colors.rose,
-    'pet' => colors.violet,
-    'topic' => colors.sky,
-    _ => colors.inkSoft,
+    'person' => dark ? const Color(0xff9a91ff) : const Color(0xff5b4ef0),
+    'place' => dark ? const Color(0xff34d399) : const Color(0xff0f9d76),
+    'organization' => dark ? const Color(0xff60a5fa) : const Color(0xff2563eb),
+    'project' => dark ? const Color(0xfffbbf24) : const Color(0xffd97706),
+    'event' => dark ? const Color(0xfff472b6) : const Color(0xffdb2777),
+    'pet' => dark ? const Color(0xfffb8c6a) : const Color(0xffe0573a),
+    'topic' => dark ? const Color(0xff22d3ee) : const Color(0xff0891b2),
+    _ => dark ? const Color(0xff9ca3af) : const Color(0xff6b7280),
   };
 }
+
+IconData graphTypeIcon(String? type) => switch (type) {
+  'person' => PhosphorIconsRegular.user,
+  'place' => PhosphorIconsRegular.mapPin,
+  'organization' => PhosphorIconsRegular.users,
+  'project' => PhosphorIconsRegular.rocketLaunch,
+  'event' => PhosphorIconsRegular.calendarBlank,
+  'pet' => PhosphorIconsRegular.heart,
+  'topic' => PhosphorIconsRegular.lightbulb,
+  _ => PhosphorIconsRegular.puzzlePiece,
+};
 
 /// Temporal knowledge graph as a pan-and-zoom map of people, places, and facts.
 class KnowledgeGraphScreen extends StatefulWidget {
@@ -51,8 +66,19 @@ class KnowledgeGraphScreen extends StatefulWidget {
 /// Holds graph fields so map and sheet mixins can share state.
 abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
     with TickerProviderStateMixin {
+  /// Everything loaded; [_snapshot] is what the map shows at [_asOf].
+  GraphSnapshot _all = GraphSnapshot.empty;
   GraphSnapshot _snapshot = GraphSnapshot.empty;
   Map<String, Offset> _layout = const {};
+  List<GraphCluster> _clusters = const [];
+  Map<String, int> _degrees = const {};
+  Map<String, DateTime> _firstSeen = const {};
+  int _maxDegree = 1;
+  ({DateTime first, DateTime last})? _range;
+  DateTime? _asOf;
+  bool _timeTravel = false;
+  late final AnimationController _pulse;
+  late final AnimationController _replay;
   Map<String, dynamic>? _status;
   final _query = TextEditingController();
   final _transform = TransformationController();
@@ -84,18 +110,33 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
       final snapshot = parseGraphOverview(
         jsonObject(responses[0].data) ?? const {},
       );
-      final you = snapshot.nodes
-          .where((node) => node.isYou)
-          .map((node) => node.id)
-          .firstOrNull;
+      final degrees = graphDegrees(snapshot);
+      final yous = snapshot.nodes.where((node) => node.isYou).toList()
+        ..sort((a, b) => degrees[b.id]!.compareTo(degrees[a.id]!));
+      final ids = [for (final node in snapshot.nodes) node.id];
+      final pairs = [
+        for (final link in snapshot.links) (link.fromId, link.toId),
+      ];
+      final communities = graphCommunities(
+        ids,
+        pairs,
+        hubs: {for (final node in yous) node.id},
+      );
       if (!mounted || revision != _requestRevision) return;
+      _replay.stop();
       setState(() {
-        _snapshot = snapshot;
+        _all = snapshot;
+        _clusters = graphClusters(communities);
+        _firstSeen = nodeFirstSeen(snapshot);
+        _range = graphTimeRange(snapshot);
+        if (_range == null) _timeTravel = false;
         _layout = layoutGraph(
-          [for (final node in snapshot.nodes) node.id],
-          [for (final link in snapshot.links) (link.fromId, link.toId)],
-          pinned: you,
+          ids,
+          pairs,
+          pinned: yous.firstOrNull?.id,
+          groups: communities,
         );
+        _applyTime(_timeTravel ? _asOf : null);
         _status = jsonObject(responses[1].data);
         _world = _worldFor(snapshot.nodes.length);
         _loading = false;
@@ -122,6 +163,83 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
     }
   }
 
+  /// Shows the graph as known at [time]; null shows everything.
+  void _applyTime(DateTime? time) {
+    _asOf = time;
+    _snapshot = time == null ? _all : snapshotAsOf(_all, time);
+    _degrees = graphDegrees(_snapshot);
+    _maxDegree = math.max(
+      1,
+      _degrees.entries
+          .where((entry) => !(_snapshot.node(entry.key)?.isYou ?? false))
+          .fold<int>(1, (top, entry) => math.max(top, entry.value)),
+    );
+    if (_snapshot.node(_selectedId) == null) _selectedId = null;
+  }
+
+  void _setTimeTravel(bool on) {
+    _replay.stop();
+    setState(() {
+      _timeTravel = on && _range != null;
+      _applyTime(_timeTravel ? _range!.last : null);
+    });
+  }
+
+  void _scrubTo(double fraction) {
+    final range = _range;
+    if (range == null) return;
+    final span = range.last.difference(range.first).inMilliseconds;
+    setState(
+      () => _applyTime(
+        range.first.add(Duration(milliseconds: (span * fraction).round())),
+      ),
+    );
+  }
+
+  double get _timeFraction {
+    final range = _range;
+    final asOf = _asOf;
+    if (range == null || asOf == null) return 1;
+    final span = range.last.difference(range.first).inMilliseconds;
+    if (span <= 0) return 1;
+    return (asOf.difference(range.first).inMilliseconds / span).clamp(0.0, 1.0);
+  }
+
+  /// Plays the graph growing from its first fact to today.
+  void _toggleReplay() {
+    if (_replay.isAnimating) {
+      _replay.stop();
+      setState(() {});
+      return;
+    }
+    if (!_timeTravel) _setTimeTravel(true);
+    final from = _timeFraction >= .999 ? 0.0 : _timeFraction;
+    unawaited(
+      _replay.forward(from: from).whenComplete(() {
+        if (mounted) setState(() {});
+      }),
+    );
+  }
+
+  /// Node diameter in screen pixels: hubs read bigger, the user's own node biggest.
+  /// Grows a little as you zoom in so the overview stays uncluttered and close-ups get room for icons.
+  double _nodeDiameter(GraphNode node) {
+    final zoom = math
+        .sqrt(_transform.value.getMaxScaleOnAxis() / .6)
+        .clamp(.72, 1.25);
+    if (node.isYou) return 30 * zoom;
+    final degree = _degrees[node.id] ?? 0;
+    final weight = math.sqrt(degree / _maxDegree).clamp(0.0, 1.0);
+    return (11 + weight * 15) * zoom;
+  }
+
+  bool _isRecent(GraphNode node) {
+    final seen = _firstSeen[node.id];
+    final reference = _asOf ?? DateTime.now();
+    if (seen == null || seen.isAfter(reference)) return false;
+    return reference.difference(seen) <= const Duration(days: 7);
+  }
+
   double _worldFor(int count) {
     final n = math.max(count, 1);
     return (860 + math.sqrt(n) * 120).clamp(980, 1760).toDouble();
@@ -140,7 +258,7 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
 
   Offset _worldPoint(String id) {
     final point = _layout[id] ?? const Offset(.5, .5);
-    const pad = 80.0;
+    const pad = 60.0;
     final span = math.max(_world - pad * 2, 1.0);
     return Offset(pad + point.dx * span, pad + point.dy * span);
   }
@@ -158,7 +276,7 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
     if (viewport.isEmpty || _world <= 0) return Matrix4.identity();
     final visibleHeight = math.max(140.0, viewport.height - covered - 8);
     final scale =
-        math.min(viewport.width / _world, visibleHeight / _world) * .92;
+        math.min(viewport.width / _world, visibleHeight / _world) * .96;
     final clamped = scale.clamp(_minScale, _maxScale);
     final dx = (viewport.width - _world * clamped) / 2;
     final dy = math.max(8.0, (visibleHeight - _world * clamped) / 2);
@@ -168,7 +286,7 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
   void _scheduleFit(Size viewport, double covered) {
     _viewport = viewport;
     _covered = covered;
-    if (_fitted || _fitQueued || viewport.isEmpty || _snapshot.nodes.isEmpty) {
+    if (_fitted || _fitQueued || viewport.isEmpty || _all.nodes.isEmpty) {
       return;
     }
     _fitQueued = true;
@@ -228,7 +346,12 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
       _selectedId = next;
       if (next != null) _reveal++;
     });
-    if (next != null) _focusOn(next);
+    if (next != null) {
+      _focusOn(next);
+      if (!MediaQuery.disableAnimationsOf(context)) {
+        unawaited(_pulse.forward(from: 0));
+      }
+    }
   }
 
   void _clearSelection() {
@@ -266,17 +389,28 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
     if (mounted) unawaited(_load());
   }
 
-  bool _linkedToSelected(String id) {
+  /// Hop distance from the selection, cached until the selection or visible graph changes.
+  Map<String, int> get _hops {
     final selected = _selectedId;
-    if (selected == null || selected == id) return true;
-    for (final link in _snapshot.links) {
-      final touches =
-          (link.fromId == selected && link.toId == id) ||
-          (link.toId == selected && link.fromId == id);
-      if (touches) return true;
+    if (selected == null) return const {};
+    if (_hopsFor != selected || !identical(_hopsSnapshot, _snapshot)) {
+      _hopsFor = selected;
+      _hopsSnapshot = _snapshot;
+      _hopsCache = graphNeighborhood(
+        selected,
+        _snapshot.links,
+        barriers: {
+          for (final node in _snapshot.nodes)
+            if (node.isYou) node.id,
+        },
+      );
     }
-    return false;
+    return _hopsCache;
   }
+
+  String? _hopsFor;
+  GraphSnapshot? _hopsSnapshot;
+  Map<String, int> _hopsCache = const {};
 }
 
 class _KnowledgeGraphScreenState extends _KnowledgeGraphController
@@ -288,6 +422,16 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
       vsync: this,
       duration: const Duration(milliseconds: 280),
     );
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+      value: 1,
+    );
+    _replay =
+        AnimationController(vsync: this, duration: const Duration(seconds: 7))
+          ..addListener(() {
+            if (_replay.isAnimating) _scrubTo(_replay.value);
+          });
     unawaited(_load());
   }
 
@@ -295,6 +439,8 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
   void dispose() {
     if (_motionTick != null) _motion.removeListener(_motionTick!);
     _motion.dispose();
+    _pulse.dispose();
+    _replay.dispose();
     _transform.dispose();
     _query.dispose();
     super.dispose();
@@ -315,12 +461,13 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
     body: ListScreenBody(
       loading: _loading,
       error: _error,
-      isEmpty: _snapshot.nodes.isEmpty,
+      isEmpty: _all.nodes.isEmpty,
       onRetry: () => unawaited(_load()),
       empty: const EmptyState(
         icon: PhosphorIconsRegular.graph,
         title: 'No connections yet',
-        message: 'As you tell Jarvis about people, places, and projects, it links them here and keeps track of how facts change over time.',
+        message:
+            'As you tell Jarvis about people, places, and projects, it links them here and keeps track of how facts change over time.',
       ),
       child: _body(),
     ),
@@ -397,16 +544,101 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
               ],
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            '$stats · drag to pan, pinch to zoom',
-            style: TextStyle(
-              fontSize: 12,
-              color: JarvisColors.of(context).muted,
-            ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _range != null
+                      ? stats
+                      : '$stats · drag to pan, pinch to zoom',
+                  key: const Key('graph-stats'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: JarvisColors.of(context).muted,
+                  ),
+                ),
+              ),
+              if (_range != null)
+                TextButton.icon(
+                  key: const Key('graph-time-travel'),
+                  onPressed: () => _setTimeTravel(!_timeTravel),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    foregroundColor: _timeTravel
+                        ? JarvisColors.of(context).accent
+                        : JarvisColors.of(context).inkSoft,
+                  ),
+                  icon: const Icon(
+                    PhosphorIconsRegular.clockCounterClockwise,
+                    size: 16,
+                  ),
+                  label: Text(
+                    _timeTravel ? 'Now' : 'Time travel',
+                    style: const TextStyle(fontSize: 12.5),
+                  ),
+                ),
+            ],
           ),
+          if (_timeTravel && _range != null) _timeline(_range!),
         ],
       ),
+    );
+  }
+
+  Widget _timeline(({DateTime first, DateTime last}) range) {
+    final colors = JarvisColors.of(context);
+    final asOf = (_asOf ?? range.last).toLocal();
+    final playing = _replay.isAnimating;
+    return Row(
+      key: const Key('graph-timeline'),
+      children: [
+        IconButton(
+          key: const Key('graph-replay'),
+          tooltip: playing ? 'Pause' : 'Replay how the graph grew',
+          visualDensity: VisualDensity.compact,
+          onPressed: _toggleReplay,
+          icon: Icon(
+            playing
+                ? PhosphorIconsRegular.pauseCircle
+                : PhosphorIconsRegular.play,
+            size: 20,
+            color: colors.accent,
+          ),
+        ),
+        Expanded(
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 3,
+              overlayShape: SliderComponentShape.noOverlay,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+            ),
+            child: Slider(
+              key: const Key('graph-time-slider'),
+              value: _timeFraction,
+              activeColor: colors.accent,
+              inactiveColor: colors.outline,
+              onChangeStart: (_) => _replay.stop(),
+              onChanged: _scrubTo,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 84,
+          child: Text(
+            formatGraphDay(asOf),
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: colors.ink,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

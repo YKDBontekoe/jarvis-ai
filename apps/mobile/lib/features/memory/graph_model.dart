@@ -373,25 +373,314 @@ List<({int lane, int lanes})> edgeLanes(List<GraphLink> links) {
   return lanes;
 }
 
-/// Keeps the most important names readable by skipping labels that would sit on top of each other.
+/// Keeps the most important names readable by skipping labels that would sit on top of each other, or on top of
+/// [obstacles] such as other nodes.
 Set<String> chooseLabelIds(
   List<({String id, Offset anchor, bool force})> anchors, {
   double labelWidth = 104,
   double labelHeight = 18,
   double gap = 6,
+  List<Rect> obstacles = const [],
+  Map<String, double> widths = const {},
 }) {
   final occupied = <Rect>[];
   final chosen = <String>{};
   for (final anchor in anchors) {
     final rect = Rect.fromCenter(
       center: anchor.anchor + const Offset(0, 24),
-      width: labelWidth,
+      width: widths[anchor.id] ?? labelWidth,
       height: labelHeight,
     ).inflate(gap / 2);
-    final blocked = occupied.any(rect.overlaps);
+    final blocked =
+        occupied.any(rect.overlaps) ||
+        obstacles.any((obstacle) => obstacle.deflate(2).overlaps(rect));
     if (!anchor.force && blocked) continue;
     chosen.add(anchor.id);
     occupied.add(rect);
   }
   return chosen;
+}
+
+/// When a node first appears: its earliest dated fact, else its last update.
+Map<String, DateTime> nodeFirstSeen(GraphSnapshot snapshot) {
+  final seen = <String, DateTime>{};
+  void note(String id, String? iso) {
+    final time = jsonDate(iso);
+    if (time == null) return;
+    final current = seen[id];
+    if (current == null || time.isBefore(current)) seen[id] = time;
+  }
+
+  for (final link in snapshot.links) {
+    note(link.fromId, link.validFrom);
+    note(link.toId, link.validFrom);
+  }
+  for (final literal in snapshot.literals) {
+    note(literal.entityId, literal.validFrom);
+  }
+  for (final node in snapshot.nodes) {
+    if (!seen.containsKey(node.id)) note(node.id, node.updatedAt);
+  }
+  return seen;
+}
+
+/// Earliest and latest fact dates, or null when nothing is dated.
+({DateTime first, DateTime last})? graphTimeRange(GraphSnapshot snapshot) {
+  DateTime? first;
+  DateTime? last;
+  void note(String? iso) {
+    final time = jsonDate(iso);
+    if (time == null) return;
+    if (first == null || time.isBefore(first!)) first = time;
+    if (last == null || time.isAfter(last!)) last = time;
+  }
+
+  for (final link in snapshot.links) {
+    note(link.validFrom);
+  }
+  for (final literal in snapshot.literals) {
+    note(literal.validFrom);
+  }
+  if (first == null || last == null || !last!.isAfter(first!)) return null;
+  return (first: first!, last: last!);
+}
+
+/// The graph as Jarvis knew it at [time]: facts dated later are hidden, undated ones always show.
+GraphSnapshot snapshotAsOf(GraphSnapshot snapshot, DateTime time) {
+  bool known(String? iso) {
+    final when = jsonDate(iso);
+    return when == null || !when.isAfter(time);
+  }
+
+  final firstSeen = nodeFirstSeen(snapshot);
+  final nodes = [
+    for (final node in snapshot.nodes)
+      if (firstSeen[node.id] == null || !firstSeen[node.id]!.isAfter(time))
+        node,
+  ];
+  final ids = {for (final node in nodes) node.id};
+  return GraphSnapshot(
+    nodes: nodes,
+    links: [
+      for (final link in snapshot.links)
+        if (ids.contains(link.fromId) &&
+            ids.contains(link.toId) &&
+            known(link.validFrom))
+          link,
+    ],
+    literals: [
+      for (final literal in snapshot.literals)
+        if (ids.contains(literal.entityId) && known(literal.validFrom)) literal,
+    ],
+  );
+}
+
+/// Links plus details per node, so hubs can be drawn larger.
+Map<String, int> graphDegrees(GraphSnapshot snapshot) {
+  final degrees = {for (final node in snapshot.nodes) node.id: 0};
+  for (final link in snapshot.links) {
+    degrees[link.fromId] = (degrees[link.fromId] ?? 0) + 1;
+    degrees[link.toId] = (degrees[link.toId] ?? 0) + 1;
+  }
+  for (final literal in snapshot.literals) {
+    degrees[literal.entityId] = (degrees[literal.entityId] ?? 0) + 1;
+  }
+  return degrees;
+}
+
+/// Hop distance from [id] to every node reachable within [maxHops].
+///
+/// Paths never continue through [barriers] (other than [id] itself): everything is two steps away via "You", which
+/// says nothing.
+Map<String, int> graphNeighborhood(
+  String id,
+  List<GraphLink> links, {
+  int maxHops = 2,
+  Set<String> barriers = const {},
+}) {
+  final adjacent = <String, Set<String>>{};
+  for (final link in links) {
+    adjacent.putIfAbsent(link.fromId, () => {}).add(link.toId);
+    adjacent.putIfAbsent(link.toId, () => {}).add(link.fromId);
+  }
+  final distance = {id: 0};
+  var frontier = [id];
+  for (var hop = 1; hop <= maxHops && frontier.isNotEmpty; hop++) {
+    final next = <String>[];
+    for (final current in frontier) {
+      if (current != id && barriers.contains(current)) continue;
+      for (final other in adjacent[current] ?? const <String>{}) {
+        if (distance.containsKey(other)) continue;
+        distance[other] = hop;
+        next.add(other);
+      }
+    }
+    frontier = next;
+  }
+  return distance;
+}
+
+/// Groups nodes that know each other, ignoring [hubs] (usually "You", who links to everything).
+///
+/// Deterministic label propagation: each node repeatedly adopts the label most common among its neighbours, ties
+/// broken by the smallest label. Returns a group index per node; nodes without links outside [hubs] get none.
+Map<String, int> graphCommunities(
+  List<String> nodes,
+  List<(String, String)> edges, {
+  Set<String> hubs = const {},
+}) {
+  final adjacent = <String, List<String>>{};
+  for (final (from, to) in edges) {
+    if (hubs.contains(from) || hubs.contains(to) || from == to) continue;
+    adjacent.putIfAbsent(from, () => []).add(to);
+    adjacent.putIfAbsent(to, () => []).add(from);
+  }
+  final ordered = [
+    for (final node in nodes)
+      if (adjacent.containsKey(node)) node,
+  ];
+  final label = {for (final (index, node) in ordered.indexed) node: index};
+  for (var round = 0; round < 12; round++) {
+    var changed = false;
+    for (final node in ordered) {
+      final counts = <int, int>{};
+      for (final other in adjacent[node]!) {
+        final value = label[other]!;
+        counts[value] = (counts[value] ?? 0) + 1;
+      }
+      var best = label[node]!;
+      var bestCount = 0;
+      for (final MapEntry(key: value, value: count) in counts.entries) {
+        if (count > bestCount || (count == bestCount && value < best)) {
+          best = value;
+          bestCount = count;
+        }
+      }
+      if (best != label[node]) {
+        label[node] = best;
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  final renumbered = <int, int>{};
+  return {
+    for (final node in ordered)
+      node: renumbered.putIfAbsent(label[node]!, () => renumbered.length),
+  };
+}
+
+class GraphCluster {
+  const GraphCluster({required this.index, required this.memberIds});
+
+  final int index;
+  final List<String> memberIds;
+}
+
+/// Groups of three or more, largest first.
+List<GraphCluster> graphClusters(Map<String, int> communities) {
+  final members = <int, List<String>>{};
+  for (final MapEntry(key: id, value: group) in communities.entries) {
+    members.putIfAbsent(group, () => []).add(id);
+  }
+  final clusters = [
+    for (final MapEntry(key: index, value: ids) in members.entries)
+      if (ids.length >= 3) GraphCluster(index: index, memberIds: ids),
+  ];
+  clusters.sort((a, b) {
+    final bySize = b.memberIds.length.compareTo(a.memberIds.length);
+    return bySize != 0 ? bySize : a.index.compareTo(b.index);
+  });
+  return clusters;
+}
+
+class GraphRecentFact {
+  const GraphRecentFact({
+    required this.fact,
+    required this.entityId,
+    required this.at,
+  });
+
+  final GraphFactView fact;
+  final String entityId;
+  final DateTime at;
+}
+
+/// Newest dated facts, links and details alike.
+List<GraphRecentFact> recentGraphFacts(
+  GraphSnapshot snapshot, {
+  int limit = 4,
+}) {
+  final items = <GraphRecentFact>[];
+  for (final link in snapshot.links) {
+    final at = jsonDate(link.validFrom);
+    final subject = snapshot.node(link.fromId);
+    if (at == null || subject == null) continue;
+    items.add(
+      GraphRecentFact(
+        entityId: link.fromId,
+        at: at,
+        fact: GraphFactView(
+          subjectName: subject.name,
+          predicate: link.predicate,
+          objectLabel: snapshot.node(link.toId)?.name ?? 'Unknown',
+          incoming: false,
+          otherId: link.toId,
+          confidence: link.confidence,
+          validFrom: link.validFrom,
+        ),
+      ),
+    );
+  }
+  for (final literal in snapshot.literals) {
+    final at = jsonDate(literal.validFrom);
+    final subject = snapshot.node(literal.entityId);
+    if (at == null || subject == null) continue;
+    items.add(
+      GraphRecentFact(
+        entityId: literal.entityId,
+        at: at,
+        fact: GraphFactView(
+          subjectName: subject.name,
+          predicate: literal.predicate,
+          objectLabel: literal.value,
+          incoming: false,
+          confidence: literal.confidence,
+          validFrom: literal.validFrom,
+          literal: true,
+        ),
+      ),
+    );
+  }
+  items.sort((a, b) {
+    final byTime = b.at.compareTo(a.at);
+    return byTime != 0 ? byTime : a.fact.sentence.compareTo(b.fact.sentence);
+  });
+  return items.take(limit).toList(growable: false);
+}
+
+/// Linked neighbours of [id] counted by type, most common first.
+List<({String type, int count})> neighborTypeMix(
+  String id,
+  GraphSnapshot snapshot,
+) {
+  final counts = <String, int>{};
+  final seen = <String>{};
+  for (final link in snapshot.links) {
+    final other = link.fromId == id
+        ? link.toId
+        : (link.toId == id ? link.fromId : null);
+    if (other == null || !seen.add(other)) continue;
+    final type = snapshot.node(other)?.type ?? 'thing';
+    counts[type] = (counts[type] ?? 0) + 1;
+  }
+  final mix = [
+    for (final MapEntry(key: type, value: count) in counts.entries)
+      (type: type, count: count),
+  ];
+  mix.sort((a, b) {
+    final byCount = b.count.compareTo(a.count);
+    return byCount != 0 ? byCount : a.type.compareTo(b.type);
+  });
+  return mix;
 }
