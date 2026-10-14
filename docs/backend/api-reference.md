@@ -225,7 +225,7 @@ Accept, dismiss and undo are audited by id and kind only.
 
 ## Usage
 
-`GET /usage` — token and activity aggregates (see `UsageEndpoints`). The response includes an `improvement` object (ratings and trend, regenerate rate, weak tools, learned skills, proposal counts).
+`GET /usage` — token and activity aggregates (see `UsageEndpoints`). The response includes an `improvement` object (ratings and trend, regenerate rate, weak tools, learned skills, proposal counts). It also includes `turnQuality` (`TurnQualityMetrics`): chat model calls with median and p90 reply time, failure rate and prompt-cache hit rate; traced turns (any turn that used memory, a skill or a tool, or did not finish) with median and p90 duration and failed/cancelled counts; tool calls, failure rate and the three slowest tools (at least 5 calls each); approvals asked, declined and handled automatically; and `flags` (`slow_replies` when p90 reply time is over 30 s, `failing_turns` at 10% failed turns, `approval_friction` when 10+ approvals were asked and fewer than half were automatic, `low_cache` under 20% cached input). Medians need at least 5 samples, otherwise they are null. At most 5,000 rows of each kind are read per period.
 
 ## Remote agents (A2A management)
 

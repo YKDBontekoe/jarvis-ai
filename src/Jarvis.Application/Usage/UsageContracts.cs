@@ -170,7 +170,8 @@ public sealed record UsageDashboard(
     IReadOnlyList<DailyUsagePoint> Daily,
     string? ChartNote,
     IReadOnlyList<ModelUsageRow> Models,
-    ImprovementSnapshot? Improvement = null);
+    ImprovementSnapshot? Improvement = null,
+    TurnQualitySnapshot? TurnQuality = null);
 
 public interface IUsageDashboard
 {

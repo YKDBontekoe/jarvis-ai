@@ -50,7 +50,7 @@ While anything is served from the cache, or a request cannot reach the server, `
 | `features/devices/` | This-device capabilities and telemetry |
 | `features/agents/` | Remote agent registry |
 | `features/coding/` | Coding runs list |
-| `features/usage/` | Usage dashboard, including the "Jarvis is improving" card (hidden when the server sends no `improvement`) |
+| `features/usage/` | Usage dashboard, including the "Jarvis is improving" card (hidden when the server sends no `improvement`) and the Turn quality card (`turn_quality_card.dart`: reply time, failed turns, slow tools, approvals, and a tip for each flag; hidden without `turnQuality`) |
 | `features/voice/` | LiveKit stage, hands-free |
 
 Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide code: `main.dart`, `theme.dart`, `appearance.dart`, `app_lock.dart`, `error_reporting.dart`, and small helpers (`json_maps.dart`, `http_urls.dart`, `schedule_format.dart`), plus `api/`, `auth/`, `push/` and `ui/`. Put new screens in a feature folder.

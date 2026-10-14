@@ -8,6 +8,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import 'turn_quality_card.dart';
 
 String formatTokenCount(num value) {
   final tokens = value.round().abs();
@@ -143,6 +144,10 @@ class _UsageScreenState extends State<UsageScreen> {
                       if (_usage?['improvement'] is Map) ...[
                         const SizedBox(height: 16),
                         _improvement(),
+                      ],
+                      if (_usage?['turnQuality'] is Map) ...[
+                        const SizedBox(height: 16),
+                        TurnQualityCard(data: _map(_usage?['turnQuality'])),
                       ],
                       const SizedBox(height: 16),
                       _headline(),
