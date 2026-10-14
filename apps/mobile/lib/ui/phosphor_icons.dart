@@ -63,6 +63,7 @@ abstract final class PhosphorIconsRegular {
   static const copy = IconData(0xe1ca, fontFamily: 'PhosphorRegular');
   static const copySimple = IconData(0xe1cc, fontFamily: 'PhosphorRegular');
   static const cpu = IconData(0xe610, fontFamily: 'PhosphorRegular');
+  static const cube = IconData(0xe1da, fontFamily: 'PhosphorRegular');
   static const cursor = IconData(0xe1dc, fontFamily: 'PhosphorRegular');
   static const cursorClick = IconData(0xe7c8, fontFamily: 'PhosphorRegular');
   static const deviceMobile = IconData(0xe1e0, fontFamily: 'PhosphorRegular');

@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jarvis_mobile/features/memory/graph_layout.dart';
 import 'package:jarvis_mobile/features/memory/graph_model.dart';
 import 'package:jarvis_mobile/features/memory/knowledge_graph_screen.dart';
@@ -15,6 +17,9 @@ Future<void> settle(WidgetTester tester) {
 }
 
 void main() {
+  graphInsightTests();
+  bigGraphTests();
+  askAndThreeDTests();
   test(
     'layout is deterministic, bounded, and keeps the pinned node centered',
     () {
@@ -104,9 +109,14 @@ void main() {
       );
       await settle(tester);
 
-      expect(find.textContaining('Semantic search on · 9/9'), findsOneWidget);
       expect(find.textContaining('2 entities · 1 link'), findsOneWidget);
       expect(find.textContaining('lives in Amsterdam'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('graph-info')));
+      await settle(tester);
+      expect(find.textContaining('Semantic search on · 9/9'), findsOneWidget);
+      await tester.tapAt(const Offset(20, 20));
+      await settle(tester);
 
       await tester.tap(find.byKey(const Key('entity-You')));
       await settle(tester);
@@ -379,5 +389,415 @@ void main() {
       (id: 'c', anchor: Offset(8, 0), force: true),
     ]);
     expect(labels, {'a', 'c'});
+  });
+}
+
+GraphSnapshot _timedSnapshot() => parseGraphOverview(_timedOverview());
+
+Map<String, dynamic> _timedOverview() => {
+  'entities': [
+    for (final (id, name, type) in [
+      ('u', 'You', 'person'),
+      ('r', 'Rosa', 'person'),
+      ('c', 'Celia', 'person'),
+      ('a', 'Arjan', 'person'),
+      ('g', 'Gym', 'place'),
+      ('l', 'Leg press', 'thing'),
+      ('b', 'Bench press', 'thing'),
+      ('s', 'Squat', 'thing'),
+    ])
+      {'id': id, 'name': name, 'type': type, 'aliases': [], 'relationCount': 1},
+  ],
+  'edges': [
+    for (final (from, to, predicate, day) in [
+      ('u', 'r', 'knows', '2026-01-01'),
+      ('u', 'c', 'knows', '2026-01-05'),
+      ('r', 'c', 'sister_of', '2026-02-01'),
+      ('r', 'a', 'married_to', '2026-02-10'),
+      ('c', 'a', 'knows', '2026-03-01'),
+      ('u', 'g', 'trains_at', '2026-04-01'),
+      ('l', 'g', 'done_at', '2026-05-01'),
+      ('b', 'g', 'done_at', '2026-05-02'),
+      ('s', 'g', 'done_at', '2026-05-03'),
+      ('l', 'b', 'paired_with', '2026-05-04'),
+    ])
+      {
+        'from': from,
+        'to': to,
+        'predicate': predicate,
+        'confidence': 0.9,
+        'validFrom': '${day}T00:00:00Z',
+      },
+  ],
+  'literals': [
+    {
+      'entityId': 'u',
+      'predicate': 'job_title',
+      'value': 'designer',
+      'confidence': 0.8,
+      'validFrom': '2026-06-01T00:00:00Z',
+    },
+  ],
+};
+
+void graphInsightTests() {
+  test('time travel hides facts and entities learned later', () {
+    final snapshot = _timedSnapshot();
+    final range = graphTimeRange(snapshot)!;
+    expect(range.first, DateTime.utc(2026, 1, 1));
+    expect(range.last, DateTime.utc(2026, 6, 1));
+
+    final february = snapshotAsOf(snapshot, DateTime.utc(2026, 2, 5));
+    expect(february.nodes.map((node) => node.name), ['You', 'Rosa', 'Celia']);
+    expect(february.links.map((link) => link.predicate), [
+      'knows',
+      'knows',
+      'sister_of',
+    ]);
+    expect(february.literals, isEmpty);
+    expect(snapshotAsOf(snapshot, range.last).literals, hasLength(1));
+  });
+
+  test('circles ignore the user hub and neighbourhoods stop at it', () {
+    final snapshot = _timedSnapshot();
+    final ids = [for (final node in snapshot.nodes) node.id];
+    final pairs = [for (final link in snapshot.links) (link.fromId, link.toId)];
+    final communities = graphCommunities(ids, pairs, hubs: {'u'});
+    expect(communities.containsKey('u'), isFalse);
+    expect(communities['r'], communities['c']);
+    expect(communities['r'], communities['a']);
+    expect(communities['l'], communities['g']);
+    expect(communities['r'], isNot(communities['g']));
+    final clusters = graphClusters(communities);
+    expect(clusters, hasLength(2));
+    expect(clusters.first.memberIds, hasLength(4));
+
+    final hops = graphNeighborhood('r', snapshot.links, barriers: {'u'});
+    expect(hops['u'], 1);
+    expect(hops.containsKey('g'), isFalse);
+    expect(graphNeighborhood('r', snapshot.links)['g'], 2);
+
+    final layout = layoutGraph(ids, pairs, pinned: 'u', groups: communities);
+    expect(layout['u'], const Offset(.5, .5));
+    final family = (layout['r']! - layout['c']!).distance;
+    final across = (layout['r']! - layout['s']!).distance;
+    expect(family, lessThan(across));
+  });
+
+  testWidgets('highlights, detail satellites, and time travel', (tester) async {
+    tester.view.physicalSize = const Size(900, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final http = FixtureHttp();
+    http.on('GET', '/api/v1/graph/overview', _timedOverview());
+    http.on('GET', '/api/v1/memory/index-status', {
+      'active': 1,
+      'embedded': 1,
+      'graphIndexed': 1,
+      'embeddingModel': 'x',
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(home: KnowledgeGraphScreen(http: http.client())),
+    );
+    await settle(tester);
+
+    expect(find.byKey(const Key('graph-highlights')), findsOneWidget);
+    expect(find.byKey(const Key('hub-Gym')), findsOneWidget);
+    expect(find.byKey(const Key('circle-Rosa')), findsOneWidget);
+    expect(find.text('You job title designer'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('hub-Gym')));
+    await settle(tester);
+    expect(find.byKey(const Key('graph-highlights')), findsNothing);
+    expect(find.byKey(const Key('graph-reach')), findsOneWidget);
+    expect(find.textContaining('3 things · 1 person'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('node-You')));
+    await settle(tester);
+    expect(
+      find.byKey(const Key('satellite-job title designer')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('graph-time-travel')));
+    await settle(tester);
+    expect(find.byKey(const Key('graph-timeline')), findsOneWidget);
+    expect(find.text('1 Jun 2026'), findsOneWidget);
+    await tester.drag(
+      find.byKey(const Key('graph-time-slider')),
+      const Offset(-2000, 0),
+    );
+    await settle(tester);
+    expect(find.text('2 entities · 1 link'), findsOneWidget);
+    expect(find.byKey(const Key('node-Gym')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('graph-time-travel')));
+    await settle(tester);
+    expect(find.byKey(const Key('graph-timeline')), findsNothing);
+    expect(find.byKey(const Key('node-Gym')), findsOneWidget);
+  });
+
+  test('highlights rank hubs, recent facts, and neighbour mix', () {
+    final snapshot = _timedSnapshot();
+    final degrees = graphDegrees(snapshot);
+    expect(degrees['g'], 4);
+    expect(degrees['u'], 4);
+    expect(
+      recentGraphFacts(snapshot, limit: 2).map((item) => item.fact.sentence),
+      ['You job title designer', 'Leg press paired with Bench press'],
+    );
+    expect(neighborTypeMix('u', snapshot), [
+      (type: 'person', count: 2),
+      (type: 'place', count: 1),
+    ]);
+  });
+}
+
+Map<String, dynamic> _bigOverview(int count) {
+  final types = ['person', 'place', 'organization', 'thing', 'topic'];
+  return {
+    'entities': [
+      {
+        'id': 'n0',
+        'name': 'You',
+        'type': 'person',
+        'aliases': [],
+        'relationCount': count,
+      },
+      for (var i = 1; i < count; i++)
+        {
+          'id': 'n$i',
+          'name': 'Entity $i',
+          'type': types[i % types.length],
+          'aliases': [],
+          'relationCount': 2,
+        },
+    ],
+    'edges': [
+      for (var i = 1; i < count; i++)
+        {'from': 'n0', 'to': 'n$i', 'predicate': 'knows', 'confidence': 0.9},
+      for (var i = 1; i + 7 < count; i += 3)
+        {
+          'from': 'n$i',
+          'to': 'n${i + 7}',
+          'predicate': 'near',
+          'confidence': 0.5,
+        },
+    ],
+  };
+}
+
+void bigGraphTests() {
+  test('big layouts run on a background isolate', () async {
+    final nodes = [for (var i = 0; i < 400; i++) 'n$i'];
+    final GraphLayoutJob job = (
+      nodes: nodes,
+      edges: [for (var i = 1; i < 400; i++) ('n0', 'n$i')],
+      pinned: 'n0',
+      groups: const {},
+    );
+    final layout = await KnowledgeGraphScreen.runLargeLayout(job);
+    expect(layout, hasLength(400));
+    expect(layout['n0'], const Offset(.5, .5));
+    expect(layout, layoutGraphJob(job));
+  });
+
+  testWidgets(
+    'a graph of hundreds of entities paints minor nodes and pages the list',
+    (tester) async {
+      tester.view.physicalSize = const Size(430, 932);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final http = FixtureHttp();
+      http.on('GET', '/api/v1/graph/overview', _bigOverview(800));
+      http.on('GET', '/api/v1/memory/index-status', {
+        'active': 1,
+        'embedded': 1,
+        'graphIndexed': 1,
+        'embeddingModel': 'x',
+      });
+      final runLayout = KnowledgeGraphScreen.runLargeLayout;
+      KnowledgeGraphScreen.runLargeLayout = (job) async => layoutGraphJob(job);
+      addTearDown(() => KnowledgeGraphScreen.runLargeLayout = runLayout);
+
+      // Dio decodes large responses on an isolate, which never finishes under the fake test clock.
+      final client = http.client()..transformer = FusedTransformer();
+      await tester.pumpWidget(
+        MaterialApp(home: KnowledgeGraphScreen(http: client)),
+      );
+      await settle(tester);
+
+      expect(
+        http.sent('GET', '/api/v1/graph/overview').single.query['limit'],
+        1000,
+      );
+      expect(find.textContaining('800 entities'), findsOneWidget);
+      final nodeWidgets = find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.startsWith('node-'),
+      );
+      expect(nodeWidgets, findsWidgets);
+      expect(nodeWidgets.evaluate().length, lessThan(200));
+      expect(find.byKey(const Key('node-You')), findsOneWidget);
+
+      await tester.drag(
+        find.byType(DraggableScrollableSheet),
+        const Offset(0, -500),
+        warnIfMissed: false,
+      );
+      await settle(tester);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('graph-list-more')),
+        400,
+        scrollable: find
+            .descendant(
+              of: find.byType(DraggableScrollableSheet),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(find.text('Show 80 more of 720'), findsOneWidget);
+    },
+  );
+}
+
+void askAndThreeDTests() {
+  Future<FixtureHttp> pumpGraph(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final http = FixtureHttp();
+    http.on('GET', '/api/v1/graph/overview', _timedOverview());
+    http.on('GET', '/api/v1/memory/index-status', {
+      'active': 1,
+      'embedded': 1,
+      'graphIndexed': 1,
+      'embeddingModel': 'x',
+    });
+    await tester.pumpWidget(
+      MaterialApp(home: KnowledgeGraphScreen(http: http.client())),
+    );
+    await settle(tester);
+    return http;
+  }
+
+  testWidgets('asking a question shows a grounded answer and lights it up', (
+    tester,
+  ) async {
+    final http = await pumpGraph(tester);
+    http.on('POST', '/api/v1/graph/ask', {
+      'answer': 'Rosa is married to Arjan.',
+      'entityIds': ['r', 'a'],
+      'links': [
+        {'from': 'r', 'to': 'a', 'predicate': 'married_to'},
+      ],
+      'facts': ['Rosa married to Arjan'],
+      'followUps': ['Where does Arjan work?'],
+      'grounded': true,
+    });
+
+    // Suggestions are built from real names in the graph.
+    expect(
+      find.byKey(const Key('graph-suggestion-Who matters most in my life?')),
+      findsOneWidget,
+    );
+    await tester.enterText(
+      find.byKey(const Key('graph-ask-field')),
+      'Who is Rosa married to?',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await settle(tester);
+
+    expect(find.text('Rosa is married to Arjan.'), findsOneWidget);
+    expect(find.byKey(const Key('answer-entity-Arjan')), findsOneWidget);
+    expect(
+      find.byKey(const Key('graph-suggestion-Where does Arjan work?')),
+      findsOneWidget,
+    );
+    // The answer's entities stay bright; everything else on screen recedes.
+    final nodes = tester.widgetList<AnimatedOpacity>(
+      find.ancestor(
+        of: find.byWidgetPredicate(
+          (widget) =>
+              widget.key is ValueKey<String> &&
+              (widget.key! as ValueKey<String>).value.startsWith('node-'),
+        ),
+        matching: find.byType(AnimatedOpacity),
+      ),
+    );
+    final opacities = [for (final node in nodes) node.opacity];
+    expect(opacities.where((value) => value == 1), hasLength(2));
+    expect(opacities.where((value) => value < .5), isNotEmpty);
+
+    final followUp = find.byKey(
+      const Key('graph-suggestion-Where does Arjan work?'),
+    );
+    await tester.ensureVisible(followUp);
+    await settle(tester);
+    await tester.tap(followUp);
+    await settle(tester);
+    final sent = http.sent('POST', '/api/v1/graph/ask').toList();
+    expect(sent, hasLength(2));
+    expect((sent.first.body! as Map)['question'], 'Who is Rosa married to?');
+    expect((sent.last.body! as Map)['history'], [
+      {
+        'question': 'Who is Rosa married to?',
+        'answer': 'Rosa is married to Arjan.',
+      },
+    ]);
+
+    await tester.ensureVisible(find.byKey(const Key('graph-answer-clear')));
+    await settle(tester);
+    await tester.tap(find.byKey(const Key('graph-answer-clear')));
+    await settle(tester);
+    expect(find.byKey(const Key('graph-answer')), findsNothing);
+  });
+
+  testWidgets('the 3D view selects what you tap and remembers the choice', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    addTearDown(() => SharedPreferences.setMockInitialValues({}));
+    // The 3D view turns slowly unless animations are off.
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    await pumpGraph(tester);
+
+    await tester.tap(find.byKey(const Key('graph-mode')));
+    await settle(tester);
+    expect(find.byKey(const Key('graph-3d')), findsOneWidget);
+    expect(find.byKey(const Key('node-You')), findsNothing);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('knowledgeGraph.mode3d'), isTrue);
+
+    // "You" sits at the origin, which projects to the middle of the visible area.
+    final view = tester.getRect(find.byKey(const Key('graph-3d')));
+    final top = tester.getRect(find.byKey(const Key('graph-overlay'))).bottom;
+    final bottom = view.bottom - view.height * .24;
+    await tester.tapAt(Offset(view.center.dx, (top + bottom) / 2));
+    await settle(tester);
+    expect(find.byKey(const Key('graph-inspector')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('graph-inspector')),
+        matching: find.text('You'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tapAt(Offset(view.left + 6, top + 6));
+    await settle(tester);
+    expect(find.byKey(const Key('graph-inspector')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('graph-mode')));
+    await settle(tester);
+    expect(find.byKey(const Key('node-You')), findsOneWidget);
+    expect(prefs.getBool('knowledgeGraph.mode3d'), isFalse);
   });
 }

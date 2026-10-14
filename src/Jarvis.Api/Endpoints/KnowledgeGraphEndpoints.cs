@@ -9,8 +9,31 @@ internal static class KnowledgeGraphEndpoints
     {
         api.MapGet("/graph/overview", async (int? limit, IKnowledgeGraphRepository graph, ICurrentUser currentUser,
                 CancellationToken ct) =>
-                Results.Ok(await graph.GetOverviewAsync(currentUser.OwnerId, Math.Clamp(limit ?? 60, 1, 150), ct)))
+                Results.Ok(await graph.GetOverviewAsync(currentUser.OwnerId, Math.Clamp(limit ?? 60, 1, KnowledgeGraphLimits.MaxOverviewEntities), ct)))
             .WithName("GetKnowledgeGraphOverview");
+
+        api.MapPost("/graph/ask", async (AskGraphRequest request, IGraphQuestionService questions,
+                ICurrentUser currentUser, CancellationToken ct) =>
+            {
+                var question = request.Question?.Trim();
+                if (string.IsNullOrEmpty(question))
+                    return EndpointHelpers.Invalid("question", "Ask a question.");
+                if (question.Length > GraphQuestionService.MaxQuestionLength)
+                    return EndpointHelpers.Invalid("question",
+                        $"Ask in {GraphQuestionService.MaxQuestionLength} characters or fewer.");
+                var focus = request.FocusIds ?? [];
+                if (focus.Count > GraphQuestionService.MaxFocus)
+                    return EndpointHelpers.Invalid("focusIds",
+                        $"Focus on {GraphQuestionService.MaxFocus} entities or fewer.");
+                var history = (request.History ?? [])
+                    .Where(turn => turn is not null && !string.IsNullOrWhiteSpace(turn.Question))
+                    .TakeLast(GraphQuestionService.MaxHistory)
+                    .Select(turn => new GraphQuestionTurn(Clip(turn.Question, GraphQuestionService.MaxQuestionLength),
+                        Clip(turn.Answer ?? "", 2_000)))
+                    .ToArray();
+                return Results.Ok(await questions.AskAsync(currentUser.OwnerId, question, focus, history, ct));
+            })
+            .WithName("AskKnowledgeGraph");
 
         api.MapGet("/graph/entities", async (string? search, IKnowledgeGraphRepository graph, ICurrentUser currentUser,
                 CancellationToken ct) =>
@@ -38,4 +61,7 @@ internal static class KnowledgeGraphEndpoints
 
         return api;
     }
+
+    private static string Clip(string value, int length) =>
+        value.Length <= length ? value.Trim() : value[..length].Trim();
 }
