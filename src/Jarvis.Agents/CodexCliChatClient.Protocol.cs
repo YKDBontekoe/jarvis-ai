@@ -113,7 +113,7 @@ public sealed partial class CodexCliChatClient
     {
         UnknownToolCallException unknown =>
             $"Your previous response asked for a Jarvis function named '{Limit(unknown.ToolName, 80)}', which does not exist. " +
-            "Use only an exact name from the Available Jarvis functions list, or return a concise text response if none fits.",
+            "Use only an exact name from the Available Jarvis functions list (call LoadTools first when the function belongs to one of its groups), or return a concise text response if none fits.",
         { InnerException: JsonException } =>
             "Your previous tool call had invalid JSON in argumentsJson. " +
             "Retry the same intended tool call with argumentsJson containing one complete, valid JSON object. " +

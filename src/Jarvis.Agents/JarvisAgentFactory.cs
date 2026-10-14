@@ -42,13 +42,18 @@ public sealed class JarvisAgentFactory(
         var modelClass = configuration["Jarvis:ModelClass"];
         if (string.IsNullOrWhiteSpace(modelClass)) modelClass = null;
         var tools = CollectTools(mcpTools, context);
+        var toolGroups = configuration.GetValue("Jarvis:ToolGroups:Enabled", true);
+        if (toolGroups)
+            tools.Add(ToolGroups.CreateLoadTools(tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal)));
 
         List<AIContextProvider> contextProviders = [.. contextContributors
             .OrderBy(contributor => contributor.Order)
             .SelectMany(contributor => contributor.CreateProviders(context))];
         contextProviders.Add(CreateCompactionProvider(loggerFactory, context.OwnerId));
 
-        var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
+        // Below function invocation: every tool stays callable, the model is shown the groups this turn needs.
+        var modelClient = toolGroups ? new ToolGroupChatClient(chatClient) : chatClient;
+        var agent = new ChatClientAgent(modelClient, new ChatClientAgentOptions
         {
             Id = "jarvis-root",
             Name = "Jarvis",
