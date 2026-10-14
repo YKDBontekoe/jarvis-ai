@@ -14,6 +14,12 @@ The same Flutter app is also hosted by the production API at the Jarvis domain
 root. It shares the existing account and owner-scoped data. See
 [hosted web deployment](../operations/deployment-and-ci.md#hosted-web-client).
 
+## Offline
+
+`lib/api/offline_cache.dart` keeps the last good answer to each JSON `GET` under `/api/` and serves it when the connection fails (no response at all: connection error or timeout), so screens open with saved data instead of an error. Server errors and 4xx answers still reach the screen, and writes never fall back (the chat outbox queues messages). Sign-in, credential, secret, token, download, content, export and stream routes are never saved; a request can opt out with `Options(extra: {OfflineCache.skipExtra: true})`. Saved answers expire after 14 days, bodies over 768 KB are skipped, and native builds keep at most 400 files (named by a hash of the request) in the app's private support directory; the web build keeps them in memory. Sign-out clears the cache.
+
+While anything is served from the cache, or a request cannot reach the server, `OfflineBanner` (`lib/ui/offline_banner.dart`, mounted in `MaterialApp.builder`) shows "Offline · showing data from …" above every page with a Retry that probes `/alive`. The next answer from the server hides it. A response from the cache carries `extra['jarvisCachedAt']` (`isCachedResponse`). Widget tests that use `debugJarvisHttpAdapter` do not attach the cache.
+
 ## Feature layout
 
 | Path | Screen / concern |

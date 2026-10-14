@@ -15,6 +15,7 @@ import 'package:signalr_netcore/signalr_client.dart';
 import '../../api/api_config.dart';
 import '../../api/api_errors.dart';
 import '../../api/jarvis_http.dart';
+import '../../api/offline_cache.dart';
 import '../../auth/auth_session.dart';
 import '../../auth/auth_validation.dart';
 import '../conversations/conversations_screen.dart';
@@ -134,6 +135,8 @@ class _ChatScreenState extends _ChatScreenController
     });
     if (widget.skipAuthentication) _restoringSession = false;
     _attachPushListeners();
+    // Widget tests serve canned responses; a cache shared across them would leak data between tests.
+    if (!usesDebugJarvisHttpAdapter) OfflineCache.instance.attach(_http);
     attachJarvisAuthInterceptor(
       http: _http,
       auth: _auth,
