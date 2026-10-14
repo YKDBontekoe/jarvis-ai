@@ -18,6 +18,7 @@ internal sealed class CoreAgentTools(
     IJarvisTaskService taskService,
     IMemoryService memoryService,
     MemoryReranker reranker,
+    FileReranker fileReranker,
     IConditionWatchService watchService,
     IReminderService reminderService,
     IAutomationRuleService automationRules,
@@ -55,8 +56,8 @@ internal sealed class CoreAgentTools(
         var watchTools = new ConditionWatchAgentTools(watchService, currentUser);
         var reminderTools = new ReminderAgentTools(reminderService, currentUser, briefings, deviceTelemetry);
         var automationTools = new AutomationAgentTools(automationRules, currentUser, briefings, timeProvider);
-        var fileTools = new FileAgentTools(fileSearch, fileRepository, conversationFileScope, fileCitations, collections,
-            currentUser, context.ConversationId, context.Profile);
+        var fileTools = new FileAgentTools(fileSearch, fileReranker, fileRepository, conversationFileScope, fileCitations,
+            collections, currentUser, context.ConversationId, context.Profile);
         var clockTools = new ClockAgentTools(timeProvider ?? TimeProvider.System);
         var mcpServerTools = new McpServerAgentTools(mcpServers, mcpPolicy, configuration, currentUser, mcpToolHost,
             mcpOAuth, mcpCatalog);

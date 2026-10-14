@@ -74,7 +74,7 @@ public sealed record SaveIntegrationSecretRequest(string Value);
 public sealed record AuditEventDto(Guid Id, Guid? AgentRunId, string Tool, string Action, string RiskClass,
     Guid? ApprovalId, DateTimeOffset Timestamp, bool Success, string? MetadataJson);
 public sealed record FileDto(Guid Id, string FileName, string ContentType, long SizeBytes, string Sha256,
-    DateTimeOffset CreatedAt, string ProcessingStatus);
+    DateTimeOffset CreatedAt, string ProcessingStatus, bool PartiallyIndexed = false);
 public sealed record FileSearchHitDto(Guid FileId, string FileName, Guid ChunkId, int ChunkIndex, string Content,
     double Score, int ExcerptStart, int ExcerptEnd, int? PageNumber, string SanitizedExcerpt);
 public sealed record ConversationSourcesDto(IReadOnlyList<ConversationFileSourceDto> Files,

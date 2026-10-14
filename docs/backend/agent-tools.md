@@ -27,7 +27,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 |-----------|-------|----------------|
 | Time | `ClockAgentTools.GetCurrentTime` | — |
 | Reminders | `ReminderAgentTools` create/list/cancel | — |
-| Files | `FileAgentTools` search/list | — |
+| Files | `FileAgentTools` search (hybrid retrieval, model rerank) / list; `FileContextContributor` adds matching passages from attached sources each turn | — |
 | Tasks | `TaskAgentTools` list/cancel/create | Create hidden during background task turns |
 | Watches | `ConditionWatchAgentTools` | — |
 | Memory | `MemoryAgentTools` list/search/remember | **Forget** requires approval |

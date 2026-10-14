@@ -15,9 +15,12 @@ public sealed class StoredFileEntity
     public DateTimeOffset? ScheduleDispatchedAt { get; set; }
     public string ProcessingStatus { get; set; } = "uploaded";
 
+    /// <summary>True when extraction or chunk limits cut off part of the file's text.</summary>
+    public bool PartiallyIndexed { get; set; }
+
     /// <summary>The owner's project this file belongs to; null when it is not in a project.</summary>
     public Guid? ProjectId { get; set; }
 
     public StoredFile ToRecord() => new(Id, OwnerId, ObjectKey, FileName, ContentType,
-        SizeBytes, Sha256, CreatedAt, ProcessingStatus);
+        SizeBytes, Sha256, CreatedAt, ProcessingStatus, PartiallyIndexed);
 }

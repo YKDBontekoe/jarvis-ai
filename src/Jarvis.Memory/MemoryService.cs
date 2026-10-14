@@ -78,11 +78,23 @@ public sealed class MemoryService(IMemoryRepository repository, IMemoryIndexRepo
             var semanticEnabled = index is not null && embedder is not null &&
                                   await repository.HasActiveMemoriesAsync(ownerId, cancellationToken);
 
-            var lexical = await repository.SearchLexicalAsync(ownerId, MemoryQuery.Parse(query), kind,
-                CandidateLimit, cancellationToken);
-            // Embedding model resolution and usage recording access the same scoped DbContext as the repositories.
-            // Await the entire embedding operation after lexical retrieval so their database operations cannot overlap.
-            var embedding = semanticEnabled ? await EmbedQueryAsync(ownerId, query, cancellationToken) : null;
+            // Resolving the model reads the scoped database context, so it runs first. The provider call itself does not
+            // touch that context and runs while the keyword query does, which takes its latency off the search.
+            var model = semanticEnabled ? await ResolveEmbedderAsync(ownerId, cancellationToken) : null;
+            var pendingEmbedding = model is null ? null : EmbedQueryAsync(model, query, cancellationToken);
+            IReadOnlyList<MemoryLexicalMatch> lexical;
+            try
+            {
+                lexical = await repository.SearchLexicalAsync(ownerId, MemoryQuery.Parse(query), kind,
+                    CandidateLimit, cancellationToken);
+            }
+            catch
+            {
+                // Observe the embedding so a cancelled provider call never surfaces as an unobserved task exception.
+                if (pendingEmbedding is not null) await Task.WhenAny(pendingEmbedding);
+                throw;
+            }
+            var embedding = pendingEmbedding is null ? null : await pendingEmbedding;
             var semantic = await SearchSemanticAsync(ownerId, embedding, kind, cancellationToken);
             activity?.SetTag("jarvis.memory.semantic_hits", semantic.Count);
             activity?.SetTag("jarvis.memory.lexical_hits", lexical.Count);
@@ -114,12 +126,26 @@ public sealed class MemoryService(IMemoryRepository repository, IMemoryIndexRepo
         CancellationToken cancellationToken) =>
         memoryIds.Count == 0 ? Task.CompletedTask : repository.RecordAccessAsync(ownerId, memoryIds, cancellationToken);
 
-    private async Task<MemoryEmbedding?> EmbedQueryAsync(Guid ownerId, string query,
+    private async Task<IResolvedEmbedder?> ResolveEmbedderAsync(Guid ownerId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await embedder!.ResolveAsync(ownerId, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException ||
+                                          !cancellationToken.IsCancellationRequested)
+        {
+            Activity.Current?.AddEvent(new ActivityEvent("jarvis.memory.semantic_unavailable"));
+            return null;
+        }
+    }
+
+    private static async Task<MemoryEmbedding?> EmbedQueryAsync(IResolvedEmbedder model, string query,
         CancellationToken cancellationToken)
     {
         try
         {
-            var embeddings = await embedder!.EmbedAsync(ownerId, [query], cancellationToken);
+            var embeddings = await model.EmbedAsync([query], cancellationToken);
             return embeddings is [var embedding] ? embedding : null;
         }
         catch (Exception exception) when (exception is not OperationCanceledException ||

@@ -20,6 +20,7 @@ internal sealed class StoredFileEntityConfiguration : IEntityTypeConfiguration<S
             builder.Property(x => x.CreatedAt).HasColumnName("created_at");
             builder.Property(x => x.ScheduleDispatchedAt).HasColumnName("schedule_dispatched_at");
             builder.Property(x => x.ProcessingStatus).HasColumnName("processing_status").HasMaxLength(30).IsRequired();
+            builder.Property(x => x.PartiallyIndexed).HasColumnName("partially_indexed");
             builder.HasIndex(x => new { x.OwnerId, x.CreatedAt });
             builder.HasIndex(x => x.ObjectKey).IsUnique();
             builder.HasIndex(x => new { x.ProcessingStatus, x.ScheduleDispatchedAt });

@@ -244,9 +244,23 @@ internal sealed class EmbeddingLookup(string model, Dictionary<string, float[]> 
         return new EmbeddingLookup(model, vectors);
     }
 
+    public string Model => model;
+
     public MemoryEmbedding Embedding(string text) => new(model, vectors[text]);
 
     public Task<IReadOnlyList<MemoryEmbedding>?> EmbedAsync(Guid ownerId, IReadOnlyList<string> texts,
         CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<MemoryEmbedding>?>(texts.Select(Embedding).ToArray());
+
+    public Task<IResolvedEmbedder?> ResolveAsync(Guid ownerId, CancellationToken cancellationToken) =>
+        Task.FromResult<IResolvedEmbedder?>(new Resolved(this));
+
+    private sealed class Resolved(EmbeddingLookup lookup) : IResolvedEmbedder
+    {
+        public string Model => lookup.Model;
+
+        public Task<IReadOnlyList<MemoryEmbedding>> EmbedAsync(IReadOnlyList<string> texts,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<MemoryEmbedding>>(texts.Select(lookup.Embedding).ToArray());
+    }
 }

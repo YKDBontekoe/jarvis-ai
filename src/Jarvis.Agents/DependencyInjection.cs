@@ -51,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<IConversationMemoryExtractor, ConversationMemoryExtractor>();
         services.AddSingleton<IRollingSummaryCache, RollingSummaryCache>();
         services.AddScoped<MemoryReranker>();
+        services.AddScoped<FileReranker>();
         services.AddScoped<IAgentToolContributor, CoreAgentTools>();
         services.AddScoped<IAgentContextContributor, CoreAgentContext>();
         // Cross-feature: the situation every turn sees, and tools that search, relate and arrange across features.
@@ -103,6 +104,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();
         services.AddScoped<IAgentContextContributor, Persona.PersonaContextContributor>();
         services.AddScoped<IAgentContextContributor, Learning.UserSummaryContextContributor>();
+        services.AddSingleton<Memory.QueryEmbeddingCache>();
         services.AddScoped<IMemoryEmbedder, Memory.ResolverMemoryEmbedder>();
         services.AddScoped<Memory.KnowledgeGraphExtractor>();
         services.AddScoped<Jarvis.Application.Memory.IGraphAnswerModel, Memory.ModelGraphAnswerModel>();

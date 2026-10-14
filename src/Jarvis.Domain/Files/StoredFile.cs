@@ -9,4 +9,5 @@ public sealed record StoredFile(
     long SizeBytes,
     string Sha256,
     DateTimeOffset CreatedAt,
-    string ProcessingStatus);
+    string ProcessingStatus,
+    bool PartiallyIndexed = false);

@@ -2355,6 +2355,11 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("vector(1536)")
                         .HasColumnName("embedding");
 
+                    b.Property<string>("EmbeddingModel")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("embedding_model");
+
                     b.Property<int>("EndOffset")
                         .HasColumnType("integer")
                         .HasColumnName("end_offset");
@@ -2362,6 +2367,11 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("FileId")
                         .HasColumnType("uuid")
                         .HasColumnName("file_id");
+
+                    b.Property<string>("Heading")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("heading");
 
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")
@@ -2376,7 +2386,7 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("tsvector")
                         .HasColumnName("search_text")
-                        .HasComputedColumnSql("to_tsvector('simple'::regconfig, content)", true);
+                        .HasComputedColumnSql("to_tsvector('simple'::regconfig, coalesce(heading, '') || ' ' || content)", true);
 
                     b.Property<int>("StartOffset")
                         .HasColumnType("integer")
@@ -2384,12 +2394,21 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Content");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Content"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Content"), new[] { "gin_trgm_ops" });
+
                     b.HasIndex("Embedding");
 
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Embedding"), "hnsw");
                     NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Embedding"), new[] { "vector_cosine_ops" });
 
                     b.HasIndex("FileId");
+
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("ix_file_content_chunks_owner_id_unembedded")
+                        .HasFilter("embedding IS NULL");
 
                     b.HasIndex("SearchText");
 
@@ -4224,6 +4243,10 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")
                         .HasColumnName("owner_id");
+
+                    b.Property<bool>("PartiallyIndexed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("partially_indexed");
 
                     b.Property<string>("ProcessingStatus")
                         .IsRequired()

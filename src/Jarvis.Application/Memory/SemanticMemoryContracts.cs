@@ -18,6 +18,20 @@ public interface IMemoryEmbedder
 {
     Task<IReadOnlyList<MemoryEmbedding>?> EmbedAsync(Guid ownerId, IReadOnlyList<string> texts,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Resolves the owner's embedding model; null when semantic search is off. Resolving is the only step that reads
+    /// the database: the returned embedder only calls the provider (usage is recorded in its own scope), so a search
+    /// can embed its query while the scoped database context serves the keyword query.
+    /// </summary>
+    Task<IResolvedEmbedder?> ResolveAsync(Guid ownerId, CancellationToken cancellationToken);
+}
+
+/// <summary>An embedding model resolved for one owner. It never touches the caller's database context.</summary>
+public interface IResolvedEmbedder
+{
+    string Model { get; }
+    Task<IReadOnlyList<MemoryEmbedding>> EmbedAsync(IReadOnlyList<string> texts, CancellationToken cancellationToken);
 }
 
 /// <summary>Background indexing state for embeddings and the knowledge graph.</summary>
