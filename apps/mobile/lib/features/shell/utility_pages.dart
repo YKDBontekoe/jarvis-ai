@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../activity/activity_screen.dart';
 import '../approvals/approvals_screen.dart';
-import '../audit/audit_screen.dart';
 import '../watches/condition_watches_screen.dart';
 import '../briefing/daily_briefing_screen.dart';
 import '../files/files_screen.dart';
@@ -23,7 +22,6 @@ import '../decisions/decisions_screen.dart';
 import '../entities/entity_ref.dart';
 import '../entities/entity_screen.dart';
 import '../devices/devices_screen.dart';
-import '../expenses/expenses_screen.dart';
 import '../habits/habits_screen.dart';
 import '../journal/journal_screen.dart';
 import '../library/library_screen.dart';
@@ -114,7 +112,12 @@ Widget? utilityPageFor(
   'modes' => ModesScreen(http: http),
   'library' => LibraryScreen(http: http),
   'inbox' => InboxScreen(http: http),
-  'expenses' => ExpensesScreen(http: http),
+  // Expenses live in Finance's Spending tab, and the audit log in Activity.
+  'expenses' => FinanceScreen(
+    http: http,
+    onAskInChat: onAskInChat,
+    initialTab: FinanceTab.spending,
+  ),
   'finance' => FinanceScreen(http: http, onAskInChat: onAskInChat),
   'habits' => HabitsScreen(http: http),
   'people' => PeopleScreen(http: http),
@@ -135,7 +138,11 @@ Widget? utilityPageFor(
     initialTab: RemindersTab.notifications,
   ),
   'files' => FilesScreen(http: http),
-  'audit' => AuditScreen(http: http),
+  'audit' => ActivityScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+    initialFilter: ActivityFilter.audit,
+  ),
   'watches' => ConditionWatchesScreen(http: http),
   'automations' => AutomationsScreen(
     http: http,

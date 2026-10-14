@@ -16,9 +16,18 @@ import 'expense_models.dart';
 /// category, and every expense. Jarvis fills it from chat ("€12 lunch") and
 /// receipt photos; the owner can scan, add, and correct expenses here too.
 class ExpensesScreen extends StatefulWidget {
-  const ExpensesScreen({required this.http, this.now, super.key});
+  const ExpensesScreen({
+    required this.http,
+    this.now,
+    this.embedded = false,
+    super.key,
+  });
 
   final Dio http;
+
+  /// Shown as the Spending tab of Finance: no app bar of its own, and scan and
+  /// add sit next to the month instead.
+  final bool embedded;
 
   /// Fixed clock for tests.
   final DateTime? now;
@@ -119,49 +128,71 @@ class _ExpensesScreenState extends State<ExpensesScreen>
   Widget build(BuildContext context) {
     final data = _data;
     final monthName = monthLabel(_month.year, _month.month, now: _now);
+    final switcher = _MonthSwitcher(
+      label: monthName,
+      canGoForward: !_isCurrentMonth,
+      onBack: () => _shiftMonth(-1),
+      onForward: () => _shiftMonth(1),
+    );
     return Scaffold(
-      appBar: AppBar(
-        title: const PageTitle('Expenses'),
-        actions: [
-          HeaderAction(
-            key: const Key('expenses-finance'),
-            label: 'Budgets & bills',
-            icon: PhosphorIconsRegular.chartLine,
-            collapsesWhenNarrow: true,
-            onPressed: () => unawaited(
-              Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => FinanceScreen(http: widget.http),
+      appBar: widget.embedded
+          ? null
+          : AppBar(
+              title: const PageTitle('Expenses'),
+              actions: [
+                HeaderAction(
+                  key: const Key('expenses-finance'),
+                  label: 'Budgets & bills',
+                  icon: PhosphorIconsRegular.chartLine,
+                  collapsesWhenNarrow: true,
+                  onPressed: () => unawaited(
+                    Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => FinanceScreen(http: widget.http),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                HeaderAction(
+                  key: const Key('expenses-scan'),
+                  label: 'Scan receipt',
+                  icon: PhosphorIconsRegular.scan,
+                  collapsesWhenNarrow: true,
+                  onPressed: _scan,
+                ),
+                const SizedBox(width: 8),
+                HeaderAction(
+                  key: const Key('expenses-add'),
+                  label: 'Add',
+                  icon: PhosphorIconsRegular.plus,
+                  onPressed: _add,
+                ),
+              ],
             ),
-          ),
-          const SizedBox(width: 8),
-          HeaderAction(
-            key: const Key('expenses-scan'),
-            label: 'Scan receipt',
-            icon: PhosphorIconsRegular.scan,
-            collapsesWhenNarrow: true,
-            onPressed: _scan,
-          ),
-          const SizedBox(width: 8),
-          HeaderAction(
-            key: const Key('expenses-add'),
-            label: 'Add',
-            icon: PhosphorIconsRegular.plus,
-            onPressed: _add,
-          ),
-        ],
-      ),
       body: Column(
         children: [
           ContentWidth(
-            child: _MonthSwitcher(
-              label: monthName,
-              canGoForward: !_isCurrentMonth,
-              onBack: () => _shiftMonth(-1),
-              onForward: () => _shiftMonth(1),
-            ),
+            child: widget.embedded
+                ? Row(
+                    children: [
+                      Expanded(child: switcher),
+                      IconButton(
+                        key: const Key('expenses-scan'),
+                        tooltip: 'Scan receipt',
+                        onPressed: _scan,
+                        icon: const Icon(PhosphorIconsRegular.scan, size: 20),
+                      ),
+                      IconButton(
+                        key: const Key('expenses-add'),
+                        tooltip: 'Add expense',
+                        onPressed: _add,
+                        icon: const Icon(PhosphorIconsRegular.plus, size: 20),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                  )
+                : switcher,
           ),
           Expanded(
             child: ListScreenBody(

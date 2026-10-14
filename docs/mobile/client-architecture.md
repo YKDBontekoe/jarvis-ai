@@ -55,6 +55,8 @@ While anything is served from the cache, or a request cannot reach the server, `
 
 Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide code: `main.dart`, `theme.dart`, `appearance.dart`, `app_lock.dart`, `error_reporting.dart`, and small helpers (`json_maps.dart`, `http_urls.dart`, `schedule_format.dart`), plus `api/`, `auth/`, `push/` and `ui/`. Put new screens in a feature folder.
 
+**Merged features.** Overlapping features were folded together: Expenses is the Spending tab of Finance, and the audit log is a view of Activity. `mergedTileIds` in `tile_registry.dart` maps the old tile ids (`expenses`, `audit`) to the tile they joined, so saved Home layouts move over, and `utilityPageFor` still opens the old destinations (deep links, notifications, search, Settings) on the merged page. When folding another feature in, add it there too.
+
 ## Motion and visual language
 
 - `lib/ui/motion.dart` — `JarvisMotion` tokens: `fast` 150 ms (presses, icon swaps), `base` 220 ms (content changes), `slow` 380 ms (pages), `standard` ease-out curve, travel 8 px, start scale 0.98. Read timings from here instead of hardcoding durations, and use `JarvisMotion.of(context, …)` so reduced motion turns them off.
@@ -114,7 +116,7 @@ Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide
 - `EntityRef` is the client side of the server's `type:id` refs. The destination `entity:<type>:<id>` opens `EntityScreen`: the thing's title, an "Open in <feature>" button, the `RelatedPanel` (from `/entities/{type}/{id}/related`) and its event history.
 - `RelatedPanel` also appears in task details. Memory's "Learned from a conversation" opens the memory's page, which leads back to the chat.
 - Chat turns completed tool steps that carry refs into `EntityResultCard`s.
-- The **Activity** tile and page (`/api/v1/events`) show what happened and what Jarvis did on its own; rows open their subject.
+- The **Activity** tile and page (`/api/v1/events`) show what happened and what Jarvis did on its own; rows open their subject. Its third view, **Audit log**, is the audit trail (`/api/v1/audit`, `AuditScreen` with `embedded: true`); the `audit` destination opens it.
 - Home refreshes on the realtime `event.created`.
 - The Learning page's autonomy card holds the level picker, including the opt-in autonomous level and its per-category outside-action switches.
 

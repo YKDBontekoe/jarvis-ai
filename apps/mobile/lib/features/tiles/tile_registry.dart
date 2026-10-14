@@ -261,26 +261,17 @@ final List<TileSpec> tileSpecs = [
   ),
   // Money
   const TileSpec(
-    id: 'expenses',
-    description: 'Log purchases and see where your money goes.',
-    name: 'Expenses',
+    id: 'finance',
+    description:
+        'Spending, receipts, budgets, subscriptions, bank accounts and your '
+        'portfolio in one place.',
+    name: 'Finance',
     icon: PhosphorIconsRegular.wallet,
     category: TileCategory.money,
     sizes: [_icon, _strip, _square, _wide],
-    destination: 'expenses',
-    load: _expenses,
-    fallback: 'What you spend',
-  ),
-  const TileSpec(
-    id: 'finance',
-    description: 'Review budgets and recurring subscriptions.',
-    name: 'Finance',
-    icon: PhosphorIconsRegular.chartBar,
-    category: TileCategory.money,
-    sizes: [_icon, _strip, _square],
     destination: 'finance',
-    load: _finance,
-    fallback: 'Budgets and subscriptions',
+    load: _money,
+    fallback: 'What you spend',
   ),
   // Automate
   const TileSpec(
@@ -425,16 +416,6 @@ final List<TileSpec> tileSpecs = [
     fallback: 'Tokens and cost',
   ),
   const TileSpec(
-    id: 'audit',
-    description: 'Inspect the actions Jarvis has taken.',
-    name: 'Audit log',
-    icon: PhosphorIconsRegular.scroll,
-    category: TileCategory.system,
-    sizes: [_icon, _strip],
-    destination: 'audit',
-    fallback: 'What Jarvis did',
-  ),
-  const TileSpec(
     id: 'notifications',
     description: 'Read updates and alerts from Jarvis.',
     name: 'Notifications',
@@ -458,6 +439,11 @@ final List<TileSpec> tileSpecs = [
 ];
 
 final Map<String, TileSpec> _byId = {for (final s in tileSpecs) s.id: s};
+
+/// Tiles that were folded into another feature, by their old id. Saved Home
+/// layouts move to the new tile, and the old destinations still open the
+/// merged page.
+const mergedTileIds = {'expenses': 'finance', 'audit': 'activity'};
 
 TileSpec? tileSpecFor(String id) => _byId[id];
 
@@ -992,6 +978,27 @@ Future<TileData?> _expenses(TileEnv env) async {
           meta: formatMoney(merchant.total, data.currency),
         ),
     ],
+  );
+}
+
+/// Spending this month, with budget alerts from the finance overview when there are any.
+Future<TileData?> _money(TileEnv env) async {
+  final results = await Future.wait([
+    _expenses(env),
+    _finance(env).then<TileData?>((data) => data, onError: (_) => null),
+  ]);
+  final spending = results[0];
+  final finance = results[1];
+  if (spending == null) return finance;
+  if (finance == null || !finance.attention) return spending;
+  return TileData(
+    stat: spending.stat,
+    unit: spending.unit,
+    subtitle: finance.subtitle,
+    attention: true,
+    visual: spending.visual,
+    bars: spending.bars,
+    rows: spending.rows,
   );
 }
 

@@ -5,6 +5,7 @@ import 'package:jarvis_mobile/features/chat/chat_entries.dart';
 import 'package:jarvis_mobile/features/chat/chat_widgets.dart';
 import 'package:jarvis_mobile/features/entities/entity_ref.dart';
 import 'package:jarvis_mobile/features/entities/entity_screen.dart';
+import 'package:jarvis_mobile/features/finance/finance_screen.dart';
 import 'package:jarvis_mobile/features/shell/utility_pages.dart';
 import 'package:jarvis_mobile/features/tiles/tile_models.dart';
 import 'package:jarvis_mobile/features/tiles/tile_registry.dart';
@@ -77,6 +78,16 @@ void main() {
       );
       expect(utilityPageFor('entity:nope:1', http.client()), isNull);
       expect(utilityPageFor('activity', http.client()), isA<ActivityScreen>());
+    });
+
+    test('merged features still open from their old destinations', () {
+      final http = FixtureHttp();
+      final audit = utilityPageFor('audit', http.client());
+      expect(audit, isA<ActivityScreen>());
+      expect((audit! as ActivityScreen).initialFilter, ActivityFilter.audit);
+      final expenses = utilityPageFor('expenses', http.client());
+      expect(expenses, isA<FinanceScreen>());
+      expect((expenses! as FinanceScreen).initialTab, FinanceTab.spending);
     });
   });
 
@@ -220,6 +231,22 @@ void main() {
       http.sent('GET', '/api/v1/events').last.query['origins'],
       'Agent,AgentReaction',
     );
+
+    http.on('GET', '/api/v1/audit', [
+      {
+        'id': 'a1',
+        'action': 'memory.created',
+        'success': true,
+        'timestamp': '2026-09-28T12:00:00Z',
+        'riskClass': 'low',
+      },
+    ]);
+    await tester.tap(
+      find.byKey(const Key('activity-filter-ActivityFilter.audit')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('memory created'), findsOneWidget);
+    expect(find.text('Battery low'), findsNothing);
   });
 
   test('the activity tile counts what Jarvis did and links each row', () async {

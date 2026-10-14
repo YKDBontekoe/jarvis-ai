@@ -4,12 +4,15 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
+import '../audit/audit_screen.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../entities/entity_ref.dart';
 import '../entities/entity_screen.dart';
 
-enum ActivityFilter { all, jarvis }
+/// What the Activity page shows: every event, only what Jarvis did on its own,
+/// or the audit log of recorded actions (approvals, memory and file changes).
+enum ActivityFilter { all, jarvis, audit }
 
 /// Everything that happened across Jarvis, newest first: reminders that went
 /// off, watches that fired, tasks, approvals, commitments, uploads, and what
@@ -44,6 +47,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   Future<void> _load() async {
+    if (_filter == ActivityFilter.audit) return;
     final revision = ++_revision;
     setState(() => _loading = true);
     try {
@@ -104,6 +108,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               options: const [
                 (ActivityFilter.all, 'Everything'),
                 (ActivityFilter.jarvis, 'By Jarvis'),
+                (ActivityFilter.audit, 'Audit log'),
               ],
               selected: _filter,
               onSelected: (filter) {
@@ -112,49 +117,51 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   _filter = filter;
                   _events = const [];
                 });
-                unawaited(_load());
+                if (filter != ActivityFilter.audit) unawaited(_load());
               },
             ),
           ),
         ),
         Expanded(
-          child: ListScreenBody(
-            loading: _loading,
-            error: _error,
-            isEmpty: _events.isEmpty,
-            onRetry: () => unawaited(_load()),
-            onRefresh: _load,
-            empty: EmptyState(
-              icon: PhosphorIconsRegular.pulse,
-              title: _filter == ActivityFilter.jarvis
-                  ? 'Jarvis has not acted on its own yet'
-                  : 'Nothing happened yet',
-              message: _filter == ActivityFilter.jarvis
-                  ? 'When a watch fires, a task fails or someone needs a '
-                        'reply, Jarvis follows up here.'
-                  : 'Reminders, watches, tasks and approvals show up here as '
-                        'they happen.',
-            ),
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                0,
-                16,
-                32 + MediaQuery.paddingOf(context).bottom,
-              ),
-              children: [
-                ContentWidth(
-                  child: GroupedSection(
-                    dividerIndent: 60,
+          child: _filter == ActivityFilter.audit
+              ? AuditScreen(http: widget.http, embedded: true)
+              : ListScreenBody(
+                  loading: _loading,
+                  error: _error,
+                  isEmpty: _events.isEmpty,
+                  onRetry: () => unawaited(_load()),
+                  onRefresh: _load,
+                  empty: EmptyState(
+                    icon: PhosphorIconsRegular.pulse,
+                    title: _filter == ActivityFilter.jarvis
+                        ? 'Jarvis has not acted on its own yet'
+                        : 'Nothing happened yet',
+                    message: _filter == ActivityFilter.jarvis
+                        ? 'When a watch fires, a task fails or someone needs a '
+                              'reply, Jarvis follows up here.'
+                        : 'Reminders, watches, tasks and approvals show up here as '
+                              'they happen.',
+                  ),
+                  child: ListView(
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      32 + MediaQuery.paddingOf(context).bottom,
+                    ),
                     children: [
-                      for (final event in _events)
-                        ActivityRow(event: event, onTap: _openFor(event)),
+                      ContentWidth(
+                        child: GroupedSection(
+                          dividerIndent: 60,
+                          children: [
+                            for (final event in _events)
+                              ActivityRow(event: event, onTap: _openFor(event)),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
         ),
       ],
     ),
