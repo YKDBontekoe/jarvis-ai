@@ -90,6 +90,52 @@ public sealed class KnowledgeMemoryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Graph_questions_retrieve_the_users_facts_history_and_nothing_from_other_owners()
+    {
+        var owner = Guid.CreateVersion7();
+        var stranger = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var graph = new KnowledgeGraphRepository(database);
+        var then = DateTimeOffset.UtcNow.AddDays(-30);
+        await graph.MergeAsync(owner,
+        [
+            new GraphFact("user", "person", "has_sister", "Anna", "person", true, false, then, 0.9f),
+            new GraphFact("Anna", "person", "works_at", "Philips", "organization", true, true, then, 0.9f),
+            new GraphFact("Anna", "person", "works_at", "ASML", "organization", true, true, DateTimeOffset.UtcNow,
+                0.9f)
+        ], null, CancellationToken.None);
+        await graph.MergeAsync(stranger,
+        [
+            new GraphFact("Anna", "person", "lives_in", "Secret Town", "place", true, true, then, 0.9f)
+        ], null, CancellationToken.None);
+        var model = new CapturingAnswerModel();
+        var questions = new GraphQuestionService(graph, model);
+
+        var answer = await questions.AskAsync(owner, "Where did my sister Anna use to work?", [], [],
+            CancellationToken.None);
+
+        Assert.True(answer.Grounded);
+        var facts = model.Facts!.Select(fact => fact.Sentence).ToArray();
+        Assert.Contains(facts, fact => fact.EndsWith("has sister Anna", StringComparison.Ordinal));
+        Assert.Contains("Anna works at ASML", facts);
+        Assert.Contains(model.Facts!, fact => fact.Sentence == "Anna works at Philips" && fact.ValidTo is not null);
+        Assert.DoesNotContain(facts, fact => fact.Contains("Secret Town", StringComparison.Ordinal));
+    }
+
+    private sealed class CapturingAnswerModel : IGraphAnswerModel
+    {
+        public IReadOnlyList<GraphContextFact>? Facts { get; private set; }
+
+        public Task<GraphModelAnswer?> AnswerAsync(Guid ownerId, string question,
+            IReadOnlyList<GraphQuestionTurn> history, IReadOnlyList<GraphContextFact> facts, DateTimeOffset now,
+            CancellationToken cancellationToken)
+        {
+            Facts = facts;
+            return Task.FromResult<GraphModelAnswer?>(new GraphModelAnswer("Philips.", [facts[0].Id], []));
+        }
+    }
+
+    [Fact]
     public async Task An_ended_fact_closes_the_open_relation_it_names_or_any_with_that_object()
     {
         var owner = Guid.CreateVersion7();

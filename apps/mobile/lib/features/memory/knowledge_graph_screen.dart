@@ -5,6 +5,8 @@ import 'dart:ui' as ui;
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
@@ -19,8 +21,10 @@ part 'knowledge_graph_map.dart';
 part 'graph_entity_screen.dart';
 part 'knowledge_graph_viewport.dart';
 part 'knowledge_graph_sheet.dart';
+part 'knowledge_graph_ask.dart';
+part 'knowledge_graph_3d.dart';
 
-const _sheetPeek = 0.34;
+const _sheetPeek = 0.24;
 const _minScale = 0.04;
 
 /// Matches the server's cap (`KnowledgeGraphLimits.MaxOverviewEntities`).
@@ -38,8 +42,13 @@ const _highlightsMinimum = 6;
 
 /// Categorical colours for entity types. The app's semantic colours are deliberately close to the indigo accent,
 /// which makes a map of eight types unreadable, so the graph gets its own palette tuned per brightness.
-Color graphTypeColor(String? type, [BuildContext? context]) {
-  final dark = context != null && JarvisColors.of(context).isDark;
+Color graphTypeColor(
+  String? type, [
+  BuildContext? context,
+  JarvisColors? palette,
+]) {
+  final dark =
+      palette?.isDark ?? (context != null && JarvisColors.of(context).isDark);
   return switch (type) {
     'person' => dark ? const Color(0xff9a91ff) : const Color(0xff5b4ef0),
     'place' => dark ? const Color(0xff34d399) : const Color(0xff0f9d76),
@@ -74,6 +83,11 @@ class KnowledgeGraphScreen extends StatefulWidget {
   @visibleForTesting
   static Future<Map<String, Offset>> Function(GraphLayoutJob job)
   runLargeLayout = (job) => compute(layoutGraphJob, job);
+
+  /// The 3D counterpart of [runLargeLayout].
+  @visibleForTesting
+  static Future<Map<String, GraphPoint3>> Function(GraphLayoutJob job)
+  runLarge3dLayout = (job) => compute(layoutGraph3dJob, job);
 
   @override
   State<KnowledgeGraphScreen> createState() => _KnowledgeGraphScreenState();
@@ -113,6 +127,21 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
   int _revealed = 0;
   int _requestRevision = 0;
   int _listLimit = _listPage;
+  double _topInset = 150;
+  final _overlayKey = GlobalKey();
+
+  bool _mode3d = false;
+  Map<String, GraphPoint3>? _layout3d;
+  GraphLayoutJob? _layoutJob;
+  final _graph3dKey = GlobalKey<_Graph3DViewState>();
+
+  final _askField = TextEditingController();
+  bool _asking = false;
+  String? _askError;
+  String? _pendingQuestion;
+  GraphAnswerView? _answer;
+  final _turns = <GraphAnswerView>[];
+  int _askRevision = 0;
 
   Future<void> _load() async {
     final revision = ++_requestRevision;
@@ -148,10 +177,13 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
       final layout = ids.length > _isolateLayoutAbove
           ? await KnowledgeGraphScreen.runLargeLayout(job)
           : layoutGraphJob(job);
+      final layout3d = _mode3d ? await _compute3d(job) : null;
       if (!mounted || revision != _requestRevision) return;
       _replay.stop();
       setState(() {
         _all = snapshot;
+        _layoutJob = job;
+        _layout3d = layout3d;
         _clusters = graphClusters(communities);
         _firstSeen = nodeFirstSeen(snapshot);
         _range = graphTimeRange(snapshot);
@@ -183,6 +215,57 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
       });
     }
   }
+
+  Future<Map<String, GraphPoint3>> _compute3d(GraphLayoutJob job) =>
+      job.nodes.length > _isolateLayoutAbove
+      ? KnowledgeGraphScreen.runLarge3dLayout(job)
+      : Future.value(layoutGraph3dJob(job));
+
+  /// Switches between the flat map and the 3D view, laying out in 3D the first time, and remembers the choice.
+  Future<void> _setMode3d(bool on, {bool remember = true}) async {
+    if (on && _layout3d == null && _layoutJob != null) {
+      final job = _layoutJob!;
+      final layout = await _compute3d(job);
+      if (!mounted || !identical(job, _layoutJob)) return;
+      _layout3d = layout;
+    }
+    if (!mounted) return;
+    setState(() => _mode3d = on);
+    if (remember) unawaited(_rememberMode(on));
+  }
+
+  static const _modeKey = 'knowledgeGraph.mode3d';
+
+  Future<void> _rememberMode(bool on) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_modeKey, on);
+    } catch (_) {
+      // Remembering the view is a convenience; without storage it just starts flat.
+    }
+  }
+
+  Future<void> _restoreMode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(_modeKey) == true && mounted) {
+        await _setMode3d(true, remember: false);
+      }
+    } catch (_) {
+      // See _rememberMode.
+    }
+  }
+
+  /// The question box and answer at the top of the sheet; see [_KnowledgeGraphAsk].
+  Widget _askPanel();
+
+  /// The part of the map not covered by the search overlay or the sheet.
+  Rect _visibleRect() => Rect.fromLTRB(
+    0,
+    _topInset,
+    _viewport.width,
+    math.max(_topInset + 140, _viewport.height - _covered),
+  );
 
   /// Shows the graph as known at [time]; null shows everything.
   void _applyTime(DateTime? time) {
@@ -335,13 +418,20 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
 
   Matrix4 _fitMatrix(Size viewport, double covered) {
     if (viewport.isEmpty || _world <= 0) return Matrix4.identity();
-    final visibleHeight = math.max(140.0, viewport.height - covered - 8);
+    final visible = Rect.fromLTRB(
+      0,
+      _topInset,
+      viewport.width,
+      math.max(_topInset + 140, viewport.height - covered - 8),
+    );
     final scale =
-        math.min(viewport.width / _world, visibleHeight / _world) * .96;
+        math.min(visible.width / _world, visible.height / _world) * .98;
     final clamped = scale.clamp(_minScale, _maxScale);
-    final dx = (viewport.width - _world * clamped) / 2;
-    final dy = math.max(8.0, (visibleHeight - _world * clamped) / 2);
-    return _placed(clamped, dx, dy);
+    return _placed(
+      clamped,
+      visible.center.dx - _world * clamped / 2,
+      visible.center.dy - _world * clamped / 2,
+    );
   }
 
   void _scheduleFit(Size viewport, double covered) {
@@ -374,7 +464,7 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
     final current = _scale;
     final next = (current * factor).clamp(_minScale, _maxScale);
     if ((next - current).abs() < 0.01) return;
-    final focal = Offset(_viewport.width / 2, _viewport.height * .32);
+    final focal = _visibleRect().center;
     final scene = MatrixUtils.transformPoint(
       Matrix4.inverted(_transform.value),
       focal,
@@ -394,7 +484,7 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
     final scene = _worldPoint(id);
     final current = _scale;
     final next = math.max(current, math.min(1.15, _maxScale));
-    final focal = Offset(_viewport.width / 2, _viewport.height * .3);
+    final focal = _visibleRect().center;
     _animateTo(
       _placed(next, focal.dx - scene.dx * next, focal.dy - scene.dy * next),
     );
@@ -475,7 +565,7 @@ abstract class _KnowledgeGraphController extends State<KnowledgeGraphScreen>
 }
 
 class _KnowledgeGraphScreenState extends _KnowledgeGraphController
-    with _KnowledgeGraphViewport, _KnowledgeGraphSheet {
+    with _KnowledgeGraphViewport, _KnowledgeGraphSheet, _KnowledgeGraphAsk {
   @override
   void initState() {
     super.initState();
@@ -494,6 +584,7 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
             if (_replay.isAnimating) _scrubTo(_replay.value);
           });
     unawaited(_load());
+    unawaited(_restoreMode());
   }
 
   @override
@@ -504,6 +595,7 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
     _replay.dispose();
     _transform.dispose();
     _query.dispose();
+    _askField.dispose();
     super.dispose();
   }
 
@@ -512,6 +604,12 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
     appBar: AppBar(
       title: const PageTitle('Knowledge graph'),
       actions: [
+        IconButton(
+          key: const Key('graph-info'),
+          tooltip: 'Memory status',
+          onPressed: _showStatus,
+          icon: const Icon(PhosphorIconsRegular.info),
+        ),
         IconButton(
           tooltip: 'Refresh',
           onPressed: () => unawaited(_load()),
@@ -534,116 +632,245 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
     ),
   );
 
+  /// The map fills the whole screen; search, filters, and the sheet float over it.
   Widget _body() => LayoutBuilder(
     builder: (context, constraints) {
       final covered = constraints.maxHeight * _sheetPeek;
       return Stack(
         clipBehavior: Clip.none,
         children: [
-          Column(
-            children: [
-              _header(),
-              Expanded(child: _map(covered)),
-            ],
+          Positioned.fill(child: _mode3d ? _map3d(covered) : _map(covered)),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: NotificationListener<SizeChangedLayoutNotification>(
+              onNotification: (_) {
+                _measureOverlay();
+                return true;
+              },
+              child: SizeChangedLayoutNotifier(
+                child: KeyedSubtree(
+                  key: _overlayKey,
+                  child: KeyedSubtree(
+                    key: const Key('graph-overlay'),
+                    child: _header(),
+                  ),
+                ),
+              ),
+            ),
           ),
+          Positioned(top: _topInset + 4, right: 12, child: _mapControls()),
           _sheet(),
         ],
       );
     },
   );
 
+  void _measureOverlay() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final height = _overlayKey.currentContext?.size?.height;
+      if (height == null || (height - _topInset).abs() < .5) return;
+      setState(() => _topInset = height);
+    });
+  }
+
+  Widget _mapControls() => Column(
+    children: [
+      CircleIconButton(
+        key: const Key('graph-mode'),
+        icon: _mode3d ? PhosphorIconsRegular.graph : PhosphorIconsRegular.cube,
+        tooltip: _mode3d ? 'Show flat map' : 'Show in 3D',
+        onPressed: () => unawaited(_setMode3d(!_mode3d)),
+      ),
+      const SizedBox(height: 8),
+      CircleIconButton(
+        icon: PhosphorIconsRegular.plus,
+        tooltip: 'Zoom in',
+        onPressed: () =>
+            _mode3d ? _graph3dKey.currentState?.zoomBy(1.25) : _zoomBy(1.25),
+      ),
+      const SizedBox(height: 8),
+      CircleIconButton(
+        icon: PhosphorIconsRegular.minusCircle,
+        tooltip: 'Zoom out',
+        onPressed: () =>
+            _mode3d ? _graph3dKey.currentState?.zoomBy(.8) : _zoomBy(.8),
+      ),
+      const SizedBox(height: 8),
+      CircleIconButton(
+        icon: PhosphorIconsRegular.arrowsClockwise,
+        tooltip: 'Reset view',
+        onPressed: () =>
+            _mode3d ? _graph3dKey.currentState?.reset() : _resetView(),
+      ),
+    ],
+  );
+
+  void _showStatus() {
+    final status = _status ?? const {};
+    final active = asJsonInt(status['active']);
+    final embedded = asJsonInt(status['embedded']);
+    final model = asJsonString(status['embeddingModel']);
+    final semantic = model != null && embedded > 0;
+    final colors = JarvisColors.of(context);
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (context) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Column(
+              key: const Key('graph-status'),
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Memory status',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    StatusPill(
+                      label: semantic
+                          ? 'Semantic search on · $embedded/$active memories'
+                          : 'Keyword search only — add an embedding model in Models',
+                      color: semantic ? colors.success : colors.warning,
+                    ),
+                    StatusPill(
+                      label:
+                          '${asJsonInt(status['graphIndexed'])}/$active memories linked',
+                      color: colors.accent,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  graphStatsLabel(
+                    entities: _all.nodes.length,
+                    links: _all.links.length,
+                    details: _all.literals.length,
+                  ),
+                  style: TextStyle(color: colors.inkSoft),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _header() {
+    final colors = JarvisColors.of(context);
     final types = graphTypesPresent(_snapshot.nodes);
     final stats = graphStatsLabel(
       entities: _snapshot.nodes.length,
       links: _snapshot.links.length,
       details: _snapshot.literals.length,
     );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _statusRow(),
-          const SizedBox(height: 10),
-          TextField(
-            key: const Key('graph-search'),
-            controller: _query,
-            textInputAction: TextInputAction.search,
-            onChanged: (_) => setState(() {}),
-            onSubmitted: _submitSearch,
-            decoration: InputDecoration(
-              hintText: 'Search people, places, facts',
-              isDense: true,
-              prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass),
-              suffixIcon: _query.text.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: 'Clear search',
-                      onPressed: () {
-                        _query.clear();
-                        setState(() {});
-                      },
-                      icon: const Icon(PhosphorIconsRegular.x, size: 18),
-                    ),
+    // Opaque behind the controls, fading into the map below so the graph keeps the screen.
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: const [0, .78, 1],
+          colors: [
+            colors.canvas,
+            colors.canvas.withValues(alpha: .9),
+            colors.canvas.withValues(alpha: 0),
+          ],
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 2, 16, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              key: const Key('graph-search'),
+              controller: _query,
+              textInputAction: TextInputAction.search,
+              onChanged: (_) => setState(() {}),
+              onSubmitted: _submitSearch,
+              decoration: InputDecoration(
+                hintText: 'Find people, places, facts',
+                isDense: true,
+                prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass),
+                suffixIcon: _query.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Clear search',
+                        onPressed: () {
+                          _query.clear();
+                          setState(() {});
+                        },
+                        icon: const Icon(PhosphorIconsRegular.x, size: 18),
+                      ),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 36,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _typeChip(null, 'All', _snapshot.nodes.length, _types == null),
-                for (final type in types)
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 34,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
                   _typeChip(
-                    type,
-                    graphTypeLabel(type),
-                    _snapshot.nodes.where((node) => node.type == type).length,
-                    _types?.contains(type) ?? false,
+                    null,
+                    'All',
+                    _snapshot.nodes.length,
+                    _types == null,
+                  ),
+                  for (final type in types)
+                    _typeChip(
+                      type,
+                      graphTypeLabel(type),
+                      _snapshot.nodes.where((node) => node.type == type).length,
+                      _types?.contains(type) ?? false,
+                    ),
+                ],
+              ),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    stats,
+                    key: const Key('graph-stats'),
+                    style: TextStyle(fontSize: 12, color: colors.muted),
+                  ),
+                ),
+                if (_range != null)
+                  TextButton.icon(
+                    key: const Key('graph-time-travel'),
+                    onPressed: () => _setTimeTravel(!_timeTravel),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      foregroundColor: _timeTravel
+                          ? colors.accent
+                          : colors.inkSoft,
+                    ),
+                    icon: const Icon(
+                      PhosphorIconsRegular.clockCounterClockwise,
+                      size: 16,
+                    ),
+                    label: Text(
+                      _timeTravel ? 'Now' : 'Time travel',
+                      style: const TextStyle(fontSize: 12.5),
+                    ),
                   ),
               ],
             ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _range != null
-                      ? stats
-                      : '$stats · drag to pan, pinch to zoom',
-                  key: const Key('graph-stats'),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: JarvisColors.of(context).muted,
-                  ),
-                ),
-              ),
-              if (_range != null)
-                TextButton.icon(
-                  key: const Key('graph-time-travel'),
-                  onPressed: () => _setTimeTravel(!_timeTravel),
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    foregroundColor: _timeTravel
-                        ? JarvisColors.of(context).accent
-                        : JarvisColors.of(context).inkSoft,
-                  ),
-                  icon: const Icon(
-                    PhosphorIconsRegular.clockCounterClockwise,
-                    size: 16,
-                  ),
-                  label: Text(
-                    _timeTravel ? 'Now' : 'Time travel',
-                    style: const TextStyle(fontSize: 12.5),
-                  ),
-                ),
-            ],
-          ),
-          if (_timeTravel && _range != null) _timeline(_range!),
-        ],
+            if (_timeTravel && _range != null) _timeline(_range!),
+          ],
+        ),
       ),
     );
   }
@@ -755,32 +982,6 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
           ),
         ),
       ),
-    );
-  }
-
-  Widget _statusRow() {
-    final status = _status ?? const {};
-    final active = asJsonInt(status['active']);
-    final embedded = asJsonInt(status['embedded']);
-    final model = asJsonString(status['embeddingModel']);
-    final semantic = model != null && embedded > 0;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        StatusPill(
-          label: semantic
-              ? 'Semantic search on · $embedded/$active memories'
-              : 'Keyword search only — add an embedding model in Models',
-          color: semantic
-              ? JarvisColors.of(context).success
-              : JarvisColors.of(context).warning,
-        ),
-        StatusPill(
-          label: '${asJsonInt(status['graphIndexed'])}/$active memories linked',
-          color: JarvisColors.of(context).accent,
-        ),
-      ],
     );
   }
 }

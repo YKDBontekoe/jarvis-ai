@@ -105,6 +105,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentContextContributor, Learning.UserSummaryContextContributor>();
         services.AddScoped<IMemoryEmbedder, Memory.ResolverMemoryEmbedder>();
         services.AddScoped<Memory.KnowledgeGraphExtractor>();
+        services.AddScoped<Jarvis.Application.Memory.IGraphAnswerModel, Memory.ModelGraphAnswerModel>();
         services.AddScoped<Memory.SearchHintGenerator>();
         services.AddScoped<Memory.MemoryIndexer>();
         services.AddScoped<IAgentToolContributor, Memory.KnowledgeGraphToolContributor>();

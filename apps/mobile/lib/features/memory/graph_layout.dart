@@ -2,6 +2,9 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui';
 
+/// A point of the 3D layout, centred on the origin and roughly inside the unit sphere.
+typedef GraphPoint3 = ({double x, double y, double z});
+
 /// Deterministic force-directed layout (Fruchterman–Reingold).
 ///
 /// Positions are normalized to 0..1 in both axes. [pinned] nodes start and stay at the center, which keeps the
@@ -20,8 +23,96 @@ Map<String, Offset> layoutGraph(
   int exactLimit = 160,
 }) {
   if (nodes.isEmpty) return const {};
-  // Index-based typed arrays: string-keyed maps dominate the cost at a thousand nodes.
+  final (x, y, _) = _simulate(
+    nodes,
+    edges,
+    dims: 2,
+    pinned: pinned,
+    groups: groups,
+    iterations: iterations,
+    exactLimit: exactLimit,
+  );
+  return _normalize({
+    for (var i = 0; i < nodes.length; i++) nodes[i]: Offset(x[i], y[i]),
+  }, pinned);
+}
+
+/// The same layout in three dimensions, centred on [pinned] (or the middle) and scaled so the bulk of the graph
+/// fits inside the unit sphere.
+Map<String, GraphPoint3> layoutGraph3d(
+  List<String> nodes,
+  List<(String, String)> edges, {
+  String? pinned,
+  Map<String, int> groups = const {},
+  int iterations = 260,
+  int exactLimit = 160,
+}) {
+  if (nodes.isEmpty) return const {};
+  final (x, y, z) = _simulate(
+    nodes,
+    edges,
+    dims: 3,
+    pinned: pinned,
+    groups: groups,
+    iterations: iterations,
+    exactLimit: exactLimit,
+  );
   final n = nodes.length;
+  var cx = 0.0, cy = 0.0, cz = 0.0;
+  final pin = pinned == null ? -1 : nodes.indexOf(pinned);
+  if (pin >= 0) {
+    cx = x[pin];
+    cy = y[pin];
+    cz = z[pin];
+  } else {
+    for (var i = 0; i < n; i++) {
+      cx += x[i] / n;
+      cy += y[i] / n;
+      cz += z[i] / n;
+    }
+  }
+  final reaches = [
+    for (var i = 0; i < n; i++)
+      math.sqrt(
+        math.pow(x[i] - cx, 2) +
+            math.pow(y[i] - cy, 2) +
+            math.pow(z[i] - cz, 2),
+      ),
+  ]..sort();
+  final reach = math.max(1e-6, reaches[((n - 1) * .9).round()]);
+  final scale = .9 / reach;
+  return {
+    for (var i = 0; i < n; i++)
+      nodes[i]: i == pin
+          ? (x: 0.0, y: 0.0, z: 0.0)
+          : _clampSphere(
+              (x[i] - cx) * scale,
+              (y[i] - cy) * scale,
+              (z[i] - cz) * scale,
+            ),
+  };
+}
+
+GraphPoint3 _clampSphere(double x, double y, double z) {
+  final length = math.sqrt(x * x + y * y + z * z);
+  if (length <= 1.3) return (x: x, y: y, z: z);
+  final shrink = 1.3 / length;
+  return (x: x * shrink, y: y * shrink, z: z * shrink);
+}
+
+/// The force simulation shared by the 2D and 3D layouts, on typed arrays: string-keyed maps dominate the cost at a
+/// thousand nodes. In 2D the z array stays zero.
+(Float64List, Float64List, Float64List) _simulate(
+  List<String> nodes,
+  List<(String, String)> edges, {
+  required int dims,
+  required String? pinned,
+  required Map<String, int> groups,
+  required int iterations,
+  required int exactLimit,
+}) {
+  final n = nodes.length;
+  final three = dims == 3;
   final indexOf = {for (final (index, node) in nodes.indexed) node: index};
   final pin = pinned == null ? -1 : (indexOf[pinned] ?? -1);
   final from = <int>[];
@@ -48,23 +139,44 @@ Map<String, Offset> layoutGraph(
   }
   final x = Float64List(n);
   final y = Float64List(n);
+  final z = Float64List(n);
   for (var i = 0; i < n; i++) {
     final hash = _hash(nodes[i]);
     final angle = (i / n) * math.pi * 2 + hash % 7 * .1;
     final radius = .18 + (hash % 100) / 600;
-    x[i] = i == pin ? .5 : .5 + math.cos(angle) * radius;
-    y[i] = i == pin ? .5 : .5 + math.sin(angle) * radius;
+    if (i == pin) {
+      x[i] = .5;
+      y[i] = .5;
+      z[i] = three ? .5 : 0;
+      continue;
+    }
+    if (three) {
+      // Spread over a sphere: golden-angle spiral, with the hash nudging the radius.
+      final t = (i + .5) / n;
+      final polar = math.acos(1 - 2 * t);
+      final azimuth = i * 2.399963 + hash % 7 * .1;
+      x[i] = .5 + radius * math.sin(polar) * math.cos(azimuth);
+      y[i] = .5 + radius * math.sin(polar) * math.sin(azimuth);
+      z[i] = .5 + radius * math.cos(polar);
+    } else {
+      x[i] = .5 + math.cos(angle) * radius;
+      y[i] = .5 + math.sin(angle) * radius;
+    }
   }
   final charge = Float64List(n);
   for (var i = 0; i < n; i++) {
     charge[i] = 1 + math.sqrt(math.min(degree[i], 30).toDouble()) * .35;
   }
-  final ideal = math.sqrt(1 / n) * .9;
+  final ideal =
+      (three ? math.pow(1 / n, 1 / 3).toDouble() : math.sqrt(1 / n)) * .9;
   final ideal2 = ideal * ideal * .6;
+  final center = three ? .5 : 0.0;
   final dx = Float64List(n);
   final dy = Float64List(n);
+  final dz = Float64List(n);
   final sumX = Float64List(groupCount);
   final sumY = Float64List(groupCount);
+  final sumZ = Float64List(groupCount);
   final sizes = Int32List(groupCount);
   final next = Int32List(n);
 
@@ -72,24 +184,29 @@ Map<String, Offset> layoutGraph(
   void repel(int a, int b) {
     var ex = x[a] - x[b];
     var ey = y[a] - y[b];
-    var distance = math.sqrt(ex * ex + ey * ey);
+    var ez = z[a] - z[b];
+    var distance = math.sqrt(ex * ex + ey * ey + ez * ez);
     if (distance > cutoff) return;
     if (distance < 1e-4) {
       ex = (_hash(nodes[a]) % 3 - 1) * 1e-3;
       ey = (_hash(nodes[b]) % 3 - 1) * 1e-3;
+      ez = three ? ((_hash(nodes[a]) >> 3) % 3 - 1) * 1e-3 : 0;
       distance = 1e-3;
     }
     final force = ideal2 / distance * charge[a] * charge[b] / distance;
     dx[a] += ex * force;
     dy[a] += ey * force;
+    dz[a] += ez * force;
     dx[b] -= ex * force;
     dy[b] -= ey * force;
+    dz[b] -= ez * force;
   }
 
   var temperature = .1;
   for (var step = 0; step < iterations; step++) {
     dx.fillRange(0, n, 0);
     dy.fillRange(0, n, 0);
+    dz.fillRange(0, n, 0);
     if (n <= exactLimit) {
       for (var i = 0; i < n; i++) {
         for (var j = i + 1; j < n; j++) {
@@ -98,16 +215,26 @@ Map<String, Offset> layoutGraph(
       }
     } else {
       // Bucket nodes into cells of a few ideal lengths; only neighbouring cells interact.
-      var minX = double.infinity, minY = double.infinity;
-      var maxX = -double.infinity, maxY = -double.infinity;
+      var minX = double.infinity,
+          minY = double.infinity,
+          minZ = double.infinity;
+      var maxX = -double.infinity,
+          maxY = -double.infinity,
+          maxZ = -double.infinity;
       for (var i = 0; i < n; i++) {
         minX = math.min(minX, x[i]);
         minY = math.min(minY, y[i]);
+        minZ = math.min(minZ, z[i]);
         maxX = math.max(maxX, x[i]);
         maxY = math.max(maxY, y[i]);
+        maxZ = math.max(maxZ, z[i]);
       }
       var cell = ideal * 2.5;
-      while (((maxX - minX) / cell + 2) * ((maxY - minY) / cell + 2) > n * 4) {
+      double cells() =>
+          ((maxX - minX) / cell + 2) *
+          ((maxY - minY) / cell + 2) *
+          (three ? (maxZ - minZ) / cell + 2 : 1);
+      while (cells() > n * 4) {
         cell *= 1.5;
       }
       // A hard, round cutoff keeps the force the same in every direction, and shifting the grid each step stops nodes
@@ -115,28 +242,44 @@ Map<String, Offset> layoutGraph(
       cutoff = cell;
       minX -= cell * ((step * 0.618034) % 1);
       minY -= cell * ((step * 0.414214) % 1);
+      minZ -= cell * ((step * 0.732051) % 1);
       final cols = ((maxX - minX) / cell).floor() + 1;
       final rows = ((maxY - minY) / cell).floor() + 1;
-      final head = Int32List(cols * rows)..fillRange(0, cols * rows, -1);
+      final layers = three ? ((maxZ - minZ) / cell).floor() + 1 : 1;
+      final head = Int32List(cols * rows * layers)
+        ..fillRange(0, cols * rows * layers, -1);
       final cellX = Int32List(n);
       final cellY = Int32List(n);
+      final cellZ = Int32List(n);
       for (var i = 0; i < n; i++) {
         final cx = ((x[i] - minX) / cell).floor();
         final cy = ((y[i] - minY) / cell).floor();
+        final cz = three ? ((z[i] - minZ) / cell).floor() : 0;
         cellX[i] = cx;
         cellY[i] = cy;
-        next[i] = head[cy * cols + cx];
-        head[cy * cols + cx] = i;
+        cellZ[i] = cz;
+        final slot = (cz * rows + cy) * cols + cx;
+        next[i] = head[slot];
+        head[slot] = i;
       }
+      final reachZ = three ? 1 : 0;
       for (var a = 0; a < n; a++) {
-        for (var oy = -1; oy <= 1; oy++) {
-          final cy = cellY[a] + oy;
-          if (cy < 0 || cy >= rows) continue;
-          for (var ox = -1; ox <= 1; ox++) {
-            final cx = cellX[a] + ox;
-            if (cx < 0 || cx >= cols) continue;
-            for (var b = head[cy * cols + cx]; b != -1; b = next[b]) {
-              if (b > a) repel(a, b);
+        for (var oz = -reachZ; oz <= reachZ; oz++) {
+          final cz = cellZ[a] + oz;
+          if (cz < 0 || cz >= layers) continue;
+          for (var oy = -1; oy <= 1; oy++) {
+            final cy = cellY[a] + oy;
+            if (cy < 0 || cy >= rows) continue;
+            for (var ox = -1; ox <= 1; ox++) {
+              final cx = cellX[a] + ox;
+              if (cx < 0 || cx >= cols) continue;
+              for (
+                var b = head[(cz * rows + cy) * cols + cx];
+                b != -1;
+                b = next[b]
+              ) {
+                if (b > a) repel(a, b);
+              }
             }
           }
         }
@@ -147,46 +290,53 @@ Map<String, Offset> layoutGraph(
       final b = to[e];
       final ex = x[a] - x[b];
       final ey = y[a] - y[b];
-      final distance = math.max(math.sqrt(ex * ex + ey * ey), 1e-4);
+      final ez = z[a] - z[b];
+      final distance = math.max(math.sqrt(ex * ex + ey * ey + ez * ez), 1e-4);
       // Hub edges are weaker so leaves fan out instead of collapsing onto the hub.
       final weight = 1 / math.sqrt(math.max(1, math.max(degree[a], degree[b])));
       final pull = distance / ideal * weight;
       dx[a] -= ex * pull;
       dy[a] -= ey * pull;
+      dz[a] -= ez * pull;
       dx[b] += ex * pull;
       dy[b] += ey * pull;
+      dz[b] += ez * pull;
     }
     sumX.fillRange(0, groupCount, 0);
     sumY.fillRange(0, groupCount, 0);
+    sumZ.fillRange(0, groupCount, 0);
     sizes.fillRange(0, groupCount, 0);
     for (var i = 0; i < n; i++) {
       final g = group[i];
       if (g < 0) continue;
       sumX[g] += x[i];
       sumY[g] += y[i];
+      sumZ[g] += z[i];
       sizes[g]++;
     }
     for (var i = 0; i < n; i++) {
       if (i == pin) continue;
       final lonely = degree[i] == 0 ? 2.2 : 1.0;
-      var mx = dx[i] + (.5 - x[i]) * ideal * 1.6 * lonely;
-      var my = dy[i] + (.5 - y[i]) * ideal * 1.6 * lonely;
+      final gravity = ideal * 1.6 * lonely;
+      var mx = dx[i] + (.5 - x[i]) * gravity;
+      var my = dy[i] + (.5 - y[i]) * gravity;
+      var mz = three ? dz[i] + (center - z[i]) * gravity : 0.0;
       final g = group[i];
       if (g >= 0 && sizes[g] > 1) {
         mx += (sumX[g] / sizes[g] - x[i]) * ideal * 1.3;
         my += (sumY[g] / sizes[g] - y[i]) * ideal * 1.3;
+        if (three) mz += (sumZ[g] / sizes[g] - z[i]) * ideal * 1.3;
       }
-      final length = math.sqrt(mx * mx + my * my);
+      final length = math.sqrt(mx * mx + my * my + mz * mz);
       if (length == 0) continue;
       final scale = math.min(length, temperature) / length;
       x[i] += mx * scale;
       y[i] += my * scale;
+      z[i] += mz * scale;
     }
     temperature = math.max(.003, temperature * .975);
   }
-  return _normalize({
-    for (var i = 0; i < n; i++) nodes[i]: Offset(x[i], y[i]),
-  }, pinned);
+  return (x, y, z);
 }
 
 /// Scales the layout uniformly into 0.06..0.94, centered on [pinned] when present.
@@ -242,3 +392,6 @@ typedef GraphLayoutJob = ({
 
 Map<String, Offset> layoutGraphJob(GraphLayoutJob job) =>
     layoutGraph(job.nodes, job.edges, pinned: job.pinned, groups: job.groups);
+
+Map<String, GraphPoint3> layoutGraph3dJob(GraphLayoutJob job) =>
+    layoutGraph3d(job.nodes, job.edges, pinned: job.pinned, groups: job.groups);

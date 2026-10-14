@@ -85,6 +85,13 @@ Entities (people, places, projects, …) with facts, relations, and timelines.
   edge and literal caps grow with the limit. The map lays out graphs above 250 nodes on a background isolate with a
   grid-accelerated force layout, paints minor nodes on a canvas once more than 160 are on screen (selection,
   neighbours, labelled hubs, and search hits stay widgets), shrinks dots with density, and pages the entity list.
+- Layout: the map fills the screen under a floating search and filter bar; memory status sits behind the info button.
+  The bottom sheet starts with "Ask about your graph" (`POST /graph/ask`, see
+  [api-reference.md](api-reference.md)): suggestions use real names, answers light up the entities and links they
+  cite, and follow-ups carry the earlier turns.
+- 3D: the cube button switches to `_Graph3DView` (`knowledge_graph_3d.dart`), a perspective view of `layoutGraph3d`
+  that turns slowly when idle (not when animations are disabled), rotates on drag, zooms on pinch, pans with two
+  fingers, and orbits the selected node. The choice is remembered in shared preferences.
 
 Embeddings and graph persistence live in Infrastructure + `Jarvis.Memory` helpers.
 

@@ -52,14 +52,22 @@ mixin _KnowledgeGraphSheet on _KnowledgeGraphController {
                   ),
                 ),
                 const SizedBox(height: 12),
+                // A selection's details come first; the question box follows with questions about it.
                 if (selected != null) ...[
                   _inspector(selected),
                   const SizedBox(height: 18),
-                ] else if (_query.text.trim().isEmpty &&
-                    _types == null &&
-                    _snapshot.nodes.length >= _highlightsMinimum) ...[
-                  _highlights(),
+                  _askPanel(),
                   const SizedBox(height: 18),
+                ] else ...[
+                  _askPanel(),
+                  const SizedBox(height: 18),
+                  if (_query.text.trim().isEmpty &&
+                      _answer == null &&
+                      _types == null &&
+                      _snapshot.nodes.length >= _highlightsMinimum) ...[
+                    _highlights(),
+                    const SizedBox(height: 18),
+                  ],
                 ],
                 SectionHeader(title),
                 if (listed.isEmpty)

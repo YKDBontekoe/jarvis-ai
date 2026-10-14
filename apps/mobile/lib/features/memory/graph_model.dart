@@ -706,3 +706,81 @@ List<({String type, int count})> neighborTypeMix(
   });
   return mix;
 }
+
+/// What the server answered about the graph, with the entities and links to light up on the map.
+class GraphAnswerView {
+  const GraphAnswerView({
+    required this.question,
+    required this.answer,
+    required this.entityIds,
+    required this.links,
+    required this.facts,
+    required this.followUps,
+    required this.grounded,
+  });
+
+  final String question;
+  final String answer;
+  final Set<String> entityIds;
+
+  /// Unordered "a|b" keys so a link matches whichever way it is stored.
+  final Set<String> links;
+  final List<String> facts;
+  final List<String> followUps;
+
+  /// False when the model was unavailable and the answer only lists facts.
+  final bool grounded;
+
+  bool coversLink(String fromId, String toId) =>
+      links.contains(graphPairKey(fromId, toId));
+}
+
+String graphPairKey(String a, String b) =>
+    a.compareTo(b) <= 0 ? '$a|$b' : '$b|$a';
+
+GraphAnswerView parseGraphAnswer(String question, Map<String, dynamic> json) =>
+    GraphAnswerView(
+      question: question,
+      answer: asJsonString(json['answer'])?.trim() ?? '',
+      entityIds: jsonStrings(json['entityIds']).toSet(),
+      links: {
+        for (final link in jsonMaps(json['links']))
+          if (asJsonString(link['from']) case final from?)
+            if (asJsonString(link['to']) case final to?) graphPairKey(from, to),
+      },
+      facts: jsonStrings(json['facts']),
+      followUps: jsonStrings(json['followUps']),
+      grounded: json['grounded'] == true,
+    );
+
+/// Questions worth asking about this graph right now, built from real names so they always have an answer.
+List<String> graphQuestionSuggestions(
+  GraphSnapshot snapshot,
+  Map<String, int> degrees, {
+  GraphNode? selected,
+}) {
+  if (selected != null && !selected.isYou) {
+    return [
+      'Tell me about ${selected.name}',
+      'How is ${selected.name} connected to me?',
+      'What changed about ${selected.name} lately?',
+    ];
+  }
+  final hubs = [
+    for (final node in snapshot.nodes)
+      if (!node.isYou) node,
+  ]..sort((a, b) => (degrees[b.id] ?? 0).compareTo(degrees[a.id] ?? 0));
+  final people = hubs.where((node) => node.type == 'person').take(2).toList();
+  final organization = hubs
+      .where((node) => node.type == 'organization')
+      .firstOrNull;
+  return [
+    'Who matters most in my life?',
+    if (people.length == 2)
+      'How is ${people[0].name} connected to ${people[1].name}?'
+    else if (hubs.isNotEmpty)
+      'Tell me about ${hubs.first.name}',
+    if (organization != null) 'Who do I know at ${organization.name}?',
+    'What did I tell you recently?',
+  ];
+}

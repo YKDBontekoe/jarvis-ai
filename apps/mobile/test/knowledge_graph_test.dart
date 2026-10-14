@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jarvis_mobile/features/memory/graph_layout.dart';
 import 'package:jarvis_mobile/features/memory/graph_model.dart';
 import 'package:jarvis_mobile/features/memory/knowledge_graph_screen.dart';
@@ -18,6 +19,7 @@ Future<void> settle(WidgetTester tester) {
 void main() {
   graphInsightTests();
   bigGraphTests();
+  askAndThreeDTests();
   test(
     'layout is deterministic, bounded, and keeps the pinned node centered',
     () {
@@ -107,9 +109,14 @@ void main() {
       );
       await settle(tester);
 
-      expect(find.textContaining('Semantic search on · 9/9'), findsOneWidget);
       expect(find.textContaining('2 entities · 1 link'), findsOneWidget);
       expect(find.textContaining('lives in Amsterdam'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('graph-info')));
+      await settle(tester);
+      expect(find.textContaining('Semantic search on · 9/9'), findsOneWidget);
+      await tester.tapAt(const Offset(20, 20));
+      await settle(tester);
 
       await tester.tap(find.byKey(const Key('entity-You')));
       await settle(tester);
@@ -507,7 +514,7 @@ void graphInsightTests() {
     expect(find.byKey(const Key('graph-reach')), findsOneWidget);
     expect(find.textContaining('3 things · 1 person'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('entity-You')));
+    await tester.tap(find.byKey(const Key('node-You')));
     await settle(tester);
     expect(
       find.byKey(const Key('satellite-job title designer')),
@@ -656,4 +663,141 @@ void bigGraphTests() {
       expect(find.text('Show 80 more of 720'), findsOneWidget);
     },
   );
+}
+
+void askAndThreeDTests() {
+  Future<FixtureHttp> pumpGraph(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final http = FixtureHttp();
+    http.on('GET', '/api/v1/graph/overview', _timedOverview());
+    http.on('GET', '/api/v1/memory/index-status', {
+      'active': 1,
+      'embedded': 1,
+      'graphIndexed': 1,
+      'embeddingModel': 'x',
+    });
+    await tester.pumpWidget(
+      MaterialApp(home: KnowledgeGraphScreen(http: http.client())),
+    );
+    await settle(tester);
+    return http;
+  }
+
+  testWidgets('asking a question shows a grounded answer and lights it up', (
+    tester,
+  ) async {
+    final http = await pumpGraph(tester);
+    http.on('POST', '/api/v1/graph/ask', {
+      'answer': 'Rosa is married to Arjan.',
+      'entityIds': ['r', 'a'],
+      'links': [
+        {'from': 'r', 'to': 'a', 'predicate': 'married_to'},
+      ],
+      'facts': ['Rosa married to Arjan'],
+      'followUps': ['Where does Arjan work?'],
+      'grounded': true,
+    });
+
+    // Suggestions are built from real names in the graph.
+    expect(
+      find.byKey(const Key('graph-suggestion-Who matters most in my life?')),
+      findsOneWidget,
+    );
+    await tester.enterText(
+      find.byKey(const Key('graph-ask-field')),
+      'Who is Rosa married to?',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await settle(tester);
+
+    expect(find.text('Rosa is married to Arjan.'), findsOneWidget);
+    expect(find.byKey(const Key('answer-entity-Arjan')), findsOneWidget);
+    expect(
+      find.byKey(const Key('graph-suggestion-Where does Arjan work?')),
+      findsOneWidget,
+    );
+    // The answer's entities stay bright; everything else on screen recedes.
+    final nodes = tester.widgetList<AnimatedOpacity>(
+      find.ancestor(
+        of: find.byWidgetPredicate(
+          (widget) =>
+              widget.key is ValueKey<String> &&
+              (widget.key! as ValueKey<String>).value.startsWith('node-'),
+        ),
+        matching: find.byType(AnimatedOpacity),
+      ),
+    );
+    final opacities = [for (final node in nodes) node.opacity];
+    expect(opacities.where((value) => value == 1), hasLength(2));
+    expect(opacities.where((value) => value < .5), isNotEmpty);
+
+    final followUp = find.byKey(
+      const Key('graph-suggestion-Where does Arjan work?'),
+    );
+    await tester.ensureVisible(followUp);
+    await settle(tester);
+    await tester.tap(followUp);
+    await settle(tester);
+    final sent = http.sent('POST', '/api/v1/graph/ask').toList();
+    expect(sent, hasLength(2));
+    expect((sent.first.body! as Map)['question'], 'Who is Rosa married to?');
+    expect((sent.last.body! as Map)['history'], [
+      {
+        'question': 'Who is Rosa married to?',
+        'answer': 'Rosa is married to Arjan.',
+      },
+    ]);
+
+    await tester.ensureVisible(find.byKey(const Key('graph-answer-clear')));
+    await settle(tester);
+    await tester.tap(find.byKey(const Key('graph-answer-clear')));
+    await settle(tester);
+    expect(find.byKey(const Key('graph-answer')), findsNothing);
+  });
+
+  testWidgets('the 3D view selects what you tap and remembers the choice', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    addTearDown(() => SharedPreferences.setMockInitialValues({}));
+    // The 3D view turns slowly unless animations are off.
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    await pumpGraph(tester);
+
+    await tester.tap(find.byKey(const Key('graph-mode')));
+    await settle(tester);
+    expect(find.byKey(const Key('graph-3d')), findsOneWidget);
+    expect(find.byKey(const Key('node-You')), findsNothing);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('knowledgeGraph.mode3d'), isTrue);
+
+    // "You" sits at the origin, which projects to the middle of the visible area.
+    final view = tester.getRect(find.byKey(const Key('graph-3d')));
+    final top = tester.getRect(find.byKey(const Key('graph-overlay'))).bottom;
+    final bottom = view.bottom - view.height * .24;
+    await tester.tapAt(Offset(view.center.dx, (top + bottom) / 2));
+    await settle(tester);
+    expect(find.byKey(const Key('graph-inspector')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('graph-inspector')),
+        matching: find.text('You'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tapAt(Offset(view.left + 6, top + 6));
+    await settle(tester);
+    expect(find.byKey(const Key('graph-inspector')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('graph-mode')));
+    await settle(tester);
+    expect(find.byKey(const Key('node-You')), findsOneWidget);
+    expect(prefs.getBool('knowledgeGraph.mode3d'), isFalse);
+  });
 }

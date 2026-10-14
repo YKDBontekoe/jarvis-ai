@@ -45,32 +45,46 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
                 animation: _transform,
                 builder: (context, _) => _nodeLayer(viewport),
               ),
-            Positioned(
-              top: 12,
-              right: 12,
-              child: Column(
-                children: [
-                  CircleIconButton(
-                    icon: PhosphorIconsRegular.plus,
-                    tooltip: 'Zoom in',
-                    onPressed: () => _zoomBy(1.25),
-                  ),
-                  const SizedBox(height: 8),
-                  CircleIconButton(
-                    icon: PhosphorIconsRegular.minusCircle,
-                    tooltip: 'Zoom out',
-                    onPressed: () => _zoomBy(.8),
-                  ),
-                  const SizedBox(height: 8),
-                  CircleIconButton(
-                    icon: PhosphorIconsRegular.arrowsClockwise,
-                    tooltip: 'Reset view',
-                    onPressed: _resetView,
-                  ),
-                ],
-              ),
-            ),
           ],
+        ),
+      );
+    },
+  );
+
+  Widget _map3d(double coveredBySheet) => LayoutBuilder(
+    builder: (context, constraints) {
+      _viewport = Size(constraints.maxWidth, constraints.maxHeight);
+      _covered = math.min(_viewport.height, coveredBySheet);
+      final points = _layout3d;
+      if (points == null) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      final matched = _matched;
+      final query = _query.text;
+      final hops = _hops;
+      final answer = _answer;
+      return ColoredBox(
+        color: JarvisColors.of(context).canvas,
+        child: _Graph3DView(
+          key: _graph3dKey,
+          nodes: _typedNodes,
+          points: points,
+          links: _snapshot.links,
+          degrees: _degrees,
+          maxDegree: _maxDegree,
+          selectedId: _selectedId,
+          emphasis: (node) => _emphasis(node, matched, query, hops),
+          highlighted: (link) => _selectedId != null
+              ? link.fromId == _selectedId || link.toId == _selectedId
+              : answer?.coversLink(link.fromId, link.toId) ?? false,
+          labelPriority: (node) {
+            final rank = _labelRank(node, matched, query, hops);
+            return rank <= 3 ? rank : null;
+          },
+          flow: _pulse,
+          insets: EdgeInsets.only(top: _topInset, bottom: _covered),
+          onSelect: _select,
+          onClear: _clearSelection,
         ),
       );
     },
@@ -344,6 +358,10 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
     Map<String, int> hops,
   ) {
     if (node.id == _selectedId) return 0;
+    if (_selectedId == null &&
+        (_answer?.entityIds.contains(node.id) ?? false)) {
+      return 0;
+    }
     if (node.isYou) return 1;
     if (hops[node.id] == 1) return 2;
     if (query.trim().isNotEmpty && matched.contains(node.id)) return 3;
@@ -364,6 +382,10 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
         2 => .5,
         _ => .16,
       };
+    }
+    // An answer lights up what it is about and lets the rest recede.
+    if (_answer case final answer?) {
+      return answer.entityIds.contains(node.id) ? 1 : .14;
     }
     return query.trim().isNotEmpty && !matched.contains(node.id) ? .26 : 1;
   }
@@ -410,14 +432,16 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
     final matched = _matched;
     final selected = _selectedId;
     final hops = _hops;
+    final answer = selected == null ? _answer : null;
+    // The selection's links, or else the links an answer relied on.
+    bool focused(GraphLink link) => selected != null
+        ? link.fromId == selected || link.toId == selected
+        : answer?.coversLink(link.fromId, link.toId) ?? false;
     final prominent = <int>[];
     for (var index = 0; index < _snapshot.links.length; index++) {
       final link = _snapshot.links[index];
       if (!shown.contains(link.fromId) || !shown.contains(link.toId)) continue;
-      if (selected != null &&
-          (link.fromId == selected || link.toId == selected)) {
-        prominent.add(index);
-      }
+      if (focused(link)) prominent.add(index);
     }
     prominent.sort(
       (a, b) => (_snapshot.links[b].confidence ?? 0).compareTo(
@@ -431,9 +455,7 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
     for (var index = 0; index < _snapshot.links.length; index++) {
       final link = _snapshot.links[index];
       if (!shown.contains(link.fromId) || !shown.contains(link.toId)) continue;
-      final isProminent =
-          selected != null &&
-          (link.fromId == selected || link.toId == selected);
+      final isProminent = focused(link);
       final from = _snapshot.node(link.fromId);
       final to = _snapshot.node(link.toId);
       final confidence = (link.confidence ?? .8).clamp(0.0, 1.0);
@@ -443,6 +465,8 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
       } else if (selected != null) {
         // Links among the selection's neighbours stay faintly visible: they show how its world connects.
         alpha = hops[link.fromId] == 1 && hops[link.toId] == 1 ? .4 : .07;
+      } else if (answer != null) {
+        alpha = .06;
       } else if (query.isNotEmpty &&
           (!matched.contains(link.fromId) || !matched.contains(link.toId))) {
         alpha = .1;
@@ -475,7 +499,7 @@ mixin _KnowledgeGraphViewport on _KnowledgeGraphController {
           lane: lanes[index].lane,
           lanes: lanes[index].lanes,
           bow: (link.fromId.hashCode ^ link.toId.hashCode).isEven ? 1 : -1,
-          flowsOut: link.fromId == selected,
+          flowsOut: selected == null || link.fromId == selected,
           label: labeled.contains(index)
               ? humanPredicate(link.predicate)
               : null,

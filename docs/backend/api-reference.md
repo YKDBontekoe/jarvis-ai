@@ -117,6 +117,8 @@ Owner-scoped (`people` table). Names are unique per owner ignoring case and acce
 
 Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints` and `PersonalAssistantEndpoints` (`/graph/...`).
 
+`POST /graph/ask` answers a question from the owner's graph. Body: `question` (≤ 500 characters, required), optional `focusIds` (≤ 5 entity ids the app has in focus) and `history` (earlier `{question, answer}` turns; the last 4 are used). Returns `answer`, the `entityIds` and `links` (`from`, `to`, `predicate`) it relied on so the map can highlight them, the cited `facts` as sentences, up to three `followUps`, and `grounded` (false when no model was available and the answer only lists the facts found). Retrieval is deterministic (`GraphQuestionService`): named and focused entities, the user for "I/my", their facts and their neighbours', shortest paths between them that don't run through the user, facts whose wording matches the question, and ended facts for "used to" questions. The model (`ModelGraphAnswerModel`, background purpose, no tools) only phrases an answer from those numbered facts.
+
 
 ## Habits
 
