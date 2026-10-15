@@ -2098,6 +2098,124 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.ToTable("conversation_file_attachments", (string)null);
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.CustomMcpServerEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("ActiveRevision")
+                        .HasColumnType("integer")
+                        .HasColumnName("active_revision");
+
+                    b.Property<string>("ActiveSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("active_sha256");
+
+                    b.Property<string>("ActiveSource")
+                        .HasColumnType("text")
+                        .HasColumnName("active_source");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("DraftSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("draft_sha256");
+
+                    b.Property<string>("DraftSource")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("draft_source");
+
+                    b.Property<string>("LastTestJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("last_test");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("RegistryServerId")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("registry_server_id");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("SecretsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("secrets");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "Name")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "RegistryServerId")
+                        .IsUnique();
+
+                    b.ToTable("custom_mcp_servers", (string)null);
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.CustomMcpServerRevisionEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid>("ServerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("server_id");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("source");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ServerId", "Revision")
+                        .IsUnique();
+
+                    b.ToTable("custom_mcp_server_revisions", (string)null);
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.DecisionEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5005,6 +5123,15 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.CustomMcpServerRevisionEntity", b =>
+                {
+                    b.HasOne("Jarvis.Infrastructure.Persistence.CustomMcpServerEntity", null)
+                        .WithMany("Revisions")
+                        .HasForeignKey("ServerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.DocumentCollectionFileEntity", b =>
                 {
                     b.HasOne("Jarvis.Domain.Files.DocumentCollection", null)
@@ -5248,6 +5375,11 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.BrowserSessionEntity", b =>
                 {
                     b.Navigation("Steps");
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.CustomMcpServerEntity", b =>
+                {
+                    b.Navigation("Revisions");
                 });
 
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.HabitEntity", b =>

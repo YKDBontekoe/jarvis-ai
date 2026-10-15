@@ -90,6 +90,7 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<ModelUsageEventEntity> ModelUsageEvents => Set<ModelUsageEventEntity>();
     public DbSet<DeviceTelemetry> DeviceTelemetry => Set<DeviceTelemetry>();
     public DbSet<McpOAuthSession> McpOAuthSessions => Set<McpOAuthSession>();
+    public DbSet<CustomMcpServerEntity> CustomMcpServers => Set<CustomMcpServerEntity>();
     public DbSet<CodingRun> CodingRuns => Set<CodingRun>();
     public DbSet<AutomationRule> AutomationRules => Set<AutomationRule>();
     public DbSet<AutomationRun> AutomationRuns => Set<AutomationRun>();

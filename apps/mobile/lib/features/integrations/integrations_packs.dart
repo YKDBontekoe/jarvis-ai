@@ -106,94 +106,29 @@ mixin _IntegrationsPacks on _IntegrationsController {
 
   @override
   Future<void> _connectOAuth({String? server, String? endpoint}) async {
-    final target = (server ?? '').trim();
-    final url = (endpoint ?? '').trim();
-    if (target.isEmpty && url.isEmpty) {
-      setState(
-        () => _error =
-            'Jarvis doesn’t know where to sign in for this app yet. Ask Jarvis in chat to set it up.',
-      );
-      return;
-    }
-    try {
-      final response = await widget.http.post<dynamic>(
-        '/api/v1/integrations/oauth/sessions',
-        data: {
-          if (target.isNotEmpty) 'server': target,
-          if (target.isEmpty && url.isNotEmpty) 'endpoint': url,
-        },
-      );
-      final body = jsonObject(response.data) ?? const {};
-      final status = asJsonString(body['status']);
-      final authorize = parseHttpUrl(asJsonString(body['authorizationUrl']));
-      if (status == 'needs_token') {
+    final outcome = await signInToApp(
+      widget.http,
+      server: server,
+      endpoint: endpoint,
+      alive: () => mounted,
+    );
+    if (!mounted) return;
+    switch (outcome.status) {
+      case 'needs_token':
+        final target = (server ?? '').trim();
         await _editSecret(
           provider: target.isNotEmpty ? target : 'jarvis-mcp-discovery',
           secretName: 'token',
         );
-        return;
-      }
-      if (authorize == null) {
-        setState(
-          () => _error =
-              'This app has no sign-in page. Use an access key instead.',
+      case 'signed_in':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Signed in. Jarvis can use it now.')),
         );
-        return;
-      }
-      final opened = await launchHttpUrl(authorize);
-      if (!opened && mounted) {
-        setState(() => _error = 'Could not open the sign-in page.');
-        return;
-      }
-      final id = asJsonString(body['id']);
-      if (id == null ||
-          id.isEmpty ||
-          id == '00000000-0000-0000-0000-000000000000') {
-        if (mounted) await _load();
-        return;
-      }
-      for (var i = 0; i < 45; i++) {
-        await Future<void>.delayed(const Duration(seconds: 2));
-        if (!mounted) return;
-        try {
-          final poll = await widget.http.get<dynamic>(
-            '/api/v1/integrations/oauth/sessions/$id',
-          );
-          final session = jsonObject(poll.data);
-          final state = asJsonString(session?['status']);
-          if (state == 'completed') {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Signed in. Jarvis can use it now.'),
-                ),
-              );
-              await _load();
-            }
-            return;
-          }
-          if (state == 'failed') {
-            setState(
-              () => _error =
-                  asJsonString(session?['error']) ??
-                  'Sign-in didn’t finish. You can use an access key instead.',
-            );
-            return;
-          }
-        } catch (_) {
-          break;
-        }
-      }
-    } on DioException catch (error) {
-      if (mounted) {
-        setState(
-          () => _error =
-              firstProblemMessage(error.response?.data) ??
-              'Could not start sign-in.',
-        );
-      }
-    } catch (_) {
-      if (mounted) setState(() => _error = 'Could not start sign-in.');
+        await _load();
+      case 'pending':
+        await _load();
+      default:
+        setState(() => _error = outcome.message);
     }
   }
 }

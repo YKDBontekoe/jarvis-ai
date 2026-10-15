@@ -75,14 +75,10 @@ public sealed class McpOAuthService(
 
         try
         {
-            var token = await ExchangeAsync(session, code, cancellationToken);
-            await credentials.SaveSecretAsync(session.OwnerId, session.Provider,
-                IntegrationCredentialProviders.UserMcpTokenSecret, token, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(session.ServerKey) &&
-                !IntegrationCredentialProviders.IsUserMcpServerId(session.Provider))
-            {
-                // Host servers such as github use the host credential provider slug.
-            }
+            var tokens = await ExchangeAsync(session, code, cancellationToken);
+            // Host servers such as github use the host credential provider slug; owner servers use their id.
+            await McpOAuthTokens.SaveAsync(credentials, session.OwnerId, session.Provider, tokens,
+                session.TokenEndpoint, session.ClientId, session.Resource, cancellationToken);
             await sessions.MarkCompletedAsync(session.Id, true, null, cancellationToken);
             return SuccessPage();
         }
@@ -145,7 +141,7 @@ public sealed class McpOAuthService(
         }
     }
 
-    private static async Task<string> ExchangeAsync(McpOAuthSessionDraft session, string code,
+    private static async Task<McpOAuthTokenSet> ExchangeAsync(McpOAuthSessionDraft session, string code,
         CancellationToken cancellationToken)
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
@@ -163,11 +159,7 @@ public sealed class McpOAuthService(
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException("The authorization server rejected the token request.");
-        using var document = JsonDocument.Parse(body);
-        if (!document.RootElement.TryGetProperty("access_token", out var token) ||
-            token.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(token.GetString()))
-            throw new InvalidOperationException("The authorization server did not return an access token.");
-        return token.GetString()!;
+        return McpOAuthTokens.Parse(body, DateTimeOffset.UtcNow);
     }
 
     private static string CreateVerifier()

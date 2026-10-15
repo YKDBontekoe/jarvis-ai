@@ -176,6 +176,8 @@ public static partial class ApprovalCategories
         ["RemoveMcpServer"] = ("integrations.remove", "Removing integrations"),
         ["DiscoverMcpServerTools"] = ("integrations.discover", "Discovering integration tools"),
         ["InstallIntegrationPack"] = ("integrations.install", "Installing guided integrations"),
+        ["TestCustomMcpServer"] = ("integrations.custom_test", "Test-running apps Jarvis wrote"),
+        ["ActivateCustomMcpServer"] = ("integrations.custom_activate", "Turning on apps Jarvis wrote"),
     };
 
     [GeneratedRegex("([a-z0-9])([A-Z])")]

@@ -46,7 +46,8 @@ internal sealed class CoreAgentTools(
     Jarvis.Application.Diagnostics.IRecentFaultLog? recentFaults = null,
     TimeProvider? timeProvider = null,
     Jarvis.Application.Devices.IDeviceTelemetryStore? deviceTelemetry = null,
-    IMcpCatalog? mcpCatalog = null) : IAgentToolContributor
+    IMcpCatalog? mcpCatalog = null,
+    ICustomMcpServerStore? customMcpServers = null) : IAgentToolContributor
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context)
     {
@@ -107,6 +108,17 @@ internal sealed class CoreAgentTools(
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.ReadMcpResourceAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.GetMcpPromptAsync));
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(mcpServerTools.RemoveMcpServerAsync));
+
+        if (customMcpServers is not null)
+        {
+            var customTools = new CustomMcpAgentTools(customMcpServers, mcpServers, currentUser, mcpToolHost);
+            yield return AIFunctionFactory.Create(customTools.GetCustomMcpTemplate);
+            yield return AIFunctionFactory.Create(customTools.WriteCustomMcpServerAsync);
+            yield return AIFunctionFactory.Create(customTools.ListCustomMcpServersAsync);
+            yield return AIFunctionFactory.Create(customTools.GetCustomMcpServerSourceAsync);
+            yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(customTools.TestCustomMcpServerAsync));
+            yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(customTools.ActivateCustomMcpServerAsync));
+        }
 
         if ((configuration.GetSection("Coding:Repositories").Get<CodingRepositoryOption[]>() ?? []).Length > 0)
         {

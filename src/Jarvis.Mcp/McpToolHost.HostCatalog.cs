@@ -61,7 +61,10 @@ public sealed partial class McpToolHost
             ? null
             : await credentialStore.GetSecretsAsync(currentUser.OwnerId, provider, cancellationToken);
         return new McpServerConnectionStatus(server.Name, state, toolCount, issue, UserServerId(server), enabled, tools,
-            hostManaged, server.Transport, provider, configuredTools, secrets is not null);
+            hostManaged, server.Transport, provider, configuredTools, secrets is not null)
+        {
+            SelfBuilt = server.Command == McpStdioCommandValidator.CustomScriptCommand
+        };
     }
 
     private static string CredentialProviderSlug(McpServerOptions server) =>

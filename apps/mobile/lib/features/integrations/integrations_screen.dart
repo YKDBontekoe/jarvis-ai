@@ -9,6 +9,8 @@ import '../../http_urls.dart';
 import '../../ui/jarvis_ui.dart';
 import '../chat/mcp_setup.dart';
 import 'app_catalog_screen.dart';
+import 'app_presentation.dart';
+import 'server_detail_screen.dart';
 
 part 'integrations_apps.dart';
 part 'integrations_credentials.dart';
@@ -16,10 +18,18 @@ part 'integrations_mcp.dart';
 part 'integrations_packs.dart';
 
 class IntegrationsScreen extends StatefulWidget {
-  const IntegrationsScreen({required this.http, this.onAskInChat, super.key});
+  const IntegrationsScreen({
+    required this.http,
+    this.onAskInChat,
+    this.startBrowsing = false,
+    super.key,
+  });
 
   final Dio http;
   final ValueChanged<String>? onAskInChat;
+
+  /// Opens app search as soon as the page shows.
+  final bool startBrowsing;
 
   @override
   State<IntegrationsScreen> createState() => _IntegrationsScreenState();
@@ -31,6 +41,7 @@ abstract class _IntegrationsController extends State<IntegrationsScreen> {
   List<Map<String, dynamic>> _connections = [];
   List<Map<String, dynamic>> _managedServers = [];
   List<Map<String, dynamic>> _packs = [];
+  List<Map<String, dynamic>> _customServers = [];
   bool _loading = true;
   bool _credentialsFailed = false;
   bool _connectionsFailed = false;
@@ -51,6 +62,7 @@ class _IntegrationsScreenState extends _IntegrationsController
   void initState() {
     super.initState();
     _load();
+    if (widget.startBrowsing) afterRouteSettles(this, _openCatalog);
   }
 
   @override
@@ -100,6 +112,17 @@ class _IntegrationsScreenState extends _IntegrationsController
       } catch (_) {
         serversFailed = true;
         error ??= 'Could not load your apps.';
+      }
+      try {
+        final customResponse = await widget.http.get<dynamic>(
+          '/api/v1/custom-mcp-servers',
+        );
+        if (!mounted || revision != _requestRevision) return;
+        setState(() => _customServers = jsonMaps(customResponse.data));
+      } catch (_) {
+        // Older servers have no self-built apps; the list just stays empty.
+        if (!mounted || revision != _requestRevision) return;
+        setState(() => _customServers = []);
       }
       try {
         final packsResponse = await widget.http.get<dynamic>(
@@ -202,6 +225,18 @@ class _IntegrationsScreenState extends _IntegrationsController
               ),
               if (ask != null)
                 ListTile(
+                  key: const Key('add-build'),
+                  leading: const IconBadge(
+                    icon: PhosphorIconsRegular.magicWand,
+                  ),
+                  title: const Text('Have Jarvis build one'),
+                  subtitle: const Text(
+                    'For a service with no ready-made app: Jarvis writes it, tests it, and asks before switching it on',
+                  ),
+                  onTap: () => Navigator.pop(sheetContext, 'build'),
+                ),
+              if (ask != null)
+                ListTile(
                   leading: const IconBadge(
                     icon: PhosphorIconsRegular.chatCircle,
                   ),
@@ -232,25 +267,39 @@ class _IntegrationsScreenState extends _IntegrationsController
         await _openCatalog(address: true);
       case 'chat':
         _askInChat(mcpSetupPrompt);
+      case 'build':
+        _askInChat(mcpBuildAnyPrompt);
       case 'key':
         await _editSecret();
     }
   }
 
-  Future<void> _openCatalog({bool address = false}) async {
+  Future<void> _openCatalog({bool address = false, String? query}) async {
     final outcome = await Navigator.of(context).push<AppInstallOutcome>(
       MaterialPageRoute(
-        builder: (_) =>
-            AppCatalogScreen(http: widget.http, startWithAddress: address),
+        builder: (_) => AppCatalogScreen(
+          http: widget.http,
+          startWithAddress: address,
+          initialQuery: query,
+          canBuild: widget.onAskInChat != null,
+        ),
       ),
     );
     if (outcome == null || !mounted) return;
+    if (outcome.nextStep == 'build') {
+      _askInChat(mcpBuildPrompt(outcome.name));
+      return;
+    }
+    if (outcome.nextStep == 'open') {
+      await _openDetail(serverId: outcome.serverId);
+      return;
+    }
     await _load();
     if (!mounted) return;
     final message = switch (outcome.nextStep) {
       'sign_in' => 'Added ${outcome.name}. Sign in to finish.',
       'secrets' => 'Added ${outcome.name}. Add its key to finish.',
-      _ => '${outcome.name} is connected.',
+      _ => 'Added ${outcome.name}.',
     };
     ScaffoldMessenger.of(
       context,
@@ -290,6 +339,8 @@ class _IntegrationsScreenState extends _IntegrationsController
           ),
         ),
       ),
+      const SizedBox(height: 16),
+      _AppSearchEntry(onSearch: (query) => _openCatalog(query: query)),
       if (_error != null)
         InlineNotice(
           message: _error!,
@@ -325,4 +376,48 @@ class _IntegrationsScreenState extends _IntegrationsController
       _savedKeys(keys),
     ];
   }
+}
+
+/// Search the app directory without first choosing "Add". Typing and
+/// pressing search opens the directory with the results.
+class _AppSearchEntry extends StatefulWidget {
+  const _AppSearchEntry({required this.onSearch});
+
+  final ValueChanged<String?> onSearch;
+
+  @override
+  State<_AppSearchEntry> createState() => _AppSearchEntryState();
+}
+
+class _AppSearchEntryState extends State<_AppSearchEntry> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit([String? value]) {
+    final query = (value ?? _controller.text).trim();
+    widget.onSearch(query.isEmpty ? null : query);
+    _controller.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) => TextField(
+    key: const Key('integrations-search'),
+    controller: _controller,
+    textInputAction: TextInputAction.search,
+    onSubmitted: _submit,
+    decoration: InputDecoration(
+      prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass),
+      hintText: 'Find an app to connect, like Notion or weather',
+      suffixIcon: IconButton(
+        tooltip: 'Browse apps',
+        onPressed: _submit,
+        icon: const Icon(PhosphorIconsRegular.caretRight),
+      ),
+    ),
+  );
 }

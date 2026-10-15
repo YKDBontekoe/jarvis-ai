@@ -7,13 +7,15 @@ using Jarvis.Application.Conversations;
 using Jarvis.Application.Integrations;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.Json;
 
 namespace Jarvis.Mcp;
 
 public sealed partial class McpToolHost(IConfiguration configuration, ILogger<McpToolHost> logger,
     ILoggerFactory loggerFactory,
     ICurrentUser currentUser, IIntegrationCredentialStore credentialStore,
-    IUserMcpServerRegistry userMcpServers, IOwnerMcpPolicyStore ownerPolicy) : IAsyncDisposable
+    IUserMcpServerRegistry userMcpServers, IOwnerMcpPolicyStore ownerPolicy,
+    ICustomMcpServerStore customServers) : IAsyncDisposable
 {
     private readonly List<IAsyncDisposable> _clients = [];
     private IReadOnlyList<AITool> _tools = [];
@@ -84,7 +86,10 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             if (!userServer.Enabled)
             {
                 statuses.Add(new McpServerConnectionStatus(userServer.Name, "paused", 0, "paused_by_owner",
-                    userServer.Id, false, userServer.AllowedTools));
+                    userServer.Id, false, userServer.AllowedTools)
+                {
+                    SelfBuilt = userServer.Command == McpStdioCommandValidator.CustomScriptCommand
+                });
                 continue;
             }
             configuredServers.Add(await CreateUserServerOptionsAsync(userServer, cancellationToken));
@@ -130,13 +135,22 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             IAsyncDisposable? client = null;
             try
             {
+                if (CustomScriptIssue(server) is { } scriptIssue)
+                {
+                    statuses.Add(await BuildStatusAsync(server, "unavailable", 0, scriptIssue, true, null,
+                        cancellationToken));
+                    continue;
+                }
                 var credentialResolution = server.MissingRequiredSecrets
                     ? (Ready: false, Secrets: null)
                     : await ResolveCredentialsAsync(server, cancellationToken);
                 if (!credentialResolution.Ready)
                 {
-                    statuses.Add(await BuildStatusAsync(server, "needs_credentials", 0, "credentials_required", true,
-                        null, cancellationToken));
+                    statuses.Add(server.SignInExpired
+                        ? await BuildStatusAsync(server, "needs_sign_in", 0, "sign_in_expired", true, null,
+                            cancellationToken)
+                        : await BuildStatusAsync(server, "needs_credentials", 0, "credentials_required", true,
+                            null, cancellationToken));
                     continue;
                 }
                 var serverSecrets = credentialResolution.Secrets;
@@ -215,7 +229,10 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                 Remember(server, new LiveSession(connectedClient, transportSecrets));
                 client = null;
                 statuses.Add(await BuildStatusAsync(server, "connected", selected.Length, null, true,
-                    selected.Select(tool => tool.Name).ToArray(), cancellationToken));
+                    selected.Select(tool => tool.Name).ToArray(), cancellationToken) with
+                {
+                    ReadOnlyTools = selected.Select(tool => tool.Name).Where(_readOnlyTools.Contains).ToArray()
+                });
                 logger.LogInformation("Connected MCP server {ServerName}; enabled {ToolCount} allowlisted tools.", server.Name, selected.Length);
             }
             catch (Exception exception) when (cancellationToken.IsCancellationRequested &&
@@ -258,6 +275,13 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             CredentialProvider = userServer.Id,
             ConnectionTimeoutSeconds = 30
         };
+        if (server.Command == McpStdioCommandValidator.CustomScriptCommand &&
+            CustomMcpNames.IdFromArguments(server.Arguments) is { } customId)
+        {
+            server.CustomServerId = customId;
+            if (await customServers.GetActiveSourceAsync(currentUser.OwnerId, customId, cancellationToken) is { } active)
+                server.Script = new McpRunnerScript("python", active.Source, active.Sha256);
+        }
         foreach (var binding in userServer.SecretBindings ?? [])
         {
             if (secrets?.ContainsKey(binding.SecretName) != true)
@@ -314,6 +338,16 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                 server.Name, currentUser.OwnerId);
             return (false, null);
         }
+        if (McpOAuthTokens.NeedsRefresh(secrets, DateTimeOffset.UtcNow))
+        {
+            var renewed = await RenewSignInAsync(provider, secrets, cancellationToken);
+            if (renewed is null)
+            {
+                server.SignInExpired = true;
+                return (false, null);
+            }
+            secrets = renewed;
+        }
 
         foreach (var (environmentName, secretName) in server.CredentialEnvironmentVariables)
         {
@@ -341,10 +375,42 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
         return (true, secrets);
     }
 
+    private static readonly HttpClient OAuthHttp = new(new SocketsHttpHandler { AllowAutoRedirect = false })
+    {
+        Timeout = TimeSpan.FromSeconds(15)
+    };
+
+    /// <summary>Renews an expiring OAuth sign-in and returns the updated secrets, or null when it cannot.</summary>
+    private async Task<IReadOnlyDictionary<string, string>?> RenewSignInAsync(string provider,
+        IReadOnlyDictionary<string, string> secrets, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var tokens = await McpOAuthTokens.RefreshAsync(OAuthHttp, secrets, DateTimeOffset.UtcNow, cancellationToken);
+            await McpOAuthTokens.SaveAsync(credentialStore, currentUser.OwnerId, provider, tokens,
+                secrets.GetValueOrDefault(McpOAuthTokens.TokenEndpointSecret),
+                secrets.GetValueOrDefault(McpOAuthTokens.ClientIdSecret),
+                secrets.GetValueOrDefault(McpOAuthTokens.ResourceSecret), cancellationToken);
+            logger.LogInformation("Renewed the OAuth sign-in for MCP provider {Provider}.", provider);
+            return await credentialStore.GetSecretsAsync(currentUser.OwnerId, provider, cancellationToken) ?? secrets;
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested &&
+                                          exception is InvalidOperationException or HttpRequestException or
+                                              JsonException or TaskCanceledException)
+        {
+            logger.LogWarning("Could not renew the OAuth sign-in for MCP provider {Provider} ({FailureType}).",
+                provider, exception.GetType().Name);
+            return null;
+        }
+    }
+
     private IClientTransport CreateTransport(McpServerOptions server, ILoggerFactory loggerFactory)
     {
         if (server.ConnectionTimeoutSeconds is < 1 or > 300)
             throw new InvalidOperationException($"MCP server '{server.Name}' connection timeout must be between 1 and 300 seconds.");
+
+        if (server.Command == McpStdioCommandValidator.CustomScriptCommand)
+            return CreateCustomScriptTransport(server, loggerFactory);
 
         return server.Transport.Trim().ToLowerInvariant() switch
         {
@@ -353,10 +419,7 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             "stdio" when IntegrationCredentialProviders.IsUserMcpServerId(server.CredentialProvider) &&
                          McpRunnerOptions.From(configuration) is { } runner =>
                 new McpRunnerClientTransport(runner,
-                    new McpRunnerLaunch(server.Command, server.Arguments,
-                        server.EnvironmentVariables
-                            .Where(pair => pair.Value is not null)
-                            .ToDictionary(pair => pair.Key, pair => pair.Value!, StringComparer.Ordinal)),
+                    new McpRunnerLaunch(server.Command, server.Arguments, RunnerEnvironment(server)),
                     server.Name, loggerFactory),
             "stdio" => CreateStdioTransport(server),
             "streamablehttp" => CreateHttpTransport(server, loggerFactory),
@@ -364,6 +427,35 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                 $"MCP server '{server.Name}' has unsupported transport '{transport}'. Use 'stdio' or 'streamableHttp'.")
         };
     }
+
+    /// <summary>Why a self-built server cannot start, or null when it can.</summary>
+    private string? CustomScriptIssue(McpServerOptions server)
+    {
+        if (server.Command != McpStdioCommandValidator.CustomScriptCommand) return null;
+        if (!IntegrationCredentialProviders.IsUserMcpServerId(server.CredentialProvider) || server.CustomServerId is null)
+            return "invalid_configuration";
+        if (McpRunnerOptions.From(configuration) is null) return "runner_required";
+        return server.Script is null ? "not_activated" : null;
+    }
+
+    /// <summary>Self-built servers only ever run in the MCP runner, never inside this process.</summary>
+    private McpRunnerClientTransport CreateCustomScriptTransport(McpServerOptions server, ILoggerFactory loggerFactory)
+    {
+        if (CustomScriptIssue(server) is { } issue)
+            throw new InvalidOperationException(issue switch
+            {
+                "runner_required" => "Self-built apps need the MCP runner (McpRunner:Url).",
+                "not_activated" => "This self-built app has no approved code yet.",
+                _ => "This self-built app is not configured correctly."
+            });
+        return new McpRunnerClientTransport(McpRunnerOptions.From(configuration)!,
+            new McpRunnerLaunch("uv", [], RunnerEnvironment(server), server.Script), server.Name, loggerFactory);
+    }
+
+    private static Dictionary<string, string> RunnerEnvironment(McpServerOptions server) =>
+        server.EnvironmentVariables
+            .Where(pair => pair.Value is not null)
+            .ToDictionary(pair => pair.Key, pair => pair.Value!, StringComparer.Ordinal);
 
     private static IClientTransport CreateStdioTransport(McpServerOptions server)
     {
@@ -472,7 +564,14 @@ public sealed class McpAuthorizationRequiredException(string endpoint, Exception
 public sealed record McpServerConnectionStatus(string Name, string State, int ToolCount, string? Issue,
     string? Id = null, bool Enabled = true, IReadOnlyList<string>? Tools = null, bool HostManaged = false,
     string? Transport = null, string? CredentialProvider = null, IReadOnlyList<string>? ConfiguredTools = null,
-    bool? HasCredentials = null);
+    bool? HasCredentials = null)
+{
+    /// <summary>Enabled tools the server marks read-only; they can run without a card when the owner allows it.</summary>
+    public IReadOnlyList<string>? ReadOnlyTools { get; init; }
+
+    /// <summary>True for an app Jarvis wrote for the owner.</summary>
+    public bool SelfBuilt { get; init; }
+}
 
 public static class McpServerConfiguration
 {
@@ -507,6 +606,17 @@ public sealed class McpServerOptions
 
     /// <summary>A secret the owner's server declares as required has not been provided yet.</summary>
     public bool MissingRequiredSecrets { get; set; }
+
+    /// <summary>The OAuth sign-in expired and could not be renewed, so the owner must sign in again.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool SignInExpired { get; set; }
     public string? WorkingDirectory { get; set; }
     public int ConnectionTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>A self-built server's id and approved source. Never read from configuration.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Guid? CustomServerId { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public McpRunnerScript? Script { get; set; }
 }

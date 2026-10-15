@@ -53,6 +53,25 @@ internal static class IntegrationEndpoints
             await servers.RemoveAsync(currentUser.OwnerId, id, ct) ? Results.NoContent() : Results.NotFound())
             .WithName("RemoveUserMcpServer");
 
+        // Connect once and report whether the app works, so a saved key or sign-in is confirmed right away.
+        // Works for owner servers (by id) and host servers (by name).
+        api.MapPost("/mcp-servers/{key}/test", async (string key, McpToolHost host, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await host.TestServerAsync(key, ct));
+            }
+            catch (ArgumentException exception)
+            {
+                return Results.Ok(new McpConnectionTestResult(false, "unavailable", 0, [], "unavailable",
+                    exception.Message));
+            }
+            catch (InvalidMcpServerConfigurationException exception)
+            {
+                return Results.Conflict(new { error = "invalid_configuration", message = exception.Message });
+            }
+        }).WithName("TestMcpServer");
+
         api.MapPut("/mcp-servers/{id}/state", async (string id, McpServerStateRequest request,
             IUserMcpServerRegistry servers, ICurrentUser currentUser, CancellationToken ct) =>
         {
@@ -119,10 +138,37 @@ internal static class IntegrationEndpoints
                     .Where(status => !IntegrationCredentialProviders.IsReserved(status.Provider))))
             .WithName("ListIntegrationCredentialStatuses");
 
-        api.MapGet("/integrations/connections", async (McpToolHost mcpToolHost, CancellationToken ct) =>
+        api.MapGet("/integrations/connections", async (McpToolHost mcpToolHost,
+            Jarvis.Application.Learning.ILearningStore learning, ICurrentUser currentUser, CancellationToken ct) =>
         {
             await mcpToolHost.InitializeAsync(ct);
-            return Results.Ok(mcpToolHost.Statuses);
+            var checkedAt = DateTimeOffset.UtcNow;
+            var turns = (await learning.ListTracesAsync(currentUser.OwnerId, checkedAt.AddDays(-7), 1000, ct))
+                .Select(trace => (trace.CreatedAt, trace.Tools.Select(tool => tool.Tool))).ToArray();
+            return Results.Ok(mcpToolHost.Statuses.Select(status =>
+            {
+                var usage = McpAppUsageSummary.For(turns, status.Tools ?? []);
+                return new
+                {
+                    status.Name,
+                    status.State,
+                    status.ToolCount,
+                    status.Issue,
+                    status.Id,
+                    status.Enabled,
+                    status.Tools,
+                    status.HostManaged,
+                    status.Transport,
+                    status.CredentialProvider,
+                    status.ConfiguredTools,
+                    status.HasCredentials,
+                    status.ReadOnlyTools,
+                    status.SelfBuilt,
+                    usage.CallsLast7Days,
+                    usage.LastUsedAt,
+                    LastCheckedAt = checkedAt
+                };
+            }));
         }).WithName("ListIntegrationConnectionStatuses");
 
         api.MapGet("/integrations/{provider}/credentials", async (string provider,

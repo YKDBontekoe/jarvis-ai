@@ -36,73 +36,39 @@ mixin _IntegrationsMcp on _IntegrationsController {
   }
 
   /// Plain-language status for a live connection, and the one fix that helps.
-  _Health _health(Map<String, dynamic>? connection, {bool enabled = true}) {
-    final colors = JarvisColors.of(context);
-    if (!enabled) {
-      return (
-        label: 'Paused',
-        detail: 'Jarvis won’t use it until you switch it back on.',
-        color: colors.muted,
-        fix: _Fix.none,
-      );
-    }
-    if (connection == null) {
-      return (
-        label: 'Checking',
-        detail: 'Jarvis checks it the next time it needs it.',
-        color: colors.muted,
-        fix: _Fix.none,
-      );
-    }
-    final state = asJsonString(connection['state']) ?? 'unavailable';
-    final toolCount = asJsonInt(connection['toolCount']);
-    final issue = switch (asJsonString(connection['issue'])) {
-      'too_many_tools' =>
-        'It offers too many actions at once. Ask Jarvis to keep only the ones you need.',
-      'no_matching_tools' =>
-        'The actions you picked are no longer offered. Ask Jarvis to pick new ones.',
-      'invalid_configuration' => 'Its setup needs fixing. Ask Jarvis to help.',
-      'connection_timed_out' =>
-        'It took too long to answer. It may be busy or offline.',
-      _ => null,
-    };
-    return switch (state) {
-      'connected' => (
-        label: 'Working',
-        detail: 'Jarvis can use ${toolCount.actions()} here.',
-        color: colors.success,
-        fix: _Fix.none,
+  _Health _health(Map<String, dynamic>? connection, {bool enabled = true}) =>
+      appHealth(context, connection, enabled: enabled);
+
+  /// The app Jarvis wrote behind a registered server, if it is one.
+  Map<String, dynamic>? _customFor(String serverId) => _customServers
+      .where((item) => asJsonString(item['registryServerId']) == serverId)
+      .firstOrNull;
+
+  Future<void> _openDetail({String? serverId, String? hostName}) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => McpServerDetailScreen(
+          http: widget.http,
+          serverId: serverId,
+          hostName: hostName,
+          onAskInChat: widget.onAskInChat == null ? null : _askInChat,
+        ),
       ),
-      'needs_credentials' => (
-        label: 'Needs sign-in',
-        detail: issue ?? 'Sign in so Jarvis can use it.',
-        color: colors.warning,
-        fix: _Fix.signIn,
-      ),
-      'paused' => (
-        label: 'Paused',
-        detail: 'Jarvis won’t use it until you switch it back on.',
-        color: colors.muted,
-        fix: _Fix.none,
-      ),
-      'disabled' => (
-        label: 'Off',
-        detail: issue ?? 'No actions are switched on for Jarvis.',
-        color: colors.muted,
-        fix: _Fix.none,
-      ),
-      _ => (
-        label: 'Can’t connect',
-        detail: issue ?? 'Jarvis couldn’t reach it. It may be offline.',
-        color: colors.danger,
-        fix: _Fix.retry,
-      ),
-    };
+    );
+    if (mounted) await _load();
   }
 
   Widget _managedServerCard(Map<String, dynamic> server) {
     final id = asJsonString(server['id']) ?? '';
-    final info = _appInfo(asJsonString(server['name']) ?? '');
+    final custom = _customFor(id);
+    final info = _appInfo(
+      asJsonString(server['name']) ?? '',
+      selfBuilt: custom != null,
+    );
+    final waitingForApproval =
+        custom != null &&
+        asJsonString(custom['draftSha256']) !=
+            asJsonString(custom['activeSha256']);
     final endpoint = asJsonString(server['endpoint']) ?? '';
     final tools = jsonStrings(server['allowedTools']);
     final allTools = tools.length == 1 && tools.first == '*';
@@ -118,10 +84,22 @@ mixin _IntegrationsMcp on _IntegrationsController {
       info: info,
       health: health,
       enabled: enabled,
+      badge: custom == null ? null : 'Built by Jarvis',
+      onOpen: id.isEmpty ? null : () => _openDetail(serverId: id),
       onEnabled: id.isEmpty ? null : (value) => _setManagedEnabled(id, value),
       fixes: [
-        // A missing key is the real problem; signing in would not help.
-        if (enabled && missingKeys.isNotEmpty)
+        if (waitingForApproval)
+          FilledButton(
+            key: Key('app-review-$id'),
+            onPressed: () => _openDetail(serverId: id),
+            child: Text(
+              asJsonString(custom['activeSha256']) == null
+                  ? 'Review and switch on'
+                  : 'Review changes',
+            ),
+          )
+        else if (enabled && missingKeys.isNotEmpty)
+          // A missing key is the real problem; signing in would not help.
           for (final key in missingKeys)
             FilledButton(
               onPressed: () => _editSecret(
@@ -237,6 +215,7 @@ mixin _IntegrationsMcp on _IntegrationsController {
       key: Key('app-$name'),
       info: info,
       health: health,
+      onOpen: canPause ? () => _openDetail(hostName: name) : null,
       enabled: state != 'paused',
       onEnabled: canPause ? (value) => _setHostEnabled(name, value) : null,
       fixes: [
@@ -323,6 +302,8 @@ class _AppCard extends StatelessWidget {
     required this.onEnabled,
     required this.fixes,
     required this.details,
+    this.onOpen,
+    this.badge,
     super.key,
   });
 
@@ -332,6 +313,12 @@ class _AppCard extends StatelessWidget {
   final ValueChanged<bool>? onEnabled;
   final List<Widget> fixes;
   final List<Widget> details;
+
+  /// Opens the app's own page with its keys, actions and checks.
+  final VoidCallback? onOpen;
+
+  /// A short tag next to the name, such as "Built by Jarvis".
+  final String? badge;
 
   @override
   Widget build(BuildContext context) {
@@ -349,35 +336,62 @@ class _AppCard extends StatelessWidget {
               IconBadge(icon: info.icon, size: 40),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(info.name, style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            color: health.color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            health.label,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: colors.inkSoft,
+                child: InkWell(
+                  key: onOpen == null ? null : Key('open-${info.name}'),
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: onOpen,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              info.name,
+                              style: theme.textTheme.titleMedium,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                          if (badge != null) ...[
+                            const SizedBox(width: 8),
+                            _Badge(badge!),
+                          ],
+                          if (onOpen != null) ...[
+                            const SizedBox(width: 2),
+                            Icon(
+                              PhosphorIconsRegular.caretRight,
+                              size: 16,
+                              color: colors.muted,
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: health.color,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              health.label,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: colors.inkSoft,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
               Semantics(
@@ -420,6 +434,32 @@ class _AppCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: colors.accentSoft,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w500,
+          color: colors.accentDeep,
+        ),
       ),
     );
   }

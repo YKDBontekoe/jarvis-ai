@@ -81,6 +81,7 @@ api.MapOwnerAutomationEndpoints(app.Logger);
 api.MapAutomationStudioEndpoints(app.Logger);
 api.MapIntegrationEndpoints();
 api.MapMcpCatalogEndpoints();
+api.MapCustomMcpEndpoints();
 api.MapNotificationEndpoints();
 api.MapVoiceEndpoints(app.Logger);
 api.MapFileEndpoints(app.Logger);

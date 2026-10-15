@@ -23,12 +23,25 @@ public sealed record McpRunnerOptions(Uri Url, string Token)
     }
 }
 
-/// <summary>What the runner starts for one connection. Sent once, as the first WebSocket message.</summary>
+/// <summary>
+/// What the runner starts for one connection. Sent once, as the first WebSocket message. A launch with
+/// <see cref="Script"/> runs a self-built server's Python source with uv instead of a registry package.
+/// </summary>
 public sealed record McpRunnerLaunch(string Command, IReadOnlyList<string> Arguments,
-    IReadOnlyDictionary<string, string> Environment);
+    IReadOnlyDictionary<string, string> Environment, McpRunnerScript? Script = null);
+
+/// <summary>A self-built server's approved source. The runner checks the hash and the script rules again.</summary>
+public sealed record McpRunnerScript(string Language, string Source, string Sha256);
+
+/// <summary>
+/// Sent by the runner as a text message when a self-built server stops on its own, so Jarvis can show why.
+/// The stderr tail has the server's key values removed.
+/// </summary>
+public sealed record McpRunnerDiagnostics(string Type, int? ExitCode, string? StderrTail);
 
 [System.Text.Json.Serialization.JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
 [System.Text.Json.Serialization.JsonSerializable(typeof(McpRunnerLaunch))]
+[System.Text.Json.Serialization.JsonSerializable(typeof(McpRunnerDiagnostics))]
 public sealed partial class McpRunnerJsonContext : System.Text.Json.Serialization.JsonSerializerContext;
 
 /// <summary>
@@ -41,6 +54,9 @@ public sealed class McpRunnerClientTransport(McpRunnerOptions options, McpRunner
 {
     public string Name => name;
 
+    /// <summary>What the runner reported when the server stopped on its own, if it did.</summary>
+    public McpRunnerDiagnostics? Diagnostics { get; private set; }
+
     public async Task<ITransport> ConnectAsync(CancellationToken cancellationToken = default)
     {
         var socket = new ClientWebSocket();
@@ -51,7 +67,7 @@ public sealed class McpRunnerClientTransport(McpRunnerOptions options, McpRunner
             await socket.ConnectAsync(options.Url, cancellationToken);
             var payload = JsonSerializer.SerializeToUtf8Bytes(launch, McpRunnerJsonContext.Default.McpRunnerLaunch);
             await socket.SendAsync(payload, WebSocketMessageType.Text, endOfMessage: true, cancellationToken);
-            var stream = WebSocketStream.Create(socket, WebSocketMessageType.Binary, ownsWebSocket: true);
+            var stream = new RunnerSocketStream(socket, diagnostics => Diagnostics = diagnostics);
             return await new StreamClientTransport(stream, stream, loggerFactory).ConnectAsync(cancellationToken);
         }
         catch
@@ -59,5 +75,93 @@ public sealed class McpRunnerClientTransport(McpRunnerOptions options, McpRunner
             socket.Dispose();
             throw;
         }
+    }
+}
+
+/// <summary>
+/// MCP bytes travel as binary WebSocket messages. A text message from the runner is a diagnostics report, kept
+/// aside instead of being passed to the MCP client as protocol data.
+/// </summary>
+internal sealed class RunnerSocketStream(WebSocket socket, Action<McpRunnerDiagnostics> onDiagnostics) : Stream
+{
+    private const int MaxDiagnosticsBytes = 16 * 1024;
+
+    public override bool CanRead => true;
+    public override bool CanSeek => false;
+    public override bool CanWrite => true;
+    public override long Length => throw new NotSupportedException();
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        while (true)
+        {
+            if (socket.State is not (WebSocketState.Open or WebSocketState.CloseSent)) return 0;
+            var result = await socket.ReceiveAsync(buffer, cancellationToken);
+            if (result.MessageType == WebSocketMessageType.Close) return 0;
+            if (result.MessageType == WebSocketMessageType.Binary) return result.Count;
+            await ReadDiagnosticsAsync(buffer[..result.Count].ToArray(), result.EndOfMessage, cancellationToken);
+        }
+    }
+
+    private async Task ReadDiagnosticsAsync(byte[] first, bool complete, CancellationToken cancellationToken)
+    {
+        using var message = new MemoryStream();
+        message.Write(first);
+        var chunk = new byte[4096];
+        while (!complete)
+        {
+            var result = await socket.ReceiveAsync(chunk, cancellationToken);
+            if (message.Length + result.Count <= MaxDiagnosticsBytes) message.Write(chunk, 0, result.Count);
+            complete = result.EndOfMessage;
+        }
+        try
+        {
+            var diagnostics = JsonSerializer.Deserialize(message.ToArray(),
+                McpRunnerJsonContext.Default.McpRunnerDiagnostics);
+            if (diagnostics is { Type: "diagnostics" }) onDiagnostics(diagnostics);
+        }
+        catch (JsonException) { }
+    }
+
+    public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
+        await socket.SendAsync(buffer, WebSocketMessageType.Binary, endOfMessage: true, cancellationToken);
+
+    public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+        ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+
+    public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+        WriteAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+
+    public override int Read(byte[] buffer, int offset, int count) =>
+        ReadAsync(buffer, offset, count, CancellationToken.None).GetAwaiter().GetResult();
+
+    public override void Write(byte[] buffer, int offset, int count) =>
+        WriteAsync(buffer, offset, count, CancellationToken.None).GetAwaiter().GetResult();
+
+    public override Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public override void Flush() { }
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) socket.Dispose();
+        base.Dispose(disposing);
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        if (socket.State == WebSocketState.Open)
+        {
+            try
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, null, timeout.Token);
+            }
+            catch (Exception exception) when (exception is WebSocketException or OperationCanceledException) { }
+        }
+        socket.Dispose();
+        await base.DisposeAsync();
     }
 }

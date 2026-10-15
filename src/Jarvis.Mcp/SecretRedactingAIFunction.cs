@@ -71,7 +71,7 @@ internal sealed class SecretRedactingAIFunction : DelegatingAIFunction
     private string RedactText(string value) => McpSecretRedactor.Redact(value, _secrets);
 }
 
-internal static class McpSecretRedactor
+public static class McpSecretRedactor
 {
     public static string Redact(string value, IEnumerable<string>? secrets)
     {

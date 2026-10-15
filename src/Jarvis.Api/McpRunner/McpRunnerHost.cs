@@ -15,7 +15,12 @@ namespace Jarvis.Api.McpRunner;
 /// </summary>
 internal static partial class McpRunnerHost
 {
-    private const int MaxLaunchBytes = 64 * 1024;
+    // Room for a self-built server's source (at most 64 KB) plus its keys.
+    private const int MaxLaunchBytes = 128 * 1024;
+    private const int MaxStderrTailBytes = 4 * 1024;
+    internal const string ScriptFileName = "server.py";
+    internal static readonly string[] ScriptArguments =
+        ["run", "--no-config", "--no-project", "--quiet", "--script", ScriptFileName];
     private const int MaxEnvironmentVariables = 16;
     private const int MaxEnvironmentValueLength = 8 * 1024;
 
@@ -87,6 +92,8 @@ internal static partial class McpRunnerHost
 
         var workDirectory = Path.Combine(settings.WorkRoot, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workDirectory);
+        if (launch.Script is { } script)
+            await File.WriteAllTextAsync(Path.Combine(workDirectory, ScriptFileName), script.Source, cancellationToken);
         using var process = new Process { StartInfo = StartInfo(launch, settings, workDirectory) };
         try
         {
@@ -108,14 +115,36 @@ internal static partial class McpRunnerHost
         var toConnector = PumpAsync(stream, process.StandardInput.BaseStream, lifetime.Token);
         var fromConnector = PumpAsync(process.StandardOutput.BaseStream, stream, lifetime.Token);
         // Connector logs can contain whatever the package prints, including its own keys, so they are dropped.
-        var drainErrors = process.StandardError.BaseStream.CopyToAsync(Stream.Null, lifetime.Token);
+        // A self-built server keeps a short tail, with its key values removed, so Jarvis can see why it stopped.
+        var stderrTail = launch.Script is null ? null : new StderrTail(MaxStderrTailBytes);
+        var drainErrors = stderrTail is null
+            ? process.StandardError.BaseStream.CopyToAsync(Stream.Null, lifetime.Token)
+            : stderrTail.ReadAllAsync(process.StandardError.BaseStream, lifetime.Token);
+        var exitedOnItsOwn = false;
         try
         {
-            await Task.WhenAny(toConnector, fromConnector, process.WaitForExitAsync(lifetime.Token));
+            var finished = await Task.WhenAny(toConnector, fromConnector, process.WaitForExitAsync(lifetime.Token));
+            // The connector closed its output or exited, rather than Jarvis hanging up or the session timing out.
+            exitedOnItsOwn = finished != toConnector && !lifetime.IsCancellationRequested;
         }
         catch (OperationCanceledException) { }
         finally
         {
+            try
+            {
+                // Let the connector finish exiting and its last error lines arrive before reporting why it stopped.
+                if (exitedOnItsOwn && stderrTail is not null)
+                {
+                    await Task.WhenAny(
+                        Task.WhenAll(process.WaitForExitAsync(CancellationToken.None), Observe(drainErrors)),
+                        Task.Delay(TimeSpan.FromSeconds(3), CancellationToken.None));
+                    // Sent while the socket is still open: cancelling the pending receive below aborts it.
+                    await SendDiagnosticsAsync(socket, new McpRunnerDiagnostics("diagnostics",
+                        process.HasExited ? process.ExitCode : null,
+                        Redact(stderrTail.Text(), launch.Environment.Values)));
+                }
+            }
+            catch (OperationCanceledException) { }
             await lifetime.CancelAsync();
             try
             {
@@ -125,6 +154,7 @@ internal static partial class McpRunnerHost
             }
             catch (InvalidOperationException) { }
             await Task.WhenAll(Observe(toConnector), Observe(fromConnector), Observe(drainErrors));
+
             await CloseQuietlyAsync(socket, WebSocketCloseStatus.NormalClosure, "Connector stopped.");
             TryDelete(workDirectory);
             LogStopped(logger, launch.Command, PackageOf(launch));
@@ -149,13 +179,36 @@ internal static partial class McpRunnerHost
         return Validate(launch);
     }
 
-    /// <summary>Only npx and uvx packages run here; operator host binaries stay in the API image.</summary>
+    /// <summary>
+    /// Only npx and uvx packages and self-built Python servers run here; operator host binaries stay in the API
+    /// image.
+    /// </summary>
     internal static McpRunnerLaunch Validate(McpRunnerLaunch launch)
     {
+        if (launch.Script is not null) return ValidateScript(launch);
         if (launch.Command is not ("npx" or "uvx"))
             throw new ArgumentException("The runner starts npx and uvx connectors only.");
         var (command, arguments) = McpStdioCommandValidator.Normalize(launch.Command, launch.Arguments);
-        var environment = launch.Environment ?? new Dictionary<string, string>();
+        return new McpRunnerLaunch(command, arguments, ValidateEnvironment(launch.Environment));
+    }
+
+    private static McpRunnerLaunch ValidateScript(McpRunnerLaunch launch)
+    {
+        var script = launch.Script!;
+        if (launch.Command != "uv" || launch.Arguments.Count != 0 || script.Language != "python")
+            throw new ArgumentException("A self-built server runs as a Python script with uv.");
+        var check = CustomMcpScriptValidator.Validate(script.Source);
+        if (!check.Ok) throw new ArgumentException("The server code breaks the script rules.");
+        if (!string.Equals(check.Sha256, script.Sha256, StringComparison.Ordinal))
+            throw new ArgumentException("The server code does not match its approved hash.");
+        var environment = ValidateEnvironment(launch.Environment);
+        return new McpRunnerLaunch("uv", ScriptArguments, environment,
+            new McpRunnerScript("python", check.Source, check.Sha256));
+    }
+
+    private static IReadOnlyDictionary<string, string> ValidateEnvironment(IReadOnlyDictionary<string, string>? values)
+    {
+        var environment = values ?? new Dictionary<string, string>();
         if (environment.Count > MaxEnvironmentVariables)
             throw new ArgumentException("Too many environment variables.");
         foreach (var (name, value) in environment)
@@ -165,7 +218,23 @@ internal static partial class McpRunnerHost
             if (value is null || value.Length > MaxEnvironmentValueLength || value.Contains('\0'))
                 throw new ArgumentException($"The value for {name} is not valid.");
         }
-        return new McpRunnerLaunch(command, arguments, environment);
+        return environment;
+    }
+
+    internal static string Redact(string text, IEnumerable<string> secrets) =>
+        McpSecretRedactor.Redact(text, secrets.Where(secret => secret.Length >= 4));
+
+    private static async Task SendDiagnosticsAsync(WebSocket socket, McpRunnerDiagnostics diagnostics)
+    {
+        if (socket.State != WebSocketState.Open) return;
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var payload = JsonSerializer.SerializeToUtf8Bytes(diagnostics,
+                McpRunnerJsonContext.Default.McpRunnerDiagnostics);
+            await socket.SendAsync(payload, WebSocketMessageType.Text, endOfMessage: true, timeout.Token);
+        }
+        catch (Exception exception) when (exception is WebSocketException or OperationCanceledException) { }
     }
 
     internal static ProcessStartInfo StartInfo(McpRunnerLaunch launch, RunnerSettings settings, string workDirectory)
@@ -210,7 +279,8 @@ internal static partial class McpRunnerHost
     }
 
     private static string PackageOf(McpRunnerLaunch launch) =>
-        launch.Arguments.LastOrDefault(argument => !argument.StartsWith('-')) ?? "";
+        launch.Script is { } script ? "script:" + script.Sha256[..12]
+        : launch.Arguments.LastOrDefault(argument => !argument.StartsWith('-')) ?? "";
 
     private static async Task Observe(Task task)
     {
@@ -251,6 +321,38 @@ internal static partial class McpRunnerHost
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "{Command} connector {Package} exited with code {ExitCode}.")]
     private static partial void LogExitFailure(ILogger logger, string command, string package, int exitCode);
+}
+
+/// <summary>Keeps the last bytes a process wrote to stderr.</summary>
+internal sealed class StderrTail(int capacity)
+{
+    private readonly Lock _gate = new();
+    private readonly Queue<byte> _bytes = new();
+
+    public async Task ReadAllAsync(Stream source, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[4096];
+        int read;
+        while ((read = await source.ReadAsync(buffer, cancellationToken)) > 0)
+            Append(buffer.AsSpan(0, read));
+    }
+
+    public void Append(ReadOnlySpan<byte> data)
+    {
+        lock (_gate)
+        {
+            foreach (var value in data.Length > capacity ? data[^capacity..] : data)
+            {
+                _bytes.Enqueue(value);
+                if (_bytes.Count > capacity) _bytes.Dequeue();
+            }
+        }
+    }
+
+    public string Text()
+    {
+        lock (_gate) return System.Text.Encoding.UTF8.GetString(_bytes.ToArray()).Trim();
+    }
 }
 
 internal sealed record RunnerSettings(int MaxProcesses, TimeSpan MaxSession, string WorkRoot, string CacheRoot,

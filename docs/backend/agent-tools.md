@@ -63,7 +63,8 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Library | `LibraryAgentTools` `SearchLibrary`, `GetLibraryItem`, `SaveToLibrary`, `GetLibraryDigest`, `GetDueFlashcards`, `GradeFlashcard`, `AddFlashcards`, `ClipUrlToLibrary`, `StartDeepResearch` | **ClipUrlToLibrary** requires approval (outbound fetch). `StartDeepResearch` and the clip tool are hidden in background tasks so research cannot start more research |
 | Modes | `ModeAgentTools` `GetCurrentMode`, `SetMode` | No approval; `SetMode` hidden in background tasks. `ModeContextContributor` (order 3) adds the current mode and tone |
 | Missions | `MissionAgentTools` `PlanMission`, `RunMission`, `GetMissions`, `PauseOrResumeMission`, `CancelMission`; crew tasks get `PostToBlackboard`, `ReadBlackboard` instead | **RunMission** requires approval (it starts background work) |
-| MCP | `McpServerAgentTools` + `McpSetupAgentTools` | Discover/add/update/invoke/read prompt/resource/remove mostly **approval**; setup and secret cards in chat |
+| MCP | `McpServerAgentTools` + `McpSetupAgentTools` | Discover/add/update/invoke/read prompt/resource/remove mostly **approval**; setup and secret cards in chat. `AskForMcpCredential` without `secretName` asks for every key a `jarvis-mcp-` server declares in one card |
+| Self-built apps | `CustomMcpAgentTools` `GetCustomMcpTemplate`, `WriteCustomMcpServer`, `ListCustomMcpServers`, `GetCustomMcpServerSource`, `TestCustomMcpServer`, `ActivateCustomMcpServer` | Writing only stores code (no approval). **Test** runs the draft in the MCP runner and **Activate** makes the reviewed hash live; both always ask (risk class Outbound). See [integrations-and-mcp.md](integrations-and-mcp.md#self-built-apps) |
 | Coding | `CodexCodingTools.RunCodingTaskAsync` | **Approval**; only if `Coding:Repositories` configured |
 
 Browser, surface, device, skill, persona, graph, and remote-agent tools are defined in their respective folders under `src/Jarvis.Agents/`.

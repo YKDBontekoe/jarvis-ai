@@ -34,8 +34,13 @@ class TileLayoutController extends ChangeNotifier {
 
   List<TilePlacement> get layout => List.unmodifiable(_layout);
 
+  /// The layout Home is showing, so pages such as an app's detail screen can
+  /// offer "Pin to Home". Null until Home opened its layout.
+  static TileLayoutController? active;
+
   /// Opens device storage and shows the saved layout.
   Future<void> open() async {
+    active = this;
     _store = await TileLayoutStore.open();
     _layout = List.of(_store.read());
     _ready = true;

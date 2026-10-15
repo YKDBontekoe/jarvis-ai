@@ -7,8 +7,12 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import 'app_presentation.dart';
 
-/// What happened after an app was added, so the caller can start sign-in.
+/// What happened after an app was picked, so the caller can start sign-in.
+/// [nextStep] is `ready`, `secrets` or `sign_in` after an install, `open` for
+/// an app that was already added, or `build` to ask Jarvis to write one
+/// ([name] is then what to build).
 typedef AppInstallOutcome = ({
   String serverId,
   String name,
@@ -21,6 +25,8 @@ class AppCatalogScreen extends StatefulWidget {
   const AppCatalogScreen({
     required this.http,
     this.startWithAddress = false,
+    this.initialQuery,
+    this.canBuild = false,
     super.key,
   });
 
@@ -28,6 +34,12 @@ class AppCatalogScreen extends StatefulWidget {
 
   /// Opens the "paste an address" dialog as soon as the page shows.
   final bool startWithAddress;
+
+  /// Searches for this as soon as the page shows.
+  final String? initialQuery;
+
+  /// Offers "build it with Jarvis" when nothing fits.
+  final bool canBuild;
 
   @override
   State<AppCatalogScreen> createState() => _AppCatalogScreenState();
@@ -51,11 +63,38 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
   String? _error;
   String _lastQuery = '';
   int _revision = 0;
+  List<Map<String, dynamic>> _featured = [];
 
   @override
   void initState() {
     super.initState();
     if (widget.startWithAddress) afterRouteSettles(this, _pasteAddress);
+    final initial = widget.initialQuery?.trim() ?? '';
+    if (initial.isNotEmpty) {
+      _search.text = initial;
+      _runSearch(initial);
+    }
+    _loadFeatured();
+  }
+
+  Future<void> _loadFeatured() async {
+    try {
+      final response = await widget.http.get<dynamic>(
+        '/api/v1/mcp-catalog/featured',
+      );
+      if (mounted) setState(() => _featured = jsonMaps(response.data));
+    } catch (_) {
+      // The suggestions below still work without the featured list.
+    }
+  }
+
+  void _build(String what) {
+    Navigator.of(context).pop<AppInstallOutcome>((
+      serverId: '',
+      name: what,
+      endpoint: '',
+      nextStep: 'build',
+    ));
   }
 
   @override
@@ -119,6 +158,16 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
   }
 
   Future<void> _openEntry(Map<String, dynamic> entry) async {
+    final installedId = asJsonString(entry['installedServerId']);
+    if (entry['installed'] == true && installedId != null) {
+      Navigator.of(context).pop<AppInstallOutcome>((
+        serverId: installedId,
+        name: asJsonString(entry['title']) ?? 'The app',
+        endpoint: '',
+        nextStep: 'open',
+      ));
+      return;
+    }
     final options = jsonMaps(entry['options']);
     if (options.isEmpty) return;
     final optionId = await showModalBottomSheet<String>(
@@ -253,8 +302,23 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
                     ),
                   const SizedBox(height: 16),
                   if (query.isEmpty) ...[
+                    for (final category in _featured) ...[
+                      Text(
+                        asJsonString(category['title']) ?? '',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: colors.inkSoft,
+                        ),
+                      ),
+                      for (final entry in jsonMaps(category['servers']))
+                        _AppResultTile(
+                          entry: entry,
+                          onTap: () => _openEntry(entry),
+                        ),
+                      const SizedBox(height: 12),
+                    ],
                     Text(
-                      'Popular',
+                      _featured.isEmpty ? 'Popular' : 'Or search for',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: colors.inkSoft,
@@ -287,21 +351,26 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
                       padding: EdgeInsets.only(top: 24),
                       child: Center(child: CircularProgressIndicator()),
                     )
-                  else if (_results.isEmpty && _error == null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: Text(
-                        'No apps found for “$query”. Try another name, or paste '
-                        'the app’s address.',
-                        style: TextStyle(color: colors.inkSoft),
+                  else ...[
+                    if (_results.isEmpty && _error == null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16, bottom: 8),
+                        child: Text(
+                          widget.canBuild
+                              ? 'No apps found for “$query”. Jarvis can build one for you, or you can paste the app’s address.'
+                              : 'No apps found for “$query”. Try another name, or paste '
+                                    'the app’s address.',
+                          style: TextStyle(color: colors.inkSoft),
+                        ),
                       ),
-                    )
-                  else
                     for (final entry in _results)
                       _AppResultTile(
                         entry: entry,
                         onTap: () => _openEntry(entry),
                       ),
+                    if (widget.canBuild)
+                      _BuildTile(query: query, onTap: _build),
+                  ],
                 ],
               ),
             ),
@@ -339,8 +408,17 @@ class _AppResultTile extends StatelessWidget {
     return ListTile(
       key: Key('catalog-${asJsonString(entry['name'])}'),
       contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      leading: const IconBadge(icon: PhosphorIconsRegular.puzzlePiece),
+      leading: IconBadge(
+        icon:
+            appInfo(asJsonString(entry['title']) ?? '').icon ==
+                PhosphorIconsRegular.plugsConnected
+            ? PhosphorIconsRegular.puzzlePiece
+            : appInfo(asJsonString(entry['title']) ?? '').icon,
+      ),
       title: Text(asJsonString(entry['title']) ?? 'App'),
+      trailing: entry['installed'] == true
+          ? Icon(PhosphorIconsRegular.checkCircle, color: colors.success)
+          : null,
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -349,6 +427,7 @@ class _AppResultTile extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             [
+              if (entry['installed'] == true) 'Added',
               _whereItRuns(kind),
               if (needsKey) 'needs a key',
               asJsonString(entry['name']) ?? '',
@@ -360,6 +439,54 @@ class _AppResultTile extends StatelessWidget {
         ],
       ),
       onTap: onTap,
+    );
+  }
+}
+
+/// The way out when the directory has nothing: Jarvis writes the app.
+class _BuildTile extends StatelessWidget {
+  const _BuildTile({required this.query, required this.onTap});
+
+  final String query;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: SurfaceCard(
+        key: const Key('app-catalog-build'),
+        onTap: () => onTap(query),
+        padding: const EdgeInsets.all(14),
+        borderColor: colors.accentSoft,
+        child: Row(
+          children: [
+            IconBadge(
+              icon: PhosphorIconsRegular.magicWand,
+              color: colors.accent,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Build “$query” with Jarvis',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Jarvis writes a small app for it, tests it, and shows you before it switches on.',
+                    style: TextStyle(fontSize: 13, color: colors.inkSoft),
+                  ),
+                ],
+              ),
+            ),
+            Icon(PhosphorIconsRegular.caretRight, color: colors.muted),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -556,13 +683,20 @@ class AppKeysDialog extends StatefulWidget {
     required this.serverId,
     required this.appName,
     required this.secrets,
+    this.verifyServer,
     super.key,
   });
 
   final Dio http;
+
+  /// Where the keys are stored: the app's id, or a host app's key name.
   final String serverId;
   final String appName;
   final List<Map<String, dynamic>> secrets;
+
+  /// After saving, connect to this app once so a wrong key shows up here,
+  /// not on the next request. Defaults to [serverId]; empty skips the check.
+  final String? verifyServer;
 
   @override
   State<AppKeysDialog> createState() => _AppKeysDialogState();
@@ -573,7 +707,10 @@ class _AppKeysDialogState extends State<AppKeysDialog> {
     for (final secret in widget.secrets)
       asJsonString(secret['name']) ?? '': TextEditingController(),
   };
+  late final Set<String> _visible = {};
   bool _saving = false;
+  bool _checking = false;
+  bool _savedOnce = false;
   String? _error;
 
   @override
@@ -584,9 +721,37 @@ class _AppKeysDialogState extends State<AppKeysDialog> {
     super.dispose();
   }
 
+  /// Connects once with the new keys. A rejected key keeps the dialog open
+  /// so it can be fixed straight away.
+  Future<void> _verify() async {
+    final target = widget.verifyServer ?? widget.serverId;
+    if (target.isEmpty) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+    setState(() => _checking = true);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final result = await testAppConnection(widget.http, target);
+    if (!mounted) return;
+    if (result.ok || result.errorKind == 'paused') {
+      Navigator.of(context).pop(true);
+      messenger?.showSnackBar(
+        SnackBar(content: Text('${widget.appName}: ${result.message}')),
+      );
+      return;
+    }
+    setState(() {
+      _checking = false;
+      _saving = false;
+      _savedOnce = true;
+      _error = result.message;
+    });
+  }
+
   Future<void> _save() async {
     final missing = widget.secrets.where(
       (secret) =>
+          !_savedOnce &&
           secret['required'] == true &&
           secret['isSet'] != true &&
           _fields[asJsonString(secret['name'])]!.text.trim().isEmpty,
@@ -610,8 +775,9 @@ class _AppKeysDialogState extends State<AppKeysDialog> {
           '/api/v1/integrations/${Uri.encodeComponent(widget.serverId)}/credentials/${Uri.encodeComponent(name)}',
           data: {'value': value},
         );
+        field.clear();
       }
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) await _verify();
     } on DioException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -644,10 +810,22 @@ class _AppKeysDialogState extends State<AppKeysDialog> {
                 TextField(
                   key: Key('app-key-${asJsonString(secret['name'])}'),
                   controller: _fields[asJsonString(secret['name'])],
-                  obscureText: true,
+                  obscureText: !_visible.contains(asJsonString(secret['name'])),
                   autocorrect: false,
                   enableSuggestions: false,
                   decoration: InputDecoration(
+                    suffixIcon: IconButton(
+                      tooltip: 'Show or hide',
+                      onPressed: () => setState(() {
+                        final name = asJsonString(secret['name']) ?? '';
+                        if (!_visible.remove(name)) _visible.add(name);
+                      }),
+                      icon: Icon(
+                        _visible.contains(asJsonString(secret['name']))
+                            ? PhosphorIconsRegular.eyeSlash
+                            : PhosphorIconsRegular.eye,
+                      ),
+                    ),
                     labelText:
                         '${asJsonString(secret['label']) ?? asJsonString(secret['name'])}'
                         '${secret['required'] == true ? '' : ' (optional)'}',
@@ -659,9 +837,22 @@ class _AppKeysDialogState extends State<AppKeysDialog> {
                   ),
                 ),
               ],
+              if (_checking) ...[
+                const SizedBox(height: 14),
+                const LinearProgressIndicator(),
+                const SizedBox(height: 6),
+                Text(
+                  'Saved. Checking that ${widget.appName} accepts it…',
+                  style: TextStyle(color: colors.inkSoft),
+                ),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Text(_error!, style: TextStyle(color: colors.danger)),
+                Text(
+                  _error!,
+                  key: const Key('app-keys-error'),
+                  style: TextStyle(color: colors.danger),
+                ),
               ],
             ],
           ),
@@ -669,13 +860,15 @@ class _AppKeysDialogState extends State<AppKeysDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Later'),
+          onPressed: _saving
+              ? null
+              : () => Navigator.of(context).pop(_savedOnce),
+          child: Text(_savedOnce ? 'Keep and close' : 'Later'),
         ),
         FilledButton(
           key: const Key('app-keys-save'),
           onPressed: _saving ? null : _save,
-          child: const Text('Save'),
+          child: Text(_savedOnce ? 'Save again' : 'Save'),
         ),
       ],
     );

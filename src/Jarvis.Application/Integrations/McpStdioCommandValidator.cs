@@ -4,6 +4,12 @@ namespace Jarvis.Application.Integrations;
 
 public static partial class McpStdioCommandValidator
 {
+    /// <summary>
+    /// The command a self-built server's registry entry stores. It is never started as a program: Jarvis loads the
+    /// approved Python source for that server and the MCP runner runs it. Only activation creates such entries.
+    /// </summary>
+    public const string CustomScriptCommand = "jarvis-script";
+
     private static readonly HashSet<string> AllowedCommands = new(StringComparer.Ordinal)
     {
         "npx",

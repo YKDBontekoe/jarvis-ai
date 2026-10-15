@@ -6,7 +6,9 @@ import '../chat/tool_catalog.dart' show humanizeToolName;
 import '../expenses/expense_models.dart';
 import '../entities/entity_ref.dart';
 import '../home/next_up.dart';
+import '../integrations/app_presentation.dart';
 import '../usage/usage_screen.dart' show formatTokenCount;
+import 'app_tiles.dart';
 import 'tile_models.dart';
 
 const _icon = TileSize.icon;
@@ -445,7 +447,7 @@ final Map<String, TileSpec> _byId = {for (final s in tileSpecs) s.id: s};
 /// merged page.
 const mergedTileIds = {'expenses': 'finance', 'audit': 'activity'};
 
-TileSpec? tileSpecFor(String id) => _byId[id];
+TileSpec? tileSpecFor(String id) => _byId[id] ?? appTileSpecFor(id);
 
 // ---------------------------------------------------------------- loaders
 
@@ -1128,17 +1130,51 @@ Future<TileData?> _integrations(TileEnv env) async {
     '/api/v1/integrations/connections',
   );
   final connections = _items(response);
+  bool needsYou(Map<String, dynamic> item) =>
+      !const {'connected', 'paused'}.contains(asJsonString(item['state']));
+  final attention = connections.where(needsYou).length;
+  final working = connections
+      .where((item) => asJsonString(item['state']) == 'connected')
+      .length;
+  // Apps that need the owner first, then the busiest ones.
+  final ordered = [...connections]
+    ..sort((a, b) {
+      final need = (needsYou(b) ? 1 : 0) - (needsYou(a) ? 1 : 0);
+      if (need != 0) return need;
+      return asJsonInt(b['callsLast7Days']) - asJsonInt(a['callsLast7Days']);
+    });
   return TileData(
     stat: '${connections.length}',
     unit: _plural(connections.length, 'app', 'apps'),
+    attention: attention > 0,
     subtitle: connections.isEmpty
         ? 'Connect your first app'
-        : _first(connections.first, ['name', 'displayName', 'provider']),
+        : attention > 0
+        ? '$attention ${attention == 1 ? 'needs' : 'need'} you'
+        : '$working working',
     rows: [
-      for (final connection in connections.take(_maxRows))
+      for (final connection in ordered.take(_maxRows))
         TileRow(
-          _first(connection, ['name', 'displayName', 'provider']) ?? 'App',
-          meta: 'Connected',
+          appInfo(
+            _first(connection, ['name', 'displayName', 'provider']) ?? 'App',
+            selfBuilt: connection['selfBuilt'] == true,
+          ).name,
+          meta: switch (asJsonString(connection['state'])) {
+            'connected' =>
+              asJsonInt(connection['callsLast7Days']) > 0
+                  ? '${asJsonInt(connection['callsLast7Days'])}× this week'
+                  : 'Working',
+            'paused' => 'Paused',
+            'needs_credentials' => 'Needs a key',
+            'needs_sign_in' => 'Sign in again',
+            _ => 'Can’t connect',
+          },
+          attention: needsYou(connection),
+          target: connection['hostManaged'] == true
+              ? '$appDestinationPrefix$appTileHostPrefix${connection['name']}'
+              : asJsonString(connection['id']) == null
+              ? null
+              : '$appDestinationPrefix${connection['id']}',
         ),
     ],
   );

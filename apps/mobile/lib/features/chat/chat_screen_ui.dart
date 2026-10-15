@@ -749,6 +749,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     ToolRunEntry() => ToolRunView(
       run: entry,
       onOpenTasks: () => _openUtility('tasks'),
+      onOpenApps: () => _openUtility('integrations'),
       onOpenEntity: (ref) => ref.type == 'conversation'
           ? unawaited(_presentConversation(ref.id))
           : _openUtility(ref.destination),

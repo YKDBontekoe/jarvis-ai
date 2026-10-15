@@ -63,6 +63,9 @@ public static class ToolRiskPolicy
         ["SetMcpServerEnabled"] = ToolRisk.Outbound,
         ["SetMcpServerTools"] = ToolRisk.Outbound,
         ["RemoveMcpServer"] = ToolRisk.Outbound,
+        // Self-built servers run code Jarvis wrote, so the owner always decides.
+        ["TestCustomMcpServer"] = ToolRisk.Outbound,
+        ["ActivateCustomMcpServer"] = ToolRisk.Outbound,
 
         ["ForgetMemory"] = ToolRisk.Destructive,
         ["DeleteExpense"] = ToolRisk.Destructive,

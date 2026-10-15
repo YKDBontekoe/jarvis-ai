@@ -47,7 +47,7 @@ While anything is served from the cache, or a request cannot reach the server, `
 | `features/reminders/` | Reminders: state and actions in `reminders_screen.dart`, list and cards in `reminders_list.dart`, editor in `reminder_editor.dart` |
 | `features/conversations/` | Conversation history, groups, export |
 | `features/files/` | Files, collections, platform download helpers |
-| `features/integrations/` | Integrations hub: apps, packs, MCP servers, credentials. `app_catalog_screen.dart` searches the app directory, installs in one tap, takes a pasted address, and asks for every key an app needs (`AppKeysDialog`) |
+| `features/integrations/` | Integrations hub: apps, packs, MCP servers, credentials. A search field at the top opens `app_catalog_screen.dart`, which shows featured apps, searches the app directory, marks apps already added, installs in one tap, takes a pasted address, and offers "Build it with Jarvis" when nothing fits. `AppKeysDialog` asks for every key an app needs and checks the app right after saving. `server_detail_screen.dart` (`McpServerDetailScreen`, destination `app:<serverId>` or `app:host:<name>`) shows one app's health, Check button, keys and sign-in, per-action switches, and for apps Jarvis built, its code, test result, versions and approval. `app_presentation.dart` holds the shared names, icons, health and connection-test helpers |
 | `features/approvals/`, `audit/` | Approval review, audit log |
 | `features/automations/`, `watches/`, `briefing/` | Automations, condition watches, daily briefing |
 | `features/notifications/` | Notification details and deep-link routing |
@@ -165,7 +165,7 @@ The audit fails on layout overflows and on toolbars squeezed below their height.
 ## Generative UI
 
 - `generative_ui.dart`, `generative_ui_card.dart` — native cards (`RenderUi`): choices, forms (including secret token fields), status, and lists. Authorization actions may open a public HTTPS URL.
-- MCP setup starts in chat (`OfferMcpSetup`); Settings → Integrations is the encrypted vault.
+- MCP setup starts in chat (`OfferMcpSetup`); Settings → Integrations is the encrypted vault. Any app can be pinned to Home from its detail screen as an `app:` tile (`features/tiles/app_tiles.dart`; the tile id carries the app key and name). Chat shows an `AppBuildCard` while Jarvis writes, tests and switches on an app.
 - Only the latest card is interactive; older cards collapse to receipts.
 - Actions: `POST /api/v1/ui-surfaces/{id}/actions`.
 

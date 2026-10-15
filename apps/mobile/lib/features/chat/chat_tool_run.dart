@@ -5,10 +5,14 @@ class ToolRunView extends StatelessWidget {
     required this.run,
     this.onOpenTasks,
     this.onOpenEntity,
+    this.onOpenApps,
     super.key,
   });
 
   final ToolRunEntry run;
+
+  /// Opens Connected apps, where an app Jarvis built can be reviewed.
+  final VoidCallback? onOpenApps;
 
   /// Lets a finished "started a background task" step jump to the Tasks list
   /// when the server did not say which task it made.
@@ -51,6 +55,14 @@ class ToolRunView extends StatelessWidget {
                 ),
             ],
           ),
+          if (AppBuildProgress.of(run) case final progress?) ...[
+            const SizedBox(height: 8),
+            PopIn(
+              from: .85,
+              alignment: Alignment.centerLeft,
+              child: AppBuildCard(progress: progress, onOpen: onOpenApps),
+            ),
+          ],
           // What the steps made, as cards that open the thing itself.
           if (made.isNotEmpty && onOpenEntity != null) ...[
             const SizedBox(height: 8),
@@ -70,6 +82,149 @@ class ToolRunView extends StatelessWidget {
                     ),
                   ),
               ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// How far Jarvis got building an app in one reply.
+class AppBuildProgress {
+  const AppBuildProgress({
+    required this.written,
+    required this.tested,
+    required this.live,
+    required this.failed,
+    required this.working,
+  });
+
+  final bool written;
+  final bool tested;
+  final bool live;
+
+  /// The last test or activation in this reply failed.
+  final bool failed;
+  final bool working;
+
+  static const _tools = {
+    'WriteCustomMcpServer',
+    'TestCustomMcpServer',
+    'ActivateCustomMcpServer',
+  };
+
+  static AppBuildProgress? of(ToolRunEntry run) {
+    final steps = [
+      for (final step in run.steps)
+        if (_tools.contains(step.tool.replaceAll(RegExp(r'Async$'), ''))) step,
+    ];
+    if (steps.isEmpty) return null;
+    bool done(String tool) => steps.any(
+      (step) =>
+          step.tool.startsWith(tool) && step.status == ToolStepStatus.completed,
+    );
+    return AppBuildProgress(
+      written: done('WriteCustomMcpServer'),
+      tested: done('TestCustomMcpServer'),
+      live: done('ActivateCustomMcpServer'),
+      failed: steps.last.status == ToolStepStatus.failed,
+      working: steps.any((step) => step.status == ToolStepStatus.running),
+    );
+  }
+}
+
+/// Written → tested → live, for an app Jarvis is building in this chat.
+class AppBuildCard extends StatelessWidget {
+  const AppBuildCard({required this.progress, this.onOpen, super.key});
+
+  final AppBuildProgress progress;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final stages = [
+      ('Code written', progress.written),
+      ('Tested', progress.tested),
+      ('Live', progress.live),
+    ];
+    final title = progress.live
+        ? 'Your new app is live'
+        : progress.tested
+        ? 'Your new app is ready for your OK'
+        : progress.working
+        ? 'Jarvis is building an app'
+        : 'Jarvis wrote an app';
+    return Container(
+      key: const Key('app-build-card'),
+      constraints: const BoxConstraints(maxWidth: 360),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconBadge(
+                icon: PhosphorIconsRegular.magicWand,
+                size: 28,
+                color: colors.accent,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 4,
+            children: [
+              for (final (label, reached) in stages)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      reached
+                          ? PhosphorIconsRegular.checkCircle
+                          : PhosphorIconsRegular.circle,
+                      size: 14,
+                      color: reached ? colors.success : colors.muted,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      label,
+                      style: TextStyle(fontSize: 12.5, color: colors.inkSoft),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          if (progress.failed) ...[
+            const SizedBox(height: 6),
+            Text(
+              'The last step did not work. Jarvis can fix the code and try again.',
+              style: TextStyle(fontSize: 12.5, color: colors.danger),
+            ),
+          ],
+          if (onOpen != null) ...[
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: onOpen,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+              child: Text(progress.live ? 'Open the app' : 'Review the code'),
             ),
           ],
         ],

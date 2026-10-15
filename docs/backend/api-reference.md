@@ -164,9 +164,12 @@ Weeks run Monday to Sunday; a weekly habit's streak counts weeks that reached `t
 |------|---------|
 | `/integrations/credentials` | List configured providers (no values) |
 | `/integrations/{provider}/credentials` | Put/delete secrets |
-| `/integrations/connections` | Per-turn MCP connection status (tool counts) |
+| `/integrations/connections` | Per-turn MCP connection status: tool counts, read-only tools, `selfBuilt`, `callsLast7Days`, `lastUsedAt` |
 | `/integrations/packs`, `/integrations/oauth/*` | Guided packs and OAuth |
 | `/mcp-servers`, `/mcp-controls/{name}` | Owner MCP registry |
+| `POST /mcp-servers/{idOrHostName}/test` | Connect once: `{ok, state, toolCount, tools, errorKind, message}`; `errorKind` is `unauthorized`, `missing_key`, `timeout`, `unreachable`, `crashed`, `runner_required`, `not_activated` or `unavailable` |
+| `/mcp-catalog`, `/mcp-catalog/featured`, `POST /mcp-catalog/install` | App directory search (entries carry `installed`, `installedServerId`), featured apps by category, install |
+| `/custom-mcp-servers`, `/custom-mcp-servers/{id}` + `POST …/test`, `…/activate {sha256}`, `…/revert {revision}`, `DELETE` | Apps Jarvis wrote: code, revisions, last test, approval |
 
 ## Channels
 

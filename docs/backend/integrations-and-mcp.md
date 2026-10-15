@@ -30,6 +30,11 @@ Owners do not need to know an address or package first:
 3. **Chat** — "connect Notion" makes the agent call `SearchMcpCatalog` and `InstallMcpFromCatalog` (approval
    required), then ask for keys with `AskForMcpCredential` or start OAuth.
 
+Before a search, the app shows `GET /api/v1/mcp-catalog/featured`: publishers' own registry entries grouped by
+category (`McpFeaturedCatalog`), each fetched by name so an entry the registry drops disappears. Search results
+and featured entries carry `installed` and `installedServerId` so the app opens an added app instead of adding
+it twice.
+
 Install and connect return `{server, nextStep}` where `nextStep` is `ready`, `secrets` (the server lists required
 keys in `server.secrets`) or `sign_in` (OAuth metadata was found). Every tool the server offers is enabled (`*`, up
 to 80) and each call still asks for approval.
@@ -46,6 +51,48 @@ A server missing a required secret reports `needs_credentials`.
 
 Catalog npm packages run with `npx -y pkg@version`; PyPI packages run with `uvx pkg@version` (the API image ships
 uv). Set `Mcp__Registry__BaseUrl` to an empty value to turn the catalog off, or to a mirror.
+
+### Checking a connection
+
+`POST /api/v1/mcp-servers/{key}/test` (owner server id or host server name) connects once and returns
+`{ok, state, toolCount, tools, errorKind, message}`. `errorKind` (`unauthorized`, `missing_key`, `timeout`,
+`unreachable`, `crashed`, `runner_required`, `not_activated`, `unavailable`) never carries secret values or
+response bodies. The app calls it right after a key is saved (`AppKeysDialog`, Settings key editor) and from the
+**Check** button on an app's page, so a wrong key shows up at once.
+
+### OAuth renewal
+
+When the token response includes `refresh_token` and `expires_in`, `McpOAuthTokens` stores the refresh token,
+token endpoint, client id, resource and expiry as secrets on the same provider (`oauth_*`, hidden in the app).
+`McpToolHost` renews the token when it expires within two minutes, before connecting. A failed renewal reports
+`needs_sign_in` (issue `sign_in_expired`) instead of `needs_credentials`. The token endpoint must be public HTTPS.
+
+## Self-built apps
+
+When nothing in the catalog fits and the service has an API, Jarvis can write the MCP server itself.
+
+| Step | Tool / route | What happens |
+|------|--------------|--------------|
+| Write | `WriteCustomMcpServer` (no approval) | Validates and saves a draft revision (`custom_mcp_servers`, `custom_mcp_server_revisions`, last 10 kept, never the live one). The first save also creates a paused registry entry (command `jarvis-script`, catalog name `custom:<id>`) so keys can be added before approval. |
+| Test | `TestCustomMcpServer` / `POST /custom-mcp-servers/{id}/test` (approval) | Runs the draft in the MCP runner, lists tools, optionally calls one. Returns the tool output and the last 4 KB of stderr with the server's key values removed, so Jarvis can fix its own code. Saved as `lastTest`. |
+| Activate | `ActivateCustomMcpServer` / `POST …/activate {sha256}` (approval) | Makes the draft live only if its hash still matches what was reviewed, and switches the registry entry on. |
+
+Rules (`CustomMcpScriptValidator`, checked on save, activation, and again in the runner):
+
+- One Python file, at most 64 KB, with exactly one PEP 723 `# /// script` block holding only `requires-python`
+  and `dependencies`. `[tool.uv]`, indexes, URLs, git and paths are refused.
+- Every dependency pinned with `==` to one release, no extras or markers, and `mcp==2.2.0` (the mcp 2.x API:
+  `from mcp.server.mcpserver import MCPServer`) among them. `CustomMcpTemplate` is the starting point; bump its
+  pin after reading the SDK release notes.
+- Keys are environment variables declared with the code; the usual variable blocklist applies.
+
+Self-built apps run **only** in the MCP runner: without `McpRunner:Url` they report `runner_required` and never
+start in the API or worker. The runner gets `{command: "uv", script: {language, source, sha256}}`, recomputes the
+hash, writes `server.py` into the session's temporary home and runs `uv run --no-config --no-project --quiet
+--script server.py` with the same clean environment and limits as registry packages. When the server stops on its
+own, the runner sends one text frame `{type: "diagnostics", exitCode, stderrTail}` before closing; registry
+packages still have their stderr dropped. Live servers run the approved `active_source`; editing only changes the
+draft. Removing the registry entry (any screen or `RemoveMcpServer`) deletes the code too.
 
 ### MCP runner
 

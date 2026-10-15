@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 namespace Jarvis.Infrastructure.Persistence;
 
 public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore credentials,
-    ILogger<UserMcpServerRegistry> logger) : IUserMcpServerRegistry
+    ILogger<UserMcpServerRegistry> logger, ICustomMcpServerStore? customServers = null) : IUserMcpServerRegistry
 {
     private const string ProviderPrefix = IntegrationCredentialProviders.UserMcpPrefix;
     private const string ConfigSecret = IntegrationCredentialProviders.UserMcpConfigSecret;
@@ -60,6 +60,8 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
     {
         var stored = definition.Transport switch
         {
+            "stdio" when definition.Command == McpStdioCommandValidator.CustomScriptCommand =>
+                BuildCustomScriptStored(definition),
             "stdio" => BuildStdioStored(new AddUserMcpStdioServerRequest(definition.Name, definition.Command ?? "",
                 definition.Arguments ?? [], definition.AllowedTools)),
             "streamableHttp" => await BuildHttpStoredAsync(new AddUserMcpServerRequest(definition.Name,
@@ -83,6 +85,10 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         var secrets = await credentials.GetSecretsAsync(ownerId, id, cancellationToken);
         if (secrets is null || !secrets.ContainsKey(ConfigSecret)) return false;
         await credentials.DeleteAsync(ownerId, id, cancellationToken);
+        // Removing a self-built app from any screen or tool also removes its code.
+        if (customServers is not null &&
+            await customServers.FindByRegistryIdAsync(ownerId, id, cancellationToken) is { } custom)
+            await customServers.DeleteAsync(ownerId, custom.Id, cancellationToken);
         return true;
     }
 
@@ -173,6 +179,32 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         var allowedTools = McpToolSelection.Normalize(request.AllowedTools);
         var (command, arguments) = McpStdioCommandValidator.Normalize(request.Command, request.Arguments);
         return new StoredServer(name, string.Empty, allowedTools, true, "stdio", command, arguments, null);
+    }
+
+    /// <summary>A self-built server: the registry holds its keys and switches, the store holds its code.</summary>
+    private static StoredServer BuildCustomScriptStored(McpServerDefinition definition)
+    {
+        var customId = CustomMcpNames.IdFromArguments(definition.Arguments)
+                       ?? throw new ArgumentException("A self-built app needs its id.");
+        if (definition.CatalogName != CustomMcpNames.CatalogName(customId))
+            throw new ArgumentException("Only Jarvis can register a self-built app.");
+        return new StoredServer(ValidateName(definition.Name), string.Empty,
+            McpToolSelection.Normalize(definition.AllowedTools), true, "stdio",
+            McpStdioCommandValidator.CustomScriptCommand, [customId.ToString("N")], null);
+    }
+
+    public async Task<UserMcpServer?> SetSecretBindingsAsync(Guid ownerId, string id,
+        IReadOnlyList<McpSecretBinding> secrets, CancellationToken cancellationToken)
+    {
+        var stored = await ReadStoredAsync(ownerId, id, cancellationToken);
+        if (stored is null) return null;
+        var updated = stored.Value.Server with
+        {
+            Secrets = McpSecretBindings.Normalize(secrets, stored.Value.Server.Transport ?? "streamableHttp").ToArray()
+        };
+        await credentials.SaveSecretAsync(ownerId, id, ConfigSecret, JsonSerializer.Serialize(updated, JsonOptions),
+            cancellationToken);
+        return ToPublic(id, updated, DateTimeOffset.UtcNow, stored.Value.SecretNames);
     }
 
     private static string ValidateName(string? name)
