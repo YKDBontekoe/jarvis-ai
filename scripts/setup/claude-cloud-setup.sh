@@ -3,8 +3,8 @@
 # settings → Setup script). Installs the heavy toolchains once per container so
 # the SessionStart hook (.claude/hooks/session-start.sh) only has to restore
 # dependencies: the pinned .NET SDK, Flutter stable with its Linux/web
-# artifacts, and the pgvector image the integration tests start through
-# Testcontainers.
+# artifacts, and the container images the integration tests (Testcontainers)
+# and the local smoke stack (scripts/dev/smoke.sh) start.
 #
 # Self-contained on purpose: paste it into the environment's Setup script
 # field as-is. It reads global.json when run from the repo root and falls back
@@ -14,7 +14,15 @@ set -euo pipefail
 DOTNET_VERSION_FALLBACK="10.0.302"
 DOTNET_ROOT="$HOME/.dotnet"
 FLUTTER_ROOT="$HOME/flutter"
-PGVECTOR_IMAGE="pgvector/pgvector:pg18"
+# Keep in sync with src/Jarvis.AppHost/LocalDevelopment.cs.
+IMAGES=(
+  pgvector/pgvector:pg18
+  temporalio/temporal:latest
+  chrislusf/seaweedfs:4.47
+  livekit/livekit-server:latest
+  clamav/clamav:stable
+  bbernhard/signal-cli-rest-api:latest
+)
 
 export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 FLUTTER_SUPPRESS_ANALYTICS=true
 export PATH="$DOTNET_ROOT:$DOTNET_ROOT/tools:$FLUTTER_ROOT/bin:$PATH"
@@ -46,7 +54,7 @@ $SUDO ln -sf "$FLUTTER_ROOT/bin/flutter" /usr/local/bin/flutter
 $SUDO ln -sf "$FLUTTER_ROOT/bin/dart" /usr/local/bin/dart
 flutter --version
 
-echo "==> Docker image for integration tests (best effort)"
+echo "==> Docker images for integration tests and the smoke stack (best effort)"
 if command -v dockerd >/dev/null 2>&1; then
   started_dockerd=""
   if ! docker info >/dev/null 2>&1; then
@@ -58,7 +66,9 @@ if command -v dockerd >/dev/null 2>&1; then
     done
   fi
   if docker info >/dev/null 2>&1; then
-    docker pull -q "$PGVECTOR_IMAGE" || echo "warning: could not pre-pull $PGVECTOR_IMAGE"
+    for image in "${IMAGES[@]}"; do
+      docker pull -q "$image" || echo "warning: could not pre-pull $image"
+    done
   else
     echo "warning: Docker daemon did not start; integration tests will need it"
   fi

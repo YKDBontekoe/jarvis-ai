@@ -10,6 +10,7 @@ const MODEL = 'jarvis-fixture';
 const STREAM_DELAY_MS = Number(process.env.FAKE_CODEX_DELAY_MS ?? 18);
 const CONTEXT_PREFIXES = [
   'Current time reference:',
+  'Situation across Jarvis',
   'Stored personal memory references',
   'Active durable tasks',
   'Active condition watches',
@@ -25,7 +26,20 @@ const CONTEXT_PREFIXES = [
   'MCP and integrations',
   'Journaling:',
   'Day planner:',
+  'Expenses:',
+  'Finance:',
+  'Habits:',
+  'Inbox and commitments:',
+  'Library (second brain):',
+  'Life timeline:',
+  'Missions:',
+  'People:',
+  'WhatsApp:',
+  'Working style:',
 ];
+
+// "Jarvis tool result: …" or, with the tool's name, "Jarvis tool result (CreateReminder): …".
+const TOOL_RESULT = /^Jarvis tool result(?: \([^)]*\))?:/;
 
 const send = message => process.stdout.write(JSON.stringify(message) + '\n');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -152,8 +166,9 @@ function plan(prompt) {
     return text("Done — I've forgotten that.");
   }
 
-  if (/what do you (know|remember) about me/.test(lower) && has('SearchMemory')) {
-    if (results.length === 0) return call('SearchMemory', { query: 'user preferences facts' });
+  if (/what do you (know|remember) about me/.test(lower) && (has('ListMemories') || has('SearchMemory'))) {
+    if (results.length === 0)
+      return has('ListMemories') ? call('ListMemories', {}) : call('SearchMemory', { query: 'user preferences facts' });
     const items = [...last.matchAll(/\] (.+?)(?:\n|$)/g)].map(match => match[1]);
     return text(items.length ? "Here's what I have saved about you:\n\n" + items.map(item => `- ${item}`).join('\n')
       : "I don't have anything saved about you yet. Tell me what you'd like me to remember!");
@@ -258,14 +273,14 @@ function parseConversation(prompt) {
     messages.push({ role: blocks[index], content: blocks[index + 1].trim() });
   let requestIndex = -1;
   messages.forEach((message, index) => {
-    if (message.role === 'user' && !message.content.startsWith('Jarvis tool result:') &&
+    if (message.role === 'user' && !TOOL_RESULT.test(message.content) &&
         !CONTEXT_PREFIXES.some(prefix => message.content.startsWith(prefix)) &&
         !message.content.startsWith('ToolApprovalResponseContent')) requestIndex = index;
   });
   const request = requestIndex >= 0 ? messages[requestIndex].content : '';
   const results = messages.slice(requestIndex + 1)
-    .flatMap(message => message.content.split('\n').filter(line => line.startsWith('Jarvis tool result:')))
-    .map(line => decodeResult(line.slice('Jarvis tool result:'.length).trim()));
+    .flatMap(message => message.content.split('\n').filter(line => TOOL_RESULT.test(line)))
+    .map(line => decodeResult(line.replace(TOOL_RESULT, '').trim()));
   return { request, results, executingTask: prompt.includes('already scheduled background task') };
 }
 
