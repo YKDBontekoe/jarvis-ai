@@ -116,13 +116,16 @@ public sealed partial class McpToolHost
             if (resolved.Error is not null) return resolved.Error;
             if (!ToolPermitted(resolved.Server!.AllowedTools, toolName))
                 return $"'{toolName}' is not enabled on this MCP server. Discover its tools, then add the exact name or *.";
+            var injected = await InjectStoredSecretsAsync(resolved.Server, arguments, cancellationToken);
+            if (injected.Error is not null) return injected.Error;
             return await WithClientAsync(resolved.Server, async (client, secrets) =>
             {
                 var available = await client.ListToolsAsync(cancellationToken: cancellationToken);
                 var tool = available.FirstOrDefault(candidate => candidate.Name.Equals(toolName, StringComparison.Ordinal));
                 if (tool is null) return "That MCP server does not expose this tool.";
-                var result = await tool.CallAsync(arguments, cancellationToken: cancellationToken);
-                return McpSecretRedactor.Bound(McpSecretRedactor.Redact(JsonSerializer.Serialize(result, JsonOptions), secrets), 12_000);
+                var result = await tool.CallAsync(injected.Arguments, cancellationToken: cancellationToken);
+                return McpSecretRedactor.Bound(McpSecretRedactor.Redact(JsonSerializer.Serialize(result, JsonOptions),
+                    secrets.Concat(injected.Values)), 12_000);
             }, cancellationToken);
         }
         catch (ArgumentException exception) { return $"Could not call MCP tool: {exception.Message}"; }
@@ -138,6 +141,27 @@ public sealed partial class McpToolHost
             }
             return "The MCP tool call failed. If it needs authorization, call RequestMcpAuthorization and try again.";
         }
+    }
+
+    /// <summary>
+    /// Swaps <c>{{secret:name}}</c> placeholders for the values this owner saved for the server, so a tool that
+    /// takes a password or key as an argument gets it without the model or the approval card ever seeing it.
+    /// </summary>
+    private async Task<InjectedArguments> InjectStoredSecretsAsync(McpServerOptions server,
+        Dictionary<string, object?> arguments, CancellationToken cancellationToken)
+    {
+        var wanted = McpSecretPlaceholders.Names(arguments);
+        if (wanted.Count == 0) return new InjectedArguments(arguments, [], null);
+        var serverId = UserServerId(server);
+        if (serverId is null)
+            return InjectedArguments.Fail("Secret placeholders only work on servers registered in Jarvis. Never put API tokens in argumentsJson.");
+        var stored = await credentialStore.GetSecretsAsync(currentUser.OwnerId, serverId, cancellationToken);
+        var resolvedArguments = McpSecretPlaceholders.Resolve(arguments, stored, out var missing);
+        if (missing.Count > 0)
+            return InjectedArguments.Fail(
+                $"No saved value for {string.Join(", ", missing.Select(name => $"'{name}'"))} on '{server.Name}'. " +
+                $"Call AskForMcpCredential with provider '{serverId}' and that secretName, wait for the user to save it, then retry.");
+        return new InjectedArguments(resolvedArguments, wanted.Select(name => stored![name]).ToArray(), null);
     }
 
     public async Task<string> ReadResourceAsync(string serverKey, string uri, CancellationToken cancellationToken)
@@ -424,6 +448,11 @@ public sealed partial class McpToolHost
     }
 
     private sealed record LiveSession(McpClient Client, string[] Secrets);
+
+    private sealed record InjectedArguments(Dictionary<string, object?> Arguments, string[] Values, string? Error)
+    {
+        public static InjectedArguments Fail(string error) => new([], [], error);
+    }
 
     private sealed record ResolvedMcpServer(McpServerOptions? Server, bool Enabled, bool Registered, string? Error = null)
     {

@@ -132,6 +132,8 @@ Integration tools that are not host-auto-approved still ask by default, except t
 
 Transports: **stdio** and **streamableHttp**. Allowlists are explicit tool names (or `*` up to 80 tools). Default = approval required; `AutoApprovedTools` for unattended tools only.
 
+Secrets a tool takes as an *argument* (for example an IMAP `password`): the agent saves it with `AskForMcpCredential` (provider = the `jarvis-mcp-` id, `secretName` = the argument name) and passes `{{secret:NAME}}` as the value in `InvokeMcpTool`'s `argumentsJson`. `McpToolHost.InvokeToolAsync` resolves it from that server's own credential store after approval (the card shows only the placeholder), refuses `server_config` and `oauth_*`, and redacts the value from the result. A missing value returns an instruction to ask for it. Direct (non-`InvokeMcpTool`) tool calls do not resolve placeholders.
+
 Agent management tools: list/discover/add/update/invoke plus chat setup (`OfferMcpSetup`, `AskForMcpCredential`, `InstallIntegrationPack`) — see [agent-tools.md](agent-tools.md).
 
 AppHost features (`JARVIS_FEATURES`, see `src/Jarvis.AppHost/JarvisFeatures.cs`):
