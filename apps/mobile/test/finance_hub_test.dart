@@ -217,6 +217,47 @@ void main() {
     expect(find.text('Income and spending'), findsOneWidget);
   });
 
+  testWidgets('spending is a tab of finance with scan and add', (tester) async {
+    http.on('GET', '/api/v1/expenses', {
+      'year': 2026,
+      'month': 10,
+      'currency': 'EUR',
+      'total': 42.5,
+      'count': 1,
+      'categories': [
+        {'category': 'groceries', 'total': 42.5, 'count': 1},
+      ],
+      'days': [
+        {'date': '2026-10-14', 'total': 42.5},
+      ],
+      'topMerchants': [
+        {'merchant': 'Albert Heijn', 'total': 42.5, 'count': 1},
+      ],
+      'otherCurrencies': <Object>[],
+      'expenses': [
+        {
+          'id': 'e1',
+          'amount': 42.5,
+          'currency': 'EUR',
+          'category': 'groceries',
+          'merchant': 'Albert Heijn',
+          'spentOn': '2026-10-14',
+        },
+      ],
+    });
+    await show(tester, tab: FinanceTab.spending);
+
+    expect(find.text('Spending'), findsOneWidget);
+    expect(find.byKey(const Key('expenses-scan')), findsOneWidget);
+    expect(find.byKey(const Key('expenses-add')), findsOneWidget);
+    expect(find.byKey(const Key('expenses-finance')), findsNothing);
+    expect(find.textContaining('Albert Heijn'), findsWidgets);
+    expect(
+      http.sent('GET', '/api/v1/expenses').single.query['month'],
+      '2026-10',
+    );
+  });
+
   testWidgets('the overview opens the accounts tab', (tester) async {
     await show(tester);
 

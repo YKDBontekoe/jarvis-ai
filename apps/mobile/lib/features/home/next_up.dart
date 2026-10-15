@@ -1,4 +1,5 @@
 import '../../json_maps.dart';
+import '../../l10n/l10n.dart';
 
 /// The next thing on the person's day: a calendar event or a reminder.
 class UpNext {
@@ -118,8 +119,11 @@ String longDate(DateTime now) {
 }
 
 /// "Good morning", "Good afternoon" or "Good evening".
-String greetingFor(DateTime now) => switch (now.hour) {
-  < 12 => 'Good morning',
-  < 18 => 'Good afternoon',
-  _ => 'Good evening',
-};
+String greetingFor(DateTime now, [AppLocalizations? strings]) {
+  final l10n = strings ?? englishStrings;
+  return switch (now.hour) {
+    < 12 => l10n.greetingMorning,
+    < 18 => l10n.greetingAfternoon,
+    _ => l10n.greetingEvening,
+  };
+}

@@ -97,7 +97,7 @@ const defaultTileLayout = [
   TilePlacement('memory', TileSize.icon),
   TilePlacement('journal', TileSize.icon),
   TilePlacement('people', TileSize.icon),
-  TilePlacement('expenses', TileSize.strip),
+  TilePlacement('finance', TileSize.strip),
   TilePlacement('habits', TileSize.strip),
 ];
 
@@ -107,9 +107,10 @@ List<TilePlacement> normalizeTileLayout(Iterable<TilePlacement> items) {
   final seen = <String>{};
   final result = <TilePlacement>[];
   for (final item in items) {
-    final spec = tileSpecFor(item.id);
-    if (spec == null || !seen.add(item.id)) continue;
-    result.add(TilePlacement(item.id, spec.nearest(item.size)));
+    final id = mergedTileIds[item.id] ?? item.id;
+    final spec = tileSpecFor(id);
+    if (spec == null || !seen.add(id)) continue;
+    result.add(TilePlacement(id, spec.nearest(item.size)));
   }
   return result;
 }

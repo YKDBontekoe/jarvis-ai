@@ -4,12 +4,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
+import 'api/offline_cache.dart';
 import 'app_lock.dart';
 import 'appearance.dart';
 import 'error_reporting.dart';
 import 'features/chat/chat_screen.dart';
+import 'l10n/l10n.dart';
 import 'push/firebase_bootstrap.dart';
 import 'theme.dart';
+import 'ui/offline_banner.dart';
 
 Future<void> main() async {
   if (sentryDsn.isEmpty || !(kReleaseMode || sentryEnabledOverride)) {
@@ -103,8 +106,14 @@ class _JarvisAppState extends State<JarvisApp> {
         theme: buildJarvisTheme(),
         darkTheme: buildJarvisTheme(brightness: Brightness.dark),
         themeMode: _appearance.themeMode,
+        locale: _appearance.language.locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         builder: (context, child) {
-          final content = child ?? const SizedBox.shrink();
+          final content = OfflineBanner(
+            cache: OfflineCache.instance,
+            child: child ?? const SizedBox.shrink(),
+          );
           final media = MediaQuery.of(context);
           final theme = Theme.of(context);
           // On very narrow phones titles sit closer to the back button.

@@ -139,8 +139,51 @@ public sealed class UsageDashboardService(JarvisDbContext db) : IUsageDashboard
         var activity = await LoadActivityAsync(ownerId, from, now, cancellationToken);
         var personalization = await LoadPersonalizationAsync(ownerId, now, cancellationToken);
         var improvement = await LoadImprovementAsync(ownerId, from, now, activity, cancellationToken);
+        var turnQuality = await LoadTurnQualityAsync(ownerId, from, now, cancellationToken);
         return UsageDashboardComposer.Compose(new UsageComposeInput(
-            now, period, zone.Id, models, points, lifetime, activity, personalization, improvement));
+            now, period, zone.Id, models, points, lifetime, activity, personalization, improvement, turnQuality));
+    }
+
+    private const int MaxRowsForTurnQuality = 5_000;
+
+    /// <summary>Interactive and task turns only; background jobs such as memory extraction have their own pace.</summary>
+    private async Task<TurnQualitySnapshot> LoadTurnQualityAsync(Guid ownerId, DateTimeOffset from,
+        DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var modelRows = await db.ModelUsageEvents.AsNoTracking()
+            .Where(item => item.OwnerId == ownerId && item.CreatedAt >= from && item.CreatedAt <= now &&
+                           item.Purpose == UsagePurposes.Chat)
+            .OrderByDescending(item => item.CreatedAt)
+            .Take(MaxRowsForTurnQuality)
+            .Select(item => new { item.DurationMs, item.Outcome, item.InputTokens, item.CachedInputTokens })
+            .ToListAsync(cancellationToken);
+        var traces = await db.TurnTraces.AsNoTracking()
+            .Where(item => item.OwnerId == ownerId && item.CreatedAt >= from && item.CreatedAt <= now)
+            .OrderByDescending(item => item.CreatedAt)
+            .Take(MaxRowsForTurnQuality)
+            .Select(item => new { item.TotalMs, item.Outcome, item.ToolsJson })
+            .ToListAsync(cancellationToken);
+        var approvals = await db.ToolApprovals.AsNoTracking()
+            .Where(item => item.OwnerId == ownerId && item.CreatedAt >= from && item.CreatedAt <= now)
+            .GroupBy(item => item.Status == "rejected")
+            .Select(group => new { Rejected = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
+        var autoApproved = await db.AuditEvents.AsNoTracking()
+            .CountAsync(item => item.OwnerId == ownerId && item.Timestamp >= from && item.Timestamp <= now &&
+                                (item.Action == "approval.auto_approved" ||
+                                 item.Action == "approval.policy_auto_approved"), cancellationToken);
+
+        var tracesWithTools = traces.Select(item => (item.TotalMs, item.Outcome,
+            Tools: Deserialize<List<TurnToolCall>>(item.ToolsJson) ?? [])).ToArray();
+        return TurnQualityMetrics.Compute(new TurnQualityInputs(
+            modelRows.Select(item => (item.DurationMs, item.Outcome)).ToArray(),
+            modelRows.Sum(item => item.InputTokens),
+            modelRows.Sum(item => item.CachedInputTokens),
+            tracesWithTools.Select(item => (item.TotalMs, item.Outcome)).ToArray(),
+            tracesWithTools.SelectMany(item => item.Tools).ToArray(),
+            approvals.Sum(item => item.Count),
+            approvals.Where(item => item.Rejected).Sum(item => item.Count),
+            autoApproved));
     }
 
     private const int MaxTracesForReliability = 5_000;

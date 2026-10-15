@@ -19,6 +19,20 @@ Tools are exposed to the model through **Microsoft Agent Framework** `AITool` in
 
 Registration: `src/Jarvis.Agents/DependencyInjection.cs`.
 
+## Tool groups
+
+Every tool stays registered and callable, but the model is not shown all of them on every call. `ToolGroups` (`src/Jarvis.Agents/ToolGroups.cs`) lists feature groups (money, inbox, library, planner, people, whatsapp, habits, journal, decisions, timeline, automations, missions, modes, devices, integrations, graph, agents, coding). Anything not listed is always shown: clock, reminders, tasks, watches, memory, files, skills, cross-feature tools, MCP setup cards, browser, cards, and the owner's MCP integration tools.
+
+`ToolGroupChatClient` sits between function invocation and the model, so execution and approval gating see every tool. For each model call it shows the always-on tools plus a group when:
+
+- the user's latest message matches the group's keywords (English and Dutch), or
+- one of its tools was called since the third most recent user message, or
+- the model called `LoadTools` with that group id. Its description is the catalog of groups and tool names.
+
+The full name list goes along in `ChatOptions.AdditionalProperties["jarvis_callable_tools"]`, so a call to a tool that exists but was not shown is still valid: it runs through normal function invocation (with its approval) and its group is shown from the next step on. Groups are worked out from the conversation messages, so nothing extra is stored. A plain turn shows about a third of the tool schema text. `jarvis.agent.tools.offered` and `jarvis.agent.tools.deferred` (meter `Jarvis.ToolGroups`) record the counts per call. Turn it off with `Jarvis__ToolGroups__Enabled=false`. Voice (`CollectFunctions`) still gets every tool.
+
+When you add a tool that only matters for one feature, add its name to the right group (or a new group with keywords). `ToolGroupTests` checks that every listed name is a real tool.
+
 ## Core tool catalog
 
 From `BuiltInAgentContributors` / dedicated tool classes:
@@ -80,7 +94,7 @@ Order is controlled by `Order` on each contributor (`CoreAgentContext` uses `Ord
 ## Adding a new tool
 
 1. Implement methods on a small class in `Jarvis.Agents` with `[Description]` on parameters (model-facing docs).
-2. Register via `AIFunctionFactory.Create(...)` in an `IAgentToolContributor`.
+2. Register via `AIFunctionFactory.Create(...)` in an `IAgentToolContributor`. Feature-specific tools also go into a group in `ToolGroups` so they are only shown when needed.
 3. Wrap with `ApprovalRequiredAIFunction` when the action is sensitive. Map it in `ApprovalCategories` when it should share a standing-approval category with related tools; unmapped tools each get their own category, which the owner can always-allow from the approval card.
 4. Use Application services; never query `JarvisDbContext` from Agents.
 5. Add unit tests in `tests/unit/Jarvis.UnitTests` when behavior is non-trivial.

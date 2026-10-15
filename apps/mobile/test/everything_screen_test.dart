@@ -91,7 +91,7 @@ void main() {
 
     await tester.enterText(find.byKey(const Key('everything-search')), 'money');
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('everything-expenses')), findsOneWidget);
+    expect(find.byKey(const Key('everything-expenses')), findsNothing);
     expect(find.byKey(const Key('everything-finance')), findsOneWidget);
     expect(find.byKey(const Key('everything-memory')), findsNothing);
 

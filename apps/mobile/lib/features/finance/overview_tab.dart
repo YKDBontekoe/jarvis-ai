@@ -364,8 +364,8 @@ class _OverviewTabState extends State<OverviewTab>
 
 /// Which hub tab an overview shortcut opens. The hub maps it to its own tab enum.
 enum FinanceTabLink {
-  accounts(2),
-  portfolio(3);
+  accounts(3),
+  portfolio(4);
 
   const FinanceTabLink(this.target);
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jarvis_mobile/features/usage/turn_quality_card.dart';
 import 'package:jarvis_mobile/features/usage/usage_screen.dart';
 
 import 'support/fixture_http.dart';
@@ -211,5 +212,75 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('usage-improvement')), findsNothing);
+  });
+
+  testWidgets('the turn quality card shows speed, failures and what to do', (
+    tester,
+  ) async {
+    final http = FixtureHttp()
+      ..on('GET', '/api/v1/usage', {
+        ..._usage(),
+        'turnQuality': {
+          'modelCalls': 40,
+          'medianModelMs': 4200,
+          'p90ModelMs': 38000,
+          'modelFailureRate': 0.05,
+          'cacheHitRate': 0.62,
+          'turns': 20,
+          'medianTurnMs': 9100,
+          'p90TurnMs': 61000,
+          'failedTurns': 3,
+          'cancelledTurns': 1,
+          'toolCalls': 30,
+          'toolFailureRate': 0.1,
+          'slowTools': [
+            {'tool': 'BrowseTheWeb', 'calls': 6, 'averageMs': 125000},
+          ],
+          'approvalsAsked': 12,
+          'approvalsDenied': 2,
+          'autoApproved': 3,
+          'flags': ['slow_replies', 'approval_friction', 'unknown_flag'],
+        },
+      });
+    tester.view.physicalSize = const Size(900, 3200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(home: UsageScreen(http: http.client())),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('usage-turn-quality')), findsOneWidget);
+    expect(find.text('4.2 s'), findsOneWidget);
+    expect(find.text('38 s'), findsOneWidget);
+    expect(find.text('9.1 s'), findsOneWidget);
+    expect(find.text('62%'), findsOneWidget);
+    expect(find.textContaining('5.0% of 40 model calls failed'), findsOneWidget);
+    expect(find.textContaining('3 turns failed, 1 stopped'), findsOneWidget);
+    expect(find.textContaining('12 approvals asked, 2 declined'), findsOneWidget);
+    expect(find.textContaining('2 min 5 s on average'), findsOneWidget);
+    expect(find.textContaining('Replies are slow'), findsOneWidget);
+    expect(find.textContaining('You approve a lot by hand'), findsOneWidget);
+  });
+
+  testWidgets('an older server without turn quality hides that card', (
+    tester,
+  ) async {
+    final http = FixtureHttp()..on('GET', '/api/v1/usage', _usage());
+    await tester.pumpWidget(
+      MaterialApp(home: UsageScreen(http: http.client())),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('usage-turn-quality')), findsNothing);
+  });
+
+  test('turn durations read naturally', () {
+    expect(formatTurnDuration(850), '850 ms');
+    expect(formatTurnDuration(4200), '4.2 s');
+    expect(formatTurnDuration(38000), '38 s');
+    expect(formatTurnDuration(120000), '2 min');
+    expect(formatTurnDuration(125000), '2 min 5 s');
   });
 }

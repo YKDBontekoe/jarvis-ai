@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../ui/jarvis_ui.dart';
+import '../expenses/expenses_screen.dart';
 import 'accounts_tab.dart';
 import 'budgets_tab.dart';
 import 'overview_tab.dart';
@@ -11,6 +12,7 @@ import 'transactions_tab.dart';
 /// The tabs of the finance hub, in the order they appear.
 enum FinanceTab {
   overview('Overview'),
+  spending('Spending'),
   transactions('Transactions'),
   accounts('Accounts'),
   portfolio('Portfolio'),
@@ -21,7 +23,8 @@ enum FinanceTab {
   final String label;
 }
 
-/// Net worth, the transaction ledger, bank accounts, the stock portfolio, and budgets with subscriptions.
+/// The one place for money: net worth, monthly spending with receipt scanning,
+/// the transaction ledger, bank accounts, the stock portfolio, and budgets with subscriptions.
 class FinanceScreen extends StatefulWidget {
   const FinanceScreen({
     required this.http,
@@ -80,6 +83,7 @@ class _FinanceScreenState extends State<FinanceScreen>
             now: widget.now,
             onOpenTab: _tabs.animateTo,
           ),
+          ExpensesScreen(http: widget.http, now: widget.now, embedded: true),
           TransactionsTab(http: widget.http, now: widget.now),
           AccountsTab(
             http: widget.http,

@@ -81,6 +81,18 @@ void main() {
       expect(result.last.size, TileSize.strip);
     });
 
+    test('tiles of merged features move to the feature they joined', () {
+      final result = normalizeTileLayout(const [
+        TilePlacement('expenses', TileSize.wide),
+        TilePlacement('finance', TileSize.icon),
+        TilePlacement('audit', TileSize.strip),
+      ]);
+      expect([for (final p in result) p.id], ['finance', 'activity']);
+      expect(result.first.size, TileSize.wide);
+      expect(tileSpecFor('expenses'), isNull);
+      expect(tileSpecFor('audit'), isNull);
+    });
+
     test('decoding ignores junk and returns null for broken JSON', () {
       expect(decodeTileLayout(null), isNull);
       expect(decodeTileLayout('{'), isNull);
@@ -314,7 +326,7 @@ void main() {
       expect(data.attention, isTrue);
     });
 
-    test('expenses show the month total and the change', () async {
+    test('finance shows spending this month and the change', () async {
       http.on('GET', '/api/v1/expenses', {
         'year': 2026,
         'month': 10,
@@ -338,7 +350,7 @@ void main() {
           },
         ],
       });
-      final data = (await load('expenses'))!;
+      final data = (await load('finance'))!;
       expect(data.stat, '€412');
       expect(data.unit, 'this month');
       expect(data.subtitle, '+9% vs last month');
@@ -348,6 +360,32 @@ void main() {
         http.sent('GET', '/api/v1/expenses').single.query['month'],
         '2026-10',
       );
+    });
+
+    test('finance raises budget alerts over the spending stat', () async {
+      http.on('GET', '/api/v1/expenses', {
+        'year': 2026,
+        'month': 10,
+        'currency': 'EUR',
+        'total': 412.3,
+        'count': 14,
+        'categories': <Object>[],
+        'days': <Object>[],
+        'topMerchants': <Object>[],
+        'otherCurrencies': <Object>[],
+        'expenses': <Object>[],
+      });
+      http.on('GET', '/api/v1/finance/overview', {
+        'currency': 'EUR',
+        'alerts': [
+          {'kind': 'budget', 'message': 'Groceries is at 95%'},
+        ],
+        'subscriptions': <Object>[],
+      });
+      final data = (await load('finance'))!;
+      expect(data.stat, '€412');
+      expect(data.subtitle, '1 alert');
+      expect(data.attention, isTrue);
     });
 
     test('notifications count the unread ones', () async {
@@ -586,7 +624,7 @@ void main() {
       expect(line.endMinute, lessThanOrEqualTo(1440));
     });
 
-    test('expenses give seven bars ending today', () async {
+    test('finance gives seven spending bars ending today', () async {
       http.on('GET', '/api/v1/expenses', {
         'year': 2026,
         'month': 10,
@@ -611,7 +649,7 @@ void main() {
           },
         ],
       });
-      final data = (await load('expenses'))!;
+      final data = (await load('finance'))!;
       expect(data.visual, TileVisual.bars);
       expect(data.bars, hasLength(7));
       expect(data.bars.last.value, 60);
@@ -620,7 +658,7 @@ void main() {
       expect(data.bars.first.value, 0);
     });
 
-    test('expenses without any daily spending draw no chart', () async {
+    test('finance without any daily spending draws no chart', () async {
       http.on('GET', '/api/v1/expenses', {
         'year': 2026,
         'month': 10,
@@ -634,7 +672,7 @@ void main() {
         'otherCurrencies': <Object>[],
         'expenses': <Object>[],
       });
-      expect((await load('expenses'))!.visual, TileVisual.none);
+      expect((await load('finance'))!.visual, TileVisual.none);
     });
 
     test('devices draw the battery as a ring', () async {

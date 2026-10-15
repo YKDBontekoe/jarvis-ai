@@ -298,6 +298,7 @@ mixin _ChatScreenNav on _ChatScreenController {
       await ComposerDrafts.clearAll();
       _outboxTimer?.cancel();
       await _outbox.clear();
+      await OfflineCache.instance.clear();
       await OutboxStore.clearAll();
       _chatList.clear();
       _tileSource.reset();

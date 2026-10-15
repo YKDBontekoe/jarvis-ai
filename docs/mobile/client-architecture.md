@@ -14,6 +14,20 @@ The same Flutter app is also hosted by the production API at the Jarvis domain
 root. It shares the existing account and owner-scoped data. See
 [hosted web deployment](../operations/deployment-and-ci.md#hosted-web-client).
 
+## Languages
+
+The app ships in English and Dutch. Strings live in `lib/l10n/app_en.arb` (the template, with descriptions and placeholders) and `lib/l10n/app_nl.arb`; `flutter gen-l10n` (run by `flutter pub get`, configured in `l10n.yaml`) writes `app_localizations*.dart` next to them, and those generated files are committed. Read strings with `context.l10n.someKey` (`lib/l10n/l10n.dart`), which falls back to English where no localizations are mounted, such as a bare `MaterialApp` in widget tests. Formatters that run without a context take an optional `AppLocalizations` and default to `englishStrings` (`greetingFor`, `offlineAge`).
+
+Appearance → Language stores `LanguagePreference` (`system`, `english`, `dutch`) with the theme and motion choices; `MaterialApp.locale` follows it, so Material and Cupertino widgets (date pickers, tooltips, text selection) switch too. Jarvis's replies follow the language the owner writes in, not this setting.
+
+Translated so far: the tab bar, the Home greeting, the offline banner, Appearance (title and Language) and the Turn quality card. Other screens still use English literals; move a screen's strings into both ARB files when you touch it, and add a Dutch entry for every new key.
+
+## Offline
+
+`lib/api/offline_cache.dart` keeps the last good answer to each JSON `GET` under `/api/` and serves it when the connection fails (no response at all: connection error or timeout), so screens open with saved data instead of an error. Server errors and 4xx answers still reach the screen, and writes never fall back (the chat outbox queues messages). Sign-in, credential, secret, token, download, content, export and stream routes are never saved; a request can opt out with `Options(extra: {OfflineCache.skipExtra: true})`. Saved answers expire after 14 days, bodies over 768 KB are skipped, and native builds keep at most 400 files (named by a hash of the request) in the app's private support directory; the web build keeps them in memory. Sign-out clears the cache.
+
+While anything is served from the cache, or a request cannot reach the server, `OfflineBanner` (`lib/ui/offline_banner.dart`, mounted in `MaterialApp.builder`) shows "Offline · showing data from …" above every page with a Retry that probes `/alive`. The next answer from the server hides it. A response from the cache carries `extra['jarvisCachedAt']` (`isCachedResponse`). Widget tests that use `debugJarvisHttpAdapter` do not attach the cache.
+
 ## Feature layout
 
 | Path | Screen / concern |
@@ -44,10 +58,12 @@ root. It shares the existing account and owner-scoped data. See
 | `features/devices/` | This-device capabilities and telemetry |
 | `features/agents/` | Remote agent registry |
 | `features/coding/` | Coding runs list |
-| `features/usage/` | Usage dashboard, including the "Jarvis is improving" card (hidden when the server sends no `improvement`) |
+| `features/usage/` | Usage dashboard, including the "Jarvis is improving" card (hidden when the server sends no `improvement`) and the Turn quality card (`turn_quality_card.dart`: reply time, failed turns, slow tools, approvals, and a tip for each flag; hidden without `turnQuality`) |
 | `features/voice/` | LiveKit stage, hands-free |
 
 Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide code: `main.dart`, `theme.dart`, `appearance.dart`, `app_lock.dart`, `error_reporting.dart`, and small helpers (`json_maps.dart`, `http_urls.dart`, `schedule_format.dart`), plus `api/`, `auth/`, `push/` and `ui/`. Put new screens in a feature folder.
+
+**Merged features.** Overlapping features were folded together: Expenses is the Spending tab of Finance, and the audit log is a view of Activity. `mergedTileIds` in `tile_registry.dart` maps the old tile ids (`expenses`, `audit`) to the tile they joined, so saved Home layouts move over, and `utilityPageFor` still opens the old destinations (deep links, notifications, search, Settings) on the merged page. When folding another feature in, add it there too.
 
 ## Motion and visual language
 
@@ -108,7 +124,7 @@ Every screen lives under `features/<area>/`. The `lib/` root holds only app-wide
 - `EntityRef` is the client side of the server's `type:id` refs. The destination `entity:<type>:<id>` opens `EntityScreen`: the thing's title, an "Open in <feature>" button, the `RelatedPanel` (from `/entities/{type}/{id}/related`) and its event history.
 - `RelatedPanel` also appears in task details. Memory's "Learned from a conversation" opens the memory's page, which leads back to the chat.
 - Chat turns completed tool steps that carry refs into `EntityResultCard`s.
-- The **Activity** tile and page (`/api/v1/events`) show what happened and what Jarvis did on its own; rows open their subject.
+- The **Activity** tile and page (`/api/v1/events`) show what happened and what Jarvis did on its own; rows open their subject. Its third view, **Audit log**, is the audit trail (`/api/v1/audit`, `AuditScreen` with `embedded: true`); the `audit` destination opens it.
 - Home refreshes on the realtime `event.created`.
 - The Learning page's autonomy card holds the level picker, including the opt-in autonomous level and its per-category outside-action switches.
 

@@ -23,6 +23,9 @@ const longRunningReceiveTimeout = Duration(minutes: 20);
 @visibleForTesting
 HttpClientAdapter? debugJarvisHttpAdapter;
 
+/// True while tests serve canned responses instead of a real server.
+bool get usesDebugJarvisHttpAdapter => debugJarvisHttpAdapter != null;
+
 Dio createJarvisHttp() {
   final dio = Dio(
     BaseOptions(

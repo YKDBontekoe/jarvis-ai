@@ -86,7 +86,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         var prompt = BuildPrompt(messages, options, tools, enableWebSearch, _access.AllowShell);
         return await RunCodexAsync(prompt, options?.ModelId ?? model,
             GetReasoningEffort(options),
-            tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal), null, IsBackground(options),
+            CallableToolNames(tools, options), null, IsBackground(options),
             cancellationToken);
     }
 
@@ -103,7 +103,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         });
         var runTask = RunCodexAsync(prompt, options?.ModelId ?? model,
             GetReasoningEffort(options),
-            tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal), updates.Writer, IsBackground(options),
+            CallableToolNames(tools, options), updates.Writer, IsBackground(options),
             cancellationToken);
         try
         {
@@ -127,6 +127,19 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         options?.AdditionalProperties is not null &&
         options.AdditionalProperties.TryGetValue(BackgroundPriorityProperty, out var flag) &&
         flag is true;
+
+    /// <summary>
+    /// Offered tools plus any the caller marked callable but left out of the prompt (<see cref="ToolGroups"/>):
+    /// a call to one of those is valid and runs through normal function invocation.
+    /// </summary>
+    internal static HashSet<string> CallableToolNames(IEnumerable<AIFunction> tools, ChatOptions? options)
+    {
+        var names = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
+        if (options?.AdditionalProperties?.TryGetValue(ToolGroups.CallableToolsProperty, out var callable) == true &&
+            callable is IEnumerable<string> extra)
+            names.UnionWith(extra);
+        return names;
+    }
 
     private static string? GetReasoningEffort(ChatOptions? options) =>
         options?.AdditionalProperties is not null &&

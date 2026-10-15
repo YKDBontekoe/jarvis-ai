@@ -35,7 +35,8 @@ public sealed record UsageComposeInput(
     IReadOnlyList<ProviderLifetime> Lifetime,
     UsageActivity Activity,
     PersonalizationSnapshot Personalization,
-    ImprovementSnapshot? Improvement = null);
+    ImprovementSnapshot? Improvement = null,
+    TurnQualitySnapshot? TurnQuality = null);
 
 public static class UsageDashboardComposer
 {
@@ -76,7 +77,8 @@ public static class UsageDashboardComposer
             .ToArray();
         return new UsageDashboard(
             input.Period, from, input.Now, zone.Id, input.Now, input.Personalization, activity,
-            codex, openRouter, other, daily, note, models, input.Improvement ?? ImprovementSnapshot.Empty);
+            codex, openRouter, other, daily, note, models, input.Improvement ?? ImprovementSnapshot.Empty,
+            input.TurnQuality ?? TurnQualitySnapshot.Empty);
     }
 
     private const string CodexNote =

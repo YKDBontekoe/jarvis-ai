@@ -640,7 +640,7 @@ void main() {
       });
       await show(
         tester,
-        tiles: const [TilePlacement('expenses', TileSize.square)],
+        tiles: const [TilePlacement('finance', TileSize.square)],
       );
       for (var i = 0; i < 7; i++) {
         expect(find.byKey(Key('bar-$i')), findsOneWidget);

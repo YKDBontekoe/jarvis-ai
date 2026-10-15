@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../appearance.dart';
+import '../../l10n/l10n.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
@@ -23,7 +24,7 @@ class AppearanceScreen extends StatelessWidget {
     };
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Appearance')),
+      appBar: AppBar(title: Text(context.l10n.appearanceTitle)),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
@@ -92,7 +93,38 @@ class AppearanceScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SectionHeader(
+                    context.l10n.languageSection,
+                    padding: const EdgeInsets.fromLTRB(4, 24, 0, 10),
+                  ),
+                  SurfaceCard(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Column(
+                      children: [
+                        for (final (index, option) in _languageOptions(
+                          context.l10n,
+                        ).indexed) ...[
+                          if (index > 0) const Divider(indent: 64),
+                          _ChoiceTile(
+                            key: Key('language-${option.$1.name}'),
+                            icon: option.$4,
+                            title: option.$2,
+                            subtitle: option.$3,
+                            selected: controller.language == option.$1,
+                            onTap: () => controller.setLanguage(option.$1),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                    child: Text(
+                      context.l10n.languageNote,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   SurfaceCard(
                     key: const Key('motion-preview'),
                     onTap: () => Navigator.of(context).push(
@@ -135,6 +167,29 @@ class AppearanceScreen extends StatelessWidget {
     );
   }
 }
+
+List<(LanguagePreference, String, String, IconData)> _languageOptions(
+  AppLocalizations strings,
+) => [
+  (
+    LanguagePreference.system,
+    strings.languageSystem,
+    strings.languageSystemSubtitle,
+    PhosphorIconsRegular.circleHalf,
+  ),
+  (
+    LanguagePreference.english,
+    strings.languageEnglish,
+    strings.languageEnglishSubtitle,
+    PhosphorIconsRegular.globe,
+  ),
+  (
+    LanguagePreference.dutch,
+    strings.languageDutch,
+    strings.languageDutchSubtitle,
+    PhosphorIconsRegular.globe,
+  ),
+];
 
 const _options = <_AppearanceOption>[
   _AppearanceOption(

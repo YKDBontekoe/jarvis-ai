@@ -8,9 +8,12 @@ import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';
 
 class AuditScreen extends StatefulWidget {
-  const AuditScreen({required this.http, super.key});
+  const AuditScreen({required this.http, this.embedded = false, super.key});
 
   final Dio http;
+
+  /// Shown as the Audit log view of Activity, without an app bar of its own.
+  final bool embedded;
 
   @override
   State<AuditScreen> createState() => _AuditScreenState();
@@ -60,17 +63,19 @@ class _AuditScreenState extends State<AuditScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const PageTitle('Activity log'),
-      actions: [
-        IconButton(
-          tooltip: 'Refresh audit log',
-          onPressed: _loading ? null : _load,
-          icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
-        ),
-        const SizedBox(width: 8),
-      ],
-    ),
+    appBar: widget.embedded
+        ? null
+        : AppBar(
+            title: const PageTitle('Audit log'),
+            actions: [
+              IconButton(
+                tooltip: 'Refresh audit log',
+                onPressed: _loading ? null : _load,
+                icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
     body: ListScreenBody(
       loading: _loading,
       error: _error,

@@ -139,7 +139,7 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         destination: 'approvals',
       ),
       (
-        title: 'Activity log',
+        title: 'Audit log',
         subtitle: 'Everything Jarvis did, and when',
         icon: PhosphorIconsRegular.listChecks,
         destination: 'audit',
