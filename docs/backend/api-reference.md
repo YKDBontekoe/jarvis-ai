@@ -167,6 +167,7 @@ Weeks run Monday to Sunday; a weekly habit's streak counts weeks that reached `t
 | `/integrations/connections` | Per-turn MCP connection status (tool counts) |
 | `/integrations/packs`, `/integrations/oauth/*` | Guided packs and OAuth |
 | `/mcp-servers`, `/mcp-controls/{name}` | Owner MCP registry |
+| `PATCH /mcp-servers/{id}/configuration` | Edit owner server name, stdio command/arguments, remote endpoint, and secret bindings; omitted fields and stored key values are preserved |
 
 ## Channels
 

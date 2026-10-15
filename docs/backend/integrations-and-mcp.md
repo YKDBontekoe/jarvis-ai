@@ -44,6 +44,30 @@ injected only when the server starts, and redacted from tool output. Variables a
 loads or how requests route (`PATH`, `NODE_OPTIONS`, `LD_*`, `PYTHON*`, proxies, `Host`, `Cookie`, …) are refused.
 A server missing a required secret reports `needs_credentials`.
 
+### Editing an installed server from chat
+
+`ListMcpServers` includes `storedSecretNames` (names only, never values), and each declared secret's `target`,
+`key`, and optional `prefix`. A key being saved does not mean a connector receives it: it needs an explicit binding.
+`AddMcpStdioServer` accepts `secretsJson` so a new stdio server and its required bindings are registered together.
+`ConfigureMcpServer` edits an existing owner server's name, stdio command/arguments, remote endpoint, or secret
+bindings, with approval. The equivalent authenticated route is `PATCH /api/v1/mcp-servers/{id}/configuration`.
+Omitted fields are preserved; a supplied `secrets` array replaces all bindings, and `[]` clears bindings without
+removing any saved key. Transport, enabled state, tool allowlists, catalog identity, and credential values are preserved.
+Existing stdio registrations with legacy environment mappings retain those mappings when read.
+
+For example, to connect an already saved field named `STEAM_API_KEY` to that environment variable, pass metadata:
+
+```json
+{"secrets":[{"secretName":"STEAM_API_KEY","target":"env","key":"STEAM_API_KEY","label":"Steam API key","required":true}]}
+```
+
+Use the **exact stored field name**, including case. New catalog-derived names remain lowercase. Bindings accept
+existing vault field names of up to 64 characters (letters, numbers, underscores, hyphens, starting with a letter).
+Variable/header blocklists, transport validation, owner scoping, and per-tool approvals still apply. Never include
+key values in configuration or tool arguments; collect a missing value through `AskForMcpCredential` only after
+declaring its binding. A failed stdio startup/discovery is a configuration diagnostic first, not a reason to repeatedly
+request the same key or start OAuth. After editing, discover tools using the server id; direct tools refresh next turn.
+
 Catalog npm packages run with `npx -y pkg@version`; PyPI packages run with `uvx pkg@version` (the API image ships
 uv). Set `Mcp__Registry__BaseUrl` to an empty value to turn the catalog off, or to a mirror.
 

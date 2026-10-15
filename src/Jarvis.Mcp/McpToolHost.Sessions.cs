@@ -12,6 +12,18 @@ public sealed partial class McpToolHost
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly Dictionary<string, LiveSession> _sessions = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Drop this run's connection after an owner's server configuration changes.</summary>
+    public async Task InvalidateSessionAsync(string serverId)
+    {
+        if (!IntegrationCredentialProviders.IsUserMcpServerId(serverId) ||
+            !_sessions.TryGetValue(serverId, out var session)) return;
+        foreach (var key in _sessions.Where(pair => ReferenceEquals(pair.Value, session))
+                     .Select(pair => pair.Key).ToArray())
+            _sessions.Remove(key);
+        _clients.Remove(session.Client);
+        await CloseQuietlyAsync(session.Client);
+    }
+
     public async Task<string> InspectAsync(string? endpoint, string? serverId, CancellationToken cancellationToken)
     {
         if (!string.IsNullOrWhiteSpace(endpoint) && !string.IsNullOrWhiteSpace(serverId))
@@ -61,7 +73,7 @@ public sealed partial class McpToolHost
                     cancellationToken);
                 return McpAuthorizationDiscovery.AuthorizationFailureMessage(target, target, url);
             }
-            return "Could not inspect MCP server. It may require authentication or may be unavailable. Call RequestMcpAuthorization, then AskForMcpCredential if a token must be pasted. Keep credentials out of chat text.";
+            return "Could not inspect MCP server. For an installed stdio server, use ListMcpServers to check its command, stored secret names and environment bindings; repair missing bindings with ConfigureMcpServer before retrying. For a remote server, check availability or RequestMcpAuthorization. Do not ask for an already stored key unless the provider explicitly rejects it. Keep credentials out of chat text.";
         }
     }
 
@@ -76,7 +88,7 @@ public sealed partial class McpToolHost
             if (resolved.Error is not null) return resolved.Error;
             var credential = await ResolveCredentialsAsync(resolved.Server!, cancellationToken);
             if (credential.Ready)
-                return "This MCP server already has stored credentials. Discover its tools. If it still fails, call AskForMcpCredential so the user can rotate the token in this chat.";
+                return "No declared credentials are missing. Use ListMcpServers to inspect stored secret names and their bindings, then discover tools. For stdio servers, a stored key must be bound to the package's documented environment variable with ConfigureMcpServer. Do not request the key again just because startup or discovery failed.";
             var url = await McpAuthorizationDiscovery.DiscoverAuthorizationUrlAsync(resolved.Server!.Endpoint, null,
                 cancellationToken);
             return McpAuthorization.FormatAsk(resolved.Server.Name,

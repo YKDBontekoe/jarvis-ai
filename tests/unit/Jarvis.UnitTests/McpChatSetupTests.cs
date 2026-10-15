@@ -136,6 +136,8 @@ public sealed class McpChatSetupTests
             Task.FromResult<UserMcpServer?>(null);
         public Task<UserMcpServer?> SetEnabledAsync(Guid ownerId, string id, bool enabled, CancellationToken cancellationToken) =>
             Task.FromResult<UserMcpServer?>(null);
+        public Task<UserMcpServer?> ConfigureAsync(Guid ownerId, string id, McpServerConfigurationRequest request, CancellationToken cancellationToken) =>
+            Task.FromResult<UserMcpServer?>(null);
         public Task<UserMcpServer?> SetToolsAsync(Guid ownerId, string id, string mode, IReadOnlyList<string> allowedTools, CancellationToken cancellationToken) =>
             Task.FromResult<UserMcpServer?>(null);
         public Task<bool> RemoveAsync(Guid ownerId, string id, CancellationToken cancellationToken) =>

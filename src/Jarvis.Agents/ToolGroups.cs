@@ -77,7 +77,7 @@ public static partial class ToolGroups
         new("integrations", "Manage MCP servers and connections: list, search the catalog, install, add, authorize, change tools, remove, read resources and prompts",
             ["ListMcpServers", "ListHostMcpServers", "ListMcpConnections", "ListMcpServerTools",
              "DiscoverMcpServerTools", "RequestMcpAuthorization", "SearchMcpCatalog", "InstallMcpFromCatalog",
-             "AddMcpServer", "AddMcpStdioServer", "UpdateMcpServer", "SetMcpServerEnabled", "SetMcpServerTools",
+             "AddMcpServer", "AddMcpStdioServer", "UpdateMcpServer", "ConfigureMcpServer", "SetMcpServerEnabled", "SetMcpServerTools",
              "ReadMcpResource", "GetMcpPrompt", "RemoveMcpServer"],
             IntegrationKeywords()),
         new("graph", "Change the knowledge graph: propose or correct facts, merge or forget entities",

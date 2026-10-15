@@ -114,6 +114,42 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
         return ToPublic(id, replacement, status?.UpdatedAt ?? DateTimeOffset.UtcNow, status?.SecretNames ?? []);
     }
 
+    public async Task<UserMcpServer?> ConfigureAsync(Guid ownerId, string id, McpServerConfigurationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var stored = await ReadStoredAsync(ownerId, id, cancellationToken);
+        if (stored is null) return null;
+        var current = stored.Value.Server;
+        var transport = current.Transport ?? "streamableHttp";
+        if (transport == "stdio" && request.Endpoint is not null)
+            throw new ArgumentException("An installed stdio server uses command and arguments, not an HTTPS endpoint.");
+        if (transport == "streamableHttp" && (request.Command is not null || request.Arguments is not null))
+            throw new ArgumentException("A remote server uses an HTTPS endpoint, not command and arguments.");
+        var command = current.Command;
+        var arguments = current.Arguments;
+        if (transport == "stdio" && (request.Command is not null || request.Arguments is not null))
+        {
+            var normalized = McpStdioCommandValidator.Normalize(request.Command ?? command ?? "",
+                request.Arguments ?? arguments ?? []);
+            command = normalized.Command;
+            arguments = normalized.Arguments.ToArray();
+        }
+        var updated = current with
+        {
+            Name = request.Name is null ? current.Name : ValidateName(request.Name),
+            Endpoint = request.Endpoint is null ? current.Endpoint
+                : await McpServerEndpointValidator.ValidateAsync(request.Endpoint, cancellationToken),
+            Command = command,
+            Arguments = arguments,
+            CredentialEnvironmentVariables = request.Secrets is null ? current.CredentialEnvironmentVariables : null,
+            Secrets = request.Secrets is null ? current.Secrets
+                : McpSecretBindings.Normalize(request.Secrets, transport).ToArray()
+        };
+        await credentials.SaveSecretAsync(ownerId, id, ConfigSecret, JsonSerializer.Serialize(updated, JsonOptions),
+            cancellationToken);
+        return ToPublic(id, updated, DateTimeOffset.UtcNow, stored.Value.SecretNames);
+    }
+
     public async Task<UserMcpServer?> SetEnabledAsync(Guid ownerId, string id, bool enabled,
         CancellationToken cancellationToken)
     {
@@ -195,6 +231,20 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
                 ? string.IsNullOrWhiteSpace(stored.Command)
                 : string.IsNullOrWhiteSpace(stored.Endpoint)))
             throw new InvalidMcpServerConfigurationException();
+        // Older owner registrations stored env -> secret-name mappings before explicit bindings existed.
+        // Preserve these mappings, including the original credential field casing, without exposing values.
+        if (stored.Transport == "stdio" && stored.Secrets is null && stored.CredentialEnvironmentVariables is { Count: > 0 } legacy)
+        {
+            try
+            {
+                stored = stored with
+                {
+                    Secrets = McpSecretBindings.Normalize(legacy.Select(pair => new McpSecretBinding(pair.Value,
+                        "env", pair.Key, null, pair.Key, null, true)).ToArray(), "stdio").ToArray()
+                };
+            }
+            catch (ArgumentException) { throw new InvalidMcpServerConfigurationException(); }
+        }
         return stored;
     }
 
@@ -212,10 +262,12 @@ public sealed partial class UserMcpServerRegistry(IIntegrationCredentialStore cr
             secretNames.Contains(IntegrationCredentialProviders.UserMcpTokenSecret), stored.Enabled ?? true,
             stored.Transport ?? "streamableHttp", stored.Command, stored.Arguments,
             Secrets: (stored.Secrets ?? []).Select(binding => new McpServerSecret(binding.SecretName, binding.Label,
-                binding.Description, binding.Required, secretNames.Contains(binding.SecretName))).ToArray(),
+                binding.Description, binding.Required, secretNames.Contains(binding.SecretName),
+                binding.Target, binding.Key, binding.Prefix)).ToArray(),
             CatalogName: stored.CatalogName)
         {
-            SecretBindings = stored.Secrets ?? []
+            SecretBindings = stored.Secrets ?? [],
+            StoredSecretNames = secretNames.Where(name => name != ConfigSecret).Order(StringComparer.Ordinal).ToArray()
         };
 
     [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9 _-]{0,79}$", RegexOptions.CultureInvariant)]

@@ -484,6 +484,11 @@ const _catalog = <String, ToolDescription>{
     'Updated an integration',
     PhosphorIconsRegular.linkSimple,
   ),
+  'ConfigureMcpServer': ToolDescription(
+    'Configuring an integration',
+    'Configured an integration',
+    PhosphorIconsRegular.plugsConnected,
+  ),
   'SetMcpServerEnabled': ToolDescription(
     'Updating an integration',
     'Updated an integration',

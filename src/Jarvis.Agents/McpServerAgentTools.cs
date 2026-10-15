@@ -67,7 +67,7 @@ internal sealed class McpServerAgentTools(IUserMcpServerRegistry servers, IOwner
         catch (McpCatalogUnavailableException exception) { return exception.Message; }
     }
 
-    [Description("List this user's registered MCP servers. Each entry includes an id, endpoint, whether it is enabled, and the exact allowed tool names or * for every exposed tool. Use this before updating, pausing, or removing a server.")]
+    [Description("List this user's registered MCP servers, commands, secret bindings (target/key), stored secret field names (never values), and allowed tools. Use before changing a server. If a key is already stored but not bound, use ConfigureMcpServer to bind that exact stored field to the documented environment variable or HTTP header; do not ask the user for the key again.")]
     public async Task<string> ListMcpServersAsync(CancellationToken cancellationToken) =>
         JsonSerializer.Serialize(await servers.ListAsync(currentUser.OwnerId, cancellationToken), JsonOptions);
 
@@ -150,12 +150,13 @@ internal sealed class McpServerAgentTools(IUserMcpServerRegistry servers, IOwner
         catch (ArgumentException exception) { return $"Could not register MCP server: {exception.Message}"; }
     }
 
-    [Description("Download and register a local stdio MCP server using npx or uvx. Jarvis runs the command when the server connects. Use for npm or PyPI MCP packages without a public HTTPS endpoint. allowedTools accepts exact names, *, or omit to allow * until discovery narrows the list. Requires approval.")]
+    [Description("Download and register a local stdio MCP server using npx or uvx. Jarvis runs the command when the server connects. Use for npm or PyPI MCP packages without a public HTTPS endpoint. allowedTools accepts exact names, *, or omit to allow * until discovery narrows the list. Declare environment bindings with secretsJson in this same registration, then use AskForMcpCredential for missing keys. For existing servers use ConfigureMcpServer instead of recreating them. Requires approval.")]
     public async Task<string> AddMcpStdioServerAsync(
         [Description("A short server name using letters, numbers, spaces, underscores, or hyphens.")] string name,
         [Description("Executable command: npx, uvx, or an approved host binary such as github-mcp-server.")] string command,
         [Description("JSON array of command arguments, for example [\"-y\",\"@modelcontextprotocol/server-brave-search\"].")] string argumentsJson,
         [Description("Comma-separated exact tool names, *, or omit to allow * until discovery narrows the list.")] string? allowedTools = null,
+        [Description("Optional JSON array of secret bindings: [{\"secretName\":\"steam_api_key\",\"target\":\"env\",\"key\":\"STEAM_API_KEY\",\"label\":\"Steam API key\",\"required\":true}]. Names only, never credential values.")] string? secretsJson = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -164,13 +165,16 @@ internal sealed class McpServerAgentTools(IUserMcpServerRegistry servers, IOwner
             var tools = string.IsNullOrWhiteSpace(allowedTools)
                 ? (IReadOnlyList<string>)[McpToolSelection.All]
                 : ParseTools(allowedTools);
-            var server = await servers.AddStdioAsync(currentUser.OwnerId,
-                new AddUserMcpStdioServerRequest(name, command, arguments, tools), cancellationToken);
+            var bindings = ParseSecretBindingsJson(secretsJson);
+            var server = await servers.AddDefinitionAsync(currentUser.OwnerId,
+                new McpServerDefinition(name, "stdio", null, command, arguments, tools, bindings ?? []), cancellationToken);
             var toolSummary = McpToolSelection.AllowsAll(tools) ? "*" : string.Join(", ", tools);
-            return $"Registered stdio MCP server '{server.Name}' (ID {server.Id}) running {command} with tools: {toolSummary}. If this package needs authorization, call RequestMcpAuthorization with server '{server.Id}', then AskForMcpCredential if a token must be pasted. Discover with serverId '{server.Id}', then narrow with SetMcpServerTools if required.";
+            return $"Registered stdio MCP server '{server.Name}' (ID {server.Id}) running {command} with tools: {toolSummary}. " +
+                JsonSerializer.Serialize(server.Secrets, JsonOptions) +
+                $" Call AskForMcpCredential with provider '{server.Id}' for required secrets whose isSet is false. If an environment binding is missing, repair it with ConfigureMcpServer. Discover with serverId '{server.Id}', then narrow with SetMcpServerTools if required.";
         }
         catch (ArgumentException exception) { return $"Could not register stdio MCP server: {exception.Message}"; }
-        catch (JsonException) { return "argumentsJson must be a JSON array of strings."; }
+        catch (JsonException) { return "argumentsJson must be a JSON array of strings and secretsJson an array of bindings."; }
     }
 
     [Description("Update the name, endpoint, or allowed tools of one of this user's MCP servers. List servers first and preserve fields the user did not ask to change. allowedTools accepts exact names or *. Jarvis asks for approval. Direct tool changes appear next turn. Never provide API tokens.")]
@@ -185,11 +189,38 @@ internal sealed class McpServerAgentTools(IUserMcpServerRegistry servers, IOwner
         {
             var server = await servers.UpdateAsync(currentUser.OwnerId, id,
                 new AddUserMcpServerRequest(name, endpoint, ParseTools(allowedTools)), cancellationToken);
+            if (server is not null) await mcpToolHost.InvalidateSessionAsync(server.Id);
             return server is null
                 ? "That MCP server was not found."
                 : $"Updated MCP server '{server.Name}' (ID {server.Id}). Direct tools refresh next turn. Use InvokeMcpTool during this turn.";
         }
         catch (ArgumentException exception) { return $"Could not update MCP server: {exception.Message}"; }
+    }
+
+    [Description("Edit an existing owner-installed MCP server, including stdio command/arguments or remote endpoint and secret bindings. ListMcpServers first; omit unchanged fields. secretsJson replaces the entire binding list, so preserve existing bindings; [] clears bindings without deleting stored keys. Bind an existing stored field name exactly (including case) to the variable/header documented by the package. Never include secret values in any argument. This does not edit operator host servers. Requires approval. Afterwards discover tools with the server id; do not repeat failed discovery or ask for an already stored key.")]
+    public async Task<string> ConfigureMcpServerAsync(
+        [Description("Registered owner MCP server id from ListMcpServers.")] string id,
+        [Description("Optional new display name.")] string? name = null,
+        [Description("Remote servers only: optional new public HTTPS endpoint.")] string? endpoint = null,
+        [Description("Stdio servers only: optional npx or uvx command.")] string? command = null,
+        [Description("Stdio servers only: optional JSON array of command arguments. Never include credentials.")] string? argumentsJson = null,
+        [Description("Optional JSON array of bindings: [{\"secretName\":\"steam_api_key\",\"target\":\"env\",\"key\":\"STEAM_API_KEY\",\"label\":\"Steam API key\",\"required\":true}]. For remote servers use target header, key the header name, and optional prefix Bearer. Contains names only, never credential values.")] string? secretsJson = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var arguments = argumentsJson is null ? null : ParseArgumentsJson(argumentsJson);
+            var bindings = ParseSecretBindingsJson(secretsJson);
+            var server = await servers.ConfigureAsync(currentUser.OwnerId, id,
+                new McpServerConfigurationRequest(name, endpoint, command, arguments, bindings), cancellationToken);
+            if (server is not null) await mcpToolHost.InvalidateSessionAsync(server.Id);
+            return server is null ? "That MCP server was not found."
+                : JsonSerializer.Serialize(server, JsonOptions) +
+                  "\nConfiguration saved; existing credential values were preserved. Discover tools with this server id. AskForMcpCredential only for required secrets whose isSet is false. Direct tools refresh next turn.";
+        }
+        catch (JsonException) { return "argumentsJson and secretsJson must be JSON arrays; never include credential values."; }
+        catch (ArgumentException exception) { return $"Could not configure MCP server: {exception.Message}"; }
+        catch (InvalidMcpServerConfigurationException exception) { return exception.Message; }
     }
 
     [Description("Enable or pause one MCP server without deleting it. Pass a registered server id or a host server name such as github. Pausing keeps the definition and token, and further calls are refused. Jarvis asks for approval.")]
@@ -333,6 +364,10 @@ internal sealed class McpServerAgentTools(IUserMcpServerRegistry servers, IOwner
                     extra: "The server is registered with * until authorization completes. Ask the user to authorize it now."));
         }
     }
+
+    private static McpSecretBinding[]? ParseSecretBindingsJson(string? json) => json is null ? null
+        : JsonSerializer.Deserialize<McpSecretBinding[]>(json, JsonOptions)
+          ?? throw new ArgumentException("secretsJson must be a JSON array of binding objects.");
 
     private static string[] ParseArgumentsJson(string json)
     {

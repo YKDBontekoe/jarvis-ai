@@ -11,10 +11,14 @@ public sealed record UserMcpServer(string Id, string Name, string Endpoint,
     /// <summary>Where each secret goes at runtime. Server-side only; clients see <see cref="Secrets"/>.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public IReadOnlyList<McpSecretBinding>? SecretBindings { get; init; }
+
+    /// <summary>Stored field names only, including keys not yet bound to the server. Never values.</summary>
+    public IReadOnlyList<string> StoredSecretNames { get; init; } = [];
 }
 
 /// <summary>A secret the owner provides for a server, and whether it is stored. Values are never returned.</summary>
-public sealed record McpServerSecret(string Name, string Label, string? Description, bool Required, bool IsSet);
+public sealed record McpServerSecret(string Name, string Label, string? Description, bool Required, bool IsSet,
+    string? Target = null, string? Key = null, string? Prefix = null);
 
 /// <summary>
 /// Where Jarvis puts one owner secret when it starts a server: an environment variable for stdio servers
@@ -61,10 +65,11 @@ public static partial class McpSecretBindings
         var result = new List<McpSecretBinding>();
         foreach (var binding in list)
         {
+            if (binding is null) throw new ArgumentException("Each secret binding must be an object.");
             var secretName = binding.SecretName?.Trim() ?? string.Empty;
             if (!SecretNamePattern().IsMatch(secretName) ||
                 secretName == IntegrationCredentialProviders.UserMcpConfigSecret)
-                throw new ArgumentException("Secret names must be 1 to 48 lowercase letters, numbers, or underscores.");
+                throw new ArgumentException("Secret names must start with a letter and contain at most 64 letters, numbers, underscores, or hyphens.");
             if (binding.Target != expectedTarget)
                 throw new ArgumentException(transport == "stdio"
                     ? "Installed connectors receive secrets as environment variables."
@@ -111,7 +116,7 @@ public static partial class McpSecretBindings
         return text.Length <= max ? text : text[..max].TrimEnd() + "…";
     }
 
-    [System.Text.RegularExpressions.GeneratedRegex("^[a-z][a-z0-9_]{0,47}$")]
+    [System.Text.RegularExpressions.GeneratedRegex("^[A-Za-z][A-Za-z0-9_-]{0,63}$")]
     private static partial System.Text.RegularExpressions.Regex SecretNamePattern();
 
     [System.Text.RegularExpressions.GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]{0,63}$")]
@@ -140,6 +145,10 @@ public sealed record AddUserMcpStdioServerRequest(string Name, string Command, I
 
 public sealed record McpServerStateRequest(bool? Enabled, string? ToolMode, IReadOnlyList<string>? AllowedTools);
 
+/// <summary>Partial configuration edit. Omitted fields and stored credentials are preserved.</summary>
+public sealed record McpServerConfigurationRequest(string? Name = null, string? Endpoint = null,
+    string? Command = null, IReadOnlyList<string>? Arguments = null, IReadOnlyList<McpSecretBinding>? Secrets = null);
+
 public sealed record HostMcpOverride(bool Enabled, IReadOnlyList<string>? AllowedTools);
 
 public interface IOwnerMcpPolicyStore
@@ -159,6 +168,8 @@ public interface IUserMcpServerRegistry
     Task<UserMcpServer> AddDefinitionAsync(Guid ownerId, McpServerDefinition definition,
         CancellationToken cancellationToken);
     Task<UserMcpServer?> UpdateAsync(Guid ownerId, string id, AddUserMcpServerRequest request,
+        CancellationToken cancellationToken);
+    Task<UserMcpServer?> ConfigureAsync(Guid ownerId, string id, McpServerConfigurationRequest request,
         CancellationToken cancellationToken);
     Task<UserMcpServer?> SetEnabledAsync(Guid ownerId, string id, bool enabled, CancellationToken cancellationToken);
     Task<UserMcpServer?> SetToolsAsync(Guid ownerId, string id, string mode, IReadOnlyList<string> allowedTools,

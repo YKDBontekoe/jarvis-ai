@@ -48,6 +48,24 @@ internal static class IntegrationEndpoints
             }
         }).WithName("UpdateUserMcpServer");
 
+        api.MapPatch("/mcp-servers/{id}/configuration", async (string id, McpServerConfigurationRequest request,
+            IUserMcpServerRegistry servers, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            try
+            {
+                var server = await servers.ConfigureAsync(currentUser.OwnerId, id, request, ct);
+                return server is null ? Results.NotFound() : Results.Ok(server);
+            }
+            catch (ArgumentException exception)
+            {
+                return EndpointHelpers.Invalid("configuration", exception.Message);
+            }
+            catch (InvalidMcpServerConfigurationException exception)
+            {
+                return Results.Conflict(new { error = "invalid_configuration", message = exception.Message });
+            }
+        }).WithName("ConfigureUserMcpServer");
+
         api.MapDelete("/mcp-servers/{id}", async (string id, IUserMcpServerRegistry servers,
                 ICurrentUser currentUser, CancellationToken ct) =>
             await servers.RemoveAsync(currentUser.OwnerId, id, ct) ? Results.NoContent() : Results.NotFound())
