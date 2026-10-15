@@ -153,6 +153,15 @@ flutter run -d <device-id> -t tool/ui_preview.dart
 
 This development-only entry point shares the screenshot fixture adapter and starts in dark appearance.
 
+Record a video of the same preview in headless Chromium (Playwright; preinstalled in cloud sessions):
+
+```sh
+flutter build web -t tool/ui_preview.dart --profile
+node tool/record_web.mjs --steps "Chats,Everything,Home"   # → build/recordings/recording.{webm,mp4} + step PNGs
+```
+
+Each step taps the first element with that accessible name (Flutter semantics are switched on). `--width`/`--height` set the viewport (default 393×852).
+
 The audit fails on layout overflows and on toolbars squeezed below their height. `debugJarvisHttpAdapter` in `lib/api/api_config.dart` is the hook that serves the whole app from `fixtures.dart`; set `SCREENSHOT_DIR` to write elsewhere.
 
 ## API client

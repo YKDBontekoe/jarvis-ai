@@ -107,7 +107,7 @@ void main() {
       await start(tester, dark: dark);
       await openTab(tester, 'everything');
       await capture(tester, '31-everything-$mode');
-      final tile = find.byKey(const Key('everything-expenses'));
+      final tile = find.byKey(const Key('everything-finance'));
       await tester.ensureVisible(tile);
       await settle(tester);
       await tester.tap(tile);
@@ -147,7 +147,7 @@ void main() {
     (9, 'tasks'),
     (10, 'habits'),
     (12, 'today'),
-    (13, 'expenses'),
+    (13, 'finance'),
     (14, 'people'),
     (15, 'journal'),
   ]) {

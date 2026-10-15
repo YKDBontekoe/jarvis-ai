@@ -41,6 +41,16 @@ Operator runbook (deploy commands, feature list): **[README.md](README.md)** —
 - New HTTP routes → `src/Jarvis.Api/Endpoints/` + register in `Program.cs`.
 - New agent capabilities → `IAgentToolContributor` / `IAgentContextContributor` in `Jarvis.Agents`.
 
+## Verify every change (required)
+
+Never hand back a new feature or fix on the strength of compiling alone. Before reporting done:
+
+1. **Tests** — add or extend tests for the change and run the affected suites (`dotnet test …UnitTests`, `flutter test`; integration tests when persistence changes, Docker is running in cloud sessions).
+2. **Smoke test the running thing** — backend changes: `scripts/dev/smoke.sh` starts the full stack on the fake Codex/MCP servers and runs `tests/e2e/local_fixture_flow.mjs`; then exercise your own endpoint or flow against `http://localhost:5082/api/v1` (curl, or another `tests/e2e/*.mjs` via `smoke.sh test <flow>`), and `smoke.sh down` when done. When a new agent context block or tool-result shape changes the prompt, update `tests/e2e/fake_codex_app_server.mjs` in the same change. See [docs/operations/testing.md](docs/operations/testing.md).
+3. **Screenshots for any UI change** — run the screenshot suites (`cd apps/mobile && flutter test --no-pub test/screenshots/app_screenshots.dart`, plus `ui_polish.dart` / `layout_audit.dart`), add a case to `app_screenshots.dart` for new screens, and look at the PNGs in `apps/mobile/build/screenshots/`.
+4. **Video for flows and interactions** — `flutter build web -t tool/ui_preview.dart --profile` then `node tool/record_web.mjs --steps "Chats,Everything,…"` (taps by accessible name) → `apps/mobile/build/recordings/recording.mp4` plus per-step PNGs.
+5. **Show the evidence** — send the screenshots/video to the user (and attach or describe them in the PR). If a step could not run, say which and why; never substitute made-up results.
+
 ## Build and test (minimal)
 
 Cloud agent bootstrap:

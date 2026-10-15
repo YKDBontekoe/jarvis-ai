@@ -38,6 +38,14 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   } >> "$CLAUDE_ENV_FILE"
 fi
 
+# Docker daemon for integration tests (Testcontainers). Started in the
+# background so the hook does not wait on it.
+if command -v dockerd >/dev/null 2>&1 && ! docker info >/dev/null 2>&1; then
+  SUDO=""
+  if [ "$(id -u)" -ne 0 ]; then SUDO="sudo"; fi
+  $SUDO sh -c 'nohup dockerd >/var/log/dockerd.log 2>&1 &' || true
+fi
+
 # Backend: tools (dotnet-ef) + restore. Build is left to the session.
 dotnet tool restore
 dotnet restore Jarvis.sln

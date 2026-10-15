@@ -8,10 +8,18 @@ internal static class LocalDevelopment
     {
         var workspaceRoot = builder.Configuration["Coding:Repositories:0:Path"] ?? FindGitRepositoryRoot(Directory.GetCurrentDirectory());
 
-        var postgres = builder.AddPostgres("postgres")
+        // A fixed development password: the data volume persists, and a password Aspire generates per run would
+        // no longer match it after the first restart (the AppHost has no user secrets to remember one).
+        var postgresPassword = builder.AddParameter(
+            "postgres-password",
+            builder.Configuration["POSTGRES_PASSWORD"] ?? "jarvis-local-postgres-development-password",
+            secret: true);
+        var postgres = builder.AddPostgres("postgres", password: postgresPassword)
             .WithImage("pgvector/pgvector")
             .WithImageTag("pg18")
-            .WithDataVolume();
+            // pg18 images keep data under /var/lib/postgresql/18 and refuse a mount at
+            // .../data (WithDataVolume's target), so mount the parent like production does.
+            .WithVolume("jarvis-postgres-data", "/var/lib/postgresql");
         var database = postgres.AddDatabase("jarvis");
         var voiceWorkerSecret = builder.Configuration["VOICE_WORKER_SECRET"] ?? "jarvis-local-voice-worker-development-secret";
         var mcpRunnerToken = builder.Configuration["MCP_RUNNER_TOKEN"] ?? "jarvis-local-mcp-runner-development-token";
@@ -79,10 +87,13 @@ internal static class LocalDevelopment
         const string mcpRunnerUrl = "ws://localhost:8090/run";
 
         var api = builder.AddProject<Projects.Jarvis_Api>("jarvis-api")
+            // ASPNETCORE_URLS below binds the API itself to 5082 (or JARVIS_LISTEN_URL); an Aspire proxy on the
+            // launch profile's 5082 would hold the same port and the API would fail with "address already in use".
+            .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
             .WithReference(database)
             .WithEnvironment("Coding__Repositories__0__Name", "jarvis")
             .WithEnvironment("Coding__Repositories__0__Path", workspaceRoot)
-            .WithEnvironment("Temporal__Address", temporal.GetEndpoint("grpc"))
+            .WithEnvironment("Temporal__Address", temporal.GetEndpoint("grpc").Property(EndpointProperty.HostAndPort))
             .WithEnvironment("ObjectStorage__ServiceUrl", objectStorage.GetEndpoint("s3"))
             .WithEnvironment("ObjectStorage__AccessKey", objectStorageAccessKey)
             .WithEnvironment("ObjectStorage__SecretKey", objectStorageSecretKey)
@@ -124,7 +135,7 @@ internal static class LocalDevelopment
             .WithReference(database)
             .WithEnvironment("Coding__Repositories__0__Name", "jarvis")
             .WithEnvironment("Coding__Repositories__0__Path", workspaceRoot)
-            .WithEnvironment("Temporal__Address", temporal.GetEndpoint("grpc"))
+            .WithEnvironment("Temporal__Address", temporal.GetEndpoint("grpc").Property(EndpointProperty.HostAndPort))
             .WithEnvironment("Codex__ExecutablePath", "codex")
             .WithEnvironment("McpRunner__Url", mcpRunnerUrl)
             .WithEnvironment("McpRunner__Token", mcpRunnerToken)
