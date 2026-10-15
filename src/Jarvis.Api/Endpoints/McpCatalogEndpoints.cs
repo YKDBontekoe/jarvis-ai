@@ -12,17 +12,37 @@ internal static class McpCatalogEndpoints
     public static RouteGroupBuilder MapMcpCatalogEndpoints(this RouteGroupBuilder api)
     {
         api.MapGet("/mcp-catalog", async (string? search, string? cursor, int? limit, IMcpCatalog catalog,
-            CancellationToken ct) =>
+            IUserMcpServerRegistry servers, ICurrentUser currentUser, CancellationToken ct) =>
         {
             try
             {
-                return Results.Ok(await catalog.SearchAsync(search, cursor, limit ?? 20, ct));
+                var page = await catalog.SearchAsync(search, cursor, limit ?? 20, ct);
+                var installed = await InstalledAsync(servers, currentUser.OwnerId, ct);
+                return Results.Ok(new
+                {
+                    servers = page.Servers.Select(entry => View(entry, installed)),
+                    nextCursor = page.NextCursor
+                });
             }
             catch (McpCatalogUnavailableException exception)
             {
                 return Unavailable(exception);
             }
         }).WithName("SearchMcpCatalog");
+
+        // What to show before the owner types anything.
+        api.MapGet("/mcp-catalog/featured", async (IMcpCatalog catalog, IUserMcpServerRegistry servers,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var installed = await InstalledAsync(servers, currentUser.OwnerId, ct);
+            var categories = await McpFeaturedCatalog.ResolveAsync(catalog, ct);
+            return Results.Ok(categories.Select(item => new
+            {
+                id = item.Category.Id,
+                title = item.Category.Title,
+                servers = item.Entries.Select(entry => View(entry, installed))
+            }));
+        }).WithName("FeaturedMcpCatalog");
 
         api.MapPost("/mcp-catalog/install", async (McpCatalogInstallRequest request, IMcpCatalog catalog,
             IUserMcpServerRegistry servers, ICurrentUser currentUser, CancellationToken ct) =>
@@ -65,6 +85,27 @@ internal static class McpCatalogEndpoints
 
         return api;
     }
+
+    private static async Task<IReadOnlyDictionary<string, string>> InstalledAsync(IUserMcpServerRegistry servers,
+        Guid ownerId, CancellationToken ct) =>
+        (await servers.ListAsync(ownerId, ct))
+            .Where(server => !string.IsNullOrWhiteSpace(server.CatalogName))
+            .GroupBy(server => server.CatalogName!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First().Id, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>A catalog entry plus whether the owner already has it, so the app opens it instead of adding twice.</summary>
+    internal static object View(McpCatalogEntry entry, IReadOnlyDictionary<string, string> installed) => new
+    {
+        entry.Name,
+        entry.Title,
+        entry.Description,
+        entry.Version,
+        entry.WebsiteUrl,
+        entry.RepositoryUrl,
+        entry.Options,
+        installed = installed.ContainsKey(entry.Name),
+        installedServerId = installed.TryGetValue(entry.Name, out var id) ? id : null
+    };
 
     private static async Task<string> NextStepAsync(UserMcpServer server, CancellationToken ct)
     {

@@ -23,7 +23,7 @@ internal sealed class McpServerAgentTools(IUserMcpServerRegistry servers, IOwner
         {
             var page = await catalog.SearchAsync(query, null, 8, cancellationToken);
             if (page.Servers.Count == 0)
-                return "No installable apps matched. Try a shorter search, or ask the user for the app's MCP address.";
+                return "No installable apps matched. Try a shorter search, ask the user for the app's MCP address, or offer to build one: GetCustomMcpTemplate, then WriteCustomMcpServer.";
             return JsonSerializer.Serialize(page.Servers.Select(entry => new
             {
                 entry.Name,
@@ -37,7 +37,7 @@ internal sealed class McpServerAgentTools(IUserMcpServerRegistry servers, IOwner
                     option.Summary,
                     secrets = option.Secrets.Select(secret => new { secret.Name, secret.Required, secret.Description })
                 })
-            }), JsonOptions) + "\nPrefer a remote option when one exists. Pass name (and option id) to InstallMcpFromCatalog.";
+            }), JsonOptions) + "\nPrefer a remote option when one exists. Pass name (and option id) to InstallMcpFromCatalog. If none fits, offer to build one with GetCustomMcpTemplate and WriteCustomMcpServer.";
         }
         catch (McpCatalogUnavailableException exception) { return exception.Message; }
     }

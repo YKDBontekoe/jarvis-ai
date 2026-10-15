@@ -90,6 +90,7 @@ public static class DependencyInjection
         services.AddScoped<IFileContentRepository, FileContentRepository>();
         services.AddScoped<IIntegrationCredentialStore, IntegrationCredentialStore>();
         services.AddScoped<IUserMcpServerRegistry, UserMcpServerRegistry>();
+        services.AddScoped<ICustomMcpServerStore, CustomMcpServerStore>();
         services.AddHttpClient<IMcpCatalog, Jarvis.Infrastructure.Integrations.OfficialMcpRegistryCatalog>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(12);

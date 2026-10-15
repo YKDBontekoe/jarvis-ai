@@ -164,6 +164,10 @@ public interface IUserMcpServerRegistry
     Task<UserMcpServer?> SetToolsAsync(Guid ownerId, string id, string mode, IReadOnlyList<string> allowedTools,
         CancellationToken cancellationToken);
     Task<bool> RemoveAsync(Guid ownerId, string id, CancellationToken cancellationToken);
+
+    /// <summary>Replaces the keys a server asks for. Used when Jarvis rewrites a self-built server.</summary>
+    Task<UserMcpServer?> SetSecretBindingsAsync(Guid ownerId, string id, IReadOnlyList<McpSecretBinding> secrets,
+        CancellationToken cancellationToken);
 }
 
 public static class McpServerEndpointValidator

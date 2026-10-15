@@ -274,3 +274,38 @@ public static partial class McpRegistryMapper
     [GeneratedRegex(@"\s+")]
     private static partial Regex Spaces();
 }
+
+/// <summary>
+/// Apps shown before the owner searches: publishers' own registry entries, grouped by what they help with.
+/// Each is fetched from the registry by name, so an entry the registry drops or Jarvis cannot run disappears.
+/// </summary>
+public static class McpFeaturedCatalog
+{
+    public sealed record Category(string Id, string Title, IReadOnlyList<string> Names);
+
+    public static readonly IReadOnlyList<Category> Categories =
+    [
+        new("productivity", "Notes and tasks", ["com.notion/mcp", "net.todoist/mcp", "com.airtable/mcp", "com.monday/monday.com"]),
+        new("work", "Work and projects", ["app.linear/linear", "com.atlassian/atlassian-mcp-server"]),
+        new("search", "Search the web", ["io.github.brave/brave-search-mcp-server"]),
+        new("money", "Payments", ["com.stripe/mcp", "com.paypal.mcp/mcp"]),
+        new("design", "Design", ["com.figma.mcp/mcp", "com.canva.mcp/mcp"])
+    ];
+
+    public static async Task<IReadOnlyList<(Category Category, IReadOnlyList<McpCatalogEntry> Entries)>> ResolveAsync(
+        IMcpCatalog catalog, CancellationToken cancellationToken)
+    {
+        var result = new List<(Category, IReadOnlyList<McpCatalogEntry>)>();
+        foreach (var category in Categories)
+        {
+            var entries = await Task.WhenAll(category.Names.Select(async name =>
+            {
+                try { return await catalog.GetAsync(name, cancellationToken); }
+                catch (McpCatalogUnavailableException) { return null; }
+            }));
+            var found = entries.Where(entry => entry is not null).Select(entry => entry!).ToArray();
+            if (found.Length > 0) result.Add((category, found));
+        }
+        return result;
+    }
+}

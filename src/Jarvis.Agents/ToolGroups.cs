@@ -74,11 +74,12 @@ public static partial class ToolGroups
             ["ListDevices", "GetDeviceBattery", "NotifyDevice", "GetDeviceLocation", "ReadDeviceClipboard",
              "OpenUrlOnDevice"],
             DeviceKeywords()),
-        new("integrations", "Manage MCP servers and connections: list, search the catalog, install, add, authorize, change tools, remove, read resources and prompts",
+        new("integrations", "Manage MCP servers and connections: list, search the catalog, install, add, authorize, change tools, remove, read resources and prompts, and write, test and activate self-built apps",
             ["ListMcpServers", "ListHostMcpServers", "ListMcpConnections", "ListMcpServerTools",
              "DiscoverMcpServerTools", "RequestMcpAuthorization", "SearchMcpCatalog", "InstallMcpFromCatalog",
              "AddMcpServer", "AddMcpStdioServer", "UpdateMcpServer", "SetMcpServerEnabled", "SetMcpServerTools",
-             "ReadMcpResource", "GetMcpPrompt", "RemoveMcpServer"],
+             "ReadMcpResource", "GetMcpPrompt", "RemoveMcpServer", "GetCustomMcpTemplate", "WriteCustomMcpServer",
+             "TestCustomMcpServer", "ActivateCustomMcpServer", "ListCustomMcpServers", "GetCustomMcpServerSource"],
             IntegrationKeywords()),
         new("graph", "Change the knowledge graph: propose or correct facts, merge or forget entities",
             ["ProposeGraphFact", "CorrectGraphFact", "MergeGraphEntities", "ForgetGraphEntity"],
@@ -243,7 +244,7 @@ public static partial class ToolGroups
     [GeneratedRegex(@"\b(device|phone|laptop|computer|mac|battery|clipboard|where am i|my location|on my (phone|mac|laptop)|notify me on|apparaat|telefoon|batterij|klembord|waar ben ik)", KeywordOptions)]
     private static partial Regex DeviceKeywords();
 
-    [GeneratedRegex(@"\b(mcp|integration|connect|connector|install|plugin|server|authori[sz]e|sign in to|log in to|oauth|api key|token|notion|github|calendar|gmail|slack|linear|home assistant|koppel|verbind|integratie|installeer)", KeywordOptions)]
+    [GeneratedRegex(@"\b(mcp|integration|connect|connector|install|plugin|server|authori[sz]e|sign in to|log in to|oauth|api key|token|notion|github|calendar|gmail|slack|linear|home assistant|build (an?|me an?|your own) (app|tool|integration)|write (an?|your own) (app|tool|integration|mcp)|koppel|verbind|integratie|installeer)", KeywordOptions)]
     private static partial Regex IntegrationKeywords();
 
     [GeneratedRegex(@"\b(knowledge graph|graph|entity|entities|merge|that'?s wrong|not true|incorrect|correct (that|this)|kennisgraaf|klopt niet|onjuist)", KeywordOptions)]
