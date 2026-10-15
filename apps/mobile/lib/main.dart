@@ -9,6 +9,7 @@ import 'app_lock.dart';
 import 'appearance.dart';
 import 'error_reporting.dart';
 import 'features/chat/chat_screen.dart';
+import 'l10n/l10n.dart';
 import 'push/firebase_bootstrap.dart';
 import 'theme.dart';
 import 'ui/offline_banner.dart';
@@ -105,6 +106,9 @@ class _JarvisAppState extends State<JarvisApp> {
         theme: buildJarvisTheme(),
         darkTheme: buildJarvisTheme(brightness: Brightness.dark),
         themeMode: _appearance.themeMode,
+        locale: _appearance.language.locale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         builder: (context, child) {
           final content = OfflineBanner(
             cache: OfflineCache.instance,

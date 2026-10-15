@@ -14,6 +14,14 @@ The same Flutter app is also hosted by the production API at the Jarvis domain
 root. It shares the existing account and owner-scoped data. See
 [hosted web deployment](../operations/deployment-and-ci.md#hosted-web-client).
 
+## Languages
+
+The app ships in English and Dutch. Strings live in `lib/l10n/app_en.arb` (the template, with descriptions and placeholders) and `lib/l10n/app_nl.arb`; `flutter gen-l10n` (run by `flutter pub get`, configured in `l10n.yaml`) writes `app_localizations*.dart` next to them, and those generated files are committed. Read strings with `context.l10n.someKey` (`lib/l10n/l10n.dart`), which falls back to English where no localizations are mounted, such as a bare `MaterialApp` in widget tests. Formatters that run without a context take an optional `AppLocalizations` and default to `englishStrings` (`greetingFor`, `offlineAge`).
+
+Appearance → Language stores `LanguagePreference` (`system`, `english`, `dutch`) with the theme and motion choices; `MaterialApp.locale` follows it, so Material and Cupertino widgets (date pickers, tooltips, text selection) switch too. Jarvis's replies follow the language the owner writes in, not this setting.
+
+Translated so far: the tab bar, the Home greeting, the offline banner, Appearance (title and Language) and the Turn quality card. Other screens still use English literals; move a screen's strings into both ARB files when you touch it, and add a Dutch entry for every new key.
+
 ## Offline
 
 `lib/api/offline_cache.dart` keeps the last good answer to each JSON `GET` under `/api/` and serves it when the connection fails (no response at all: connection error or timeout), so screens open with saved data instead of an error. Server errors and 4xx answers still reach the screen, and writes never fall back (the chat outbox queues messages). Sign-in, credential, secret, token, download, content, export and stream routes are never saved; a request can opt out with `Options(extra: {OfflineCache.skipExtra: true})`. Saved answers expire after 14 days, bodies over 768 KB are skipped, and native builds keep at most 400 files (named by a hash of the request) in the app's private support directory; the web build keeps them in memory. Sign-out clears the cache.

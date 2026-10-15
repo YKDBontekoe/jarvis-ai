@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/offline_cache.dart';
+import '../l10n/l10n.dart';
 import '../theme.dart';
 import 'motion.dart';
 import 'phosphor_icons.dart';
@@ -67,9 +68,10 @@ class _OfflineBarState extends State<_OfflineBar> {
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     final savedAt = widget.state.savedAt;
+    final l10n = context.l10n;
     final label = savedAt == null
-        ? 'Offline'
-        : 'Offline · showing data from ${offlineAge(savedAt, DateTime.now())}';
+        ? l10n.offline
+        : l10n.offlineShowingSaved(offlineAge(savedAt, DateTime.now(), l10n));
     return Material(
       color: colors.warningSoft,
       child: SafeArea(
@@ -110,7 +112,9 @@ class _OfflineBarState extends State<_OfflineBar> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  child: Text(_checking ? 'Checking…' : 'Retry'),
+                  child: Text(
+                    _checking ? l10n.offlineChecking : l10n.offlineRetry,
+                  ),
                 ),
               ],
             ),
@@ -122,10 +126,11 @@ class _OfflineBarState extends State<_OfflineBar> {
 }
 
 /// "just now", "5 min ago", "3 h ago", "2 days ago".
-String offlineAge(DateTime savedAt, DateTime now) {
+String offlineAge(DateTime savedAt, DateTime now, [AppLocalizations? strings]) {
+  final l10n = strings ?? englishStrings;
   final age = now.difference(savedAt);
-  if (age.inMinutes < 1) return 'just now';
-  if (age.inHours < 1) return '${age.inMinutes} min ago';
-  if (age.inDays < 1) return '${age.inHours} h ago';
-  return age.inDays == 1 ? 'yesterday' : '${age.inDays} days ago';
+  if (age.inMinutes < 1) return l10n.ageJustNow;
+  if (age.inHours < 1) return l10n.ageMinutes(age.inMinutes);
+  if (age.inDays < 1) return l10n.ageHours(age.inHours);
+  return age.inDays == 1 ? l10n.ageYesterday : l10n.ageDays(age.inDays);
 }

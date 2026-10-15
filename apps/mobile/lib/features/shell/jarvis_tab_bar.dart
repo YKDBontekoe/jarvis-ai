@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import 'tab_icons.dart';
+import '../../l10n/l10n.dart';
 
 /// The main destinations. Names remain available to VoiceOver and tooltips.
 enum JarvisTab {
@@ -19,6 +20,14 @@ enum JarvisTab {
 
   final String label;
   final TabGlyph glyph;
+
+  /// [label] in the app's language.
+  String localizedLabel(AppLocalizations strings) => switch (this) {
+    JarvisTab.home => strings.tabHome,
+    JarvisTab.chats => strings.tabChats,
+    JarvisTab.everything => strings.tabEverything,
+    JarvisTab.you => strings.tabYou,
+  };
 }
 
 /// A quiet, floating navigation surface. The central orb opens Jarvis.
@@ -283,11 +292,13 @@ class _TabButton extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: attention ? '${tab.label}, unread' : tab.label,
+      label: attention
+          ? context.l10n.tabUnread(tab.localizedLabel(context.l10n))
+          : tab.localizedLabel(context.l10n),
       onTap: activate,
       excludeSemantics: true,
       child: Tooltip(
-        message: tab.label,
+        message: tab.localizedLabel(context.l10n),
         excludeFromSemantics: true,
         child: PressFeedback(
           scale: .96,

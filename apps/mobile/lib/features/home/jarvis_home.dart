@@ -23,6 +23,7 @@ import '../whatsapp/whatsapp_models.dart';
 import 'clock_header.dart';
 import 'get_started_card.dart';
 import 'next_up.dart' hide greetingFor;
+import '../../l10n/l10n.dart';
 
 /// Home: the next thing on your day, then the content and shortcuts you chose.
 class JarvisHome extends StatefulWidget {
@@ -509,7 +510,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
         _CompactHeader(
           scroll: _scroll,
           title: [
-            greetingFor(now),
+            greetingFor(now, context.l10n),
             if (_preferredName?.trim() case final name? when name.isNotEmpty)
               name,
           ].join(', '),

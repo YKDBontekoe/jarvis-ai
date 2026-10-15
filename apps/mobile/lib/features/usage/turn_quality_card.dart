@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
+import '../../l10n/l10n.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
@@ -14,24 +15,20 @@ class TurnQualityCard extends StatelessWidget {
 
   final Map<String, dynamic> data;
 
-  static const _flagText = {
-    'slow_replies':
-        'Replies are slow: one in ten takes over 30 s. A faster chat model in '
-        'Settings → Models helps most.',
-    'failing_turns':
-        'More than one in ten turns failed. The Codex sign-in or the server '
-        'log usually says why.',
-    'approval_friction':
-        'You approve a lot by hand. Always allow a category on its next '
-        'approval card, or raise the autonomy level in Learning.',
-    'low_cache':
-        'Few prompts are reused from cache, so each reply costs more time.',
-  };
+  static String? _flagText(AppLocalizations l10n, String flag) =>
+      switch (flag) {
+        'slow_replies' => l10n.turnQualityFlagSlowReplies,
+        'failing_turns' => l10n.turnQualityFlagFailingTurns,
+        'approval_friction' => l10n.turnQualityFlagApprovalFriction,
+        'low_cache' => l10n.turnQualityFlagLowCache,
+        _ => null,
+      };
 
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final modelCalls = asJsonInt(data['modelCalls']);
     final median = _int(data['medianModelMs']);
     final p90 = _int(data['p90ModelMs']);
@@ -48,27 +45,28 @@ class TurnQualityCard extends StatelessWidget {
     final auto = asJsonInt(data['autoApproved']);
     final slowTools = jsonMaps(data['slowTools']);
     final flags = [
-      for (final flag in jsonStrings(data['flags'])) ?_flagText[flag],
+      for (final flag in jsonStrings(data['flags'])) ?_flagText(l10n, flag),
     ];
     final metrics = <(String, String)>[
-      if (median != null) ('Typical reply', formatTurnDuration(median)),
-      if (p90 != null) ('Slowest 1 in 10', formatTurnDuration(p90)),
-      if (medianTurn != null) ('Typical turn', formatTurnDuration(medianTurn)),
-      if (cacheRate != null) ('From cache', '${(cacheRate * 100).round()}%'),
+      if (median != null)
+        (l10n.turnQualityTypicalReply, formatTurnDuration(median)),
+      if (p90 != null) (l10n.turnQualitySlowestReply, formatTurnDuration(p90)),
+      if (medianTurn != null)
+        (l10n.turnQualityTypicalTurn, formatTurnDuration(medianTurn)),
+      if (cacheRate != null)
+        (l10n.turnQualityFromCache, '${(cacheRate * 100).round()}%'),
     ];
     final lines = <String>[
       if (failureRate != null && failureRate > 0)
-        '${(failureRate * 100).toStringAsFixed(failureRate < .1 ? 1 : 0)}% of '
-            '$modelCalls model calls failed',
+        l10n.turnQualityModelFailures(
+          (failureRate * 100).toStringAsFixed(failureRate < .1 ? 1 : 0),
+          modelCalls,
+        ),
       if (failedTurns > 0 || cancelledTurns > 0)
-        '${_count(failedTurns, 'turn')} failed, $cancelledTurns stopped '
-            '(of $turns traced)',
+        l10n.turnQualityTurns(failedTurns, cancelledTurns, turns),
       if (toolFailureRate != null && toolCalls > 0)
-        '${_count(toolCalls, 'tool call')}, '
-            '${(toolFailureRate * 100).round()}% failed',
-      if (asked > 0)
-        '${_count(asked, 'approval')} asked, $denied declined, '
-            '$auto handled automatically',
+        l10n.turnQualityTools(toolCalls, (toolFailureRate * 100).round()),
+      if (asked > 0) l10n.turnQualityApprovals(asked, denied, auto),
     ];
 
     return SurfaceCard(
@@ -81,15 +79,17 @@ class TurnQualityCard extends StatelessWidget {
               const IconBadge(icon: PhosphorIconsRegular.timer),
               const SizedBox(width: 14),
               Expanded(
-                child: Text('Turn quality', style: theme.textTheme.titleMedium),
+                child: Text(
+                  l10n.turnQualityTitle,
+                  style: theme.textTheme.titleMedium,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
           if (metrics.isEmpty && lines.isEmpty)
             Text(
-              'Not enough turns yet. Reply times, failures and approvals '
-              'show up here after a few chats.',
+              l10n.turnQualityEmpty,
               style: TextStyle(color: colors.inkSoft, height: 1.35),
             ),
           if (metrics.isNotEmpty)
@@ -124,12 +124,17 @@ class TurnQualityCard extends StatelessWidget {
             ),
           if (slowTools.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text('Slowest tools', style: theme.textTheme.labelLarge),
+            Text(
+              l10n.turnQualitySlowestTools,
+              style: theme.textTheme.labelLarge,
+            ),
             const SizedBox(height: 4),
             for (final tool in slowTools)
               Text(
-                '${humanizeToolName(asJsonString(tool['tool']) ?? 'tool')}: '
-                '${formatTurnDuration(asJsonInt(tool['averageMs']))} on average',
+                l10n.turnQualityToolAverage(
+                  humanizeToolName(asJsonString(tool['tool']) ?? 'tool'),
+                  formatTurnDuration(asJsonInt(tool['averageMs'])),
+                ),
                 style: TextStyle(color: colors.inkSoft, height: 1.35),
               ),
           ],
@@ -145,9 +150,6 @@ class TurnQualityCard extends StatelessWidget {
   static num? _num(dynamic value) => value is num ? value : null;
 
   static int? _int(dynamic value) => value is num ? value.round() : null;
-
-  static String _count(int count, String noun) =>
-      '$count ${count == 1 ? noun : '${noun}s'}';
 }
 
 /// "850 ms", "4.2 s", "38 s", "2 min 5 s".

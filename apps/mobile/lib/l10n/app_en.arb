@@ -1,0 +1,70 @@
+{
+  "@@locale": "en",
+  "tabHome": "Home",
+  "tabChats": "Chats",
+  "tabEverything": "Everything",
+  "tabYou": "You",
+  "tabUnread": "{label}, unread",
+  "@tabUnread": {
+    "description": "Screen reader label of a tab with unread items.",
+    "placeholders": { "label": { "type": "String" } }
+  },
+  "greetingMorning": "Good morning",
+  "greetingAfternoon": "Good afternoon",
+  "greetingEvening": "Good evening",
+  "offline": "Offline",
+  "offlineShowingSaved": "Offline · showing data from {age}",
+  "@offlineShowingSaved": {
+    "placeholders": { "age": { "type": "String", "example": "5 min ago" } }
+  },
+  "offlineRetry": "Retry",
+  "offlineChecking": "Checking…",
+  "ageJustNow": "just now",
+  "ageMinutes": "{count} min ago",
+  "@ageMinutes": { "placeholders": { "count": { "type": "int" } } },
+  "ageHours": "{count} h ago",
+  "@ageHours": { "placeholders": { "count": { "type": "int" } } },
+  "ageYesterday": "yesterday",
+  "ageDays": "{count} days ago",
+  "@ageDays": { "placeholders": { "count": { "type": "int" } } },
+  "appearanceTitle": "Appearance",
+  "languageSection": "Language",
+  "languageSystem": "Use device language",
+  "languageSystemSubtitle": "English or Dutch, whichever this device uses",
+  "languageEnglish": "English",
+  "languageEnglishSubtitle": "Jarvis's screens in English",
+  "languageDutch": "Nederlands",
+  "languageDutchSubtitle": "Jarvis's screens in Dutch",
+  "languageNote": "Jarvis answers in the language you write in, whatever you pick here.",
+  "turnQualityTitle": "Turn quality",
+  "turnQualityEmpty": "Not enough turns yet. Reply times, failures and approvals show up here after a few chats.",
+  "turnQualityTypicalReply": "Typical reply",
+  "turnQualitySlowestReply": "Slowest 1 in 10",
+  "turnQualityTypicalTurn": "Typical turn",
+  "turnQualityFromCache": "From cache",
+  "turnQualitySlowestTools": "Slowest tools",
+  "turnQualityToolAverage": "{tool}: {duration} on average",
+  "@turnQualityToolAverage": {
+    "placeholders": { "tool": { "type": "String" }, "duration": { "type": "String" } }
+  },
+  "turnQualityModelFailures": "{percent}% of {calls} model calls failed",
+  "@turnQualityModelFailures": {
+    "placeholders": { "percent": { "type": "String" }, "calls": { "type": "int" } }
+  },
+  "turnQualityTurns": "{failed, plural, =1{1 turn failed} other{{failed} turns failed}}, {cancelled} stopped (of {turns} traced)",
+  "@turnQualityTurns": {
+    "placeholders": { "failed": { "type": "int" }, "cancelled": { "type": "int" }, "turns": { "type": "int" } }
+  },
+  "turnQualityTools": "{calls, plural, =1{1 tool call} other{{calls} tool calls}}, {percent}% failed",
+  "@turnQualityTools": {
+    "placeholders": { "calls": { "type": "int" }, "percent": { "type": "int" } }
+  },
+  "turnQualityApprovals": "{asked, plural, =1{1 approval} other{{asked} approvals}} asked, {denied} declined, {auto} handled automatically",
+  "@turnQualityApprovals": {
+    "placeholders": { "asked": { "type": "int" }, "denied": { "type": "int" }, "auto": { "type": "int" } }
+  },
+  "turnQualityFlagSlowReplies": "Replies are slow: one in ten takes over 30 s. A faster chat model in Settings → Models helps most.",
+  "turnQualityFlagFailingTurns": "More than one in ten turns failed. The Codex sign-in or the server log usually says why.",
+  "turnQualityFlagApprovalFriction": "You approve a lot by hand. Always allow a category on its next approval card, or raise the autonomy level in Learning.",
+  "turnQualityFlagLowCache": "Few prompts are reused from cache, so each reply costs more time."
+}

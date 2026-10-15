@@ -34,19 +34,43 @@ enum MotionPreference {
   };
 }
 
+/// Which language Jarvis's screens use: the device's, or one chosen here.
+/// Only languages with translations are offered.
+enum LanguagePreference {
+  system,
+  english,
+  dutch;
+
+  /// Null follows the device.
+  Locale? get locale => switch (this) {
+    LanguagePreference.system => null,
+    LanguagePreference.english => const Locale('en'),
+    LanguagePreference.dutch => const Locale('nl'),
+  };
+
+  static LanguagePreference parse(String? value) => switch (value) {
+    'english' => LanguagePreference.english,
+    'dutch' => LanguagePreference.dutch,
+    _ => LanguagePreference.system,
+  };
+}
+
 abstract class AppearanceStore {
   Future<String?> read();
   Future<void> write(String value);
   Future<String?> readMotion();
   Future<void> writeMotion(String value);
+  Future<String?> readLanguage();
+  Future<void> writeLanguage(String value);
 }
 
 /// In-memory store for tests and when OS storage is unavailable.
 class MemoryAppearanceStore implements AppearanceStore {
-  MemoryAppearanceStore([this.value, this.motion]);
+  MemoryAppearanceStore([this.value, this.motion, this.language]);
 
   String? value;
   String? motion;
+  String? language;
 
   @override
   Future<String?> read() async => value;
@@ -59,6 +83,12 @@ class MemoryAppearanceStore implements AppearanceStore {
 
   @override
   Future<void> writeMotion(String next) async => motion = next;
+
+  @override
+  Future<String?> readLanguage() async => language;
+
+  @override
+  Future<void> writeLanguage(String next) async => language = next;
 }
 
 class SecureAppearanceStore implements AppearanceStore {
@@ -67,6 +97,7 @@ class SecureAppearanceStore implements AppearanceStore {
 
   static const key = 'jarvis.appearance';
   static const motionKey = 'jarvis.motion';
+  static const languageKey = 'jarvis.language';
   final FlutterSecureStorage _storage;
 
   @override
@@ -80,6 +111,12 @@ class SecureAppearanceStore implements AppearanceStore {
 
   @override
   Future<void> writeMotion(String value) => _write(motionKey, value);
+
+  @override
+  Future<String?> readLanguage() => _read(languageKey);
+
+  @override
+  Future<void> writeLanguage(String value) => _write(languageKey, value);
 
   Future<String?> _read(String name) async {
     try {
@@ -103,6 +140,7 @@ class AppearanceController extends ChangeNotifier {
   final AppearanceStore _store;
   AppearancePreference preference = AppearancePreference.system;
   MotionPreference motion = MotionPreference.system;
+  LanguagePreference language = LanguagePreference.system;
   var _loaded = false;
 
   bool get loaded => _loaded;
@@ -111,6 +149,7 @@ class AppearanceController extends ChangeNotifier {
   Future<void> load() async {
     preference = AppearancePreference.parse(await _store.read());
     motion = MotionPreference.parse(await _store.readMotion());
+    language = LanguagePreference.parse(await _store.readLanguage());
     _loaded = true;
     notifyListeners();
   }
@@ -120,6 +159,13 @@ class AppearanceController extends ChangeNotifier {
     motion = value;
     notifyListeners();
     await _store.writeMotion(value.name);
+  }
+
+  Future<void> setLanguage(LanguagePreference value) async {
+    if (language == value) return;
+    language = value;
+    notifyListeners();
+    await _store.writeLanguage(value.name);
   }
 
   /// Applies [motion] on top of the device setting that [data] carries.

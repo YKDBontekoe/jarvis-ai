@@ -4,6 +4,7 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'next_up.dart';
+import '../../l10n/l10n.dart';
 
 /// A personal greeting, followed by the next event and its context.
 class ClockHeader extends StatelessWidget {
@@ -58,7 +59,7 @@ class ClockHeader extends StatelessWidget {
                   children: [
                     BlurIn(
                       child: Text(
-                        greetingFor(now),
+                        greetingFor(now, context.l10n),
                         key: const Key('home-greeting'),
                         style: style,
                       ),
@@ -347,11 +348,14 @@ class _EventHeading extends StatelessWidget {
 }
 
 /// Follows the device's local time, including changes while Home stays open.
-String greetingFor(DateTime now) => switch (now.hour) {
-  < 12 => 'Good morning',
-  < 18 => 'Good afternoon',
-  _ => 'Good evening',
-};
+String greetingFor(DateTime now, [AppLocalizations? strings]) {
+  final l10n = strings ?? englishStrings;
+  return switch (now.hour) {
+    < 12 => l10n.greetingMorning,
+    < 18 => l10n.greetingAfternoon,
+    _ => l10n.greetingEvening,
+  };
+}
 
 /// "Today", "Tomorrow" or the weekday, for the line under the next item.
 String shortDay(DateTime start, DateTime now) {
