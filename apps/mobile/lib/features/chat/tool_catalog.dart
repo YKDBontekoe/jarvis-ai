@@ -509,6 +509,46 @@ const _catalog = <String, ToolDescription>{
     'Fetched an integration prompt',
     PhosphorIconsRegular.chatText,
   ),
+  'SearchMcpCatalog': ToolDescription(
+    'Looking for an app',
+    'Looked for an app',
+    PhosphorIconsRegular.magnifyingGlass,
+  ),
+  'InstallMcpFromCatalog': ToolDescription(
+    'Adding an app',
+    'Added an app',
+    PhosphorIconsRegular.plugsConnected,
+  ),
+  'GetCustomMcpTemplate': ToolDescription(
+    'Planning a new app',
+    'Planned a new app',
+    PhosphorIconsRegular.magicWand,
+  ),
+  'WriteCustomMcpServer': ToolDescription(
+    'Writing an app',
+    'Wrote an app',
+    PhosphorIconsRegular.code,
+  ),
+  'TestCustomMcpServer': ToolDescription(
+    'Testing the app',
+    'Tested the app',
+    PhosphorIconsRegular.play,
+  ),
+  'ActivateCustomMcpServer': ToolDescription(
+    'Switching the app on',
+    'Switched the app on',
+    PhosphorIconsRegular.rocketLaunch,
+  ),
+  'ListCustomMcpServers': ToolDescription(
+    'Checking the apps Jarvis built',
+    'Checked the apps Jarvis built',
+    PhosphorIconsRegular.magicWand,
+  ),
+  'GetCustomMcpServerSource': ToolDescription(
+    'Reading an app’s code',
+    'Read an app’s code',
+    PhosphorIconsRegular.code,
+  ),
   'RemoveMcpServer': ToolDescription(
     'Removing an integration',
     'Removed an integration',

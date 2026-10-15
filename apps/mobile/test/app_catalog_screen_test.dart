@@ -93,6 +93,12 @@ void main() {
       '/api/v1/integrations/jarvis-mcp-1/credentials/brave_api_key',
       {'provider': 'jarvis-mcp-1'},
     );
+    http.on('POST', '/api/v1/mcp-servers/jarvis-mcp-1/test', {
+      'ok': true,
+      'state': 'connected',
+      'toolCount': 3,
+      'tools': ['brave_web_search', 'brave_news', 'brave_images'],
+    });
     await show(tester);
 
     expect(find.text('Notion'), findsOneWidget);
@@ -143,8 +149,135 @@ void main() {
           .body,
       {'value': 'secret-key'},
     );
+    // The new key is checked right away.
+    expect(
+      http.sent('POST', '/api/v1/mcp-servers/jarvis-mcp-1/test'),
+      hasLength(1),
+    );
     expect(outcome?.serverId, 'jarvis-mcp-1');
     expect(outcome?.nextStep, 'ready');
+  });
+
+  testWidgets('a rejected key keeps the dialog open to fix it', (tester) async {
+    http.on(
+      'PUT',
+      '/api/v1/integrations/jarvis-mcp-1/credentials/brave_api_key',
+      {},
+    );
+    http.on('POST', '/api/v1/mcp-servers/jarvis-mcp-1/test', {
+      'ok': false,
+      'state': 'needs_sign_in',
+      'toolCount': 0,
+      'tools': <String>[],
+      'errorKind': 'unauthorized',
+    });
+    bool? saved;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () async {
+                saved = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => AppKeysDialog(
+                    http: http.client(),
+                    serverId: 'jarvis-mcp-1',
+                    appName: 'Brave Search',
+                    secrets: const [
+                      {
+                        'name': 'brave_api_key',
+                        'label': 'Brave key',
+                        'required': true,
+                      },
+                    ],
+                  ),
+                );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('app-key-brave_api_key')),
+      'wrong',
+    );
+    await tester.tap(find.byKey(const Key('app-keys-save')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('app-keys-error')), findsOneWidget);
+    expect(
+      find.textContaining('turned the key or sign-in down'),
+      findsOneWidget,
+    );
+    expect(find.text('Save again'), findsOneWidget);
+
+    await tester.tap(find.text('Keep and close'));
+    await tester.pumpAndSettle();
+    expect(saved, isTrue);
+  });
+
+  testWidgets('shows featured apps, opens added ones, and offers to build', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/mcp-catalog/featured', [
+      {
+        'id': 'search',
+        'title': 'Search the web',
+        'servers': [
+          {..._brave, 'installed': true, 'installedServerId': 'jarvis-mcp-9'},
+        ],
+      },
+    ]);
+    http.on('GET', '/api/v1/mcp-catalog?search=bakery&limit=20', {
+      'servers': <Object>[],
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () async {
+                outcome = await Navigator.of(context).push<AppInstallOutcome>(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        AppCatalogScreen(http: http.client(), canBuild: true),
+                  ),
+                );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Search the web'), findsOneWidget);
+    expect(find.textContaining('Added'), findsOneWidget);
+    await tester.tap(find.text('Brave Search'));
+    await tester.pumpAndSettle();
+    expect(outcome?.nextStep, 'open');
+    expect(outcome?.serverId, 'jarvis-mcp-9');
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('app-catalog-search')),
+      'bakery',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Jarvis can build one'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('app-catalog-build')));
+    await tester.pumpAndSettle();
+    expect(outcome?.nextStep, 'build');
+    expect(outcome?.name, 'bakery');
   });
 
   testWidgets('a pasted address that needs sign-in hands that back', (

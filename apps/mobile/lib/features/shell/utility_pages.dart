@@ -9,6 +9,8 @@ import '../files/files_screen.dart';
 import '../finance/finance_screen.dart';
 import '../inbox/inbox_screen.dart';
 import '../integrations/integrations_screen.dart';
+import '../integrations/server_detail_screen.dart';
+import '../tiles/app_tiles.dart';
 import '../memory/memory_screen.dart';
 import '../missions/missions_screen.dart';
 import '../modes/modes_screen.dart';
@@ -151,6 +153,26 @@ Widget? utilityPageFor(
   'briefing' => DailyBriefingScreen(http: http),
   'weekly-review' => WeeklyReviewScreen(http: http),
   'integrations' => IntegrationsScreen(http: http, onAskInChat: onAskInChat),
+  'integrations$createDestinationSuffix' => IntegrationsScreen(
+    http: http,
+    onAskInChat: onAskInChat,
+    startBrowsing: true,
+  ),
+  final app when app.startsWith(appDestinationPrefix) => switch (app.substring(
+    appDestinationPrefix.length,
+  )) {
+    final key when key.startsWith(appTileHostPrefix) => McpServerDetailScreen(
+      http: http,
+      hostName: key.substring(appTileHostPrefix.length),
+      onAskInChat: onAskInChat,
+    ),
+    final key when key.isNotEmpty => McpServerDetailScreen(
+      http: http,
+      serverId: key,
+      onAskInChat: onAskInChat,
+    ),
+    _ => null,
+  },
   'appearance' => const AppearanceScreen(),
   'app-lock' => const AppLockScreen(),
   'models' => ModelSettingsScreen(http: http),

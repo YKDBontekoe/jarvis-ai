@@ -269,4 +269,43 @@ void main() {
     expect(find.text('Add BRAVE_API_KEY'), findsOneWidget);
     expect(find.text('Sign in'), findsNothing);
   });
+
+  testWidgets(
+    'search opens the directory and Jarvis-built apps wait for review',
+    (tester) async {
+      http.on('GET', '/api/v1/custom-mcp-servers', [
+        {
+          'id': 'c1',
+          'registryServerId': 'jarvis-mcp-abc',
+          'draftSha256': 'b' * 64,
+          'activeSha256': null,
+        },
+      ]);
+      http.on('GET', '/api/v1/mcp-catalog?search=notion&limit=20', {
+        'servers': <Object>[],
+      });
+      await show(tester);
+
+      expect(find.text('Built by Jarvis'), findsOneWidget);
+      expect(
+        find.byKey(const Key('app-review-jarvis-mcp-abc')),
+        findsOneWidget,
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('integrations-search')),
+        'notion',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Browse apps'), findsOneWidget);
+      expect(
+        http
+            .sent('GET', '/api/v1/mcp-catalog')
+            .where((request) => request.query['search'] == 'notion'),
+        hasLength(1),
+      );
+    },
+  );
 }

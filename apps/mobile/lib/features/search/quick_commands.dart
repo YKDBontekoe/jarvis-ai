@@ -50,6 +50,22 @@ const quickCommands = [
     creates: true,
   ),
   QuickCommand(
+    label: 'Connect an app',
+    icon: PhosphorIconsRegular.plugsConnected,
+    destination: 'integrations$createDestinationSuffix',
+    keywords: [
+      'connect',
+      'connect app',
+      'add app',
+      'mcp',
+      'integration',
+      'build app',
+      'koppel',
+      'verbind',
+      'app toevoegen',
+    ],
+  ),
+  QuickCommand(
     label: 'Go to Today',
     icon: PhosphorIconsRegular.sunHorizon,
     destination: 'today',

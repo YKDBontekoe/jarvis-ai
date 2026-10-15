@@ -17,7 +17,10 @@ mixin _ChatScreenNav on _ChatScreenController {
         }
         await _presentConversation(id);
       },
-      onAskInChat: destination == 'integrations' || destination == 'journal'
+      onAskInChat:
+          utilityBaseDestination(destination) == 'integrations' ||
+              destination == 'journal' ||
+              destination.startsWith(appDestinationPrefix)
           ? (prompt) {
               _presentChat();
               unawaited(_send(prompt));

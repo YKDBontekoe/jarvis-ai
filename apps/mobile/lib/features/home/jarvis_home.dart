@@ -15,6 +15,7 @@ import '../entities/entity_ref.dart' show entityDestinationPrefix;
 import '../settings/codex_sign_in_card.dart';
 import '../tiles/tile_actions.dart';
 import '../tiles/tile_card.dart' show tileRadius;
+import '../tiles/app_tiles.dart';
 import '../tiles/tile_controller.dart';
 import '../tiles/tile_grid.dart';
 import '../tiles/tile_models.dart';
@@ -444,7 +445,10 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                                   target.startsWith('chat:')) {
                                 widget.onOpenChat(target.substring(5));
                               } else if (target != null &&
-                                  target.startsWith(entityDestinationPrefix)) {
+                                  (target.startsWith(entityDestinationPrefix) ||
+                                      target.startsWith(
+                                        appDestinationPrefix,
+                                      ))) {
                                 widget.onOpen(target);
                               } else {
                                 widget.onOpen(spec.destination);

@@ -148,10 +148,43 @@ mixin _IntegrationsCredentials on _IntegrationsController {
         ),
       ),
     );
+    final savedProvider = (provider ?? providerController.text).trim();
     providerController.dispose();
     nameController.dispose();
     valueController.dispose();
-    if (saved == true && mounted) await _load();
+    if (saved == true && mounted) {
+      await _verifyAfterKeyChange(savedProvider);
+      if (mounted) await _load();
+    }
+  }
+
+  /// Checks the app right after its key changes, so the owner learns at once
+  /// whether the key works instead of on the next request.
+  Future<void> _verifyAfterKeyChange(String provider) async {
+    final managed = _managedServers.any((server) => server['id'] == provider);
+    final host = _connections
+        .where((item) => item['hostManaged'] == true)
+        .map((item) => asJsonString(item['name']) ?? '')
+        .firstWhere(
+          (name) =>
+              name.toLowerCase() == provider ||
+              _connections.any(
+                (item) =>
+                    item['name'] == name &&
+                    asJsonString(item['credentialProvider']) == provider,
+              ),
+          orElse: () => '',
+        );
+    final key = managed ? provider : host;
+    if (key.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Key saved. Checking the app…')),
+    );
+    final result = await testAppConnection(widget.http, key);
+    if (!mounted) return;
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(content: Text(result.message)));
   }
 
   Future<void> _deleteSecret(String provider, String secretName) async {
@@ -350,7 +383,9 @@ mixin _IntegrationsCredentials on _IntegrationsController {
   Widget _providerCard(Map<String, dynamic> provider) {
     final slug = asJsonString(provider['provider']) ?? '';
     final info = _appInfo(slug);
-    final names = jsonStrings(provider['secretNames']);
+    final names = jsonStrings(
+      provider['secretNames'],
+    ).where((name) => !isInternalSecret(name)).toList();
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
