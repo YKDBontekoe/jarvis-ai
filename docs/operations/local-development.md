@@ -9,6 +9,8 @@
 
 Cloud agents: run `bash .cursor/install.sh` from repo root; optional `dockerd` terminal per `.cursor/environment.json`.
 
+Claude Code on the web: paste `scripts/setup/claude-cloud-setup.sh` into the environment's **Setup script** (installs the pinned .NET SDK, Flutter stable and the pgvector test image); `.claude/hooks/session-start.sh` then starts `dockerd` and restores dependencies each session.
+
 ## Environment file (optional)
 
 The AppHost has development defaults for everything, so `dotnet run --project src/Jarvis.AppHost` works without
