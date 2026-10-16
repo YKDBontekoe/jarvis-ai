@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using Jarvis.Application;
 using Jarvis.Application.Files;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Jarvis.Api.Errors;
 
@@ -53,6 +54,15 @@ internal static class ExceptionProblemMapper
                 "Validation failed",
                 StatusCodes.Status400BadRequest,
                 SafeClientMessage(argument, "The request was invalid.")),
+
+            // Data the database refuses (too long, malformed, out of range, missing) is the client's input to fix.
+            DbUpdateException { InnerException: PostgresException { SqlState: { } state } }
+                when state.StartsWith("22", StringComparison.Ordinal) || state is "23502" or "23514" =>
+                new MappedProblem(
+                    ApiErrorCodes.ValidationFailed,
+                    "Validation failed",
+                    StatusCodes.Status400BadRequest,
+                    "Some of the text or values in the request cannot be stored."),
 
             DbUpdateException => new MappedProblem(
                 ApiErrorCodes.Conflict,

@@ -547,6 +547,28 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
         Assert.Null(previews[internalOnly.Id].At);
     }
 
+    [Fact]
+    public async Task Text_with_nul_characters_is_saved_without_them_instead_of_failing_the_write()
+    {
+        var owner = Guid.CreateVersion7();
+        var options = new DbContextOptionsBuilder<JarvisDbContext>()
+            .UseNpgsql(_postgres.GetConnectionString(), postgres => postgres.UseVector())
+            .AddInterceptors(new NulCharacterInterceptor())
+            .Options;
+        await using var database = new JarvisDbContext(options);
+        var store = new ConversationStore(database);
+
+        var conversation = await store.CreateAsync(owner, "Pasted\0 title", CancellationToken.None);
+        var message = new Message(conversation.Id, "assistant", "tool said:\0 hi", citationsJson: "[{\"title\":\"a\\u0000b\"}]");
+        await store.AddMessageAsync(message, CancellationToken.None);
+        database.ChangeTracker.Clear();
+
+        Assert.Equal("Pasted title", (await store.GetAsync(conversation.Id, owner, CancellationToken.None))!.Title);
+        var stored = await database.Messages.AsNoTracking().SingleAsync(x => x.Id == message.Id);
+        Assert.Equal("tool said: hi", stored.Content);
+        Assert.Contains("\"ab\"", stored.CitationsJson);
+    }
+
     private JarvisDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<JarvisDbContext>()
