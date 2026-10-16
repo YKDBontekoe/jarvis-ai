@@ -81,9 +81,11 @@ async function runTurn(params) {
   const prompt = params.input.find(item => item.type === 'text')?.text ?? '';
   const output = JSON.stringify(plan(prompt));
   for (let index = 0; index < output.length;) {
-    const size = 3 + Math.floor(Math.random() * 6);
-    send({ method: 'item/agentMessage/delta', params: { delta: output.slice(index, index + size) } });
-    index += size;
+    let end = Math.min(output.length, index + 3 + Math.floor(Math.random() * 6));
+    // Never cut an emoji in half: a lone surrogate is not valid text, and the real app server never sends one.
+    if (end < output.length && /[\ud800-\udbff]/.test(output[end - 1])) end++;
+    send({ method: 'item/agentMessage/delta', params: { delta: output.slice(index, end) } });
+    index = end;
     if (STREAM_DELAY_MS > 0) await sleep(STREAM_DELAY_MS);
   }
   send({ method: 'thread/tokenUsage/updated', params: { tokenUsage: { last: {
