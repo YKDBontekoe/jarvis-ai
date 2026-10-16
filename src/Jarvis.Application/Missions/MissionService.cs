@@ -8,6 +8,10 @@ public sealed class MissionService(IMissionRepository repository, IMissionPlanne
     TimeProvider? timeProvider = null, Events.IJarvisEventBus? events = null) : IMissionService
 {
     private const string BlockedError = "An earlier step did not finish.";
+
+    /// <summary>How long a claimed step may wait for its task to be recorded before it is released again.</summary>
+    public static readonly TimeSpan OrphanedClaimAfter = TimeSpan.FromMinutes(2);
+
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
     public Task<IReadOnlyList<Mission>> ListAsync(Guid ownerId, CancellationToken cancellationToken) =>
@@ -177,6 +181,16 @@ public sealed class MissionService(IMissionRepository repository, IMissionPlanne
         // 1. Collect what the running tasks produced.
         for (var i = 0; i < steps.Count; i++)
         {
+            // A step is claimed before its task exists. If the worker stopped in between, nothing would ever finish
+            // it, so a claim that never got a task goes back in line.
+            if (steps[i] is { Status: StepStatuses.Running, TaskId: null } orphan &&
+                now - (orphan.StartedAt ?? now) > OrphanedClaimAfter)
+            {
+                steps[i] = orphan with { Status = StepStatuses.Pending, StartedAt = null };
+                await repository.UpdateStepAsync(steps[i], cancellationToken);
+                continue;
+            }
+
             if (steps[i] is not { Status: StepStatuses.Running, TaskId: { } taskId }) continue;
             var task = await taskRepository.GetTaskByIdAsync(taskId, cancellationToken);
             MissionStep? updated = task?.Status switch
