@@ -22,7 +22,8 @@ public sealed record SendMessageRequest([StringLength(32_000)] string? Content,
 public sealed record MessageAttachmentDto(Guid FileId, string FileName, string ContentType);
 public sealed record ConversationDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     Guid? ProfileId = null, string? ProfileName = null, int? ProfileVersion = null, bool ProfileDeleted = false,
-    bool Pinned = false, Guid? ProjectId = null);
+    bool Pinned = false, Guid? ProjectId = null, string? LastMessage = null, string? LastMessageRole = null,
+    DateTimeOffset? LastMessageAt = null, bool Responding = false, string? Origin = null, Guid? OriginId = null);
 public sealed record UpdateConversationRequest(string? Title, bool? Pinned);
 public sealed record ConversationDetailsDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     IReadOnlyList<MessageDto> Messages, bool Responding, Guid? ProfileId = null, string? ProfileName = null,

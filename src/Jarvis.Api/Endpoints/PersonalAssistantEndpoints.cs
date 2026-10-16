@@ -17,6 +17,17 @@ internal static class PersonalAssistantEndpoints
         api.MapGet("/home", async (IHomeBriefingService home, ICurrentUser currentUser, CancellationToken ct) =>
             Results.Ok(await home.GetAsync(currentUser.OwnerId, ct))).WithName("GetHomeBriefing");
 
+        api.MapGet("/home/context", async (IHomeContextService context, ICurrentUser currentUser,
+            CancellationToken ct) => Results.Ok(await context.GetAsync(currentUser.OwnerId, ct)))
+            .WithName("GetHomeContext");
+
+        api.MapPost("/home/context/dismiss", async (HomeContextDismissRequest request, IHomeContextService context,
+            ICurrentUser currentUser, CancellationToken ct) =>
+            await context.DismissAsync(currentUser.OwnerId, request, ct)
+                ? Results.NoContent()
+                : EndpointHelpers.Invalid("id", "That card is not one Home shows."))
+            .WithName("DismissHomeContextCard");
+
         api.MapPost("/devices/telemetry", async (SaveDeviceTelemetryRequest request, IDeviceTelemetryStore telemetry,
             IPlaceReminderService places, ICurrentUser currentUser, ILoggerFactory loggers, CancellationToken ct) =>
         {

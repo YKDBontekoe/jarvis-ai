@@ -9,7 +9,6 @@ import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../../json_maps.dart';
 import '../chat/mcp_setup.dart';
-import '../chat/tool_catalog.dart' show humanizeToolName;
 import '../chats/chat_list.dart';
 import '../entities/entity_ref.dart' show entityDestinationPrefix;
 import '../settings/codex_sign_in_card.dart';
@@ -20,11 +19,27 @@ import '../tiles/tile_controller.dart';
 import '../tiles/tile_grid.dart';
 import '../tiles/tile_models.dart';
 import '../tiles/tile_registry.dart';
+import '../whatsapp/catch_up_card.dart';
 import '../whatsapp/whatsapp_models.dart';
+import 'ask_bar.dart';
+import 'brief_card.dart';
 import 'clock_header.dart';
+import 'day_one_card.dart';
+import 'evening_card.dart';
+import 'home_context.dart';
+import 'noticed_card.dart';
+import 'right_now_card.dart';
+import 'home_insights.dart';
+import 'home_widget_sync.dart';
+import 'needs_you_card.dart';
 import 'get_started_card.dart';
 import 'next_up.dart' hide greetingFor;
 import '../../l10n/l10n.dart';
+
+/// Replaces Home's wall clock when no [JarvisHome.clock] is given
+/// (screenshots of the evening).
+@visibleForTesting
+DateTime Function()? debugHomeClock;
 
 /// Home: the next thing on your day, then the content and shortcuts you chose.
 class JarvisHome extends StatefulWidget {
@@ -38,6 +53,7 @@ class JarvisHome extends StatefulWidget {
     required this.onOpenChat,
     required this.onAddTile,
     this.onSuggestion,
+    this.onReplyWith,
     this.jarvisBusy = false,
     this.clock,
     super.key,
@@ -59,6 +75,9 @@ class JarvisHome extends StatefulWidget {
   final VoidCallback onAddTile;
   final ValueChanged<String>? onSuggestion;
 
+  /// Opens a WhatsApp chat, by its key, with a quick reply in the composer.
+  final void Function(String key, String draft)? onReplyWith;
+
   /// Jarvis is writing a reply, possibly in a conversation that is not open.
   final bool jarvisBusy;
 
@@ -73,6 +92,10 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   late final Map<String, TileData?> _data = Map.of(widget.source.cache);
   late Map<String, dynamic>? _briefing = widget.source.lastBriefing;
   late String? _preferredName = widget.source.lastPreferredName;
+  late HomeContext? _context = widget.source.lastContext;
+
+  /// Cards put away here, hidden before the server confirms it.
+  final Set<String> _gone = {};
   bool _editing = false;
   Timer? _tick;
   int _ticks = 0;
@@ -84,7 +107,14 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   /// Drives the parallax glow, the receding greeting and the compact header.
   final _scroll = ScrollController();
 
-  DateTime get _now => widget.clock?.call() ?? DateTime.now();
+  /// The Ask bar's text, so a follow-up on the brief can start it.
+  final _ask = TextEditingController();
+
+  /// The brief dismissed here, hidden before the server confirms it.
+  String? _briefDismissed;
+
+  DateTime get _now =>
+      widget.clock?.call() ?? debugHomeClock?.call() ?? DateTime.now();
 
   @override
   void initState() {
@@ -121,6 +151,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
         _data.clear();
         _briefing = null;
         _preferredName = null;
+        _context = null;
       });
     } else if (!oldWidget.ready ||
         oldWidget.refreshRevision != widget.refreshRevision) {
@@ -143,6 +174,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     _tick?.cancel();
     _generation++;
     _scroll.dispose();
+    _ask.dispose();
     super.dispose();
   }
 
@@ -175,14 +207,194 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     final generation = ++_generation;
     widget.source.invalidate();
     unawaited(_loadPreferredName(generation));
+    unawaited(_loadContext(generation));
     final briefing = await widget.source.briefing();
     if (!mounted || generation != _generation) return;
     setState(() => _briefing = briefing);
+    _syncWidget();
     await Future.wait([
       for (final item in widget.layout.layout)
         if (tileSpecFor(item.id) case final spec? when spec.load != null)
           _loadTile(spec, generation),
     ]);
+  }
+
+  Future<void> _loadContext(int generation) async {
+    final context = await widget.source.context();
+    if (!mounted || generation != _generation || context == null) return;
+    setState(() => _context = context);
+    widget.chats.setPeople(context.people);
+    _syncWidget();
+  }
+
+  /// Hands the iOS widget what Home now shows.
+  void _syncWidget() {
+    final now = _now;
+    unawaited(
+      HomeWidgetSync.instance.push(
+        HomeWidgetPayload.build(
+          now: now,
+          context: _context,
+          needsYou: needsYouItems(
+            now: now,
+            briefing: _briefing,
+            chats: widget.chats,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Fetches the context again after something on it changed.
+  Future<void> _reloadContext() async {
+    widget.source.invalidate();
+    await _loadContext(_generation);
+  }
+
+  HomeHero? get _hero {
+    final hero = _context?.hero;
+    return hero == null || _gone.contains(hero.id) ? null : hero;
+  }
+
+  void _dismissCard(String id, String kind, {bool mute = false}) {
+    setState(() => _gone.add(id));
+    unawaited(widget.source.dismiss(id, kind, mute: mute));
+  }
+
+  Future<void> _heroAction(HomeHero hero, HeroAction action) async {
+    final suggest = widget.onSuggestion;
+    switch (action) {
+      case HeroAction.done || HeroAction.snooze:
+        final id = hero.reminderId;
+        if (id == null) return;
+        setState(() => _gone.add(hero.id));
+        await _remind(id, action == HeroAction.done ? 'done' : 'snooze');
+        await _reloadContext();
+      case HeroAction.open:
+        widget.onOpen('today');
+      case HeroAction.brief:
+        await _readBrief();
+      case HeroAction.plan:
+        suggest?.call(switch (hero.kind) {
+          'brief' => 'About my morning brief: what should I focus on first?',
+          'wind_down' => 'Help me plan tomorrow.',
+          _ => 'Help me prepare for ${hero.title}.',
+        });
+      case HeroAction.ok:
+        _dismissCard(hero.id, hero.kind);
+    }
+  }
+
+  /// Opens today's brief in full and marks it read.
+  Future<void> _readBrief() async {
+    final note = _briefNote ?? jsonObject(_briefing?['latestBriefing']);
+    if (note == null) return;
+    final id = asJsonString(note['id']);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (sheet) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: .6,
+        maxChildSize: .92,
+        builder: (sheet, scroll) => ListView(
+          key: const Key('home-brief-sheet'),
+          controller: scroll,
+          padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
+          children: [
+            Text(
+              asJsonString(note['title']) ?? 'Morning brief',
+              style: JarvisType.displayOf(
+                sheet,
+              ).copyWith(fontSize: 26, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              plainBriefing(asJsonString(note['body']) ?? ''),
+              style: TextStyle(
+                fontSize: 16,
+                height: 1.55,
+                color: JarvisColors.of(sheet).ink,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (id != null && mounted) {
+      await _dismissBrief(id);
+      await _reloadContext();
+    }
+  }
+
+  Future<void> _noticed(HomeInsight insight) async {
+    final suggest = widget.onSuggestion;
+    switch (insight.kind) {
+      case 'routine':
+        final id = insight.sourceId;
+        if (id == null) return;
+        setState(() => _gone.add(insight.id));
+        String message;
+        try {
+          await widget.source.http.post<dynamic>(
+            '/api/v1/routines/suggestions/$id/accept',
+          );
+          message = 'Saved as a draft routine. Turn it on in Routines.';
+        } catch (_) {
+          if (mounted) setState(() => _gone.remove(insight.id));
+          message = 'Could not set up that routine';
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.maybeOf(context)
+          ?..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(message)));
+      case 'drift':
+        for (final item in widget.chats.whatsApp) {
+          if (widget.chats.personFor(item)?.personId == insight.personId) {
+            widget.onOpenChat(item.key);
+            return;
+          }
+        }
+        suggest?.call(
+          'Help me write a short message to check in: ${insight.title}.',
+        );
+      default:
+        suggest?.call('Help me write a birthday message: ${insight.title}.');
+    }
+  }
+
+  /// What Jarvis can learn from in the first days, and what is connected.
+  List<DayOneStep> _dayOneSteps() {
+    final calendar = jsonObject(_briefing?['calendar']);
+    final suggest = widget.onSuggestion;
+    return [
+      DayOneStep(
+        id: 'calendar',
+        label: 'Connect your calendar',
+        unlocks: 'Right now, countdowns and your day line',
+        icon: PhosphorIconsRegular.calendarBlank,
+        done: asJsonBool(calendar?['connected']),
+        onTap: () => suggest?.call(mcpCalendarPrompt),
+      ),
+      DayOneStep(
+        id: 'whatsapp',
+        label: 'Read along with WhatsApp',
+        unlocks: 'Who is waiting on you, and quick replies',
+        icon: PhosphorIconsRegular.whatsappLogo,
+        done: widget.chats.whatsAppLinked,
+        onTap: () => widget.onOpen('whatsapp'),
+      ),
+      DayOneStep(
+        id: 'people',
+        label: 'Tell Jarvis who matters',
+        unlocks: 'Birthdays, and a nudge when you drift apart',
+        icon: PhosphorIconsRegular.users,
+        done: _context?.people.isNotEmpty ?? false,
+        onTap: () => widget.onOpen('people'),
+      ),
+    ];
   }
 
   Future<void> _loadPreferredName(int generation) async {
@@ -198,7 +410,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     final unread = chats.unreadCount;
     if (items.isEmpty) return const TileData(subtitle: 'No conversations yet');
     (String, ChatSource, String?) identity(ChatListItem item) =>
-        (item.title, item.source, item.isJarvis ? item.preview : item.account);
+        (item.title, item.source, item.isJarvis ? item.profile : item.account);
     final identities = <(String, ChatSource, String?), int>{};
     for (final item in items) {
       identities.update(
@@ -208,7 +420,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
       );
     }
     String contextLine(ChatListItem item) {
-      final profile = item.preview?.trim();
+      final profile = item.profile?.trim();
       return [
         item.isJarvis ? 'Jarvis' : 'WhatsApp',
         if (item.isJarvis && profile?.isNotEmpty == true && profile != 'Jarvis')
@@ -248,7 +460,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
           TileChat(
             title: item.title,
             context: contextLine(item),
-            preview: item.isJarvis ? null : item.preview,
+            preview: item.preview,
             time: whatsAppListTime(item.time, now: _now),
             unread: item.unread,
             isJarvis: item.isJarvis,
@@ -260,6 +472,14 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   }
 
   Map<String, TileData?> get _tileData => {..._data, 'chats': _chatsData()};
+
+  /// Today's brief, unless it was read or dismissed.
+  Map<String, dynamic>? get _briefNote {
+    final note = jsonObject(_briefing?['latestBriefing']);
+    if (!BriefCard.shows(note)) return null;
+    if (asJsonString(note!['id']) == _briefDismissed) return null;
+    return note;
+  }
 
   bool _isLoading(String id) =>
       widget.ready && tileSpecFor(id)?.load != null && !_data.containsKey(id);
@@ -305,6 +525,64 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
       if (other?.load != null && widget.layout.contains(id)) {
         unawaited(_loadTile(other!, generation));
       }
+    }
+  }
+
+  /// A button on a Needs you row: reminders are handled right here, the rest
+  /// open where they live or go to Jarvis.
+  Future<void> _needsYou(NeedsYouItem item, NeedsYouAction action) async {
+    switch ((item.kind, action)) {
+      case (NeedsYouKind.approval, _):
+        widget.onOpen('approvals');
+      case (NeedsYouKind.task, _):
+        widget.onOpen('tasks');
+      case (NeedsYouKind.catchUp, _):
+        await showCatchUpSheet(context, [
+          for (final chat in item.chats)
+            CatchUpDigestEntry(
+              id: chat.key,
+              title: chat.title,
+              catchUp: chat.whatsApp!.catchUp!,
+              onOpen: () => widget.onOpenChat(chat.key),
+            ),
+        ]);
+      case (NeedsYouKind.person, NeedsYouAction.draft):
+        widget.onSuggestion?.call(
+          'Draft a short reply to ${item.title} on WhatsApp, in the language of our chat.',
+        );
+      case (NeedsYouKind.person, _):
+        widget.onOpenChat(item.id);
+      case (NeedsYouKind.reminder, NeedsYouAction.done) ||
+          (NeedsYouKind.reminder, NeedsYouAction.snooze):
+        await _remind(
+          item.id,
+          action == NeedsYouAction.done ? 'done' : 'snooze',
+        );
+      case (NeedsYouKind.reminder, _):
+        widget.onOpen('reminders');
+    }
+  }
+
+  Future<void> _remind(String id, String action) async {
+    if (_pending.contains(id)) return;
+    setState(() => _pending.add(id));
+    final outcome = await widget.source.act('reminders', action, id);
+    if (!mounted) return;
+    setState(() => _pending.remove(id));
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(outcome.message)));
+    widget.source.invalidate();
+    final briefing = await widget.source.briefing();
+    if (mounted) setState(() => _briefing = briefing);
+  }
+
+  Future<void> _dismissBrief(String id) async {
+    setState(() => _briefDismissed = id);
+    try {
+      await widget.source.http.post<dynamic>('/api/v1/notifications/$id/read');
+    } catch (_) {
+      // Hidden for now; it comes back on the next load if the server missed it.
     }
   }
 
@@ -359,6 +637,18 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     final calendar = _briefing?['calendar'];
     final calendarOff =
         calendar is Map && calendar['connected'] == false && _briefing != null;
+    final hero = _hero;
+    final homeContext = _context;
+    final evening = now.hour >= 18;
+    final tomorrow = hero?.kind == 'wind_down'
+        ? const <HomeAgendaItem>[]
+        : homeContext?.tomorrow ?? const <HomeAgendaItem>[];
+    final noticed = [
+      for (final item in homeContext?.noticed ?? const <HomeInsight>[])
+        if (!_gone.contains(item.id)) item,
+    ];
+    final dayOne = homeContext == null ? null : _dayOneSteps();
+    final showDayOne = dayOne != null && DayOneCard.shows(dayOne);
     final list = OrbRefresh(
       onRefresh: _refresh,
       child: ListView(
@@ -380,8 +670,22 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                       now: now,
                       next: upcoming.isEmpty ? null : upcoming.first,
                       preferredName: _preferredName,
+                      dayLine: homeContext?.dayLine,
+                      lead: hero == null
+                          ? null
+                          : RightNowCard(
+                              hero: hero,
+                              now: now,
+                              onAction: (action) =>
+                                  unawaited(_heroAction(hero, action)),
+                              onDismiss: ({required mute}) =>
+                                  _dismissCard(hero.id, hero.kind, mute: mute),
+                            ),
                       onOpen: () => widget.onOpen('today'),
-                      emptyHint: calendarOff && widget.onSuggestion != null
+                      emptyHint:
+                          calendarOff &&
+                              !showDayOne &&
+                              widget.onSuggestion != null
                           ? 'Connect a calendar'
                           : null,
                       onEmptyHint: () =>
@@ -389,22 +693,116 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  if (!_editing && approvals.isNotEmpty)
-                    PopIn(
-                      from: .9,
-                      child: _ApprovalsBanner(
-                        approvals: approvals,
-                        onTap: () => widget.onOpen('approvals'),
+                  if (!_editing) ...[
+                    FadeSlideIn(
+                      index: 1,
+                      child: AskBar(
+                        controller: _ask,
+                        busy: widget.jarvisBusy,
+                        suggestions: homeSuggestions(
+                          now: now,
+                          briefing: _briefing,
+                          chats: widget.chats,
+                        ),
+                        onSubmit: widget.onSuggestion,
+                        onVoice: () => widget.onOpen('voice'),
                       ),
                     ),
+                    const SizedBox(height: 28),
+                    if (_briefing != null)
+                      FadeSlideIn(
+                        index: 2,
+                        child: NeedsYouCard(
+                          items: needsYouItems(
+                            now: now,
+                            briefing: _briefing,
+                            chats: widget.chats,
+                          ),
+                          http: widget.source.http,
+                          pending: _pending,
+                          onReplyWith: widget.onReplyWith == null
+                              ? null
+                              : (item, draft) =>
+                                    widget.onReplyWith!(item.id, draft),
+                          onSeeAll: approvals.isEmpty
+                              ? null
+                              : () => widget.onOpen('approvals'),
+                          onAction: (item, action) =>
+                              unawaited(_needsYou(item, action)),
+                        ),
+                      ),
+                    const SizedBox(height: 20),
+                    if (noticed.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 24),
+                        child: FadeSlideIn(
+                          index: 3,
+                          child: NoticedCard(
+                            insights: noticed,
+                            onAction: (item) => unawaited(_noticed(item)),
+                            onDismiss: (item) =>
+                                _dismissCard(item.id, item.kind),
+                          ),
+                        ),
+                      ),
+                    if (evening &&
+                        homeContext != null &&
+                        EveningCard.shows(homeContext.recap, tomorrow))
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: FadeSlideIn(
+                          index: 4,
+                          child: EveningCard(
+                            recap: homeContext.recap,
+                            tomorrow: tomorrow,
+                            onWrite: widget.onSuggestion == null
+                                ? null
+                                : () => widget.onSuggestion!(
+                                    'Help me write a short journal entry about today. Ask me one question at a time.',
+                                  ),
+                            onPlan: widget.onSuggestion == null
+                                ? null
+                                : () => widget.onSuggestion!(
+                                    'Help me plan tomorrow.',
+                                  ),
+                          ),
+                        ),
+                      )
+                    else if (_briefNote case final note?
+                        when hero?.kind != 'brief')
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: FadeSlideIn(
+                          index: 3,
+                          child: BriefCard(
+                            note: note,
+                            onDismiss: () => unawaited(
+                              _dismissBrief(asJsonString(note['id']) ?? ''),
+                            ),
+                            onFollowUp: widget.onSuggestion == null
+                                ? null
+                                : () => _ask.text = 'About my morning brief: ',
+                          ),
+                        ),
+                      ),
+                  ],
                   if (widget.ready && _briefing != null) ...[
                     CodexSignInCard(http: widget.source.http),
-                    GetStartedCard(
-                      http: widget.source.http,
-                      briefing: _briefing,
-                      onSuggestion: widget.onSuggestion,
-                      refreshRevision: widget.refreshRevision,
-                    ),
+                    if (showDayOne && !_editing)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: DayOneCard(
+                          steps: dayOne,
+                          http: widget.source.http,
+                        ),
+                      )
+                    else
+                      GetStartedCard(
+                        http: widget.source.http,
+                        briefing: _briefing,
+                        onSuggestion: widget.onSuggestion,
+                        refreshRevision: widget.refreshRevision,
+                      ),
                   ],
                   if (_editing)
                     Padding(
@@ -603,89 +1001,6 @@ class _CompactHeader extends StatelessWidget {
                     ],
                   ),
                 ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Pending approvals stay in view on Home: Jarvis is waiting on the person.
-class _ApprovalsBanner extends StatelessWidget {
-  const _ApprovalsBanner({required this.approvals, required this.onTap});
-
-  final List<Map<String, dynamic>> approvals;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = JarvisColors.of(context);
-    final count = approvals.length;
-    final names = approvals
-        .take(3)
-        .map((item) {
-          final name = humanizeToolName(asJsonString(item['toolName']) ?? '');
-          return name[0].toUpperCase() + name.substring(1);
-        })
-        .join(' · ');
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Sheen(
-        trigger: count,
-        borderRadius: BorderRadius.circular(tileRadius),
-        child: Material(
-          color: colors.accentSoft,
-          borderRadius: BorderRadius.circular(tileRadius),
-          child: InkWell(
-            key: const Key('home-approvals'),
-            borderRadius: BorderRadius.circular(tileRadius),
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-              child: Row(
-                children: [
-                  Icon(
-                    PhosphorIconsRegular.shieldCheck,
-                    size: 22,
-                    color: colors.accent,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$count ${count == 1 ? 'approval' : 'approvals'} waiting',
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w600,
-                            color: colors.ink,
-                          ),
-                        ),
-                        if (names.isNotEmpty)
-                          Text(
-                            names,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: colors.inkSoft,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    'Review',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                      color: colors.accent,
-                    ),
-                  ),
-                ],
               ),
             ),
           ),

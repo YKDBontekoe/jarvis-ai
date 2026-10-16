@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<ConversationStore>();
         services.AddScoped<IConversationStore>(provider => provider.GetRequiredService<ConversationStore>());
         services.AddScoped<IConversationHistory>(provider => provider.GetRequiredService<ConversationStore>());
+        services.AddScoped<IConversationPreviews>(provider => provider.GetRequiredService<ConversationStore>());
         services.AddScoped<IConversationRunLock>(serviceProvider => new PostgresConversationRunLock(
             connectionString,
             serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PostgresConversationRunLock>>()));
@@ -65,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<ICodingRunStore, CodingRunStore>();
         services.AddScoped<ICodingPullRequestService, Jarvis.Infrastructure.Coding.GitHubCodingPullRequestService>();
         services.AddScoped<Jarvis.Application.Home.IHomeBriefingService, Jarvis.Infrastructure.Home.HomeBriefingService>();
+        services.AddScoped<Jarvis.Application.Home.IHomeContextService, Jarvis.Infrastructure.Home.HomeContextService>();
         services.AddScoped<Jarvis.Application.Surfaces.IUiSurfaceRepository, UiSurfaceRepository>();
         services.AddScoped<Jarvis.Application.Agents.IRemoteAgentRepository, RemoteAgentRepository>();
         services.AddScoped<Jarvis.Application.Agents.IA2ATokenRepository, A2ATokenRepository>();

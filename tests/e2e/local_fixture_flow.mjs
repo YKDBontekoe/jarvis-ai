@@ -61,7 +61,19 @@ await step('greeting streams deltas and titles the conversation', async () => {
   assert.equal(deltas.map(event => event.payload.delta).join(''), reply.content);
   const listed = (await request('GET', '/conversations')).data.find(item => item.id === conversation.id);
   assert.equal(listed.title, 'Hello Jarvis');
-  return { deltas: deltas.length };
+  assert.equal(listed.lastMessageRole, 'assistant');
+  assert.match(listed.lastMessage, /I'm Jarvis/);
+  assert.equal(listed.responding, false);
+  return { deltas: deltas.length, lastMessage: listed.lastMessage };
+});
+
+await step('home context describes the day', async () => {
+  const context = (await request('GET', '/home/context')).data;
+  assert.equal(typeof context.dayLine, 'string');
+  assert(context.dayLine.length > 0, 'expected a day line');
+  assert(Array.isArray(context.people) && Array.isArray(context.noticed), 'expected people and insights');
+  await request('POST', '/home/context/dismiss', { id: 'wind_down:test', kind: 'wind_down' }, [204]);
+  return { dayLine: context.dayLine, hero: context.hero?.kind ?? null };
 });
 
 await step('reminder tool schedules a durable reminder', async () => {

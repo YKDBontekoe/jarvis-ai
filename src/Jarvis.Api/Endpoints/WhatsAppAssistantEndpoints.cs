@@ -29,6 +29,7 @@ public sealed record WhatsAppMessageDto(Guid Id, string ChatId, bool FromMe, str
 public sealed record WhatsAppSuggestRequest(string? Instruction);
 
 public sealed record WhatsAppSuggestionDto(string Text);
+public sealed record WhatsAppQuickRepliesDto(IReadOnlyList<string> Replies);
 
 /// <param name="ReplyTo">A saved message in the same chat to quote, as WhatsApp's swipe-to-reply does.</param>
 public sealed record WhatsAppSendRequest(string? Text, Guid? ReplyTo = null);
@@ -194,6 +195,13 @@ internal static class WhatsAppAssistantEndpoints
         group.MapPost("/open/suggest", Suggest);
         group.MapPost("/{chatId}/suggest", Suggest).WithName("SuggestWhatsAppReply");
 
+        Task<IResult> QuickReplies(Guid id, string chatId, IWhatsAppAssistantRepository chats,
+            IWhatsAppAssistant assistant, WhatsAppQuickReplyCache cache, ICurrentUser currentUser,
+            CancellationToken ct) =>
+            QuickRepliesAsync(id, chatId, chats, assistant, cache, currentUser, ct);
+        group.MapPost("/open/quick-replies", QuickReplies);
+        group.MapPost("/{chatId}/quick-replies", QuickReplies).WithName("SuggestWhatsAppQuickReplies");
+
         Task<IResult> Send(Guid id, string chatId, WhatsAppSendRequest request, IWhatsAppAssistantRepository chats,
             IWhatsAppSender sender, ICurrentUser currentUser, CancellationToken ct) =>
             SendAsync(id, chatId, request, chats, sender, currentUser, ct);
@@ -323,6 +331,25 @@ internal static class WhatsAppAssistantEndpoints
         return draft is null
             ? ApiProblemResults.BadGateway("Jarvis could not write a reply right now. Try again.")
             : Results.Ok(new WhatsAppSuggestionDto(draft));
+    }
+
+    private static async Task<IResult> QuickRepliesAsync(Guid id, string chatId, IWhatsAppAssistantRepository chats,
+        IWhatsAppAssistant assistant, WhatsAppQuickReplyCache cache, ICurrentUser currentUser, CancellationToken ct)
+    {
+        var chat = await FindAsync(chats, currentUser.OwnerId, id, chatId, ct);
+        if (chat is not { ReadAlong: true }) return Results.NotFound();
+        var messages = (await chats.ListMessagesAsync(currentUser.OwnerId, id, chat.ChatId, 20, null, ct))
+            .Reverse().ToArray();
+        // Nothing to answer when the chat is empty or the last word was the owner's.
+        if (messages.Length == 0 || messages[^1].FromMe) return Results.Ok(new WhatsAppQuickRepliesDto([]));
+        var newest = messages[^1].Id;
+        if (!cache.TryGet(currentUser.OwnerId, id, chat.ChatId, newest, out var replies))
+        {
+            replies = await assistant.QuickRepliesAsync(currentUser.OwnerId, chat, messages, ct);
+            if (replies.Count > 0) cache.Set(currentUser.OwnerId, id, chat.ChatId, newest, replies);
+        }
+
+        return Results.Ok(new WhatsAppQuickRepliesDto(replies));
     }
 
     private static async Task<IResult> SendAsync(Guid id, string chatId, WhatsAppSendRequest request,

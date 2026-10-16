@@ -153,6 +153,13 @@ public interface IWhatsAppAssistant
         IReadOnlyList<string> existingReminders, DateTimeOffset now, string timeZoneId,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Up to <see cref="WhatsAppQuickReplies.Max"/> short replies the owner could send next, in the chat's language.
+    /// Empty when the model is unavailable or had nothing useful.
+    /// </summary>
+    Task<IReadOnlyList<string>> QuickRepliesAsync(Guid ownerId, WhatsAppChatSettings chat,
+        IReadOnlyList<WhatsAppChatMessage> messages, CancellationToken cancellationToken);
+
     /// <summary>Summarizes unread messages and lists what the owner should reply to; null when it could not.</summary>
     Task<WhatsAppCatchUp?> SummarizeUnreadAsync(Guid ownerId, WhatsAppCatchUpBatch batch,
         CancellationToken cancellationToken);
@@ -286,4 +293,78 @@ public static partial class WhatsAppChatIds
 
     [System.Text.RegularExpressions.GeneratedRegex(@"^[0-9]{5,32}@lid$")]
     private static partial System.Text.RegularExpressions.Regex LidPattern();
+}
+
+/// <summary>Reads the model's quick replies and keeps a few recent answers per chat.</summary>
+public static class WhatsAppQuickReplies
+{
+    public const int Max = 3;
+    public const int MaxLength = 60;
+
+    /// <summary>A JSON array of strings, tolerating a Markdown fence or prose around it.</summary>
+    public static IReadOnlyList<string> Parse(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return [];
+        var start = text.IndexOf('[');
+        var end = text.LastIndexOf(']');
+        if (start < 0 || end <= start) return [];
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(text[start..(end + 1)]);
+            if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array) return [];
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var replies = new List<string>();
+            foreach (var item in document.RootElement.EnumerateArray())
+            {
+                if (item.ValueKind != System.Text.Json.JsonValueKind.String) continue;
+                var reply = item.GetString()?.Trim().Trim('"').Trim();
+                if (string.IsNullOrEmpty(reply) || reply.Length > MaxLength || reply.Contains('\n')) continue;
+                if (seen.Add(reply)) replies.Add(reply);
+                if (replies.Count == Max) break;
+            }
+
+            return replies;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return [];
+        }
+    }
+}
+
+/// <summary>
+/// Remembers quick replies per chat and newest message, so opening Home again does not ask the model again.
+/// Bounded: the oldest entries go first.
+/// </summary>
+public sealed class WhatsAppQuickReplyCache
+{
+    public const int Capacity = 500;
+    private readonly Dictionary<(Guid Owner, Guid Connection, string Chat, Guid Message), IReadOnlyList<string>> _items = [];
+    private readonly Queue<(Guid, Guid, string, Guid)> _order = new();
+    private readonly Lock _gate = new();
+
+    public bool TryGet(Guid owner, Guid connection, string chat, Guid message, out IReadOnlyList<string> replies)
+    {
+        lock (_gate)
+        {
+            if (_items.TryGetValue((owner, connection, chat, message), out var found))
+            {
+                replies = found;
+                return true;
+            }
+        }
+
+        replies = [];
+        return false;
+    }
+
+    public void Set(Guid owner, Guid connection, string chat, Guid message, IReadOnlyList<string> replies)
+    {
+        lock (_gate)
+        {
+            var key = (owner, connection, chat, message);
+            if (_items.TryAdd(key, replies)) _order.Enqueue(key);
+            while (_order.Count > Capacity) _items.Remove(_order.Dequeue());
+        }
+    }
 }

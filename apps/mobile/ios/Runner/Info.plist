@@ -84,5 +84,16 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.example.jarvis_mobile</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>jarvis</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

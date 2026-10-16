@@ -2,7 +2,7 @@
 //
 //   flutter build web -t tool/ui_preview.dart --profile   # fixture data, no backend
 //   node tool/record_web.mjs [--out build/recordings] [--width 393] [--height 852]
-//                            [--steps "Chats,Everything,Home"]
+//                            [--steps "Chats,Everything,Home"]  (or "a; b" when a name has a comma)
 //
 // Each step taps the first element whose accessible name contains the text
 // (Flutter semantics are switched on first) and saves a numbered screenshot.
@@ -23,7 +23,9 @@ const webRoot = resolve(args.web ?? 'build/web');
 const outDir = resolve(args.out ?? 'build/recordings');
 const width = Number(args.width ?? 393);
 const height = Number(args.height ?? 852);
-const steps = (args.steps ?? 'Chats,Everything,Home').split(',').map((s) => s.trim()).filter(Boolean);
+// Steps are comma separated; use semicolons instead when a name has a comma.
+const rawSteps = args.steps ?? 'Chats,Everything,Home';
+const steps = rawSteps.split(rawSteps.includes(';') ? ';' : ',').map((s) => s.trim()).filter(Boolean);
 
 if (!existsSync(join(webRoot, 'index.html'))) {
   console.error(`No web build at ${webRoot}; run: flutter build web -t tool/ui_preview.dart --profile`);

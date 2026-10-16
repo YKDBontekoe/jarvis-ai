@@ -99,6 +99,8 @@ function plan(prompt) {
   if (prompt.includes('Extract at most three useful long-term memories')) return text('[]');
   if (prompt.includes('Reorder saved-memory candidates')) return text('[]');
 
+  if (prompt.includes('You suggest up to three short WhatsApp replies'))
+    return text(JSON.stringify(['Sounds good!', 'What time?', "I'll let you know"]));
   if (prompt.includes('You write a short morning briefing intro for Jarvis'))
     return text('Here is a calm look at today.');
   if (prompt.includes('You maintain a temporal knowledge graph'))

@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/api/api_config.dart';
 import 'package:jarvis_mobile/features/chat/chat_entries.dart';
 import 'package:jarvis_mobile/features/chat/chat_widgets.dart';
+import 'package:jarvis_mobile/features/home/jarvis_home.dart'
+    show debugHomeClock;
 import 'package:jarvis_mobile/theme.dart';
 import 'package:jarvis_mobile/ui/jarvis_ui.dart';
 import 'package:jarvis_mobile/ui/phosphor_icons.dart';
@@ -100,6 +102,95 @@ void main() {
       await start(tester, dark: dark);
       await openTab(tester, 'chats');
       await capture(tester, '05-chats-$mode');
+    });
+
+    screenshotTest('home why $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await tester.tap(find.byKey(const Key('home-right-now-why')));
+      await settle(tester);
+      await capture(tester, '01b-home-why-$mode');
+      await tester.tap(find.byKey(const Key('home-why-not-now')));
+      await settle(tester);
+      expect(find.byKey(const Key('home-right-now')), findsNothing);
+      await capture(tester, '01g-home-after-not-now-$mode');
+    });
+
+    screenshotTest('home noticed $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -420));
+      await settle(tester);
+      await capture(tester, '01c-home-noticed-$mode');
+    });
+
+    screenshotTest('home evening $mode', (tester) async {
+      usePhone(tester);
+      final now = DateTime.now();
+      final evening = DateTime(now.year, now.month, now.day, 21, 40);
+      debugHomeClock = () => evening;
+      addTearDown(() => debugHomeClock = null);
+      http.routes['GET /api/v1/home/context'] = homeContext(evening: true);
+      await start(tester, dark: dark);
+      await capture(tester, '01d-home-evening-$mode');
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -560));
+      await settle(tester);
+      await capture(tester, '01e-home-evening-scrolled-$mode');
+    });
+
+    screenshotTest('home day one $mode', (tester) async {
+      usePhone(tester);
+      http.routes['GET /api/v1/home/context'] = {
+        'dayLine': 'Nothing on your plate today. A good day to get ahead.',
+      };
+      http.routes['GET /api/v1/channels'] = <Object>[];
+      http.routes['GET /api/v1/home'] = {
+        ...home(),
+        'calendar': {'connected': false},
+        'latestBriefing': null,
+        'reminders': <Object>[],
+        'approvals': <Object>[],
+      };
+      http.routes['GET /api/v1/briefings/daily'] = {
+        'enabled': true,
+        'localTime': '08:00:00',
+        'timeZoneId': 'Europe/Amsterdam',
+      };
+      await start(tester, dark: dark);
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -300));
+      await settle(tester);
+      await capture(tester, '01f-home-day-one-$mode');
+    });
+
+    screenshotTest('chats all $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openTab(tester, 'chats');
+      await tester.tap(find.byKey(const Key('chats-tab-all')));
+      await settle(tester);
+      await capture(tester, '05b-chats-all-$mode');
+    });
+
+    screenshotTest('chats preview $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openTab(tester, 'chats');
+      await tester.longPress(
+        find.byKey(const Key('chat-whatsapp:wa1:climb@g.us')),
+      );
+      await settle(tester);
+      await capture(tester, '05c-chats-preview-$mode');
+    });
+
+    screenshotTest('chats preview person $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openTab(tester, 'chats');
+      await tester.longPress(
+        find.byKey(const Key('chat-whatsapp:wa1:+31633333333')),
+      );
+      await settle(tester);
+      await capture(tester, '05d-chats-preview-person-$mode');
     });
 
     screenshotTest('everything $mode', (tester) async {
@@ -393,4 +484,32 @@ void main() {
     await openChat(tester);
     await capture(tester, '20-desktop-chat');
   });
+
+  for (final dark in [false, true]) {
+    final mode = dark ? 'dark' : 'light';
+    screenshotTest('desktop chats $mode', (tester) async {
+      useDesktop(tester);
+      http.routes['GET /api/v1/people/p-rosa'] = {
+        'person': {
+          'id': 'p-rosa',
+          'name': 'Rosa',
+          'relationship': 'Partner',
+          'daysUntilBirthday': 23,
+          'turningAge': 31,
+          'notes': 'Allergic to hazelnuts. Loves the Rijksmuseum on Sundays.',
+        },
+        'facts': [
+          {'predicate': 'works_at', 'value': 'Booking.com, product design'},
+          {'predicate': 'favourite_food', 'value': 'Ramen from Fou Fow'},
+          {'predicate': 'training', 'value': 'Runs on Tuesday mornings'},
+        ],
+      };
+      await start(tester, dark: dark);
+      await openTab(tester, 'chats');
+      await tester.tap(find.byKey(const Key('chat-whatsapp:wa1:+31633333333')));
+      await settle(tester);
+      expect(find.byKey(const Key('whatsapp-person-panel')), findsOneWidget);
+      await capture(tester, '21-desktop-chats-about-$mode');
+    });
+  }
 }

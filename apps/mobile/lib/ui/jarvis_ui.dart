@@ -13,6 +13,7 @@ import '../theme.dart';
 
 export 'effects.dart';
 export 'motion.dart';
+export 'typing_dots.dart';
 
 part 'jarvis_orb.dart';
 
@@ -78,6 +79,15 @@ class _FadeSlideInState extends State<FadeSlideIn>
     if (widget.animate) {
       _controller.forward();
     } else {
+      _controller.value = 1;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // With Reduce Motion the child shows at once, so no ticker keeps running.
+    if (JarvisMotion.reduced(context) && _controller.isAnimating) {
       _controller.value = 1;
     }
   }

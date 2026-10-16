@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../json_maps.dart';
 import '../../schedule_format.dart' show deviceTimeZoneLookup;
+import '../home/home_context.dart';
 import 'tile_actions.dart';
 import 'tile_layout.dart';
 import 'tile_models.dart';
@@ -188,10 +189,42 @@ class TileDataSource {
     }
   }
 
+  Future<HomeContext?>? _context;
+
+  /// The last Home context that loaded.
+  HomeContext? lastContext;
+
+  /// `/home/context`, shared until [invalidate]. Null on an older server.
+  Future<HomeContext?> context() => _context ??= _fetchContext();
+
+  Future<HomeContext?> _fetchContext() async {
+    final revision = _accountRevision;
+    try {
+      final response = await http.get<dynamic>('/api/v1/home/context');
+      if (revision != _accountRevision) return null;
+      return lastContext = HomeContext.fromJson(response.data);
+    } catch (_) {
+      return revision == _accountRevision ? lastContext : null;
+    }
+  }
+
+  /// Puts a Home card away on the server; [mute] hides its whole kind.
+  Future<void> dismiss(String id, String kind, {bool mute = false}) async {
+    try {
+      await http.post<dynamic>(
+        '/api/v1/home/context/dismiss',
+        data: {'id': id, 'kind': kind, 'mute': mute},
+      );
+    } catch (_) {
+      // Hidden here for now; the next load brings it back if the server missed it.
+    }
+  }
+
   /// The next [briefing] call fetches again.
   void invalidate() {
     _briefing = null;
     _preferredName = null;
+    _context = null;
   }
 
   /// Forgets everything, for a different account.
@@ -199,6 +232,8 @@ class TileDataSource {
     _accountRevision++;
     _briefing = null;
     lastBriefing = null;
+    _context = null;
+    lastContext = null;
     _preferredName = null;
     lastPreferredName = null;
     cache.clear();

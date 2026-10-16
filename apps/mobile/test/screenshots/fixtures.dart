@@ -17,26 +17,48 @@ List<Map<String, Object?>> conversations() {
       'id': conversationId,
       'title': 'Weekend in Lisbon',
       'updatedAt': _iso(now.subtract(const Duration(minutes: 4))),
+      'lastMessage': "Here's an easy-going plan that leaves room to wander.",
+      'lastMessageRole': 'assistant',
+      'pinned': true,
     },
     {
       'id': 'c-garden',
       'title': 'Balcony herb garden',
       'updatedAt': _iso(now.subtract(const Duration(hours: 3))),
+      'lastMessage': 'Which herbs survive a windy north balcony?',
+      'lastMessageRole': 'user',
+      'responding': true,
     },
     {
       'id': 'c-tax',
       'title': 'Q3 expense summary',
       'updatedAt': _iso(now.subtract(const Duration(days: 1, hours: 2))),
+      'lastMessage': 'You spent €412 on groceries, 8% less than Q2.',
+      'lastMessageRole': 'assistant',
+      'profileName': 'Finance',
     },
     {
       'id': 'c-run',
       'title': 'Half marathon training plan',
       'updatedAt': _iso(now.subtract(const Duration(days: 2))),
+      'lastMessage': 'Thursday is an easy 6 km. Keep it conversational.',
+      'lastMessageRole': 'assistant',
+      'profileName': 'Coach',
     },
     {
       'id': 'c-gift',
+      'title': 'Pick up the dry cleaning',
+      'updatedAt': _iso(now.subtract(const Duration(days: 1, hours: 4))),
+      'lastMessage': 'Reminder · the shop closes at 18:00.',
+      'lastMessageRole': 'assistant',
+      'origin': 'reminder',
+    },
+    {
+      'id': 'c-gift2',
       'title': 'Birthday gift ideas for Sam',
       'updatedAt': _iso(now.subtract(const Duration(days: 6))),
+      'lastMessage': 'A good pair of trail socks never fails.',
+      'lastMessageRole': 'assistant',
     },
   ];
 }
@@ -134,8 +156,25 @@ Map<String, Object?> home() {
         'title': 'Call mum',
         'dueAt': _iso(today.add(const Duration(hours: 19, minutes: 30))),
       },
+      {
+        'id': 'r-late',
+        'title': 'Bring the charger',
+        'status': 'pending',
+        'dueAt': _iso(now.subtract(const Duration(minutes: 20))),
+      },
     ],
     'approvals': approvals(),
+    'latestBriefing': {
+      'id': 'n-brief',
+      'title': 'Your morning briefing',
+      'body':
+          'A calm Friday. The **design review** is at the top of the afternoon, then you fly to Lisbon.\n\n'
+          '- Leave for Schiphol by 15:30\n'
+          '- Sam asked to move dinner to 19:45\n'
+          '- The bank summary is waiting on your approval',
+      'createdAt': _iso(today.add(const Duration(hours: 8))),
+      'read': false,
+    },
     'calendar': {
       'connected': true,
       'events': [
@@ -338,6 +377,110 @@ Map<String, Object?> expenseMonth() {
 
 const whatsAppChannelId = 'wa1';
 
+/// `/home/context`: the design review coming up, Rosa and Sam linked to their
+/// chats, and three things Jarvis noticed.
+Map<String, Object?> homeContext({bool evening = false}) {
+  final now = _now();
+  final tomorrow = DateTime(now.year, now.month, now.day + 1);
+  Map<String, Object?> person(
+    String id,
+    String name,
+    String chat,
+    String? relationship, {
+    double? usual,
+    double? waiting,
+    bool quiet = false,
+  }) => {
+    'personId': id,
+    'name': name,
+    'relationship': relationship,
+    'connectionId': whatsAppChannelId,
+    'chatId': chat,
+    'usualReplyMinutes': usual,
+    'waitingHours': waiting,
+    'quiet': quiet,
+    'baselinePerWeek': 6.0,
+  };
+  return {
+    'dayLine': evening
+        ? 'A quiet evening. Tomorrow starts with Brunch with Rosa at 10:30.'
+        : 'Design review soon, then you fly to Lisbon. Free after 21:00.',
+    'hero': evening
+        ? {
+            'id': 'wind_down:x',
+            'kind': 'wind_down',
+            'title': "Tomorrow: Quinty's birthday",
+            'detail': 'Then Brunch with Rosa at 10:30',
+            'reason': 'It is late and tomorrow has plans',
+            'facts': ['2 plans tomorrow', 'Brief at 08:00'],
+          }
+        : {
+            'id': 'soon:design',
+            'kind': 'soon',
+            'title': 'Design review',
+            'detail': 'With Joëlle and the product team',
+            'startsAt': _iso(now.add(const Duration(minutes: 34))),
+            'reason': 'From your calendar',
+            'facts': ['Calendar event at the top of the afternoon'],
+          },
+    'people': [
+      person(
+        'p-rosa',
+        'Rosa',
+        '+31633333333',
+        'Partner',
+        usual: 18,
+        waiting: 14,
+      ),
+      person('p-sam', 'Sam', '+31611111111', 'Friend', usual: 45, waiting: .2),
+      person('p-tom', 'Tom', '+31622222222', 'Brother', quiet: true),
+    ],
+    'noticed': [
+      {
+        'id': 'routine:fri',
+        'kind': 'routine',
+        'title': 'Leave for Dordrecht on Fridays at 17:30',
+        'evidence': 'You did this 4 of your last 5 Fridays',
+        'confidence': .82,
+        'actionLabel': 'Set it up',
+        'sourceId': 'fri',
+      },
+      {
+        'id': 'drift:p-tom',
+        'kind': 'drift',
+        'title': '3 weeks since you talked to Tom',
+        'evidence': 'You usually talk every few days',
+        'actionLabel': 'Say hi',
+        'personId': 'p-tom',
+      },
+      {
+        'id': 'birthday:q',
+        'kind': 'birthday',
+        'title': 'Quinty turns 25 tomorrow',
+        'evidence': 'From your People list',
+        'actionLabel': 'Plan a message',
+      },
+    ],
+    'tomorrow': [
+      {
+        'title': "Quinty's birthday",
+        'at': _iso(tomorrow.add(const Duration(hours: 9))),
+        'kind': 'reminder',
+      },
+      {
+        'title': 'Brunch with Rosa',
+        'at': _iso(tomorrow.add(const Duration(hours: 10, minutes: 30))),
+        'kind': 'event',
+      },
+    ],
+    'dayRecap': {
+      'remindersDone': 4,
+      'tasksDone': 2,
+      'done': ['Water the basil', 'Call mum', 'Book the gym'],
+    },
+  };
+}
+
 Map<String, Object?> whatsAppChats() {
   final now = _now();
   Map<String, Object?> chat(
@@ -386,6 +529,39 @@ Map<String, Object?> whatsAppChats() {
         const Duration(hours: 2),
         fromMe: true,
       ),
+      chat(
+        '+31633333333',
+        'Rosa',
+        'Je bent de beste',
+        const Duration(hours: 14),
+        unread: 1,
+      ),
+      {
+        ...chat(
+          'climb@g.us',
+          'Climbing crew',
+          'Noor: Saturday 10:00 at the gym?',
+          const Duration(hours: 3),
+          group: true,
+          unread: 9,
+        ),
+        'catchUp': {
+          'summary':
+              'Noor is booking the bouldering gym for Saturday at 10:00 and asked who is in.',
+          'toReply': [
+            {'who': 'Noor', 'about': 'Are you in on Saturday?'},
+          ],
+          'messageCount': 9,
+        },
+      },
+      chat(
+        'street@g.us',
+        'Street party',
+        'Lena: who has a long table?',
+        const Duration(hours: 5),
+        group: true,
+        unread: 23,
+      ),
     ],
   };
 }
@@ -408,6 +584,28 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   ],
   'GET /api/v1/projects': projects(),
   'GET /api/v1/home': home(),
+  'GET /api/v1/home/context': homeContext(),
+  // Every chat path is ".../chats/open" with the chat in the query, so one
+  // sample conversation serves all of them.
+  'GET /api/v1/channels/$whatsAppChannelId/chats/open/messages': [
+    for (final (id, fromMe, text, minutes) in [
+      ('m1', false, 'Zullen we zondag naar het Rijks?', 900),
+      ('m2', true, 'Ja leuk! Om 11 uur?', 880),
+      ('m3', false, 'Perfect. Ik reserveer', 870),
+      ('m4', false, 'Je bent de beste', 840),
+    ])
+      {
+        'id': id,
+        'chatId': '+31633333333',
+        'fromMe': fromMe,
+        'sender': fromMe ? null : 'Rosa',
+        'text': text,
+        'sentAt': _iso(_now().subtract(Duration(minutes: minutes))),
+      },
+  ],
+  'POST /api/v1/channels/$whatsAppChannelId/chats/open/quick-replies': {
+    'replies': ['Ik ook van jou', 'Tot vanavond!', 'Zal ik koken?'],
+  },
   'GET /api/v1/persona': {
     'preferredName': 'Youri',
     'language': 'en',

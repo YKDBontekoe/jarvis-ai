@@ -118,8 +118,19 @@ void main() {
             await capture(tester, 'polish-home-$suffix');
             await tester.tap(find.byKey(const Key('tab-chats')));
             await settle(tester);
-            expect(find.text('WhatsApp · Personal'), findsOneWidget);
+            await tester.tap(find.byKey(const Key('chats-tab-all')));
+            await settle(tester);
             await capture(tester, 'polish-chats-$suffix');
+            await tester.scrollUntilVisible(
+              find.text('WhatsApp · Personal'),
+              100,
+              scrollable: find.descendant(
+                of: find.byKey(const Key('chats-list')),
+                matching: find.byType(Scrollable),
+              ),
+            );
+            await settle(tester);
+            expect(find.text('WhatsApp · Personal'), findsOneWidget);
             await tester.scrollUntilVisible(
               find.text('WhatsApp · Work'),
               100,

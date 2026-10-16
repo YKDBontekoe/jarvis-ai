@@ -962,7 +962,12 @@ class _ChatAvatarState extends State<ChatAvatar> {
       _subject ?? widget.chat?.name ?? letters,
       colors,
     );
-    const color = Colors.white;
+    // Soft tone with the letters in a deeper shade of the same colour.
+    final color = Color.lerp(
+      hue,
+      colors.isDark ? Colors.white : Colors.black,
+      colors.isDark ? .55 : .45,
+    )!;
     return Container(
       width: widget.size,
       height: widget.size,
@@ -977,8 +982,8 @@ class _ChatAvatarState extends State<ChatAvatar> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color.lerp(hue, Colors.white, colors.isDark ? .05 : .25)!,
-                  Color.lerp(hue, Colors.black, colors.isDark ? .35 : .12)!,
+                  Color.lerp(hue, colors.surface, colors.isDark ? .62 : .74)!,
+                  Color.lerp(hue, colors.surface, colors.isDark ? .7 : .82)!,
                 ],
               ),
       ),

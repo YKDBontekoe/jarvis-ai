@@ -17,8 +17,13 @@ public sealed class HomeBriefingService(
     ICalendarFeed calendar,
     IDeviceTelemetryStore telemetry,
     IIntegrationCredentialStore credentials,
-    IUserMcpServerRegistry mcpServers) : IHomeBriefingService
+    IUserMcpServerRegistry mcpServers,
+    INotificationRepository notifications) : IHomeBriefingService
 {
+    /// <summary>A briefing older than this belongs to an earlier day and is not shown.</summary>
+    public static readonly TimeSpan BriefingFreshness = TimeSpan.FromHours(18);
+    public const string BriefingNotificationType = "briefing.daily";
+
     public async Task<HomeBriefingDto> GetAsync(Guid ownerId, CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
@@ -76,6 +81,26 @@ public sealed class HomeBriefingService(
             device is null ? null : new HomeDeviceDto(device.BatteryPercent, device.Charging,
                 device.Latitude is not null && device.Longitude is not null, device.ReportedAt),
             brief is null ? null : new HomeBriefingScheduleDto(brief.Enabled, brief.LocalTime, brief.TimeZoneId),
-            packs);
+            packs,
+            await LatestBriefingAsync(ownerId, now, cancellationToken));
+    }
+
+    private async Task<HomeBriefingNoteDto?> LatestBriefingAsync(Guid ownerId, DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var items = await notifications.ListNotificationsAsync(ownerId, cancellationToken);
+        return PickLatestBriefing(items, now);
+    }
+
+    /// <summary>The newest morning briefing that still belongs to today, or null.</summary>
+    public static HomeBriefingNoteDto? PickLatestBriefing(IEnumerable<NotificationRecord> notifications,
+        DateTimeOffset now)
+    {
+        var latest = notifications
+            .Where(item => item.Type == BriefingNotificationType && item.CreatedAt >= now - BriefingFreshness)
+            .MaxBy(item => item.CreatedAt);
+        return latest is null
+            ? null
+            : new HomeBriefingNoteDto(latest.Id, latest.Title, latest.Body, latest.CreatedAt, latest.ReadAt is not null);
     }
 }

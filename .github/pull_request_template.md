@@ -1,6 +1,6 @@
 ## Summary
 
-<!-- What does this pull request change, and why? Link to design notes or issues when helpful. -->
+<!-- What changes, why, and what the person using Jarvis will notice. Link to issues, design notes or mockups (docs/design/mockups/). -->
 
 ## SemVer impact
 
@@ -43,6 +43,8 @@ Merging to `main` runs [`.github/workflows/create-release-tag.yml`](.github/work
 - [ ] Temporal workflow or worker behavior
 - [ ] Docker / AppHost / production deploy
 - [ ] MCP, integrations, or auth
+- [ ] Agent tools or context (prompt shape changed; `tests/e2e/fake_codex_app_server.mjs` updated)
+- [ ] Owner scope or approvals touched
 
 ### Mobile (Flutter)
 
@@ -50,26 +52,53 @@ Merging to `main` runs [`.github/workflows/create-release-tag.yml`](.github/work
 - [ ] UI / UX
 - [ ] Sign-in, push, or LiveKit
 - [ ] iOS build / unsigned IPA / LiveContainer
+- [ ] Home screen widget or other native iOS code
+
+### Docs and agent config
+
+- [ ] Not applicable
+- [ ] `docs/`, `AGENTS.md` or `.claude/` (skills, hooks) changed
 
 ## Related issues
 
 <!-- Fixes #123, relates to #456 -->
 
-## How to test
+## Evidence
 
-<!-- Commands, environments, and manual steps reviewers or release managers should run. -->
+Required by [`AGENTS.md`](AGENTS.md) ("Verify every change"). Tick what ran, paste the results, and say why a step did not run. Never fill in results that were not produced.
 
-```sh
-# Example
-dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
-python3 -m unittest discover -s tests/unit -p 'test_*.py'
+- [ ] Unit tests: `dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj`
+- [ ] Integration tests (persistence changes): `dotnet test tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj` (Docker)
+- [ ] Flutter: `cd apps/mobile && flutter analyze && flutter test`
+- [ ] Smoke test (backend changes): `scripts/dev/smoke.sh`, plus the new endpoint or flow exercised against `http://localhost:5082/api/v1`
+- [ ] Screenshots (UI changes): `app_screenshots.dart`, `ui_polish.dart`, `layout_audit.dart`, with a new case per new screen or state; images attached below
+- [ ] Recording (flows and interactions): `flutter build web -t tool/ui_preview.dart --profile` and `node tool/record_web.mjs --steps "…"`; video attached below
+- [ ] Python / bridge tests when touched: `python3 -m unittest discover -s tests/unit -p 'test_*.py'`
+
+```text
+# Paste results, e.g. "Passed! Failed: 0, Passed: 1611", "11/11 checks passed", "+715: All tests passed!"
 ```
+
+**Not run, and why:**
+
+### Screenshots / recordings
+
+<!-- Required for UI changes. Light and dark; add 320pt / large text when layout changed. -->
+
+### UI and design (Mobile UI changes)
+
+- [ ] Follows [`docs/design/playbook.md`](docs/design/playbook.md): tokens from `JarvisColors`, motion from `JarvisMotion`, existing components reused
+- [ ] Checked at 320pt and 2× text, light and dark, and with reduced motion
+- [ ] New screen or redesign: mockup linked above
+- [ ] Playbook updated if a token, component or pattern was added or changed
 
 ### Checklist
 
 - [ ] CI (**All checks passed** on this PR) is green
 - [ ] Automated tests added or updated where behavior changed
-- [ ] `README.md` or ops docs updated if setup, secrets, or release steps changed
+- [ ] Owner scope (`ICurrentUser.OwnerId`) on every new query and endpoint
+- [ ] Sensitive agent actions go through approvals
+- [ ] `docs/` updated for API or behaviour changes; `README.md` or ops docs updated if setup, secrets, or release steps changed
 - [ ] No secrets, tokens, or production `.env` files committed
 - [ ] Production AppHost deployment / GHCR image names unchanged unless intentional
 - [ ] iOS release workflow / `Jarvis.ipa` packaging considered if mobile or version fields changed
@@ -77,10 +106,6 @@ python3 -m unittest discover -s tests/unit -p 'test_*.py'
 ## Deployment / release notes
 
 <!-- What operators must do after merge: env vars, migrations, `docker compose pull`, new GitHub secrets, AltStore source URL, etc. -->
-
-## Screenshots / recordings
-
-<!-- Optional for UI changes -->
 
 ## Reviewer notes
 

@@ -24,6 +24,7 @@ Full index: **[docs/README.md](docs/README.md)**.
 | MCP / integrations / channels | [docs/backend/integrations-and-mcp.md](docs/backend/integrations-and-mcp.md) |
 | Assistant profiles | [docs/backend/assistant-profiles.md](docs/backend/assistant-profiles.md) |
 | Flutter UI | [docs/mobile/client-architecture.md](docs/mobile/client-architecture.md) |
+| UI design, motion, components, mockups | [docs/design/playbook.md](docs/design/playbook.md) |
 | Run locally / test | [docs/operations/local-development.md](docs/operations/local-development.md), [docs/operations/testing.md](docs/operations/testing.md) |
 | Config keys | [docs/operations/configuration.md](docs/operations/configuration.md) |
 | Deploy / CI | [docs/operations/deployment-and-ci.md](docs/operations/deployment-and-ci.md) |
@@ -40,6 +41,7 @@ Operator runbook (deploy commands, feature list): **[README.md](README.md)** —
 - **Layering**: Domain → Application → Infrastructure; Agents call Application services, not EF directly.
 - New HTTP routes → `src/Jarvis.Api/Endpoints/` + register in `Program.cs`.
 - New agent capabilities → `IAgentToolContributor` / `IAgentContextContributor` in `Jarvis.Agents`.
+- **UI changes** follow [docs/design/playbook.md](docs/design/playbook.md) (tokens, motion, components, mockup-first); update it when you add a token, component or pattern.
 
 ## Verify every change (required)
 

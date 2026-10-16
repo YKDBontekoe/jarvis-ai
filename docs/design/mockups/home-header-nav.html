@@ -1,0 +1,443 @@
+<title>Jarvis Header and Tab Bar</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500&display=swap">
+<style>
+/* Layout: a board of phone frames, current beside proposed, each with a one-line note. */
+:root {
+  --board: #ECECF1; --canvas: #F6F6F8; --surface: #FFFFFF; --muted-surface: #EFEFF4;
+  --ink: #111116; --ink2: #55566A; --ink3: #8C8D9C; --line: #E3E3EA;
+  --accent: #5B4EF0; --accent-soft: #EFEDFF; --accent-deep: #3F33C7;
+  --rose: #D2457A; --warn: #B4610E; --warn-soft: #FBF1E2;
+  --hero: #111116; --hero-ink: #FFFFFF; --frame: #1B1B22;
+  --display: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --board: #08080B; --canvas: #0C0C10; --surface: #16161C; --muted-surface: #202028;
+  --ink: #F3F3F7; --ink2: #A9AABB; --ink3: #74758A; --line: #2A2A33;
+  --accent: #8F86FF; --accent-soft: #24203F; --accent-deep: #B3ABFF;
+  --rose: #F07AA6; --warn: #F0B35A; --warn-soft: #3A2A12;
+  --hero: #1E1E26; --hero-ink: #FFFFFF; --frame: #2C2C36; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --board: #08080B; --canvas: #0C0C10; --surface: #16161C; --muted-surface: #202028;
+  --ink: #F3F3F7; --ink2: #A9AABB; --ink3: #74758A; --line: #2A2A33;
+  --accent: #8F86FF; --accent-soft: #24203F; --accent-deep: #B3ABFF;
+  --rose: #F07AA6; --warn: #F0B35A; --warn-soft: #3A2A12;
+  --hero: #1E1E26; --hero-ink: #FFFFFF; --frame: #2C2C36; color-scheme: dark }
+
+body { background: var(--board); color: var(--ink); font: 15px/1.5 var(--display); }
+.page { max-width: 1240px; margin: 0 auto; padding-block: 32px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font-size: 28px; letter-spacing: -.8px; margin: 0 0 6px; text-wrap: balance; }
+h2 { font-size: 19px; letter-spacing: -.4px; margin: 0 0 4px; }
+.lede { color: var(--ink2); max-width: 64ch; margin: 0; }
+section { margin-top: 44px; display: grid; gap: 18px; }
+.row { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+.col { display: grid; gap: 10px; justify-items: start; min-width: 0; }
+.tag { font: 600 11px/1 var(--display); letter-spacing: 1.2px; text-transform: uppercase; color: var(--ink3); }
+.tag.new { color: var(--accent); }
+.note { font-size: 13px; color: var(--ink2); max-width: 300px; margin: 0; }
+
+/* Phone frame: 300 wide, ~ 393pt scaled. */
+.phone { width: 300px; height: 620px; border-radius: 40px; background: var(--canvas); border: 6px solid var(--frame);
+  position: relative; overflow: hidden; flex: none; box-shadow: 0 20px 50px -24px rgba(0,0,0,.35); }
+.phone.short { height: 300px; }
+.phone .screen { position: absolute; inset: 0; padding: 40px 14px 0; display: flex; flex-direction: column; gap: 12px; }
+.status { position: absolute; top: 12px; left: 22px; right: 22px; display: flex; justify-content: space-between; font: 600 11px var(--display); }
+
+/* Header, current */
+.g-old { font-size: 29px; line-height: 1.06; font-weight: 700; letter-spacing: -1.1px; margin: 0; }
+.name { background: linear-gradient(90deg, var(--accent), #9B7BF6, #C77BC8); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.date { font-size: 11px; color: var(--ink2); margin: 0; }
+.dayline { font-size: 12.5px; line-height: 1.4; color: var(--ink); opacity: .82; margin: 0; }
+/* Header, proposed */
+.g-new { font-size: 22px; line-height: 1.12; font-weight: 700; letter-spacing: -.7px; margin: 0; text-wrap: balance; }
+.meta { display: grid; gap: 2px; }
+
+/* Right now card */
+.hero { background: var(--hero); color: var(--hero-ink); border-radius: 22px; padding: 14px 16px 12px; position: relative; overflow: hidden; display: grid; gap: 6px; }
+.hero::after { content: ""; position: absolute; width: 180px; height: 180px; right: -60px; top: -80px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(124,108,255,.55), rgba(124,108,255,0)); }
+.hero .k { font: 600 9px var(--display); letter-spacing: 1.2px; opacity: .6; }
+.hero .t { font-size: 19px; font-weight: 700; letter-spacing: -.6px; line-height: 1.1; }
+.hero .c { font-size: 14px; font-weight: 600; color: #B3ABFF; }
+.hero .c span { color: rgba(255,255,255,.6); font-weight: 500; }
+.hero .btns { display: flex; gap: 6px; margin-top: 4px; position: relative; z-index: 1; }
+.hero .btns b { flex: 1; text-align: center; font-size: 11.5px; padding: 8px 0; border-radius: 10px; background: rgba(255,255,255,.12); font-weight: 600; }
+.hero .btns b:first-child { background: #fff; color: #111116; }
+
+.ask { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink3); }
+.orb { width: 22px; height: 22px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 35% 30%, #fff 0 8%, transparent 9%), conic-gradient(from 200deg, #6E5BFF, #2C1D9C, #A57CFF, #4AD3FF, #6E5BFF); }
+.card { background: var(--surface); border-radius: 16px; padding: 10px 12px; display: grid; gap: 8px; }
+.card h3 { margin: 0; font-size: 14px; letter-spacing: -.3px; display: flex; align-items: center; gap: 6px; }
+.pill { font: 700 10px/1 var(--display); background: var(--accent); color: #fff; border-radius: 99px; padding: 3px 6px; }
+.item { display: flex; gap: 8px; align-items: center; font-size: 11.5px; }
+.av { width: 26px; height: 26px; border-radius: 50%; background: #EADBB0; color: #6B4A12; display: grid; place-items: center; font-weight: 700; font-size: 11px; flex: none; }
+.rel { font-size: 9px; font-weight: 600; color: var(--rose); background: color-mix(in srgb, var(--rose) 12%, transparent); padding: 2px 5px; border-radius: 5px; }
+.sub { color: var(--ink2); font-size: 10.5px; }
+
+/* Tab bars */
+.bar { position: absolute; left: 10px; right: 10px; bottom: 12px; height: 50px; border-radius: 26px; background: var(--surface);
+  border: .5px solid var(--line); box-shadow: 0 8px 24px -12px rgba(0,0,0,.3); display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; }
+.tab { position: relative; display: grid; justify-items: center; gap: 1px; color: var(--ink2); }
+.tab svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tab.on { color: var(--accent); }
+.tab.on::before { content: ""; position: absolute; inset: -6px 6px; border-radius: 16px; background: var(--accent-soft); z-index: -1; }
+.tab .lbl { font: 600 8.5px var(--display); }
+.tab .dot { position: absolute; top: -1px; right: calc(50% - 13px); width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.tab .count { position: absolute; top: -5px; left: calc(50% + 4px); font: 700 9px/1 var(--display); background: var(--accent); color: #fff; border-radius: 99px; padding: 3px 5px; border: 1.5px solid var(--surface); }
+.tab .urgent { background: var(--warn); }
+.obtn { justify-self: center; position: relative; }
+.obtn .orb { width: 34px; height: 34px; }
+.obtn .ready { position: absolute; top: -2px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background: #22C55E; border: 2px solid var(--surface); }
+.hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: 70px; background: var(--ink); color: var(--canvas);
+  font-size: 11px; padding: 6px 10px; border-radius: 10px; white-space: nowrap; }
+.ring { position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--accent); opacity: .5; }
+.peek { position: absolute; left: 10px; right: 10px; bottom: 70px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; display: grid; gap: 4px; font-size: 11.5px; box-shadow: 0 10px 30px -14px rgba(0,0,0,.35); }
+.peek b { font-size: 12px; }
+.ghost { opacity: .35; }
+.scrollmark { position: absolute; right: 6px; top: 120px; width: 3px; height: 70px; border-radius: 2px; background: var(--ink3); opacity: .5; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--ink2); }
+.legend span::before { content: "✓ "; color: var(--accent); font-weight: 700; }
+@media (prefers-reduced-motion: no-preference) { .hero::after { animation: drift 8s ease-in-out infinite alternate; } }
+@keyframes drift { to { transform: translate(-20px, 14px); } }
+
+/* Modern navigation: a glass tab capsule and a separate orb button, with a contextual accessory above. */
+.phone.dark { --canvas: #0C0C10; --surface: #16161C; --ink: #F3F3F7; --ink2: #A9AABB; --ink3: #74758A; --line: #2A2A33; --accent: #8F86FF; --accent-soft: #24203F; --glass: rgba(30,30,38,.62); --glass-edge: rgba(255,255,255,.14); --glass-hi: rgba(255,255,255,.07); --sel: rgba(255,255,255,.14); --sel-ink: #FFFFFF; }
+.phone { --glass: rgba(255,255,255,.62); --glass-edge: rgba(255,255,255,.9); --glass-hi: rgba(255,255,255,.55); --sel: #111116; --sel-ink: #FFFFFF; }
+.under { position: absolute; inset: 40px 14px 0; display: grid; gap: 12px; align-content: start; }
+.under .feed { display: grid; gap: 8px; }
+.under .feed .card { padding: 9px 11px; }
+.dock { position: absolute; left: 12px; right: 12px; bottom: 14px; display: grid; gap: 8px; }
+.dock-row { display: flex; gap: 8px; align-items: center; }
+.glass { background: var(--glass); backdrop-filter: blur(22px) saturate(1.8); -webkit-backdrop-filter: blur(22px) saturate(1.8);
+  border: .5px solid var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-hi), 0 10px 30px -12px rgba(10,10,30,.35); }
+.caps { flex: 1; height: 56px; border-radius: 28px; display: flex; align-items: center; justify-content: space-between; padding: 0 6px; }
+.t2 { height: 44px; min-width: 44px; border-radius: 22px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--ink2); padding: 0 10px; }
+.t2 svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.t2.on { background: var(--sel); color: var(--sel-ink); padding: 0 14px 0 12px; font: 600 12.5px var(--display); }
+.t2 .b { position: relative; display: inline-flex; }
+.t2 .n { position: absolute; top: -6px; right: -9px; font: 700 9px/1 var(--display); background: var(--accent); color: #fff; border-radius: 99px; padding: 3px 5px; border: 1.5px solid var(--surface); }
+.t2 .w { position: absolute; top: -2px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); border: 1.5px solid var(--surface); }
+.orbbtn { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; flex: none; position: relative; }
+.orbbtn .orb { width: 36px; height: 36px; box-shadow: 0 0 18px rgba(124,108,255,.55); }
+.orbbtn .ready { position: absolute; top: 6px; right: 6px; width: 11px; height: 11px; border-radius: 50%; background: #22C55E; border: 2px solid var(--surface); }
+.acc { height: 44px; border-radius: 22px; display: flex; align-items: center; gap: 9px; padding: 0 6px 0 8px; font-size: 12px; min-width: 0; }
+.acc .av { width: 28px; height: 28px; }
+.acc .txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acc .txt b { font-weight: 600; }
+.acc .txt span { color: var(--ink2); }
+.acc .go { font: 600 11.5px var(--display); background: var(--sel); color: var(--sel-ink); border-radius: 16px; padding: 7px 12px; flex: none; }
+.acc .x { color: var(--ink3); font-size: 15px; padding: 0 6px; }
+.typing { display: inline-flex; gap: 3px; }
+.typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); opacity: .5; }
+.typing i:nth-child(2) { opacity: .75 } .typing i:nth-child(3) { opacity: 1 }
+.mini { flex: none; width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; color: var(--ink); }
+.mini svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.voice { flex: 1; height: 56px; border-radius: 28px; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 16px; }
+.voice .wave { flex: 1; display: flex; align-items: center; gap: 3px; height: 28px; }
+.voice .wave i { flex: 1; border-radius: 2px; background: var(--accent); }
+.voice .lbl2 { font: 600 12px var(--display); white-space: nowrap; }
+.voice .orb { width: 40px; height: 40px; box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 22%, transparent), 0 0 24px rgba(124,108,255,.7); }
+.cancel { justify-self: center; font-size: 11px; color: var(--ink2); }
+.island { position: absolute; left: 50%; transform: translateX(-50%); bottom: 14px; height: 56px; border-radius: 28px; display: flex; align-items: center; gap: 4px; padding: 0 6px; }
+.island .orb { width: 34px; height: 34px; margin: 0 6px; }
+.island .live { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 6px; font-size: 12px; white-space: nowrap; }
+.badgeline { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 600 11px var(--display); padding: 5px 9px; border-radius: 99px; background: var(--accent-soft); color: var(--accent-deep); }
+@media (prefers-reduced-motion: no-preference) {
+  .voice .wave i { animation: bar 1.1s ease-in-out infinite alternate; }
+  .voice .wave i:nth-child(odd) { animation-delay: .25s } .voice .wave i:nth-child(3n) { animation-delay: .5s }
+  .typing i { animation: blink 1.1s ease-in-out infinite; } .typing i:nth-child(2) { animation-delay: .18s } .typing i:nth-child(3) { animation-delay: .36s }
+}
+@keyframes bar { from { transform: scaleY(.35) } to { transform: scaleY(1) } }
+@keyframes blink { 50% { opacity: .25 } }
+</style>
+
+<div class="page">
+  <h1>Modern tab bar and smaller header</h1>
+  <p class="lede">Home today spends almost half the screen on the greeting before anything useful shows. The proposal puts the greeting and name on one line, shrinks the meta, and caps how far the big heading grows with large text, so the Right now card and the Ask bar are on the first screen. The tab bar learns what Home and Chats already know.</p>
+
+  <section>
+    <h2>Modern navigation</h2>
+    <p class="lede">The tab bar becomes two floating glass pieces: a capsule for the four places and a separate orb button for Jarvis. The open tab is a solid pill with its name. Above them sits one contextual strip that shows the single most useful thing right now, or nothing. While you scroll, the capsule shrinks to the tab you are on.</p>
+    <div class="row">
+
+      <div class="col">
+        <span class="tag new">At rest</span>
+        <div class="phone"><div class="under">
+          <div class="status" style="position:static"><span>14:22</span><span>●●● 82%</span></div>
+          <p class="g-new">Good afternoon, <span class="name">Youri</span></p>
+          <div class="meta"><p class="date">Friday 16 October</p><p class="dayline">Design review soon, then you fly to Lisbon.</p></div>
+          <div class="hero"><span class="k">RIGHT NOW</span><span class="t">Design review</span><span class="c">in 33 min <span>· 14:57</span></span><div class="btns"><b>Open my day</b><b>Prepare</b></div></div>
+          <div class="ask"><span class="orb"></span>Ask Jarvis</div>
+          <div class="feed"><div class="card"><div class="item"><span class="av">R</span><div><b>Rosa</b> <span class="rel">Partner</span><div class="sub">Je bent de beste · 14 h</div></div></div></div><div class="card"><div class="item"><span class="av" style="background:#E3E0D8;color:#4A4030">S</span><div><b>Sam</b> <span class="rel">Friend</span><div class="sub">Can we push dinner to 19:45?</div></div></div></div></div>
+        </div>
+        <div class="dock"><div class="dock-row">
+          <div class="caps glass">
+            <span class="t2 on"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg>Home</span>
+            <span class="t2"><span class="b"><svg viewBox="0 0 24 24"><path d="M5 18l-1 3 4-2a8 8 0 1 0-3-1z"/></svg><span class="n">3</span></span></span>
+            <span class="t2"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg></span>
+            <span class="t2"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18a6 6 0 0 1 11 0"/></svg></span>
+          </div>
+          <div class="orbbtn glass"><span class="orb"></span></div>
+        </div></div></div>
+        <p class="note">Four places in the capsule, Jarvis on its own. Content shows through the glass, so the bar feels lighter than a solid strip.</p>
+      </div>
+
+      <div class="col">
+        <span class="tag new">Someone is waiting</span>
+        <div class="phone"><div class="under">
+          <div class="status" style="position:static"><span>14:22</span><span>●●● 82%</span></div>
+          <h3 style="margin:0;font-size:26px;letter-spacing:-1px">Everything</h3>
+          <div class="badgeline"><span class="chip">Reminders</span><span class="chip">Tasks</span><span class="chip">Habits</span><span class="chip">Finance</span><span class="chip">People</span></div>
+          <div class="card" style="height:120px"></div><div class="card" style="height:120px"></div><div class="card" style="height:80px"></div>
+        </div>
+        <div class="dock">
+          <div class="acc glass"><span class="av">R</span><span class="txt"><b>Rosa</b> <span>is waiting · 14 h</span></span><span class="go">Reply</span><span class="x">×</span></div>
+          <div class="dock-row">
+          <div class="caps glass">
+            <span class="t2"><span class="b"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg><span class="w"></span></span></span>
+            <span class="t2"><span class="b"><svg viewBox="0 0 24 24"><path d="M5 18l-1 3 4-2a8 8 0 1 0-3-1z"/></svg><span class="n">3</span></span></span>
+            <span class="t2 on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>Everything</span>
+            <span class="t2"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18a6 6 0 0 1 11 0"/></svg></span>
+          </div>
+          <div class="orbbtn glass"><span class="orb"></span></div>
+        </div></div></div>
+        <p class="note">Away from Home, the strip carries the top Needs you item: Rosa waiting, a reminder due now, or an approval. Reply opens her chat; × hides it until something new comes in. Home's amber dot means an approval or due reminder.</p>
+      </div>
+
+      <div class="col">
+        <span class="tag new">Scrolling: minimized</span>
+        <div class="phone dark" style="background:var(--canvas);color:var(--ink)"><div class="under">
+          <div class="status" style="position:static"><span>14:22</span><span>●●● 82%</span></div>
+          <div class="feed">
+            <div class="card"><div class="item"><span class="av">R</span><div><b>Rosa</b> <span class="rel">Partner</span><div class="sub">Je bent de beste</div></div></div></div>
+            <div class="card"><div class="item"><span class="av" style="background:#3A3550;color:#CFC8FF">S</span><div><b>Sam</b> <span class="rel">Friend</span><div class="sub">Can we push dinner to 19:45?</div></div></div></div>
+            <div class="card"><div class="item"><span class="av" style="background:#4A2E55;color:#EBC8FF">C</span><div><b>Climbing crew</b><div class="sub">Noor: Saturday 10:00 at the gym?</div></div></div></div>
+            <div class="card"><div class="item"><span class="av" style="background:#2E3B4F;color:#BFD9FF">T</span><div><b>Tom</b> <span class="rel">Brother</span><div class="sub">You: Running 10 min late</div></div></div></div>
+            <div class="card"><div class="item"><span class="av" style="background:#30443A;color:#C0F0D6">F</span><div><b>Family</b><div class="sub">Photos from Sunday are in the album</div></div></div></div>
+            <div class="card"><div class="item"><span class="av" style="background:#4F3A2E;color:#FFD9BF">L</span><div><b>Street party</b><div class="sub">Lena: who has a long table?</div></div></div></div>
+          </div>
+        </div>
+        <div class="dock"><div class="dock-row">
+          <div class="mini glass"><span class="b" style="position:relative;display:inline-flex"><svg viewBox="0 0 24 24"><path d="M5 18l-1 3 4-2a8 8 0 1 0-3-1z"/></svg></span></div>
+          <div class="acc glass" style="flex:1;height:56px;border-radius:28px"><span class="txt"><span class="typing"><i></i><i></i><i></i></span> <b>Jarvis</b> <span>is writing in Weekend in Lisbon</span></span></div>
+          <div class="orbbtn glass"><span class="orb"></span></div>
+        </div></div></div>
+        <p class="note">Scroll down and the capsule folds into the tab you are on; the strip moves in between. Scroll up or tap the small tab to unfold. Shown in dark mode.</p>
+      </div>
+
+      <div class="col">
+        <span class="tag new">Hold the orb</span>
+        <div class="phone"><div class="under" style="filter:blur(3px);opacity:.55">
+          <div class="status" style="position:static"><span>14:22</span><span>●●● 82%</span></div>
+          <p class="g-new">Good afternoon, <span class="name">Youri</span></p>
+          <div class="hero"><span class="k">RIGHT NOW</span><span class="t">Design review</span><span class="c">in 33 min</span></div>
+          <div class="ask"><span class="orb"></span>Ask Jarvis</div>
+          <div class="card" style="height:140px"></div>
+        </div>
+        <div class="dock">
+          <span class="cancel">Slide left to cancel · release to send</span>
+          <div class="dock-row">
+            <div class="voice glass"><span class="lbl2">Listening</span><span class="wave"><i style="height:30%"></i><i style="height:70%"></i><i style="height:45%"></i><i style="height:90%"></i><i style="height:55%"></i><i style="height:80%"></i><i style="height:35%"></i><i style="height:65%"></i><i style="height:50%"></i><i style="height:85%"></i><i style="height:40%"></i><i style="height:60%"></i></span><span class="orb"></span></div>
+          </div>
+        </div></div>
+        <p class="note">Tap the orb for a chat. Hold it and the orb stretches over the capsule into a listening strip; let go to send, slide left to cancel. The page behind blurs.</p>
+      </div>
+
+      <div class="col">
+        <span class="tag new">Jarvis replied</span>
+        <div class="phone dark" style="background:var(--canvas);color:var(--ink)"><div class="under">
+          <div class="status" style="position:static"><span>14:22</span><span>●●● 82%</span></div>
+          <p class="g-new">Good afternoon, <span class="name">Youri</span></p>
+          <div class="hero"><span class="k">RIGHT NOW</span><span class="t">Design review</span><span class="c">in 33 min <span>· 14:57</span></span></div>
+          <div class="ask"><span class="orb"></span>Ask Jarvis</div>
+          <div class="card" style="height:120px"></div>
+        </div>
+        <div class="dock">
+          <div class="acc glass"><span class="orb" style="width:26px;height:26px"></span><span class="txt"><b>Here's an easy-going Saturday</b> <span>· Weekend in Lisbon</span></span><span class="go">Open</span></div>
+          <div class="dock-row">
+          <div class="caps glass">
+            <span class="t2 on"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg>Home</span>
+            <span class="t2"><span class="b"><svg viewBox="0 0 24 24"><path d="M5 18l-1 3 4-2a8 8 0 1 0-3-1z"/></svg><span class="n">3</span></span></span>
+            <span class="t2"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg></span>
+            <span class="t2"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18a6 6 0 0 1 11 0"/></svg></span>
+          </div>
+          <div class="orbbtn glass"><span class="orb"></span><span class="ready"></span></div>
+        </div></div></div>
+        <p class="note">A reply that finished while you were away fills the strip with its first line. The orb keeps a green dot until you read it.</p>
+      </div>
+
+      <div class="col">
+        <span class="tag">Alternative · one island</span>
+        <div class="phone"><div class="under">
+          <div class="status" style="position:static"><span>14:22</span><span>●●● 82%</span></div>
+          <p class="g-new">Good afternoon, <span class="name">Youri</span></p>
+          <div class="hero"><span class="k">RIGHT NOW</span><span class="t">Design review</span><span class="c">in 33 min</span></div>
+          <div class="ask"><span class="orb"></span>Ask Jarvis</div>
+          <div class="card" style="height:150px"></div>
+        </div>
+        <div class="island glass">
+          <span class="t2 on"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg></span>
+          <span class="t2"><span class="b"><svg viewBox="0 0 24 24"><path d="M5 18l-1 3 4-2a8 8 0 1 0-3-1z"/></svg><span class="n">3</span></span></span>
+          <span class="orb"></span>
+          <span class="t2"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg></span>
+          <span class="t2"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18a6 6 0 0 1 11 0"/></svg></span>
+        </div></div>
+        <p class="note">A narrower centered pill that keeps today's order with the orb in the middle. Less change, but it has no room for the contextual strip, and the orb competes with the tabs.</p>
+      </div>
+
+    </div>
+    <div class="legend"><span>Two glass pieces: places and Jarvis</span><span>Open tab named in a solid pill</span><span>One contextual strip, never more</span><span>Folds while scrolling</span><span>Hold the orb to talk</span></div>
+  </section>
+
+  <section>
+    <h2>Home header, normal text</h2>
+    <div class="row">
+      <div class="col">
+        <span class="tag">Now</span>
+        <div class="phone"><div class="screen">
+          <div class="status"><span>14:22</span><span>●●● 82%</span></div>
+          <div style="height:10px"></div>
+          <p class="g-old">Good afternoon<br><span class="name">Youri</span></p>
+          <p class="date">Friday 16 October</p>
+          <p class="dayline">Design review soon, then you fly to Lisbon. Free after 21:00.</p>
+          <div class="hero" style="margin-top:6px"><span class="k">RIGHT NOW</span><span class="t">Design review</span><span class="c">in 33 min <span>· 14:57</span></span><div class="btns"><b>Open my day</b><b>Prepare</b></div></div>
+          <div class="bar"></div>
+        </div></div>
+        <p class="note">Greeting and name take two 38pt lines. The Ask bar sits below the fold.</p>
+      </div>
+      <div class="col">
+        <span class="tag new">Proposed</span>
+        <div class="phone"><div class="screen">
+          <div class="status"><span>14:22</span><span>●●● 82%</span></div>
+          <p class="g-new">Good afternoon, <span class="name">Youri</span></p>
+          <div class="meta"><p class="date">Friday 16 October</p><p class="dayline">Design review soon, then you fly to Lisbon. Free after 21:00.</p></div>
+          <div class="hero"><span class="k">RIGHT NOW</span><span class="t">Design review</span><span class="c">in 33 min <span>· 14:57</span></span><div class="btns"><b>Open my day</b><b>Prepare</b></div></div>
+          <div class="ask"><span class="orb"></span>Ask Jarvis</div>
+          <div class="card"><h3>Needs you <span class="pill">5</span></h3>
+            <div class="item"><span class="av">R</span><div><b>Rosa</b> <span class="rel">Partner</span><div class="sub">Je bent de beste · 14 h</div></div></div>
+          </div>
+          <div class="bar"></div>
+        </div></div>
+        <p class="note">One line at 30pt (26pt under 360pt wide). Right now, Ask and the top of Needs you are all on the first screen.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Largest text size, small phone (320pt, 2×)</h2>
+    <div class="row">
+      <div class="col">
+        <span class="tag">Now</span>
+        <div class="phone"><div class="screen" style="padding-inline:16px">
+          <div style="height:22px"></div>
+          <p class="g-old" style="font-size:44px">Good afternoon<br><span class="name">Youri</span></p>
+          <p class="date" style="font-size:20px">Friday 16 October</p>
+          <p class="dayline" style="font-size:24px">Design review soon, then you fly to Lisbon. Free after 21:00.</p>
+          <div class="bar"></div>
+        </div></div>
+        <p class="note">The whole screen is greeting. Nothing to act on without scrolling.</p>
+      </div>
+      <div class="col">
+        <span class="tag new">Proposed</span>
+        <div class="phone"><div class="screen" style="padding-inline:16px">
+          <div style="height:10px"></div>
+          <p class="g-new" style="font-size:29px">Good afternoon, <span class="name">Youri</span></p>
+          <div class="meta"><p class="date" style="font-size:17px">Friday 16 October</p><p class="dayline" style="font-size:19px">Design review soon, then you fly to Lisbon…</p></div>
+          <div class="hero"><span class="k" style="font-size:13px">RIGHT NOW</span><span class="t" style="font-size:24px">Design review</span><span class="c" style="font-size:18px">in 33 min</span></div>
+          <div class="bar"></div>
+        </div></div>
+        <p class="note">The heading grows to at most 1.3×, the day line to 1.6× and three lines. Body text, buttons and lists still follow the full text size.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Tab bar</h2>
+    <p class="lede">Same five slots and the same floating bar. What changes is what it tells you and what the orb can do.</p>
+    <div class="row">
+      <div class="col">
+        <span class="tag">Now</span>
+        <div class="phone short"><div class="screen"><div class="bar">
+          <div class="tab on"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg></div>
+          <div class="tab"><svg viewBox="0 0 24 24"><path d="M5 18l-1 3 4-2a8 8 0 1 0-3-1z"/></svg><span class="dot"></span></div>
+          <div class="obtn"><span class="orb"></span></div>
+          <div class="tab"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg></div>
+          <div class="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18a6 6 0 0 1 11 0"/></svg></div>
+        </div></div></div>
+        <p class="note">Icons only. One dot on Chats for any unread message, groups included.</p>
+      </div>
+
+      <div class="col">
+        <span class="tag new">1 · Counts and labels</span>
+        <div class="phone short"><div class="screen"><div class="bar">
+          <div class="tab on"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg><span class="lbl">Home</span></div>
+          <div class="tab"><svg viewBox="0 0 24 24"><path d="M5 18l-1 3 4-2a8 8 0 1 0-3-1z"/></svg><span class="count">3</span></div>
+          <div class="obtn"><span class="orb"></span></div>
+          <div class="tab"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg></div>
+          <div class="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18a6 6 0 0 1 11 0"/></svg></div>
+        </div></div></div>
+        <p class="note">Chats counts the people waiting on you (the same 3 as "Waiting on you"), not every unread group message. The open tab shows its name.</p>
+      </div>
+
+      <div class="col">
+        <span class="tag new">2 · Home calls you back</span>
+        <div class="phone short"><div class="screen"><div class="bar">
+          <div class="tab"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg><span class="count urgent">!</span></div>
+          <div class="tab on"><svg viewBox="0 0 24 24"><path d="M5 18l-1 3 4-2a8 8 0 1 0-3-1z"/></svg><span class="lbl">Chats</span></div>
+          <div class="obtn"><span class="orb"></span></div>
+          <div class="tab"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg></div>
+          <div class="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18a6 6 0 0 1 11 0"/></svg></div>
+        </div></div></div>
+        <p class="note">While you are in Chats, Home gets an amber mark when something can't wait: an approval, or a reminder that is due now.</p>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <span class="tag new">3 · Jarvis answered</span>
+        <div class="phone short"><div class="screen">
+          <div class="peek"><b>Jarvis replied in "Weekend in Lisbon"</b><span class="sub">Here's an easy-going plan for Saturday…</span></div>
+          <div class="bar">
+          <div class="tab on"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg><span class="lbl">Home</span></div>
+          <div class="tab"><svg viewBox="0 0 24 24"><path d="M5 18l-1 3 4-2a8 8 0 1 0-3-1z"/></svg></div>
+          <div class="obtn"><span class="orb"></span><span class="ready"></span></div>
+          <div class="tab"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg></div>
+          <div class="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18a6 6 0 0 1 11 0"/></svg></div>
+        </div></div></div>
+        <p class="note">A reply that finished while you were elsewhere puts a green dot on the orb and a short peek above the bar for 4 seconds. Tapping opens that chat.</p>
+      </div>
+
+      <div class="col">
+        <span class="tag new">4 · Hold the orb to talk</span>
+        <div class="phone short"><div class="screen">
+          <div class="hint">Listening… release to send</div>
+          <div class="bar">
+          <div class="tab on ghost"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg></div>
+          <div class="tab ghost"><svg viewBox="0 0 24 24"><path d="M5 18l-1 3 4-2a8 8 0 1 0-3-1z"/></svg></div>
+          <div class="obtn"><span class="ring"></span><span class="orb"></span></div>
+          <div class="tab ghost"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg></div>
+          <div class="tab ghost"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18a6 6 0 0 1 11 0"/></svg></div>
+        </div></div></div>
+        <p class="note">Tap the orb for a chat, hold it to go straight to voice. The other tabs dim while you hold.</p>
+      </div>
+
+      <div class="col">
+        <span class="tag new">5 · Out of the way while reading</span>
+        <div class="phone short"><div class="screen">
+          <div class="card"><div class="item"><span class="av">S</span><div><b>Sam</b> <span class="rel">Friend</span><div class="sub">Can we push dinner to 19:45?</div></div></div></div>
+          <div class="card"><div class="item"><span class="av" style="background:#E7D8F2;color:#5B2A7A">C</span><div><b>Climbing crew</b><div class="sub">Noor: Saturday 10:00 at the gym?</div></div></div></div>
+          <div class="scrollmark"></div>
+          <div class="bar" style="transform: translateY(80px)"></div>
+        </div></div>
+        <p class="note">Scrolling down slides the bar away, and scrolling up brings it back. Tapping the open tab again jumps to the top. It never hides with reduced motion.</p>
+      </div>
+    </div>
+    <div class="legend"><span>Same five slots</span><span>Counts match Needs you and Chats</span><span>Every mark has a spoken label</span><span>Wide layout gets 1–3 on the side rail</span></div>
+  </section>
+</div>

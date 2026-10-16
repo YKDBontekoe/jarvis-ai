@@ -8,7 +8,9 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../home/home_context.dart';
 import 'catch_up_card.dart';
+import 'person_panel.dart';
 import 'read_along_screen.dart';
 import 'whatsapp_media.dart';
 import 'whatsapp_models.dart';
@@ -22,9 +24,18 @@ class WhatsAppChatScreen extends StatefulWidget {
     required this.channelId,
     required this.chat,
     this.account,
+    this.initialDraft,
+    this.person,
     this.pollInterval = const Duration(seconds: 3),
     super.key,
   });
+
+  /// Text to start the composer with, such as a quick reply. Never sent on
+  /// its own: the owner still taps Send.
+  final String? initialDraft;
+
+  /// Who this chat is with, from People; wide screens show an About panel.
+  final HomePerson? person;
 
   final Dio http;
   final String channelId;
@@ -76,6 +87,9 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
   void initState() {
     super.initState();
     _catchUp = widget.chat.catchUp;
+    if (widget.initialDraft case final draft? when draft.trim().isNotEmpty) {
+      _composer.text = draft;
+    }
     unawaited(_load());
     unawaited(_loadStatus());
     _poll = Timer.periodic(widget.pollInterval, (_) {
@@ -561,6 +575,24 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     context,
   ).showSnackBar(SnackBar(content: Text(message)));
 
+  /// The chat, with the About panel beside it when there is room and the
+  /// chat is linked to a person.
+  Widget _withPanel(Widget chat) {
+    final person = widget.person;
+    if (person == null) return chat;
+    return LayoutBuilder(
+      builder: (context, box) => !PersonPanel.fits(box.maxWidth)
+          ? chat
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: chat),
+                PersonPanel(person: person, http: widget.http),
+              ],
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -596,7 +628,11 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
                   ),
                   Text(
                     [
-                      ?(_account ?? widget.account),
+                      // Who they are to you says more than which of your
+                      // numbers the chat is on.
+                      ?(widget.person?.relationship ??
+                          _account ??
+                          widget.account),
                       _connectionState != null && _connectionState != 'open'
                           ? whatsAppConnectionLabel(_connectionState!)
                           : _chat.readAlong
@@ -664,106 +700,110 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          if (_connectionState != null && _connectionState != 'open')
-            InlineNotice(message: whatsAppConnectionMessage(_connectionState!)),
-          if (_refreshError != null) InlineNotice(message: _refreshError!),
-          if (!_chat.readAlong) ...[
-            const InlineNotice(
-              message:
-                  'Reading is off for this chat. Jarvis is not receiving its messages.',
-            ),
-            TextButton(
-              onPressed: () => unawaited(_startReading()),
-              child: const Text('Start reading this chat'),
-            ),
-          ],
-          if (_catchUp != null && _chat.readAlong)
-            ContentWidth(
-              child: CatchUpCard(
-                catchUp: _catchUp!,
-                onDismiss: () => setState(() => _catchUp = null),
-                onDraft: (item) => unawaited(
-                  _draft(
-                    preset: item == null
-                        ? null
-                        : 'Reply to ${item.who.isEmpty ? 'them' : item.who} about: ${item.about}',
+      body: _withPanel(
+        Column(
+          children: [
+            if (_connectionState != null && _connectionState != 'open')
+              InlineNotice(
+                message: whatsAppConnectionMessage(_connectionState!),
+              ),
+            if (_refreshError != null) InlineNotice(message: _refreshError!),
+            if (!_chat.readAlong) ...[
+              const InlineNotice(
+                message:
+                    'Reading is off for this chat. Jarvis is not receiving its messages.',
+              ),
+              TextButton(
+                onPressed: () => unawaited(_startReading()),
+                child: const Text('Start reading this chat'),
+              ),
+            ],
+            if (_catchUp != null && _chat.readAlong)
+              ContentWidth(
+                child: CatchUpCard(
+                  catchUp: _catchUp!,
+                  onDismiss: () => setState(() => _catchUp = null),
+                  onDraft: (item) => unawaited(
+                    _draft(
+                      preset: item == null
+                          ? null
+                          : 'Reply to ${item.who.isEmpty ? 'them' : item.who} about: ${item.about}',
+                    ),
                   ),
                 ),
               ),
-            ),
-          Expanded(
-            child: _loading
-                ? const SkeletonList(rows: 7, shape: SkeletonShape.chat)
-                : _error != null && _messages.isEmpty
-                ? ErrorState(
-                    message: _error!,
-                    onRetry: () => unawaited(_load()),
-                  )
-                : _messages.isEmpty
-                ? EmptyState(
-                    icon: PhosphorIconsRegular.chatsCircle,
-                    title: 'Waiting for messages',
-                    message: _chat.readAlong
-                        ? 'New messages appear as they arrive. Use More → Load WhatsApp history to request older messages from your phone.'
-                        : 'Turn on reading to receive messages from this chat.',
-                  )
-                : WhatsAppWallpaper(
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: ContentWidth(
-                            child: _MessageList(
-                              messages: _messages,
-                              isGroup: _chat.isGroup,
-                              http: widget.http,
-                              channelId: widget.channelId,
-                              controller: _scroll,
-                              hasOlder: _hasOlder,
-                              loadingOlder: _loadingOlder,
-                              onLoadOlder: () => unawaited(_loadOlder()),
-                              onReply: _canSend ? _startReply : null,
-                              onHold: (message, anchor) =>
-                                  unawaited(_messageActions(message, anchor)),
+            Expanded(
+              child: _loading
+                  ? const SkeletonList(rows: 7, shape: SkeletonShape.chat)
+                  : _error != null && _messages.isEmpty
+                  ? ErrorState(
+                      message: _error!,
+                      onRetry: () => unawaited(_load()),
+                    )
+                  : _messages.isEmpty
+                  ? EmptyState(
+                      icon: PhosphorIconsRegular.chatsCircle,
+                      title: 'Waiting for messages',
+                      message: _chat.readAlong
+                          ? 'New messages appear as they arrive. Use More → Load WhatsApp history to request older messages from your phone.'
+                          : 'Turn on reading to receive messages from this chat.',
+                    )
+                  : WhatsAppWallpaper(
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: ContentWidth(
+                              child: _MessageList(
+                                messages: _messages,
+                                isGroup: _chat.isGroup,
+                                http: widget.http,
+                                channelId: widget.channelId,
+                                controller: _scroll,
+                                hasOlder: _hasOlder,
+                                loadingOlder: _loadingOlder,
+                                onLoadOlder: () => unawaited(_loadOlder()),
+                                onReply: _canSend ? _startReply : null,
+                                onHold: (message, anchor) =>
+                                    unawaited(_messageActions(message, anchor)),
+                              ),
                             ),
                           ),
-                        ),
-                        Positioned(
-                          right: 16,
-                          bottom: 12,
-                          child: JumpToLatest(controller: _scroll),
-                        ),
-                      ],
-                    ),
-                  ),
-          ),
-          _Composer(
-            controller: _composer,
-            focus: _composerFocus,
-            replyTo: _replyTo == null
-                ? null
-                : ReplyPreview(
-                    key: ValueKey(_replyTo!.id),
-                    author: _replyTo!.fromMe
-                        ? 'You'
-                        : _replyTo!.sender ?? _chat.name,
-                    text: _replyTo!.text,
-                    color: _replyTo!.fromMe
-                        ? whatsAppGreen
-                        : whatsAppSenderColor(
-                            _replyTo!.senderId ?? _replyTo!.sender ?? '',
-                            JarvisColors.of(context),
+                          Positioned(
+                            right: 16,
+                            bottom: 12,
+                            child: JumpToLatest(controller: _scroll),
                           ),
-                    onCancel: () => setState(() => _replyTo = null),
-                  ),
-            sending: _sending,
-            drafting: _drafting,
-            onDraft: () => unawaited(_draft()),
-            onSend: () => unawaited(_send()),
-            canSend: _canSend,
-          ),
-        ],
+                        ],
+                      ),
+                    ),
+            ),
+            _Composer(
+              controller: _composer,
+              focus: _composerFocus,
+              replyTo: _replyTo == null
+                  ? null
+                  : ReplyPreview(
+                      key: ValueKey(_replyTo!.id),
+                      author: _replyTo!.fromMe
+                          ? 'You'
+                          : _replyTo!.sender ?? _chat.name,
+                      text: _replyTo!.text,
+                      color: _replyTo!.fromMe
+                          ? whatsAppGreen
+                          : whatsAppSenderColor(
+                              _replyTo!.senderId ?? _replyTo!.sender ?? '',
+                              JarvisColors.of(context),
+                            ),
+                      onCancel: () => setState(() => _replyTo = null),
+                    ),
+              sending: _sending,
+              drafting: _drafting,
+              onDraft: () => unawaited(_draft()),
+              onSend: () => unawaited(_send()),
+              canSend: _canSend,
+            ),
+          ],
+        ),
       ),
     );
   }

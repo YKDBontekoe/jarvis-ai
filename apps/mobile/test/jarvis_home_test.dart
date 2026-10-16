@@ -113,11 +113,32 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Scrolls [target] to the middle of the screen, clear of the compact
+  /// header that covers the top once Home scrolls.
+  Future<void> reveal(WidgetTester tester, Finder target) async {
+    await Scrollable.ensureVisible(tester.element(target), alignment: .5);
+    await tester.pumpAndSettle();
+  }
+
   Future<void> enterEdit(WidgetTester tester) async {
-    await tester.ensureVisible(find.byKey(const Key('home-edit')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('home-edit')),
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const Key('home-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await reveal(tester, find.byKey(const Key('home-edit')));
     await tester.tap(find.byKey(const Key('home-edit')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('home-edit-hint')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('home-edit-hint')),
+      -200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
   }
 
@@ -246,7 +267,7 @@ void main() {
     expect(find.byKey(const Key('home-clock')), findsOneWidget);
   });
 
-  testWidgets('pending approvals stay in view and open Approvals', (
+  testWidgets('pending approvals lead Needs you and open Approvals', (
     tester,
   ) async {
     http.on('GET', '/api/v1/home', {
@@ -255,10 +276,127 @@ void main() {
       ],
     });
     await show(tester);
-    expect(find.text('1 approval waiting'), findsOneWidget);
+    expect(find.byKey(const Key('home-needs-you')), findsOneWidget);
     expect(find.text('Create calendar event'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('home-approvals')));
+    await tester.tap(find.byKey(const Key('home-needs-you-button-Review')));
     expect(opened, ['approvals']);
+  });
+
+  testWidgets('the Ask bar sends what you type and its suggestions', (
+    tester,
+  ) async {
+    await show(tester);
+    await tester.enterText(
+      find.byKey(const Key('home-ask-field')),
+      'What is on tomorrow?',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('home-ask-send')));
+    await tester.pumpAndSettle();
+    expect(suggestions, ['What is on tomorrow?']);
+    // Evening: the chips look ahead to tomorrow.
+    await tester.tap(find.byKey(const Key('home-suggestion-Plan tomorrow')));
+    await tester.pumpAndSettle();
+    expect(suggestions.last, contains('tomorrow'));
+    await tester.tap(find.byKey(const Key('home-ask-voice')));
+    expect(opened, ['voice']);
+  });
+
+  testWidgets('a due reminder is done from Home and slides away', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/home', {
+      'reminders': [
+        {
+          'id': 'r1',
+          'title': 'Take the pills',
+          'dueAt': _iso(now.subtract(const Duration(minutes: 20))),
+          'status': 'pending',
+        },
+      ],
+      'approvals': <Object>[],
+    });
+    http.on('POST', '/api/v1/reminders/r1/complete', {'id': 'r1'});
+    await show(tester);
+    expect(find.text('Take the pills'), findsOneWidget);
+    expect(find.text('Overdue · 20 min'), findsOneWidget);
+    http.on('GET', '/api/v1/home', {'reminders': <Object>[]});
+    await tester.tap(find.byKey(const Key('home-needs-you-button-Done')));
+    await tester.pumpAndSettle();
+    expect(http.sent('POST', '/api/v1/reminders/r1/complete'), hasLength(1));
+    expect(find.text('Take the pills'), findsNothing);
+    expect(find.byKey(const Key('home-needs-you-clear')), findsOneWidget);
+  });
+
+  testWidgets('people waiting on a reply open their chat or ask for a draft', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/channels', [
+      {'id': 'wa', 'kind': 'whatsapp_linked'},
+    ]);
+    http.on('GET', '/api/v1/channels/wa/chats', {
+      'chats': [
+        {
+          'chatId': '+31611',
+          'name': 'Rosa',
+          'lastMessageAt': _iso(now.subtract(const Duration(hours: 2))),
+          'preview': 'Kom je om 5?',
+          'unreadCount': 1,
+        },
+      ],
+    });
+    await tester.runAsync(() => chats.loadWhatsApp(http.client()));
+    await show(tester);
+    expect(find.text('Rosa'), findsWidgets);
+    await tester.tap(find.byKey(const Key('home-needs-you-button-Draft')));
+    expect(suggestions.single, contains('Rosa'));
+    await tester.tap(find.byKey(const Key('home-needs-you-button-Reply')));
+    expect(openedChats, ['whatsapp:wa:+31611']);
+  });
+
+  testWidgets("today's brief shows on Home and can be dismissed", (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/home', {
+      'approvals': <Object>[],
+      'latestBriefing': {
+        'id': 'n1',
+        'title': 'Your morning briefing',
+        'body': '**Good morning.** Two plans today.\n- Joëlle at 10:00',
+        'createdAt': _iso(DateTime(2026, 10, 3, 8)),
+        'read': false,
+      },
+    });
+    http.on('POST', '/api/v1/notifications/n1/read', <String, Object>{});
+    await show(tester);
+    expect(find.byKey(const Key('home-brief')), findsOneWidget);
+    expect(
+      find.text('Good morning. Two plans today.\n• Joëlle at 10:00'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('home-brief-dismiss')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('home-brief')), findsNothing);
+    expect(http.sent('POST', '/api/v1/notifications/n1/read'), hasLength(1));
+  });
+
+  testWidgets('a long brief opens to five lines and unfolds in place', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/home', {
+      'latestBriefing': {
+        'id': 'n2',
+        'body': [for (var i = 1; i <= 9; i++) '- Item number $i'].join('\n'),
+        'createdAt': _iso(DateTime(2026, 10, 3, 8)),
+      },
+    });
+    await show(tester);
+    final body = find.byKey(const Key('home-brief-body'));
+    expect(tester.widget<Text>(body).maxLines, 5);
+    await tester.tap(find.byKey(const Key('home-brief-more')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(body).maxLines, isNull);
+    expect(find.text('Show less'), findsOneWidget);
   });
 
   testWidgets('a personal greeting replaces the header buttons', (
@@ -272,7 +410,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('home-edit-done')), findsOneWidget);
     expect(find.byKey(const Key('home-edit-hint')), findsOneWidget);
-    expect(find.byKey(const Key('home-approvals')), findsNothing);
+    expect(find.byKey(const Key('home-needs-you')), findsNothing);
+    expect(find.byKey(const Key('home-ask-field')), findsNothing);
     await tester.tap(find.byKey(const Key('home-edit-done')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('home-edit')), findsOneWidget);
@@ -366,7 +505,12 @@ void main() {
     await show(tester);
     await enterEdit(tester);
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('home-add-tile')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('home-add-tile')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await reveal(tester, find.byKey(const Key('home-add-tile')));
     await tester.tap(find.byKey(const Key('home-add-tile')));
     expect(addTile, 1);
   });

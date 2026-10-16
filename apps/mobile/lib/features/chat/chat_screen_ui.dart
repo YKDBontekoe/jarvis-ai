@@ -149,7 +149,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     }
   }
 
-  void _openChatItem(ChatListItem item) => _fromShell(() {
+  void _openChatItem(ChatListItem item, {String? draft}) => _fromShell(() {
     if (item.isJarvis) {
       final id = item.conversationId;
       if (id != null) unawaited(_openJarvisChat(id));
@@ -163,6 +163,8 @@ mixin _ChatScreenUi on _ChatScreenController {
       channelId: channelId,
       chat: chat,
       account: item.account,
+      initialDraft: draft,
+      person: _chatList.personFor(item),
     );
     if (_isWide) {
       _showInPane('whatsapp-chat', page);
@@ -171,10 +173,10 @@ mixin _ChatScreenUi on _ChatScreenController {
     }
   });
 
-  void _openChatByKey(String key) {
+  void _openChatByKey(String key, {String? draft}) {
     for (final item in _chatList.all) {
       if (item.key == key) {
-        _openChatItem(item);
+        _openChatItem(item, draft: draft);
         return;
       }
     }
@@ -228,6 +230,7 @@ mixin _ChatScreenUi on _ChatScreenController {
       jarvisBusy: _busy,
       onOpen: _openTile,
       onOpenChat: _openChatByKey,
+      onReplyWith: (key, draft) => _openChatByKey(key, draft: draft),
       onAddTile: () => _selectTab(JarvisTab.everything),
       onSuggestion: _conversationId == null || _busy || _hasPendingApproval
           ? null
@@ -240,11 +243,18 @@ mixin _ChatScreenUi on _ChatScreenController {
       chats: _chatList,
       http: _http,
       onOpen: _openChatItem,
+      onReplyWith: (item, draft) => _openChatItem(item, draft: draft),
       onNewChat: _busy ? null : _startNewChat,
       onSearch: () => unawaited(_openSearch(context)),
       onManage: () => _fromShell(() => unawaited(_chooseConversation())),
       onRefresh: _refreshChats,
       onConnectWhatsApp: () => _openTile('whatsapp'),
+      onAsk: _conversationId == null || _busy || _hasPendingApproval
+          ? null
+          : (text) {
+              _presentChat();
+              unawaited(_send(text));
+            },
     ),
     JarvisTab.everything => EverythingScreen(
       source: _tileSource,

@@ -9,7 +9,11 @@ public sealed record HomeBriefingDto(
     HomeCalendarDto Calendar,
     HomeDeviceDto? Device,
     HomeBriefingScheduleDto? Briefing,
-    IReadOnlyList<HomePackDto> Packs);
+    IReadOnlyList<HomePackDto> Packs,
+    HomeBriefingNoteDto? LatestBriefing = null);
+
+/// <summary>Today's morning briefing as it was delivered, so Home can show it.</summary>
+public sealed record HomeBriefingNoteDto(Guid Id, string Title, string Body, DateTimeOffset CreatedAt, bool Read);
 
 public sealed record HomeReminderDto(Guid Id, string Title, DateTimeOffset DueAt, string Status, string Recurrence,
     Guid? ConversationId = null);
