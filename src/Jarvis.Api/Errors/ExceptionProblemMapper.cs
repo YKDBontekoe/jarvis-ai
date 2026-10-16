@@ -108,7 +108,7 @@ internal static class ExceptionProblemMapper
         var message = exception.Message;
         if (string.IsNullOrWhiteSpace(message)) return fallback;
         if (ContainsSensitiveData(message)) return fallback;
-        return message;
+        return ApiMessages.Clean(message);
     }
 
     private static bool ContainsSensitiveData(string message)
