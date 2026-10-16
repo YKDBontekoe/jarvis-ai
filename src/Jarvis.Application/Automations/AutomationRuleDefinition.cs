@@ -186,6 +186,19 @@ public static class AutomationDefinitionJson
         JsonSerializer.Deserialize<AutomationRuleDefinition>(json, Options)
         ?? throw new JsonException("Automation definition was empty.");
 
+    /// <summary>For a request property that may be missing: that is a bad definition, not a server error.</summary>
+    public static AutomationRuleDefinition Deserialize(JsonElement definition) =>
+        definition.ValueKind is JsonValueKind.Undefined
+            ? throw new JsonException("An automation needs a definition.")
+            : Deserialize(definition.GetRawText());
+
+    /// <summary>The "kind" of a trigger, condition or action. Malformed input is a <see cref="JsonException"/>.</summary>
+    internal static string ReadKind(JsonElement element) =>
+        element.ValueKind is JsonValueKind.Object && element.TryGetProperty("kind", out var kind) &&
+        kind.ValueKind is JsonValueKind.String
+            ? kind.GetString()!
+            : throw new JsonException("Each trigger, condition and action needs a text \"kind\".");
+
     public static AutomationRuleDefinition Parse(string json)
     {
         var definition = Deserialize(json);
@@ -200,7 +213,7 @@ internal sealed class AutomationTriggerJsonConverter : JsonConverter<AutomationT
         JsonSerializerOptions options)
     {
         using var document = JsonDocument.ParseValue(ref reader);
-        var kind = document.RootElement.GetProperty("kind").GetString();
+        var kind = AutomationDefinitionJson.ReadKind(document.RootElement);
         return kind switch
         {
             AutomationTriggerKinds.Schedule => document.Deserialize<ScheduleTriggerDefinition>(options),
@@ -225,7 +238,7 @@ internal sealed class AutomationConditionJsonConverter : JsonConverter<Automatio
         JsonSerializerOptions options)
     {
         using var document = JsonDocument.ParseValue(ref reader);
-        var kind = document.RootElement.GetProperty("kind").GetString();
+        var kind = AutomationDefinitionJson.ReadKind(document.RootElement);
         return kind switch
         {
             "time_window" => document.Deserialize<TimeWindowConditionDefinition>(options),
@@ -244,7 +257,7 @@ internal sealed class AutomationActionJsonConverter : JsonConverter<AutomationAc
         JsonSerializerOptions options)
     {
         using var document = JsonDocument.ParseValue(ref reader);
-        var kind = document.RootElement.GetProperty("kind").GetString();
+        var kind = AutomationDefinitionJson.ReadKind(document.RootElement);
         return kind switch
         {
             AutomationActionKinds.Notification => document.Deserialize<NotificationActionDefinition>(options),

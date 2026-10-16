@@ -40,12 +40,25 @@ public static partial class AutomationRuleValidator
             throw new ArgumentException("Automation name must contain 1 to 200 characters.");
     }
 
+    /// <summary>An unknown time zone is a mistake in the request, not a failure of the server.</summary>
+    private static void RequireTimeZone(string? timeZoneId)
+    {
+        try
+        {
+            _ = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId ?? throw new ArgumentException("A time zone is required."));
+        }
+        catch (Exception exception) when (exception is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            throw new ArgumentException($"Unknown time zone '{timeZoneId}'.");
+        }
+    }
+
     private static void ValidateTrigger(AutomationTriggerDefinition trigger)
     {
         switch (trigger)
         {
             case ScheduleTriggerDefinition schedule:
-                _ = TimeZoneInfo.FindSystemTimeZoneById(schedule.TimeZoneId);
+                RequireTimeZone(schedule.TimeZoneId);
                 if (schedule.Weekdays is < 0 or > 127)
                     throw new ArgumentException("weekdays must be a valid bitmask.");
                 break;
@@ -94,7 +107,7 @@ public static partial class AutomationRuleValidator
         switch (condition)
         {
             case TimeWindowConditionDefinition window:
-                _ = TimeZoneInfo.FindSystemTimeZoneById(window.TimeZoneId);
+                RequireTimeZone(window.TimeZoneId);
                 break;
             case JsonThresholdConditionDefinition json:
                 ValidateJsonWatch(json.Url, json.JsonPath, json.Comparison, json.Threshold, 15, json.CredentialProvider);
