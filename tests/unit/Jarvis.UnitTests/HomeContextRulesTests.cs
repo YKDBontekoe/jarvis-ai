@@ -144,6 +144,43 @@ public sealed class HomeContextRulesTests
             item => item.Kind == HomeInsightKinds.Drift);
     }
 
+    [Fact]
+    public void A_contact_gone_quiet_stays_put_away_for_the_week_not_just_the_day()
+    {
+        var danielle = Person(Guid.CreateVersion7(), "Danielle", "Sister");
+        var people = new[]
+        {
+            new HomePersonDto(danielle.Id, "Danielle", "Sister", Guid.CreateVersion7(), "+316", null, null, true, 1.5,
+                Morning.AddDays(-21), null)
+        };
+        var drift = InsightRules.Build([], people, [], Morning, Amsterdam).Single();
+        var dismissed = new HomeContextDismissals().With(drift.Id, drift.Kind, false, Morning);
+
+        // The same card is still hidden on each of the next days, and returns once the week is over.
+        foreach (var days in new[] { 1, 3, 6 })
+            Assert.Empty(InsightRules.Build([], people, [], Morning.AddDays(days), Amsterdam, dismissed));
+        Assert.Single(InsightRules.Build([], people, [], Morning.AddDays(8), Amsterdam, dismissed));
+    }
+
+    [Fact]
+    public void A_person_in_two_chats_is_one_contact_gone_quiet()
+    {
+        var danielle = Person(Guid.CreateVersion7(), "Danielle", "Sister");
+        var quiet = new[]
+        {
+            new HomePersonDto(danielle.Id, "Danielle", "Sister", Guid.CreateVersion7(), "+316", null, null, true, 1.5,
+                Morning.AddDays(-21), null),
+            new HomePersonDto(danielle.Id, "Danielle", "Sister", Guid.CreateVersion7(), "+317", null, null, true, 1.5,
+                Morning.AddDays(-21), null),
+            new HomePersonDto(Guid.CreateVersion7(), "Quinty", null, Guid.CreateVersion7(), "+318", null, null, true, .5,
+                Morning.AddDays(-30), null)
+        };
+
+        var insights = InsightRules.Build([], quiet, [], Morning, Amsterdam);
+
+        Assert.Equal(["drift:" + danielle.Id, "drift:" + quiet[2].PersonId], insights.Select(item => item.Id));
+    }
+
     [Theory]
     [InlineData(10, 16, 0)]
     [InlineData(10, 17, 1)]

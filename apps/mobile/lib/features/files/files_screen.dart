@@ -196,26 +196,11 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   Future<void> _createCollection() async {
-    final controller = TextEditingController();
     final name = await showJarvisDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('New collection'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Collection name'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Create'),
-          ),
-        ],
-      ),
+      builder: (_) => const _NewCollectionDialog(),
     );
-    if (name == null || name.isEmpty) return;
+    if (name == null || name.isEmpty || !mounted) return;
     setState(() => _busy = true);
     try {
       await widget.http.post('/api/v1/collections', data: {'name': name});
@@ -241,7 +226,7 @@ class _FilesScreenState extends State<FilesScreen> {
       destructive: true,
       icon: PhosphorIconsRegular.trash,
     );
-    if (!confirmed) return;
+    if (!confirmed || !mounted) return;
     setState(() => _busy = true);
     try {
       await widget.http.delete('/api/v1/collections/$id');
@@ -476,4 +461,52 @@ String uploadContentTypeFor(String fileName) {
     'webp' => 'image/webp',
     _ => 'application/octet-stream',
   };
+}
+
+class _NewCollectionDialog extends StatefulWidget {
+  const _NewCollectionDialog();
+
+  @override
+  State<_NewCollectionDialog> createState() => _NewCollectionDialogState();
+}
+
+class _NewCollectionDialogState extends State<_NewCollectionDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String get _name => _controller.text.trim();
+
+  void _create() {
+    if (_name.isEmpty) return;
+    Navigator.pop(context, _name);
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('New collection'),
+    content: TextField(
+      controller: _controller,
+      autofocus: true,
+      maxLength: 80,
+      textInputAction: TextInputAction.done,
+      onChanged: (_) => setState(() {}),
+      onSubmitted: (_) => _create(),
+      decoration: const InputDecoration(hintText: 'Collection name'),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        onPressed: _name.isEmpty ? null : _create,
+        child: const Text('Create'),
+      ),
+    ],
+  );
 }

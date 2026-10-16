@@ -240,6 +240,33 @@ public sealed class MissionTests
     }
 
     [Fact]
+    public async Task A_step_claimed_but_never_given_a_task_is_released_and_started_again()
+    {
+        var harness = new Harness();
+        var id = (await harness.Service.CreateAsync(Owner, Goal, null, null, default)).Value!.Mission.Id;
+        await harness.Service.StartAsync(id, Owner, default);
+        Assert.Equal(3, harness.CreatedTasks.Count);
+
+        // The worker stopped after claiming a step and before recording its task.
+        var stuck = (await harness.Repository.ListStepsAsync(id, default)).First(x => x.Key == "s1");
+        await harness.Repository.UpdateStepAsync(stuck with { Status = StepStatuses.Running, TaskId = null,
+            StartedAt = Now }, default);
+
+        harness.Clock.Time = Now + MissionService.OrphanedClaimAfter - TimeSpan.FromSeconds(10);
+        await harness.Service.AdvanceAsync(id, default);
+        Assert.Equal(3, harness.CreatedTasks.Count);
+        Assert.Null((await harness.Repository.ListStepsAsync(id, default)).First(x => x.Key == "s1").TaskId);
+
+        harness.Clock.Time = Now + MissionService.OrphanedClaimAfter + TimeSpan.FromSeconds(10);
+        await harness.Service.AdvanceAsync(id, default);
+
+        Assert.Equal(4, harness.CreatedTasks.Count);
+        var again = (await harness.Repository.ListStepsAsync(id, default)).First(x => x.Key == "s1");
+        Assert.Equal(StepStatuses.Running, again.Status);
+        Assert.NotNull(again.TaskId);
+    }
+
+    [Fact]
     public async Task The_blackboard_is_shared_between_steps_and_bounded()
     {
         var harness = new Harness();
@@ -332,12 +359,16 @@ public sealed class MissionTests
 
     private sealed class FixedClock : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow() => Now;
+        public DateTimeOffset Time { get; set; } = Now;
+
+        public override DateTimeOffset GetUtcNow() => Time;
     }
 
     private sealed class Harness
     {
         private readonly FakeMissions repository = new();
+        public FakeMissions Repository => repository;
+        public FixedClock Clock { get; } = new();
         private readonly Dictionary<Guid, (string Status, string? Summary)> taskStates = [];
 
         public bool ClaimSucceeds { get => repository.ClaimSucceeds; set => repository.ClaimSucceeds = value; }
@@ -379,7 +410,7 @@ public sealed class MissionTests
                 return new NotificationRecord(Guid.NewGuid(), (string)args[1]!, (string)args[2]!, (string)args[3]!,
                     null, Now, null);
             }));
-            Service = new MissionService(repository, planner, taskRepository, tasks, notifications, new FixedClock());
+            Service = new MissionService(repository, planner, taskRepository, tasks, notifications, Clock);
         }
 
         public void Finish(int taskIndex, string summary) =>

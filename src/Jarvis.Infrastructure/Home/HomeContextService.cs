@@ -28,29 +28,32 @@ public sealed class HomeContextService(
     IRoutineSuggestionService routines,
     IOwnerSettingsStore settings,
     ILogger<HomeContextService> logger,
-    TimeProvider? clock = null) : IHomeContextService
+    TimeProvider? clock = null,
+    TimeSpan? sourceTimeout = null) : IHomeContextService
 {
-    private static readonly TimeSpan SourceTimeout = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan DefaultSourceTimeout = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan SettleGrace = TimeSpan.FromSeconds(1);
+    private readonly TimeSpan _sourceTimeout = sourceTimeout ?? DefaultSourceTimeout;
 
     public async Task<HomeContextDto> GetAsync(Guid ownerId, CancellationToken cancellationToken)
     {
         var now = (clock ?? TimeProvider.System).GetUtcNow();
         // Sources run one after another: they share the request's database context, which is not thread safe.
-        var preference = await Read("briefing settings", () => briefing.GetAsync(ownerId, cancellationToken), null);
+        var preference = await Read("briefing settings", token => briefing.GetAsync(ownerId, token), null, cancellationToken);
         var zone = Zone(preference?.TimeZoneId);
-        var reminderList = await Read("reminders", () => reminders.ListAsync(ownerId, cancellationToken), []);
-        var taskList = await Read("tasks", () => tasks.ListAsync(ownerId, cancellationToken), []);
+        var reminderList = await Read("reminders", token => reminders.ListAsync(ownerId, token), [], cancellationToken);
+        var taskList = await Read("tasks", token => tasks.ListAsync(ownerId, token), [], cancellationToken);
         var events = await Read("calendar",
-            () => calendar.ListUpcomingAsync(ownerId, now.AddHours(-1), now.AddHours(48), cancellationToken), []);
-        var device = await Read("device", () => telemetry.GetAsync(ownerId, cancellationToken), null);
-        var notes = await Read("notifications", () => notifications.ListNotificationsAsync(ownerId, cancellationToken), []);
-        var everyone = await Read("people", () => people.ListAsync(ownerId, cancellationToken), []);
-        var chatLinks = await Read("people links", () => links.ListAsync(ownerId, cancellationToken), []);
-        var overview = await Read<RadarOverview?>("radar", async () => await radar.OverviewAsync(ownerId, cancellationToken), null);
-        var suggestions = await Read("routines", () => routines.ListAsync(ownerId, cancellationToken), []);
+            token => calendar.ListUpcomingAsync(ownerId, now.AddHours(-1), now.AddHours(48), token), [], cancellationToken);
+        var device = await Read("device", token => telemetry.GetAsync(ownerId, token), null, cancellationToken);
+        var notes = await Read("notifications", token => notifications.ListNotificationsAsync(ownerId, token), [], cancellationToken);
+        var everyone = await Read("people", token => people.ListAsync(ownerId, token), [], cancellationToken);
+        var chatLinks = await Read("people links", token => links.ListAsync(ownerId, token), [], cancellationToken);
+        var overview = await Read<RadarOverview?>("radar", async token => await radar.OverviewAsync(ownerId, token), null, cancellationToken);
+        var suggestions = await Read("routines", token => routines.ListAsync(ownerId, token), [], cancellationToken);
         var dismissed = await Read("dismissals",
-            () => settings.GetAsync<HomeContextDismissals>(ownerId, HomeContextDismissals.Section, cancellationToken),
-            null);
+            token => settings.GetAsync<HomeContextDismissals>(ownerId, HomeContextDismissals.Section, token),
+            null, cancellationToken);
 
         var agenda = new List<HomeAgendaFact>();
         foreach (var reminder in reminderList)
@@ -118,16 +121,39 @@ public sealed class HomeContextService(
         }
     }
 
-    private async Task<T> Read<T>(string source, Func<Task<T>> load, T fallback)
+    /// <summary>
+    /// Reads one source with a time limit. The source is told to stop when the limit passes, and given a moment to
+    /// do so: the next source runs on the same database context, which cannot serve two queries at once, so an
+    /// abandoned query would make every later source fail too. Cancelling the request itself still propagates.
+    /// </summary>
+    private async Task<T> Read<T>(string source, Func<CancellationToken, Task<T>> load, T fallback,
+        CancellationToken cancellationToken)
+    {
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        limit.CancelAfter(_sourceTimeout);
+        Task<T>? work = null;
+        try
+        {
+            work = load(limit.Token);
+            return await work.WaitAsync(limit.Token);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning(exception, "Home left out {Source}.", source);
+            if (work is { IsCompleted: false }) await SettleAsync(work);
+            return fallback;
+        }
+    }
+
+    private static async Task SettleAsync(Task work)
     {
         try
         {
-            return await load().WaitAsync(SourceTimeout);
+            await work.WaitAsync(SettleGrace);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch
         {
-            logger.LogWarning(exception, "Home left out {Source}.", source);
-            return fallback;
+            // The source already failed or was cancelled; there is nothing more to do with it.
         }
     }
 }

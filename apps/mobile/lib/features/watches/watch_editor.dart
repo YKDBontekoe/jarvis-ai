@@ -164,6 +164,7 @@ class _NewWatchDialogState extends State<_NewWatchDialog> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: _kind,
                 decoration: const InputDecoration(labelText: 'Watch type'),
                 items: const [
@@ -297,6 +298,7 @@ class _NewWatchDialogState extends State<_NewWatchDialog> {
               if (_kind != 'calendar' && _kind != 'device_location') ...[
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _comparison,
                   decoration: const InputDecoration(
                     labelText: 'Alert when value is',

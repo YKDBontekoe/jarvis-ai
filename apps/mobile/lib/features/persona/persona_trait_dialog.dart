@@ -28,6 +28,7 @@ class _TraitDialogState extends State<_TraitDialog> {
       children: [
         if (widget.statement == null)
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _category,
             decoration: const InputDecoration(labelText: 'About'),
             items: [

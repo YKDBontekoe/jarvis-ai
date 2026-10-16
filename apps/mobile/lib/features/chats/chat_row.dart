@@ -152,7 +152,7 @@ class ChatRow extends StatelessWidget {
                                       when duplicate ||
                                           _namedProfile(profile)) ...[
                                     const SizedBox(width: 6),
-                                    ChatTag(profile),
+                                    Flexible(child: ChatTag(profile)),
                                   ],
                                   if (person?.relationship
                                       case final relationship?) ...[

@@ -92,6 +92,8 @@ mixin _ChatScreenOutbox on _ChatScreenController {
       return;
     }
     _flushingOutbox = true;
+    Set<String>? existing;
+    final claimed = <String>{};
     try {
       for (final item in _outbox.forConversation(conversationId)) {
         if (!mounted || _conversationId != conversationId) return;
@@ -107,15 +109,18 @@ mixin _ChatScreenOutbox on _ChatScreenController {
           rethrow;
         }
         if (!mounted || _conversationId != conversationId) return;
-        final arrived = recent.any((message) {
-          final created = jsonDate(message['createdAt']);
-          return message['role'] == 'user' &&
-              message['content'] == item.content &&
-              created != null &&
-              !created.isBefore(
-                item.queuedAt.toUtc().subtract(const Duration(minutes: 1)),
-              );
-        });
+        // The first look is before anything is sent: those are the messages that can already be this item.
+        existing ??= {
+          for (final message in recent) ?asJsonString(message['id']),
+        };
+        final arrivedId = arrivedMessageId(
+          item,
+          recent,
+          existing: existing,
+          claimed: claimed,
+        );
+        final arrived = arrivedId != null;
+        if (arrivedId != null) claimed.add(arrivedId);
         await _outbox.remove(item.id);
         if (!mounted) return;
         setState(

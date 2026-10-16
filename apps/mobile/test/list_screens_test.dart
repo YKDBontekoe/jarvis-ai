@@ -73,6 +73,55 @@ void main() {
     expect(find.text('Work docs'), findsOneWidget);
   });
 
+  testWidgets('a new collection needs a name, stops at 80 characters and is created on enter', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/files', <Object>[]);
+    http.on('GET', '/api/v1/collections', <Object>[]);
+    http.on('POST', '/api/v1/collections', {'id': 'c9', 'name': 'Trips'});
+    await show(tester, FilesScreen(http: http.client()));
+
+    await tester.tap(find.text('Collection'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Create')).onPressed,
+      isNull,
+    );
+
+    await tester.enterText(find.byType(TextField), 'x' * 120);
+    await tester.pump();
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text.length,
+      80,
+    );
+
+    await tester.enterText(find.byType(TextField), '  Trips  ');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(http.sent('POST', '/api/v1/collections').single.body, {'name': 'Trips'});
+  });
+
+  testWidgets('tearing Files down with its new-collection dialog open leaves no error and creates nothing', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/files', <Object>[]);
+    http.on('GET', '/api/v1/collections', <Object>[]);
+    await show(tester, FilesScreen(http: http.client()));
+
+    await tester.tap(find.text('Collection'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Trips');
+    await tester.pump();
+    // The screen goes away behind the dialog (sign-out, deep link), then the dialog is confirmed.
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(http.sent('POST', '/api/v1/collections'), isEmpty);
+  });
+
   testWidgets('conversations skip invalid list rows instead of crashing', (
     tester,
   ) async {

@@ -62,4 +62,37 @@ public sealed class AutomationRuleTests
         Assert.Equal(conversationId, rule.ConversationId);
         Assert.Throws<ArgumentException>(() => rule.AttachConversation(Guid.Empty));
     }
+
+    [Theory]
+    [InlineData("{\"trigger\": 5}")]
+    [InlineData("{\"trigger\": {}, \"actions\": []}")]
+    [InlineData("{\"trigger\": {\"kind\": 3}, \"actions\": []}")]
+    [InlineData("{\"trigger\": {\"kind\": \"manual\"}, \"actions\": [{}]}")]
+    [InlineData("{\"trigger\": {\"kind\": \"manual\"}, \"actions\": [\"x\"]}")]
+    [InlineData("{\"trigger\": {\"kind\": \"manual\"}, \"conditions\": [{}], \"actions\": []}")]
+    [InlineData("[]")]
+    [InlineData("\"text\"")]
+    public void A_malformed_definition_is_a_json_error_the_api_can_report_not_a_crash(string json) =>
+        Assert.ThrowsAny<System.Text.Json.JsonException>(() => AutomationDefinitionJson.Deserialize(json));
+
+    [Fact]
+    public void A_request_without_a_definition_is_a_json_error()
+    {
+        var request = System.Text.Json.JsonSerializer.Deserialize<SaveAutomationRuleRequest>(
+            "{\"name\": \"No definition\"}")!;
+
+        Assert.Throws<System.Text.Json.JsonException>(() => request.ParseDefinition());
+    }
+
+    [Theory]
+    [InlineData("{\"trigger\": {\"kind\": \"schedule\", \"timeZoneId\": \"Mars/Olympus\"}, \"actions\": [{\"kind\": \"notification\", \"title\": \"a\", \"body\": \"b\"}]}")]
+    [InlineData("{\"trigger\": {\"kind\": \"schedule\"}, \"actions\": [{\"kind\": \"notification\", \"title\": \"a\", \"body\": \"b\"}]}")]
+    [InlineData("{\"schemaVersion\": 1, \"trigger\": {\"kind\": \"manual\"}, \"conditions\": [{\"kind\": \"time_window\", \"timeZoneId\": \"Nowhere/City\"}], \"actions\": [{\"kind\": \"notification\", \"title\": \"a\", \"body\": \"b\"}]}")]
+    [InlineData("{}")]
+    public void An_unusable_definition_is_reported_as_invalid_not_thrown_as_a_server_error(string json)
+    {
+        var definition = AutomationDefinitionJson.Deserialize(json);
+
+        Assert.ThrowsAny<ArgumentException>(() => AutomationRuleValidator.Validate(definition));
+    }
 }

@@ -32,7 +32,7 @@ internal static class JarvisProblemDetails
         HttpContext httpContext,
         string? detail = null)
     {
-        var problem = new ValidationProblemDetails(errors)
+        var problem = new ValidationProblemDetails(ApiMessages.Clean(errors))
         {
             Type = TypeUriFor(ApiErrorCodes.ValidationFailed),
             Title = "One or more validation errors occurred.",

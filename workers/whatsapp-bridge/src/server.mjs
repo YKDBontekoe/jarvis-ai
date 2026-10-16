@@ -453,11 +453,17 @@ async function readJson(request) {
     chunks.push(chunk);
   }
   if (size === 0) return {};
+  let parsed;
   try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
   } catch {
     throw new HttpError(400, 'Invalid JSON.');
   }
+  // Every route reads named fields, so null, a number or a list would only fail later as a server error.
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new HttpError(400, 'The body must be a JSON object.');
+  }
+  return parsed;
 }
 
 async function route(request) {

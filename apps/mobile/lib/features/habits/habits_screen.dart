@@ -466,12 +466,16 @@ class _HabitTile extends StatelessWidget {
                         color: colors.warning,
                       ),
                       const SizedBox(width: 3),
-                      Text(
-                        streak,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: colors.inkSoft,
+                      Flexible(
+                        child: Text(
+                          streak,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: colors.inkSoft,
+                          ),
                         ),
                       ),
                       Text(

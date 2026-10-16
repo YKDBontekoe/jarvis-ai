@@ -2,6 +2,39 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../json_maps.dart';
+
+/// The id of the stored message that already is [item], when the connection
+/// dropped after the server took it, or null when it still has to be sent.
+///
+/// A stored message only counts if it existed before this flush began
+/// ([existing]) and no earlier queued item has taken it ([claimed]): two
+/// identical texts typed offline are two messages, and what this flush just
+/// sent is never mistaken for the next item.
+String? arrivedMessageId(
+  OutboxMessage item,
+  List<Map<String, dynamic>> recent, {
+  required Set<String> existing,
+  required Set<String> claimed,
+}) {
+  final since = item.queuedAt.toUtc().subtract(const Duration(minutes: 1));
+  for (final message in recent) {
+    final id = asJsonString(message['id']);
+    final created = jsonDate(message['createdAt']);
+    if (id == null ||
+        claimed.contains(id) ||
+        !existing.contains(id) ||
+        message['role'] != 'user' ||
+        message['content'] != item.content ||
+        created == null ||
+        created.isBefore(since)) {
+      continue;
+    }
+    return id;
+  }
+  return null;
+}
+
 /// A message typed while Jarvis was unreachable, waiting to be sent.
 class OutboxMessage {
   const OutboxMessage({

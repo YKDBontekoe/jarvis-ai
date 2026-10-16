@@ -126,6 +126,7 @@ internal static class ApiServiceRegistration
             provider.GetRequiredService<TemporalReminderScheduler>());
         services.AddScoped<Jarvis.Application.Reviews.IWeeklyReviewService, WeeklyReviewService>();
         services.TryAddSingleton(TimeProvider.System);
+        services.AddNulCharacterGuard();
         services.AddScoped<IAutomationRuleService, AutomationRuleService>();
         services.AddScoped<IAutomationApprovalResolver, AutomationApprovalResolver>();
         services.AddScoped<IAutomationTriggerPublisher, AutomationTriggerPublisher>();
@@ -171,6 +172,7 @@ internal static class ApiServiceRegistration
         services.AddHttpClient("firebase-messaging", client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddHostedService<NotificationPushWorker>();
         services.AddHostedService<PushDigestWorker>();
+        services.AddHostedService<Security.RefreshTokenCleanupWorker>();
         services.AddHostedService<NotificationRealtimeWorker>();
         services.AddJarvisChannels(configuration);
         services.AddSignalR();

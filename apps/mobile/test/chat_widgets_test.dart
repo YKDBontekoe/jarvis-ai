@@ -217,6 +217,45 @@ void main() {
     );
   });
 
+  testWidgets('the typing indicator holds still under Reduce Motion but keeps counting', (
+    tester,
+  ) async {
+    List<double> bounce() => tester
+        .widgetList<Transform>(
+          find.descendant(
+            of: find.byType(TypingIndicator),
+            matching: find.byType(Transform),
+          ),
+        )
+        .map((transform) => transform.transform.getTranslation().y)
+        .toList();
+
+    Future<void> show({required bool reduced}) => tester.pumpWidget(
+      _host(
+        Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: reduced),
+            child: const TypingIndicator(label: 'Working'),
+          ),
+        ),
+      ),
+    );
+
+    await show(reduced: false);
+    await tester.pump(const Duration(milliseconds: 100));
+    final moving = bounce();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(bounce(), isNot(moving));
+
+    await show(reduced: true);
+    await tester.pump(const Duration(milliseconds: 100));
+    final still = bounce();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(bounce(), still);
+    await tester.pump(const Duration(seconds: 12));
+    expect(find.text('Working · 12s'), findsOneWidget);
+  });
+
   test('thinking label follows the tools of the current reply', () {
     const user = MessageEntry(role: 'user', content: 'Plan my day');
     const placeholder = MessageEntry(

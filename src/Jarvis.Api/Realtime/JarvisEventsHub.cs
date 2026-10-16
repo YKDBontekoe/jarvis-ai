@@ -39,7 +39,7 @@ public sealed class JarvisEventsHub(
 
     public Task CompleteDeviceInvoke(Guid invokeId, string? result, string? error)
     {
-        devices.Complete(invokeId, result, error);
+        devices.Complete(currentUser.OwnerId, invokeId, result, error);
         return Task.CompletedTask;
     }
 

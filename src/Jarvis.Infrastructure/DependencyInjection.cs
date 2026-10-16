@@ -34,7 +34,10 @@ public static class DependencyInjection
             protection.PersistKeysToFileSystem(new DirectoryInfo(keysDirectory));
         }
 
-        services.AddDbContext<JarvisDbContext>(options => options.UseNpgsql(connectionString, npgsql => npgsql.UseVector()));
+        services.AddSingleton<NulCharacterInterceptor>();
+        services.AddDbContext<JarvisDbContext>((provider, options) => options
+            .UseNpgsql(connectionString, npgsql => npgsql.UseVector())
+            .AddInterceptors(provider.GetRequiredService<NulCharacterInterceptor>()));
         services.AddScoped<ConversationStore>();
         services.AddScoped<IConversationStore>(provider => provider.GetRequiredService<ConversationStore>());
         services.AddScoped<IConversationHistory>(provider => provider.GetRequiredService<ConversationStore>());

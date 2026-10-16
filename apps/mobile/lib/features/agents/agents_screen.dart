@@ -410,10 +410,12 @@ class _EmptyRow extends StatelessWidget {
         children: [
           Icon(icon, size: 20, color: colors.muted),
           const SizedBox(width: 12),
-          Text(
-            message,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colors.inkSoft,
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colors.inkSoft,
+              ),
             ),
           ),
         ],

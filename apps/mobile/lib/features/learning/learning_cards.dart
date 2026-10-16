@@ -72,31 +72,26 @@ mixin _LearningCards on _LearningController {
                 : (option) => unawaited(_update('heartbeatMinutes', option)),
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  asJsonString(_state['lastSummary']) ??
-                      'No heartbeat has run yet.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: JarvisColors.of(context).inkSoft,
-                  ),
-                ),
+          _SummaryAndAction(
+            summary: Text(
+              asJsonString(_state['lastSummary']) ??
+                  'No heartbeat has run yet.',
+              style: TextStyle(
+                fontSize: 13,
+                color: JarvisColors.of(context).inkSoft,
               ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                key: const Key('run-heartbeat'),
-                onPressed: _running ? null : () => unawaited(_runNow()),
-                icon: _running
-                    ? const SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(PhosphorIconsRegular.play, size: 16),
-                label: const Text('Reflect now'),
-              ),
-            ],
+            ),
+            action: OutlinedButton.icon(
+              key: const Key('run-heartbeat'),
+              onPressed: _running ? null : () => unawaited(_runNow()),
+              icon: _running
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(PhosphorIconsRegular.play, size: 16),
+              label: const Text('Reflect now'),
+            ),
           ),
         ],
       ),
@@ -171,31 +166,25 @@ mixin _LearningCards on _LearningController {
                 : (option) => unawaited(_update('dreamingHour', option)),
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  asJsonString(_dreaming['lastSummary']) ??
-                      'No dream has run yet.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: JarvisColors.of(context).inkSoft,
-                  ),
-                ),
+          _SummaryAndAction(
+            summary: Text(
+              asJsonString(_dreaming['lastSummary']) ?? 'No dream has run yet.',
+              style: TextStyle(
+                fontSize: 13,
+                color: JarvisColors.of(context).inkSoft,
               ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                key: const Key('run-dreaming'),
-                onPressed: _dreamingNow ? null : () => unawaited(_dreamNow()),
-                icon: _dreamingNow
-                    ? const SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(PhosphorIconsRegular.sparkle, size: 16),
-                label: const Text('Dream now'),
-              ),
-            ],
+            ),
+            action: OutlinedButton.icon(
+              key: const Key('run-dreaming'),
+              onPressed: _dreamingNow ? null : () => unawaited(_dreamNow()),
+              icon: _dreamingNow
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(PhosphorIconsRegular.sparkle, size: 16),
+              label: const Text('Dream now'),
+            ),
           ),
         ],
       ),
@@ -374,6 +363,7 @@ mixin _LearningCards on _LearningController {
     final end = asJsonInt(_settings['quietHoursEnd'], 7);
     Widget picker(String label, int value, String key) => Expanded(
       child: DropdownButtonFormField<int>(
+        isExpanded: true,
         initialValue: value,
         decoration: InputDecoration(labelText: label),
         items: [
@@ -479,5 +469,32 @@ mixin _LearningCards on _LearningController {
     if (minutes < 60) return '$minutes min ago';
     if (minutes < 1440) return '${minutes ~/ 60} h ago';
     return '${minutes ~/ 1440} days ago';
+  }
+}
+
+/// A line of what last happened with the button that does it again. The two share a row while there is room, and
+/// the button goes underneath when large text or a narrow screen leaves the line no space.
+class _SummaryAndAction extends StatelessWidget {
+  const _SummaryAndAction({required this.summary, required this.action});
+
+  final Widget summary;
+  final Widget action;
+
+  @override
+  Widget build(BuildContext context) {
+    final stacked = MediaQuery.textScalerOf(context).scale(1) >= 1.5;
+    if (stacked) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [summary, const SizedBox(height: 10), action],
+      );
+    }
+    return Row(
+      children: [
+        Expanded(child: summary),
+        const SizedBox(width: 12),
+        action,
+      ],
+    );
   }
 }

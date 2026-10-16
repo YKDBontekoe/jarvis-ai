@@ -55,7 +55,7 @@ internal static class AutomationStudioEndpoints
         {
             try
             {
-                var definition = AutomationDefinitionJson.Deserialize(request.Definition.GetRawText());
+                var definition = AutomationDefinitionJson.Deserialize(request.Definition);
                 AutomationRuleValidator.Validate(definition);
                 return Results.Ok(AutomationSimulator.Simulate(definition, ToEvent(request.Sample, definition),
                     clock.GetUtcNow()));

@@ -556,6 +556,7 @@ class _BudgetDialogState extends State<_BudgetDialog> {
       mainAxisSize: MainAxisSize.min,
       children: [
         DropdownButtonFormField<String>(
+          isExpanded: true,
           key: const Key('budget-category'),
           initialValue: _category,
           items: [

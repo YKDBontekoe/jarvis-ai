@@ -55,6 +55,7 @@ if (app.Environment.IsDevelopment())
 app.UseJarvisRateLimiting();
 app.UseExceptionHandler();
 app.UseJarvisApiProblemResponses();
+app.UseNulCharacterGuard();
 app.UseJarvisWebClient();
 app.UseCors();
 app.UseAuthentication();

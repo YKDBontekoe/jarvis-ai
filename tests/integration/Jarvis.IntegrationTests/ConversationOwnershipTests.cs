@@ -525,6 +525,50 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
         Assert.Empty(await store.ListPreviewsAsync(otherOwner, [chat.Id], CancellationToken.None));
     }
 
+    [Fact]
+    public async Task Previews_cope_with_repeated_ids_and_chats_that_only_hold_internal_messages()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var store = new ConversationStore(database);
+        var internalOnly = await store.CreateAsync(owner, "Tool chatter", CancellationToken.None);
+        var spoken = await store.CreateAsync(owner, "Hello", CancellationToken.None);
+        await store.AddMessageAsync(new Message(internalOnly.Id, "system", "note"), CancellationToken.None);
+        await store.AddMessageAsync(new Message(internalOnly.Id, "tool", "result"), CancellationToken.None);
+        await store.AddMessageAsync(new Message(spoken.Id, "user", "Hi"), CancellationToken.None);
+
+        var previews = await store.ListPreviewsAsync(owner, [spoken.Id, spoken.Id, internalOnly.Id],
+            CancellationToken.None);
+
+        Assert.Equal(2, previews.Count);
+        Assert.Equal("Hi", previews[spoken.Id].Snippet);
+        Assert.Null(previews[internalOnly.Id].Snippet);
+        Assert.Null(previews[internalOnly.Id].Role);
+        Assert.Null(previews[internalOnly.Id].At);
+    }
+
+    [Fact]
+    public async Task Text_with_nul_characters_is_saved_without_them_instead_of_failing_the_write()
+    {
+        var owner = Guid.CreateVersion7();
+        var options = new DbContextOptionsBuilder<JarvisDbContext>()
+            .UseNpgsql(_postgres.GetConnectionString(), postgres => postgres.UseVector())
+            .AddInterceptors(new NulCharacterInterceptor())
+            .Options;
+        await using var database = new JarvisDbContext(options);
+        var store = new ConversationStore(database);
+
+        var conversation = await store.CreateAsync(owner, "Pasted\0 title", CancellationToken.None);
+        var message = new Message(conversation.Id, "assistant", "tool said:\0 hi", citationsJson: "[{\"title\":\"a\\u0000b\"}]");
+        await store.AddMessageAsync(message, CancellationToken.None);
+        database.ChangeTracker.Clear();
+
+        Assert.Equal("Pasted title", (await store.GetAsync(conversation.Id, owner, CancellationToken.None))!.Title);
+        var stored = await database.Messages.AsNoTracking().SingleAsync(x => x.Id == message.Id);
+        Assert.Equal("tool said: hi", stored.Content);
+        Assert.Contains("\"ab\"", stored.CitationsJson);
+    }
+
     private JarvisDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<JarvisDbContext>()

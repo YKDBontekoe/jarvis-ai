@@ -105,12 +105,14 @@ class _NeedsYouCardState extends State<NeedsYouCard> {
                       color: colors.accent,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      "You're all caught up",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: colors.inkSoft,
+                    Flexible(
+                      child: Text(
+                        "You're all caught up",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: colors.inkSoft,
+                        ),
                       ),
                     ),
                   ],
@@ -123,26 +125,33 @@ class _NeedsYouCardState extends State<NeedsYouCard> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
-                  child: Row(
+                  // A Wrap, not a Row: at very large text "See all" moves under the title instead of overflowing.
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Semantics(
-                        header: true,
-                        child: Text(
-                          'Needs you',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -.5,
-                            color: colors.ink,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Semantics(
+                            header: true,
+                            child: Text(
+                              'Needs you',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: -.5,
+                                color: colors.ink,
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          PopIn(
+                            key: ValueKey(visible.length),
+                            child: UnreadCount(visible.length),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      PopIn(
-                        key: ValueKey(visible.length),
-                        child: UnreadCount(visible.length),
-                      ),
-                      const Spacer(),
                       if (widget.onSeeAll != null)
                         TextButton(
                           key: const Key('home-needs-you-all'),

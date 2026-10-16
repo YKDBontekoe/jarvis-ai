@@ -306,7 +306,10 @@ public static class InsightRules
                 routine.Evidence, routine.Confidence, "Set it up", routine.Id));
         }
 
-        foreach (var person in people.Where(item => item.Quiet).OrderByDescending(item => item.BaselinePerWeek).Take(2))
+        // A person in several chats is one contact gone quiet. The id carries no date: putting the card away hides
+        // it for the whole week, instead of it coming back as "one more day" the next morning.
+        foreach (var person in people.Where(item => item.Quiet).GroupBy(item => item.PersonId)
+                     .Select(group => group.First()).OrderByDescending(item => item.BaselinePerWeek).Take(2))
         {
             var since = person.LastMessageAt is { } last ? Since(now - last) : "a while";
             var usual = person.BaselinePerWeek switch
@@ -315,7 +318,7 @@ public static class InsightRules
                 >= 1 => "you usually talk weekly",
                 _ => "you used to talk more"
             };
-            result.Add(new HomeInsightDto($"drift:{person.PersonId}:{now:yyyyMMdd}", HomeInsightKinds.Drift,
+            result.Add(new HomeInsightDto($"drift:{person.PersonId}", HomeInsightKinds.Drift,
                 $"{since} since you talked to {person.Name}", Capitalize(usual), null, "Say hi", null, person.PersonId));
         }
 

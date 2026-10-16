@@ -38,7 +38,7 @@ public sealed record AutomationRunRecord(
 
 public sealed record SaveAutomationRuleRequest(string Name, JsonElement Definition)
 {
-    public AutomationRuleDefinition ParseDefinition() => AutomationDefinitionJson.Deserialize(Definition.GetRawText());
+    public AutomationRuleDefinition ParseDefinition() => AutomationDefinitionJson.Deserialize(Definition);
 }
 
 public sealed record AutomationValidationResult(bool Valid, IReadOnlyList<string> Errors);

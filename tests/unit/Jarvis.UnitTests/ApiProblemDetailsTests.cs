@@ -65,6 +65,20 @@ public sealed class ApiProblemDetailsTests
         Assert.DoesNotContain("parameter", mapped.Detail);
     }
 
+    [Theory]
+    [InlineData("22021", StatusCodes.Status400BadRequest)] // invalid byte sequence, such as a NUL character
+    [InlineData("22001", StatusCodes.Status400BadRequest)] // value too long
+    [InlineData("23502", StatusCodes.Status400BadRequest)] // required value missing
+    [InlineData("23505", StatusCodes.Status409Conflict)] // duplicate
+    [InlineData("23503", StatusCodes.Status409Conflict)] // something it points at changed
+    public void ExceptionProblemMapper_tells_bad_data_from_a_conflict(string sqlState, int status)
+    {
+        var failure = new Microsoft.EntityFrameworkCore.DbUpdateException("save failed",
+            new Npgsql.PostgresException("detail", "ERROR", "ERROR", sqlState));
+
+        Assert.Equal(status, ExceptionProblemMapper.Map(failure).Status);
+    }
+
     [Fact]
     public void ExceptionProblemMapper_maps_client_abort_to_request_cancelled()
     {

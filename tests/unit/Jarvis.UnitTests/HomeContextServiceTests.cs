@@ -20,7 +20,8 @@ public sealed class HomeContextServiceTests
     private readonly Dictionary<(Guid, string), object> _settings = [];
     private readonly List<Guid> _routinesDismissed = [];
 
-    private HomeContextService Service(bool radarFails = false)
+    private HomeContextService Service(bool radarFails = false, Func<object?[], object?>? remindersList = null,
+        Func<object?[], object?>? tasksList = null, TimeSpan? sourceTimeout = null)
     {
         var reminder = new ReminderRecord(Guid.CreateVersion7(), _owner, "Joëlle on campus", Now.AddMinutes(46),
             "wf", "pending", Now.AddDays(-1), null);
@@ -31,8 +32,8 @@ public sealed class HomeContextServiceTests
         var link = new PersonChannelLink(Guid.CreateVersion7(), _owner, rosa.Id, Guid.CreateVersion7(), "+31633", null,
             null, null, Now);
         return new HomeContextService(
-            Fake<IReminderService>.Create(("ListAsync", _ => (IReadOnlyList<ReminderRecord>)[reminder, done])),
-            Fake<IJarvisTaskService>.Create(("ListAsync", _ => (IReadOnlyList<JarvisTaskRecord>)[])),
+            Fake<IReminderService>.Create(("ListAsync", remindersList ?? (_ => (IReadOnlyList<ReminderRecord>)[reminder, done]))),
+            Fake<IJarvisTaskService>.Create(("ListAsync", tasksList ?? (_ => (IReadOnlyList<JarvisTaskRecord>)[]))),
             Fake<ICalendarFeed>.Create(("ListUpcomingAsync", _ => (IReadOnlyList<CalendarEventRecord>)[])),
             Fake<IDeviceTelemetryStore>.Create(("GetAsync", _ => (DeviceTelemetryRecord?)null)),
             Fake<IDailyBriefingService>.Create(("GetAsync", _ => new DailyBriefingPreferenceRecord(_owner, true,
@@ -58,7 +59,7 @@ public sealed class HomeContextServiceTests
                     return Task.CompletedTask;
                 })),
             NullLogger<HomeContextService>.Instance,
-            new FakeTimeProvider(Now));
+            new FakeTimeProvider(Now), sourceTimeout);
     }
 
     [Fact]
@@ -105,6 +106,62 @@ public sealed class HomeContextServiceTests
         // Another owner's Home is untouched.
         var other = Guid.CreateVersion7();
         Assert.False(_settings.ContainsKey((other, HomeContextDismissals.Section)));
+    }
+
+    [Fact]
+    public async Task A_slow_source_is_cancelled_before_the_next_one_uses_the_shared_context()
+    {
+        var reminderRunning = false;
+        var cancelled = false;
+        var overlapped = false;
+        var service = Service(
+            remindersList: args => SlowReminders((CancellationToken)args[1]!),
+            tasksList: _ =>
+            {
+                // Home's sources share one database context, which cannot run two queries at once.
+                overlapped = reminderRunning;
+                return (IReadOnlyList<JarvisTaskRecord>)[];
+            },
+            sourceTimeout: TimeSpan.FromMilliseconds(100));
+
+        async Task<IReadOnlyList<ReminderRecord>> SlowReminders(CancellationToken token)
+        {
+            reminderRunning = true;
+            try
+            {
+                await Task.Delay(Timeout.Infinite, token);
+                return [];
+            }
+            catch (OperationCanceledException)
+            {
+                cancelled = true;
+                throw;
+            }
+            finally
+            {
+                reminderRunning = false;
+            }
+        }
+
+        var context = await service.GetAsync(_owner, CancellationToken.None);
+
+        Assert.True(cancelled, "the slow source should be told to stop");
+        Assert.False(overlapped, "the next source must not start while the slow one is still running");
+        // The day is still composed from what did answer.
+        Assert.Equal("Nothing on your plate today. A good day to get ahead.", context.DayLine);
+    }
+
+    [Fact]
+    public async Task Cancelling_the_request_is_not_swallowed_as_a_failing_source()
+    {
+        using var cancel = new CancellationTokenSource();
+        var service = Service(remindersList: args =>
+        {
+            cancel.Cancel();
+            return Task.FromCanceled<IReadOnlyList<ReminderRecord>>((CancellationToken)args[1]!);
+        });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.GetAsync(_owner, cancel.Token));
     }
 
     private sealed class FakeTimeProvider(DateTimeOffset now) : TimeProvider

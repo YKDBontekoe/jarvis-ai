@@ -124,6 +124,7 @@ class _TransactionFormState extends State<_TransactionForm> {
     ValueChanged<String?> onChanged, {
     bool optional = true,
   }) => DropdownButtonFormField<String?>(
+    isExpanded: true,
     key: key,
     initialValue: widget.accounts.any((a) => a.id == value) ? value : null,
     decoration: InputDecoration(labelText: label),
@@ -184,6 +185,7 @@ class _TransactionFormState extends State<_TransactionForm> {
               ),
             if (_kind != 'transfer')
               DropdownButtonFormField<String?>(
+                isExpanded: true,
                 key: ValueKey('transaction-category-$_kind'),
                 initialValue: _categories.contains(_category)
                     ? _category

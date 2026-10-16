@@ -62,7 +62,8 @@ public interface IDeviceInvoker
     void Unregister(string connectionId);
     Task<string> InvokeAsync(Guid ownerId, string capability, JsonElement? arguments, TimeSpan timeout,
         CancellationToken cancellationToken);
-    bool Complete(Guid invokeId, string? result, string? error);
+    /// <summary>Answers a pending call. False when it is not pending or was not made for <paramref name="ownerId"/>.</summary>
+    bool Complete(Guid ownerId, Guid invokeId, string? result, string? error);
 }
 
 public sealed class NoOpDeviceInvoker : IDeviceInvoker
@@ -73,5 +74,5 @@ public sealed class NoOpDeviceInvoker : IDeviceInvoker
     public Task<string> InvokeAsync(Guid ownerId, string capability, JsonElement? arguments, TimeSpan timeout,
         CancellationToken cancellationToken) =>
         Task.FromResult("No device is connected to handle this request.");
-    public bool Complete(Guid invokeId, string? result, string? error) => false;
+    public bool Complete(Guid ownerId, Guid invokeId, string? result, string? error) => false;
 }

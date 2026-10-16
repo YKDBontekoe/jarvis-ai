@@ -172,7 +172,14 @@ class _Stat extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        Text(label, style: TextStyle(fontSize: 14, color: colors.inkSoft)),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 14, color: colors.inkSoft),
+          ),
+        ),
       ],
     );
   }

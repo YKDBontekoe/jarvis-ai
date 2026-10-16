@@ -15,18 +15,22 @@ public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, 
     {
         if (conversationIds.Count == 0) return new Dictionary<Guid, ConversationPreview>();
         var ids = conversationIds.Distinct().ToArray();
-        var owned = db.Conversations.AsNoTracking()
-            .Where(conversation => conversation.OwnerId == ownerId && ids.Contains(conversation.Id))
-            .Select(conversation => conversation.Id);
-        var latest = await db.Messages.AsNoTracking()
-            .Where(message => owned.Contains(message.ConversationId) &&
-                              (message.Role == "user" || message.Role == "assistant"))
-            .GroupBy(message => message.ConversationId)
-            .Select(group => group.OrderByDescending(message => message.CreatedAt)
-                .ThenByDescending(message => message.Id)
-                .Select(message => new { message.ConversationId, message.Role, message.Content, message.CreatedAt })
-                .First())
-            .ToListAsync(cancellationToken);
+        // One indexed lookup per listed conversation: newest message first, stopping at the first match. EF turns
+        // "first message per group" into a window function that sorts the owner's whole history (content included,
+        // spilling to disk) on every list refresh, so this is written as a lateral join over the (conversation,
+        // created_at, id) index instead.
+        var owned = await db.Database.SqlQuery<PreviewRow>($"""
+            SELECT c."Id" AS "ConversationId", latest."Role" AS "Role", latest."Content" AS "Content",
+                   latest."CreatedAt" AS "CreatedAt"
+            FROM conversations AS c
+            LEFT JOIN LATERAL (
+                SELECT m."Role", m."Content", m."CreatedAt"
+                FROM messages AS m
+                WHERE m."ConversationId" = c."Id" AND m."Role" IN ('user', 'assistant')
+                ORDER BY m."CreatedAt" DESC, m."Id" DESC
+                LIMIT 1) AS latest ON TRUE
+            WHERE c."OwnerId" = {ownerId} AND c."Id" = ANY({ids})
+            """).ToListAsync(cancellationToken);
         var reminders = await db.Reminders.AsNoTracking()
             .Where(reminder => reminder.OwnerId == ownerId && reminder.ConversationId != null &&
                                ids.Contains(reminder.ConversationId.Value))
@@ -34,19 +38,24 @@ public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, 
             .ToListAsync(cancellationToken);
         var origins = reminders.GroupBy(item => item.ConversationId).ToDictionary(group => group.Key,
             group => group.First().Id);
-        var ownedIds = await owned.ToListAsync(cancellationToken);
-        var messages = latest.ToDictionary(item => item.ConversationId);
-        var result = new Dictionary<Guid, ConversationPreview>(ownedIds.Count);
-        foreach (var id in ownedIds)
+        var result = new Dictionary<Guid, ConversationPreview>(owned.Count);
+        foreach (var row in owned)
         {
-            messages.TryGetValue(id, out var message);
-            var hasOrigin = origins.TryGetValue(id, out var reminderId);
-            result[id] = new ConversationPreview(id, message?.Role, ConversationSnippets.Build(message?.Content),
-                message?.CreatedAt, hasOrigin ? ConversationSnippets.OriginReminder : null,
-                hasOrigin ? reminderId : null);
+            var hasOrigin = origins.TryGetValue(row.ConversationId, out var reminderId);
+            result[row.ConversationId] = new ConversationPreview(row.ConversationId, row.Role,
+                ConversationSnippets.Build(row.Content), row.CreatedAt,
+                hasOrigin ? ConversationSnippets.OriginReminder : null, hasOrigin ? reminderId : null);
         }
 
         return result;
+    }
+
+    private sealed class PreviewRow
+    {
+        public Guid ConversationId { get; set; }
+        public string? Role { get; set; }
+        public string? Content { get; set; }
+        public DateTimeOffset? CreatedAt { get; set; }
     }
 
     public async Task<IReadOnlyList<Message>> ListRecentMessagesAsync(Guid ownerId, DateTimeOffset since, int limit,
