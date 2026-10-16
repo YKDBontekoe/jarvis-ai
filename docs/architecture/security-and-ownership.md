@@ -13,6 +13,8 @@ Jarvis is designed to **fail closed** when authentication, scanning, or approval
 - Tokens: short-lived access JWT + rotating refresh; mobile uses `flutter_secure_storage`.
 - **OwnerId** = Identity user id; all repositories filter by `ICurrentUser.OwnerId`.
 
+Refresh tokens are stored hashed and rotated on every use; presenting an already-rotated token revokes the whole session. A background worker in the API deletes tokens a day after they expire (revoked tokens that have not expired are kept, since they are how replay is noticed).
+
 Production requires `Authentication:Issuer`, `Authentication:Audience`, and `Authentication:SigningKey` (≥32 bytes). Set `Authentication:AllowRegistration=false` after bootstrap.
 
 ## Secrets and credentials
@@ -23,6 +25,12 @@ Production requires `Authentication:Issuer`, `Authentication:Audience`, and `Aut
 - **Audit log** (`GET /api/v1/audit`): action metadata only—no prompts, file bodies, or memory text.
 
 Configure `DataProtection:KeysDirectory` to a persistent `0700` directory in production.
+
+## Input hygiene
+
+- PostgreSQL cannot store the NUL character. JSON bodies lose NULs from every string on the way in, a path or query string containing one is a `400`, and an EF save interceptor (`NulCharacterInterceptor`) removes them from anything written by any other route, such as tool results or channel messages.
+- Database data errors (SQLSTATE class 22, not-null, check) map to `400`; only constraint conflicts such as duplicates map to `409`.
+- Validation messages never include the server's parameter name.
 
 ## Network and SSRF controls
 
