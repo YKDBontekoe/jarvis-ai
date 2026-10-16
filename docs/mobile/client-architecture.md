@@ -1,5 +1,7 @@
 # Flutter client architecture
 
+Visual rules (tokens, type, motion, components, patterns) live in the [design playbook](../design/playbook.md).
+
 App root: **`apps/mobile/`** (package `jarvis_mobile`).
 
 ## Entry and configuration

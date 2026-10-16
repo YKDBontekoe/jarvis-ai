@@ -15,7 +15,7 @@ Use this table to jump to the right doc and code **before** broad repo search.
 | MCP server / integration secret | [integrations-and-mcp.md](../backend/integrations-and-mcp.md) | `Jarvis.Mcp/`, `IntegrationEndpoints` |
 | WhatsApp / Signal | [integrations-and-mcp.md](../backend/integrations-and-mcp.md) | `ChannelEndpoints`, `features/channels/` |
 | Browser / Playwright | same | `Jarvis.Agents/Browser/`, compose browser overlay |
-| Flutter UI bug | [mobile/client-architecture.md](../mobile/client-architecture.md) | `apps/mobile/lib/features/...` |
+| Flutter UI bug | [mobile/client-architecture.md](../mobile/client-architecture.md), [design/playbook.md](../design/playbook.md) | `apps/mobile/lib/features/...` |
 | Voice / LiveKit | [api-reference.md](../backend/api-reference.md), README voice section | `Jarvis.Api/Realtime/` |
 | Auth / JWT / owner mix-up | [security-and-ownership.md](../architecture/security-and-ownership.md) | `Jarvis.Infrastructure/Identity/` |
 | File upload / virus scan | [security-and-ownership.md](../architecture/security-and-ownership.md) | `Jarvis.Application/Files/` |
