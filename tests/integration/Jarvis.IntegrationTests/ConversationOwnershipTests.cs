@@ -488,6 +488,43 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
         Assert.Contains(chunkId.ToString(), stored.CitationsJson, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Previews_show_the_newest_spoken_message_and_reminder_origin_for_the_owner_only()
+    {
+        var owner = Guid.CreateVersion7();
+        var otherOwner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var store = new ConversationStore(database);
+        var chat = await store.CreateAsync(owner, "Mail access", CancellationToken.None);
+        var fromReminder = await store.CreateAsync(owner, "Meet Joëlle", CancellationToken.None);
+        var empty = await store.CreateAsync(owner, "Empty", CancellationToken.None);
+        var foreign = await store.CreateAsync(otherOwner, "Not yours", CancellationToken.None);
+        await store.AddMessageAsync(new Message(chat.Id, "user", "Do you have access to my mail?"), CancellationToken.None);
+        await Task.Delay(5);
+        await store.AddMessageAsync(new Message(chat.Id, "assistant", "**Yes.** I can read your [Gmail](https://mail.google.com)."),
+            CancellationToken.None);
+        await Task.Delay(5);
+        await store.AddMessageAsync(new Message(chat.Id, "system", "internal note"), CancellationToken.None);
+        await store.AddMessageAsync(new Message(foreign.Id, "user", "secret"), CancellationToken.None);
+        var reminder = new Reminder(owner, "Meet Joëlle", DateTimeOffset.UtcNow.AddHours(1));
+        reminder.AttachConversation(fromReminder.Id);
+        database.Reminders.Add(reminder);
+        await database.SaveChangesAsync();
+
+        var previews = await store.ListPreviewsAsync(owner, [chat.Id, fromReminder.Id, empty.Id, foreign.Id],
+            CancellationToken.None);
+
+        Assert.Equal(3, previews.Count);
+        Assert.False(previews.ContainsKey(foreign.Id));
+        Assert.Equal("assistant", previews[chat.Id].Role);
+        Assert.Equal("Yes. I can read your Gmail.", previews[chat.Id].Snippet);
+        Assert.Null(previews[chat.Id].Origin);
+        Assert.Equal(ConversationSnippets.OriginReminder, previews[fromReminder.Id].Origin);
+        Assert.Equal(reminder.Id, previews[fromReminder.Id].OriginId);
+        Assert.Null(previews[empty.Id].Snippet);
+        Assert.Empty(await store.ListPreviewsAsync(otherOwner, [chat.Id], CancellationToken.None));
+    }
+
     private JarvisDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<JarvisDbContext>()

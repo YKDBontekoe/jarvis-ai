@@ -23,7 +23,7 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | Method | Path | Purpose |
 |--------|------|---------|
 | POST | `/conversations` | Create conversation (`profileId` optional) |
-| GET | `/conversations` | List, pinned first then most recent (includes bound profile name and `pinned`) |
+| GET | `/conversations` | List, pinned first then most recent (includes bound profile name and `pinned`). Each row also carries `lastMessage` (newest user or assistant message as one plain line, Markdown stripped, at most 160 characters), `lastMessageRole`, `lastMessageAt`, `responding`, and `origin`/`originId` (`reminder` plus the reminder's id when a reminder started the chat) |
 | GET | `/conversations/{id}` | Messages + responding flag + profile |
 | PATCH | `/conversations/{id}` | Rename (`title`) and/or pin (`pinned`); 404 for task-backed chats |
 | PUT | `/conversations/{id}/profile` | Switch bound profile snapshot (409 if scope changes without `confirm`) |
@@ -197,7 +197,7 @@ Internal routes under `/voice/internal/{conversationId}/...` are for the voice r
 
 | Path | Purpose |
 |------|---------|
-| GET `/home` | Home briefing payload |
+| GET `/home` | Home briefing payload. `latestBriefing` (`id`, `title`, `body`, `createdAt`, `read`) is today's morning briefing notification, or null when none arrived in the last 18 hours |
 | POST `/devices/telemetry` | Battery/location snapshots; a location also checks pending place reminders |
 | POST `/devices/invoke/{id}/result` | Device capability callback |
 | GET `/coding/runs`, `/coding/runs/{id}` | Coding task history |

@@ -41,12 +41,28 @@ internal static class ConversationEndpoints
             }
         }).WithName("CreateConversation");
 
-        api.MapGet("/conversations", async (IConversationStore store, IAssistantProfileService profiles,
-            ICurrentUser currentUser, CancellationToken ct) =>
+        api.MapGet("/conversations", async (IConversationStore store, IConversationPreviews previews,
+            IAssistantProfileService profiles, RemoteQueryHost queries, ICurrentUser currentUser,
+            CancellationToken ct) =>
         {
             var live = (await profiles.ListAsync(currentUser.OwnerId, ct)).ToDictionary(item => item.Id);
-            return Results.Ok((await store.ListAsync(currentUser.OwnerId, ct))
-                .Select(item => ToDto(item, live)));
+            var conversations = await store.ListAsync(currentUser.OwnerId, ct);
+            var latest = await previews.ListPreviewsAsync(currentUser.OwnerId,
+                conversations.Select(item => item.Id).ToArray(), ct);
+            return Results.Ok(conversations.Select(item =>
+            {
+                var dto = ToDto(item, live);
+                latest.TryGetValue(item.Id, out var preview);
+                return dto with
+                {
+                    LastMessage = preview?.Snippet,
+                    LastMessageRole = preview?.Role,
+                    LastMessageAt = preview?.At,
+                    Responding = queries.IsResponding(item.Id),
+                    Origin = preview?.Origin,
+                    OriginId = preview?.OriginId
+                };
+            }));
         }).WithName("ListConversations");
 
         api.MapGet("/conversations/{conversationId:guid}", async (Guid conversationId, bool? includeMessages,

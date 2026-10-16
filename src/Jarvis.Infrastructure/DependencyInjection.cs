@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<ConversationStore>();
         services.AddScoped<IConversationStore>(provider => provider.GetRequiredService<ConversationStore>());
         services.AddScoped<IConversationHistory>(provider => provider.GetRequiredService<ConversationStore>());
+        services.AddScoped<IConversationPreviews>(provider => provider.GetRequiredService<ConversationStore>());
         services.AddScoped<IConversationRunLock>(serviceProvider => new PostgresConversationRunLock(
             connectionString,
             serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PostgresConversationRunLock>>()));

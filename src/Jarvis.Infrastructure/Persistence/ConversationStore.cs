@@ -7,8 +7,48 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Jarvis.Infrastructure.Persistence;
 
-public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, IConversationHistory
+public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, IConversationHistory,
+    IConversationPreviews
 {
+    public async Task<IReadOnlyDictionary<Guid, ConversationPreview>> ListPreviewsAsync(Guid ownerId,
+        IReadOnlyCollection<Guid> conversationIds, CancellationToken cancellationToken)
+    {
+        if (conversationIds.Count == 0) return new Dictionary<Guid, ConversationPreview>();
+        var ids = conversationIds.Distinct().ToArray();
+        var owned = db.Conversations.AsNoTracking()
+            .Where(conversation => conversation.OwnerId == ownerId && ids.Contains(conversation.Id))
+            .Select(conversation => conversation.Id);
+        var latest = await db.Messages.AsNoTracking()
+            .Where(message => owned.Contains(message.ConversationId) &&
+                              (message.Role == "user" || message.Role == "assistant"))
+            .GroupBy(message => message.ConversationId)
+            .Select(group => group.OrderByDescending(message => message.CreatedAt)
+                .ThenByDescending(message => message.Id)
+                .Select(message => new { message.ConversationId, message.Role, message.Content, message.CreatedAt })
+                .First())
+            .ToListAsync(cancellationToken);
+        var reminders = await db.Reminders.AsNoTracking()
+            .Where(reminder => reminder.OwnerId == ownerId && reminder.ConversationId != null &&
+                               ids.Contains(reminder.ConversationId.Value))
+            .Select(reminder => new { ConversationId = reminder.ConversationId!.Value, reminder.Id })
+            .ToListAsync(cancellationToken);
+        var origins = reminders.GroupBy(item => item.ConversationId).ToDictionary(group => group.Key,
+            group => group.First().Id);
+        var ownedIds = await owned.ToListAsync(cancellationToken);
+        var messages = latest.ToDictionary(item => item.ConversationId);
+        var result = new Dictionary<Guid, ConversationPreview>(ownedIds.Count);
+        foreach (var id in ownedIds)
+        {
+            messages.TryGetValue(id, out var message);
+            var hasOrigin = origins.TryGetValue(id, out var reminderId);
+            result[id] = new ConversationPreview(id, message?.Role, ConversationSnippets.Build(message?.Content),
+                message?.CreatedAt, hasOrigin ? ConversationSnippets.OriginReminder : null,
+                hasOrigin ? reminderId : null);
+        }
+
+        return result;
+    }
+
     public async Task<IReadOnlyList<Message>> ListRecentMessagesAsync(Guid ownerId, DateTimeOffset since, int limit,
         CancellationToken cancellationToken)
     {
