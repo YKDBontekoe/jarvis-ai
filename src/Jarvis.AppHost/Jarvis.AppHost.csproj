@@ -8,6 +8,7 @@
     <PackageReference Include="Aspire.Hosting.AppHost" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" />
     <PackageReference Include="Aspire.Hosting.Docker" />
+    <PackageReference Include="MessagePack" />
     <ProjectReference Include="../Jarvis.Api/Jarvis.Api.csproj" />
     <ProjectReference Include="../../workers/Jarvis.Worker/Jarvis.Worker.csproj" />
   </ItemGroup>

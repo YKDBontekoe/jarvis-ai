@@ -592,42 +592,53 @@ class _Arrival extends StatefulWidget {
 
 class _ArrivalState extends State<_Arrival>
     with SingleTickerProviderStateMixin {
-  late final bool _fresh = widget.fresh;
-  late final AnimationController _wash = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-    value: _fresh ? 1 : 0,
-  );
+  /// Only rows that just got a message animate; the rest never make a
+  /// controller, so disposing them looks nothing up.
+  AnimationController? _wash;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.fresh) {
+      _wash = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 900),
+        value: 1,
+      );
+    }
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_fresh || _wash.isAnimating || _wash.value == 0) return;
+    final wash = _wash;
+    if (wash == null || wash.isAnimating || wash.value == 0) return;
     if (JarvisMotion.reduced(context)) {
-      _wash.value = 0;
+      wash.value = 0;
     } else {
       unawaited(
-        _wash.animateTo(0, curve: Curves.easeOut).orCancel.catchError((_) {}),
+        wash.animateTo(0, curve: Curves.easeOut).orCancel.catchError((_) {}),
       );
     }
   }
 
   @override
   void dispose() {
-    _wash.dispose();
+    _wash?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_fresh) return widget.child;
+    final wash = _wash;
+    if (wash == null) return widget.child;
     final colors = JarvisColors.of(context);
     final row = AnimatedBuilder(
-      animation: _wash,
+      animation: wash,
       child: widget.child,
       builder: (context, child) => DecoratedBox(
         decoration: BoxDecoration(
-          color: colors.accentSoft.withValues(alpha: _wash.value),
+          color: colors.accentSoft.withValues(alpha: wash.value),
           borderRadius: BorderRadius.circular(18),
         ),
         child: child,
