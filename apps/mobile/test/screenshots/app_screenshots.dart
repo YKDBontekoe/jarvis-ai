@@ -102,6 +102,26 @@ void main() {
       await capture(tester, '05-chats-$mode');
     });
 
+    screenshotTest('chats all $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openTab(tester, 'chats');
+      await tester.tap(find.byKey(const Key('chats-tab-all')));
+      await settle(tester);
+      await capture(tester, '05b-chats-all-$mode');
+    });
+
+    screenshotTest('chats preview $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openTab(tester, 'chats');
+      await tester.longPress(
+        find.byKey(const Key('chat-whatsapp:wa1:climb@g.us')),
+      );
+      await settle(tester);
+      await capture(tester, '05c-chats-preview-$mode');
+    });
+
     screenshotTest('everything $mode', (tester) async {
       usePhone(tester);
       await start(tester, dark: dark);

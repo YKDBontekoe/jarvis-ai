@@ -17,26 +17,49 @@ List<Map<String, Object?>> conversations() {
       'id': conversationId,
       'title': 'Weekend in Lisbon',
       'updatedAt': _iso(now.subtract(const Duration(minutes: 4))),
+      'lastMessage':
+          "Here's an easy-going plan that leaves room to wander.",
+      'lastMessageRole': 'assistant',
+      'pinned': true,
     },
     {
       'id': 'c-garden',
       'title': 'Balcony herb garden',
       'updatedAt': _iso(now.subtract(const Duration(hours: 3))),
+      'lastMessage': 'Which herbs survive a windy north balcony?',
+      'lastMessageRole': 'user',
+      'responding': true,
     },
     {
       'id': 'c-tax',
       'title': 'Q3 expense summary',
       'updatedAt': _iso(now.subtract(const Duration(days: 1, hours: 2))),
+      'lastMessage': 'You spent €412 on groceries, 8% less than Q2.',
+      'lastMessageRole': 'assistant',
+      'profileName': 'Finance',
     },
     {
       'id': 'c-run',
       'title': 'Half marathon training plan',
       'updatedAt': _iso(now.subtract(const Duration(days: 2))),
+      'lastMessage': 'Thursday is an easy 6 km. Keep it conversational.',
+      'lastMessageRole': 'assistant',
+      'profileName': 'Coach',
     },
     {
       'id': 'c-gift',
+      'title': 'Pick up the dry cleaning',
+      'updatedAt': _iso(now.subtract(const Duration(days: 1, hours: 4))),
+      'lastMessage': 'Reminder · the shop closes at 18:00.',
+      'lastMessageRole': 'assistant',
+      'origin': 'reminder',
+    },
+    {
+      'id': 'c-gift2',
       'title': 'Birthday gift ideas for Sam',
       'updatedAt': _iso(now.subtract(const Duration(days: 6))),
+      'lastMessage': 'A good pair of trail socks never fails.',
+      'lastMessageRole': 'assistant',
     },
   ];
 }
@@ -385,6 +408,39 @@ Map<String, Object?> whatsAppChats() {
         'Running 10 min late',
         const Duration(hours: 2),
         fromMe: true,
+      ),
+      chat(
+        '+31633333333',
+        'Rosa',
+        'Je bent de beste',
+        const Duration(hours: 14),
+        unread: 1,
+      ),
+      {
+        ...chat(
+          'climb@g.us',
+          'Climbing crew',
+          'Noor: Saturday 10:00 at the gym?',
+          const Duration(hours: 3),
+          group: true,
+          unread: 9,
+        ),
+        'catchUp': {
+          'summary':
+              'Noor is booking the bouldering gym for Saturday at 10:00 and asked who is in.',
+          'toReply': [
+            {'who': 'Noor', 'about': 'Are you in on Saturday?'},
+          ],
+          'messageCount': 9,
+        },
+      },
+      chat(
+        'street@g.us',
+        'Street party',
+        'Lena: who has a long table?',
+        const Duration(hours: 5),
+        group: true,
+        unread: 23,
       ),
     ],
   };

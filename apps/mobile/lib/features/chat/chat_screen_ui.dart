@@ -245,6 +245,12 @@ mixin _ChatScreenUi on _ChatScreenController {
       onManage: () => _fromShell(() => unawaited(_chooseConversation())),
       onRefresh: _refreshChats,
       onConnectWhatsApp: () => _openTile('whatsapp'),
+      onAsk: _conversationId == null || _busy || _hasPendingApproval
+          ? null
+          : (text) {
+              _presentChat();
+              unawaited(_send(text));
+            },
     ),
     JarvisTab.everything => EverythingScreen(
       source: _tileSource,

@@ -198,7 +198,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     final unread = chats.unreadCount;
     if (items.isEmpty) return const TileData(subtitle: 'No conversations yet');
     (String, ChatSource, String?) identity(ChatListItem item) =>
-        (item.title, item.source, item.isJarvis ? item.preview : item.account);
+        (item.title, item.source, item.isJarvis ? item.profile : item.account);
     final identities = <(String, ChatSource, String?), int>{};
     for (final item in items) {
       identities.update(
@@ -208,7 +208,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
       );
     }
     String contextLine(ChatListItem item) {
-      final profile = item.preview?.trim();
+      final profile = item.profile?.trim();
       return [
         item.isJarvis ? 'Jarvis' : 'WhatsApp',
         if (item.isJarvis && profile?.isNotEmpty == true && profile != 'Jarvis')
@@ -248,7 +248,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
           TileChat(
             title: item.title,
             context: contextLine(item),
-            preview: item.isJarvis ? null : item.preview,
+            preview: item.preview,
             time: whatsAppListTime(item.time, now: _now),
             unread: item.unread,
             isJarvis: item.isJarvis,

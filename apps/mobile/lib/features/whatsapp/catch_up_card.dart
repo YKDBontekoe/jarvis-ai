@@ -138,70 +138,104 @@ class CatchUpRow extends StatelessWidget {
       label: 'Catch up, $detail, $who',
       onTap: onTap,
       excludeSemantics: true,
-      child: InkWell(
-        key: const Key('whatsapp-catch-up-row'),
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: colors.accentSoft,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  PhosphorIconsRegular.sparkle,
-                  size: 20,
-                  color: colors.accentDeep,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Catch up',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: -.1,
-                              color: colors.ink,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          whatsAppListTime(time),
-                          style: TextStyle(fontSize: 12, color: colors.accent),
+      child: Material(
+        color: Colors.transparent,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [colors.accentSoft, colors.surface],
+            ),
+            border: Border.all(color: colors.accent.withValues(alpha: .14)),
+          ),
+          child: InkWell(
+            key: const Key('whatsapp-catch-up-row'),
+            borderRadius: BorderRadius.circular(20),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: colors.accent.withValues(alpha: .18),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      who,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 13.5, color: colors.inkSoft),
+                    child: Icon(
+                      PhosphorIconsRegular.sparkle,
+                      size: 20,
+                      color: colors.accent,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      detail,
-                      style: TextStyle(fontSize: 12, color: colors.inkSoft),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Catch up',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: -.25,
+                                  color: colors.ink,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              whatsAppListTime(time),
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: colors.accent,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          who,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 14, color: colors.inkSoft),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          detail,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: colors.accentDeep,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    PhosphorIconsRegular.caretRight,
+                    size: 16,
+                    color: colors.muted,
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

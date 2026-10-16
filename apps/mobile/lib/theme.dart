@@ -273,6 +273,16 @@ class JarvisType {
     color: JarvisColors.of(context).inkSoft,
   );
 
+  /// Small uppercase label over a group of rows ("WAITING ON YOU").
+  static TextStyle capsOf(BuildContext context) => TextStyle(
+    fontFamily: 'Geist',
+    fontSize: 11,
+    height: 14 / 11,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 1,
+    color: JarvisColors.of(context).muted,
+  );
+
   static TextStyle clock(Color color) => TextStyle(
     fontFamily: 'Geist',
     color: color,

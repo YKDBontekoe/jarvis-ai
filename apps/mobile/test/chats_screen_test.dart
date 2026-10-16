@@ -117,20 +117,86 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('shows Jarvis and WhatsApp chats together', (tester) async {
+  Future<void> pick(WidgetTester tester, ChatFilter filter) async {
+    final pill = find.byKey(Key('chats-tab-${filter.name}'));
+    await tester.ensureVisible(pill);
+    await tester.pumpAndSettle();
+    await tester.tap(pill);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('For you leads with who is waiting, then Jarvis, then the rest', (
+    tester,
+  ) async {
     await linkWhatsApp(tester);
     await show(tester);
-    expect(find.text('Lisbon trip'), findsOneWidget);
-    expect(find.text('Sam'), findsOneWidget);
-    expect(find.text('Family'), findsOneWidget);
+    expect(find.byKey(const Key('chats-section-waiting')), findsOneWidget);
+    expect(find.byKey(const Key('chats-section-jarvis')), findsOneWidget);
+    expect(find.byKey(const Key('chats-section-quiet')), findsOneWidget);
     expect(find.text('Can we push dinner?'), findsOneWidget);
-    expect(find.byKey(const Key('chat-unread-dot')), findsOneWidget);
-    // Newest first: Sam, Family, then the Jarvis chat from hours ago.
+    expect(find.byKey(const Key('chat-unread-count')), findsOneWidget);
+    final sam = tester.getTopLeft(find.text('Sam')).dy;
+    final lisbon = tester.getTopLeft(find.text('Lisbon trip')).dy;
+    final family = tester.getTopLeft(find.text('Family')).dy;
+    expect(sam, lessThan(lisbon));
+    expect(lisbon, lessThan(family));
+    // Waiting rows say how long, not what time.
+    expect(find.text('5 min'), findsOneWidget);
+  });
+
+  testWidgets('All lists chats newest first under day headings', (
+    tester,
+  ) async {
+    await linkWhatsApp(tester);
+    await show(tester);
+    await pick(tester, ChatFilter.all);
+    expect(find.byKey(const Key('chats-section-today')), findsOneWidget);
     final sam = tester.getTopLeft(find.text('Sam')).dy;
     final family = tester.getTopLeft(find.text('Family')).dy;
     final lisbon = tester.getTopLeft(find.text('Lisbon trip')).dy;
     expect(sam, lessThan(family));
     expect(family, lessThan(lisbon));
+    expect(find.byKey(const Key('chat-source-whatsapp')), findsNWidgets(2));
+  });
+
+  testWidgets('Jarvis rows show the last message, typing and reminders', (
+    tester,
+  ) async {
+    chats.setConversations([
+      {
+        'id': 'mail',
+        'title': 'Mail access',
+        'updatedAt': _iso(now),
+        'lastMessage': 'Checking your inbox',
+        'lastMessageRole': 'assistant',
+        'responding': true,
+      },
+      {
+        'id': 'trip',
+        'title': 'Lisbon trip',
+        'updatedAt': _iso(now.subtract(const Duration(hours: 1))),
+        'lastMessage': 'Book the hotel',
+        'lastMessageRole': 'user',
+      },
+      {
+        'id': 'r',
+        'title': 'Meet Joëlle',
+        'updatedAt': _iso(now),
+        'origin': 'reminder',
+      },
+    ]);
+    // The typing dots loop forever; with Reduce Motion they hold still.
+    final reduced = ValueNotifier(true);
+    addTearDown(reduced.dispose);
+    await show(tester, reducedMotion: reduced);
+    expect(find.byKey(const Key('chat-typing')), findsOneWidget);
+    expect(find.text('You: Book the hotel'), findsOneWidget);
+    // Reminder chats fold into one row that opens in place.
+    expect(find.byKey(const Key('chat-avatar-reminder')), findsNothing);
+    await tester.tap(find.byKey(const Key('chats-reminders')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-avatar-reminder')), findsOneWidget);
+    expect(find.byKey(const Key('chat-jarvis:r')), findsOneWidget);
   });
 
   testWidgets('catch-ups are one row that opens every summary in full', (
@@ -218,8 +284,12 @@ void main() {
     }
     await tester.runAsync(() => chats.loadWhatsApp(http.client()));
     await show(tester);
-    expect(find.text('Jarvis · Personal · 1 Oct · 10:00'), findsOneWidget);
-    expect(find.text('Jarvis · Work · 2 Oct · 10:00'), findsOneWidget);
+    await pick(tester, ChatFilter.all);
+    // The profile shows as a tag, and as the line under a chat with no text.
+    expect(find.text('Personal'), findsNWidgets(2));
+    expect(find.text('Work'), findsNWidgets(2));
+    expect(find.text('Started 1 Oct · 10:00'), findsOneWidget);
+    expect(find.text('Started 2 Oct · 10:00'), findsOneWidget);
     expect(find.text('WhatsApp · Personal'), findsOneWidget);
     expect(find.text('WhatsApp · Work'), findsOneWidget);
     expect(find.text('Tap to open chat'), findsNWidgets(2));
@@ -260,24 +330,29 @@ void main() {
   ) async {
     await linkWhatsApp(tester);
     await show(tester);
-    expect(find.text('Unread 2'), findsOneWidget);
+    // The badge counts chats, not messages.
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chats-tab-unread-count'))).data,
+      '1',
+    );
 
-    await tester.tap(find.byKey(const Key('chats-tab-unread')));
-    await tester.pumpAndSettle();
+    await pick(tester, ChatFilter.unread);
     expect(find.text('Sam'), findsOneWidget);
     expect(find.text('Family'), findsNothing);
     expect(find.text('Lisbon trip'), findsNothing);
 
-    await tester.tap(find.byKey(const Key('chats-tab-jarvis')));
-    await tester.pumpAndSettle();
+    await pick(tester, ChatFilter.jarvis);
     expect(find.text('Lisbon trip'), findsOneWidget);
     expect(find.text('Sam'), findsNothing);
 
-    await tester.tap(find.byKey(const Key('chats-tab-whatsapp')));
-    await tester.pumpAndSettle();
+    await pick(tester, ChatFilter.whatsapp);
     expect(find.text('Sam'), findsOneWidget);
     expect(find.text('Family'), findsOneWidget);
     expect(find.text('Lisbon trip'), findsNothing);
+
+    await pick(tester, ChatFilter.groups);
+    expect(find.text('Family'), findsOneWidget);
+    expect(find.text('Sam'), findsNothing);
   });
 
   testWidgets('the search field filters by title and preview', (tester) async {
@@ -312,21 +387,22 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     reduced.value = true;
     await tester.pumpAndSettle();
-    expect(
-      tester.widget<TabBar>(find.byType(TabBar)).controller!.animationDuration,
-      Duration.zero,
-    );
+    await tester.ensureVisible(find.byKey(const Key('chats-tab-jarvis')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chats-tab-jarvis')));
     await tester.pumpAndSettle();
+    // With Reduce Motion the ink pill jumps instead of sliding.
+    expect(
+      tester
+          .widget<AnimatedPositioned>(find.byType(AnimatedPositioned))
+          .duration,
+      Duration.zero,
+    );
     expect(find.text('Lisbon trip'), findsOneWidget);
     expect(find.text('Sam'), findsNothing);
-    expect(tester.hasRunningAnimations, isFalse);
     reduced.value = false;
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('chats-tab-all')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('chats-tab-all')));
-    await tester.pumpAndSettle();
+    await pick(tester, ChatFilter.all);
     expect(find.text('Sam'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -358,8 +434,7 @@ void main() {
     tester,
   ) async {
     await show(tester);
-    await tester.tap(find.byKey(const Key('chats-tab-whatsapp')));
-    await tester.pumpAndSettle();
+    await pick(tester, ChatFilter.whatsapp);
     expect(find.text('Bring your WhatsApp in'), findsOneWidget);
     await tester.tap(find.byKey(const Key('chats-connect-whatsapp')));
     expect(connected, 1);
@@ -367,9 +442,83 @@ void main() {
 
   testWidgets('no unread chats says so', (tester) async {
     await show(tester);
-    await tester.tap(find.byKey(const Key('chats-tab-unread')));
-    await tester.pumpAndSettle();
+    await pick(tester, ChatFilter.unread);
     expect(find.text('You are all caught up'), findsOneWidget);
+  });
+
+  testWidgets('swiping a Jarvis chat pins it', (tester) async {
+    http.on('PATCH', '/api/v1/conversations/c1', {'id': 'c1'});
+    await show(tester, pictures: http.client());
+    await tester.timedDrag(
+      find.text('Lisbon trip'),
+      const Offset(500, 0),
+      const Duration(milliseconds: 400),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(http.sent('PATCH', '/api/v1/conversations/c1').single.body, {
+      'pinned': true,
+    });
+    expect(chats.all.single.pinned, isTrue);
+    expect(find.text('Pinned to the top'), findsOneWidget);
+  });
+
+  testWidgets('holding a chat lifts a preview with its catch-up and actions', (
+    tester,
+  ) async {
+    final asked = <String>[];
+    http.on('GET', '/api/v1/channels', [
+      {'id': 'wa', 'kind': 'whatsapp_linked'},
+    ]);
+    http.on('GET', '/api/v1/channels/wa/chats', {
+      'chats': [
+        {
+          'chatId': 'men@g.us',
+          'name': 'Mannen middag',
+          'isGroup': true,
+          'lastMessageAt': _iso(now.subtract(const Duration(hours: 2))),
+          'preview': 'Bart: zaterdag 14:00?',
+          'unreadCount': 14,
+          'catchUp': {
+            'summary': 'Bart is hosting on Saturday at 14:00.',
+            'toReply': [
+              {'who': 'Bart', 'about': 'Kom je?'},
+            ],
+          },
+        },
+      ],
+    });
+    await tester.runAsync(() => chats.loadWhatsApp(http.client()));
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildJarvisTheme(),
+        home: Scaffold(
+          body: ChatsScreen(
+            chats: chats,
+            http: http.client(),
+            onOpen: opened.add,
+            onNewChat: () {},
+            onSearch: () {},
+            onRefresh: () async {},
+            onAsk: asked.add,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('@you '), findsOneWidget);
+
+    await tester.longPress(find.byKey(const Key('chat-whatsapp:wa:men@g.us')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-preview')), findsOneWidget);
+    expect(find.text('Bart is hosting on Saturday at 14:00.'), findsWidgets);
+    await tester.tap(find.byKey(const Key('chat-preview-draft')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-preview')), findsNothing);
+    expect(asked.single, contains('Mannen middag'));
   });
 
   testWidgets('pulling down refreshes', (tester) async {
