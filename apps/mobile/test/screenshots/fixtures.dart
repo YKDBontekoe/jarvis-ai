@@ -585,6 +585,24 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   'GET /api/v1/projects': projects(),
   'GET /api/v1/home': home(),
   'GET /api/v1/home/context': homeContext(),
+  // Every chat path is ".../chats/open" with the chat in the query, so one
+  // sample conversation serves all of them.
+  'GET /api/v1/channels/$whatsAppChannelId/chats/open/messages': [
+    for (final (id, fromMe, text, minutes) in [
+      ('m1', false, 'Zullen we zondag naar het Rijks?', 900),
+      ('m2', true, 'Ja leuk! Om 11 uur?', 880),
+      ('m3', false, 'Perfect. Ik reserveer', 870),
+      ('m4', false, 'Je bent de beste', 840),
+    ])
+      {
+        'id': id,
+        'chatId': '+31633333333',
+        'fromMe': fromMe,
+        'sender': fromMe ? null : 'Rosa',
+        'text': text,
+        'sentAt': _iso(_now().subtract(Duration(minutes: minutes))),
+      },
+  ],
   'POST /api/v1/channels/$whatsAppChannelId/chats/open/quick-replies': {
     'replies': ['Ik ook van jou', 'Tot vanavond!', 'Zal ik koken?'],
   },

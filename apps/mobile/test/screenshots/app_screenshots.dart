@@ -182,6 +182,17 @@ void main() {
       await capture(tester, '05c-chats-preview-$mode');
     });
 
+    screenshotTest('chats preview person $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openTab(tester, 'chats');
+      await tester.longPress(
+        find.byKey(const Key('chat-whatsapp:wa1:+31633333333')),
+      );
+      await settle(tester);
+      await capture(tester, '05d-chats-preview-person-$mode');
+    });
+
     screenshotTest('everything $mode', (tester) async {
       usePhone(tester);
       await start(tester, dark: dark);
@@ -493,25 +504,6 @@ void main() {
           {'predicate': 'training', 'value': 'Runs on Tuesday mornings'},
         ],
       };
-      final now = DateTime.now();
-      String at(int minutes) =>
-          now.subtract(Duration(minutes: minutes)).toUtc().toIso8601String();
-      http.routes['GET /api/v1/channels/wa1/chats/open/messages'] = [
-        for (final (id, fromMe, text, minutes) in [
-          ('m1', false, 'Zullen we zondag naar het Rijks?', 900),
-          ('m2', true, 'Ja leuk! Om 11 uur?', 880),
-          ('m3', false, 'Perfect. Ik reserveer', 870),
-          ('m4', false, 'Je bent de beste', 840),
-        ])
-          {
-            'id': id,
-            'chatId': '+31633333333',
-            'fromMe': fromMe,
-            'sender': fromMe ? null : 'Rosa',
-            'text': text,
-            'sentAt': at(minutes),
-          },
-      ];
       await start(tester, dark: dark);
       await openTab(tester, 'chats');
       await tester.tap(find.byKey(const Key('chat-whatsapp:wa1:+31633333333')));

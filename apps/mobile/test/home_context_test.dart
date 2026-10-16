@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/chats/chat_list.dart';
@@ -8,6 +10,8 @@ import 'package:jarvis_mobile/features/home/evening_card.dart';
 import 'package:jarvis_mobile/features/home/home_context.dart';
 import 'package:jarvis_mobile/features/home/home_insights.dart';
 import 'package:jarvis_mobile/features/home/jarvis_home.dart';
+import 'package:jarvis_mobile/features/home/needs_you_card.dart';
+import 'package:jarvis_mobile/features/chats/chats_screen.dart';
 import 'package:jarvis_mobile/features/home/noticed_card.dart';
 import 'package:jarvis_mobile/features/home/right_now_card.dart';
 import 'package:jarvis_mobile/features/tiles/tile_controller.dart';
@@ -140,12 +144,12 @@ void main() {
       final person = HomePerson.fromJson(
         _person('p', 'Dani', 'x', usual: 20, waiting: 2, quiet: true),
       )!;
-      expect(person.usualReply, 'You usually reply in 20 min');
+      expect(person.usualReply, 'You reply in ~20 min');
       expect(person.drift, 'Quiet lately · you usually talk weekly');
       expect(person.overdue, 6);
       expect(
         HomePerson.fromJson(_person('p', 'A', 'x', usual: 300))!.usualReply,
-        'You usually reply in 5 h',
+        'You reply in ~5 h',
       );
     });
 
@@ -172,6 +176,11 @@ void main() {
 
       final waiting = list.grouped(ChatFilter.forYou, now: _now).first;
       expect(waiting.items.map((i) => i.title), ['Rosa', 'Sam']);
+      // The Ask bar suggests the same person Needs you leads with.
+      expect(
+        homeSuggestions(now: _now, chats: list).first.label,
+        'Reply to Rosa',
+      );
       expect(
         needsYouItems(now: _now, chats: list).first.relationship,
         'Partner',
@@ -406,6 +415,88 @@ void main() {
       {'chatId': '+31611'},
     );
     expect(http.sent('POST', '/api/v1/channels/wa/chats/open/send'), isEmpty);
+  });
+
+  group('Needs you folds', () {
+    NeedsYouItem item(NeedsYouKind kind, String id) =>
+        NeedsYouItem(kind: kind, id: id, title: id, detail: '');
+    final items = [
+      item(NeedsYouKind.reminder, 'r1'),
+      item(NeedsYouKind.reminder, 'r2'),
+      item(NeedsYouKind.reminder, 'r3'),
+      item(NeedsYouKind.person, 'rosa'),
+      item(NeedsYouKind.task, 't'),
+    ];
+
+    test('three reminders never hide the person waiting on you', () {
+      expect(folded(items).map((i) => i.id), ['r1', 'rosa', 't']);
+      expect(folded(items.take(3).toList()).map((i) => i.id), [
+        'r1',
+        'r2',
+        'r3',
+      ]);
+    });
+
+    testWidgets('Show more opens the rest', (tester) async {
+      await tester.pumpWidget(
+        _app(NeedsYouCard(items: items, onAction: (_, _) {})),
+      );
+      expect(find.text('r2'), findsNothing);
+      await tester.tap(find.byKey(const Key('home-needs-you-more')));
+      await tester.pumpAndSettle();
+      expect(find.text('r2'), findsOneWidget);
+      expect(find.byKey(const Key('home-needs-you-more')), findsNothing);
+    });
+  });
+
+  testWidgets('the hold preview offers quick replies to a person', (
+    tester,
+  ) async {
+    clearQuickReplies();
+    final http = FixtureHttp();
+    http.on('GET', '/api/v1/channels', [
+      {'id': 'wa', 'kind': 'whatsapp_linked'},
+    ]);
+    http.on('GET', '/api/v1/channels/wa/chats', {
+      'chats': [_chat('+31611', 'Rosa', const Duration(minutes: 10), 1)],
+    });
+    http.on('POST', '/api/v1/channels/wa/chats/open/quick-replies', {
+      'replies': ['Tot vanavond!'],
+    });
+    final list = ChatList();
+    await tester.runAsync(() => list.loadWhatsApp(http.client()));
+    final replied = <String>[];
+    late BuildContext page;
+    await tester.pumpWidget(
+      _app(
+        Builder(
+          builder: (context) {
+            page = context;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+    unawaited(
+      showChatPreview(
+        page,
+        item: list.whatsApp.single,
+        http: http.client(),
+        relationship: 'Partner',
+        onReply: replied.add,
+      ),
+    );
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Partner · 1 new'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('quick-reply-Tot vanavond!')));
+    await tester.pumpAndSettle();
+    expect(replied, ['Tot vanavond!']);
+    expect(find.byKey(const Key('chat-preview')), findsNothing);
   });
 
   group('Home', () {

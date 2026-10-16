@@ -162,11 +162,12 @@ void main() {
         now: now,
         briefing: {
           'approvals': [
-            for (var i = 0; i < 8; i++) {'id': 'a$i', 'toolName': 'Tool'},
+            for (var i = 0; i < 12; i++) {'id': 'a$i', 'toolName': 'Tool'},
           ],
         },
       );
-      expect(items, hasLength(5));
+      // The card folds after three; "Show more" reaches the rest.
+      expect(items, hasLength(8));
     });
   });
 }

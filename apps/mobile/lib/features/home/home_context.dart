@@ -211,9 +211,9 @@ class HomePerson {
   String? get usualReply {
     final minutes = usualReplyMinutes;
     if (minutes == null || minutes <= 0) return null;
-    if (minutes < 60) return 'You usually reply in ${minutes.round()} min';
+    if (minutes < 60) return 'You reply in ~${minutes.round()} min';
     final hours = minutes / 60;
-    if (hours < 24) return 'You usually reply in ${hours.round()} h';
+    if (hours < 24) return 'You reply in ~${hours.round()} h';
     return null;
   }
 }

@@ -66,10 +66,17 @@ class ClockHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     BlurIn(
-                      child: Text(
-                        greetingFor(now, context.l10n),
-                        key: const Key('home-greeting'),
-                        style: style,
+                      // Shrinks with very large text instead of breaking
+                      // "afternoon" in the middle.
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(
+                          greetingFor(now, context.l10n),
+                          key: const Key('home-greeting'),
+                          maxLines: 1,
+                          style: style,
+                        ),
                       ),
                     ),
                     MotionSwitcher(

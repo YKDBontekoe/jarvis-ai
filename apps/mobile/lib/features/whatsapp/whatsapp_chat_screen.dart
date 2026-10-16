@@ -628,7 +628,11 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
                   ),
                   Text(
                     [
-                      ?(_account ?? widget.account),
+                      // Who they are to you says more than which of your
+                      // numbers the chat is on.
+                      ?(widget.person?.relationship ??
+                          _account ??
+                          widget.account),
                       _connectionState != null && _connectionState != 'open'
                           ? whatsAppConnectionLabel(_connectionState!)
                           : _chat.readAlong

@@ -91,51 +91,62 @@ class _QuickRepliesState extends State<QuickReplies> {
               padding: widget.padding,
               child: FadeSlideIn(
                 offset: 6,
-                child: SingleChildScrollView(
-                  key: Key('quick-replies-${widget.item.key}'),
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      Icon(
-                        PhosphorIconsRegular.sparkle,
-                        size: 13,
-                        color: colors.accent,
-                      ),
-                      const SizedBox(width: 6),
-                      for (final reply in _replies) ...[
-                        PressFeedback(
-                          scale: .96,
-                          builder: (context, highlight) => Material(
-                            color: colors.accentSoft,
-                            borderRadius: BorderRadius.circular(999),
-                            child: InkWell(
-                              key: Key('quick-reply-$reply'),
+                // The last chip fades out at the edge, so the row reads as
+                // one that scrolls.
+                child: ShaderMask(
+                  blendMode: BlendMode.dstIn,
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [Colors.white, Colors.white, Colors.transparent],
+                    stops: [0, .88, 1],
+                  ).createShader(bounds),
+                  child: SingleChildScrollView(
+                    key: Key('quick-replies-${widget.item.key}'),
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        Icon(
+                          PhosphorIconsRegular.sparkle,
+                          size: 13,
+                          color: colors.accent,
+                        ),
+                        const SizedBox(width: 6),
+                        for (final reply in _replies) ...[
+                          PressFeedback(
+                            scale: .96,
+                            builder: (context, highlight) => Material(
+                              color: colors.accentSoft,
                               borderRadius: BorderRadius.circular(999),
-                              onHighlightChanged: highlight,
-                              onTap: () {
-                                unawaited(HapticFeedback.selectionClick());
-                                widget.onPick(reply);
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                child: Text(
-                                  reply,
-                                  style: TextStyle(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w500,
-                                    color: colors.accentDeep,
+                              child: InkWell(
+                                key: Key('quick-reply-$reply'),
+                                borderRadius: BorderRadius.circular(999),
+                                onHighlightChanged: highlight,
+                                onTap: () {
+                                  unawaited(HapticFeedback.selectionClick());
+                                  widget.onPick(reply);
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  child: Text(
+                                    reply,
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w500,
+                                      color: colors.accentDeep,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 6),
+                          const SizedBox(width: 6),
+                        ],
+                        // Room to scroll the last chip clear of the fade.
+                        const SizedBox(width: 28),
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),

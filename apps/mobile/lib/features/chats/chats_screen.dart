@@ -167,6 +167,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
       http: widget.http,
       canAsk: widget.onAsk != null,
       canChange: widget.http != null,
+      relationship: widget.chats.personFor(item)?.relationship,
+      onReply: widget.onReplyWith == null
+          ? null
+          : (text) => widget.onReplyWith!(item, text),
     );
     if (!mounted || action == null) return;
     switch (action) {
@@ -1291,6 +1295,8 @@ Future<ChatPreviewAction?> showChatPreview(
   Dio? http,
   bool canAsk = false,
   bool canChange = false,
+  String? relationship,
+  ValueChanged<String>? onReply,
 }) {
   final duration = JarvisMotion.of(context, JarvisMotion.slow);
   final reduced = JarvisMotion.reduced(context);
@@ -1305,6 +1311,8 @@ Future<ChatPreviewAction?> showChatPreview(
       http: http,
       canAsk: canAsk,
       canChange: canChange,
+      relationship: relationship,
+      onReply: onReply,
     ),
     transitionBuilder: (context, animation, _, child) {
       final fade = CurvedAnimation(
@@ -1365,12 +1373,20 @@ class _ChatPreview extends StatelessWidget {
     required this.canAsk,
     required this.canChange,
     this.http,
+    this.relationship,
+    this.onReply,
   });
 
   final ChatListItem item;
   final Dio? http;
   final bool canAsk;
   final bool canChange;
+
+  /// Who this is to you, from People.
+  final String? relationship;
+
+  /// Opens the chat with a quick reply in the composer.
+  final ValueChanged<String>? onReply;
 
   @override
   Widget build(BuildContext context) {
@@ -1452,7 +1468,7 @@ class _ChatPreview extends StatelessWidget {
                                           ? (item.profile ?? 'Jarvis')
                                           : (item.group
                                                 ? 'WhatsApp group'
-                                                : 'WhatsApp'),
+                                                : relationship ?? 'WhatsApp'),
                                       if (item.unread > 0) '${item.unread} new',
                                     ].join(' · '),
                                     style: TextStyle(
@@ -1535,6 +1551,19 @@ class _ChatPreview extends StatelessWidget {
                             ),
                           ),
                         ],
+                        if ((http, onReply) case (
+                          final http?,
+                          final reply?,
+                        ) when !item.isJarvis && !item.group && item.unread > 0)
+                          QuickReplies(
+                            http: http,
+                            item: item,
+                            padding: const EdgeInsets.only(top: 12),
+                            onPick: (text) {
+                              Navigator.of(context).pop();
+                              reply(text);
+                            },
+                          ),
                       ],
                     ),
                   ),

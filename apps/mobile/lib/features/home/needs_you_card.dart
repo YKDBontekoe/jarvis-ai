@@ -51,6 +51,12 @@ class _NeedsYouCardState extends State<NeedsYouCard> {
   /// Rows already handled here, kept away until Home reloads without them.
   final Set<String> _handled = {};
 
+  /// Shows every row instead of the first [collapsed].
+  bool _expanded = false;
+
+  /// Rows shown before "Show more".
+  static const collapsed = 3;
+
   @override
   void didUpdateWidget(NeedsYouCard oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -155,7 +161,8 @@ class _NeedsYouCardState extends State<NeedsYouCard> {
                   clipBehavior: Clip.antiAlias,
                   child: Column(
                     children: [
-                      for (final (index, item) in visible.indexed)
+                      for (final (index, item)
+                          in (_expanded ? visible : folded(visible)).indexed)
                         _LeavingRow(
                           key: ValueKey(item.id),
                           leaving: _leaving.contains(item.id),
@@ -176,11 +183,82 @@ class _NeedsYouCardState extends State<NeedsYouCard> {
                             ),
                           ),
                         ),
+                      if (!_expanded && visible.length > collapsed)
+                        _MoreRow(
+                          count: visible.length - collapsed,
+                          onTap: () => setState(() => _expanded = true),
+                        ),
                     ],
                   ),
                 ),
               ],
             ),
+    );
+  }
+}
+
+/// The rows shown before "Show more": the first of each kind, so three
+/// overdue reminders never hide the person waiting on you, topped up in
+/// order and kept in their original order.
+@visibleForTesting
+List<NeedsYouItem> folded(List<NeedsYouItem> items) {
+  const limit = _NeedsYouCardState.collapsed;
+  if (items.length <= limit) return items;
+  final picked = <NeedsYouItem>{};
+  final kinds = <NeedsYouKind>{};
+  for (final item in items) {
+    if (picked.length == limit) break;
+    if (kinds.add(item.kind)) picked.add(item);
+  }
+  for (final item in items) {
+    if (picked.length == limit) break;
+    picked.add(item);
+  }
+  return [
+    for (final item in items)
+      if (picked.contains(item)) item,
+  ];
+}
+
+/// "Show 2 more" under the first rows.
+class _MoreRow extends StatelessWidget {
+  const _MoreRow({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return InkWell(
+      key: const Key('home-needs-you-more'),
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 48),
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: colors.outline)),
+        ),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Show $count more',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: colors.accent,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              PhosphorIconsRegular.caretDown,
+              size: 14,
+              color: colors.accent,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

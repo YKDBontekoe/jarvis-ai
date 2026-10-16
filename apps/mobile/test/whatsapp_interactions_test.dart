@@ -98,9 +98,11 @@ void main() {
 
     await show(tester, person: piet, size: const Size(1300, 900));
     expect(find.byKey(const Key('whatsapp-person-panel')), findsOneWidget);
+    // In the panel, and in the header instead of the account.
     expect(find.text('Uncle'), findsOneWidget);
+    expect(find.textContaining('Uncle · '), findsOneWidget);
     expect(find.text('Birthday in 12 days'), findsOneWidget);
-    expect(find.text('You usually reply in 30 min'), findsOneWidget);
+    expect(find.text('You reply in ~30 min'), findsOneWidget);
     expect(find.textContaining('Indonesian food'), findsOneWidget);
     await close(tester);
 

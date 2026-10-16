@@ -28,9 +28,10 @@ List<HomeSuggestion> homeSuggestions({
 }) {
   final result = <HomeSuggestion>[];
   final hour = now.hour;
+  // The same person Needs you puts first.
   final waiting = [
-    for (final item in chats?.whatsApp ?? const <ChatListItem>[])
-      if (item.unread > 0 && !item.group) item,
+    for (final item in waitingOnYou(chats, now))
+      if (!item.group) item,
   ];
   if (waiting.isNotEmpty) {
     final person = waiting.first.title;
@@ -150,8 +151,31 @@ class NeedsYouItem {
   /// For a person: who they are to you, from People.
   final String? relationship;
 
-  /// A quieter third line, such as "You usually reply in 20 min".
+  /// A quieter third line, such as "You reply in ~20 min".
   final String? hint;
+}
+
+/// WhatsApp chats waiting on a reply: people before groups (groups only when
+/// someone asked you), people close to you first, then whoever is furthest
+/// past your usual reply time, then whoever waited longest.
+List<ChatListItem> waitingOnYou(ChatList? chats, DateTime now) {
+  if (chats == null) return const [];
+  return [
+    for (final item in chats.whatsApp)
+      if (item.unread > 0 && (!item.group || item.asksYou)) item,
+  ]..sort((a, b) {
+    if (a.group != b.group) return a.group ? 1 : -1;
+    final pa = chats.personFor(a);
+    final pb = chats.personFor(b);
+    final ca = pa?.relationship != null;
+    final cb = pb?.relationship != null;
+    if (ca != cb) return ca ? -1 : 1;
+    final late = (pb?.overdue ?? 0).compareTo(pa?.overdue ?? 0);
+    if (late != 0) return late;
+    final x = a.time ?? now;
+    final y = b.time ?? now;
+    return x.compareTo(y);
+  });
 }
 
 /// What needs the person now, most urgent first: approvals Jarvis is waiting
@@ -161,7 +185,7 @@ List<NeedsYouItem> needsYouItems({
   required DateTime now,
   Map<String, dynamic>? briefing,
   ChatList? chats,
-  int max = 5,
+  int max = 8,
 }) {
   final items = <NeedsYouItem>[];
   for (final approval in jsonMaps(briefing?['approvals'])) {
@@ -204,23 +228,7 @@ List<NeedsYouItem> needsYouItems({
       ),
     );
   }
-  final waiting =
-      [
-        for (final item in chats?.whatsApp ?? const <ChatListItem>[])
-          if (item.unread > 0 && (!item.group || item.asksYou)) item,
-      ]..sort((a, b) {
-        if (a.group != b.group) return a.group ? 1 : -1;
-        final pa = chats?.personFor(a);
-        final pb = chats?.personFor(b);
-        final ca = pa?.relationship != null;
-        final cb = pb?.relationship != null;
-        if (ca != cb) return ca ? -1 : 1;
-        final late = (pb?.overdue ?? 0).compareTo(pa?.overdue ?? 0);
-        if (late != 0) return late;
-        final x = a.time ?? now;
-        final y = b.time ?? now;
-        return x.compareTo(y);
-      });
+  final waiting = waitingOnYou(chats, now);
   for (final chat in waiting) {
     final ask = chat.whatsApp?.catchUp?.toReply.firstOrNull;
     final person = chats?.personFor(chat);
