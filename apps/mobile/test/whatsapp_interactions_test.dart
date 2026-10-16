@@ -51,7 +51,7 @@ void main() {
     http.on('POST', '$_piet/react', {'sent': true});
   });
 
-  Future<void> show(WidgetTester tester) async {
+  Future<void> show(WidgetTester tester, {String? draft}) async {
     tester.view.physicalSize = const Size(900, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -62,6 +62,7 @@ void main() {
           http: http.client(),
           channelId: _channel,
           chat: _pietChat,
+          initialDraft: draft,
           pollInterval: const Duration(hours: 1),
         ),
       ),
@@ -71,6 +72,19 @@ void main() {
 
   Future<void> close(WidgetTester tester) =>
       tester.pumpWidget(const SizedBox.shrink());
+
+  testWidgets('a quick reply waits in the composer until Send', (
+    tester,
+  ) async {
+    await show(tester, draft: 'What time?');
+
+    final field = tester.widget<TextField>(
+      find.byKey(const Key('whatsapp-composer')),
+    );
+    expect(field.controller!.text, 'What time?');
+    expect(http.sent('POST', '$_piet/send'), isEmpty);
+    await close(tester);
+  });
 
   testWidgets('swiping a message right replies to it with a quote', (
     tester,

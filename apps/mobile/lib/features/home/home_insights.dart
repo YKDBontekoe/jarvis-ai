@@ -131,6 +131,8 @@ class NeedsYouItem {
     this.overdue = false,
     this.chat,
     this.chats = const [],
+    this.relationship,
+    this.hint,
   });
 
   final NeedsYouKind kind;
@@ -144,6 +146,12 @@ class NeedsYouItem {
 
   /// For [NeedsYouKind.catchUp]: every chat with a catch-up.
   final List<ChatListItem> chats;
+
+  /// For a person: who they are to you, from People.
+  final String? relationship;
+
+  /// A quieter third line, such as "You usually reply in 20 min".
+  final String? hint;
 }
 
 /// What needs the person now, most urgent first: approvals Jarvis is waiting
@@ -202,12 +210,20 @@ List<NeedsYouItem> needsYouItems({
           if (item.unread > 0 && (!item.group || item.asksYou)) item,
       ]..sort((a, b) {
         if (a.group != b.group) return a.group ? 1 : -1;
+        final pa = chats?.personFor(a);
+        final pb = chats?.personFor(b);
+        final ca = pa?.relationship != null;
+        final cb = pb?.relationship != null;
+        if (ca != cb) return ca ? -1 : 1;
+        final late = (pb?.overdue ?? 0).compareTo(pa?.overdue ?? 0);
+        if (late != 0) return late;
         final x = a.time ?? now;
         final y = b.time ?? now;
         return x.compareTo(y);
       });
   for (final chat in waiting) {
     final ask = chat.whatsApp?.catchUp?.toReply.firstOrNull;
+    final person = chats?.personFor(chat);
     items.add(
       NeedsYouItem(
         kind: NeedsYouKind.person,
@@ -221,6 +237,8 @@ List<NeedsYouItem> needsYouItems({
           if (chat.time != null) _ago(chat.time!, now),
         ].join(' · '),
         chat: chat,
+        relationship: person?.relationship,
+        hint: person?.usualReply,
       ),
     );
   }

@@ -22,9 +22,14 @@ class WhatsAppChatScreen extends StatefulWidget {
     required this.channelId,
     required this.chat,
     this.account,
+    this.initialDraft,
     this.pollInterval = const Duration(seconds: 3),
     super.key,
   });
+
+  /// Text to start the composer with, such as a quick reply. Never sent on
+  /// its own: the owner still taps Send.
+  final String? initialDraft;
 
   final Dio http;
   final String channelId;
@@ -76,6 +81,9 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
   void initState() {
     super.initState();
     _catchUp = widget.chat.catchUp;
+    if (widget.initialDraft case final draft? when draft.trim().isNotEmpty) {
+      _composer.text = draft;
+    }
     unawaited(_load());
     unawaited(_loadStatus());
     _poll = Timer.periodic(widget.pollInterval, (_) {

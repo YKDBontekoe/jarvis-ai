@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../json_maps.dart';
+import '../home/home_context.dart';
 import '../whatsapp/whatsapp_models.dart';
 
 /// Where a chat in the unified list lives.
@@ -150,7 +151,20 @@ class ChatList extends ChangeNotifier {
   bool _loadingWhatsApp = false;
   int _revision = 0;
 
+  /// People linked to WhatsApp chats, from Home's context.
+  List<HomePerson> _people = const [];
+
   bool get whatsAppLinked => _whatsAppLinked;
+
+  /// Lets rows show who someone is to you, and ranks Waiting on you by it.
+  void setPeople(List<HomePerson> people) {
+    if (_people.isEmpty && people.isEmpty) return;
+    _people = people;
+    notifyListeners();
+  }
+
+  /// The person linked to [item], if any.
+  HomePerson? personFor(ChatListItem item) => personForChat(_people, item);
   bool get loadingWhatsApp => _loadingWhatsApp;
 
   /// Replaces the Jarvis side from the conversation list the app already loads.
@@ -361,11 +375,14 @@ class ChatList extends ChangeNotifier {
     final items = filtered(filter, query);
     if (items.isEmpty) return const [];
     if (query.trim().isNotEmpty) return [ChatGroup(ChatSection.today, items)];
-    if (filter == ChatFilter.forYou) return _forYou(items);
+    if (filter == ChatFilter.forYou) return _forYou(items, personFor);
     return _byTime(items, now ?? DateTime.now());
   }
 
-  static List<ChatGroup> _forYou(List<ChatListItem> items) {
+  static List<ChatGroup> _forYou(
+    List<ChatListItem> items,
+    HomePerson? Function(ChatListItem) personOf,
+  ) {
     final waiting =
         [
           for (final item in items)
@@ -374,8 +391,16 @@ class ChatList extends ChangeNotifier {
                 (!item.group || item.asksYou))
               item,
         ]..sort((a, b) {
-          // People before groups, then whoever has waited longest.
+          // People before groups, people close to you first, then whoever is
+          // furthest past your usual reply time, then whoever waited longest.
           if (a.group != b.group) return a.group ? 1 : -1;
+          final pa = personOf(a);
+          final pb = personOf(b);
+          final ca = pa?.relationship != null;
+          final cb = pb?.relationship != null;
+          if (ca != cb) return ca ? -1 : 1;
+          final late = (pb?.overdue ?? 0).compareTo(pa?.overdue ?? 0);
+          if (late != 0) return late;
           final x = a.time ?? DateTime.fromMillisecondsSinceEpoch(0);
           final y = b.time ?? DateTime.fromMillisecondsSinceEpoch(0);
           return x.compareTo(y);

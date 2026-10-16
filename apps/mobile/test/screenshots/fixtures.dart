@@ -378,6 +378,110 @@ Map<String, Object?> expenseMonth() {
 
 const whatsAppChannelId = 'wa1';
 
+/// `/home/context`: the design review coming up, Rosa and Sam linked to their
+/// chats, and three things Jarvis noticed.
+Map<String, Object?> homeContext({bool evening = false}) {
+  final now = _now();
+  final tomorrow = DateTime(now.year, now.month, now.day + 1);
+  Map<String, Object?> person(
+    String id,
+    String name,
+    String chat,
+    String? relationship, {
+    double? usual,
+    double? waiting,
+    bool quiet = false,
+  }) => {
+    'personId': id,
+    'name': name,
+    'relationship': relationship,
+    'connectionId': whatsAppChannelId,
+    'chatId': chat,
+    'usualReplyMinutes': usual,
+    'waitingHours': waiting,
+    'quiet': quiet,
+    'baselinePerWeek': 6.0,
+  };
+  return {
+    'dayLine': evening
+        ? 'A quiet evening. Tomorrow starts with Brunch with Rosa at 10:30.'
+        : 'Design review soon, then you fly to Lisbon. Free after 21:00.',
+    'hero': evening
+        ? {
+            'id': 'wind_down:x',
+            'kind': 'wind_down',
+            'title': "Tomorrow: Quinty's birthday",
+            'detail': 'Then Brunch with Rosa at 10:30',
+            'reason': 'It is late and tomorrow has plans',
+            'facts': ['2 plans tomorrow', 'Brief at 08:00'],
+          }
+        : {
+            'id': 'soon:design',
+            'kind': 'soon',
+            'title': 'Design review',
+            'detail': 'With Joëlle and the product team',
+            'startsAt': _iso(now.add(const Duration(minutes: 34))),
+            'reason': 'From your calendar',
+            'facts': ['Calendar event at the top of the afternoon'],
+          },
+    'people': [
+      person(
+        'p-rosa',
+        'Rosa',
+        '+31633333333',
+        'Partner',
+        usual: 18,
+        waiting: 14,
+      ),
+      person('p-sam', 'Sam', '+31611111111', 'Friend', usual: 45, waiting: .2),
+      person('p-tom', 'Tom', '+31622222222', 'Brother', quiet: true),
+    ],
+    'noticed': [
+      {
+        'id': 'routine:fri',
+        'kind': 'routine',
+        'title': 'Leave for Dordrecht on Fridays at 17:30',
+        'evidence': 'You did this 4 of your last 5 Fridays',
+        'confidence': .82,
+        'actionLabel': 'Set it up',
+        'sourceId': 'fri',
+      },
+      {
+        'id': 'drift:p-tom',
+        'kind': 'drift',
+        'title': '3 weeks since you talked to Tom',
+        'evidence': 'You usually talk every few days',
+        'actionLabel': 'Say hi',
+        'personId': 'p-tom',
+      },
+      {
+        'id': 'birthday:q',
+        'kind': 'birthday',
+        'title': 'Quinty turns 25 tomorrow',
+        'evidence': 'From your People list',
+        'actionLabel': 'Plan a message',
+      },
+    ],
+    'tomorrow': [
+      {
+        'title': "Quinty's birthday",
+        'at': _iso(tomorrow.add(const Duration(hours: 9))),
+        'kind': 'reminder',
+      },
+      {
+        'title': 'Brunch with Rosa',
+        'at': _iso(tomorrow.add(const Duration(hours: 10, minutes: 30))),
+        'kind': 'event',
+      },
+    ],
+    'dayRecap': {
+      'remindersDone': 4,
+      'tasksDone': 2,
+      'done': ['Water the basil', 'Call mum', 'Book the gym'],
+    },
+  };
+}
+
 Map<String, Object?> whatsAppChats() {
   final now = _now();
   Map<String, Object?> chat(
@@ -481,6 +585,10 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   ],
   'GET /api/v1/projects': projects(),
   'GET /api/v1/home': home(),
+  'GET /api/v1/home/context': homeContext(),
+  'POST /api/v1/channels/$whatsAppChannelId/chats/open/quick-replies': {
+    'replies': ['Ik ook van jou', 'Tot vanavond!', 'Zal ik koken?'],
+  },
   'GET /api/v1/persona': {
     'preferredName': 'Youri',
     'language': 'en',

@@ -13,6 +13,7 @@ import '../whatsapp/read_along_screen.dart';
 import '../whatsapp/whatsapp_models.dart';
 import 'chat_list.dart';
 import 'chat_row.dart';
+import 'quick_replies.dart';
 
 /// Every conversation in one place: your chats with Jarvis and your WhatsApp.
 /// "For you" leads with who is waiting on you; the other filters list chats
@@ -27,6 +28,7 @@ class ChatsScreen extends StatefulWidget {
     this.onManage,
     this.onConnectWhatsApp,
     this.onAsk,
+    this.onReplyWith,
     this.selectedKey,
     this.http,
     this.clock,
@@ -47,6 +49,9 @@ class ChatsScreen extends StatefulWidget {
 
   /// Asks Jarvis something about a chat, such as a summary or a draft reply.
   final ValueChanged<String>? onAsk;
+
+  /// Opens a WhatsApp chat with a quick reply in its composer, not sent.
+  final void Function(ChatListItem item, String draft)? onReplyWith;
 
   /// The row to mark as open (wide layout).
   final String? selectedKey;
@@ -356,6 +361,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           item,
           index: index,
           waiting: waiting,
+          replies: waiting && index == 0,
           duplicate: duplicate(item),
           query: _query.text,
           now: now,
@@ -465,8 +471,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
     bool waiting = false,
     bool duplicate = false,
     bool divider = true,
+    bool replies = false,
   }) {
     final colors = JarvisColors.of(context);
+    final http = widget.http;
+    final reply = widget.onReplyWith;
     final canChange = widget.http != null;
     SwipeAction? start;
     if (canChange && item.isJarvis) {
@@ -503,6 +512,14 @@ class _ChatsScreenState extends State<ChatsScreen> {
           query: query,
           divider: divider,
           now: now,
+          person: widget.chats.personFor(item),
+          footer: replies && http != null && reply != null && !item.group
+              ? QuickReplies(
+                  http: http,
+                  item: item,
+                  onPick: (text) => reply(item, text),
+                )
+              : null,
           onTap: () => widget.onOpen(item),
           onLongPress: () => unawaited(_preview(item)),
         ),

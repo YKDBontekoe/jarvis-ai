@@ -7,7 +7,8 @@ import 'package:flutter/services.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
-import '../chats/chat_row.dart' show ChatRowAvatar, UnreadCount;
+import '../chats/chat_row.dart' show ChatRowAvatar, ChatTag, UnreadCount;
+import '../chats/quick_replies.dart';
 import '../tiles/tile_card.dart' show tileRadius;
 import 'home_insights.dart';
 
@@ -22,10 +23,14 @@ class NeedsYouCard extends StatefulWidget {
     required this.items,
     required this.onAction,
     this.onSeeAll,
+    this.onReplyWith,
     this.http,
     this.pending = const {},
     super.key,
   });
+
+  /// Opens a person's chat with a quick reply in the composer, not sent.
+  final void Function(NeedsYouItem item, String draft)? onReplyWith;
 
   final List<NeedsYouItem> items;
   final void Function(NeedsYouItem item, NeedsYouAction action) onAction;
@@ -163,6 +168,11 @@ class _NeedsYouCardState extends State<NeedsYouCard> {
                               divider: index > 0,
                               busy: widget.pending.contains(item.id),
                               onAction: (action) => _act(item, action),
+                              replies:
+                                  item == _firstPerson(visible) &&
+                                      widget.onReplyWith != null
+                                  ? (text) => widget.onReplyWith!(item, text)
+                                  : null,
                             ),
                           ),
                         ),
@@ -173,6 +183,16 @@ class _NeedsYouCardState extends State<NeedsYouCard> {
             ),
     );
   }
+}
+
+/// The first one-to-one chat: it gets quick replies.
+NeedsYouItem? _firstPerson(List<NeedsYouItem> items) {
+  for (final item in items) {
+    if (item.kind == NeedsYouKind.person && item.chat?.group == false) {
+      return item;
+    }
+  }
+  return null;
 }
 
 /// Slides a handled row toward the side it was sent and fades it.
@@ -206,9 +226,13 @@ class _NeedsYouRow extends StatelessWidget {
     required this.divider,
     required this.busy,
     this.http,
+    this.replies,
   });
 
   final NeedsYouItem item;
+
+  /// Set on the row that offers quick replies.
+  final ValueChanged<String>? replies;
   final ValueChanged<NeedsYouAction> onAction;
   final bool divider;
   final bool busy;
@@ -235,47 +259,92 @@ class _NeedsYouRow extends StatelessWidget {
                 : null,
           ),
           padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              leading,
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -.2,
-                        color: colors.ink,
-                      ),
+              Row(
+                children: [
+                  leading,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                item.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: -.2,
+                                  color: colors.ink,
+                                ),
+                              ),
+                            ),
+                            if (item.relationship case final relationship?) ...[
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: ChatTag(
+                                  relationship,
+                                  background: colors.rose.withValues(
+                                    alpha: colors.isDark ? .18 : .1,
+                                  ),
+                                  foreground: colors.rose,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.detail,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: item.overdue
+                                ? colors.warning
+                                : colors.inkSoft,
+                          ),
+                        ),
+                        if (item.hint case final hint?) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            hint,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: colors.muted),
+                          ),
+                        ],
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      item.detail,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: item.overdue ? colors.warning : colors.inkSoft,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (busy)
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    ...actions,
+                ],
               ),
-              const SizedBox(width: 8),
-              if (busy)
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else
-                ...actions,
+              if ((http, item.chat, replies) case (
+                final http?,
+                final chat?,
+                final pick?,
+              ))
+                QuickReplies(
+                  http: http,
+                  item: chat,
+                  onPick: pick,
+                  padding: const EdgeInsets.only(left: 58, top: 10),
+                ),
             ],
           ),
         ),

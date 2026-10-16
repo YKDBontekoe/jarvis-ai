@@ -8,6 +8,7 @@ import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../whatsapp/read_along_screen.dart' show ChatAvatar;
 import '../whatsapp/whatsapp_models.dart';
+import '../home/home_context.dart';
 import 'chat_list.dart';
 
 /// WhatsApp's own green, used only for the small source badge on avatars.
@@ -29,10 +30,18 @@ class ChatRow extends StatelessWidget {
     this.http,
     this.divider = true,
     this.now,
+    this.person,
+    this.footer,
     super.key,
   });
 
   final ChatListItem item;
+
+  /// Who this chat is with, from People: their relationship and keeping in touch.
+  final HomePerson? person;
+
+  /// Under the preview, such as quick replies.
+  final Widget? footer;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   final bool selected;
@@ -72,6 +81,7 @@ class ChatRow extends StatelessWidget {
         if (unread) '${item.unread} unread',
         item.isJarvis ? 'Jarvis' : 'WhatsApp',
         if (item.responding) 'Jarvis is replying',
+        ?person?.relationship,
         ?preview,
         ?context0,
       ].join(', '),
@@ -143,6 +153,22 @@ class ChatRow extends StatelessWidget {
                                     const SizedBox(width: 6),
                                     ChatTag(profile),
                                   ],
+                                  if (person?.relationship
+                                      case final relationship?) ...[
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: ChatTag(
+                                        relationship,
+                                        key: Key(
+                                          'chat-relationship-${item.key}',
+                                        ),
+                                        background: colors.rose.withValues(
+                                          alpha: colors.isDark ? .18 : .1,
+                                        ),
+                                        foreground: colors.rose,
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -174,6 +200,10 @@ class ChatRow extends StatelessWidget {
                             ],
                           ],
                         ),
+                        if (footer case final footer?) ...[
+                          const SizedBox(height: 8),
+                          footer,
+                        ],
                         if (context0 != null) ...[
                           const SizedBox(height: 2),
                           Text(
@@ -261,6 +291,9 @@ class ChatRow extends StatelessWidget {
 
   /// A third, quiet line only when two chats would otherwise look the same.
   String? _context() {
+    if (!item.isJarvis && item.unread == 0 && person?.drift != null) {
+      return person!.drift;
+    }
     if (!duplicate) return null;
     if (item.isJarvis) {
       final started = item.startedAt ?? item.time;
@@ -471,18 +504,22 @@ class ChatTag extends StatelessWidget {
     return Container(
       height: 20,
       padding: const EdgeInsets.symmetric(horizontal: 7),
-      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: background ?? colors.surfaceMuted,
         borderRadius: BorderRadius.circular(7),
       ),
-      child: Text(
-        label,
-        maxLines: 1,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: foreground ?? colors.inkSoft,
+      // Only as wide as the label, even inside a Flexible.
+      child: Center(
+        widthFactor: 1,
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: foreground ?? colors.inkSoft,
+          ),
         ),
       ),
     );
