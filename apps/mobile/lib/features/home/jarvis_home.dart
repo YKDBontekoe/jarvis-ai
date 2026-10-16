@@ -30,6 +30,7 @@ import 'home_context.dart';
 import 'noticed_card.dart';
 import 'right_now_card.dart';
 import 'home_insights.dart';
+import 'home_widget_sync.dart';
 import 'needs_you_card.dart';
 import 'get_started_card.dart';
 import 'next_up.dart' hide greetingFor;
@@ -210,6 +211,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     final briefing = await widget.source.briefing();
     if (!mounted || generation != _generation) return;
     setState(() => _briefing = briefing);
+    _syncWidget();
     await Future.wait([
       for (final item in widget.layout.layout)
         if (tileSpecFor(item.id) case final spec? when spec.load != null)
@@ -222,6 +224,25 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     if (!mounted || generation != _generation || context == null) return;
     setState(() => _context = context);
     widget.chats.setPeople(context.people);
+    _syncWidget();
+  }
+
+  /// Hands the iOS widget what Home now shows.
+  void _syncWidget() {
+    final now = _now;
+    unawaited(
+      HomeWidgetSync.instance.push(
+        HomeWidgetPayload.build(
+          now: now,
+          context: _context,
+          needsYou: needsYouItems(
+            now: now,
+            briefing: _briefing,
+            chats: widget.chats,
+          ),
+        ),
+      ),
+    );
   }
 
   /// Fetches the context again after something on it changed.

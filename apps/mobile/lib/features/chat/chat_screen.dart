@@ -38,6 +38,7 @@ import '../../ui/phosphor_icons.dart';
 import '../devices/device_invoke.dart';
 import '../devices/device_telemetry.dart';
 import '../devices/place_reminder_tracker.dart';
+import '../home/home_widget_sync.dart';
 import '../chats/chat_list.dart';
 import '../chats/chats_screen.dart';
 import '../everything/everything_screen.dart';
@@ -136,6 +137,15 @@ class _ChatScreenState extends _ChatScreenController
     });
     if (widget.skipAuthentication) _restoringSession = false;
     _attachPushListeners();
+    // Taps on the iOS home screen widget.
+    _widgetClicks = HomeWidgetSync.instance.clicks().listen(
+      (destination) => switch (destination) {
+        'ask' => _presentChat(),
+        'voice' => _openTile('voice'),
+        'chats' => _selectTab(JarvisTab.chats),
+        _ => _selectTab(JarvisTab.home),
+      },
+    );
     // Widget tests serve canned responses; a cache shared across them would leak data between tests.
     if (!usesDebugJarvisHttpAdapter) OfflineCache.instance.attach(_http);
     attachJarvisAuthInterceptor(
@@ -317,6 +327,7 @@ class _ChatScreenState extends _ChatScreenController
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     unawaited(PlaceReminderTracker.instance.detach());
+    unawaited(_widgetClicks?.cancel());
     _catchUpTimer?.cancel();
     _chatsTimer?.cancel();
     _chatList.dispose();

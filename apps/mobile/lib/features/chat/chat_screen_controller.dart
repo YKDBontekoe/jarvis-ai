@@ -105,6 +105,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   StreamSubscription<String>? _pushTokenSubscription;
   StreamSubscription<RemoteMessage>? _pushOpenedSubscription;
   StreamSubscription<RemoteMessage>? _pushForegroundSubscription;
+  StreamSubscription<String>? _widgetClicks;
   final Set<String> _shownPushNotifications = {};
   final Set<String> _handledPushActions = {};
   List<ConversationSourceChip> _attachedSources = [];
