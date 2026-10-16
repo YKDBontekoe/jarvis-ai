@@ -89,16 +89,18 @@ int gridRows(List<PlacedTile> placed) => placed.fold(
 );
 
 /// What a new account sees on Home.
+/// Needs you and the Ask bar already cover chats and voice above the tiles,
+/// so the grid opens on the day itself.
 const defaultTileLayout = [
-  TilePlacement('chats', TileSize.wide),
-  TilePlacement('today', TileSize.square),
+  TilePlacement('today', TileSize.wide),
   TilePlacement('tasks', TileSize.square),
-  TilePlacement('voice', TileSize.icon),
+  TilePlacement('chats', TileSize.square),
+  TilePlacement('habits', TileSize.strip),
+  TilePlacement('finance', TileSize.strip),
   TilePlacement('memory', TileSize.icon),
   TilePlacement('journal', TileSize.icon),
   TilePlacement('people', TileSize.icon),
-  TilePlacement('finance', TileSize.strip),
-  TilePlacement('habits', TileSize.strip),
+  TilePlacement('voice', TileSize.icon),
 ];
 
 /// Drops unknown and repeated tiles and moves unsupported sizes to the nearest

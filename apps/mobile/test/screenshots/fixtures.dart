@@ -157,8 +157,25 @@ Map<String, Object?> home() {
         'title': 'Call mum',
         'dueAt': _iso(today.add(const Duration(hours: 19, minutes: 30))),
       },
+      {
+        'id': 'r-late',
+        'title': 'Bring the charger',
+        'status': 'pending',
+        'dueAt': _iso(now.subtract(const Duration(minutes: 20))),
+      },
     ],
     'approvals': approvals(),
+    'latestBriefing': {
+      'id': 'n-brief',
+      'title': 'Your morning briefing',
+      'body':
+          'A calm Friday. The **design review** is at the top of the afternoon, then you fly to Lisbon.\n\n'
+          '- Leave for Schiphol by 15:30\n'
+          '- Sam asked to move dinner to 19:45\n'
+          '- The bank summary is waiting on your approval',
+      'createdAt': _iso(today.add(const Duration(hours: 8))),
+      'read': false,
+    },
     'calendar': {
       'connected': true,
       'events': [

@@ -9,7 +9,6 @@ import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../../json_maps.dart';
 import '../chat/mcp_setup.dart';
-import '../chat/tool_catalog.dart' show humanizeToolName;
 import '../chats/chat_list.dart';
 import '../entities/entity_ref.dart' show entityDestinationPrefix;
 import '../settings/codex_sign_in_card.dart';
@@ -20,8 +19,13 @@ import '../tiles/tile_controller.dart';
 import '../tiles/tile_grid.dart';
 import '../tiles/tile_models.dart';
 import '../tiles/tile_registry.dart';
+import '../whatsapp/catch_up_card.dart';
 import '../whatsapp/whatsapp_models.dart';
+import 'ask_bar.dart';
+import 'brief_card.dart';
 import 'clock_header.dart';
+import 'home_insights.dart';
+import 'needs_you_card.dart';
 import 'get_started_card.dart';
 import 'next_up.dart' hide greetingFor;
 import '../../l10n/l10n.dart';
@@ -84,6 +88,12 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   /// Drives the parallax glow, the receding greeting and the compact header.
   final _scroll = ScrollController();
 
+  /// The Ask bar's text, so a follow-up on the brief can start it.
+  final _ask = TextEditingController();
+
+  /// The brief dismissed here, hidden before the server confirms it.
+  String? _briefDismissed;
+
   DateTime get _now => widget.clock?.call() ?? DateTime.now();
 
   @override
@@ -143,6 +153,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     _tick?.cancel();
     _generation++;
     _scroll.dispose();
+    _ask.dispose();
     super.dispose();
   }
 
@@ -261,6 +272,14 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
 
   Map<String, TileData?> get _tileData => {..._data, 'chats': _chatsData()};
 
+  /// Today's brief, unless it was read or dismissed.
+  Map<String, dynamic>? get _briefNote {
+    final note = jsonObject(_briefing?['latestBriefing']);
+    if (!BriefCard.shows(note)) return null;
+    if (asJsonString(note!['id']) == _briefDismissed) return null;
+    return note;
+  }
+
   bool _isLoading(String id) =>
       widget.ready && tileSpecFor(id)?.load != null && !_data.containsKey(id);
 
@@ -305,6 +324,64 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
       if (other?.load != null && widget.layout.contains(id)) {
         unawaited(_loadTile(other!, generation));
       }
+    }
+  }
+
+  /// A button on a Needs you row: reminders are handled right here, the rest
+  /// open where they live or go to Jarvis.
+  Future<void> _needsYou(NeedsYouItem item, NeedsYouAction action) async {
+    switch ((item.kind, action)) {
+      case (NeedsYouKind.approval, _):
+        widget.onOpen('approvals');
+      case (NeedsYouKind.task, _):
+        widget.onOpen('tasks');
+      case (NeedsYouKind.catchUp, _):
+        await showCatchUpSheet(context, [
+          for (final chat in item.chats)
+            CatchUpDigestEntry(
+              id: chat.key,
+              title: chat.title,
+              catchUp: chat.whatsApp!.catchUp!,
+              onOpen: () => widget.onOpenChat(chat.key),
+            ),
+        ]);
+      case (NeedsYouKind.person, NeedsYouAction.draft):
+        widget.onSuggestion?.call(
+          'Draft a short reply to ${item.title} on WhatsApp, in the language of our chat.',
+        );
+      case (NeedsYouKind.person, _):
+        widget.onOpenChat(item.id);
+      case (NeedsYouKind.reminder, NeedsYouAction.done) ||
+          (NeedsYouKind.reminder, NeedsYouAction.snooze):
+        await _remind(
+          item.id,
+          action == NeedsYouAction.done ? 'done' : 'snooze',
+        );
+      case (NeedsYouKind.reminder, _):
+        widget.onOpen('reminders');
+    }
+  }
+
+  Future<void> _remind(String id, String action) async {
+    if (_pending.contains(id)) return;
+    setState(() => _pending.add(id));
+    final outcome = await widget.source.act('reminders', action, id);
+    if (!mounted) return;
+    setState(() => _pending.remove(id));
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(outcome.message)));
+    widget.source.invalidate();
+    final briefing = await widget.source.briefing();
+    if (mounted) setState(() => _briefing = briefing);
+  }
+
+  Future<void> _dismissBrief(String id) async {
+    setState(() => _briefDismissed = id);
+    try {
+      await widget.source.http.post<dynamic>('/api/v1/notifications/$id/read');
+    } catch (_) {
+      // Hidden for now; it comes back on the next load if the server missed it.
     }
   }
 
@@ -389,14 +466,58 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  if (!_editing && approvals.isNotEmpty)
-                    PopIn(
-                      from: .9,
-                      child: _ApprovalsBanner(
-                        approvals: approvals,
-                        onTap: () => widget.onOpen('approvals'),
+                  if (!_editing) ...[
+                    FadeSlideIn(
+                      index: 1,
+                      child: AskBar(
+                        controller: _ask,
+                        busy: widget.jarvisBusy,
+                        suggestions: homeSuggestions(
+                          now: now,
+                          briefing: _briefing,
+                          chats: widget.chats,
+                        ),
+                        onSubmit: widget.onSuggestion,
+                        onVoice: () => widget.onOpen('voice'),
                       ),
                     ),
+                    const SizedBox(height: 28),
+                    if (_briefing != null)
+                      FadeSlideIn(
+                        index: 2,
+                        child: NeedsYouCard(
+                          items: needsYouItems(
+                            now: now,
+                            briefing: _briefing,
+                            chats: widget.chats,
+                          ),
+                          http: widget.source.http,
+                          pending: _pending,
+                          onSeeAll: approvals.isEmpty
+                              ? null
+                              : () => widget.onOpen('approvals'),
+                          onAction: (item, action) =>
+                              unawaited(_needsYou(item, action)),
+                        ),
+                      ),
+                    const SizedBox(height: 20),
+                    if (_briefNote case final note?)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: FadeSlideIn(
+                          index: 3,
+                          child: BriefCard(
+                            note: note,
+                            onDismiss: () => unawaited(
+                              _dismissBrief(asJsonString(note['id']) ?? ''),
+                            ),
+                            onFollowUp: widget.onSuggestion == null
+                                ? null
+                                : () => _ask.text = 'About my morning brief: ',
+                          ),
+                        ),
+                      ),
+                  ],
                   if (widget.ready && _briefing != null) ...[
                     CodexSignInCard(http: widget.source.http),
                     GetStartedCard(
@@ -603,89 +724,6 @@ class _CompactHeader extends StatelessWidget {
                     ],
                   ),
                 ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Pending approvals stay in view on Home: Jarvis is waiting on the person.
-class _ApprovalsBanner extends StatelessWidget {
-  const _ApprovalsBanner({required this.approvals, required this.onTap});
-
-  final List<Map<String, dynamic>> approvals;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = JarvisColors.of(context);
-    final count = approvals.length;
-    final names = approvals
-        .take(3)
-        .map((item) {
-          final name = humanizeToolName(asJsonString(item['toolName']) ?? '');
-          return name[0].toUpperCase() + name.substring(1);
-        })
-        .join(' · ');
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Sheen(
-        trigger: count,
-        borderRadius: BorderRadius.circular(tileRadius),
-        child: Material(
-          color: colors.accentSoft,
-          borderRadius: BorderRadius.circular(tileRadius),
-          child: InkWell(
-            key: const Key('home-approvals'),
-            borderRadius: BorderRadius.circular(tileRadius),
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-              child: Row(
-                children: [
-                  Icon(
-                    PhosphorIconsRegular.shieldCheck,
-                    size: 22,
-                    color: colors.accent,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$count ${count == 1 ? 'approval' : 'approvals'} waiting',
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w600,
-                            color: colors.ink,
-                          ),
-                        ),
-                        if (names.isNotEmpty)
-                          Text(
-                            names,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: colors.inkSoft,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    'Review',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                      color: colors.accent,
-                    ),
-                  ),
-                ],
               ),
             ),
           ),

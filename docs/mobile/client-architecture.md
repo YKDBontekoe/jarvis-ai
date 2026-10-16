@@ -34,9 +34,9 @@ While anything is served from the cache, or a request cannot reach the server, `
 |------|------------------|
 | `features/chat/` | Chat transcript, composer, SignalR realtime, approvals, generative UI, browser timeline |
 | `features/shell/` | Tab bar (`jarvis_tab_bar.dart`), wide-layout rail, the Cupertino tab symbols (`tab_icons.dart`), and `utility_pages.dart`, which maps a destination name to its page |
-| `features/home/` | Home: the next-event header (`clock_header.dart`, `next_up.dart`), the tile grid screen (`jarvis_home.dart`), the first-run checklist |
+| `features/home/` | Home: the next-event header (`clock_header.dart`, `next_up.dart`), the Ask bar with suggestions for the moment (`ask_bar.dart`, `homeSuggestions` in `home_insights.dart`), Needs you (`needs_you_card.dart`, `needsYouItems`: approvals, due reminders with Done / +10 min, people waiting on a reply, tasks that stopped to ask, catch-ups), today's morning brief from `/home` `latestBriefing` (`brief_card.dart`, dismissing marks the notification read), the tile grid screen (`jarvis_home.dart`), the first-run checklist |
 | `features/tiles/` | The tile system: registry of every feature, sizes, grid packing, saved layout, live data loaders, the grid with edit mode |
-| `features/chats/` | Chats: one list of Jarvis conversations and linked WhatsApp chats (`chat_list.dart`, `chats_screen.dart`) |
+| `features/chats/` | Chats: one list of Jarvis conversations and linked WhatsApp chats (`chat_list.dart`, `chats_screen.dart`, `chat_row.dart`). It opens on For you (`ChatList.grouped`): Waiting on you (people with unread messages, longest wait first, and groups whose catch-up asks you something), With Jarvis (reminder chats folded into one row), Quiet (busy groups folded into one row with a recap). The other filters group by day under pinned headers. Swipe pins a Jarvis chat or marks a WhatsApp chat read (optimistic, rolled back on failure); press and hold opens `showChatPreview` |
 | `features/everything/` | Everything: compact feature launchers by category, pinned shortcuts, and the size preview / pin-to-Home sheet |
 | `features/projects/` | Projects list, project page (instructions, chats, files, tasks), editor, and the move-to-project sheet; reached from the Projects tile |
 | `features/review/` | Weekly review screen and mood trend chart |
