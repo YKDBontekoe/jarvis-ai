@@ -67,6 +67,15 @@ await step('greeting streams deltas and titles the conversation', async () => {
   return { deltas: deltas.length, lastMessage: listed.lastMessage };
 });
 
+await step('home context describes the day', async () => {
+  const context = (await request('GET', '/home/context')).data;
+  assert.equal(typeof context.dayLine, 'string');
+  assert(context.dayLine.length > 0, 'expected a day line');
+  assert(Array.isArray(context.people) && Array.isArray(context.noticed), 'expected people and insights');
+  await request('POST', '/home/context/dismiss', { id: 'wind_down:test', kind: 'wind_down' }, [204]);
+  return { dayLine: context.dayLine, hero: context.hero?.kind ?? null };
+});
+
 await step('reminder tool schedules a durable reminder', async () => {
   const mark = events.length;
   const reply = (await send('Remind me to stretch in 10 minutes')).data;

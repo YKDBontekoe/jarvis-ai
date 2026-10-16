@@ -43,6 +43,7 @@ internal static class ApiServiceRegistration
         services.AddHostedService<Channels.ChannelNotificationForwarder>();
         services.AddScoped<Jarvis.Application.WhatsApp.IWhatsAppSender, Channels.BridgeWhatsAppSender>();
         services.AddSingleton<Channels.WhatsAppReadAlongReceiver>();
+        services.AddSingleton<Jarvis.Application.WhatsApp.WhatsAppQuickReplyCache>();
         services.AddHostedService(provider => provider.GetRequiredService<Channels.WhatsAppReadAlongReceiver>());
         services.AddHostedService<Channels.WhatsAppReminderScanner>();
         services.AddHostedService<Channels.WhatsAppCatchUpScanner>();
