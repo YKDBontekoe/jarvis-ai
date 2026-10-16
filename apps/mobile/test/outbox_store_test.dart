@@ -88,4 +88,103 @@ void main() {
     await tester.tap(find.text('Cancel'));
     expect(cancelled, 1);
   });
+
+  group('arrivedMessageId', () {
+    final queuedAt = DateTime.utc(2026, 10, 16, 12);
+    OutboxMessage queued(String content) => OutboxMessage(
+      id: 'o-$content',
+      conversationId: 'c1',
+      content: content,
+      queuedAt: queuedAt,
+    );
+    Map<String, dynamic> stored(
+      String id,
+      String content, {
+      String role = 'user',
+      int minute = 0,
+    }) => {
+      'id': id,
+      'role': role,
+      'content': content,
+      'createdAt': queuedAt.add(Duration(minutes: minute)).toIso8601String(),
+    };
+
+    test('finds a message the server took before the connection dropped', () {
+      final recent = [stored('m1', 'On my way')];
+
+      expect(
+        arrivedMessageId(
+          queued('On my way'),
+          recent,
+          existing: {'m1'},
+          claimed: {},
+        ),
+        'm1',
+      );
+      expect(
+        arrivedMessageId(
+          queued('Something else'),
+          recent,
+          existing: {'m1'},
+          claimed: {},
+        ),
+        isNull,
+      );
+    });
+
+    test('ignores replies, older messages and other roles', () {
+      final recent = [
+        stored('m1', 'On my way', role: 'assistant'),
+        stored('m2', 'On my way', minute: -5),
+      ];
+
+      expect(
+        arrivedMessageId(
+          queued('On my way'),
+          recent,
+          existing: {'m1', 'm2'},
+          claimed: {},
+        ),
+        isNull,
+      );
+    });
+
+    test('two identical texts typed offline are two messages', () {
+      // The first one went out during this flush, so it was not there when the flush began.
+      final recent = [stored('m-sent-now', 'Yes', minute: 1)];
+
+      expect(
+        arrivedMessageId(
+          queued('Yes'),
+          recent,
+          existing: {'m-old'},
+          claimed: {},
+        ),
+        isNull,
+      );
+    });
+
+    test('one stored message is only ever taken by one queued item', () {
+      final recent = [stored('m1', 'Yes')];
+      final claimed = <String>{};
+
+      final first = arrivedMessageId(
+        queued('Yes'),
+        recent,
+        existing: {'m1'},
+        claimed: claimed,
+      );
+      claimed.add(first!);
+
+      expect(
+        arrivedMessageId(
+          queued('Yes'),
+          recent,
+          existing: {'m1'},
+          claimed: claimed,
+        ),
+        isNull,
+      );
+    });
+  });
 }
