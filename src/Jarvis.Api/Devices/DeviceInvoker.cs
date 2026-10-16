@@ -9,7 +9,7 @@ namespace Jarvis.Api.Devices;
 public sealed class SignalRDeviceInvoker(IHubContext<JarvisEventsHub> hub) : IDeviceInvoker
 {
     private readonly ConcurrentDictionary<string, (Guid OwnerId, DevicePresence Presence)> _connections = new();
-    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<string>> _pending = new();
+    private readonly ConcurrentDictionary<Guid, (Guid OwnerId, TaskCompletionSource<string> Completion)> _pending = new();
 
     public IReadOnlyList<DevicePresence> List(Guid ownerId) =>
         _connections.Values.Where(item => item.OwnerId == ownerId).Select(item => item.Presence).ToArray();
@@ -35,7 +35,7 @@ public sealed class SignalRDeviceInvoker(IHubContext<JarvisEventsHub> hub) : IDe
 
         var invokeId = Guid.CreateVersion7();
         var completion = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _pending[invokeId] = completion;
+        _pending[invokeId] = (ownerId, completion);
         try
         {
             await hub.Clients.Group(JarvisEventsHub.OwnerGroupName(ownerId)).SendAsync("device.invoke", new
@@ -57,9 +57,11 @@ public sealed class SignalRDeviceInvoker(IHubContext<JarvisEventsHub> hub) : IDe
         }
     }
 
-    public bool Complete(Guid invokeId, string? result, string? error)
+    public bool Complete(Guid ownerId, Guid invokeId, string? result, string? error)
     {
-        if (!_pending.TryGetValue(invokeId, out var completion)) return false;
+        // Only the owner whose device was asked can answer, even if another account learns the id.
+        if (!_pending.TryGetValue(invokeId, out var pending) || pending.OwnerId != ownerId) return false;
+        var completion = pending.Completion;
         var text = !string.IsNullOrWhiteSpace(error) ? error.Trim()
             : string.IsNullOrWhiteSpace(result) ? "The device returned an empty result."
             : result.Trim();

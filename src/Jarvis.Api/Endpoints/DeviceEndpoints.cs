@@ -29,8 +29,8 @@ internal static class DeviceEndpoints
         }).WithName("SaveDeviceSettings");
 
         api.MapPost("/devices/invoke/{invokeId:guid}/result", (Guid invokeId, DeviceInvokeResultRequest request,
-            IDeviceInvoker devices) =>
-            devices.Complete(invokeId, request.Result, request.Error)
+            IDeviceInvoker devices, ICurrentUser currentUser) =>
+            devices.Complete(currentUser.OwnerId, invokeId, request.Result, request.Error)
                 ? Results.NoContent()
                 : Results.NotFound()).WithName("CompleteDeviceInvoke");
 
