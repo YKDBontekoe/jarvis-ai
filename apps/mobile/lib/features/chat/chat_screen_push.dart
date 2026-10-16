@@ -25,13 +25,12 @@ mixin _ChatScreenPush on _ChatScreenController {
       if (settings.authorizationStatus == AuthorizationStatus.denied) return;
       if (_signedOut || _signingOut) return;
       _attachPushListeners();
-      _pushTokenSubscription ??= messaging.onTokenRefresh.listen((token) {
-        unawaited(_registerPushToken(token).catchError((_) {}));
+      // onRegistered emits the Firebase Installation ID, now and whenever it
+      // changes. The API sends to that ID, so subscribe before registering.
+      _pushTokenSubscription ??= messaging.onRegistered.listen((fid) {
+        unawaited(_registerPushToken(fid).catchError((_) {}));
       });
-      final token = await messaging.getToken();
-      if (token != null && !_signedOut && !_signingOut) {
-        await _registerPushToken(token);
-      }
+      await messaging.register();
     } on FirebaseException catch (error) {
       if (mounted) {
         setState(

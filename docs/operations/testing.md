@@ -3,10 +3,14 @@
 ## Unit tests (.NET)
 
 ```sh
-dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
+dotnet test --project tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
 ```
 
 Covers domain rules, agents, endpoints helpers, compaction, MCP redaction, and related logic.
+
+The .NET suites use xunit.v3 on Microsoft.Testing.Platform (opted in through `global.json`), so pass the project with
+`--project`; the old positional path form is rejected. xUnit1051 (use `TestContext.Current.CancellationToken`) is
+advisory in `tests/.editorconfig` until the existing call sites are migrated; new tests should follow it.
 
 ## Python unit tests (release/altstore, generated production Compose)
 
@@ -20,7 +24,7 @@ python3 -m unittest tests/unit/compose/test_production_compose.py   # needs a .N
 Requires Docker (Testcontainers + pgvector image):
 
 ```sh
-dotnet test tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj
+dotnet test --project tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj
 ```
 
 ## Flutter

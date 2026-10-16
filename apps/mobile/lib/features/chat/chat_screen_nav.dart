@@ -290,7 +290,7 @@ mixin _ChatScreenNav on _ChatScreenController {
       _pushForegroundSubscription = null;
       if (Firebase.apps.isNotEmpty) {
         try {
-          await FirebaseMessaging.instance.deleteToken();
+          await FirebaseMessaging.instance.unregister();
         } on FirebaseException {
           // The server registration is also removed above when the API is reachable.
         }

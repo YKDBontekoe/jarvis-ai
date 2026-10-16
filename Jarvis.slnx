@@ -1,0 +1,34 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/Jarvis.Agents/Jarvis.Agents.csproj" />
+    <Project Path="src/Jarvis.Api/Jarvis.Api.csproj" />
+    <Project Path="src/Jarvis.AppHost/Jarvis.AppHost.csproj" />
+    <Project Path="src/Jarvis.Application/Jarvis.Application.csproj" />
+    <Project Path="src/Jarvis.Domain/Jarvis.Domain.csproj" />
+    <Project Path="src/Jarvis.Infrastructure/Jarvis.Infrastructure.csproj" />
+    <Project Path="src/Jarvis.Mcp/Jarvis.Mcp.csproj" />
+    <Project Path="src/Jarvis.Memory/Jarvis.Memory.csproj" />
+    <Project Path="src/Jarvis.ServiceDefaults/Jarvis.ServiceDefaults.csproj" />
+    <Project Path="src/Jarvis.Workflows/Jarvis.Workflows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/eval/Jarvis.MemoryEval/Jarvis.MemoryEval.csproj" />
+    <Project Path="tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj" />
+    <Project Path="tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/eval/">
+    <Project Path="tests/eval/Jarvis.CompactionEval/Jarvis.CompactionEval.csproj" />
+    <Project Path="tests/eval/Jarvis.DreamingEval/Jarvis.DreamingEval.csproj" />
+    <Project Path="tests/eval/Jarvis.ExtractionEval/Jarvis.ExtractionEval.csproj" />
+    <Project Path="tests/eval/Jarvis.FileEval/Jarvis.FileEval.csproj" />
+    <Project Path="tests/eval/Jarvis.GraphEval/Jarvis.GraphEval.csproj" />
+  </Folder>
+  <Folder Name="/workers/">
+    <Project Path="workers/Jarvis.Worker/Jarvis.Worker.csproj" />
+  </Folder>
+</Solution>

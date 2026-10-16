@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **.NET SDK** 10.x (see `global.json` / `.cursor/install.sh` pin `10.0.302`)
+- **.NET SDK** 10.x (see `global.json` / `.cursor/install.sh` pin `10.0.402`)
 - **Codex CLI** installed; sign it in from the app (Home → Sign Jarvis in to ChatGPT) or with `codex login`
 - **Docker** (or Podman) — Aspire container dependencies and Testcontainers
 - **Flutter** — for mobile/web client work

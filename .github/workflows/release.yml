@@ -31,7 +31,7 @@ jobs:
       build: ${{ steps.checks.outputs.build }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Wait for backend and iOS builds
         id: checks
@@ -63,7 +63,7 @@ jobs:
           echo "Backend run ${BACKEND_RUN_ID}; iOS run ${IOS_RUN_ID}."
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -93,7 +93,7 @@ jobs:
         run: bash scripts/deploy/runner_deploy.sh
 
       - name: Download iOS IPA
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: jarvis-altstore-ipa
           path: dist

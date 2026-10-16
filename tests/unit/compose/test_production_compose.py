@@ -118,6 +118,25 @@ class ProductionComposeTests(unittest.TestCase):
         self.assertLess(deploy.index("--rm --no-deps jarvis-migrate"), deploy.index("-d --no-build --remove-orphans"))
         self.assertIn("flock -n 9", deploy)
 
+    def test_temporal_runs_the_server_image_with_explicit_schema_and_namespace_steps(self) -> None:
+        # temporalio/auto-setup is retired; its three jobs are separate, ordered services.
+        for name in ("temporal-schema", "temporal", "temporal-namespace", "temporal-ui"):
+            self.assertNotIn("auto-setup", self.service(name)["image"], name)
+            self.assertNotIn("latest", self.service(name)["image"], name)
+        self.assertTrue(self.service("temporal")["image"].startswith("temporalio/server:"))
+        self.assertEqual("no", self.service("temporal-schema")["restart"])
+        self.assertEqual("no", self.service("temporal-namespace")["restart"])
+        self.assertEqual("service_completed_successfully",
+                         self.service("temporal")["depends_on"]["temporal-schema"]["condition"])
+        for name in ("jarvis-api", "jarvis-worker"):
+            self.assertEqual("service_completed_successfully",
+                             self.service(name)["depends_on"]["temporal-namespace"]["condition"], name)
+        # The password reaches the server and the schema tool through the environment, never the config file.
+        config = (REPO_ROOT / "infra" / "temporal" / "config.yaml").read_text(encoding="utf-8")
+        self.assertIn("passwordCommand", config)
+        self.assertNotIn("temporal-test-secret", config)
+        self.assertEqual("temporal-test-secret", self.service("temporal-schema")["environment"]["SQL_PASSWORD"])
+
     def test_application_containers_are_hardened(self) -> None:
         for name in ("jarvis-api", "jarvis-worker", "mcp-runner", "jarvis-migrate", "backup"):
             service = self.service(name)

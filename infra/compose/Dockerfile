@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1
 ARG PROJECT_PATH
 
-FROM node:22-slim AS codex-cli
+FROM node:24-slim AS codex-cli
 RUN npm install --global @openai/codex@0.145.0
 
 # uv provides uvx, which runs PyPI MCP connectors installed from the app catalog.
-FROM ghcr.io/astral-sh/uv:0.12.22 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.1 AS uv
 
-FROM golang:1.27.1-alpine AS github-mcp-server
-ARG GITHUB_MCP_SERVER_VERSION=v1.12.2
+FROM golang:1.27.2-alpine AS github-mcp-server
+ARG GITHUB_MCP_SERVER_VERSION=v2.0.2
 RUN apk add --no-cache git
 WORKDIR /source
 RUN git clone --depth 1 --branch "$GITHUB_MCP_SERVER_VERSION" \
@@ -17,7 +17,7 @@ RUN git clone --depth 1 --branch "$GITHUB_MCP_SERVER_VERSION" \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" \
       -o /out/github-mcp-server ./cmd/github-mcp-server
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0.302 AS publish
+FROM mcr.microsoft.com/dotnet/sdk:10.0.402 AS publish
 ARG PROJECT_PATH
 ARG SENTRY_ORG=
 ARG SENTRY_PROJECT=

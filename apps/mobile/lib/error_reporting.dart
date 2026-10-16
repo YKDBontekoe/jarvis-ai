@@ -72,8 +72,9 @@ void installErrorReporting() {
   };
 }
 
-/// Drops logs below warning before they leave the device.
-SentryLog? filterSentryLog(SentryLog log) {
+/// Drops logs below warning before they leave the device. Sentry 10 always
+/// collects logs, so this callback is the only gate.
+SentryLog? filterSentryLog(SentryLog log, Hint hint) {
   if (log.level == SentryLogLevel.trace ||
       log.level == SentryLogLevel.debug ||
       log.level == SentryLogLevel.info) {

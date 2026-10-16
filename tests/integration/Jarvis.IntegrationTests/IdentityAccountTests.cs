@@ -53,7 +53,7 @@ public sealed class IdentityAccountTests : IAsyncLifetime
     private ServiceProvider? _services;
     private AccountTokenOptions _tokens = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _postgres.StartAsync();
         _tokens = AccountTokenOptions.From(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -75,7 +75,7 @@ public sealed class IdentityAccountTests : IAsyncLifetime
         await database.Database.MigrateAsync();
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_services is not null)
             await _services.DisposeAsync();

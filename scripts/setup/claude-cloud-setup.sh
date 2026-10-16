@@ -11,13 +11,13 @@
 # to the pinned SDK version otherwise. Safe to re-run.
 set -euo pipefail
 
-DOTNET_VERSION_FALLBACK="10.0.302"
+DOTNET_VERSION_FALLBACK="10.0.402"
 DOTNET_ROOT="$HOME/.dotnet"
 FLUTTER_ROOT="$HOME/flutter"
 # Keep in sync with src/Jarvis.AppHost/LocalDevelopment.cs.
 IMAGES=(
   pgvector/pgvector:pg18
-  temporalio/temporal:latest
+  temporalio/temporal:1.9.1
   chrislusf/seaweedfs:4.47
   livekit/livekit-server:latest
   clamav/clamav:stable

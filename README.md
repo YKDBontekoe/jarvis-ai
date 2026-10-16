@@ -97,7 +97,7 @@ Pull requests targeting `main` run [`.github/workflows/ci.yml`](.github/workflow
 Run deterministic unit tests with:
 
 ```sh
-dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
+dotnet test --project tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
 scripts/ci/run-python-unit-tests.sh
 ```
 
@@ -121,7 +121,7 @@ dotnet run --project workers/Jarvis.Worker --no-launch-profile &
 PostgreSQL integration tests use Testcontainers and the same pgvector PostgreSQL image as the app. Run them on a machine with Docker available:
 
 ```sh
-dotnet test tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj
+dotnet test --project tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj
 ```
 
 Aspire exposes the Temporal development UI at `http://localhost:8233`. The AppHost (`src/Jarvis.AppHost`) is the only orchestration: there are no hand-written Compose files. Optional parts are switched on by name with `JARVIS_FEATURES` (or `--Jarvis:Features=`), the same names locally and in production:
@@ -246,7 +246,7 @@ Jarvis can manage MCP servers in conversation. `list_host_mcp_servers` lists ope
 
 Home Assistant's first-party MCP Server integration is supported over its Streamable HTTP `/api/mcp` endpoint. Enable the integration in Home Assistant and expose only the entities Jarvis may access. Set `HOME_ASSISTANT_MCP_URL` to its HTTPS `/api/mcp` URL, then turn on the `home-assistant` feature (`JARVIS_FEATURES`) locally or in production. In Jarvis → Integrations, use **Set or rotate token** and paste a Home Assistant long-lived access token; Jarvis stores it under `home-assistant` → `token`, encrypted, and adds the `Bearer` scheme only when connecting. The feature allowlists the Home Assistant server's exposed tools; Jarvis requires approval for every call by default. Use HTTPS because the per-owner token is sent in an Authorization header. See the [Home Assistant MCP Server setup](https://www.home-assistant.io/integrations/mcp_server) for enabling the server and exposing entities.
 
-GitHub uses the [official GitHub MCP server](https://github.com/github/github-mcp-server), pinned to v1.12.2 and built into the API container. The `github` feature launches it over stdio with only its repository, issue, and pull request toolsets enabled. Store a least-privilege GitHub personal access token in Jarvis → Integrations under `github` → `token`; it is injected into that server process for the signed-in owner only. All exposed GitHub tools require approval. Model inference stays on Codex unless the owner selects OpenRouter in Settings → Models.
+GitHub uses the [official GitHub MCP server](https://github.com/github/github-mcp-server), pinned to v2.0.2 and built into the API container. The `github` feature launches it over stdio with only its repository, issue, and pull request toolsets enabled. Store a least-privilege GitHub personal access token in Jarvis → Integrations under `github` → `token`; it is injected into that server process for the signed-in owner only. All exposed GitHub tools require approval. Model inference stays on Codex unless the owner selects OpenRouter in Settings → Models.
 
 The Flutter default API URL is `http://localhost:5082`. On Android emulators use `--dart-define=JARVIS_API_URL=http://10.0.2.2:5082`. On a physical device, point the API URL at the machine's reachable address and configure the Compose port bindings and firewall for the device. The app expects the API host to be reachable and joins `/hubs/events` for incremental response updates.
 

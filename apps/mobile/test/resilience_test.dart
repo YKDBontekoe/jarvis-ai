@@ -34,14 +34,15 @@ void main() {
   test('sentry logs below warning are dropped', () {
     SentryLog log(SentryLogLevel level) => SentryLog(
       timestamp: DateTime.utc(2026),
+      traceId: SentryId.newId(),
       level: level,
       body: 'status',
       attributes: const {},
     );
 
-    expect(filterSentryLog(log(SentryLogLevel.info)), isNull);
+    expect(filterSentryLog(log(SentryLogLevel.info), Hint()), isNull);
     final warning = log(SentryLogLevel.warn);
-    expect(filterSentryLog(warning), same(warning));
+    expect(filterSentryLog(warning, Hint()), same(warning));
   });
 
   test('error reporting preserves Sentry platform and framework handlers', () {

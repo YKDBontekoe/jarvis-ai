@@ -24,7 +24,6 @@ Future<void> main() async {
     options.dsn = sentryDsn;
     options.sendDefaultPii = false;
     options.tracesSampleRate = kReleaseMode ? 0.2 : 1.0;
-    options.enableLogs = true;
     options.attachScreenshot = false;
     // attachViewHierarchy stays at the SDK default (off). A view dump would include chat text.
     options.replay.sessionSampleRate = 0;

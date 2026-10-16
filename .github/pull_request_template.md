@@ -67,8 +67,8 @@ Merging to `main` runs [`.github/workflows/create-release-tag.yml`](.github/work
 
 Required by [`AGENTS.md`](AGENTS.md) ("Verify every change"). Tick what ran, paste the results, and say why a step did not run. Never fill in results that were not produced.
 
-- [ ] Unit tests: `dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj`
-- [ ] Integration tests (persistence changes): `dotnet test tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj` (Docker)
+- [ ] Unit tests: `dotnet test --project tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj`
+- [ ] Integration tests (persistence changes): `dotnet test --project tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj` (Docker)
 - [ ] Flutter: `cd apps/mobile && flutter analyze && flutter test`
 - [ ] Smoke test (backend changes): `scripts/dev/smoke.sh`, plus the new endpoint or flow exercised against `http://localhost:5082/api/v1`
 - [ ] Screenshots (UI changes): `app_screenshots.dart`, `ui_polish.dart`, `layout_audit.dart`, with a new case per new screen or state; images attached below

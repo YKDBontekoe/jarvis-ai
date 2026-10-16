@@ -4,7 +4,7 @@ Quick map of high-signal paths. Grep from repo root is fine; start here to reduc
 
 ## Solution entry
 
-- `Jarvis.sln` — all C# projects
+- `Jarvis.slnx` — all C# projects
 - `src/Jarvis.Api/Program.cs` — HTTP pipeline and endpoint map
 - `workers/Jarvis.Worker/Program.cs` — Temporal worker + activities
 - `src/Jarvis.AppHost/Program.cs` — local orchestration

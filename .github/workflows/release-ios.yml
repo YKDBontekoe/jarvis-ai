@@ -31,7 +31,7 @@ jobs:
       build: ${{ steps.version.outputs.build }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -66,6 +66,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.47.7'
           channel: stable
           cache: true
 
@@ -148,7 +149,7 @@ jobs:
 
       - name: Create GitHub Release
         if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Jarvis ${{ steps.version.outputs.version }}
@@ -159,7 +160,7 @@ jobs:
           files: dist/Jarvis.ipa
 
       - name: Upload IPA artifact for server publishing
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jarvis-altstore-ipa
           path: dist/Jarvis.ipa
@@ -175,7 +176,7 @@ jobs:
           printf '{"version":"%s","build":"%s"}\n' "${VERSION}" "${BUILD}" > dist/release-meta.json
 
       - name: Upload release metadata
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jarvis-release-meta
           path: dist/release-meta.json
@@ -193,10 +194,10 @@ jobs:
     environment: production
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download IPA artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: jarvis-altstore-ipa
           path: dist

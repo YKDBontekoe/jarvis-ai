@@ -137,24 +137,34 @@ public sealed class NotificationPushWorker(
     private async Task<HttpResponseMessage> SendAsync(string projectId, PushDeliveryWork work, string accessToken,
         CancellationToken cancellationToken)
     {
-        var notification = work.Notification;
         var client = httpClientFactory.CreateClient("firebase-messaging");
         using var request = new HttpRequestMessage(HttpMethod.Post,
             $"https://fcm.googleapis.com/v1/projects/{Uri.EscapeDataString(projectId)}/messages:send");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        request.Content = JsonContent.Create(new
-        {
-            message = new
-            {
-                token = work.DeviceToken,
-                notification = new { title = notification.Title, body = notification.Body },
-                data = work.Data,
-                android = new { priority = "HIGH", notification = new { channel_id = "jarvis_notifications" } },
-                apns = new { headers = new Dictionary<string, string> { ["apns-priority"] = "10" },
-                    payload = new { aps = BuildApsPayload(notification.Type) } }
-            }
-        });
+        request.Content = JsonContent.Create(BuildMessage(work));
         return await client.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Targets the device by Firebase Installation ID (<c>fid</c>), which is what firebase_messaging 17 registers.
+    /// Devices that registered before that upgrade still hold an FCM registration token; those always contain a
+    /// colon and an Installation ID never does, so they keep using the legacy <c>token</c> field until the app
+    /// next launches and replaces them.
+    /// </summary>
+    internal static Dictionary<string, object?> BuildMessage(PushDeliveryWork work)
+    {
+        var notification = work.Notification;
+        var message = new Dictionary<string, object?>();
+        message[work.DeviceToken.Contains(':') ? "token" : "fid"] = work.DeviceToken;
+        message["notification"] = new { title = notification.Title, body = notification.Body };
+        message["data"] = work.Data;
+        message["android"] = new { priority = "HIGH", notification = new { channel_id = "jarvis_notifications" } };
+        message["apns"] = new
+        {
+            headers = new Dictionary<string, string> { ["apns-priority"] = "10" },
+            payload = new { aps = BuildApsPayload(notification.Type) }
+        };
+        return new Dictionary<string, object?> { ["message"] = message };
     }
 
     /// <summary>

@@ -48,7 +48,7 @@ fi
 
 # Backend: tools (dotnet-ef) + restore. Build is left to the session.
 dotnet tool restore
-dotnet restore Jarvis.sln
+dotnet restore Jarvis.slnx
 
 # Mobile: pub dependencies (also warms the Flutter engine cache).
 (cd apps/mobile && flutter pub get)

@@ -118,7 +118,7 @@ origin for both HTTP and SignalR. An optional repository variable
 origin, configure the API's `Cors:AllowedOrigins` as well. Native builds retain
 their existing `JARVIS_API_URL` configuration.
 
-The web build uses Flutter 3.44.4, packages rendering resources locally, disables
+The web build uses Flutter 3.47.7, packages rendering resources locally, disables
 the generated service worker, and serves assets with `Cache-Control: no-cache`
 so a refreshed browser picks up new releases. It does not cache private API data
 for offline access. Existing browser microphone and file-picker support is reused;
@@ -151,3 +151,21 @@ web server against a separate local API, continue passing
 6. Never expose a local Aspire (Development) instance publicly
 
 Detailed operator steps remain in [README.md](../../README.md#production-deployment).
+
+## Upgrading Temporal
+
+Production Temporal no longer uses `temporalio/auto-setup`, which Temporal retired. The compose stack runs a one-shot
+schema step, `temporalio/server` and a one-shot namespace step (see [temporal.md](../backend/temporal.md)), all pinned
+to `TEMPORAL_VERSION` (default `1.32.1`).
+
+Temporal advises moving one minor version at a time. A database last served by `auto-setup:latest` (Temporal 1.29.x) was
+rehearsed jumping straight to 1.32.1: the schema upgraded in place, the `default` namespace kept its ID and an open
+workflow survived. For a production database, take a backup first and step through the intermediate minors if you want
+the supported path, setting `TEMPORAL_VERSION` in the environment file and redeploying at each step:
+
+```sh
+TEMPORAL_VERSION=1.30.8   # then 1.31.4, then 1.32.1
+```
+
+Unset it to return to the pinned default. Raise the default in `src/Jarvis.AppHost/ProductionDeployment.cs`
+(`TemporalVersion`) together with the `temporalio/ui` pin when moving forward.
