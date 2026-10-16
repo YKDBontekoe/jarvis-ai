@@ -69,13 +69,53 @@ class ChatsScreen extends StatefulWidget {
 
 class _ChatsScreenState extends State<ChatsScreen> {
   final _query = TextEditingController();
+  final _searchFocus = FocusNode();
   var _filter = ChatFilter.forYou;
   var _remindersOpen = false;
 
+  /// When each chat last moved, so a newer message can light its row up.
+  final Map<String, DateTime?> _seen = {};
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_key);
+  }
+
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_key);
     _query.dispose();
+    _searchFocus.dispose();
     super.dispose();
+  }
+
+  /// ⌘K or Ctrl+K jumps to the search field.
+  bool _key(KeyEvent event) {
+    if (event is! KeyDownEvent ||
+        event.logicalKey != LogicalKeyboardKey.keyK ||
+        !(HardwareKeyboard.instance.isMetaPressed ||
+            HardwareKeyboard.instance.isControlPressed) ||
+        !mounted ||
+        !(TickerMode.valuesOf(context).enabled)) {
+      return false;
+    }
+    _searchFocus.requestFocus();
+    _query.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _query.text.length,
+    );
+    return true;
+  }
+
+  /// True once for a chat whose last message is newer than the one seen
+  /// before; the first look at a chat never counts.
+  bool _arrived(ChatListItem item) {
+    final known = _seen.containsKey(item.key);
+    final before = _seen[item.key];
+    _seen[item.key] = item.time;
+    final time = item.time;
+    return known && time != null && (before == null || time.isAfter(before));
   }
 
   void _select(ChatFilter filter) {
@@ -199,6 +239,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   child: TextField(
                     key: const Key('chats-filter-field'),
                     controller: _query,
+                    focusNode: _searchFocus,
                     onChanged: (_) => setState(() {}),
                     style: TextStyle(fontSize: 16, color: colors.ink),
                     decoration: InputDecoration(
@@ -493,37 +534,107 @@ class _ChatsScreenState extends State<ChatsScreen> {
         onTrigger: () => _markRead(item),
       );
     }
+    final arrived = _arrived(item);
     return FadeSlideIn(
       key: ValueKey(item.key),
       index: index,
       offset: 10,
-      child: SwipeActions(
-        id: item.key,
-        start: start,
-        bottomGap: 0,
-        radius: 18,
-        child: ChatRow(
-          item: item,
-          selected: item.key == widget.selectedKey,
-          http: widget.http,
-          showSource: _filter != ChatFilter.whatsapp,
-          duplicate: duplicate,
-          waiting: waiting,
-          query: query,
-          divider: divider,
-          now: now,
-          person: widget.chats.personFor(item),
-          footer: replies && http != null && reply != null && !item.group
-              ? QuickReplies(
-                  http: http,
-                  item: item,
-                  onPick: (text) => reply(item, text),
-                )
-              : null,
-          onTap: () => widget.onOpen(item),
-          onLongPress: () => unawaited(_preview(item)),
+      child: _Arrival(
+        key: ValueKey('${item.key}@${item.time?.microsecondsSinceEpoch}'),
+        fresh: arrived,
+        child: SwipeActions(
+          id: item.key,
+          start: start,
+          bottomGap: 0,
+          radius: 18,
+          child: ChatRow(
+            item: item,
+            selected: item.key == widget.selectedKey,
+            http: widget.http,
+            showSource: _filter != ChatFilter.whatsapp,
+            duplicate: duplicate,
+            waiting: waiting,
+            query: query,
+            divider: divider,
+            now: now,
+            person: widget.chats.personFor(item),
+            footer: replies && http != null && reply != null && !item.group
+                ? QuickReplies(
+                    http: http,
+                    item: item,
+                    onPick: (text) => reply(item, text),
+                  )
+                : null,
+            onTap: () => widget.onOpen(item),
+            onLongPress: () => unawaited(_preview(item)),
+          ),
         ),
       ),
+    );
+  }
+}
+
+/// A row whose chat just got a new message: a soft accent wash that fades,
+/// and one sheen across it.
+class _Arrival extends StatefulWidget {
+  const _Arrival({required this.fresh, required this.child, super.key});
+
+  final bool fresh;
+  final Widget child;
+
+  @override
+  State<_Arrival> createState() => _ArrivalState();
+}
+
+class _ArrivalState extends State<_Arrival>
+    with SingleTickerProviderStateMixin {
+  late final bool _fresh = widget.fresh;
+  late final AnimationController _wash = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+    value: _fresh ? 1 : 0,
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_fresh || _wash.isAnimating || _wash.value == 0) return;
+    if (JarvisMotion.reduced(context)) {
+      _wash.value = 0;
+    } else {
+      unawaited(
+        _wash.animateTo(0, curve: Curves.easeOut).orCancel.catchError((_) {}),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _wash.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_fresh) return widget.child;
+    final colors = JarvisColors.of(context);
+    final row = AnimatedBuilder(
+      animation: _wash,
+      child: widget.child,
+      builder: (context, child) => DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.accentSoft.withValues(alpha: _wash.value),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: child,
+      ),
+    );
+    if (JarvisMotion.reduced(context)) return row;
+    return Sheen(
+      delay: Duration.zero,
+      strength: .22,
+      borderRadius: BorderRadius.circular(18),
+      child: row,
     );
   }
 }

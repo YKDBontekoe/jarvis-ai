@@ -93,6 +93,7 @@ class ChatRow extends StatelessWidget {
         builder: (context, highlight) => InkWell(
           key: Key('chat-${item.key}'),
           borderRadius: BorderRadius.circular(18),
+          hoverColor: colors.surfaceMuted.withValues(alpha: .7),
           onTap: onTap,
           onLongPress: onLongPress,
           onHighlightChanged: highlight,

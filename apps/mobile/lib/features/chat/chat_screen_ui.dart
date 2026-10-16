@@ -164,6 +164,7 @@ mixin _ChatScreenUi on _ChatScreenController {
       chat: chat,
       account: item.account,
       initialDraft: draft,
+      person: _chatList.personFor(item),
     );
     if (_isWide) {
       _showInPane('whatsapp-chat', page);

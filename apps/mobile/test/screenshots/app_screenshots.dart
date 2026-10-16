@@ -3,7 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/api/api_config.dart';
 import 'package:jarvis_mobile/features/chat/chat_entries.dart';
 import 'package:jarvis_mobile/features/chat/chat_widgets.dart';
-import 'package:jarvis_mobile/features/home/jarvis_home.dart' show debugHomeClock;
+import 'package:jarvis_mobile/features/home/jarvis_home.dart'
+    show debugHomeClock;
 import 'package:jarvis_mobile/theme.dart';
 import 'package:jarvis_mobile/ui/jarvis_ui.dart';
 import 'package:jarvis_mobile/ui/phosphor_icons.dart';
@@ -472,4 +473,51 @@ void main() {
     await openChat(tester);
     await capture(tester, '20-desktop-chat');
   });
+
+  for (final dark in [false, true]) {
+    final mode = dark ? 'dark' : 'light';
+    screenshotTest('desktop chats $mode', (tester) async {
+      useDesktop(tester);
+      http.routes['GET /api/v1/people/p-rosa'] = {
+        'person': {
+          'id': 'p-rosa',
+          'name': 'Rosa',
+          'relationship': 'Partner',
+          'daysUntilBirthday': 23,
+          'turningAge': 31,
+          'notes': 'Allergic to hazelnuts. Loves the Rijksmuseum on Sundays.',
+        },
+        'facts': [
+          {'predicate': 'works_at', 'value': 'Booking.com, product design'},
+          {'predicate': 'favourite_food', 'value': 'Ramen from Fou Fow'},
+          {'predicate': 'training', 'value': 'Runs on Tuesday mornings'},
+        ],
+      };
+      final now = DateTime.now();
+      String at(int minutes) =>
+          now.subtract(Duration(minutes: minutes)).toUtc().toIso8601String();
+      http.routes['GET /api/v1/channels/wa1/chats/open/messages'] = [
+        for (final (id, fromMe, text, minutes) in [
+          ('m1', false, 'Zullen we zondag naar het Rijks?', 900),
+          ('m2', true, 'Ja leuk! Om 11 uur?', 880),
+          ('m3', false, 'Perfect. Ik reserveer', 870),
+          ('m4', false, 'Je bent de beste', 840),
+        ])
+          {
+            'id': id,
+            'chatId': '+31633333333',
+            'fromMe': fromMe,
+            'sender': fromMe ? null : 'Rosa',
+            'text': text,
+            'sentAt': at(minutes),
+          },
+      ];
+      await start(tester, dark: dark);
+      await openTab(tester, 'chats');
+      await tester.tap(find.byKey(const Key('chat-whatsapp:wa1:+31633333333')));
+      await settle(tester);
+      expect(find.byKey(const Key('whatsapp-person-panel')), findsOneWidget);
+      await capture(tester, '21-desktop-chats-about-$mode');
+    });
+  }
 }

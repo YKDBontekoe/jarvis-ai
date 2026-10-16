@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jarvis_mobile/features/home/home_context.dart';
 import 'package:jarvis_mobile/features/whatsapp/whatsapp_chat_screen.dart';
 import 'package:jarvis_mobile/features/whatsapp/whatsapp_models.dart';
 
@@ -51,8 +52,13 @@ void main() {
     http.on('POST', '$_piet/react', {'sent': true});
   });
 
-  Future<void> show(WidgetTester tester, {String? draft}) async {
-    tester.view.physicalSize = const Size(900, 1800);
+  Future<void> show(
+    WidgetTester tester, {
+    String? draft,
+    HomePerson? person,
+    Size size = const Size(900, 1800),
+  }) async {
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -63,6 +69,7 @@ void main() {
           channelId: _channel,
           chat: _pietChat,
           initialDraft: draft,
+          person: person,
           pollInterval: const Duration(hours: 1),
         ),
       ),
@@ -73,9 +80,36 @@ void main() {
   Future<void> close(WidgetTester tester) =>
       tester.pumpWidget(const SizedBox.shrink());
 
-  testWidgets('a quick reply waits in the composer until Send', (
-    tester,
-  ) async {
+  testWidgets('wide screens show who the chat is with', (tester) async {
+    http.on('GET', '/api/v1/people/p-piet', {
+      'person': {'id': 'p-piet', 'name': 'Piet', 'daysUntilBirthday': 12},
+      'facts': [
+        {'predicate': 'likes', 'value': 'Indonesian food'},
+      ],
+    });
+    const piet = HomePerson(
+      personId: 'p-piet',
+      name: 'Piet',
+      relationship: 'Uncle',
+      connectionId: _channel,
+      chatId: '+31611111111',
+      usualReplyMinutes: 30,
+    );
+
+    await show(tester, person: piet, size: const Size(1300, 900));
+    expect(find.byKey(const Key('whatsapp-person-panel')), findsOneWidget);
+    expect(find.text('Uncle'), findsOneWidget);
+    expect(find.text('Birthday in 12 days'), findsOneWidget);
+    expect(find.text('You usually reply in 30 min'), findsOneWidget);
+    expect(find.textContaining('Indonesian food'), findsOneWidget);
+    await close(tester);
+
+    await show(tester, person: piet, size: const Size(600, 1000));
+    expect(find.byKey(const Key('whatsapp-person-panel')), findsNothing);
+    await close(tester);
+  });
+
+  testWidgets('a quick reply waits in the composer until Send', (tester) async {
     await show(tester, draft: 'What time?');
 
     final field = tester.widget<TextField>(

@@ -1,13 +1,13 @@
-import 'dart:typed_data';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/chats/chat_list.dart';
 import 'package:jarvis_mobile/features/chats/chats_screen.dart';
 import 'package:jarvis_mobile/features/whatsapp/read_along_screen.dart';
 import 'package:jarvis_mobile/features/whatsapp/whatsapp_models.dart';
 import 'package:jarvis_mobile/theme.dart';
+import 'package:jarvis_mobile/ui/jarvis_ui.dart' show Sheen;
 
 import 'support/fixture_http.dart';
 
@@ -537,6 +537,50 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Energy contracts'), findsOneWidget);
     expect(find.text('Lisbon trip'), findsNothing);
+  });
+
+  testWidgets('Cmd+K or Ctrl+K jumps to search', (tester) async {
+    await show(tester);
+    final field = find.byKey(const Key('chats-filter-field'));
+    bool focused() =>
+        tester.widget<TextField>(field).focusNode?.hasFocus ?? false;
+    expect(focused(), isFalse);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    expect(focused(), isTrue);
+  });
+
+  testWidgets('a new message lights its row up once', (tester) async {
+    await linkWhatsApp(tester);
+    await show(tester);
+    Finder washes() => find.descendant(
+      of: find.byKey(const Key('chat-whatsapp:wa:+31611')),
+      matching: find.byType(DecoratedBox),
+    );
+    final before = find.byType(Sheen).evaluate().length;
+
+    http.on('GET', '/api/v1/channels/wa/chats', {
+      'chats': [
+        {
+          'chatId': '+31611',
+          'name': 'Sam',
+          'isGroup': false,
+          'lastMessageAt': _iso(now),
+          'preview': 'Never mind, 19:00 works',
+          'unreadCount': 3,
+        },
+      ],
+    });
+    await tester.runAsync(() => chats.loadWhatsApp(http.client()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byType(Sheen).evaluate().length, before + 1);
+    expect(washes(), findsWidgets);
+    await tester.pumpAndSettle();
   });
 }
 

@@ -17,8 +17,7 @@ List<Map<String, Object?>> conversations() {
       'id': conversationId,
       'title': 'Weekend in Lisbon',
       'updatedAt': _iso(now.subtract(const Duration(minutes: 4))),
-      'lastMessage':
-          "Here's an easy-going plan that leaves room to wander.",
+      'lastMessage': "Here's an easy-going plan that leaves room to wander.",
       'lastMessageRole': 'assistant',
       'pinned': true,
     },
