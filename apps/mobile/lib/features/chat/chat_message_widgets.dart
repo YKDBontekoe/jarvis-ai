@@ -631,63 +631,69 @@ class _TypingIndicatorState extends State<TypingIndicator>
               ),
               child: AnimatedBuilder(
                 animation: _controller,
-                builder: (context, _) => Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (var i = 0; i < 3; i++)
-                      Transform.translate(
-                        offset: Offset(
-                          0,
-                          -3 * _pulse((_controller.value + i * .18) % 1),
-                        ),
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 2.5),
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Color.lerp(
-                              colors.outlineStrong,
-                              colors.inkSoft,
-                              _pulse((_controller.value + i * .18) % 1),
+                builder: (context, _) {
+                  // The controller also keeps the elapsed time, so under Reduce Motion only the movement stops.
+                  final motion = JarvisMotion.reduced(context)
+                      ? 0.0
+                      : _controller.value;
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (var i = 0; i < 3; i++)
+                        Transform.translate(
+                          offset: Offset(
+                            0,
+                            -3 * _pulse((motion + i * .18) % 1),
+                          ),
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color.lerp(
+                                colors.outlineStrong,
+                                colors.inkSoft,
+                                _pulse((motion + i * .18) % 1),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    const SizedBox(width: 10),
-                    Flexible(
-                      child: ExcludeSemantics(
-                        // Light runs along the words while Jarvis thinks.
-                        child: ShaderMask(
-                          blendMode: BlendMode.srcIn,
-                          shaderCallback: (bounds) => LinearGradient(
-                            begin: Alignment(-3 + 5 * _controller.value, 0),
-                            end: Alignment(-1 + 5 * _controller.value, 0),
-                            colors: [
-                              colors.inkSoft,
-                              colors.accent,
-                              colors.inkSoft,
-                            ],
-                            stops: const [.25, .5, .75],
-                          ).createShader(bounds),
-                          child: Text(
-                            _statusText(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: colors.inkSoft,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: ExcludeSemantics(
+                          // Light runs along the words while Jarvis thinks.
+                          child: ShaderMask(
+                            blendMode: BlendMode.srcIn,
+                            shaderCallback: (bounds) => LinearGradient(
+                              begin: Alignment(-3 + 5 * motion, 0),
+                              end: Alignment(-1 + 5 * motion, 0),
+                              colors: [
+                                colors.inkSoft,
+                                colors.accent,
+                                colors.inkSoft,
                               ],
+                              stops: const [.25, .5, .75],
+                            ).createShader(bounds),
+                            child: Text(
+                              _statusText(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: colors.inkSoft,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
@@ -728,7 +734,18 @@ class _StreamingPulseState extends State<StreamingPulse>
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 900),
-  )..repeat(reverse: true);
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // A still dot under Reduce Motion needs no ticker running behind it.
+    if (JarvisMotion.reduced(context)) {
+      _controller.stop();
+    } else if (!_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
+  }
 
   @override
   void dispose() {
