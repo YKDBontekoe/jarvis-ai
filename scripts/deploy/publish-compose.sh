@@ -18,7 +18,7 @@ mkdir -p "${out}"
 out="$(cd "${out}" && pwd)"
 rm -f "${out}/docker-compose.yaml"
 
-sdk_image="${DOTNET_SDK_IMAGE:-mcr.microsoft.com/dotnet/sdk:10.0.302}"
+sdk_image="${DOTNET_SDK_IMAGE:-mcr.microsoft.com/dotnet/sdk:10.0.402}"
 args=(--operation publish --step publish --output-path "${out}" "--Jarvis:Features=${JARVIS_FEATURES:-}")
 
 if command -v dotnet >/dev/null 2>&1 && dotnet --list-sdks 2>/dev/null | grep -q '^10\.'; then

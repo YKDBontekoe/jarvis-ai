@@ -165,6 +165,9 @@ public static class JarvisSentry
         options.MinimumEventLevel = LogLevel.None;
         // Native Sentry spans stay on so agent tracing can call StartSpan. The OpenTelemetry processor
         // still forwards Jarvis activities. UseOtlp would turn those Sentry spans off.
+        // Sentry marks UseOpenTelemetry obsolete in favour of UseOtlp (Sentry.OpenTelemetry.Exporter), which turns the
+        // native spans off and would also drop the agent tracing in Jarvis.Agents. Moving needs that tracing reworked
+        // and checked against a live Sentry project, so the suppression stays until then.
 #pragma warning disable CS0618
         options.UseOpenTelemetry();
 #pragma warning restore CS0618

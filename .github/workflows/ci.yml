@@ -22,10 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -33,10 +33,10 @@ jobs:
         run: dotnet tool restore
 
       - name: Restore
-        run: dotnet restore Jarvis.sln
+        run: dotnet restore Jarvis.slnx
 
       - name: Build
-        run: dotnet build Jarvis.sln --configuration Release --no-restore
+        run: dotnet build Jarvis.slnx --configuration Release --no-restore
 
       - name: Verify EF migrations match the model
         run: >-
@@ -46,7 +46,7 @@ jobs:
 
       - name: Unit tests
         run: >-
-          dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
+          dotnet test --project tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
           --configuration Release
           --no-build
           --verbosity normal
@@ -60,22 +60,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
       - name: Restore
-        run: dotnet restore Jarvis.sln
+        run: dotnet restore Jarvis.slnx
 
       - name: Build
-        run: dotnet build Jarvis.sln --configuration Release --no-restore
+        run: dotnet build Jarvis.slnx --configuration Release --no-restore
 
       - name: Integration tests
         run: >-
-          dotnet test tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj
+          dotnet test --project tests/integration/Jarvis.IntegrationTests/Jarvis.IntegrationTests.csproj
           --configuration Release
           --verbosity normal
 
@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Python unit tests
         run: scripts/ci/run-python-unit-tests.sh
@@ -97,12 +97,12 @@ jobs:
         working-directory: workers/whatsapp-bridge
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Install
         run: npm ci
@@ -118,12 +118,12 @@ jobs:
         working-directory: apps/mobile
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.4'
+          flutter-version: '3.47.7'
           channel: stable
           cache: true
 
@@ -145,7 +145,7 @@ jobs:
         run: bash scripts/ci/stage-web.sh
 
       - name: Upload web distribution
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jarvis-web-client
           path: infra/web/dist/
@@ -168,20 +168,20 @@ jobs:
             build-args: PROJECT_PATH=workers/Jarvis.Worker/Jarvis.Worker.csproj
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Download hosted web client
         if: matrix.name == 'api'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: jarvis-web-client
           path: infra/web/dist
 
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ${{ matrix.dockerfile }}

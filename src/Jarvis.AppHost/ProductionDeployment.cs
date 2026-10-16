@@ -101,17 +101,43 @@ internal static class ProductionDeployment
             s.Networks = ["data", "temporal-data"];
         });
 
-        builder.Service("temporal", "temporalio/auto-setup:latest", s =>
+        // temporalio/auto-setup is retired, so schema setup, the server and the namespace are separate steps. Both
+        // one-shot steps are idempotent, so they rerun safely against an existing database on every `up`.
+        builder.Service("temporal-schema", $"temporalio/admin-tools:{TemporalVersion}", s =>
+        {
+            s.Restart = "no";
+            s.Entrypoint = ["/bin/sh", "-ec"];
+            s.Command = [TemporalSchemaScript];
+            s.Env(("SQL_PLUGIN", "postgres12"), ("SQL_HOST", "temporal-postgres"), ("SQL_PORT", "5432"),
+                ("SQL_USER", "temporal"), ("SQL_PASSWORD", TemporalPassword));
+            s.After("temporal-postgres", Healthy);
+            s.Networks = ["temporal-data"];
+        });
+
+        // The image does not template its config file, so config.yaml is static and reads the database password from
+        // TEMPORAL_DB_PASSWORD through passwordCommand.
+        builder.Service("temporal", $"temporalio/server:{TemporalVersion}", s =>
         {
             s.Restart = "unless-stopped";
-            s.Env(("DB", "postgres12"), ("DB_PORT", "5432"), ("POSTGRES_USER", "temporal"),
-                ("POSTGRES_PWD", TemporalPassword), ("POSTGRES_SEEDS", "temporal-postgres"), ("DBNAME", "temporal"),
-                ("VISIBILITY_DBNAME", "temporal_visibility"));
-            s.After("temporal-postgres", Healthy);
+            s.Env(("TEMPORAL_SERVER_CONFIG_FILE_PATH", "/etc/temporal/config.yaml"),
+                ("TEMPORAL_DB_PASSWORD", TemporalPassword));
+            s.Volumes.Add(Bind("./infra/temporal/config.yaml", "/etc/temporal/config.yaml", readOnly: true));
+            s.After("temporal-schema", Completed);
             s.Networks = ["application", "temporal-data"];
         });
 
-        builder.Service("temporal-ui", "temporalio/ui:latest", s =>
+        // auto-setup used to register the default namespace, which the API and worker use.
+        builder.Service("temporal-namespace", $"temporalio/admin-tools:{TemporalVersion}", s =>
+        {
+            s.Restart = "no";
+            s.Entrypoint = ["/bin/sh", "-c"];
+            s.Command = [TemporalNamespaceScript];
+            s.Env(("TEMPORAL_ADDRESS", "temporal:7233"));
+            s.After("temporal", Started);
+            s.Networks = ["application"];
+        });
+
+        builder.Service("temporal-ui", $"temporalio/ui:{TemporalUiVersion}", s =>
         {
             s.Restart = "unless-stopped";
             s.Env(("TEMPORAL_ADDRESS", "temporal:7233"));
@@ -228,7 +254,7 @@ internal static class ProductionDeployment
             s.Volumes.Add(Bind("${FIREBASE_SERVICE_ACCOUNT_FILE:-/dev/null}", "/run/secrets/firebase-service-account.json",
                 readOnly: true));
             s.Volumes.Add(Bind(KeysDirectory, "/var/lib/jarvis-data-protection-keys"));
-            s.After("postgres", Healthy).After("temporal", Started).After("garage", Healthy)
+            s.After("postgres", Healthy).After("temporal-namespace", Completed).After("garage", Healthy)
                 .After("clamav", Healthy).After("livekit", Started).After("signal-cli", Started)
                 .After("whatsapp-bridge", Started);
             s.Healthcheck = Check(["CMD", "node", "-e",
@@ -278,7 +304,7 @@ internal static class ProductionDeployment
             s.Env(SharedAppEnvironment());
             s.Volumes.Add(Bind("${CODEX_HOME_DIR:?Set CODEX_HOME_DIR}", "/codex"));
             s.Volumes.Add(Bind(KeysDirectory, "/var/lib/jarvis-data-protection-keys"));
-            s.After("jarvis-api", Healthy).After("garage", Healthy).After("temporal", Started);
+            s.After("jarvis-api", Healthy).After("garage", Healthy).After("temporal-namespace", Completed);
             s.Networks = ["application", "data", "mcp"];
             if (features.Coding) s.AddCodingCheckout();
         });
@@ -410,6 +436,32 @@ internal static class ProductionDeployment
 
     private const string Healthy = "service_healthy";
     private const string Started = "service_started";
+    private const string Completed = "service_completed_successfully";
+
+    // Temporal advises upgrading one minor version at a time. Operators stepping an older database forward
+    // override TEMPORAL_VERSION (docs/operations/deployment-and-ci.md); the server and its tools stay in lockstep.
+    private const string TemporalVersion = "${TEMPORAL_VERSION:-1.32.1}";
+    private const string TemporalUiVersion = "2.56.0";
+
+    // temporal-sql-tool reads the connection from SQL_* variables. setup-schema is a no-op on an existing
+    // database and update-schema applies only the missing versions.
+    private static readonly string TemporalSchemaScript = """
+        for database in temporal:temporal temporal_visibility:visibility; do
+          name="${database%%:*}"; dir="${database##*:}"
+          temporal-sql-tool --db "$name" setup-schema -v 0.0
+          temporal-sql-tool --db "$name" update-schema -d "/etc/temporal/schema/postgresql/v12/$dir/versioned"
+        done
+        """.Replace("$", "$$");
+
+    private static readonly string TemporalNamespaceScript = """
+        for attempt in $(seq 1 60); do
+          if temporal operator namespace describe --namespace default >/dev/null 2>&1 \
+            || temporal operator namespace create --namespace default >/dev/null 2>&1; then exit 0; fi
+          sleep 2
+        done
+        echo "Could not register the Temporal default namespace" >&2
+        exit 1
+        """.Replace("$", "$$");
 
     private static void Service(this IDistributedApplicationBuilder builder, string name, string? image,
         Action<Service> configure) =>

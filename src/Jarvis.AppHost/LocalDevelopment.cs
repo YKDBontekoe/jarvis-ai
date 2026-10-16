@@ -26,7 +26,7 @@ internal static class LocalDevelopment
         var livekitApiKey = builder.Configuration["LIVEKIT_API_KEY"] ?? "devkey";
         var livekitApiSecret = builder.Configuration["LIVEKIT_API_SECRET"] ?? "jarvis-local-livekit-development-secret";
 
-        var temporal = builder.AddContainer("temporal", "temporalio/temporal", "latest")
+        var temporal = builder.AddContainer("temporal", "temporalio/temporal", "1.9.1")
             .WithArgs("server", "start-dev", "--ip", "0.0.0.0", "--db-filename", "/home/temporal/temporal.db")
             .WithEndpoint(targetPort: 7233, port: 7233, name: "grpc")
             .WithEndpoint(targetPort: 8233, port: 8233, name: "ui")

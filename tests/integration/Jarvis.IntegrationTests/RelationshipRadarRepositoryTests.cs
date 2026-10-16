@@ -16,14 +16,14 @@ public sealed class RelationshipRadarRepositoryTests : IAsyncLifetime
     private const string Lid = "100000000000001@lid";
     private const string OtherLid = "100000000000002@lid";
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _postgres.StartAsync();
         await using var database = CreateDbContext();
         await database.Database.MigrateAsync();
     }
 
-    public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();
+    public ValueTask DisposeAsync() => _postgres.DisposeAsync();
 
     [Fact]
     public async Task A_chat_belongs_to_one_person_and_links_are_owner_scoped()

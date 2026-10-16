@@ -62,7 +62,7 @@ bash .cursor/install.sh
 ```
 
 ```sh
-dotnet test tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
+dotnet test --project tests/unit/Jarvis.UnitTests/Jarvis.UnitTests.csproj
 ```
 
 Flutter: `cd apps/mobile && flutter test`.

@@ -1,0 +1,5 @@
+# Applies to every test project under tests/.
+[*.cs]
+# xunit.v3 asks every CancellationToken-accepting call in a test to pass TestContext.Current.CancellationToken.
+# The suite predates it (~880 call sites), so the rule is advisory until those are migrated; new tests should follow it.
+dotnet_diagnostic.xUnit1051.severity = suggestion

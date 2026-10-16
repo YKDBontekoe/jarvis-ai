@@ -7,7 +7,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-DOTNET_VERSION="10.0.302"
+DOTNET_VERSION="10.0.402"
 DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
 export DOTNET_NOLOGO=1
@@ -41,6 +41,6 @@ echo "==> Restoring dotnet local tools (dotnet-ef)"
 dotnet tool restore
 
 echo "==> Restoring and building the solution"
-dotnet build Jarvis.sln -c Debug
+dotnet build Jarvis.slnx -c Debug
 
 echo "==> Install complete"
