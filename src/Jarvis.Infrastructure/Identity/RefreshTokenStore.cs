@@ -91,6 +91,14 @@ public sealed class RefreshTokenStore(JarvisDbContext database)
             .ExecuteUpdateAsync(setters => setters.SetProperty(token => token.RevokedAt, now), cancellationToken);
     }
 
+    /// <summary>
+    /// Removes tokens that expired before <paramref name="expiredBefore"/>. Revoked tokens that have not expired stay:
+    /// presenting one again is how a stolen, already-rotated token is noticed.
+    /// </summary>
+    public Task<int> PruneAsync(DateTimeOffset expiredBefore, CancellationToken cancellationToken) =>
+        database.AuthRefreshTokens.Where(token => token.ExpiresAt < expiredBefore)
+            .ExecuteDeleteAsync(cancellationToken);
+
     public static string Hash(string token) =>
         Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 

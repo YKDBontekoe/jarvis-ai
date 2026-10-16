@@ -126,4 +126,30 @@ public sealed class IdentityAccountTests : IAsyncLifetime
         Assert.False((await refreshTokens.RotateAsync(rotated.RefreshToken, TimeSpan.FromDays(1), CancellationToken.None)).Succeeded);
         await refreshTokens.RevokeAsync(rotated.RefreshToken, CancellationToken.None);
     }
+
+    [Fact]
+    public async Task Pruning_removes_long_expired_refresh_tokens_but_keeps_live_and_revoked_ones()
+    {
+        await using var scope = _services!.CreateAsyncScope();
+        var refreshTokens = scope.ServiceProvider.GetRequiredService<RefreshTokenStore>();
+        var database = scope.ServiceProvider.GetRequiredService<Jarvis.Infrastructure.Persistence.JarvisDbContext>();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<JarvisUser>>();
+        var email = $"prune-{Guid.NewGuid():N}@example.com";
+        var user = new JarvisUser { Id = Guid.CreateVersion7(), UserName = email, Email = email, EmailConfirmed = true };
+        Assert.True((await users.CreateAsync(user, "Correct-horse-1")).Succeeded);
+
+        var longGone = await refreshTokens.IssueAsync(user.Id, TimeSpan.FromDays(-3), CancellationToken.None);
+        var live = await refreshTokens.IssueAsync(user.Id, TimeSpan.FromDays(30), CancellationToken.None);
+        var rotatedAway = await refreshTokens.IssueAsync(user.Id, TimeSpan.FromDays(30), CancellationToken.None);
+        var replacement = await refreshTokens.RotateAsync(rotatedAway, TimeSpan.FromDays(30), CancellationToken.None);
+
+        var removed = await refreshTokens.PruneAsync(DateTimeOffset.UtcNow.AddDays(-1), CancellationToken.None);
+
+        Assert.Equal(1, removed);
+        Assert.False(await database.AuthRefreshTokens.AnyAsync(t => t.TokenHash == RefreshTokenStore.Hash(longGone)));
+        Assert.True(await database.AuthRefreshTokens.AnyAsync(t => t.TokenHash == RefreshTokenStore.Hash(live)));
+        // The rotated-away token is still known, so replaying it still revokes the whole session.
+        Assert.False((await refreshTokens.RotateAsync(rotatedAway, TimeSpan.FromDays(30), CancellationToken.None)).Succeeded);
+        Assert.False((await refreshTokens.RotateAsync(replacement.RefreshToken, TimeSpan.FromDays(30), CancellationToken.None)).Succeeded);
+    }
 }
