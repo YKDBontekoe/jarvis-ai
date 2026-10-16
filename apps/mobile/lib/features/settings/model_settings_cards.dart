@@ -279,6 +279,7 @@ mixin _ModelSettingsCards on _ModelSettingsController {
           Padding(
             padding: const EdgeInsets.only(top: 12),
             child: DropdownButtonFormField<String>(
+              isExpanded: true,
               key: const Key('reasoning-effort'),
               initialValue: selectedEffort,
               decoration: InputDecoration(

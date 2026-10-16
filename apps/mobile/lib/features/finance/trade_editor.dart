@@ -131,6 +131,7 @@ class _TradeFormState extends State<_TradeForm> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true,
                       key: const Key('trade-asset-type'),
                       initialValue: _assetType,
                       decoration: const InputDecoration(labelText: 'Type'),

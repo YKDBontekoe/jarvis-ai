@@ -275,9 +275,13 @@ class _Confidence extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            '$percent% sure',
-            style: TextStyle(fontSize: 12, color: colors.muted),
+          Flexible(
+            child: Text(
+              '$percent% sure',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, color: colors.muted),
+            ),
           ),
         ],
       ),

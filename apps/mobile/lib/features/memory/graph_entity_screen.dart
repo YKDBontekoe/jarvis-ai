@@ -192,6 +192,7 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
           builder: (context, setDialog) => AlertDialog(
             title: const Text('Merge another entity into this one'),
             content: DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: absorbId,
               items: [
                 for (final item in others)
@@ -442,6 +443,7 @@ class _EntityEditDialogState extends State<_EntityEditDialog> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _type,
             decoration: const InputDecoration(labelText: 'Type'),
             items: [

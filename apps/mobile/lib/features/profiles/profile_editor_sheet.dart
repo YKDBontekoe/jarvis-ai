@@ -237,6 +237,7 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
             }),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _memoryScope,
             decoration: const InputDecoration(labelText: 'Memory recall'),
             items: const [
@@ -248,6 +249,7 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _modelClass ?? '',
             decoration: const InputDecoration(labelText: 'Model class'),
             items: const [

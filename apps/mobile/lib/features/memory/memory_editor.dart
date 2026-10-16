@@ -64,6 +64,7 @@ class _MemoryEditorDialogState extends State<_MemoryEditorDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _kind,
             decoration: const InputDecoration(labelText: 'Type'),
             items: [

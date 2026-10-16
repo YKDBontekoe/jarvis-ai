@@ -369,6 +369,7 @@ class _AutomationStudioScreenState extends State<AutomationStudioScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
       children: [
         DropdownButtonFormField<String>(
+          isExpanded: true,
           key: const Key('studio-rule'),
           initialValue: _ruleId,
           decoration: const InputDecoration(labelText: 'Automation'),

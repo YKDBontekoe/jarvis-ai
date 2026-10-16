@@ -30,7 +30,7 @@ void main() {
       const Size(393, 852),
       const Size(430, 932),
     ]) {
-      for (final scale in [1.0, 2.0]) {
+      for (final scale in [1.0, 2.0, 3.0]) {
         screenshotTest(
           '${brightness.name} polished shell at ${size.width.toInt()}pt, text $scale',
           (tester) async {

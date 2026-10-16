@@ -8,7 +8,7 @@ import 'fixtures.dart';
 import 'harness.dart';
 
 /// Opens every utility page on a phone and a small phone, in light and dark,
-/// and fails on layout overflows or a toolbar squeezed below its height.
+/// and at the largest text size, and fails on layout overflows or a toolbar squeezed below its height.
 /// Writes a screenshot of each page. Run:
 /// flutter test test/screenshots/layout_audit.dart
 const destinations = [
@@ -47,9 +47,11 @@ void main() {
   setUpAll(loadAppFonts);
   setUp(mockPlatformChannels);
 
-  for (final (name, size) in [
-    ('phone', const Size(393, 852)),
-    ('small', const Size(320, 640)),
+  // "large-text" is the biggest accessibility text size on a small phone.
+  for (final (name, size, textScale) in [
+    ('phone', const Size(393, 852), 1.0),
+    ('small', const Size(320, 640), 1.0),
+    ('large-text', const Size(320, 640), 3.0),
   ]) {
     for (final destination in destinations) {
       screenshotTest('$destination on $name', (tester) async {
@@ -64,6 +66,12 @@ void main() {
             child: MaterialApp(
               navigatorKey: navigator,
               debugShowCheckedModeBanner: false,
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(textScale),
+                ),
+                child: child!,
+              ),
               theme: buildJarvisTheme(),
               home: const Scaffold(),
             ),

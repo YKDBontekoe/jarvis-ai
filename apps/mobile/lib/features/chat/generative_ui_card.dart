@@ -245,6 +245,7 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
             Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: selected,
               decoration: const InputDecoration(hintText: 'Choose'),
               items: [

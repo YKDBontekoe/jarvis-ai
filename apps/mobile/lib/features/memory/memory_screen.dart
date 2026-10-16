@@ -424,7 +424,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
         children: [
           Row(
             children: [
-              _KindTag(label: kind, icon: _kindIcon(kind)),
+              Flexible(child: _KindTag(label: kind, icon: _kindIcon(kind))),
               if (isSuperseded) ...[
                 const SizedBox(width: 6),
                 StatusPill(
@@ -587,12 +587,16 @@ class _KindTag extends StatelessWidget {
     children: [
       Icon(icon, size: 14, color: JarvisColors.of(context).muted),
       const SizedBox(width: 6),
-      Text(
-        label.isEmpty ? 'Other' : label[0].toUpperCase() + label.substring(1),
-        style: TextStyle(
-          fontSize: 12.5,
-          fontWeight: FontWeight.w500,
-          color: JarvisColors.of(context).muted,
+      Flexible(
+        child: Text(
+          label.isEmpty ? 'Other' : label[0].toUpperCase() + label.substring(1),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w500,
+            color: JarvisColors.of(context).muted,
+          ),
         ),
       ),
     ],

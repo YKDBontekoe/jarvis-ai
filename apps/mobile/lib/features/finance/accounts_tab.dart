@@ -244,6 +244,7 @@ class _AccountDialogState extends State<_AccountDialog> {
               decoration: const InputDecoration(labelText: 'Name'),
             ),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               key: const Key('account-type'),
               initialValue: _type,
               decoration: const InputDecoration(labelText: 'Type'),
