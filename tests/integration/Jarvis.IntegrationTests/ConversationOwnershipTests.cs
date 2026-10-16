@@ -525,6 +525,28 @@ public sealed class ConversationOwnershipTests : IAsyncLifetime
         Assert.Empty(await store.ListPreviewsAsync(otherOwner, [chat.Id], CancellationToken.None));
     }
 
+    [Fact]
+    public async Task Previews_cope_with_repeated_ids_and_chats_that_only_hold_internal_messages()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var store = new ConversationStore(database);
+        var internalOnly = await store.CreateAsync(owner, "Tool chatter", CancellationToken.None);
+        var spoken = await store.CreateAsync(owner, "Hello", CancellationToken.None);
+        await store.AddMessageAsync(new Message(internalOnly.Id, "system", "note"), CancellationToken.None);
+        await store.AddMessageAsync(new Message(internalOnly.Id, "tool", "result"), CancellationToken.None);
+        await store.AddMessageAsync(new Message(spoken.Id, "user", "Hi"), CancellationToken.None);
+
+        var previews = await store.ListPreviewsAsync(owner, [spoken.Id, spoken.Id, internalOnly.Id],
+            CancellationToken.None);
+
+        Assert.Equal(2, previews.Count);
+        Assert.Equal("Hi", previews[spoken.Id].Snippet);
+        Assert.Null(previews[internalOnly.Id].Snippet);
+        Assert.Null(previews[internalOnly.Id].Role);
+        Assert.Null(previews[internalOnly.Id].At);
+    }
+
     private JarvisDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<JarvisDbContext>()
