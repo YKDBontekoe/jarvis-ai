@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'document_screen.dart';
@@ -66,7 +67,9 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   Future<void> _create() async {
     var projects = <Map<String, dynamic>>[];
     try {
-      projects = jsonMaps((await widget.http.get<dynamic>('/api/v1/projects')).data);
+      projects = jsonMaps(
+        (await widget.http.get<dynamic>('/api/v1/projects')).data,
+      );
     } on DioException {
       // Without projects there is nothing to update.
     }
@@ -79,8 +82,14 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     );
     if (draft == null || !mounted) return;
     try {
-      final response = await widget.http.post<dynamic>('/api/v1/documents', data: draft);
-      final id = jsonString(jsonObject(jsonObject(response.data)?['draft']) ?? const {}, 'id');
+      final response = await widget.http.post<dynamic>(
+        '/api/v1/documents',
+        data: draft,
+      );
+      final id = jsonString(
+        jsonObject(jsonObject(response.data)?['draft']) ?? const {},
+        'id',
+      );
       if (id != null && mounted) await _open(id);
     } on DioException catch (error) {
       if (!mounted) return;
@@ -89,7 +98,8 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         ..showSnackBar(
           SnackBar(
             content: Text(
-              firstProblemMessage(error.response?.data) ?? 'Could not start the draft.',
+              firstProblemMessage(error.response?.data) ??
+                  'Could not start the draft.',
             ),
           ),
         );
@@ -98,12 +108,15 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = JarvisColors.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const PageTitle('Documents'),
         actions: [
-          HeaderAction(label: 'New', icon: PhosphorIconsRegular.plus, onPressed: _create),
+          HeaderAction(
+            label: 'New',
+            icon: PhosphorIconsRegular.plus,
+            onPressed: _create,
+          ),
         ],
       ),
       body: _loading
@@ -123,36 +136,39 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                             message:
                                 'Start a one-page project update from your own '
                                 'records. You edit it, nothing is sent.',
-                            action: FilledButton(
+                            action: PillAction(
                               key: const Key('document-start'),
+                              primary: true,
+                              icon: PhosphorIconsRegular.notePencil,
+                              label: 'Start a project update',
                               onPressed: _create,
-                              child: const Text('Start a project update'),
                             ),
                           ),
                         )
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            for (final draft in _drafts)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: SurfaceCard(
-                                  key: Key('document-${draft['id']}'),
-                                  onTap: () => unawaited(_open(draft['id'] as String)),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        asJsonString(draft['title']) ?? 'Draft',
-                                        style: const TextStyle(fontWeight: FontWeight.w600),
-                                      ),
-                                      Text(
-                                        'Version ${asJsonInt(draft['version'])}'
-                                        '${asJsonInt(draft['savedVersion']) == asJsonInt(draft['version']) ? ' · saved' : ''}',
-                                        style: TextStyle(color: colors.inkSoft, fontSize: 13),
-                                      ),
-                                    ],
-                                  ),
+                            for (var i = 0; i < _drafts.length; i++)
+                              FeatureRow(
+                                key: Key('document-${_drafts[i]['id']}'),
+                                index: i,
+                                icon: PhosphorIconsRegular.fileText,
+                                caption: 'Project update',
+                                title:
+                                    asJsonString(_drafts[i]['title']) ??
+                                    'Draft',
+                                subtitle:
+                                    'Version ${asJsonInt(_drafts[i]['version'])}',
+                                trailing:
+                                    asJsonInt(_drafts[i]['savedVersion']) ==
+                                        asJsonInt(_drafts[i]['version'])
+                                    ? StatusPill(
+                                        label: 'Saved',
+                                        color: JarvisColors.of(context).accent,
+                                      )
+                                    : null,
+                                onTap: () => unawaited(
+                                  _open(_drafts[i]['id'] as String),
                                 ),
                               ),
                           ],
@@ -185,7 +201,10 @@ class _NewDocumentSheetState extends State<_NewDocumentSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Project update', style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            'Project update',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           const SizedBox(height: 12),
           if (widget.projects.isEmpty)
             const Text('Create a project first; the update is built from it.')

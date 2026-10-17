@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
+import '../../ui/phosphor_icons.dart';
 
 /// What-if scenarios: change a few assumptions and see the consequence at
 /// once. Calculating changes nothing; saving writes a Library report and, if
@@ -249,7 +251,8 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                if (result != null) ..._outcome(result, colors),
+                const GroupLabel('Your numbers'),
                 _labelled(
                   'Name it (optional)',
                   TextField(
@@ -298,7 +301,7 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
                     tone: NoticeTone.info,
                     message: _problem!,
                   ),
-                if (result != null) ..._outcome(result, colors),
+                if (result != null) ..._saveBlock(),
               ],
             ),
           ),
@@ -307,44 +310,11 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
     );
   }
 
-  List<Widget> _outcome(Map<String, dynamic> result, JarvisColors colors) {
-    final baseline = jsonObject(result['baseline']) ?? const {};
-    final alternative = jsonObject(result['alternative']) ?? const {};
-    return [
-      const SectionHeader('What changes'),
-      SurfaceCard(
-        key: const Key('scenario-result'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(asJsonString(baseline['summary']) ?? ''),
-            const SizedBox(height: 8),
-            Text(asJsonString(alternative['summary']) ?? ''),
-            const SizedBox(height: 12),
-            for (final delta in jsonMaps(result['deltas']))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${asJsonString(delta['label']) ?? ''}: ${delta['value']} ${asJsonString(delta['unit']) ?? ''}',
-                      key: const Key('scenario-delta'),
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      asJsonString(delta['explanation']) ?? '',
-                      style: TextStyle(color: colors.inkSoft, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-            for (final note in jsonStrings(result['notes']))
-              Text(note, style: TextStyle(color: colors.muted, fontSize: 13)),
-          ],
-        ),
-      ),
-      SwitchListTile(
+  List<Widget> _saveBlock() => [
+    SurfaceCard(
+      margin: const EdgeInsets.only(top: 8, bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      child: SwitchListTile(
         key: const Key('scenario-decision'),
         contentPadding: EdgeInsets.zero,
         title: const Text('Also log it as a decision'),
@@ -352,11 +322,69 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
         value: _asDecision,
         onChanged: (value) => setState(() => _asDecision = value),
       ),
-      FilledButton(
+    ),
+    Align(
+      alignment: Alignment.centerLeft,
+      child: PillAction(
         key: const Key('scenario-save'),
+        primary: true,
+        icon: PhosphorIconsRegular.bookmarkSimple,
+        label: 'Save to Library',
         onPressed: _saving ? null : () => unawaited(_save()),
-        child: const Text('Save to Library'),
       ),
+    ),
+  ];
+
+  List<Widget> _outcome(Map<String, dynamic> result, JarvisColors colors) {
+    final baseline = jsonObject(result['baseline']) ?? const {};
+    final alternative = jsonObject(result['alternative']) ?? const {};
+    final deltas = jsonMaps(result['deltas']);
+    final lead = deltas.firstOrNull;
+    return [
+      const GroupLabel('What changes'),
+      if (lead != null)
+        KeyedSubtree(
+          key: const Key('scenario-result'),
+          child: FadeSlideIn(
+            child: HeroCard(
+              label: asJsonString(lead['label']) ?? '',
+              title: '${lead['value']} ${asJsonString(lead['unit']) ?? ''}'
+                  .trim(),
+              subtitle: asJsonString(lead['explanation']),
+            ),
+          ),
+        ),
+      const SizedBox(height: 12),
+      FeatureRow(
+        icon: PhosphorIconsRegular.clockCounterClockwise,
+        caption: 'Now',
+        title: asJsonString(baseline['summary']) ?? '',
+      ),
+      FeatureRow(
+        index: 1,
+        icon: PhosphorIconsRegular.sparkle,
+        caption: 'With the change',
+        title: asJsonString(alternative['summary']) ?? '',
+      ),
+      for (var i = 1; i < deltas.length; i++)
+        FeatureRow(
+          key: const Key('scenario-delta'),
+          index: i + 1,
+          icon: PhosphorIconsRegular.chartLine,
+          caption: asJsonString(deltas[i]['label']),
+          title:
+              '${deltas[i]['value']} ${asJsonString(deltas[i]['unit']) ?? ''}'
+                  .trim(),
+          subtitle: asJsonString(deltas[i]['explanation']),
+        ),
+      for (final note in jsonStrings(result['notes']))
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+          child: Text(
+            note,
+            style: TextStyle(color: colors.muted, fontSize: 13),
+          ),
+        ),
     ];
   }
 }

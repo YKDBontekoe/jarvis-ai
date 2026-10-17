@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'goal_screen.dart';
@@ -122,9 +123,33 @@ class _GoalsScreenState extends State<GoalsScreen> {
     }
   }
 
+  Widget _goalRow(Map<String, dynamic> goal, int index) {
+    final due = goal['checkInDue'] == true;
+    final review = jsonObject(goal['review']);
+    final open = asJsonInt(goal['openPlanItems']);
+    return FeatureRow(
+      key: Key('goal-${goal['id']}'),
+      index: index,
+      icon: PhosphorIconsRegular.target,
+      caption: goal['status'] != 'active' ? '${goal['status']}' : null,
+      title: asJsonString(goal['title']) ?? 'Goal',
+      subtitle: [
+        if (goal['feeling'] != null) goalFeelingLabels[goal['feeling']] ?? '',
+        if (open > 0) '$open steps this week',
+        if (review != null) asJsonString(review['reason']) ?? '',
+      ].where((x) => x.isNotEmpty).join('\n'),
+      trailing: due
+          ? StatusPill(
+              label: 'Check-in due',
+              color: JarvisColors.of(context).warning,
+            )
+          : null,
+      onTap: () => unawaited(_open(goal['id'] as String)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final colors = JarvisColors.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const PageTitle('Goals'),
@@ -159,67 +184,18 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                   'Pick one thing you want, link what already '
                                   'serves it, and check in when it suits you. '
                                   'Jarvis only proposes small steps.',
-                              action: FilledButton(
+                              action: PillAction(
                                 key: const Key('goal-start'),
+                                primary: true,
+                                icon: PhosphorIconsRegular.plus,
+                                label: 'Add a goal',
                                 onPressed: _create,
-                                child: const Text('Add a goal'),
                               ),
                             ),
                           )
                         else
-                          for (final goal in _goals)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: SurfaceCard(
-                                key: Key('goal-${goal['id']}'),
-                                onTap: () =>
-                                    unawaited(_open(goal['id'] as String)),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      asJsonString(goal['title']) ?? 'Goal',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: colors.ink,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      [
-                                        if (goal['status'] != 'active')
-                                          '${goal['status']}',
-                                        if (goal['feeling'] != null)
-                                          goalFeelingLabels[goal['feeling']] ??
-                                              '',
-                                        if (goal['checkInDue'] == true)
-                                          'Check-in due',
-                                        if (asJsonInt(goal['openPlanItems']) >
-                                            0)
-                                          '${asJsonInt(goal['openPlanItems'])} steps this week',
-                                      ].where((x) => x.isNotEmpty).join(' · '),
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: colors.inkSoft,
-                                      ),
-                                    ),
-                                    if (jsonObject(goal['review'])
-                                        case final review?)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 6),
-                                        child: Text(
-                                          asJsonString(review['reason']) ?? '',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: colors.muted,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                          for (var i = 0; i < _goals.length; i++)
+                            _goalRow(_goals[i], i),
                       ],
                     ),
                   ),

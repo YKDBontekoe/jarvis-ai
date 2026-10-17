@@ -96,7 +96,7 @@ void main() {
     await show(tester, GoalsScreen(http: http.client()));
     expect(find.text('Run a 10k'), findsOneWidget);
     expect(find.textContaining('Check-in due'), findsOneWidget);
-    expect(find.text('What would make it easier?'), findsOneWidget);
+    expect(find.textContaining('What would make it easier?'), findsOneWidget);
   });
 
   testWidgets('creating a goal posts its links and opens it', (tester) async {
