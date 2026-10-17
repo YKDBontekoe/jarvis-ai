@@ -362,3 +362,15 @@ Drafts live in owner settings (`documents.drafts`, at most 20, no table). Creati
 | GET | `/documents/{id}/export?format=md\|txt` (a file download) |
 
 `POST /library/notes` now also takes an optional `projectId` (validated against the owner) so notes can be filed in a project.
+
+## Opportunity radar (F31)
+
+Deterministic rules over the owner's own facts; reading proposes only and never sends, creates or changes anything. State (feedback, muted kinds, history) lives in owner settings (`opportunities`).
+
+| Method | Route |
+|--------|-------|
+| GET | `/opportunities` (up to eight cards: `title`, `whyNow`, `evidence` refs, `destination`, `urgency` 1–3, `windowEnds`, `also` for related chances merged under one project / person / subscription; plus `history` of what was useful and `mutedKinds`) |
+| POST | `/opportunities/feedback` (`key`, `verdict` `useful`/`later`/`handled`/`wrong`/`fewer`; 404 for a key not on the radar right now) |
+| POST | `/opportunities/unmute` (`kind`; undoes "fewer like this") |
+
+Rules: a meeting in the next 24 hours with no prep note; an open accepted promise due within 3 days or late (older than 30 days it only asks whether it still matters); a subscription's notice day within 7 days (unless kept); a decision whose review day is within 7 days; free time of 45+ minutes today with a project's open next step. "Later" returns after 3 days, "handled", "wrong" and "useful" hide that opportunity, "fewer" or two "wrong" for a kind mute it for 30 days.

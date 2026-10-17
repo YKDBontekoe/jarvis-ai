@@ -64,6 +64,9 @@ public static partial class ToolGroups
         new("comparisons", "Weigh options against criteria: create a comparison, record what is known, see the ranking",
             ["CreateComparison", "SetComparisonCell", "GetComparison"],
             ComparisonKeywords()),
+        new("opportunities", "What is worth acting on now: meetings to prepare for, promises to follow up, renewals, decisions, free time",
+            ["GetOpportunities"],
+            OpportunityKeywords()),
         new("documents", "Draft a one-page project update from the user's own records, nothing is sent",
             ["DraftProjectUpdate"],
             DocumentKeywords()),
@@ -256,6 +259,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(compare|comparison|which (one|should)|pros and cons|versus|\bvs\b|choose between|shortlist|vergelijk|vergelijking|welke (moet|zal)|kiezen tussen)", KeywordOptions)]
     private static partial Regex ComparisonKeywords();
+
+    [GeneratedRegex(@"\b(what should i do (next|now)|what('?s| is) coming up|anything (i )?(should|need to) (do|know)|what needs my attention|what am i missing|wat moet ik (nu )?doen|wat komt eraan|wat heeft aandacht nodig)", KeywordOptions)]
+    private static partial Regex OpportunityKeywords();
 
     [GeneratedRegex(@"\b(project update|status update|progress report|write (up )?(an? )?update|statusupdate|voortgangsrapport|schrijf (een )?update)", KeywordOptions)]
     private static partial Regex DocumentKeywords();

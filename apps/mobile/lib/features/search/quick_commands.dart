@@ -162,6 +162,12 @@ const quickCommands = [
     keywords: ['documents', 'document', 'update', 'report', 'draft', 'project update', 'rapport', 'concept', 'statusupdate'],
   ),
   QuickCommand(
+    label: 'What is worth doing now?',
+    icon: PhosphorIconsRegular.target,
+    destination: 'opportunities',
+    keywords: ['worth', 'next', 'attention', 'coming up', 'opportunities', 'what should i do', 'wat nu', 'aandacht', 'volgende'],
+  ),
+  QuickCommand(
     label: 'Go to What if',
     icon: PhosphorIconsRegular.sliders,
     destination: 'scenarios',

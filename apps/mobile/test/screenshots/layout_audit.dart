@@ -21,6 +21,7 @@ const destinations = [
   'meeting:m1',
   'goals',
   'scenarios',
+  'opportunities',
   'documents',
   'document:d1',
   'lesson:i1',

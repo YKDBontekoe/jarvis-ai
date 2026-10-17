@@ -25,7 +25,9 @@ import '../comparisons/comparisons_screen.dart';
 import '../apps/app_goals_screen.dart';
 import '../documents/document_screen.dart';
 import '../documents/documents_screen.dart';
+import '../finance/subscription_review_screen.dart';
 import '../goals/goal_screen.dart';
+import '../opportunities/opportunities_screen.dart';
 import '../library/lesson_screen.dart';
 import '../scenarios/scenarios_screen.dart';
 import '../goals/goals_screen.dart';
@@ -130,6 +132,20 @@ Widget? utilityPageFor(
     http: http,
     documentId: document.substring('document:'.length),
   ),
+  'opportunities' => OpportunitiesScreen(
+    http: http,
+    pageFor: (destination) => utilityPageFor(
+      destination == 'plan-today' ? 'today' : destination,
+      http,
+      onAskInChat: onAskInChat,
+    ),
+  ),
+  final subscription when subscription.startsWith('subscription:') =>
+    SubscriptionReviewScreen(
+      http: http,
+      subscriptionId: subscription.substring('subscription:'.length),
+      onAskInChat: onAskInChat,
+    ),
   'scenarios' => ScenariosScreen(http: http),
   'goals' => GoalsScreen(http: http),
   final goal when goal.startsWith('goal:') => GoalScreen(

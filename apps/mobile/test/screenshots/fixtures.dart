@@ -822,6 +822,24 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
       {'text': 'Saving or exporting does not send anything. Sharing is a separate step you take yourself.', 'ok': true},
     ],
   },
+  'GET /api/v1/opportunities': {
+    'items': [
+      {
+        'key': 'meeting_prep:m1', 'kind': 'meeting_prep', 'groupKey': 'project:p2', 'title': 'Prepare for “Kitchen sync”',
+        'whyNow': 'It starts in about 2 hours and has no prep note yet.', 'evidence': ['meeting:m1'], 'destination': 'meeting:m1',
+        'urgency': 3, 'windowEnds': '2026-10-17', 'also': ['You promised this to Rosa; it is 2 days late.'],
+      },
+      {
+        'key': 'renewal:s1:20261022', 'kind': 'renewal', 'groupKey': 'subscription:s1', 'title': 'Review Netflix before it renews',
+        'whyNow': 'The next charge (15.99 EUR) is expected 22 Oct; decide by 20 Oct. A comparison and a price pack can be prepared.',
+        'evidence': ['subscription:s1'], 'destination': 'subscription:s1', 'urgency': 2, 'windowEnds': '2026-10-20', 'also': <Object>[],
+      },
+    ],
+    'history': [
+      {'key': 'k1', 'kind': 'follow_up', 'title': 'Plan time for: Send the deck', 'on': '2026-10-10'},
+    ],
+    'mutedKinds': ['free_slot'],
+  },
   'GET /api/v1/goals': [
     {'id': 'g1', 'title': 'Run a 10k', 'status': 'active', 'checkInDue': true, 'checkInCount': 1, 'feeling': 'slipping', 'openPlanItems': 2, 'review': {'verdict': 'change', 'reason': 'Your last 2 check-ins mention slipping or stuck. What would make it easier?'}},
   ],

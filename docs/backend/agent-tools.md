@@ -50,6 +50,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Watches | `ConditionWatchAgentTools` | — |
 | Memory | `MemoryAgentTools` list/search/remember | **Forget** requires approval |
 | Journal | `JournalAgentTools` `SaveJournalEntry` (appends to the day's entry), `ListJournalEntries` | Hidden during background task turns; off when the profile disallows remembering |
+| Opportunities | `OpportunityAgentTools` `GetOpportunities` | Read-only: the few things worth acting on now with the reason; the model only suggests |
 | Documents | `DocumentAgentTools` `DraftProjectUpdate` | Creates a draft in the app from the user's own records; never sends or shares, unknowns stay placeholders |
 | Apps | `AppGoalAgentTools` `FindAppForGoal` | Read-only: says which app covers a goal, its real capabilities and next step; connecting is done in the app, never with secrets in chat |
 | Scenarios | `ScenarioAgentTools` `CompareCostScenario`, `CompareTimeScenario` | No approval: pure arithmetic on numbers the user gave; nothing is stored or changed |
