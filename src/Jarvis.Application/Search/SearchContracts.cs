@@ -11,10 +11,15 @@ public static class SearchResultKinds
     public const string GraphEntity = "graph_entity";
     public const string ChannelThread = "channel_thread";
     public const string CodingRun = "coding_run";
+    public const string Message = "message";
+    public const string Person = "person";
+    public const string Commitment = "commitment";
+    public const string Decision = "decision";
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
-        Conversation, Memory, File, Task, Reminder, Skill, GraphEntity, ChannelThread, CodingRun
+        Conversation, Memory, File, Task, Reminder, Skill, GraphEntity, ChannelThread, CodingRun, Message, Person,
+        Commitment, Decision
     };
 
     public static bool IsValid(string? kind) => kind is not null && All.Contains(kind);

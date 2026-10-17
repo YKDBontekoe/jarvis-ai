@@ -32,7 +32,8 @@ public sealed record MessageDto(Guid Id, string Role, string Content, DateTimeOf
     IReadOnlyList<FileCitationDto>? Citations = null, IReadOnlyList<MessageAttachmentDto>? Attachments = null);
 public sealed record FileCitationDto(Guid FileId, string DisplayName, Guid ChunkId, int ChunkIndex, string Excerpt,
     int? PageNumber, string SourceStatus = "available");
-public sealed record MessagePageDto(IReadOnlyList<MessageDto> Items, string? NextCursor, bool HasMore);
+public sealed record MessagePageDto(IReadOnlyList<MessageDto> Items, string? NextCursor, bool HasMore,
+    string? NewerCursor = null, bool HasNewer = false, string? AnchorId = null);
 /// <summary>
 /// <paramref name="RememberHours"/> limits an always-allow to that many hours; <paramref name="RememberScope"/> is
 /// <c>all</c> (default) or <c>tasks</c>, which only covers background task and automation runs.

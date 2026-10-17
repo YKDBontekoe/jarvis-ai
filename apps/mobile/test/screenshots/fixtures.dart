@@ -273,6 +273,33 @@ List<Map<String, Object?>> projects() => [
   {'id': 'p2', 'name': 'Home renovation', 'color': 'teal'},
 ];
 
+Map<String, Object?> projectDetails() => {
+  'project': {
+    'id': 'p2',
+    'name': 'Home renovation',
+    'description': 'A new kitchen before summer',
+    'instructions': 'Compare at least three quotes and answer in Dutch.',
+    'color': 'teal',
+    'createdAt': '2026-09-01T10:00:00Z',
+    'updatedAt': '2026-10-10T10:00:00Z',
+    'conversationCount': 1,
+    'fileCount': 0,
+    'taskCount': 0,
+    'outcome': 'Cook for ten people in the new kitchen by June.',
+    'status': 'active',
+  },
+  'nextAction': {
+    'type': 'commitment',
+    'id': 'c-deck',
+    'note': 'Before the plumber comes on Friday',
+    'title': 'Send Rosa the tile quotes',
+    'state': 'open',
+  },
+  'conversations': <Object>[],
+  'files': <Object>[],
+  'tasks': <Object>[],
+};
+
 List<Map<String, Object?>> reminders() {
   final now = _now();
   final today = DateTime(now.year, now.month, now.day);
@@ -597,6 +624,7 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     {'id': 'n1', 'type': 'reminder.due', 'title': 'Water the basil'},
   ],
   'GET /api/v1/projects': projects(),
+  'GET /api/v1/projects/p2': projectDetails(),
   'GET /api/v1/home': home(),
   'GET /api/v1/home/context': homeContext(),
   // Every chat path is ".../chats/open" with the chat in the query, so one

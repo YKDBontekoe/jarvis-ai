@@ -10,12 +10,13 @@ Tools are exposed to the model through **Microsoft Agent Framework** `AITool` in
 | **McpSetupToolContributor** | `OfferMcpSetup`, `AskForMcpCredential`, `InstallIntegrationPack` |
 | **SkillToolContributor** | Load/list/save skills |
 | **PersonaToolContributor** | Record persona traits |
+| **ProjectToolContributor** | `GetProjects`, `SetProjectOutcome`, `SetProjectNextAction` (a project's outcome, status and next action; a link must be the owner's own promise, decision, reminder or task). Group `projects` |
 | **KnowledgeGraphToolContributor** | Graph search and proposed writes (approval-gated) |
 | **SurfaceToolContributor** | `RenderUi` generative cards |
 | **RemoteAgentToolContributor** | Delegate to registered HTTPS agents (approval-gated) |
 | **DeviceToolContributor** | Location, battery, clipboard, open URL, notifications on connected nodes |
 | **BrowserToolContributor** | `BrowseTheWeb` session + Playwright tools |
-| **ConnectedToolContributor** | Cross-feature: `SearchEverything`, `GetRelated`, `LinkEntities`, `ListRecentEvents`, `ListNotifications`, `MarkNotificationRead`, `ListProjects`, `CreateProject`, `AssignToProject`, `ListAssistantProfiles`, `GetWeeklyReview` (see [event-spine.md](../architecture/event-spine.md)) |
+| **ConnectedToolContributor** | Cross-feature: `SearchEverything` (people, promises and decisions included; chat messages are not, so a restricted profile cannot read other chats through it), `GetRelated`, `LinkEntities`, `ListRecentEvents`, `ListNotifications`, `MarkNotificationRead`, `ListProjects`, `CreateProject`, `AssignToProject`, `ListAssistantProfiles`, `GetWeeklyReview` (see [event-spine.md](../architecture/event-spine.md)) |
 
 Registration: `src/Jarvis.Agents/DependencyInjection.cs`.
 

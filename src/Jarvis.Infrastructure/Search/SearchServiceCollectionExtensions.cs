@@ -20,6 +20,10 @@ public static class SearchServiceCollectionExtensions
         services.AddScoped<IFederatedSearchProvider, GraphEntitySearchProvider>();
         services.AddScoped<IFederatedSearchProvider, ChannelThreadSearchProvider>();
         services.AddScoped<IFederatedSearchProvider, CodingRunSearchProvider>();
+        services.AddScoped<IFederatedSearchProvider, MessageSearchProvider>();
+        services.AddScoped<IFederatedSearchProvider, PersonSearchProvider>();
+        services.AddScoped<IFederatedSearchProvider, CommitmentSearchProvider>();
+        services.AddScoped<IFederatedSearchProvider, DecisionSearchProvider>();
         return services;
     }
 }

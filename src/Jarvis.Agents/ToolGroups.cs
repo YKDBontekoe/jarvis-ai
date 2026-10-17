@@ -57,6 +57,9 @@ public static partial class ToolGroups
         new("decisions", "Decision journal: log and resolve decisions, see calibration",
             ["LogDecision", "ResolveDecision", "GetDecisions", "GetCalibration"],
             DecisionKeywords()),
+        new("projects", "Projects: what each is for, its status and the next action to take",
+            ["GetProjects", "SetProjectOutcome", "SetProjectNextAction"],
+            ProjectKeywords()),
         new("timeline", "Life timeline, on this day, life insights, routine and self-improvement suggestions",
             ["QueryTimeline", "OnThisDay", "GetLifeInsights", "GetRoutineSuggestions", "GetImprovementProposals"],
             TimelineKeywords()),
@@ -228,6 +231,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(decision|decide|decided|calibration|prediction|beslis|besluit|beslissing|voorspelling)", KeywordOptions)]
     private static partial Regex DecisionKeywords();
+
+    [GeneratedRegex(@"\b(project|next (step|action)|outcome|goal of|project(en)?|volgende (stap|actie)|doel van)", KeywordOptions)]
+    private static partial Regex ProjectKeywords();
 
     [GeneratedRegex(@"\b(timeline|on this day|this day last|years? ago|insight|routine|pattern|improvement|tijdlijn|vandaag \d+ jaar|jaar geleden|inzicht|patroon|verbeter)", KeywordOptions)]
     private static partial Regex TimelineKeywords();

@@ -1,5 +1,8 @@
 using Jarvis.Application.Channels;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Decisions;
+using Jarvis.Application.Inbox;
+using Jarvis.Application.People;
 using Jarvis.Application.Files;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Search;
@@ -42,6 +45,22 @@ internal static class SearchRoutes
             ["peer"] = peer
         });
 
+    public static SearchRouteTarget Message(Guid conversationId, Guid messageId) => new("message",
+        new Dictionary<string, string>
+        {
+            ["conversationId"] = conversationId.ToString(),
+            ["messageId"] = messageId.ToString()
+        });
+
+    public static SearchRouteTarget Person(Guid personId) => new("person",
+        new Dictionary<string, string> { ["personId"] = personId.ToString() });
+
+    public static SearchRouteTarget Commitment(Guid commitmentId) => new("commitment",
+        new Dictionary<string, string> { ["commitmentId"] = commitmentId.ToString() });
+
+    public static SearchRouteTarget Decision(Guid decisionId) => new("decision",
+        new Dictionary<string, string> { ["decisionId"] = decisionId.ToString() });
+
     public static SearchRouteTarget CodingRun(Guid runId) => new("coding_run",
         new Dictionary<string, string> { ["runId"] = runId.ToString() });
 }
@@ -62,9 +81,8 @@ public sealed class ConversationSearchProvider(IConversationStore conversations)
             hits.Add(new FederatedSearchResult(SearchResultKinds.Conversation, conversation.Id.ToString(),
                 conversation.Title, null, conversation.UpdatedAt, SearchRoutes.Conversation(conversation.Id),
                 SearchRanking.TextRelevance(conversation.Title, normalized), false));
-            if (hits.Count >= limit) break;
         }
-        return hits;
+        return SearchRanking.Best(hits, limit);
     }
 }
 
@@ -122,9 +140,8 @@ public sealed class TaskSearchProvider(IJarvisTaskRepository tasks) : IFederated
             hits.Add(new FederatedSearchResult(SearchResultKinds.Task, task.Id.ToString(), task.Title,
                 SearchRanking.TruncateSummary(task.Summary ?? task.Prompt), task.CreatedAt,
                 SearchRoutes.Task(task.Id), SearchRanking.TextRelevance(task.Title, normalized), false));
-            if (hits.Count >= limit) break;
         }
-        return hits;
+        return SearchRanking.Best(hits, limit);
     }
 }
 
@@ -144,9 +161,8 @@ public sealed class ReminderSearchProvider(IReminderRepository reminders) : IFed
             hits.Add(new FederatedSearchResult(SearchResultKinds.Reminder, reminder.Id.ToString(), reminder.Title,
                 reminder.Place is { } place ? $"At {place.Name}" : $"Due {reminder.DueAt:u}", reminder.DueAt, SearchRoutes.Reminder(reminder.Id, reminder.ConversationId),
                 SearchRanking.TextRelevance(reminder.Title, normalized), false));
-            if (hits.Count >= limit) break;
         }
-        return hits;
+        return SearchRanking.Best(hits, limit);
     }
 }
 
@@ -168,9 +184,8 @@ public sealed class SkillSearchProvider(ISkillRepository skills) : IFederatedSea
             hits.Add(new FederatedSearchResult(SearchResultKinds.Skill, skill.Id.ToString(), skill.Name,
                 SearchRanking.TruncateSummary(skill.Description), skill.UpdatedAt, SearchRoutes.Skill(skill.Id),
                 SearchRanking.TextRelevance(skill.Name, normalized), false));
-            if (hits.Count >= limit) break;
         }
-        return hits;
+        return SearchRanking.Best(hits, limit);
     }
 }
 
@@ -214,10 +229,9 @@ public sealed class ChannelThreadSearchProvider(IChannelRepository channels) : I
                     $"{connection.Id}:{thread.Peer}", label, SearchRanking.TruncateSummary(preview),
                     thread.LastMessage?.CreatedAt, SearchRoutes.ChannelThread(connection.Id, thread.Peer),
                     SearchRanking.TextRelevance(label, normalized), false));
-                if (hits.Count >= limit) return hits;
             }
         }
-        return hits;
+        return SearchRanking.Best(hits, limit);
     }
 }
 
@@ -241,8 +255,138 @@ public sealed class CodingRunSearchProvider(ICodingRunStore runs) : IFederatedSe
                 $"{run.Repository}: {SearchRanking.TruncateSummary(run.Task, 80)}",
                 SearchRanking.TruncateSummary(run.Summary ?? run.DiffSummary), run.CreatedAt,
                 SearchRoutes.CodingRun(run.Id), SearchRanking.TextRelevance(run.Task, normalized), false));
-            if (hits.Count >= limit) break;
         }
-        return hits;
+        return SearchRanking.Best(hits, limit);
+    }
+}
+
+
+/// <summary>People by name, relationship or notes. Notes are only matched, never shown in the snippet.</summary>
+public sealed class PersonSearchProvider(IPeopleService people) : IFederatedSearchProvider
+{
+    public string ProviderId => "people";
+    public IReadOnlySet<string> ResultKinds => new HashSet<string> { SearchResultKinds.Person };
+
+    public async Task<IReadOnlyList<FederatedSearchResult>> SearchAsync(Guid ownerId, string query, int limit,
+        CancellationToken cancellationToken)
+    {
+        var normalized = SearchRanking.NormalizeQuery(query);
+        var hits = new List<FederatedSearchResult>();
+        foreach (var person in await people.ListAsync(ownerId, cancellationToken))
+        {
+            var relationship = person.Relationship ?? string.Empty;
+            if (!SearchRanking.MatchesQuery(person.Name, normalized) &&
+                !SearchRanking.MatchesQuery(relationship, normalized) &&
+                !SearchRanking.MatchesQuery(person.Notes ?? string.Empty, normalized))
+                continue;
+            hits.Add(new FederatedSearchResult(SearchResultKinds.Person, person.Id.ToString(), person.Name,
+                string.IsNullOrWhiteSpace(relationship) ? "Person" : relationship.Trim(),
+                person.LastContactedAt ?? person.UpdatedAt, SearchRoutes.Person(person.Id),
+                Math.Max(SearchRanking.TextRelevance(person.Name, normalized),
+                    SearchRanking.TextRelevance(relationship, normalized) * .8 + .05), false));
+        }
+        return SearchRanking.Best(hits, limit);
+    }
+}
+
+/// <summary>
+/// Promises the owner made or was given, by what was promised or who it involves. Suggested ones are found too, and say
+/// so, because they are not yet obligations.
+/// </summary>
+public sealed class CommitmentSearchProvider(ICommitmentService commitments) : IFederatedSearchProvider
+{
+    public string ProviderId => "commitments";
+    public IReadOnlySet<string> ResultKinds => new HashSet<string> { SearchResultKinds.Commitment };
+
+    public async Task<IReadOnlyList<FederatedSearchResult>> SearchAsync(Guid ownerId, string query, int limit,
+        CancellationToken cancellationToken)
+    {
+        var normalized = SearchRanking.NormalizeQuery(query);
+        var hits = new List<FederatedSearchResult>();
+        foreach (var commitment in await commitments.ListAsync(ownerId, null, null, true, cancellationToken))
+        {
+            if (!SearchRanking.MatchesQuery(commitment.Description, normalized) &&
+                !SearchRanking.MatchesQuery(commitment.Counterparty, normalized))
+                continue;
+            var who = commitment.Direction == CommitmentDirections.IOwe
+                ? $"You promised {commitment.Counterparty}"
+                : $"{commitment.Counterparty} promised you";
+            var state = commitment.Suggested ? "Suggested, not accepted yet"
+                : commitment.Status != CommitmentStatuses.Open ? commitment.Status
+                : commitment.DueOn is { } due ? $"Due {due:yyyy-MM-dd}" : "Open";
+            hits.Add(new FederatedSearchResult(SearchResultKinds.Commitment, commitment.Id.ToString(),
+                commitment.Description, $"{who} · {state}", commitment.UpdatedAt,
+                SearchRoutes.Commitment(commitment.Id),
+                Math.Max(SearchRanking.TextRelevance(commitment.Description, normalized),
+                    SearchRanking.TextRelevance(commitment.Counterparty, normalized) * .7), false));
+        }
+        return SearchRanking.Best(hits, limit);
+    }
+}
+
+/// <summary>Logged decisions by title, prediction or the background the owner wrote.</summary>
+public sealed class DecisionSearchProvider(IDecisionService decisions) : IFederatedSearchProvider
+{
+    public string ProviderId => "decisions";
+    public IReadOnlySet<string> ResultKinds => new HashSet<string> { SearchResultKinds.Decision };
+
+    public async Task<IReadOnlyList<FederatedSearchResult>> SearchAsync(Guid ownerId, string query, int limit,
+        CancellationToken cancellationToken)
+    {
+        var normalized = SearchRanking.NormalizeQuery(query);
+        var hits = new List<FederatedSearchResult>();
+        foreach (var decision in await decisions.ListAsync(ownerId, null, DecisionRules.MaxLimit, cancellationToken))
+        {
+            if (!SearchRanking.MatchesQuery(decision.Title, normalized) &&
+                !SearchRanking.MatchesQuery(decision.Prediction, normalized) &&
+                !SearchRanking.MatchesQuery(decision.Context ?? string.Empty, normalized))
+                continue;
+            var state = decision.Status switch
+            {
+                DecisionStatuses.Resolved => decision.Outcome == true ? "Happened" : "Did not happen",
+                DecisionStatuses.Due => "Time to review",
+                _ => $"Review {decision.ReviewOn:yyyy-MM-dd}"
+            };
+            hits.Add(new FederatedSearchResult(SearchResultKinds.Decision, decision.Id.ToString(), decision.Title,
+                $"{SearchRanking.TruncateSummary(decision.Prediction, 120)} · {state}",
+                decision.ResolvedAt ?? decision.CreatedAt, SearchRoutes.Decision(decision.Id),
+                Math.Max(SearchRanking.TextRelevance(decision.Title, normalized),
+                    SearchRanking.TextRelevance(decision.Prediction, normalized) * .8), false));
+        }
+        return SearchRanking.Best(hits, limit);
+    }
+}
+
+
+/// <summary>
+/// What was said, not just what a chat is called. Hits carry an excerpt around the match and open at that message.
+/// Message hits are for the owner's own search screen: <c>SearchEverything</c> leaves them out, so a profile that is
+/// restricted from the owner's other chats never reads them.
+/// </summary>
+public sealed class MessageSearchProvider(IConversationStore conversations) : IFederatedSearchProvider
+{
+    public const int ExcerptLength = 180;
+    public string ProviderId => "messages";
+    public IReadOnlySet<string> ResultKinds => new HashSet<string> { SearchResultKinds.Message };
+
+    public async Task<IReadOnlyList<FederatedSearchResult>> SearchAsync(Guid ownerId, string query, int limit,
+        CancellationToken cancellationToken)
+    {
+        var hits = await conversations.SearchMessagesAsync(ownerId, query, limit, cancellationToken);
+        return hits.Select(hit => new FederatedSearchResult(SearchResultKinds.Message, hit.Message.Id.ToString(),
+            hit.ConversationTitle, (hit.Message.Role == "user" ? "You: " : "Jarvis: ") + Excerpt(hit.Message.Content, query),
+            hit.Message.CreatedAt, SearchRoutes.Message(hit.Message.ConversationId, hit.Message.Id), .6, false)).ToArray();
+    }
+
+    /// <summary>A single line of text around the first match, so a long message or a code block stays readable.</summary>
+    public static string Excerpt(string content, string query)
+    {
+        var flat = string.Join(' ', content.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        var at = flat.IndexOf(query.Trim(), StringComparison.OrdinalIgnoreCase);
+        if (at < 0 || flat.Length <= ExcerptLength) return SearchRanking.TruncateSummary(flat, ExcerptLength);
+        var start = Math.Max(0, at - ExcerptLength / 3);
+        var end = Math.Min(flat.Length, start + ExcerptLength);
+        start = Math.Max(0, end - ExcerptLength);
+        return (start > 0 ? "…" : "") + flat[start..end].Trim() + (end < flat.Length ? "…" : "");
     }
 }

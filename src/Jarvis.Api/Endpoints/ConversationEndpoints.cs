@@ -104,7 +104,7 @@ internal static class ConversationEndpoints
         }).WithName("UpdateConversation");
 
         api.MapGet("/conversations/{conversationId:guid}/messages", async (Guid conversationId, int? limit,
-            string? cursor, IConversationStore store, IJarvisTaskRepository tasks, ICurrentUser currentUser,
+            string? cursor, Guid? around, string? after, IConversationStore store, IJarvisTaskRepository tasks, ICurrentUser currentUser,
             CancellationToken ct) =>
         {
             const int defaultLimit = 50;
@@ -119,6 +119,20 @@ internal static class ConversationEndpoints
             if (conversation is null ||
                 await tasks.GetTaskByConversationIdAsync(conversationId, currentUser.OwnerId, ct) is not null)
                 return Results.NotFound();
+
+            // ?around=<messageId> opens a transcript at a search hit: that message with some history either side, and
+            // cursors to keep going both ways. ?after=<cursor> pages forwards from there.
+            if (around is { } anchor)
+            {
+                var window = await store.GetMessageWindowAsync(conversationId, anchor, pageSize / 2, pageSize / 2, ct);
+                return window is null ? Results.NotFound() : Results.Ok(ToDto(window, anchor));
+            }
+            if (!string.IsNullOrEmpty(after))
+            {
+                if (!TryDecodeCursor(after, out var afterCursor) || afterCursor is null)
+                    return EndpointHelpers.Invalid("after", "Cursor is invalid.");
+                return Results.Ok(ToDto(await store.GetMessagesAfterAsync(conversationId, afterCursor, pageSize, ct), null));
+            }
 
             var page = await store.GetMessagePageAsync(conversationId, before, pageSize, ct);
             return Results.Ok(new MessagePageDto(page.Items.Select(message => message.ToDto()).ToArray(),
@@ -297,6 +311,11 @@ internal static class ConversationEndpoints
 
         return api;
     }
+
+    private static MessagePageDto ToDto(MessageWindow window, Guid? anchor) => new(
+        window.Items.Select(message => message.ToDto()).ToArray(),
+        window.OlderCursor is null ? null : EncodeCursor(window.OlderCursor), window.HasOlder,
+        window.NewerCursor is null ? null : EncodeCursor(window.NewerCursor), window.HasNewer, anchor?.ToString());
 
     private static string EncodeCursor(MessageCursor cursor)
     {

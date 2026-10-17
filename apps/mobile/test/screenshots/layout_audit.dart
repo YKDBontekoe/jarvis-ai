@@ -14,6 +14,7 @@ import 'harness.dart';
 const destinations = [
   'tasks',
   'projects',
+  'project:p2',
   'memory',
   'journal',
   'today',

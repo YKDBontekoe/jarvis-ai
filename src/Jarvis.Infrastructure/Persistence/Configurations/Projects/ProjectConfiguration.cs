@@ -17,6 +17,13 @@ internal sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.Property(x => x.Instructions).HasColumnName("instructions")
             .HasMaxLength(Project.MaxInstructionsLength);
         builder.Property(x => x.Color).HasColumnName("color").HasMaxLength(20).IsRequired();
+        builder.Property(x => x.Outcome).HasColumnName("outcome").HasMaxLength(Project.MaxOutcomeLength);
+        builder.Property(x => x.Status).HasColumnName("status").HasMaxLength(20).HasDefaultValue(Project.StatusActive)
+            .IsRequired();
+        builder.Property(x => x.NextActionType).HasColumnName("next_action_type").HasMaxLength(20);
+        builder.Property(x => x.NextActionId).HasColumnName("next_action_id");
+        builder.Property(x => x.NextActionNote).HasColumnName("next_action_note")
+            .HasMaxLength(Project.MaxNextActionNoteLength);
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         builder.HasIndex(x => new { x.OwnerId, x.UpdatedAt });

@@ -4,6 +4,8 @@ import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../entities/entity_ref.dart';
+import '../entities/entity_screen.dart';
 import '../files/files_screen.dart';
 import '../../json_maps.dart';
 import '../tasks/task_details_screen.dart';
@@ -13,6 +15,7 @@ import '../../ui/phosphor_icons.dart';
 import 'project_editor.dart';
 import 'project_style.dart';
 
+part 'project_focus.dart';
 part 'project_screen_parts.dart';
 
 enum ProjectTab { chats, files, tasks }
@@ -39,6 +42,7 @@ class ProjectScreen extends StatefulWidget {
 
 class _ProjectScreenState extends State<ProjectScreen> {
   Map<String, dynamic>? _project;
+  Map<String, dynamic>? _nextAction;
   List<Map<String, dynamic>> _conversations = const [];
   List<Map<String, dynamic>> _files = const [];
   List<Map<String, dynamic>> _tasks = const [];
@@ -66,6 +70,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
       final body = jsonObject(response.data);
       setState(() {
         _project = jsonObject(body?['project']);
+        _nextAction = jsonObject(body?['nextAction']);
         _conversations = _withIds(body?['conversations']);
         _files = _withIds(body?['files']);
         _tasks = _withIds(body?['tasks']);
@@ -167,6 +172,81 @@ class _ProjectScreenState extends State<ProjectScreen> {
     if (saved != null && mounted) {
       setState(() => _project = {...project, ...saved});
     }
+  }
+
+  Future<void> _editFocus() async {
+    final project = _project;
+    if (project == null || _busy) return;
+    final choice = await showModalBottomSheet<_FocusChoice>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _FocusSheet(
+        outcome: asJsonString(project['outcome']),
+        status: asJsonString(project['status']) ?? 'active',
+        nextAction: _nextAction,
+        loadPromises: _openPromises,
+      ),
+    );
+    if (choice == null || !mounted) return;
+    await _run(() async {
+      final hasNext =
+          choice.linkType != null || choice.note.isNotEmpty;
+      final response = await widget.http.put<dynamic>(
+        '$_base/focus',
+        data: {
+          'outcome': choice.outcome.isEmpty ? null : choice.outcome,
+          'status': choice.status,
+          'nextAction': hasNext
+              ? {
+                  'type': choice.linkType,
+                  'id': choice.linkId,
+                  'note': choice.note.isEmpty ? null : choice.note,
+                }
+              : null,
+        },
+      );
+      final body = jsonObject(response.data);
+      if (mounted) {
+        setState(() {
+          _project = {...project, ...?jsonObject(body?['project'])};
+          _nextAction = jsonObject(body?['nextAction']);
+        });
+      }
+    }, 'Jarvis could not save the outcome.');
+  }
+
+  /// Promises the owner accepted and has not finished: what a next step can be linked to.
+  Future<List<_PickItem>> _openPromises() async {
+    final response = await widget.http.get<dynamic>(
+      '/api/v1/commitments',
+      queryParameters: {'status': 'open'},
+    );
+    return [
+      for (final item in _withIds(response.data))
+        if (item['suggested'] != true)
+          (
+            id: jsonString(item, 'id')!,
+            title: asJsonString(item['description']) ?? 'Promise',
+            subtitle: asJsonString(item['counterparty']) ?? '',
+            icon: PhosphorIconsRegular.hand,
+          ),
+    ];
+  }
+
+  Future<void> _openNext() async {
+    final type = asJsonString(_nextAction?['type']);
+    final id = asJsonString(_nextAction?['id']);
+    if (type == null || id == null) return;
+    final ref = EntityRef.tryParse('$type:$id');
+    if (ref == null) return;
+    await openEntity(
+      context,
+      widget.http,
+      ref,
+      onOpenConversation: widget.onOpenConversation,
+    );
+    if (mounted) unawaited(_load());
   }
 
   Future<void> _delete() async {
@@ -426,6 +506,19 @@ class _ProjectScreenState extends State<ProjectScreen> {
                 const SizedBox(height: 12),
                 FadeSlideIn(
                   index: 2,
+                  child: _FocusCard(
+                    outcome: asJsonString(project['outcome']),
+                    status: asJsonString(project['status']) ?? 'active',
+                    nextAction: _nextAction,
+                    onEdit: () => unawaited(_editFocus()),
+                    onOpenNext: asJsonString(_nextAction?['type']) == null
+                        ? null
+                        : () => unawaited(_openNext()),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                FadeSlideIn(
+                  index: 3,
                   child: _InstructionsCard(
                     instructions: asJsonString(project['instructions']),
                     onEdit: () => unawaited(_edit()),
