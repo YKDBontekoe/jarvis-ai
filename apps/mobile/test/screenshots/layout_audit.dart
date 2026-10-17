@@ -25,6 +25,7 @@ const destinations = [
   'documents',
   'document:d1',
   'setup',
+  'notification-settings',
   'stories',
   'story:s1',
   'lesson:i1',

@@ -156,6 +156,12 @@ const quickCommands = [
     keywords: ['connect', 'app', 'apps', 'integrate', 'calendar', 'email', 'contacts', 'koppel', 'verbind', 'welke app'],
   ),
   QuickCommand(
+    label: 'What buzzes my phone',
+    icon: PhosphorIconsRegular.bellRinging,
+    destination: 'notification-settings',
+    keywords: ['notifications', 'notification', 'buzz', 'push', 'quiet', 'do not disturb', 'meldingen', 'stil'],
+  ),
+  QuickCommand(
     label: 'Getting started',
     icon: PhosphorIconsRegular.listChecks,
     destination: 'setup',

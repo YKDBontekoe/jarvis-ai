@@ -78,6 +78,7 @@ public static class LifeFeaturesRegistration
 
         // Context modes: stored in the owner's settings, so no tables of their own.
         services.AddScoped<IModeService, ModeService>();
+        services.AddScoped<Jarvis.Application.Notifications.INotificationPreferenceService, Jarvis.Application.Notifications.NotificationPreferenceService>();
         services.AddScoped<IPushDigestService, PushDigestService>();
 
         // Decision journal: predictions with a confidence, resolved later and scored for calibration.

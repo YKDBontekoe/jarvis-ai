@@ -803,6 +803,16 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
       {'id': 'e1', 'kind': 'explain_back', 'prompt': 'In your own words, what is the main idea of “Sourdough basics”?', 'hint': 'Mention the key terms you remember from the points above.', 'source': {'quote': 'x', 'offset': 0}},
     ],
   },
+  'GET /api/v1/notifications/preferences': {
+    'currentMode': 'normal', 'currentModeLabel': 'Normal', 'summary': '1 kind of notification stays in the app only, by your choice.',
+    'categories': [
+      {'id': 'approvals', 'title': 'Needs your decision', 'description': 'Jarvis waiting for you to approve something. These always buzz, because nothing happens until you answer.', 'locked': true, 'setting': 'on', 'now': {'outcome': 'push', 'reason': 'x'}, 'modes': []},
+      {'id': 'reminders', 'title': 'Reminders', 'description': 'Your reminders when they are due.', 'locked': false, 'setting': 'on', 'now': {'outcome': 'push', 'reason': 'x'}, 'modes': []},
+      {'id': 'problems', 'title': 'Something went wrong', 'description': 'A reminder, task or mission that failed. These always buzz, and stay in the app either way.', 'locked': true, 'setting': 'on', 'now': {'outcome': 'push', 'reason': 'x'}, 'modes': []},
+      {'id': 'briefings', 'title': 'Briefings', 'description': 'Your morning brief and weekly review.', 'locked': false, 'setting': 'on', 'now': {'outcome': 'push', 'reason': 'x'}, 'modes': [{'mode':'meeting','label':'Meeting','outcome':'held'},{'mode':'sleep','label':'Sleep','outcome':'held'}]},
+      {'id': 'updates', 'title': 'Updates and ideas', 'description': 'Finished tasks, things Jarvis learned, budget alerts and check-ins.', 'locked': false, 'setting': 'quiet', 'now': {'outcome': 'app_only', 'reason': 'x'}, 'modes': [{'mode':'meeting','label':'Meeting','outcome':'held'},{'mode':'sleep','label':'Sleep','outcome':'held'}]},
+    ],
+  },
   'GET /api/v1/setup': {
     'summary': '2 of 5 done. Next: connect your calendar.', 'done': 2, 'total': 5, 'nextGoalId': 'calendar',
     'goals': [

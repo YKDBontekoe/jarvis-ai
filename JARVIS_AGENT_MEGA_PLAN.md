@@ -218,3 +218,12 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **Agent.** Read-only `GetSetupStatus` (tool group `setup`); skipped steps are described as choices.
 - **Tests.** .NET `SetupTests` (10), Dart `setup_test` (4), screenshots `audit-*-setup`, real-stack `tests/e2e/setup_flow.mjs`.
 - **Not done in F18.** Harmless connection probes (F18.1.4), reauth detection for connectors, storage/scanner/push registration status (F18.1.5), the timezone → message → reminder → Home guided demo (F18.1.7), making Home's day-one card use `/setup`, F18.2 and later.
+
+## Checkpoint 22: F19 first slice, notification preferences and an honest explanation
+
+- **What.** Five kinds replace per-event thinking: needs your decision, reminders, something went wrong, briefings, updates and ideas. The owner can keep reminders, briefings and updates in the app only; approvals and failures are locked on (they always buzz and always stay in the app). The push worker now asks one policy: owner choice first (`app_only`), then the current mode (`held` for the digest, or `push`). A broken settings row falls back to pushing.
+- **Explained (F19.1.4).** `GET /notifications/preferences` says what happens to each kind now and in every mode, in plain words; the hero names the current mode and what it holds. The in-app list is never filtered, so an urgent failure stays inspectable even if push is unavailable.
+- **Agent.** Read-only `ExplainNotifications` ("why didn't I get a notification?").
+- **UI.** Built on the feature kit (hero, rows, switch, lock) and checked in light, dark, small and 3x text.
+- **Tests.** .NET `NotificationPreferenceTests` (19 incl. category mapping), Dart `notification_settings_test` (3), screenshots `audit-*-notification-settings`, real-stack `tests/e2e/notification_preferences_flow.mjs`.
+- **Not done in F19.** Delivery-state truth per notification (created / held / provider-accepted / device-read / action-completed, F19.1.2), urgency and per-source preferences and grouping/dedup by source ref (F19.1.3), a scheduled digest time instead of "when the mode allows" (digest is still sent within a minute of a mode lifting), stale-action protection for quick actions (F19.1.5), Android/iOS action parity (F19.1.6), aggregate counts of useful/dismissed (F19.1.7). The push worker's Firebase path is not exercised in the sandbox; the policy is covered by unit tests only.

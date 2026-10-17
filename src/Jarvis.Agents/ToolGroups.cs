@@ -73,6 +73,9 @@ public static partial class ToolGroups
         new("setup", "How far setup is: steps done, skipped or open, and what is not connected",
             ["GetSetupStatus"],
             SetupKeywords()),
+        new("notification-settings", "Why something did or did not buzz the phone: per-kind choices and the current mode",
+            ["ExplainNotifications"],
+            NotificationSettingsKeywords()),
         new("documents", "Draft a one-page project update from the user's own records, nothing is sent",
             ["DraftProjectUpdate"],
             DocumentKeywords()),
@@ -274,6 +277,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(set ?up|getting started|what('?s| is) (connected|not working)|is (my )?\w+ connected|what (is|isn't) set up|first week|instellen|wat is er ingesteld|is .{1,20} gekoppeld)", KeywordOptions)]
     private static partial Regex SetupKeywords();
+
+    [GeneratedRegex(@"\b(why (didn'?t|did) i (get|receive)|what will (buzz|ping|notify)|notification settings|which notifications|do not disturb|waarom kreeg ik|welke meldingen)", KeywordOptions)]
+    private static partial Regex NotificationSettingsKeywords();
 
     [GeneratedRegex(@"\b(project update|status update|progress report|write (up )?(an? )?update|statusupdate|voortgangsrapport|schrijf (een )?update)", KeywordOptions)]
     private static partial Regex DocumentKeywords();

@@ -1,5 +1,6 @@
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Notifications;
 using Jarvis.Application.Workflows;
 
 namespace Jarvis.Api.Endpoints;
@@ -41,6 +42,22 @@ internal static class NotificationEndpoints
                 _ => EndpointHelpers.Invalid("action", "Use done or snooze.")
             };
         }).WithName("RunNotificationAction");
+
+        // What reaches the phone, per kind of notification, and what each mode does about it. The notification list
+        // is never filtered by any of this: everything stays inspectable in the app.
+        api.MapGet("/notifications/preferences", async (INotificationPreferenceService preferences,
+            ICurrentUser currentUser, CancellationToken ct) =>
+            Results.Ok(await preferences.GetAsync(currentUser.OwnerId, ct))).WithName("GetNotificationPreferences");
+
+        api.MapPut("/notifications/preferences/{category}", async (string category,
+            NotificationPreferenceRequest request, INotificationPreferenceService preferences,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var result = await preferences.SetAsync(currentUser.OwnerId, category, request.Push, ct);
+            return result.Succeeded
+                ? Results.Ok(result.View)
+                : EndpointHelpers.Invalid(result.Field ?? "push", result.Message ?? "The request is invalid.");
+        }).WithName("SetNotificationPreference");
 
         api.MapPut("/push-devices", async (PushDeviceRequest request, IPushDeviceRepository devices,
             ICurrentUser currentUser, CancellationToken ct) =>
