@@ -813,6 +813,34 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
       {'id': 'updates', 'title': 'Updates and ideas', 'description': 'Finished tasks, things Jarvis learned, budget alerts and check-ins.', 'locked': false, 'setting': 'quiet', 'now': {'outcome': 'app_only', 'reason': 'x'}, 'modes': [{'mode':'meeting','label':'Meeting','outcome':'held'},{'mode':'sleep','label':'Sleep','outcome':'held'}]},
     ],
   },
+  'GET /api/v1/missions/templates': [
+    {'id': 'decision', 'title': 'Research a decision', 'purpose': 'Weigh the options for a choice you have to make and recommend one, with the evidence.', 'deliverable': 'A short report.', 'questions': <Object>[]},
+    {'id': 'brief', 'title': 'Prepare a project brief', 'purpose': 'Pull what Jarvis knows about a project into a one-page brief you can share.', 'deliverable': 'A one-page brief.', 'questions': <Object>[]},
+    {'id': 'compare', 'title': 'Compare proposals', 'purpose': 'Line up offers or quotes side by side and show the differences that matter.', 'deliverable': 'A comparison.', 'questions': <Object>[]},
+    {'id': 'meeting', 'title': 'Assemble a meeting pack', 'purpose': 'Gather everything you need for a meeting: background, open points and questions to ask.', 'deliverable': 'A pack.', 'questions': <Object>[]},
+  ],
+  'GET /api/v1/missions/m1/deliverable': {
+    'missionId': 'm1', 'title': 'Pick a laptop for travel', 'status': 'completed',
+    'headline': 'The 13-inch model is the best fit: lightest, 14 hours of battery, inside the budget.',
+    'sections': [
+      {'stepKey': 'research', 'title': 'Research the options', 'role': 'researcher', 'text': 'Three models fit under 1,500 euro. The 13-inch weighs 1.1 kg.'},
+      {'stepKey': 'compare', 'title': 'Compare them', 'role': 'planner', 'text': 'Battery: 14 h, 11 h, 9 h. Weight: 1.1, 1.4, 1.6 kg.'},
+    ],
+    'evidence': [
+      {'url': 'https://example.com/laptops/13', 'host': 'example.com', 'stepTitle': 'Research the options'},
+    ],
+    'checks': [
+      {'id': 'finished', 'label': 'Every step has finished', 'ok': true},
+      {'id': 'nothing-failed', 'label': 'No step failed or was stopped', 'ok': true},
+      {'id': 'result', 'label': 'There is a final result', 'ok': true},
+      {'id': 'sources', 'label': 'At least one source is named', 'ok': true},
+    ],
+    'limitations': <Object>[],
+    'nextDecisions': ['Decide what to do with this: save it, refine it, or start a follow-up mission.'],
+    'effort': 'Took about 12 minutes. Model cost is not tracked per mission, so none is shown.',
+    'reviewNote': 'These checks only show that the work exists and is complete. They cannot tell whether it is right: read it before you rely on it.',
+    'libraryItemId': null,
+  },
   'GET /api/v1/setup': {
     'summary': '2 of 5 done. Next: connect your calendar.', 'done': 2, 'total': 5, 'nextGoalId': 'calendar',
     'goals': [

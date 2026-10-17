@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'mission_models.dart';
+import 'mission_result_screen.dart';
 
 /// One mission as a live board: stages left to right in time, steps within a
 /// stage side by side. The owner can pause, cancel, edit a waiting step, skip
@@ -77,9 +79,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
       if (_mission == null) {
         setState(() => _error = message);
       } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }
@@ -211,16 +212,37 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
           ],
         ),
       ),
-      if (mission.summary != null)
-        SurfaceCard(
-          key: const Key('mission-summary'),
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SectionHeader('Result'),
-              SelectableText(mission.summary!),
-            ],
+      if (mission.summary != null || mission.status == 'completed')
+        FadeSlideIn(
+          child: KeyedSubtree(
+            key: const Key('mission-summary'),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: HeroCard(
+                label: 'Result',
+                title: mission.status == 'completed'
+                    ? 'Your result is ready'
+                    : 'Partly done',
+                subtitle: mission.summary,
+                footer: PillAction(
+                  key: const Key('mission-result'),
+                  primary: true,
+                  onDark: true,
+                  icon: PhosphorIconsRegular.fileText,
+                  label: 'See the result',
+                  onPressed: () => unawaited(
+                    Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => MissionResultScreen(
+                          http: widget.http,
+                          missionId: widget.missionId,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       for (final (index, stage) in mission.stages.indexed) ...[
@@ -265,7 +287,11 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
     final colors = JarvisColors.of(context);
     final statusColor = stepStatusColor(colors, step.status);
     final canEdit = step.status == 'pending';
-    final canSkip = const {'pending', 'failed', 'cancelled'}.contains(step.status);
+    final canSkip = const {
+      'pending',
+      'failed',
+      'cancelled',
+    }.contains(step.status);
     final canRetry = const {'failed', 'cancelled'}.contains(step.status);
     return SurfaceCard(
       key: Key('step-${step.key}'),
@@ -309,7 +335,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
           ),
           if (step.result != null)
             Theme(
-              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              data: Theme.of(context)
+                  .copyWith(dividerColor: Colors.transparent),
               child: ExpansionTile(
                 key: Key('step-result-${step.key}'),
                 tilePadding: EdgeInsets.zero,

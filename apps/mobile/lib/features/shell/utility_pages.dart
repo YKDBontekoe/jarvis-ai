@@ -12,6 +12,8 @@ import '../integrations/integrations_screen.dart';
 import '../integrations/server_detail_screen.dart';
 import '../tiles/app_tiles.dart';
 import '../memory/memory_screen.dart';
+import '../missions/mission_result_screen.dart';
+import '../missions/mission_starter_screen.dart';
 import '../missions/missions_screen.dart';
 import '../modes/modes_screen.dart';
 import '../automations/automations_screen.dart';
@@ -181,6 +183,11 @@ Widget? utilityPageFor(
   'today' => DayPlannerScreen(http: http, onAskInChat: onAskInChat),
   'timeline' => TimelineScreen(http: http),
   'missions' => MissionsScreen(http: http),
+  'mission-starter' => MissionStarterScreen(http: http),
+  final result when result.startsWith('mission-result:') => MissionResultScreen(
+    http: http,
+    missionId: result.substring('mission-result:'.length),
+  ),
   'modes' => ModesScreen(http: http),
   'library' => LibraryScreen(http: http),
   'inbox' => InboxScreen(http: http),

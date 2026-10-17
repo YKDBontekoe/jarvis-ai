@@ -11,6 +11,8 @@ public sealed record MissionRequest(string? Goal, string? Title, Guid? ProjectId
 
 public sealed record StepUpdateRequest(string? Instruction);
 
+public sealed record StarterRequest(Dictionary<string, string?>? Answers);
+
 public sealed record MissionSummaryDto(Guid Id, string Title, string Status, DateTimeOffset CreatedAt,
     DateTimeOffset? CompletedAt);
 
@@ -38,6 +40,35 @@ internal static class MissionEndpoints
             Results.Ok((await missions.ListAsync(currentUser.OwnerId, ct))
                 .Select(x => new MissionSummaryDto(x.Id, x.Title, x.Status, x.CreatedAt, x.CompletedAt))
                 .ToArray())).WithName("ListMissions");
+
+        group.MapGet("/templates", () => Results.Ok(MissionStarter.All)).WithName("ListMissionTemplates");
+
+        // Turns a few answers into a goal the owner can still edit. Nothing is planned or started here.
+        group.MapPost("/templates/{templateId}/compose", (string templateId, StarterRequest request) =>
+        {
+            var result = MissionStarter.Compose(templateId, request.Answers);
+            return result.Succeeded
+                ? Results.Ok(result.Composed)
+                : ApiProblemResults.Validation(result.Field ?? "request", result.Message ?? "The request is invalid.");
+        }).WithName("ComposeMissionStarter");
+
+        group.MapGet("/{id:guid}/deliverable", async (Guid id, IMissionDeliverableService deliverables,
+            ICurrentUser currentUser, CancellationToken ct) =>
+            await deliverables.GetAsync(currentUser.OwnerId, id, ct) is { } result
+                ? Results.Ok(result)
+                : Results.NotFound()).WithName("GetMissionDeliverable");
+
+        group.MapPost("/{id:guid}/deliverable/save", async (Guid id, IMissionDeliverableService deliverables,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var result = await deliverables.SaveAsync(currentUser.OwnerId, id, ct);
+            return result.Failure switch
+            {
+                MissionFailure.None => Results.Ok(result.Value),
+                MissionFailure.NotFound => Results.NotFound(),
+                _ => ApiProblemResults.Validation(result.Field ?? "mission", result.Message ?? "It could not be saved.")
+            };
+        }).WithName("SaveMissionDeliverable");
 
         group.MapGet("/{id:guid}", async (Guid id, IMissionService missions, ICurrentUser currentUser,
             CancellationToken ct) =>

@@ -375,6 +375,17 @@ Deterministic rules over the owner's own facts; reading proposes only and never 
 
 Rules: a meeting in the next 24 hours with no prep note; an open accepted promise due within 3 days or late (older than 30 days it only asks whether it still matters); a subscription's notice day within 7 days (unless kept); a decision whose review day is within 7 days; free time of 45+ minutes today with a project's open next step. "Later" returns after 3 days, "handled", "wrong" and "useful" hide that opportunity, "fewer" or two "wrong" for a kind mute it for 30 days.
 
+### Mission starters and deliverables
+
+Starters only turn a few answers into a goal; the existing planner then makes the plan, which waits in `ready` until the owner starts it. The deliverable is assembled from the mission's own steps: nothing is invented, and the checks are run by code (every step finished, none failed or stopped, a final result exists, at least one web source is named). They say the work exists, not that it is right, and the response says so. Model cost is not tracked per mission, so only elapsed time is shown.
+
+| Method | Path |
+|---|---|
+| GET | `/missions/templates` (decision, brief, compare, meeting: `questions` with `required`) |
+| POST | `/missions/templates/{templateId}/compose` (`answers`; 400 names the missing question) → `{title, goal}` |
+| GET | `/missions/{id}/deliverable` (`headline`, `sections`, `evidence` links, `checks`, `limitations`, `nextDecisions`, `effort`, `reviewNote`, `libraryItemId`) |
+| POST | `/missions/{id}/deliverable/save` (private Library report tagged `mission`; saving twice returns the same item; 400 when there is no result) |
+
 ### Notification preferences
 
 What reaches the phone, per kind: `approvals` and `problems` (always buzz, cannot be quieted), `reminders`, `briefings`, `updates`. The push worker asks `INotificationPreferenceService.DecideAsync` before sending: a kind the owner set to `quiet` is not pushed (`app_only`), otherwise the current mode either lets it through (`push`) or holds it for the "while you were away" digest (`held`). The owner's choice is applied before the mode. The in-app notification list is never filtered. State lives in owner settings (`notifications.preferences`); if settings cannot be read the push is sent.

@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'mission_detail_screen.dart';
 import 'mission_models.dart';
+import 'mission_starter_screen.dart';
 
 /// Big jobs split among a crew of agents. Describe one, review the plan, start it.
 class MissionsScreen extends StatefulWidget {
@@ -41,7 +43,8 @@ class _MissionsScreenState extends State<MissionsScreen> {
       if (!mounted) return;
       setState(() {
         _missions = [
-          for (final item in jsonMaps(response.data)) ?MissionSummaryData.fromJson(item),
+          for (final item in jsonMaps(response.data))
+            ?MissionSummaryData.fromJson(item),
         ];
         _loading = false;
         _error = null;
@@ -58,16 +61,29 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   Future<void> _create() async {
-    final goal = await showJarvisDialog<String>(
-      context: context,
-      builder: (_) => const _GoalDialog(),
+    final started = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => MissionStarterScreen(http: widget.http),
+      ),
     );
+    if (started == null || !mounted) return;
+    String? title;
+    final String? goal;
+    if (started['own'] == true) {
+      goal = await showJarvisDialog<String>(
+        context: context,
+        builder: (_) => const _GoalDialog(),
+      );
+    } else {
+      goal = asJsonString(started['goal']);
+      title = asJsonString(started['title']);
+    }
     if (goal == null || !mounted) return;
     setState(() => _planning = true);
     try {
       final response = await widget.http.post<dynamic>(
         '/api/v1/missions',
-        data: {'goal': goal},
+        data: {'goal': goal, 'title': ?title},
         options: Options(receiveTimeout: const Duration(minutes: 2)),
       );
       final id = jsonId(jsonObject(response.data));
@@ -92,8 +108,11 @@ class _MissionsScreenState extends State<MissionsScreen> {
   Future<void> _open(String id) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) =>
-            MissionDetailScreen(http: widget.http, missionId: id, poll: widget.poll),
+        builder: (_) => MissionDetailScreen(
+          http: widget.http,
+          missionId: id,
+          poll: widget.poll,
+        ),
       ),
     );
     if (mounted) await _load();
@@ -132,32 +151,22 @@ class _MissionsScreenState extends State<MissionsScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                 children: [
-                  for (final mission in _missions)
-                    SurfaceCard(
+                  for (final (i, mission) in _missions.indexed)
+                    FeatureRow(
                       key: Key('mission-${mission.id}'),
-                      margin: const EdgeInsets.only(bottom: 10),
-                      onTap: () => unawaited(_open(mission.id)),
-                      child: Row(
-                        children: [
-                          const IconBadge(icon: PhosphorIconsRegular.flowArrow),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              mission.title,
-                              style: const TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                          StatusPill(
-                            label: missionStatusLabel(mission.status),
-                            color: switch (mission.status) {
-                              'completed' => colors.success,
-                              'failed' => colors.danger,
-                              'running' => colors.info,
-                              _ => colors.muted,
-                            },
-                          ),
-                        ],
+                      index: i,
+                      icon: PhosphorIconsRegular.flowArrow,
+                      title: mission.title,
+                      trailing: StatusPill(
+                        label: missionStatusLabel(mission.status),
+                        color: switch (mission.status) {
+                          'completed' => colors.success,
+                          'failed' => colors.danger,
+                          'running' => colors.info,
+                          _ => colors.muted,
+                        },
                       ),
+                      onTap: () => unawaited(_open(mission.id)),
                     ),
                 ],
               ),

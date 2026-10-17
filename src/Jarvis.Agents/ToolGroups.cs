@@ -99,7 +99,7 @@ public static partial class ToolGroups
              "CreateAutomationFromTemplate", "EnableAutomation", "DisableAutomation", "RunAutomation"],
             AutomationKeywords()),
         new("missions", "Multi-step missions run by a crew of background tasks: plan, run, pause, cancel",
-            ["PlanMission", "RunMission", "GetMissions", "PauseOrResumeMission", "CancelMission"],
+            ["PlanMission", "RunMission", "GetMissions", "PauseOrResumeMission", "CancelMission", "GetMissionResult"],
             MissionKeywords()),
         new("modes", "Assistant modes such as focus or travel: get or set the current mode",
             ["GetCurrentMode", "SetMode"],

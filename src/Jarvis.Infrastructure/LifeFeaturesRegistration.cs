@@ -93,6 +93,7 @@ public static class LifeFeaturesRegistration
         services.AddScoped<Jarvis.Application.Documents.IDocumentService, Jarvis.Application.Documents.DocumentService>();
         services.AddScoped<Jarvis.Application.Opportunities.IOpportunityService, Jarvis.Application.Opportunities.OpportunityService>();
         services.AddScoped<Jarvis.Application.Stories.IStoryService, Jarvis.Application.Stories.StoryService>();
+        services.AddScoped<Jarvis.Application.Missions.IMissionDeliverableService, Jarvis.Application.Missions.MissionDeliverableService>();
         services.AddScoped<Jarvis.Application.Setup.ISetupService, Jarvis.Application.Setup.SetupService>();
         services.AddScoped<Jarvis.Application.Goals.IGoalService, Jarvis.Application.Goals.GoalService>();
         services.AddScoped<Jarvis.Application.Comparisons.IComparisonRepository, ComparisonRepository>();
