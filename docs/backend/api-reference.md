@@ -333,3 +333,7 @@ Starts from what the owner wants, not from a connector list. Setup itself stays 
 | PUT/DELETE | `/apps/goals/{goalId}/pin` (pins an app action, max six, only when connected; stored in owner settings `apps.pins`) |
 
 A calendar is ready with a saved link or an MCP server; mail and contacts only with an MCP server (a stored token alone cannot read anything).
+
+## Automation templates (F10.1.7)
+
+`GET /automations/templates` now also returns, per template, `successCriterion` (what good looks like) and `preview` (what each action would do, from the same dry-run the simulator uses; an event template previews with an example event of its own kind). New named templates: `meeting-prep` (30 minutes before a calendar event, writes a prep note), `document-follow-up` (suggestions from an uploaded file only), `bill-reminder` (Friday 09:00, subscriptions due in 7 days) and `weekly-project-review` (Friday 16:00). All four are read-or-suggest tasks that need no approval, and creating one only makes a draft.

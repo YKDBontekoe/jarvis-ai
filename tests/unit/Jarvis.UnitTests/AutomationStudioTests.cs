@@ -182,6 +182,52 @@ public sealed class AutomationStudioTests
         Assert.Null(AutomationTemplates.Find("nope"));
     }
 
+    [Theory]
+    [InlineData("meeting-prep")]
+    [InlineData("document-follow-up")]
+    [InlineData("bill-reminder")]
+    [InlineData("weekly-project-review")]
+    public void The_named_templates_state_what_success_looks_like_and_never_act_without_the_owner(string id)
+    {
+        var template = AutomationTemplates.Find(id)!;
+        var definition = template.Build("Europe/Amsterdam");
+
+        Assert.False(string.IsNullOrWhiteSpace(template.SuccessCriterion));
+        Assert.Contains("Success", template.SuccessCriterion!);
+        Assert.All(definition.Actions, action => Assert.False(AutomationActionPolicy.RequiresApproval(action)));
+        // A task that only reads or suggests: the prompt says so, so the agent is not invited to act.
+        var task = Assert.IsType<TaskActionDefinition>(Assert.Single(definition.Actions));
+        Assert.Matches("(?i)do not|only read|suggestions only", task.Prompt);
+    }
+
+    [Fact]
+    public void The_bill_and_project_templates_run_on_fridays_only_and_meeting_prep_looks_30_minutes_ahead()
+    {
+        var bills = (ScheduleTriggerDefinition)AutomationTemplates.Find("bill-reminder")!.Build("UTC").Trigger;
+        var projects = (ScheduleTriggerDefinition)AutomationTemplates.Find("weekly-project-review")!.Build("UTC").Trigger;
+        var meeting = (CalendarWindowTriggerDefinition)AutomationTemplates.Find("meeting-prep")!.Build("UTC").Trigger;
+
+        Assert.Equal(0b0010000, bills.Weekdays);
+        Assert.Equal(0b0010000, projects.Weekdays);
+        Assert.Equal(30, meeting.MinutesBefore);
+    }
+
+    [Fact]
+    public void The_document_template_previews_deterministically_for_an_uploaded_file()
+    {
+        var definition = AutomationTemplates.Find("document-follow-up")!.Build("UTC");
+        var sample = new AutomationEvent(AutomationEventKinds.FileUploaded, "Quote.pdf", "12 KB").Normalize();
+        var now = new DateTimeOffset(2026, 10, 17, 9, 0, 0, TimeSpan.Zero);
+
+        var first = AutomationSimulator.Simulate(definition, sample, now);
+        var second = AutomationSimulator.Simulate(definition, sample, now);
+
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(first), System.Text.Json.JsonSerializer.Serialize(second));
+        Assert.True(first.TriggerMatches);
+        Assert.Equal("Follow-up points for Quote.pdf", Assert.Single(first.Steps).Title);
+        Assert.Equal(0, first.ApprovalsNeeded);
+    }
+
     [Fact]
     public void Webhook_bodies_become_events()
     {

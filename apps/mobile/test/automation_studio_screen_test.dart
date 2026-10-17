@@ -29,6 +29,19 @@ void main() {
         'actions': 1,
         'needsApproval': true,
       },
+      {
+        'id': 'bill-reminder',
+        'title': 'Weekly bills check',
+        'description': 'Tells you what is due next week.',
+        'category': 'Money',
+        'trigger': 'Fridays at 09:00',
+        'actions': 1,
+        'needsApproval': false,
+        'successCriterion': 'On Fridays you see what is coming up. Success: nothing renews unnoticed.',
+        'preview': [
+          {'label': 'Task', 'title': 'Bills due in the next 7 days', 'body': 'x', 'needsApproval': false},
+        ],
+      },
     ]);
     http.on('GET', '/api/v1/automations/webhooks', [
       {
@@ -185,5 +198,17 @@ void main() {
     expect(find.byKey(const Key('studio-step')), findsNWidgets(2));
     final body = http.sent('POST', '/api/v1/automations/r1/simulate').single.body as Map;
     expect(body['title'], 'Sanne');
+  });
+
+  testWidgets('a named template shows what it will do and what good looks like', (
+    tester,
+  ) async {
+    await show(tester);
+
+    expect(find.byKey(const Key('template-preview-bill-reminder')), findsOneWidget);
+    expect(find.text('Then: Bills due in the next 7 days'), findsOneWidget);
+    expect(find.byKey(const Key('template-success-bill-reminder')), findsOneWidget);
+    expect(find.textContaining('nothing renews unnoticed'), findsOneWidget);
+    expect(find.byKey(const Key('template-success-urgent-message')), findsNothing);
   });
 }
