@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/inbox/inbox_models.dart';
 import 'package:jarvis_mobile/features/inbox/inbox_screen.dart';
@@ -174,4 +175,50 @@ void main() {
     expect(find.text('That promise was not found.'), findsOneWidget);
     expect(find.textContaining('Added to today'), findsNothing);
   });
+
+  testWidgets(
+    'an overdue owed-to-me promise offers a draft to copy, snooze or dismiss',
+    (tester) async {
+      http
+        ..on('GET', '/api/v1/commitments/follow-ups', [
+          {
+            'commitmentId': 'c2',
+            'counterparty': 'Piet',
+            'description': 'Offerte sturen',
+            'daysOverdue': 5,
+            'draft': 'Hi Piet, a quick check on "Offerte sturen".',
+          },
+        ])
+        ..on('POST', '/api/v1/commitments/c2/follow-up/snooze', null, status: 204)
+        ..on('POST', '/api/v1/commitments/c2/follow-up/dismiss', null, status: 204);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async => null,
+      );
+      await show(tester);
+      await tester.tap(find.byKey(const Key('inbox-tab-commitments')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Piet is 5 days late'), findsOneWidget);
+      expect(find.textContaining('a quick check on'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('followup-copy-c2')));
+      await tester.pump();
+      expect(find.text('Draft copied. Nothing was sent.'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('followup-snooze-c2')));
+      await tester.pumpAndSettle();
+      expect(
+        http.sent('POST', '/api/v1/commitments/c2/follow-up/snooze').single.body,
+        {'days': 7},
+      );
+
+      await tester.tap(find.byKey(const Key('followup-dismiss-c2')));
+      await tester.pumpAndSettle();
+      expect(
+        http.sent('POST', '/api/v1/commitments/c2/follow-up/dismiss'),
+        hasLength(1),
+      );
+    },
+  );
 }

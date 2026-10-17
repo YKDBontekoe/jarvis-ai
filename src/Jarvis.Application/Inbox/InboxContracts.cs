@@ -240,6 +240,14 @@ public interface ICommitmentService
     Task<InboxOperation<Commitment>> UpdateAsync(Guid id, Guid ownerId, string? description, DateOnly? dueOn,
         bool clearDue, DateOnly today, CancellationToken cancellationToken);
     Task<bool> DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Links a promise to a project and/or a person of the owner (or clears either). A link is the owner's own
+    /// statement: nothing is guessed from names.
+    /// </summary>
+    Task<InboxOperation<Commitment>> SetLinksAsync(Guid id, Guid ownerId, Guid? projectId, Guid? personId,
+        bool clearProject, bool clearPerson, CancellationToken cancellationToken);
+
     Task<CommitmentSummary> SummarizeAsync(Guid ownerId, DateOnly today, CancellationToken cancellationToken);
     Task<DateOnly> TodayAsync(Guid ownerId, CancellationToken cancellationToken);
 }

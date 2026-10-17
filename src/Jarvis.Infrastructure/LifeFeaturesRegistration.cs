@@ -85,6 +85,8 @@ public static class LifeFeaturesRegistration
         services.AddScoped<IDecisionService, DecisionService>();
         services.AddScoped<Jarvis.Application.Finance.ISubscriptionReviewService,
             Jarvis.Application.Finance.SubscriptionReviewService>();
+        services.AddScoped<Jarvis.Application.Inbox.ICommitmentFollowUpService,
+            Jarvis.Application.Inbox.CommitmentFollowUpService>();
         services.AddScoped<Jarvis.Application.Goals.IGoalService, Jarvis.Application.Goals.GoalService>();
         services.AddScoped<Jarvis.Application.Comparisons.IComparisonRepository, ComparisonRepository>();
         services.AddScoped<Jarvis.Application.Comparisons.IComparisonService, Jarvis.Application.Comparisons.ComparisonService>();

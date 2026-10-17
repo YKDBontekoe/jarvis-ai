@@ -5,7 +5,9 @@ namespace Jarvis.Application.Inbox;
 
 public sealed class CommitmentService(IInboxRepository repository, IReminderService reminders,
     IDailyBriefingRepository briefings, TimeProvider? timeProvider = null,
-    Events.IJarvisEventBus? events = null) : ICommitmentService
+    Events.IJarvisEventBus? events = null,
+    Projects.IProjectStore? projects = null,
+    People.IPeopleRepository? people = null) : ICommitmentService
 {
     public const int DueSoonDays = 7;
     private static readonly TimeOnly ReminderTime = new(9, 0);
@@ -183,6 +185,24 @@ public sealed class CommitmentService(IInboxRepository repository, IReminderServ
                     : null
             };
         }
+        await repository.UpdateCommitmentAsync(updated, cancellationToken);
+        return InboxOperation<Commitment>.Ok(updated);
+    }
+
+    public async Task<InboxOperation<Commitment>> SetLinksAsync(Guid id, Guid ownerId, Guid? projectId,
+        Guid? personId, bool clearProject, bool clearPerson, CancellationToken cancellationToken)
+    {
+        var commitment = await repository.GetCommitmentAsync(id, ownerId, cancellationToken);
+        if (commitment is null) return InboxOperation<Commitment>.NotFound();
+        var project = clearProject ? null : projectId ?? commitment.ProjectId;
+        var person = clearPerson ? null : personId ?? commitment.PersonId;
+        if (project is { } p && p != commitment.ProjectId &&
+            (projects is null || await projects.GetAsync(p, ownerId, cancellationToken) is null))
+            return InboxOperation<Commitment>.Invalid("projectId", "That project was not found.");
+        if (person is { } q && q != commitment.PersonId &&
+            (people is null || await people.GetAsync(q, ownerId, cancellationToken) is null))
+            return InboxOperation<Commitment>.Invalid("personId", "That person was not found.");
+        var updated = commitment with { ProjectId = project, PersonId = person, UpdatedAt = clock.GetUtcNow() };
         await repository.UpdateCommitmentAsync(updated, cancellationToken);
         return InboxOperation<Commitment>.Ok(updated);
     }

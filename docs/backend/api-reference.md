@@ -303,3 +303,12 @@ A committed statement import that adds rows becomes a batch in owner settings (`
 | POST | `/finance/imports/{id}/undo` (removes only rows the batch created that still exist and were never edited; edited rows, duplicates of earlier rows and anything else with the same merchant stay; undoing again changes nothing; audit entry carries counts only) |
 
 `POST /finance/import` answers with `batchId` on a commit that added rows.
+
+## Promise links and follow-up nudges
+
+Commitments carry optional `projectId` and `personId`, set only by the owner (`PATCH /commitments/{id}` with `projectId`, `personId`, `clearProject`, `clearPerson`; unknown or foreign ids are 400, migration `AddCommitmentLinks`). A linked promise counts under that person even when the counterparty name differs; an unlinked one only matches an identical full name, never a nickname.
+
+| Method | Route |
+|--------|-------|
+| GET | `/commitments/follow-ups` (`language` `en`/`nl`: up to five open, accepted, owed-to-me promises at least 3 days late, longest first, each with a draft; nothing is sent) |
+| POST | `/commitments/{id}/follow-up/snooze` (`days` 1–60) · `/commitments/{id}/follow-up/dismiss` (quiet for good; stored in owner settings `commitments.followups`) |

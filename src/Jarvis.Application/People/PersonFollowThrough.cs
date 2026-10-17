@@ -74,11 +74,14 @@ public static class PersonFollowThroughBuilder
     public const int MaxPromises = 8;
 
     /// <summary>
-    /// Promises count for a person only when the counterparty is the same name once case and accents are ignored.
-    /// A first name or nickname is never matched silently; the owner links a promise by writing the name.
+    /// Promises count for a person when the owner linked them, or, for a promise linked to nobody, when the
+    /// counterparty is the same name once case and accents are ignored. A first name or nickname is never matched
+    /// silently, and a promise linked to someone else never counts here.
     /// </summary>
     public static bool IsCounterparty(Person person, Commitment commitment) =>
-        PeopleRules.NameKey(person.Name) is { Length: > 0 } key && PeopleRules.NameKey(commitment.Counterparty) == key;
+        commitment.PersonId == person.Id ||
+        (commitment.PersonId is null && PeopleRules.NameKey(person.Name) is { Length: > 0 } key &&
+         PeopleRules.NameKey(commitment.Counterparty) == key);
 
     public static PersonFollowThrough Build(Person person, DateOnly today, TimeZoneInfo zone,
         IEnumerable<Commitment> commitments, PersonNudgePref pref)

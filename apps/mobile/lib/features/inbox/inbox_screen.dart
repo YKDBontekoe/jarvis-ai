@@ -28,6 +28,7 @@ class InboxScreen extends StatefulWidget {
 class _InboxScreenState extends State<InboxScreen> {
   InboxData? _inbox;
   List<CommitmentData> _commitments = const [];
+  List<Map<String, dynamic>> _followUps = const [];
   bool _loading = true;
   String? _error;
   String _filter = 'needs_reply';
@@ -52,8 +53,18 @@ class _InboxScreenState extends State<InboxScreen> {
         '/api/v1/commitments',
         queryParameters: {'status': 'open'},
       );
+      var followUps = <Map<String, dynamic>>[];
+      try {
+        // A bonus: without nudges the tab is just the promises.
+        followUps = jsonMaps(
+          (await widget.http.get<dynamic>('/api/v1/commitments/follow-ups')).data,
+        );
+      } on DioException {
+        // Keep going.
+      }
       if (!mounted) return;
       setState(() {
+        _followUps = followUps;
         _inbox = InboxData.fromJson(inbox.data);
         _commitments = [
           for (final item in jsonMaps(commitments.data))
@@ -142,6 +153,28 @@ class _InboxScreenState extends State<InboxScreen> {
       const SnackBar(
         content: Text('Added to today. Plan your day to place it.'),
       ),
+    );
+  }
+
+  Future<void> _copyDraft(Map<String, dynamic> nudge) async {
+    await Clipboard.setData(ClipboardData(text: asJsonString(nudge['draft']) ?? ''));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Draft copied. Nothing was sent.')),
+    );
+  }
+
+  Future<void> _quietNudge(Map<String, dynamic> nudge, {int? snoozeDays}) async {
+    final id = asJsonString(nudge['commitmentId']);
+    if (id == null) return;
+    await _run(
+      id,
+      () => snoozeDays == null
+          ? widget.http.post<dynamic>('/api/v1/commitments/$id/follow-up/dismiss')
+          : widget.http.post<dynamic>(
+              '/api/v1/commitments/$id/follow-up/snooze',
+              data: {'days': snoozeDays},
+            ),
     );
   }
 
@@ -376,6 +409,47 @@ class _InboxScreenState extends State<InboxScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             children: [
+              for (final nudge in _followUps)
+                SurfaceCard(
+                  key: Key('followup-${nudge['commitmentId']}'),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${asJsonString(nudge['counterparty']) ?? ''} is '
+                        '${asJsonInt(nudge['daysOverdue'])} days late: '
+                        '${asJsonString(nudge['description']) ?? ''}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        asJsonString(nudge['draft']) ?? '',
+                        style: TextStyle(color: colors.inkSoft, fontSize: 14),
+                      ),
+                      Wrap(
+                        spacing: 4,
+                        children: [
+                          TextButton(
+                            key: Key('followup-copy-${nudge['commitmentId']}'),
+                            onPressed: () => unawaited(_copyDraft(nudge)),
+                            child: const Text('Copy draft'),
+                          ),
+                          TextButton(
+                            key: Key('followup-snooze-${nudge['commitmentId']}'),
+                            onPressed: () => unawaited(_quietNudge(nudge, snoozeDays: 7)),
+                            child: const Text('Not this week'),
+                          ),
+                          TextButton(
+                            key: Key('followup-dismiss-${nudge['commitmentId']}'),
+                            onPressed: () => unawaited(_quietNudge(nudge)),
+                            child: const Text('Don’t nudge'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               if (suggested.isNotEmpty) ...[
                 const SectionHeader('Jarvis found these in your chats'),
                 for (final item in suggested)

@@ -2044,6 +2044,14 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("owner_id");
 
+                    b.Property<Guid?>("PersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("person_id");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
                     b.Property<Guid?>("ReminderId")
                         .HasColumnType("uuid")
                         .HasColumnName("reminder_id");
@@ -2071,6 +2079,10 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerId", "DueOn");
+
+                    b.HasIndex("OwnerId", "PersonId");
+
+                    b.HasIndex("OwnerId", "ProjectId");
 
                     b.HasIndex("OwnerId", "Status");
 
