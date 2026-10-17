@@ -374,3 +374,15 @@ Deterministic rules over the owner's own facts; reading proposes only and never 
 | POST | `/opportunities/unmute` (`kind`; undoes "fewer like this") |
 
 Rules: a meeting in the next 24 hours with no prep note; an open accepted promise due within 3 days or late (older than 30 days it only asks whether it still matters); a subscription's notice day within 7 days (unless kept); a decision whose review day is within 7 days; free time of 45+ minutes today with a project's open next step. "Later" returns after 3 days, "handled", "wrong" and "useful" hide that opportunity, "fewer" or two "wrong" for a kind mute it for 30 days.
+
+### Life stories
+
+Recaps built from the timeline (`ITimelineService`) for a chosen window (at most 120 days). Decisions, tasks and journal are included by default; money, contacts and chats only when named in `kinds`. Items point at records through `sourceRef`; edits, removal and order change only the story. Patterns come from timeline insights only with 14+ days of data and always carry their window and limits. State lives in owner settings (`stories.drafts`, at most 20 drafts).
+
+| Method | Path |
+|---|---|
+| GET / POST | `/stories` (POST: `from`, `to`, `style` `recap`/`retrospective`/`what_changed`, optional `kinds`) |
+| GET / DELETE | `/stories/{id}` |
+| PUT | `/stories/{id}/items/{itemId}` (`text`), `/stories/{id}/items/{itemId}/removed` (`removed`) |
+| POST | `/stories/{id}/items/{itemId}/move` (`direction` `up`/`down`; 409 at the end), `/stories/{id}/save` (private Library report, one per version) |
+| GET | `/stories/{id}/export?redact=journal,people,expense,…` (Markdown; leaves out those kinds, counts and patterns) |

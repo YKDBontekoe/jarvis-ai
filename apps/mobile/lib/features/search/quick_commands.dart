@@ -156,6 +156,12 @@ const quickCommands = [
     keywords: ['connect', 'app', 'apps', 'integrate', 'calendar', 'email', 'contacts', 'koppel', 'verbind', 'welke app'],
   ),
   QuickCommand(
+    label: 'Go to Stories',
+    icon: PhosphorIconsRegular.bookOpen,
+    destination: 'stories',
+    keywords: ['stories', 'story', 'recap', 'retrospective', 'look back', 'year in review', 'terugblik', 'verhaal'],
+  ),
+  QuickCommand(
     label: 'Go to Documents',
     icon: PhosphorIconsRegular.notePencil,
     destination: 'documents',

@@ -803,6 +803,24 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
       {'id': 'e1', 'kind': 'explain_back', 'prompt': 'In your own words, what is the main idea of “Sourdough basics”?', 'hint': 'Mention the key terms you remember from the points above.', 'source': {'quote': 'x', 'offset': 0}},
     ],
   },
+  'GET /api/v1/stories': [
+    {'id': 's1', 'title': 'Recap: 18 Sep – 17 Oct 2026', 'style': 'recap', 'from': '2026-09-18', 'to': '2026-10-17', 'version': 2, 'savedVersion': 1},
+  ],
+  'GET /api/v1/stories/s1': {
+    'id': 's1', 'title': 'Recap: 18 Sep – 17 Oct 2026', 'style': 'recap', 'from': '2026-09-18', 'to': '2026-10-17',
+    'kinds': ['decision', 'task', 'journal'], 'version': 2, 'savedVersion': 1,
+    'counts': {'decision': 1, 'task': 2, 'journal': 1},
+    'items': [
+      {'id': 'i1', 'kind': 'decision', 'date': '2026-09-25', 'text': 'Switch to the credit union', 'originalText': 'Switch bank', 'sourceRef': 'decision:d1', 'removed': false},
+      {'id': 'i2', 'kind': 'task', 'date': '2026-10-02', 'text': 'Book the plumber', 'originalText': 'Book the plumber', 'sourceRef': 'task:t1', 'removed': false},
+      {'id': 'i3', 'kind': 'journal', 'date': '2026-10-09', 'text': 'Good day: Walked along the canal and felt calm.', 'originalText': 'Good day: Walked along the canal and felt calm.', 'sourceRef': 'journal:j1', 'removed': true},
+    ],
+    'patterns': [
+      {'headline': 'Mood is higher on days with exercise', 'detail': 'Across the window.', 'limits': 'Based on 20 days with data over 18 Sep – 17 Oct. This shows what went together, not why.'},
+    ],
+    'patternsNote': null,
+    'reflection': 'What did choosing “Switch to the credit union” teach you about what matters to you?',
+  },
   'GET /api/v1/documents': [
     {'id': 'd1', 'title': 'Home renovation: update 17 Oct 2026', 'kind': 'project_update', 'version': 3, 'savedVersion': 2},
   ],

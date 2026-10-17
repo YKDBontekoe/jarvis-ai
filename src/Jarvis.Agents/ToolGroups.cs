@@ -67,6 +67,9 @@ public static partial class ToolGroups
         new("opportunities", "What is worth acting on now: meetings to prepare for, promises to follow up, renewals, decisions, free time",
             ["GetOpportunities"],
             OpportunityKeywords()),
+        new("stories", "Draft a recap, retrospective or what-changed story from the user's own timeline; stored as an editable draft, nothing is shared",
+            ["DraftLifeStory"],
+            StoryKeywords()),
         new("documents", "Draft a one-page project update from the user's own records, nothing is sent",
             ["DraftProjectUpdate"],
             DocumentKeywords()),
@@ -262,6 +265,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(what should i do (next|now)|what('?s| is) coming up|anything (i )?(should|need to) (do|know)|what needs my attention|what am i missing|wat moet ik (nu )?doen|wat komt eraan|wat heeft aandacht nodig)", KeywordOptions)]
     private static partial Regex OpportunityKeywords();
+
+    [GeneratedRegex(@"\b(recap|retrospective|year in review|month in review|what changed (this|last|over)|my story|life story|terugblik|jaaroverzicht|maandoverzicht|wat is er veranderd)", KeywordOptions)]
+    private static partial Regex StoryKeywords();
 
     [GeneratedRegex(@"\b(project update|status update|progress report|write (up )?(an? )?update|statusupdate|voortgangsrapport|schrijf (een )?update)", KeywordOptions)]
     private static partial Regex DocumentKeywords();

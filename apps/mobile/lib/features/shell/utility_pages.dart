@@ -25,6 +25,8 @@ import '../comparisons/comparisons_screen.dart';
 import '../apps/app_goals_screen.dart';
 import '../documents/document_screen.dart';
 import '../documents/documents_screen.dart';
+import '../stories/stories_screen.dart';
+import '../stories/story_screen.dart';
 import '../finance/subscription_review_screen.dart';
 import '../goals/goal_screen.dart';
 import '../opportunities/opportunities_screen.dart';
@@ -126,6 +128,11 @@ Widget? utilityPageFor(
   final lesson when lesson.startsWith('lesson:') => LessonScreen(
     http: http,
     itemId: lesson.substring('lesson:'.length),
+  ),
+  'stories' => StoriesScreen(http: http),
+  final story when story.startsWith('story:') => StoryScreen(
+    http: http,
+    storyId: story.substring('story:'.length),
   ),
   'documents' => DocumentsScreen(http: http),
   final document when document.startsWith('document:') => DocumentScreen(

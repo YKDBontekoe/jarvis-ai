@@ -24,6 +24,8 @@ const destinations = [
   'opportunities',
   'documents',
   'document:d1',
+  'stories',
+  'story:s1',
   'lesson:i1',
   'find-app',
   'goal:g1',
