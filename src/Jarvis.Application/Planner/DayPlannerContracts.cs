@@ -20,7 +20,8 @@ public sealed record DayPlanItem(
     int Minutes,
     bool Done,
     DateTimeOffset? StartAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? SourceRef = null);
 
 /// <summary>
 /// The owner's plan for one local day, kept in owner settings (no table of its own). <see cref="TimeZoneId"/> is the
@@ -43,7 +44,7 @@ public sealed record DayTimelineEntryDto(
     bool Done);
 
 public sealed record DayPlanItemDto(Guid Id, string Title, int Minutes, bool Done, DateTimeOffset? StartAt,
-    DateTimeOffset? EndAt);
+    DateTimeOffset? EndAt, string? SourceRef = null);
 
 public sealed record DayFreeSlotDto(DateTimeOffset StartAt, DateTimeOffset EndAt, int Minutes);
 
@@ -63,7 +64,11 @@ public sealed record DayTimelineDto(
 /// <summary>Result of "plan my day": the new timeline plus the to-dos that did not fit.</summary>
 public sealed record DayPlanResultDto(DayTimelineDto Today, int Scheduled, IReadOnlyList<DayPlanItemDto> DidNotFit);
 
-public sealed record AddDayPlanItemRequest(string Title, int? Minutes = null);
+/// <summary>
+/// <paramref name="SourceRef"/> ties the to-do to the thing it comes from; today only <c>commitment:&lt;id&gt;</c>,
+/// which supplies the title when none is given and keeps a promise from being planned twice.
+/// </summary>
+public sealed record AddDayPlanItemRequest(string? Title = null, int? Minutes = null, string? SourceRef = null);
 
 public sealed record UpdateDayPlanItemRequest(string? Title = null, int? Minutes = null, bool? Done = null);
 

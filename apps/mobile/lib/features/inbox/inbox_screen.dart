@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
+import '../../schedule_format.dart' show deviceTimeZoneLookup;
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
@@ -72,13 +73,14 @@ class _InboxScreenState extends State<InboxScreen> {
     }
   }
 
-  Future<void> _run(String id, Future<void> Function() action) async {
+  Future<bool> _run(String id, Future<void> Function() action) async {
     setState(() => _busy.add(id));
     try {
       await action();
       await _load();
+      return true;
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -86,6 +88,7 @@ class _InboxScreenState extends State<InboxScreen> {
           ),
         ),
       );
+      return false;
     } finally {
       if (mounted) setState(() => _busy.remove(id));
     }
@@ -122,6 +125,25 @@ class _InboxScreenState extends State<InboxScreen> {
       data: {'status': status},
     ),
   );
+
+  /// Puts the promise on today's plan; it stays open until the owner finishes it.
+  Future<void> _planToday(CommitmentData item) async {
+    final zone = await deviceTimeZoneLookup();
+    final added = await _run(
+      item.id,
+      () => widget.http.post<dynamic>(
+        '/api/v1/planner/today/items',
+        queryParameters: zone == null ? null : {'timeZone': zone},
+        data: {'sourceRef': 'commitment:${item.id}'},
+      ),
+    );
+    if (!added || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Added to today. Plan your day to place it.'),
+      ),
+    );
+  }
 
   Future<void> _addCommitment() async {
     final result = await showJarvisDialog<Map<String, String>>(
@@ -429,6 +451,13 @@ class _InboxScreenState extends State<InboxScreen> {
                   child: const Text('Dismiss'),
                 )
               else ...[
+                TextButton(
+                  key: Key('commitment-plan-${item.id}'),
+                  onPressed: _busy.contains(item.id)
+                      ? null
+                      : () => unawaited(_planToday(item)),
+                  child: const Text('Plan today'),
+                ),
                 TextButton(
                   key: Key('commitment-done-${item.id}'),
                   onPressed: () => unawaited(_setCommitment(item, 'done')),

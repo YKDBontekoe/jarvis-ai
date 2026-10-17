@@ -72,7 +72,7 @@ Described in [life-features.md](life-features.md): `/timeline` (`/on-this-day`, 
 | Method | Path |
 |--------|------|
 | GET | `/planner/today` (timeline of calendar events, reminders and focus blocks; to-dos; free slots) |
-| POST | `/planner/today/items` (`title` ≤ 200, `minutes` 5–480, default 30) |
+| POST | `/planner/today/items` (`title` ≤ 200, `minutes` 5–480, default 30; optional `sourceRef` `commitment:<id>` plans an open, accepted promise: the title defaults to its description and planning it again returns the same to-do; items carry `sourceRef`) |
 | PATCH/DELETE | `/planner/today/items/{id}` (PATCH: `title`, `minutes`, `done`) |
 | POST/DELETE | `/planner/today/plan` (place open to-dos in free time / take them off the timeline) |
 | PUT | `/planner/today/hours` (`dayStart`, `dayEnd`, at least one hour apart) |

@@ -81,3 +81,11 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **Tool.** `GetWeekFollowThrough` (read-only).
 - **Tests.** Unit 1794 pass (`WeekFollowThroughTests` 13); Dart `follow_through_test` (6), existing `weekly_review_screen_test` unchanged and passing, full `flutter test` 767, analyze clean. Real stack: `week_follow_through_flow` (counts reconcile, reading creates nothing, plan moves one promise with a reminder, project step keeps the outcome, dismiss, 400/404 cases).
 - **Not done.** Accepting into the day planner or as a project-linked reminder (F05), a "keep/change/stop" review of habits (F23.7), the narrator mentioning follow-through, widgets/briefings using the same counts (F01.1.7 beyond Home).
+
+## Checkpoint 7: F05 promise → time on today's plan
+
+- **What.** `POST /planner/today/items` and the `AddToDayPlan` tool accept a `commitment:<id>` source. `DayPlannerService` checks it through `ICommitmentService.GetAsync` (owner scoped; unknown, another owner's, suggested, done or dropped promises are refused with 400), uses the promise description as the title when none is given, and returns the existing open to-do if the same promise was already planned, so asking twice never doubles the time. Items carry `sourceRef` (backward compatible: the settings JSON simply lacks it for older items).
+- **Placement.** Unchanged: the existing deterministic `PlanMyDay` puts the to-do in the earliest free block. Nothing is written to the calendar, and finishing the to-do does not close the promise (the owner says it is done in Inbox).
+- **App.** Inbox promise cards get "Plan today" (accepted promises only; shows the server's reason when refused); Today labels such to-dos "From a promise".
+- **Tests.** Unit `DayPlannerTests` (+7: title from promise, dedupe, replan after done, explicit title wins, bad source, other owner/suggested/closed, promise stays open); Dart `inbox_screen_test` (+2), `day_planner_test` (+1). Real stack: `planner_commitment_flow` passes.
+- **Not done.** Choosing a day other than today, suggesting a block from the promise due date automatically, a link from the Today row back to the promise, screenshots of the new button.

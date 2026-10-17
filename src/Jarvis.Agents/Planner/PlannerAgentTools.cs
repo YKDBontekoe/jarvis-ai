@@ -21,13 +21,15 @@ internal sealed class PlannerAgentTools(IDayPlannerService planner, ICurrentUser
 
     [Description("Add a to-do to today's plan with an estimate in minutes (5 to 480, default 30). It is not on the timeline until PlanMyDay places it. Use this for things the user wants to get done today, not for reminders at a fixed time.")]
     public async Task<string> AddToDayPlanAsync(
-        [Description("Short title of the to-do.")] string title,
+        [Description("Short title of the to-do. May be empty when commitmentId is given.")] string title = "",
         [Description("Estimated minutes, 5 to 480.")] int minutes = DayPlannerService.DefaultMinutes,
+        [Description("Optional ID of an open promise to plan time for; the promise itself stays open until the user finishes it.")] string? commitmentId = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var item = await planner.AddItemAsync(currentUser.OwnerId, new AddDayPlanItemRequest(title, minutes),
+            var item = await planner.AddItemAsync(currentUser.OwnerId, new AddDayPlanItemRequest(title, minutes,
+                    string.IsNullOrWhiteSpace(commitmentId) ? null : "commitment:" + commitmentId.Trim()),
                 null, cancellationToken);
             return $"Added to today's plan (item ID {item.Id}): {item.Title}, {item.Minutes} min. " +
                    "Call PlanMyDay to put it in a free block.";

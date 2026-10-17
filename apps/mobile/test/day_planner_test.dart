@@ -41,11 +41,13 @@ Map<String, Object?> _item(
   int minutes = 30,
   bool done = false,
   DateTime? startAt,
+  String? sourceRef,
 }) => {
   'id': id,
   'title': title,
   'minutes': minutes,
   'done': done,
+  'sourceRef': sourceRef,
   'startAt': startAt == null ? null : _iso(startAt),
   'endAt': startAt == null
       ? null
@@ -169,6 +171,23 @@ void main() {
       find.text('1 to-do planned. Rebuild shed did not fit today.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('a to-do that came from a promise says so', (tester) async {
+    http.on(
+      'GET',
+      _base,
+      _day(
+        items: [
+          _item('p', 'Send Rosa the deck', sourceRef: 'commitment:c1'),
+          _item('q', 'Call plumber'),
+        ],
+      ),
+    );
+
+    await show(tester, DayPlannerScreen(http: http.client()));
+
+    expect(find.textContaining('From a promise'), findsOneWidget);
   });
 
   testWidgets('checks off and removes to-dos', (tester) async {
