@@ -63,6 +63,9 @@ public static partial class ToolGroups
         new("comparisons", "Weigh options against criteria: create a comparison, record what is known, see the ranking",
             ["CreateComparison", "SetComparisonCell", "GetComparison"],
             ComparisonKeywords()),
+        new("scenarios", "What-if arithmetic: compare a cost or a pace now and with an alternative, nothing is changed",
+            ["CompareCostScenario", "CompareTimeScenario"],
+            ScenarioKeywords()),
         new("goals", "Goals: how they are going, check-ins in the user's words, a small proposed plan for the week",
             ["GetGoals", "AddGoalCheckIn", "ProposeGoalPlan"],
             GoalKeywords()),
@@ -246,6 +249,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(compare|comparison|which (one|should)|pros and cons|versus|\bvs\b|choose between|shortlist|vergelijk|vergelijking|welke (moet|zal)|kiezen tussen)", KeywordOptions)]
     private static partial Regex ComparisonKeywords();
+
+    [GeneratedRegex(@"\b(what if|what[- ]if|scenario|break[- ]even|how long would|how many weeks|would i save|save if|switch(ing)? to|wat als|scenario|hoe lang zou|zou ik besparen|overstappen)", KeywordOptions)]
+    private static partial Regex ScenarioKeywords();
 
     [GeneratedRegex(@"\b(goals?|check[- ]?in on|making progress|my progress|experiment|doelen?|vooruitgang|voortgang|experiment)", KeywordOptions)]
     private static partial Regex GoalKeywords();

@@ -150,6 +150,12 @@ const quickCommands = [
     keywords: ['decisions', 'decision', 'predictions', 'calibration', 'beslissingen', 'voorspelling'],
   ),
   QuickCommand(
+    label: 'Go to What if',
+    icon: PhosphorIconsRegular.sliders,
+    destination: 'scenarios',
+    keywords: ['what if', 'scenario', 'savings', 'break even', 'how long', 'wat als', 'besparen', 'scenario'],
+  ),
+  QuickCommand(
     label: 'Go to Goals',
     icon: PhosphorIconsRegular.target,
     destination: 'goals',

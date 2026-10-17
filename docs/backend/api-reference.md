@@ -312,3 +312,12 @@ Commitments carry optional `projectId` and `personId`, set only by the owner (`P
 |--------|-------|
 | GET | `/commitments/follow-ups` (`language` `en`/`nl`: up to five open, accepted, owed-to-me promises at least 3 days late, longest first, each with a draft; nothing is sent) |
 | POST | `/commitments/{id}/follow-up/snooze` (`days` 1–60) · `/commitments/{id}/follow-up/dismiss` (quiet for good; stored in owner settings `commitments.followups`) |
+
+## What-if scenarios
+
+Stateless arithmetic plus a save step; nothing here reads or changes budgets, accounts, subscriptions or the calendar.
+
+| Method | Route |
+|--------|-------|
+| POST | `/scenarios/evaluate` (`kind` `savings`: `savingsBaseline` / `savingsAlternative` with `monthlyCost`, `months` (1–120, equal on both sides), `oneTimeCost`, `currency` (the same three letters on both sides); `kind` `time`: `timeBaseline` / `timeAlternative` with `hoursPerWeek`, `taskHours`, `bufferPercent`; answers with both outcomes, deltas that carry their arithmetic in words, and notes; 400 names the field) |
+| POST | `/scenarios/save` (`scenario`, optional `projectId`, and optionally `decisionProbability` with `decisionReviewOn`, both or neither; writes one Library report tagged `scenario` and, when asked, one decision; the decision input is checked before anything is written) |

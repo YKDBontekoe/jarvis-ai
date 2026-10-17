@@ -762,6 +762,16 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     {'id': 'c1', 'title': 'Which boiler?', 'options': 2, 'criteria': 3, 'leader': 'Bosch Condens 2300i', 'decided': false, 'updatedAt': '2026-10-10T10:00:00Z'},
   ],
   'GET /api/v1/comparisons/c1': comparisonDetails(),
+  'POST /api/v1/scenarios/evaluate': {
+    'kind': 'savings',
+    'baseline': {'label': 'Now', 'primary': 311.76, 'unit': 'EUR', 'summary': '12.99 EUR a month for 24 months, 311.76 in total.'},
+    'alternative': {'label': 'Alternative', 'primary': 227.76, 'unit': 'EUR', 'summary': '9.49 EUR a month for 24 months plus 0.00 once, 227.76 in total.'},
+    'deltas': [
+      {'label': 'Total over the period', 'value': 84.0, 'unit': 'EUR', 'explanation': '(12.99 × 24 + 0.00) − (9.49 × 24 + 0.00) = 84.00'},
+      {'label': 'Per month', 'value': 3.5, 'unit': 'EUR', 'explanation': '12.99 − 9.49 = 3.50 a month'},
+    ],
+    'notes': ['Assumes the prices stay as entered. Nothing here changes a budget, account or subscription.'],
+  },
   'GET /api/v1/goals': [
     {'id': 'g1', 'title': 'Run a 10k', 'status': 'active', 'checkInDue': true, 'checkInCount': 1, 'feeling': 'slipping', 'openPlanItems': 2, 'review': {'verdict': 'change', 'reason': 'Your last 2 check-ins mention slipping or stuck. What would make it easier?'}},
   ],
