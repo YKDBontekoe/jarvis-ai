@@ -453,13 +453,16 @@ internal static class ProductionDeployment
         done
         """.Replace("$", "$$");
 
+    // The server has no healthcheck, so this step waits for the frontend itself (up to five minutes, enough for a slow
+    // first start on a small host). The CLI error is kept and logged so a failure says why instead of only "exit 1".
     private static readonly string TemporalNamespaceScript = """
-        for attempt in $(seq 1 60); do
-          if temporal operator namespace describe --namespace default >/dev/null 2>&1 \
-            || temporal operator namespace create --namespace default >/dev/null 2>&1; then exit 0; fi
+        for attempt in $(seq 1 150); do
+          if out=$(temporal operator namespace describe --namespace default 2>&1) \
+            || out=$(temporal operator namespace create --namespace default 2>&1); then exit 0; fi
+          [ $((attempt % 10)) -ne 1 ] || echo "Waiting for Temporal at $TEMPORAL_ADDRESS (attempt $attempt): $out" >&2
           sleep 2
         done
-        echo "Could not register the Temporal default namespace" >&2
+        echo "Could not register the Temporal default namespace: $out" >&2
         exit 1
         """.Replace("$", "$$");
 
