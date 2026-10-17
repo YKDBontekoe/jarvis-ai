@@ -50,6 +50,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Watches | `ConditionWatchAgentTools` | — |
 | Memory | `MemoryAgentTools` list/search/remember | **Forget** requires approval |
 | Journal | `JournalAgentTools` `SaveJournalEntry` (appends to the day's entry), `ListJournalEntries` | Hidden during background task turns; off when the profile disallows remembering |
+| Apps | `AppGoalAgentTools` `FindAppForGoal` | Read-only: says which app covers a goal, its real capabilities and next step; connecting is done in the app, never with secrets in chat |
 | Scenarios | `ScenarioAgentTools` `CompareCostScenario`, `CompareTimeScenario` | No approval: pure arithmetic on numbers the user gave; nothing is stored or changed |
 | Goals | `GoalAgentTools` `GetGoals`, `AddGoalCheckIn`, `ProposeGoalPlan` | No approval: a check-in records what the user said, a plan is only a proposal the user accepts in the app |
 | Day planner | `PlannerAgentTools` `GetTodayPlan`, `AddToDayPlan` (optional `commitmentId`), `PlanMyDay`, `CompleteDayPlanItem`, `RemoveDayPlanItem` | No approval: they only change the owner's day plan in Jarvis. Calendar writes go through `InvokeMcpTool` (approval) per the planner guidance |

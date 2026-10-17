@@ -150,6 +150,12 @@ const quickCommands = [
     keywords: ['decisions', 'decision', 'predictions', 'calibration', 'beslissingen', 'voorspelling'],
   ),
   QuickCommand(
+    label: 'Find an app for a job',
+    icon: PhosphorIconsRegular.magnifyingGlass,
+    destination: 'find-app',
+    keywords: ['connect', 'app', 'apps', 'integrate', 'calendar', 'email', 'contacts', 'koppel', 'verbind', 'welke app'],
+  ),
+  QuickCommand(
     label: 'Go to What if',
     icon: PhosphorIconsRegular.sliders,
     destination: 'scenarios',

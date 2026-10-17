@@ -772,6 +772,25 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     ],
     'notes': ['Assumes the prices stay as entered. Nothing here changes a budget, account or subscription.'],
   },
+  'GET /api/v1/apps/goals': {
+    'goals': [
+      {
+        'id': 'calendar', 'title': 'Manage my calendar', 'purpose': 'See what is on today and plan around it. Jarvis reads your events; adding one asks you first.',
+        'packId': 'calendar', 'packName': 'Calendar', 'status': 'not_connected',
+        'nextStep': 'Paste your calendar\'s private link to connect.',
+        'capabilities': {'reads': ['calendar events list'], 'prepares': <Object>[], 'changes': ['calendar event create'], 'needs': 'A private calendar link from your calendar provider.'},
+        'try': null, 'pinned': false,
+      },
+      {
+        'id': 'mail', 'title': 'Deal with my email', 'purpose': 'Search your mail and draft replies for you to send.',
+        'packId': 'mail', 'packName': 'Mail', 'status': 'ready', 'nextStep': 'Connected. Try it below or pin it.',
+        'capabilities': {'reads': ['list emails', 'search emails'], 'prepares': ['draft email'], 'changes': <Object>[], 'needs': 'You sign in once with your provider. Jarvis never sees your password.'},
+        'try': {'label': 'Show my latest emails', 'kind': 'chat_prompt', 'prompt': 'x'}, 'pinned': true,
+      },
+    ],
+    'unmatched': false,
+    'suggestion': null,
+  },
   'GET /api/v1/goals': [
     {'id': 'g1', 'title': 'Run a 10k', 'status': 'active', 'checkInDue': true, 'checkInCount': 1, 'feeling': 'slipping', 'openPlanItems': 2, 'review': {'verdict': 'change', 'reason': 'Your last 2 check-ins mention slipping or stuck. What would make it easier?'}},
   ],

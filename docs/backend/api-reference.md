@@ -321,3 +321,15 @@ Stateless arithmetic plus a save step; nothing here reads or changes budgets, ac
 |--------|-------|
 | POST | `/scenarios/evaluate` (`kind` `savings`: `savingsBaseline` / `savingsAlternative` with `monthlyCost`, `months` (1–120, equal on both sides), `oneTimeCost`, `currency` (the same three letters on both sides); `kind` `time`: `timeBaseline` / `timeAlternative` with `hoursPerWeek`, `taskHours`, `bufferPercent`; answers with both outcomes, deltas that carry their arithmetic in words, and notes; 400 names the field) |
 | POST | `/scenarios/save` (`scenario`, optional `projectId`, and optionally `decisionProbability` with `decisionReviewOn`, both or neither; writes one Library report tagged `scenario` and, when asked, one decision; the decision input is checked before anything is written) |
+
+## Goal-led app discovery
+
+Starts from what the owner wants, not from a connector list. Setup itself stays in the existing pack, OAuth and credential routes; no secret passes through these.
+
+| Method | Route |
+|--------|-------|
+| GET | `/apps/goals` (`q` words in English or Dutch: matching goals each with the pack, `status` `ready`/`not_connected`, the real `nextStep`, capabilities (`reads`, `prepares`, `changes`, `needs`) derived from the pack's actual tool names, a harmless `try` only when ready, and `pinned`; `unmatched` with an honest `suggestion` when nothing covers the goal) |
+| POST | `/apps/goals/{goalId}/try` (calendar: reads today's events for real, or answers `problem` with what to check when the link cannot be read; mail and contacts: a read-only chat prompt; 404 until the app is connected) |
+| PUT/DELETE | `/apps/goals/{goalId}/pin` (pins an app action, max six, only when connected; stored in owner settings `apps.pins`) |
+
+A calendar is ready with a saved link or an MCP server; mail and contacts only with an MCP server (a stored token alone cannot read anything).

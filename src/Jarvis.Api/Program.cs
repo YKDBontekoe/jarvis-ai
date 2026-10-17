@@ -125,6 +125,7 @@ api.MapDecisionEndpoints(app.Logger);
 api.MapComparisonEndpoints();
 api.MapGoalEndpoints();
 api.MapScenarioEndpoints();
+api.MapAppGoalEndpoints();
 api.MapMeetingEndpoints();
 api.MapMissionEndpoints(app.Logger);
 api.MapEventEndpoints();

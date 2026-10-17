@@ -21,6 +21,7 @@ const destinations = [
   'meeting:m1',
   'goals',
   'scenarios',
+  'find-app',
   'goal:g1',
   'memory',
   'journal',
