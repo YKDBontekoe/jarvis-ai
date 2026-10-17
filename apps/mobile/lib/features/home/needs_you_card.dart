@@ -26,6 +26,7 @@ class NeedsYouCard extends StatefulWidget {
     this.onReplyWith,
     this.http,
     this.pending = const {},
+    this.failed = const {},
     super.key,
   });
 
@@ -39,6 +40,10 @@ class NeedsYouCard extends StatefulWidget {
 
   /// Ids an action is running on.
   final Set<String> pending;
+
+  /// Ids whose action failed on the server: their rows come back, so a
+  /// failed "Done" never leaves something hidden that still needs the person.
+  final Set<String> failed;
 
   @override
   State<NeedsYouCard> createState() => _NeedsYouCardState();
@@ -61,7 +66,9 @@ class _NeedsYouCardState extends State<NeedsYouCard> {
   void didUpdateWidget(NeedsYouCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     final ids = {for (final item in widget.items) item.id};
-    _handled.retainAll(ids);
+    _handled
+      ..retainAll(ids)
+      ..removeAll(widget.failed);
   }
 
   void _act(NeedsYouItem item, NeedsYouAction action) {
@@ -329,6 +336,12 @@ class _NeedsYouRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     final (leading, actions) = _parts(context);
+    // A promise or decision is only useful with its date and who it is for, so these wrap instead of truncating.
+    final lines =
+        item.kind == NeedsYouKind.commitment ||
+            item.kind == NeedsYouKind.decision
+        ? 2
+        : 1;
     return Semantics(
       container: true,
       label: '${item.title}, ${item.detail}',
@@ -362,7 +375,7 @@ class _NeedsYouRow extends StatelessWidget {
                             Flexible(
                               child: Text(
                                 item.title,
-                                maxLines: 1,
+                                maxLines: lines,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 15.5,
@@ -389,7 +402,7 @@ class _NeedsYouRow extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           item.detail,
-                          maxLines: 1,
+                          maxLines: lines,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
@@ -475,6 +488,29 @@ class _NeedsYouRow extends StatelessWidget {
             'Done',
             primary: true,
             onTap: () => onAction(NeedsYouAction.done),
+          ),
+        ],
+      ),
+      NeedsYouKind.commitment => (
+        icon(PhosphorIconsRegular.hand, colors.accent, colors.accentSoft),
+        [
+          _RowButton('Open', onTap: () => onAction(NeedsYouAction.open)),
+          const SizedBox(width: 6),
+          _RowButton(
+            'Done',
+            primary: true,
+            semantic: 'Mark ${item.title} as done',
+            onTap: () => onAction(NeedsYouAction.done),
+          ),
+        ],
+      ),
+      NeedsYouKind.decision => (
+        icon(PhosphorIconsRegular.gavel, colors.info, colors.infoSoft),
+        [
+          _RowButton(
+            'Review',
+            primary: true,
+            onTap: () => onAction(NeedsYouAction.open),
           ),
         ],
       ),

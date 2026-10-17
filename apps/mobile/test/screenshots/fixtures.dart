@@ -67,8 +67,7 @@ List<Map<String, Object?>> messages() => [
   {
     'id': 'm1',
     'role': 'user',
-    'content':
-        'Can you plan a relaxed weekend in Lisbon for two? We land Friday at 18:40.',
+    'content': 'Can you plan a relaxed weekend in Lisbon for two? We land Friday at 18:40.',
   },
   {
     'id': 'm2',
@@ -96,8 +95,7 @@ Want me to add the dinner booking to your calendar and remind you to reserve on 
   {
     'id': 'm4',
     'role': 'assistant',
-    'content':
-        'Done — I set a reminder for **Wednesday at 10:00** to book Cervejaria Ramiro. The calendar entry needs your OK first.',
+    'content': 'Done — I set a reminder for **Wednesday at 10:00** to book Cervejaria Ramiro. The calendar entry needs your OK first.',
   },
 ];
 
@@ -106,8 +104,7 @@ List<Map<String, Object?>> approvals() => [
     'id': 'a1',
     'conversationId': conversationId,
     'toolName': 'CreateCalendarEvent',
-    'argumentsJson':
-        '{"title":"Dinner at Cervejaria Ramiro","start":"Friday 21:00","location":"Av. Almirante Reis 1"}',
+    'argumentsJson': '{"title":"Dinner at Cervejaria Ramiro","start":"Friday 21:00","location":"Av. Almirante Reis 1"}',
     'status': 'pending',
   },
 ];
@@ -143,8 +140,7 @@ Map<String, Object?> home() {
   final now = _now();
   final today = DateTime(now.year, now.month, now.day);
   return {
-    'portrait':
-        'A calm Friday. Two things need you: the dinner booking and the bank summary that is waiting on your approval.',
+    'portrait': 'A calm Friday. Two things need you: the dinner booking and the bank summary that is waiting on your approval.',
     'reminders': [
       {
         'id': 'r1',
@@ -164,6 +160,25 @@ Map<String, Object?> home() {
       },
     ],
     'approvals': approvals(),
+    'commitments': [
+      {
+        'id': 'c-deck',
+        'direction': 'i_owe',
+        'counterparty': 'Rosa',
+        'description': 'Send Rosa the pitch deck',
+        'daysOverdue': 2,
+        'source': 'whatsapp',
+      },
+    ],
+    'decisions': [
+      {
+        'id': 'd-bank',
+        'title': 'Switch to the new bank',
+        'prediction': 'Monthly fees drop by half',
+        'probability': 0.7,
+        'daysOverdue': 0,
+      },
+    ],
     'latestBriefing': {
       'id': 'n-brief',
       'title': 'Your morning briefing',
@@ -546,8 +561,7 @@ Map<String, Object?> whatsAppChats() {
           unread: 9,
         ),
         'catchUp': {
-          'summary':
-              'Noor is booking the bouldering gym for Saturday at 10:00 and asked who is in.',
+          'summary': 'Noor is booking the bouldering gym for Saturday at 10:00 and asked who is in.',
           'toReply': [
             {'who': 'Noor', 'about': 'Are you in on Saturday?'},
           ],
