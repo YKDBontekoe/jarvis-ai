@@ -375,6 +375,16 @@ Deterministic rules over the owner's own facts; reading proposes only and never 
 
 Rules: a meeting in the next 24 hours with no prep note; an open accepted promise due within 3 days or late (older than 30 days it only asks whether it still matters); a subscription's notice day within 7 days (unless kept); a decision whose review day is within 7 days; free time of 45+ minutes today with a project's open next step. "Later" returns after 3 days, "handled", "wrong" and "useful" hide that opportunity, "fewer" or two "wrong" for a kind mute it for 30 days.
 
+### Setup
+
+Guided first steps and honest capability status. Steps (`talk`, `reminder`, `calendar`, `source`, `brief`) are done when the thing exists (a chat, a reminder, a connected calendar, a Library item, an enabled brief), so a reinstall or reconnect resumes without repeating anything. Only the owner's skips are stored (owner settings `setup.journey`); `calendar`, `source` and `brief` can be skipped, `talk` and `reminder` cannot. Capability statuses: `ready`, `not_connected`, `needs_reauth`, `unavailable`, `unsupported` (push registration cannot be checked from the server, so it says so). Nothing is sent or created to probe anything.
+
+| Method | Path |
+|---|---|
+| GET | `/setup` (`goals`, `capabilities`, `done`, `total`, `nextGoalId`, `summary`) |
+| POST | `/setup/goals/{goalId}/decline`, `/setup/goals/{goalId}/reopen` (400 for unknown or required steps) |
+| GET | `/setup/support-bundle` (version, on/off states, goal states; reviewed in the app before copying; no names, hostnames, tokens or addresses) |
+
 ### Life stories
 
 Recaps built from the timeline (`ITimelineService`) for a chosen window (at most 120 days). Decisions, tasks and journal are included by default; money, contacts and chats only when named in `kinds`. Items point at records through `sourceRef`; edits, removal and order change only the story. Patterns come from timeline insights only with 14+ days of data and always carry their window and limits. State lives in owner settings (`stories.drafts`, at most 20 drafts).

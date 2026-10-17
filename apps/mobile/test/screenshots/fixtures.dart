@@ -803,6 +803,22 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
       {'id': 'e1', 'kind': 'explain_back', 'prompt': 'In your own words, what is the main idea of “Sourdough basics”?', 'hint': 'Mention the key terms you remember from the points above.', 'source': {'quote': 'x', 'offset': 0}},
     ],
   },
+  'GET /api/v1/setup': {
+    'summary': '2 of 5 done. Next: connect your calendar.', 'done': 2, 'total': 5, 'nextGoalId': 'calendar',
+    'goals': [
+      {'id': 'talk', 'title': 'Talk to Jarvis', 'why': 'Ask anything; Jarvis learns what you care about.', 'done': true, 'declined': false, 'action': 'Start a chat', 'destination': null, 'blocker': null},
+      {'id': 'reminder', 'title': 'Set a reminder', 'why': 'Say what and when; Jarvis tells you at that time.', 'done': true, 'declined': false, 'action': 'Make a reminder', 'destination': 'reminders', 'blocker': null},
+      {'id': 'calendar', 'title': 'Connect your calendar', 'why': 'See what is on today and plan around it.', 'done': false, 'declined': false, 'action': 'Connect', 'destination': 'find-app', 'blocker': null},
+      {'id': 'source', 'title': 'Add something to read', 'why': 'Save a page or note so Jarvis can answer from it.', 'done': false, 'declined': true, 'action': 'Open the Library', 'destination': 'library', 'blocker': null},
+      {'id': 'brief', 'title': 'Choose when you get a brief', 'why': 'A short morning summary of the day.', 'done': false, 'declined': false, 'action': 'Choose a time', 'destination': 'briefing', 'blocker': null},
+    ],
+    'capabilities': [
+      {'id': 'model', 'title': 'Jarvis\'s brain', 'status': 'ready', 'detail': 'Signed in, so Jarvis can answer.', 'destination': null},
+      {'id': 'calendar', 'title': 'Calendar', 'status': 'not_connected', 'detail': 'Not connected. That is fine; connect it only if you want help with your agenda.', 'destination': 'find-app'},
+      {'id': 'brief', 'title': 'Morning brief', 'status': 'not_connected', 'detail': 'Off. Choose a time if you want one.', 'destination': 'briefing'},
+      {'id': 'push', 'title': 'Notifications on this phone', 'status': 'unsupported', 'detail': 'Jarvis cannot check from here whether this phone is registered. Open Notifications to see.', 'destination': 'notifications'},
+    ],
+  },
   'GET /api/v1/stories': [
     {'id': 's1', 'title': 'Recap: 18 Sep – 17 Oct 2026', 'style': 'recap', 'from': '2026-09-18', 'to': '2026-10-17', 'version': 2, 'savedVersion': 1},
   ],

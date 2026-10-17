@@ -156,6 +156,12 @@ const quickCommands = [
     keywords: ['connect', 'app', 'apps', 'integrate', 'calendar', 'email', 'contacts', 'koppel', 'verbind', 'welke app'],
   ),
   QuickCommand(
+    label: 'Getting started',
+    icon: PhosphorIconsRegular.listChecks,
+    destination: 'setup',
+    keywords: ['setup', 'set up', 'getting started', 'first week', 'connected', 'health', 'instellen', 'beginnen', 'aan de slag'],
+  ),
+  QuickCommand(
     label: 'Go to Stories',
     icon: PhosphorIconsRegular.bookOpen,
     destination: 'stories',

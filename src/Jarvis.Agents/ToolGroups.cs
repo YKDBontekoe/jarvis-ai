@@ -70,6 +70,9 @@ public static partial class ToolGroups
         new("stories", "Draft a recap, retrospective or what-changed story from the user's own timeline; stored as an editable draft, nothing is shared",
             ["DraftLifeStory"],
             StoryKeywords()),
+        new("setup", "How far setup is: steps done, skipped or open, and what is not connected",
+            ["GetSetupStatus"],
+            SetupKeywords()),
         new("documents", "Draft a one-page project update from the user's own records, nothing is sent",
             ["DraftProjectUpdate"],
             DocumentKeywords()),
@@ -268,6 +271,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(recap|retrospective|year in review|month in review|what changed (this|last|over)|my story|life story|terugblik|jaaroverzicht|maandoverzicht|wat is er veranderd)", KeywordOptions)]
     private static partial Regex StoryKeywords();
+
+    [GeneratedRegex(@"\b(set ?up|getting started|what('?s| is) (connected|not working)|is (my )?\w+ connected|what (is|isn't) set up|first week|instellen|wat is er ingesteld|is .{1,20} gekoppeld)", KeywordOptions)]
+    private static partial Regex SetupKeywords();
 
     [GeneratedRegex(@"\b(project update|status update|progress report|write (up )?(an? )?update|statusupdate|voortgangsrapport|schrijf (een )?update)", KeywordOptions)]
     private static partial Regex DocumentKeywords();
