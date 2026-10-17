@@ -37,7 +37,8 @@ public static partial class ToolGroups
             InboxKeywords()),
         new("library", "Saved articles and notes, flashcards, clipping a URL, deep research reports",
             ["SearchLibrary", "GetLibraryItem", "SaveToLibrary", "GetLibraryDigest", "GetDueFlashcards",
-             "GradeFlashcard", "AddFlashcards", "ClipUrlToLibrary", "StartDeepResearch"],
+             "GradeFlashcard", "AddFlashcards", "ClipUrlToLibrary", "StartDeepResearch", "TeachFromLibraryItem",
+             "CheckLessonAnswer"],
             LibraryKeywords()),
         new("planner", "Today's day plan: show it, plan the day, add, complete or remove items",
             ["GetTodayPlan", "AddToDayPlan", "PlanMyDay", "CompleteDayPlanItem", "RemoveDayPlanItem"],
@@ -226,7 +227,7 @@ public static partial class ToolGroups
     [GeneratedRegex(@"\b(inbox|e-?mail|mail|thread|unread|triage|commitment|promis|follow[- ]?up|owe|reply to|respond to|beloofd|belofte|toezegging|ongelezen)", KeywordOptions)]
     private static partial Regex InboxKeywords();
 
-    [GeneratedRegex(@"\b(library|article|read later|saved? (this|it|link)|clip|bookmark|flashcard|study|quiz me|deep research|research report|digest|bibliotheek|artikel|opslaan|onderzoek)", KeywordOptions)]
+    [GeneratedRegex(@"\b(library|article|read later|saved? (this|it|link)|clip|bookmark|flashcard|study|quiz me|teach me|lesson|explain this article|leer me|les over|deep research|research report|digest|bibliotheek|artikel|opslaan|onderzoek)", KeywordOptions)]
     private static partial Regex LibraryKeywords();
 
     [GeneratedRegex(@"\b(plan (my|the|for)|day plan|today'?s plan|my day|schedule (my|the) day|agenda|to-?do|planning|dagplan|mijn dag|vandaag plannen)", KeywordOptions)]

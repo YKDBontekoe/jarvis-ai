@@ -294,6 +294,35 @@ public sealed class LibraryTests
         Assert.Contains("2 items saved", digest);
     }
 
+    [Fact]
+    public async Task The_lesson_tools_teach_only_from_the_saved_text_and_check_answers_against_it()
+    {
+        var (service, _, _) = Create();
+        const string text =
+            "Sourdough starter is a living mixture of flour and water that holds wild yeast and bacteria. " +
+            "Feeding the starter every day keeps the yeast active and the dough rising reliably. " +
+            "A warm kitchen speeds up fermentation, while a cold fridge slows fermentation down to a crawl. " +
+            "Bakers judge readiness by bubbles on the surface and a pleasant sour smell.";
+        var item = (await service.AddNoteAsync(Owner, new NoteDraft("Sourdough basics", text), default)).Value!;
+        var tools = new LibraryAgentTools(service, new ResearchService(Fake<IJarvisTaskService>.Create()),
+            new FixedUser(), new FixedClock());
+
+        var lesson = await tools.TeachFromLibraryItemAsync(item.Id);
+        var answer = LessonBuilder.AnswerFor(item, "b1")!;
+        var right = await tools.CheckLessonAnswerAsync(item.Id, "b1", answer);
+        var wrong = await tools.CheckLessonAnswerAsync(item.Id, "b1", "pineapple");
+        var thin = await service.AddNoteAsync(Owner, new NoteDraft("Tiny", "Only a few words here, nothing to learn."), default);
+
+        Assert.Contains("quoted from the user's saved text", lesson);
+        Assert.Contains("b1:", lesson);
+        Assert.StartsWith("correct", right);
+        Assert.StartsWith("incorrect", wrong);
+        Assert.Contains("Source:", wrong);
+        Assert.Contains("not enough text", await tools.TeachFromLibraryItemAsync(thin.Value!.Id));
+        Assert.Contains("no library item", await tools.TeachFromLibraryItemAsync(Guid.NewGuid()));
+        Assert.Contains("not part of the lesson", await tools.CheckLessonAnswerAsync(item.Id, "zz", "x"));
+    }
+
     private static (LibraryService Service, FakeLibrary Repository, FakeFetcher Fetcher) Create()
     {
         var repository = new FakeLibrary();

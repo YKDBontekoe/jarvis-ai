@@ -791,6 +791,18 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     'unmatched': false,
     'suggestion': null,
   },
+  'GET /api/v1/library/i1/lesson': {
+    'itemId': 'i1', 'title': 'Sourdough basics', 'overview': 'How a sourdough starter works.', 'minutes': 4,
+    'note': 'Every point is a sentence from your saved text, quoted with where it is. Nothing here is invented.',
+    'points': [
+      {'text': 'Feeding the starter every day keeps the yeast active and the dough rising reliably.', 'source': {'quote': 'x', 'offset': 0}},
+      {'text': 'A warm kitchen speeds up fermentation, while a cold fridge slows it down.', 'source': {'quote': 'x', 'offset': 90}},
+    ],
+    'questions': [
+      {'id': 'b1', 'kind': 'blank', 'prompt': 'Fill in the missing word: Feeding the starter every day keeps the _____ active and the dough rising reliably.', 'hint': 'It starts with “y” and has 5 letters.', 'source': {'quote': 'x', 'offset': 0}},
+      {'id': 'e1', 'kind': 'explain_back', 'prompt': 'In your own words, what is the main idea of “Sourdough basics”?', 'hint': 'Mention the key terms you remember from the points above.', 'source': {'quote': 'x', 'offset': 0}},
+    ],
+  },
   'GET /api/v1/goals': [
     {'id': 'g1', 'title': 'Run a 10k', 'status': 'active', 'checkInDue': true, 'checkInCount': 1, 'feeling': 'slipping', 'openPlanItems': 2, 'review': {'verdict': 'change', 'reason': 'Your last 2 check-ins mention slipping or stuck. What would make it easier?'}},
   ],

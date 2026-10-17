@@ -112,6 +112,41 @@ internal static class LibraryEndpoints
                 : Respond(result, x => x);
         }).WithName("StartDeepResearch");
 
+        // A short lesson built only from the owner's saved text: quoted points, questions and an answer key that
+        // always comes from the same source. Nothing is stored until the owner picks cards to keep.
+        group.MapGet("/{id:guid}/lesson", async (Guid id, ILibraryService library, ICurrentUser currentUser,
+            CancellationToken ct) =>
+        {
+            var item = await library.GetAsync(id, currentUser.OwnerId, ct);
+            if (item is null) return Results.NotFound();
+            return LessonBuilder.Build(item) is { } lesson
+                ? Results.Ok(lesson)
+                : EndpointHelpers.Invalid("item", "There is not enough text in this item to teach from.");
+        }).WithName("GetLesson");
+
+        group.MapPost("/{id:guid}/lesson/check", async (Guid id, LessonCheckRequest request, ILibraryService library,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var item = await library.GetAsync(id, currentUser.OwnerId, ct);
+            if (item is null) return Results.NotFound();
+            return LessonBuilder.Check(item, request.QuestionId, request.Answer) is { } grade
+                ? Results.Ok(grade)
+                : EndpointHelpers.Invalid("questionId", "That question is not part of this lesson.");
+        }).WithName("CheckLessonAnswer");
+
+        group.MapPost("/{id:guid}/lesson/cards", async (Guid id, LessonCardsRequest request, ILibraryService library,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var item = await library.GetAsync(id, currentUser.OwnerId, ct);
+            if (item is null) return Results.NotFound();
+            var drafts = LessonBuilder.Cards(item, request.QuestionIds ?? []);
+            if (drafts.Count == 0)
+                return EndpointHelpers.Invalid("questionIds", "Pick at least one fill-in question to keep as a card.");
+            var today = await library.TodayAsync(currentUser.OwnerId, ct);
+            var added = await library.AddCardsAsync(currentUser.OwnerId, id, drafts, today, ct);
+            return Results.Ok(new { added = added.Count, skipped = drafts.Count - added.Count });
+        }).WithName("KeepLessonCards");
+
         var cards = group.MapGroup("/cards");
 
         cards.MapGet("/due", async (int? limit, ILibraryService library, ICurrentUser currentUser,

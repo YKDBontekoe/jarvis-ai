@@ -8,6 +8,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import 'lesson_screen.dart';
 import 'library_models.dart';
 
 /// Pages, notes and research reports the owner keeps, with spaced-repetition
@@ -174,11 +175,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
     if (!mounted) return;
     final shown = full ?? item;
+    var learn = false;
     final deleted = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder: (context) => _ItemSheet(
         item: shown,
+        onLearn: () {
+          learn = true;
+          Navigator.pop(context, false);
+        },
         onOpenLink: shown.url == null
             ? null
             : () => unawaited(
@@ -189,6 +195,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
               ),
       ),
     );
+    if (learn && mounted) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => LessonScreen(http: widget.http, itemId: item.id),
+        ),
+      );
+      if (mounted) unawaited(_load());
+      return;
+    }
     if (deleted == true) {
       await _guard('Deleting', () async {
         await widget.http.delete<dynamic>('/api/v1/library/${item.id}');
@@ -423,10 +438,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
 }
 
 class _ItemSheet extends StatelessWidget {
-  const _ItemSheet({required this.item, this.onOpenLink});
+  const _ItemSheet({required this.item, this.onOpenLink, this.onLearn});
 
   final LibraryItemData item;
   final VoidCallback? onOpenLink;
+  final VoidCallback? onLearn;
 
   @override
   Widget build(BuildContext context) {
@@ -471,6 +487,12 @@ class _ItemSheet extends StatelessWidget {
                     icon: const Icon(PhosphorIconsRegular.arrowSquareOut, size: 18),
                     label: const Text('Open original'),
                   ),
+                TextButton.icon(
+                  key: const Key('library-learn'),
+                  onPressed: onLearn,
+                  icon: const Icon(PhosphorIconsRegular.graduationCap, size: 18),
+                  label: const Text('Learn this'),
+                ),
                 const Spacer(),
                 TextButton(
                   key: const Key('library-delete'),

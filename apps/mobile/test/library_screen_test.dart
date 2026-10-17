@@ -127,4 +127,27 @@ void main() {
     expect(post['button'], 'good');
     expect(find.text('Where do they live?'), findsOneWidget);
   });
+
+  testWidgets('Learn this opens a lesson built from the item', (tester) async {
+    http
+      ..on('GET', '/api/v1/library/i1', _item('i1', 'Bees explained', 'web'))
+      ..on('GET', '/api/v1/library/i1/lesson', {
+        'itemId': 'i1',
+        'title': 'Bees explained',
+        'overview': 'About bees.',
+        'minutes': 3,
+        'note': 'Nothing here is invented.',
+        'points': <Object>[],
+        'questions': <Object>[],
+      });
+    await show(tester);
+
+    await tester.tap(find.text('Bees explained'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('library-learn')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('lesson-note')), findsOneWidget);
+    expect(http.sent('GET', '/api/v1/library/i1/lesson'), hasLength(1));
+  });
 }

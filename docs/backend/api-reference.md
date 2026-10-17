@@ -337,3 +337,13 @@ A calendar is ready with a saved link or an MCP server; mail and contacts only w
 ## Automation templates (F10.1.7)
 
 `GET /automations/templates` now also returns, per template, `successCriterion` (what good looks like) and `preview` (what each action would do, from the same dry-run the simulator uses; an event template previews with an example event of its own kind). New named templates: `meeting-prep` (30 minutes before a calendar event, writes a prep note), `document-follow-up` (suggestions from an uploaded file only), `bill-reminder` (Friday 09:00, subscriptions due in 7 days) and `weekly-project-review` (Friday 16:00). All four are read-or-suggest tasks that need no approval, and creating one only makes a draft.
+
+## Lessons from a saved item (F28 first slice)
+
+Built without a model from the item's own text, so the same text always gives the same lesson and answer key; nothing is stored until the owner keeps cards.
+
+| Method | Route |
+|--------|-------|
+| GET | `/library/{id}/lesson` (up to five quoted sentences with their offsets, three fill-in-the-blank questions and one explain-it-back prompt, a time estimate and an honesty note; 400 when the text is too thin to teach from) |
+| POST | `/library/{id}/lesson/check` (`questionId`, `answer`: verdict `correct` / `close` / `incorrect` / `unsure`, the expected answer and the quoted source; empty or "I don't know" is `unsure`; explain-it-back is checked against terms from the source and says it is not a judgement of understanding) |
+| POST | `/library/{id}/lesson/cards` (`questionIds`, only fill-in questions, at most five, into the existing SM-2 cards with the source sentence on the back; repeats are skipped) |
