@@ -10,6 +10,7 @@ const MODEL = 'jarvis-fixture';
 const STREAM_DELAY_MS = Number(process.env.FAKE_CODEX_DELAY_MS ?? 18);
 const CONTEXT_PREFIXES = [
   'Current time reference:',
+  'Context mode:',
   'Situation across Jarvis',
   'Stored personal memory references',
   'Active durable tasks',

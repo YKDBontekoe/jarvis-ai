@@ -121,6 +121,9 @@ public sealed partial class CodexCliChatClient
         _ => null
     };
 
+    internal const string UnusableToolCallReply =
+        "I tried to take a step for you but my request came out garbled twice, so I stopped. Please ask again.";
+
     internal sealed class UnknownToolCallException(string toolName)
         : InvalidOperationException($"Codex CLI requested an unknown Jarvis tool: {toolName}")
     {

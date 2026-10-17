@@ -1,3 +1,4 @@
+using Jarvis.Application;
 using Jarvis.ServiceDefaults;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
@@ -41,6 +42,20 @@ internal sealed class JarvisExceptionHandler(
 
 internal static class JarvisSentryExceptions
 {
-    public static bool ShouldCapture(Exception exception, HttpContext? httpContext = null) =>
-        JarvisSentry.ShouldCaptureHttpStatus(ExceptionProblemMapper.Map(exception, httpContext).Status);
+    public static bool ShouldCapture(Exception exception, HttpContext? httpContext = null)
+    {
+        // A used-up model plan is an account limit the owner is already told about, not a defect.
+        if (Jarvis.Api.Conversations.AgentFailureMessage.IsRateLimited(exception)) return false;
+        // A cancellation with no timeout behind it was asked for: the client left or the run was stopped.
+        // Model clients turn their own deadlines into TimeoutException, which is still captured.
+        if (CancellationExceptions.Unwrap(exception) is not null && !HasTimeout(exception)) return false;
+        return JarvisSentry.ShouldCaptureHttpStatus(ExceptionProblemMapper.Map(exception, httpContext).Status);
+    }
+
+    private static bool HasTimeout(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+            if (current is TimeoutException) return true;
+        return false;
+    }
 }

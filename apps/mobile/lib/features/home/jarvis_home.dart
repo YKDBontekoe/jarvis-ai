@@ -101,6 +101,12 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   int _ticks = 0;
   int _generation = 0;
 
+  /// Time since Home last fetched everything. Coming back to the app sooner
+  /// than [_resumeRefreshGap] keeps what is shown instead of fetching again:
+  /// flicking between apps used to stack full reloads.
+  final _sinceRefresh = Stopwatch();
+  static const _resumeRefreshGap = Duration(seconds: 30);
+
   /// Items an action is running on, so their rows can show it.
   final Set<String> _pending = {};
 
@@ -161,7 +167,10 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && widget.ready) {
+    if (state != AppLifecycleState.resumed || !widget.ready) return;
+    if (_sinceRefresh.isRunning && _sinceRefresh.elapsed < _resumeRefreshGap) {
+      _rebuild();
+    } else {
       unawaited(_refresh());
     }
   }
@@ -205,6 +214,9 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   Future<void> _refresh() async {
     if (!widget.ready) return;
     final generation = ++_generation;
+    _sinceRefresh
+      ..reset()
+      ..start();
     widget.source.invalidate();
     unawaited(_loadPreferredName(generation));
     unawaited(_loadContext(generation));
@@ -306,9 +318,8 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
           children: [
             Text(
               asJsonString(note['title']) ?? 'Morning brief',
-              style: JarvisType.displayOf(
-                sheet,
-              ).copyWith(fontSize: 26, fontWeight: FontWeight.w700),
+              style: JarvisType.displayOf(sheet)
+                  .copyWith(fontSize: 26, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 14),
             Text(

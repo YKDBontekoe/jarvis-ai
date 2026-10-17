@@ -334,7 +334,21 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
                     if (rawResponse.Length == 0)
                         throw new InvalidOperationException("Codex CLI retry completed without an assistant response.");
                     using var retryDocument = ParseLastResponse(rawResponse.ToString());
-                    assistant = ParseAssistantMessage(retryDocument.RootElement, toolNames);
+                    try
+                    {
+                        assistant = ParseAssistantMessage(retryDocument.RootElement, toolNames);
+                    }
+                    catch (InvalidOperationException retryException) when (RetryInstruction(retryException) is not null)
+                    {
+                        // Two broken tool calls in a row: end the turn with a reply instead of failing it.
+                        assistant = new ChatMessage(ChatRole.Assistant, UnusableToolCallReply);
+                        updates?.TryWrite(new ChatResponseUpdate
+                        {
+                            Role = ChatRole.Assistant,
+                            Contents = [new TextContent(UnusableToolCallReply)],
+                            ModelId = resolvedModel
+                        });
+                    }
                 }
                 if (assistant.Contents.Count == 1 && assistant.Contents[0] is FunctionCallContent functionCall)
                 {
