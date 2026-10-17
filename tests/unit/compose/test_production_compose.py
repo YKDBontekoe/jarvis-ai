@@ -8,6 +8,7 @@ would run. Needs a .NET 10 SDK (or Docker) and the docker compose plugin.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import shutil
 import subprocess
@@ -136,6 +137,17 @@ class ProductionComposeTests(unittest.TestCase):
         self.assertIn("passwordCommand", config)
         self.assertNotIn("temporal-test-secret", config)
         self.assertEqual("temporal-test-secret", self.service("temporal-schema")["environment"]["SQL_PASSWORD"])
+
+    def test_temporal_config_binds_all_interfaces_and_recreates_when_config_changes(self) -> None:
+        path = REPO_ROOT / "infra" / "temporal" / "config.yaml"
+        config = path.read_text(encoding="utf-8")
+        self.assertIn('broadcastAddress: "127.0.0.1"', config)
+        for role in ("frontend", "matching", "history", "worker"):
+            self.assertRegex(config, rf'(?m)^  {role}:\n    rpc: \{{[^\n}}]*bindOnIP: "0\.0\.0\.0"', role)
+        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest().upper(),
+                         self.service("temporal")["environment"]["JARVIS_TEMPORAL_CONFIG_SHA256"])
+        self.assertEqual({"application", "temporal-data"}, set(self.service("temporal")["networks"]))
+        self.assertNotIn("ports", self.service("temporal"))
 
     def test_application_containers_are_hardened(self) -> None:
         for name in ("jarvis-api", "jarvis-worker", "mcp-runner", "jarvis-migrate", "backup"):

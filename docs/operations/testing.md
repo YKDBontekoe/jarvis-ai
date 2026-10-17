@@ -17,9 +17,16 @@ advisory in `tests/.editorconfig` until the existing call sites are migrated; ne
 ```sh
 scripts/ci/run-python-unit-tests.sh
 python3 -m unittest tests/unit/compose/test_production_compose.py   # needs a .NET 10 SDK (or Docker) and docker compose
+python3 -m unittest tests/unit/compose/test_remote_up.py           # failure ordering with Docker/Compose stubs
+python3 -m unittest tests/integration/compose/test_temporal_bootstrap.py  # disposable production Temporal stack
 ```
 
 ## Integration tests
+
+The production Temporal bootstrap check uses the AppHost-generated Compose file with a unique project name and
+disposable volumes. It starts only Temporal/PostgreSQL and the setup jobs, verifies both fresh and existing namespace
+bootstrap, and checks frontend health from the application network while the server is attached to two networks.
+It publishes no ports and removes its stack and volumes afterwards. The backend CI job runs it after Compose checks.
 
 Requires Docker (Testcontainers + pgvector image):
 

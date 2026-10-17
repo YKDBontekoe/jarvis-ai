@@ -1,6 +1,7 @@
 using Aspire.Hosting.Docker.Resources.ComposeNodes;
 using Aspire.Hosting.Docker.Resources.ServiceNodes;
 using Aspire.Hosting.Docker.Resources.ServiceNodes.Swarm;
+using System.Security.Cryptography;
 
 /// <summary>
 /// The production stack, published as a Docker Compose file by <c>scripts/deploy/publish-compose.sh</c>.
@@ -34,6 +35,8 @@ internal static class ProductionDeployment
 
     public static void AddProductionDeployment(this IDistributedApplicationBuilder builder, JarvisFeatures features)
     {
+        var temporalConfigHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(
+            Path.Combine(builder.AppHostDirectory, "..", "..", "infra", "temporal", "config.yaml"))));
         var volumes = new List<string>
         {
             "postgres-data", "temporal-postgres-data", "garage-meta", "garage-data", "clamav-signatures",
@@ -120,7 +123,9 @@ internal static class ProductionDeployment
         {
             s.Restart = "unless-stopped";
             s.Env(("TEMPORAL_SERVER_CONFIG_FILE_PATH", "/etc/temporal/config.yaml"),
-                ("TEMPORAL_DB_PASSWORD", TemporalPassword));
+                ("TEMPORAL_DB_PASSWORD", TemporalPassword),
+                // A bind-mounted config is read at startup; its contents otherwise do not change Compose's hash.
+                ("JARVIS_TEMPORAL_CONFIG_SHA256", temporalConfigHash));
             s.Volumes.Add(Bind("./infra/temporal/config.yaml", "/etc/temporal/config.yaml", readOnly: true));
             s.After("temporal-schema", Completed);
             s.Networks = ["application", "temporal-data"];

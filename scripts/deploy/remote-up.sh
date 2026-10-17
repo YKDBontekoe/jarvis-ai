@@ -71,6 +71,32 @@ jarvis_compose up \
 jarvis_compose run \
   --rm --no-deps jarvis-migrate
 
+# Verify the workflow backend before replacing the API and worker. Compose otherwise recreates them before
+# waiting for temporal-namespace, leaving the app stopped when bootstrap fails. Include the underlying logs.
+temporal_logs() {
+  jarvis_compose logs --no-color --tail=80 temporal-schema temporal temporal-namespace >&2 || true
+}
+if ! jarvis_compose up -d --no-build temporal-namespace; then
+  temporal_logs
+  exit 1
+fi
+namespace_container="$(jarvis_compose ps -a -q temporal-namespace | head -n1)"
+if [[ -z "${namespace_container}" ]]; then
+  echo "Temporal namespace setup container is missing; application containers have not been replaced." >&2
+  temporal_logs
+  exit 1
+fi
+if ! namespace_exit="$(docker wait "${namespace_container}")"; then
+  echo "Could not wait for Temporal namespace setup; application containers have not been replaced." >&2
+  temporal_logs
+  exit 1
+fi
+if [[ "${namespace_exit}" != "0" ]]; then
+  echo "Temporal namespace setup failed (exit ${namespace_exit}); application containers have not been replaced." >&2
+  temporal_logs
+  exit 1
+fi
+
 jarvis_compose up \
   -d --no-build --remove-orphans
 
