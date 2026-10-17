@@ -111,6 +111,9 @@ Owner-scoped (`expenses` table). Categories: groceries, dining, transport, shopp
 | GET | `/people/radar` (`toneEnabled` and one report per linked person, most worrying first; also brings last-contact dates up to date) |
 | PUT | `/people/radar/settings` (`toneEnabled`) |
 | GET | `/people/link-suggestions` (people and unlinked one-to-one chats whose names match, for the owner to confirm), `/people/link-candidates` (every unlinked one-to-one chat, read-along ones first) |
+| GET | `/people/{id}/follow-through` (rhythm with why it is or is not due, birthday, open accepted promises whose counterparty is exactly this name, nudge state) |
+| PUT | `/people/{id}/nudges` (`mode` `on`/`snoozed`/`muted`, `snoozeDays` 1–365 for snoozed) |
+| POST | `/people/{id}/nudges/not-useful` (snoozes 30 days, 60 on the second time, and counts; a mute stays muted; undo with PUT `on`) |
 | GET/POST | `/people/{id}/links` (POST body `connectionId`, `chatId`; 400 for a group or unknown chat, 409 when the chat belongs to another person) |
 | DELETE | `/people/{id}/links/{linkId}` |
 | GET | `/people/{id}/radar` (the person's linked chats and their report) |

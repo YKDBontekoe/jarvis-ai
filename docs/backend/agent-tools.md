@@ -62,7 +62,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Routines | `RoutineAgentTools` `GetRoutineSuggestions` | Read-only. Accepting or dismissing a suggestion is done in the app |
 | Improvements | `ImprovementAgentTools` `GetImprovementProposals` | Read-only. Accepting, dismissing and undoing stay with the owner in the app |
 | Decisions | `DecisionAgentTools` `LogDecision`, `ResolveDecision`, `GetDecisions`, `GetCalibration` | No approval; they only read and write the owner's own decision journal |
-| Relationship radar | `RadarAgentTools` `GetRelationshipRadar` | Read-only. Linking chats and the tone switch are done in the app |
+| Relationship radar | `RadarAgentTools` `GetRelationshipRadar`, `GetPersonFollowThrough` (read-only) | Read-only. Linking chats and the tone switch are done in the app |
 | Automation studio | `AutomationAgentTools` `PreviewAutomation`, `ListAutomationTemplates`, `CreateAutomationFromTemplate` | Preview saves nothing; templates create a draft that stays off |
 | Library | `LibraryAgentTools` `SearchLibrary`, `GetLibraryItem`, `SaveToLibrary`, `GetLibraryDigest`, `GetDueFlashcards`, `GradeFlashcard`, `AddFlashcards`, `ClipUrlToLibrary`, `StartDeepResearch` | **ClipUrlToLibrary** requires approval (outbound fetch). `StartDeepResearch` and the clip tool are hidden in background tasks so research cannot start more research |
 | Modes | `ModeAgentTools` `GetCurrentMode`, `SetMode` | No approval; `SetMode` hidden in background tasks. `ModeContextContributor` (order 3) adds the current mode and tone |

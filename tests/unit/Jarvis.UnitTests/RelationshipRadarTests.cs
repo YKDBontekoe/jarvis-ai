@@ -654,6 +654,23 @@ public sealed class RelationshipRadarTests
     }
 
     [Fact]
+    public async Task A_muted_person_never_triggers_a_radar_notification()
+    {
+        var h = new Harness();
+        h.AddChat();
+        await h.LinkAsync();
+        h.AddMessages(HeavyBaseline());
+        await h.Settings.SaveAsync(Owner, PersonNudgeSettings.Section,
+            new PersonNudgeSettings(new() { [PersonId.ToString()] = new PersonNudgePref(NudgeModes.Muted) }), default);
+
+        Assert.Equal(0, (await h.Service.DailyAsync(Owner, default)).Notified);
+
+        Assert.Empty(h.Notifications.Created);
+        // The signals are still on the radar screen; only the notification stays silent.
+        Assert.True((await h.Service.OverviewAsync(Owner, default)).People.Single().Severity >= 2);
+    }
+
+    [Fact]
     public async Task Notes_below_the_nudge_bar_never_notify()
     {
         var h = new Harness();

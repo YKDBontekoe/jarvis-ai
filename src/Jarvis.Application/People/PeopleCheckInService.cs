@@ -1,4 +1,5 @@
 using Jarvis.Application.People.Radar;
+using Jarvis.Application.Settings;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.People;
 
@@ -17,7 +18,8 @@ public sealed class PeopleCheckInService(
     INotificationRepository notifications,
     IDailyBriefingRepository briefings,
     TimeProvider? timeProvider = null,
-    IRelationshipRadarService? radar = null) : IPeopleCheckInService
+    IRelationshipRadarService? radar = null,
+    IOwnerSettingsStore? settings = null) : IPeopleCheckInService
 {
     public static readonly TimeOnly LocalCheckInTime = new(9, 0);
     public const int NudgeRepeatDays = 7;
@@ -78,7 +80,13 @@ public sealed class PeopleCheckInService(
         }
 
         var birthdayIds = birthdays.Select(x => x.Id).ToHashSet();
-        var nudges = DueForNudge(watched.Where(x => !birthdayIds.Contains(x.Id)), today, zone);
+        // A person the owner snoozed or muted gets no keep-in-touch nudge; birthdays are the owner's own dates.
+        var prefs = settings is null
+            ? new PersonNudgeSettings()
+            : await settings.GetAsync<PersonNudgeSettings>(ownerId, PersonNudgeSettings.Section,
+                cancellationToken) ?? new PersonNudgeSettings();
+        var nudges = DueForNudge(watched.Where(x => !birthdayIds.Contains(x.Id) && !prefs.IsQuiet(x.Id, today)),
+            today, zone);
         if (nudges.Count > 0)
         {
             var (title, body) = DescribeNudge(nudges, today, zone);

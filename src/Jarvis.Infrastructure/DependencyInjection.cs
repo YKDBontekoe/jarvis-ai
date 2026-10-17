@@ -59,6 +59,8 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Memory.IGraphQuestionService,
             Jarvis.Application.Memory.GraphQuestionService>();
         services.AddScoped<Jarvis.Application.People.IPeopleCheckInService, Jarvis.Application.People.PeopleCheckInService>();
+        services.AddScoped<Jarvis.Application.People.IPersonFollowThroughService,
+            Jarvis.Application.People.PersonFollowThroughService>();
         services.AddScoped<Jarvis.Application.People.Radar.IPersonLinkRepository, PersonLinkRepository>();
         services.AddScoped<Jarvis.Application.People.Radar.IChatActivityStats, WhatsAppAssistantRepository>();
         services.AddScoped<Jarvis.Application.People.Radar.IRelationshipRadarService,

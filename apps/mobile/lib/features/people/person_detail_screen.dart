@@ -9,6 +9,7 @@ import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'people_models.dart';
 import 'person_widgets.dart';
+import 'follow_through_card.dart';
 import 'radar_models.dart';
 import 'radar_widgets.dart';
 
@@ -336,6 +337,16 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
                 ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          ContentWidth(
+            child: FadeSlideIn(
+              index: 3,
+              child: FollowThroughCard(
+                http: widget.http,
+                personId: _person.id,
               ),
             ),
           ),

@@ -43,7 +43,7 @@ public static partial class ToolGroups
             ["GetTodayPlan", "AddToDayPlan", "PlanMyDay", "CompleteDayPlanItem", "RemoveDayPlanItem"],
             PlannerKeywords()),
         new("people", "Contacts the user keeps up with: details, birthdays, logging contact, relationship radar",
-            ["GetPeople", "SavePerson", "LogContact", "RemovePerson", "GetRelationshipRadar"],
+            ["GetPeople", "SavePerson", "LogContact", "RemovePerson", "GetRelationshipRadar", "GetPersonFollowThrough"],
             PeopleKeywords()),
         new("whatsapp", "Read, search and send WhatsApp messages in chats the user turned on",
             ["ListWhatsAppChats", "ReadWhatsAppChat", "SearchWhatsAppMessages", "SendWhatsAppMessage"],
