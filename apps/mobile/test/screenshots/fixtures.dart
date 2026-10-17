@@ -384,6 +384,55 @@ Map<String, Object?> meetingDetails() => {
   },
 };
 
+Map<String, Object?> goalDetails() => {
+  'goal': {
+    'id': 'g1',
+    'title': 'Run a 10k',
+    'motivation': 'Feel fit before the summer.',
+    'status': 'active',
+    'weeklyMinutes': 90,
+    'checkInEveryDays': 7,
+    'habitIds': ['h1'],
+    'commitmentIds': <Object>[],
+    'plan': {
+      'weekStart': '2026-10-12',
+      'omittedForTime': 1,
+      'items': [
+        {'id': 's1', 'title': 'Pick a training plan', 'minutes': 30, 'status': 'proposed', 'ref': 'project:p2', 'key': 'project:p2'},
+        {'id': 's2', 'title': 'Run ×2 this week', 'minutes': 40, 'status': 'accepted', 'ref': 'habit:h1', 'key': 'habit:h1'},
+      ],
+    },
+    'experiments': [
+      {
+        'id': 'e1',
+        'change': 'Run before breakfast',
+        'expectedBenefit': 'More energy',
+        'status': 'running',
+        'reviewOn': '2026-10-31',
+        'notes': [
+          {'on': '2026-10-15', 'text': 'Slept badly, ran anyway'},
+        ],
+      },
+    ],
+  },
+  'checkInDue': true,
+  'habits': [
+    {'id': 'h1', 'name': 'Run', 'thisWeekCount': 1, 'targetPerWeek': 3},
+  ],
+  'project': {'id': 'p2', 'name': 'Marathon', 'nextAction': 'Pick a training plan'},
+  'commitments': <Object>[],
+  'progress': {
+    'measured': ['Run: 1 of 3 this week', '0 planned steps done this week'],
+    'reflections': [
+      {'feeling': 'slipping', 'progress': 'Ran once', 'friction': 'Rainy week', 'adjustment': 'Try mornings'},
+    ],
+    'interpretation': {
+      'verdict': 'change',
+      'reason': 'Your last 2 check-ins mention slipping or stuck. What would make it easier?',
+    },
+  },
+};
+
 List<Map<String, Object?>> reminders() {
   final now = _now();
   final today = DateTime(now.year, now.month, now.day);
@@ -713,6 +762,10 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     {'id': 'c1', 'title': 'Which boiler?', 'options': 2, 'criteria': 3, 'leader': 'Bosch Condens 2300i', 'decided': false, 'updatedAt': '2026-10-10T10:00:00Z'},
   ],
   'GET /api/v1/comparisons/c1': comparisonDetails(),
+  'GET /api/v1/goals': [
+    {'id': 'g1', 'title': 'Run a 10k', 'status': 'active', 'checkInDue': true, 'checkInCount': 1, 'feeling': 'slipping', 'openPlanItems': 2, 'review': {'verdict': 'change', 'reason': 'Your last 2 check-ins mention slipping or stuck. What would make it easier?'}},
+  ],
+  'GET /api/v1/goals/g1': goalDetails(),
   'GET /api/v1/meetings': [
     {'id': 'm1', 'title': 'Kitchen sync with Rosa', 'startsAt': '2026-10-20T14:00:00Z', 'projectId': 'p2', 'open': 2, 'accepted': 0, 'updatedAt': '2026-10-17T09:00:00Z'},
   ],

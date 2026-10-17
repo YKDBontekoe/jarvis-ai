@@ -63,6 +63,9 @@ public static partial class ToolGroups
         new("comparisons", "Weigh options against criteria: create a comparison, record what is known, see the ranking",
             ["CreateComparison", "SetComparisonCell", "GetComparison"],
             ComparisonKeywords()),
+        new("goals", "Goals: how they are going, check-ins in the user's words, a small proposed plan for the week",
+            ["GetGoals", "AddGoalCheckIn", "ProposeGoalPlan"],
+            GoalKeywords()),
         new("meetings", "Meetings: prepare from the user's own records, debrief into proposed decisions and promises, draft a follow-up",
             ["PrepareMeeting", "DebriefMeeting", "DraftMeetingFollowUp"],
             MeetingKeywords()),
@@ -243,6 +246,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(compare|comparison|which (one|should)|pros and cons|versus|\bvs\b|choose between|shortlist|vergelijk|vergelijking|welke (moet|zal)|kiezen tussen)", KeywordOptions)]
     private static partial Regex ComparisonKeywords();
+
+    [GeneratedRegex(@"\b(goals?|check[- ]?in on|making progress|my progress|experiment|doelen?|vooruitgang|voortgang|experiment)", KeywordOptions)]
+    private static partial Regex GoalKeywords();
 
     [GeneratedRegex(@"\b(meeting|agenda|debrief|prep(are)? (me )?for|follow[- ]?up|standup|stand-up|1[:-]1|one[- ]on[- ]one|vergadering|overleg|bespreking|afspraak met|voorbereiden)", KeywordOptions)]
     private static partial Regex MeetingKeywords();

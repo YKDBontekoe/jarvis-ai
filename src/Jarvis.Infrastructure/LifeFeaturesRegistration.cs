@@ -83,6 +83,7 @@ public static class LifeFeaturesRegistration
         // Decision journal: predictions with a confidence, resolved later and scored for calibration.
         services.AddScoped<IDecisionRepository, DecisionRepository>();
         services.AddScoped<IDecisionService, DecisionService>();
+        services.AddScoped<Jarvis.Application.Goals.IGoalService, Jarvis.Application.Goals.GoalService>();
         services.AddScoped<Jarvis.Application.Comparisons.IComparisonRepository, ComparisonRepository>();
         services.AddScoped<Jarvis.Application.Comparisons.IComparisonService, Jarvis.Application.Comparisons.ComparisonService>();
         services.AddScoped<Jarvis.Application.Meetings.IMeetingRepository, MeetingRepository>();

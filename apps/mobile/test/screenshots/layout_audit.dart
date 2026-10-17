@@ -19,6 +19,8 @@ const destinations = [
   'comparison:c1',
   'meetings',
   'meeting:m1',
+  'goals',
+  'goal:g1',
   'memory',
   'journal',
   'today',

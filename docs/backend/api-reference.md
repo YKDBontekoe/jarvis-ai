@@ -260,3 +260,19 @@ Under `/api/v1/agents` and `/api/v1/a2a-tokens` — registry and inbound token h
 ## Implementation map
 
 Each route group is implemented in `src/Jarvis.Api/Endpoints/*.cs` and registered in `Program.cs`. When adding routes, prefer existing groups and `ICurrentUser` for owner checks.
+
+## Goals
+
+Stored in owner settings (`goals`, no table). A goal links existing habits, one project and promises by id (validated against the owner); suggestions are proposals.
+
+| Method | Route |
+|--------|-------|
+| GET/POST | `/goals` (GET `includeArchived`; POST `title` ≤ 200, `motivation`, `horizon`, `target`, `checkInEveryDays` 3–60 (default 7), `weeklyMinutes` 15–1200 (default 90), `projectId`, `habitIds` ≤ 5, `commitmentIds` ≤ 8) |
+| GET/PATCH/DELETE | `/goals/{id}` (PATCH takes the same fields plus `status` `active`/`paused`/`achieved`/`archived`, `clearProject`, `clearHorizon`) |
+| POST | `/goals/{id}/check-ins` (`progress` required, `friction`, `adjustment`, `feeling` `on_track`/`slipping`/`stuck`) |
+| POST | `/goals/{id}/plan` (proposes ≤ 3 small steps that fit `weeklyMinutes`; accepted, done and declined steps are kept; 409 while paused) |
+| POST | `/goals/{id}/plan/items/{itemId}` (`action` `accept`/`reduce` (+`minutes`, shorter)/`decline`/`done`/`schedule` (accepted only; adds to Today, `timeZone` query; a promise step keeps its `commitment:` source)) |
+| POST | `/goals/{id}/experiments`, `.../{experimentId}/notes`, `.../{experimentId}/finish` (`keep`) (one running experiment, 3–60 days; notes are observations) |
+| POST | `/goals/{id}/review/dismiss` (the keep/change/stop suggestion stays quiet 28 days) · `/goals/{id}/reset-season` (history kept, progress and plan restart) |
+
+A declined step is not proposed again for 28 days. The keep/change/stop suggestion is rule-based on the owner's own check-ins of the current season and needs two; a passed horizon suggests finishing or moving it.
