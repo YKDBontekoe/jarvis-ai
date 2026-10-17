@@ -15,7 +15,8 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 | A4 ask about this source (F09.1.2 partial) | verified | See checkpoint 3; end-to-end with a seeded file row (ClamAV cannot load signatures in this sandbox) |
 | A8 memory review and correction (F03.1.1–F03.1.3 first slice) | verified | See checkpoint 3 |
 | A7 editable comparison (F26.1–F26.6 first slice, F08.1.2 partly) | verified | See checkpoint 4 |
-| Everything else | planned | Next: Sprint D (A5/A6 meetings, A10 weekly review) |
+| A5 meeting prep pack, A6 debrief into reviewed commitments, F22.1–F22.8 first slice | verified | See checkpoint 5 |
+| Everything else | planned | Next: A10 weekly review, then the rest of Sprint D |
 
 ## Checkpoint 1: Slice A1, decisions and commitments in Needs you
 
@@ -57,3 +58,16 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **Decisions.** Storage is a new table rather than a Library note because weights and cells must be edited and recomputed; the Library gets the rendered report. No new entity type, so a comparison is reached from Comparisons, quick commands and `comparison:{id}` destinations, not yet from search or related views.
 - **Tests.** Unit 1745 pass (`ComparisonTests` 10, `ComparisonServiceTests` 9); integration `ComparisonPersistenceTests` (1); Dart `comparisons_test` (6), full `flutter test` 750 pass, analyze clean. Real stack: `comparison_flow` (create, rank, cell edit, determinism, Library report, decide once, 409, link preserved) plus the earlier flows. Screenshots: `build/screenshots/audit-{phone,small,large-text}-comparison:c1.png`.
 - **Not done.** Quoting current prices (F26.2 live research), vendor watches (F26.7), shareable export without private budget (F26.8), a "what should I verify before buying" view (F26.5), comparisons from selected files (F09.1.5) other than via the tools.
+
+## Checkpoint 5: A5 meeting prep, A6 debrief, F22 first slice
+
+- **Contract.** `meetings` table (owner, title, start, project, `document` jsonb; migration `AddMeetings`). The document holds participants, agenda lines (each `shared` or private), private notes, the prep pack, the debrief text and the candidates.
+- **Prep (`MeetingPrepBuilder`, pure).** From the owner's own records only: project outcome and next step (A2), open accepted promises with the participants (overdue first, capped), unresolved decisions that mention a participant or the project, project files, what earlier meetings with the same people or project left unanswered or unreviewed. Every fact has a `ref`; anything missing becomes a question (template-specific for one-on-one, project update, interview, decision). The agenda is only filled when empty, so a refresh never overwrites the owner's agenda.
+- **Debrief (`MeetingDebriefExtractor`, pure, rule-based, English and Dutch).** Decisions ("we decided", "besloten"), what I owe ("I'll", "ik stuur"), what a named participant will do, and questions. Dates: ISO, today/tomorrow, weekdays, day-month in both languages; a vague date ("next week", "end of the month") is kept as wording with no day. Ids are stable per kind and sentence, so a second read keeps earlier choices. Text is untrusted data: a hidden instruction produces nothing, and an injected promise is only a pending proposal (tested).
+- **Acceptance.** `AcceptAsync` calls `ICommitmentService.CreateAsync` (source `meeting`) or `IDecisionService.CreateAsync` (the owner must give confidence and a review day); accepting twice creates one record; a question cannot be accepted; an accepted candidate cannot be dismissed; dismissing changes nothing but the candidate.
+- **Follow-up.** Built only from accepted items and shared agenda lines; private notes, private lines and unaccepted items are excluded; `sent` is always false and there is no send endpoint.
+- **Agent.** Tools `PrepareMeeting`, `DebriefMeeting`, `DraftMeetingFollowUp` (group `meetings`); the debrief tool only lists proposals and tells the user to accept in the app.
+- **App.** Meetings list with calendar events, creation sheet, detail screen as described in the architecture doc.
+- **Decision.** The debrief uses rules instead of a model so the demo is deterministic and works with no provider; a model reading remains a later addition behind the same candidate contract. Meetings are not yet an `EntityType`, so a meeting is reached from the Meetings screen, quick commands and prep refs (`meeting:id`), not search.
+- **Tests.** Unit 1781 pass (`MeetingExtractionTests` 24, `MeetingServiceTests` 12); Dart `meetings_test` (11), full `flutter test` 761 pass, analyze clean. Real stack: `meeting_flow` (prep from seeded records, agenda kept on refresh, debrief creates nothing, accept once, edited acceptance, decision needs confidence, dismiss, unsent follow-up without private text, bad input) plus all earlier flows. Screenshots: `build/screenshots/audit-{phone,small,large-text}-meeting:m1.png`.
+- **Not done.** Calendar write-back, recording or transcription, calendar-event identity beyond title and start (F22.1 stable link), proposed time blocks for accepted follow-through (F22.7), people-page open loops (F22.8 beyond the prep carry-forward), a model-based extraction, search for meetings.

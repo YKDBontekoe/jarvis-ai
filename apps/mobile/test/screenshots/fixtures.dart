@@ -350,6 +350,40 @@ Map<String, Object?> comparisonDetails() => {
   'libraryItemId': null,
 };
 
+Map<String, Object?> meetingDetails() => {
+  'id': 'm1',
+  'title': 'Kitchen sync with Rosa',
+  'startsAt': '2026-10-20T14:00:00Z',
+  'projectId': 'p2',
+  'document': {
+    'purpose': 'Agree the tiles and who books the plumber',
+    'template': 'project_update',
+    'participants': [
+      {'name': 'Rosa Visser', 'personId': null},
+    ],
+    'agenda': [
+      {'id': 'a1', 'text': 'Agree the tiles and who books the plumber', 'shared': true},
+      {'id': 'a2', 'text': 'Close the loop with Rosa: Send the tile quotes', 'shared': true},
+      {'id': 'a3', 'text': 'Is the budget realistic?', 'shared': false},
+    ],
+    'privateNotes': null,
+    'prep': {
+      'builtAt': '2026-10-17T09:00:00Z',
+      'items': [
+        {'section': 'Project', 'kind': 'fact', 'text': '“Home renovation” is for: Cook for ten people in the new kitchen by June.', 'ref': 'project:11111111-1111-7111-8111-111111111111'},
+        {'section': 'Open loops', 'kind': 'fact', 'text': 'You owe Rosa Visser: Send the tile quotes — 3 days overdue', 'ref': 'commitment:22222222-2222-7222-8222-222222222222'},
+        {'section': 'Decisions', 'kind': 'fact', 'text': 'Open decision: Pick a plumber. You predicted “It arrives on time” (60% sure), review 2026-11-02.', 'ref': 'decision:33333333-3333-7333-8333-333333333333'},
+        {'section': 'Questions', 'kind': 'question', 'text': 'What is the next step, who owns it and by when?', 'ref': null},
+      ],
+    },
+    'debriefText': null,
+    'candidates': [
+      {'id': 'i_owe-1', 'kind': 'i_owe', 'text': "I'll send Rosa the revised quote by Friday.", 'counterparty': 'Rosa Visser', 'dueOn': '2026-10-23', 'dueText': 'friday', 'evidence': '', 'state': 'pending', 'resultRef': null},
+      {'id': 'they_owe-1', 'kind': 'they_owe', 'text': 'Rosa will confirm the plumber next week.', 'counterparty': 'Rosa Visser', 'dueOn': null, 'dueText': 'next week', 'evidence': '', 'state': 'pending', 'resultRef': null},
+    ],
+  },
+};
+
 List<Map<String, Object?>> reminders() {
   final now = _now();
   final today = DateTime(now.year, now.month, now.day);
@@ -679,6 +713,11 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     {'id': 'c1', 'title': 'Which boiler?', 'options': 2, 'criteria': 3, 'leader': 'Bosch Condens 2300i', 'decided': false, 'updatedAt': '2026-10-10T10:00:00Z'},
   ],
   'GET /api/v1/comparisons/c1': comparisonDetails(),
+  'GET /api/v1/meetings': [
+    {'id': 'm1', 'title': 'Kitchen sync with Rosa', 'startsAt': '2026-10-20T14:00:00Z', 'projectId': 'p2', 'open': 2, 'accepted': 0, 'updatedAt': '2026-10-17T09:00:00Z'},
+  ],
+  'GET /api/v1/meetings/events': <Object>[],
+  'GET /api/v1/meetings/m1': meetingDetails(),
   'GET /api/v1/home': home(),
   'GET /api/v1/home/context': homeContext(),
   // Every chat path is ".../chats/open" with the chat in the query, so one

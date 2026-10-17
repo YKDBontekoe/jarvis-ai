@@ -85,6 +85,8 @@ public static class LifeFeaturesRegistration
         services.AddScoped<IDecisionService, DecisionService>();
         services.AddScoped<Jarvis.Application.Comparisons.IComparisonRepository, ComparisonRepository>();
         services.AddScoped<Jarvis.Application.Comparisons.IComparisonService, Jarvis.Application.Comparisons.ComparisonService>();
+        services.AddScoped<Jarvis.Application.Meetings.IMeetingRepository, MeetingRepository>();
+        services.AddScoped<Jarvis.Application.Meetings.IMeetingService, Jarvis.Application.Meetings.MeetingService>();
 
         // Routine miner: repeated behaviour turned into suggested automations.
         services.AddScoped<IRoutineSuggestionRepository, RoutineSuggestionRepository>();

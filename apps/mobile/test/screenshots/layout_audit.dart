@@ -17,6 +17,8 @@ const destinations = [
   'project:p2',
   'comparisons',
   'comparison:c1',
+  'meetings',
+  'meeting:m1',
   'memory',
   'journal',
   'today',

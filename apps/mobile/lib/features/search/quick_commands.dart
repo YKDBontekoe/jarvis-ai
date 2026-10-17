@@ -150,6 +150,12 @@ const quickCommands = [
     keywords: ['decisions', 'decision', 'predictions', 'calibration', 'beslissingen', 'voorspelling'],
   ),
   QuickCommand(
+    label: 'Go to Meetings',
+    icon: PhosphorIconsRegular.calendarCheck,
+    destination: 'meetings',
+    keywords: ['meetings', 'meeting', 'prepare', 'debrief', 'agenda', 'vergadering', 'overleg', 'voorbereiden'],
+  ),
+  QuickCommand(
     label: 'Go to Comparisons',
     icon: PhosphorIconsRegular.sliders,
     destination: 'comparisons',

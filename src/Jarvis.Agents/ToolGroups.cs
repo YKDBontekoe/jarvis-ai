@@ -63,6 +63,9 @@ public static partial class ToolGroups
         new("comparisons", "Weigh options against criteria: create a comparison, record what is known, see the ranking",
             ["CreateComparison", "SetComparisonCell", "GetComparison"],
             ComparisonKeywords()),
+        new("meetings", "Meetings: prepare from the user's own records, debrief into proposed decisions and promises, draft a follow-up",
+            ["PrepareMeeting", "DebriefMeeting", "DraftMeetingFollowUp"],
+            MeetingKeywords()),
         new("timeline", "Life timeline, on this day, life insights, routine and self-improvement suggestions",
             ["QueryTimeline", "OnThisDay", "GetLifeInsights", "GetRoutineSuggestions", "GetImprovementProposals"],
             TimelineKeywords()),
@@ -240,6 +243,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(compare|comparison|which (one|should)|pros and cons|versus|\bvs\b|choose between|shortlist|vergelijk|vergelijking|welke (moet|zal)|kiezen tussen)", KeywordOptions)]
     private static partial Regex ComparisonKeywords();
+
+    [GeneratedRegex(@"\b(meeting|agenda|debrief|prep(are)? (me )?for|follow[- ]?up|standup|stand-up|1[:-]1|one[- ]on[- ]one|vergadering|overleg|bespreking|afspraak met|voorbereiden)", KeywordOptions)]
+    private static partial Regex MeetingKeywords();
 
     [GeneratedRegex(@"\b(timeline|on this day|this day last|years? ago|insight|routine|pattern|improvement|tijdlijn|vandaag \d+ jaar|jaar geleden|inzicht|patroon|verbeter)", KeywordOptions)]
     private static partial Regex TimelineKeywords();

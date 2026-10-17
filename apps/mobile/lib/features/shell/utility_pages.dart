@@ -22,6 +22,8 @@ import '../channels/channels_screen.dart';
 import '../coding/coding_runs_screen.dart';
 import '../comparisons/comparison_screen.dart';
 import '../comparisons/comparisons_screen.dart';
+import '../meetings/meeting_screen.dart';
+import '../meetings/meetings_screen.dart';
 import '../decisions/decisions_screen.dart';
 import '../entities/entity_ref.dart';
 import '../entities/entity_screen.dart';
@@ -111,6 +113,11 @@ Widget? utilityPageFor(
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'decisions' => DecisionsScreen(http: http),
   'comparisons' => ComparisonsScreen(http: http),
+  'meetings' => MeetingsScreen(http: http),
+  final meeting when meeting.startsWith('meeting:') => MeetingScreen(
+    http: http,
+    meetingId: meeting.substring('meeting:'.length),
+  ),
   final comparison when comparison.startsWith('comparison:') =>
     ComparisonScreen(
       http: http,

@@ -3487,6 +3487,51 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.MeetingEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DocumentJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("document");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<DateTimeOffset?>("StartsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("starts_at");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "ProjectId");
+
+                    b.HasIndex("OwnerId", "StartsAt");
+
+                    b.ToTable("meetings", (string)null);
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.MemoryEntity", b =>
                 {
                     b.Property<Guid>("Id")
