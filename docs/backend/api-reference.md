@@ -140,6 +140,9 @@ Weeks run Monday to Sunday; a weekly habit's streak counts weeks that reached `t
 | Method | Path |
 |--------|------|
 | GET | `/files`, `/files/search` |
+| POST | `/files/{id}/ask` | `{ profileId? }` starts a chat about one file: a new conversation titled "About …" with that file attached as its only source; 201 `{ conversationId, fileId, fileName, status }`. 404 for an unknown or deleting file; 409 when the profile restricts files to collections that do not contain it (attaching never widens a profile) |
+| GET | `/memory/review` | Memories worth a second look: learned lately (not by the owner), low confidence, expiring; each with `reasons`, `source` (label and, for a chat, `conversationId`/`messageId`), profile name and how many times it was corrected |
+| POST | `/memory/{id}/correct`, `/memory/{id}/expire`, GET `/memory/{id}/history` | Correct replaces a current memory (the old one ends now and stays as history; the new one is the owner's own certain statement); expire ends it with no replacement. 409 for a pinned memory or one that is no longer current. History lists the replaced versions, newest first |
 | POST | `/files` (multipart upload) |
 | GET | `/files/{id}/content` |
 | POST | `/files/{id}/reprocess` |

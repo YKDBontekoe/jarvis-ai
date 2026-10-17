@@ -139,7 +139,7 @@ Widget? utilityPageFor(
     onOpenConversation: onOpenConversation,
     initialTab: RemindersTab.notifications,
   ),
-  'files' => FilesScreen(http: http),
+  'files' => FilesScreen(http: http, onOpenConversation: onOpenConversation),
   'audit' => ActivityScreen(
     http: http,
     onOpenConversation: onOpenConversation,

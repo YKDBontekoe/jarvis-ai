@@ -12,7 +12,9 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 | F01.1.1, F01.1.3–F01.1.8, F01.2.1 (full queue), F01.2.4–F01.2.8 | planned | Shared attention contract, tasks/inbox sources, full queue screen |
 | A2 / F04.1.1, F04.1.4 (project outcome, status, next action) | verified | See checkpoint 2 |
 | A3 / F02.1.2 first group, F02.1.4 partial, F02.1.7 partial, F02.2 (message search, open at match) | verified | See checkpoint 2 |
-| Everything else | planned | Next: A4, A7, A8 (Sprint B) |
+| A4 ask about this source (F09.1.2 partial) | verified | See checkpoint 3; end-to-end with a seeded file row (ClamAV cannot load signatures in this sandbox) |
+| A8 memory review and correction (F03.1.1–F03.1.3 first slice) | verified | See checkpoint 3 |
+| Everything else | planned | Next: A7 research comparison (Sprint B), then Sprint D |
 
 ## Checkpoint 1: Slice A1, decisions and commitments in Needs you
 
@@ -35,3 +37,12 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **Profile scope decision (F02.2.5).** Message hits are for the owner's own search screen. The agent's `SearchEverything` removes the `message` kind, so a restricted profile never reads other chats through it. People/promises/decisions are exposed to the agent like memories already are.
 - **Tests.** .NET unit 1716 pass (`ProjectFocusTests`, `LifeSearchProviderTests`, …); integration `ProjectStoreTests` (3), `MessageSearchTests` (4); Dart `projects_screen_test`, `message_context_test`; `flutter analyze` clean. Real stack: `needs_you_flow`, `project_focus_flow`, `search_life_flow`, and the existing `local_fixture_flow` (11/11) all pass. Screenshot: `build/screenshots/audit-phone-project:p2.png` (and small / large-text with no overflow).
 - **Not done / limits.** Message text is matched as typed (no accent folding in PostgreSQL). Search does not yet cover library/journal/projects/missions/finance/apps (F02.1.2 later groups), has no source/date/project filters, no scoped retry, no rank fusion across providers, no benchmark (F02.1.4–F02.1.8 mostly open). Projects: no milestones, no commitment→project links, no archive effect on recurring work (F04.1.2–F04.1.6 open). The search screen was not screenshotted.
+
+## Checkpoint 3: A4 ask about a source, A8 memory review and correction
+
+- **A8.** `memories.superseded_by_id` (migration `AddMemorySupersession`) links a replaced memory to its replacement, so a correction keeps a readable chain. `MemoryReviewRules` (pure) lists current memories that were learned lately by Jarvis, have confidence below 0.6, or expire within 14 days; pinned memories are listed but never replaced. `MemoryReviewService` resolves each memory's source (the chat and message it came from, only for the owner), the profile name, and the number of corrections. API: `GET /memory/review`, `POST /memory/{id}/correct|expire`, `GET /memory/{id}/history`. A correction goes through the existing `ReplaceAsync`, so the old memory's `valid_until` and graph facts end with it and search finds only the correction (integration-tested against Postgres). Tool `CorrectMemory` (no approval: it keeps history and refuses pinned memories). App: Review memories screen with Correct / No longer true / history / "See where" (opens the A3 message context view).
+- **A4.** `POST /files/{id}/ask` creates a chat bound to the chosen profile with the file as its only source; a profile that restricts files to collections cannot be widened (409). App: "Ask Jarvis about this" in Files; the chat shows the source chip, which can be removed (existing behaviour).
+- **Decision.** Opening a chat "with a source selected" reuses conversation sources; a Library item is not a conversation source today, so Ask from Library is not done.
+- **Tests.** Unit 1726 pass (`MemoryReviewTests` 10); integration `MemoryCorrectionTests` (4); Dart `memory_review_test` (7), `list_screens_test` (+3), full `flutter test` 744 pass, `flutter analyze` clean. Real stack: `memory_review_flow`, `ask_file_flow` (seeded file row via `JARVIS_E2E_PG_CONTAINER`), earlier flows still pass.
+- **Environment limit.** File upload returns 503 here because ClamAV cannot download signatures in this sandbox, so real upload and indexing were not exercised.
+- **Not done.** F03.1.4 do-not-learn options, F03.1.5 delayed-job fencing, F03.1.6 cross-session evals, F03.1.7 outcome tracking, F03.2 provenance for graph facts and reports. No screenshot of the review screen.

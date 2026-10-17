@@ -26,6 +26,9 @@ public interface IConversationStore
     Task<IReadOnlyList<MessageSearchHit>> SearchMessagesAsync(Guid ownerId, string query, int limit,
         CancellationToken cancellationToken);
 
+    /// <summary>One message with its conversation's title, only when the conversation is the owner's.</summary>
+    Task<MessageSearchHit?> FindMessageAsync(Guid ownerId, Guid messageId, CancellationToken cancellationToken);
+
     /// <summary>
     /// The messages around <paramref name="messageId"/>: up to <paramref name="before"/> older and
     /// <paramref name="after"/> newer ones, oldest first. Null when the message is not in the conversation.

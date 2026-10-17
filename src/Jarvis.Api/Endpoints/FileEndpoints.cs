@@ -3,8 +3,14 @@ using Jarvis.Api.Errors;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
+using Jarvis.Application.Profiles;
 
 namespace Jarvis.Api.Endpoints;
+
+public sealed record AskAboutFileRequest(Guid? ProfileId = null);
+
+/// <summary><see cref="Status"/> is the file's indexing status: a file that is not ready yet answers poorly.</summary>
+public sealed record AskAboutFileDto(Guid ConversationId, Guid FileId, string FileName, string Status);
 
 internal static class FileEndpoints
 {
@@ -24,6 +30,43 @@ internal static class FileEndpoints
                 new FileSearchHitDto(hit.FileId, hit.FileName, hit.ChunkId, hit.ChunkIndex, hit.SanitizedExcerpt,
                     hit.Score, hit.ExcerptStart, hit.ExcerptEnd, hit.PageNumber, hit.SanitizedExcerpt)));
         }).WithName("SearchFiles");
+
+        // "Ask Jarvis about this": a new chat with the file already attached as its only source.
+        api.MapPost("/files/{id:guid}/ask", async (Guid id, AskAboutFileRequest? request, IFileService files,
+            IConversationStore conversations, IConversationFileContextRepository sources,
+            IDocumentCollectionRepository collections, IAssistantProfileService profiles,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var file = await files.GetAsync(id, currentUser.OwnerId, ct);
+            if (file is null || file.ProcessingStatus == "deleting") return Results.NotFound();
+            ProfileBinding binding;
+            try
+            {
+                binding = await profiles.CaptureBindingAsync(currentUser.OwnerId, request?.ProfileId, ct);
+            }
+            catch (ArgumentException exception)
+            {
+                return EndpointHelpers.Invalid("profileId", exception.Message);
+            }
+            // A profile that limits files to some collections must not be widened by attaching a file outside them.
+            var snapshot = await profiles.ResolveSnapshotAsync(binding, currentUser.OwnerId, ct);
+            if (snapshot.RestrictFiles)
+            {
+                var allowed = await collections.ListFileIdsAsync(currentUser.OwnerId, snapshot.AllowedCollectionIds, ct);
+                if (!allowed.Contains(file.Id))
+                    return Results.Conflict(new { message = "That assistant profile cannot read this file." });
+            }
+
+            var name = file.FileName.Length <= 80 ? file.FileName : file.FileName[..79] + "…";
+            var conversation = await conversations.CreateAsync(currentUser.OwnerId, "About " + name, ct, binding);
+            if (!await sources.AttachFileAsync(conversation.Id, file.Id, currentUser.OwnerId, ct))
+            {
+                await conversations.DeleteAsync(conversation.Id, currentUser.OwnerId, ct);
+                return Results.NotFound();
+            }
+            return Results.Created($"/api/v1/conversations/{conversation.Id}",
+                new AskAboutFileDto(conversation.Id, file.Id, file.FileName, file.ProcessingStatus));
+        }).WithName("AskAboutFile");
 
         api.MapPost("/files/{id:guid}/reprocess", async (Guid id, IFileService files, ICurrentUser currentUser,
                 CancellationToken ct) =>

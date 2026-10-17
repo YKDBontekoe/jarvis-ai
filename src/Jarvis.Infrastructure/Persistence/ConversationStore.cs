@@ -215,6 +215,18 @@ public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, 
         return rows.Select(row => new MessageSearchHit(row.message, row.Title)).ToArray();
     }
 
+    public async Task<MessageSearchHit?> FindMessageAsync(Guid ownerId, Guid messageId,
+        CancellationToken cancellationToken)
+    {
+        var row = await (
+                from message in db.Messages.AsNoTracking()
+                join conversation in db.Conversations.AsNoTracking() on message.ConversationId equals conversation.Id
+                where message.Id == messageId && conversation.OwnerId == ownerId
+                select new { message, conversation.Title })
+            .SingleOrDefaultAsync(cancellationToken);
+        return row is null ? null : new MessageSearchHit(row.message, row.Title);
+    }
+
     public async Task<MessageWindow?> GetMessageWindowAsync(Guid conversationId, Guid messageId, int before,
         int after, CancellationToken cancellationToken)
     {

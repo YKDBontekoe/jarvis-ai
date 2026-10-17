@@ -25,8 +25,12 @@ public sealed class MemoryEntity
     public DateTimeOffset? LastAccessedAt { get; set; }
     /// <summary>Model-written questions and synonyms that make the memory findable by other words; null until indexed.</summary>
     public string? SearchHints { get; set; }
+
+    /// <summary>The memory that replaced this one when the owner corrected it; null while it is not superseded.</summary>
+    public Guid? SupersededById { get; set; }
     public NpgsqlTypes.NpgsqlTsVector SearchVector { get; set; } = null!;
 
     public MemoryRecord ToRecord() => new(Id, OwnerId, Kind, Content, Importance, Confidence,
-        SourceType, SourceId, CreatedAt, UpdatedAt, ValidUntil, IsPinned, ProfileId, AccessCount, LastAccessedAt, SearchHints);
+        SourceType, SourceId, CreatedAt, UpdatedAt, ValidUntil, IsPinned, ProfileId, AccessCount, LastAccessedAt, SearchHints,
+        SupersededById);
 }

@@ -16,6 +16,9 @@ public interface IMemoryRepository
     /// </summary>
     Task<MemoryRecord?> ExpireAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<MemoryRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+
+    /// <summary>The versions this memory replaced, newest first. Empty when it never replaced anything.</summary>
+    Task<IReadOnlyList<MemoryRecord>> ListHistoryAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<MemoryRecord>> ListAsync(Guid ownerId, string? kind, CancellationToken cancellationToken);
     Task<IReadOnlyList<MemoryRecord>> ListPinnedAsync(Guid ownerId, CancellationToken cancellationToken);
     Task<MemoryRecord?> UpdateAsync(Guid id, Guid ownerId, string kind, string content, float importance, float confidence,

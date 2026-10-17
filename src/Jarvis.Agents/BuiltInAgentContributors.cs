@@ -88,6 +88,7 @@ internal sealed class CoreAgentTools(
         yield return AIFunctionFactory.Create(memoryTools.ListMemoriesAsync);
         yield return AIFunctionFactory.Create(memoryTools.SearchMemoryAsync);
         yield return AIFunctionFactory.Create(memoryTools.RememberAsync);
+        yield return AIFunctionFactory.Create(memoryTools.CorrectMemoryAsync);
         yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(memoryTools.ForgetMemoryAsync));
         if (!context.IsBackgroundTask)
             yield return AIFunctionFactory.Create(taskTools.CreateTaskAsync);

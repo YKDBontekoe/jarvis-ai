@@ -89,6 +89,10 @@ public sealed record MemoryRequest(string? Kind, string? Content, float Importan
 public sealed record MemoryDto(Guid Id, string Kind, string Content, float Importance, float Confidence,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, DateTimeOffset? ValidUntil, bool IsPinned, string? SourceType);
 public sealed record MemoryHitDto(MemoryDto Memory, double Score);
+public sealed record MemoryCorrectionRequest(string? Content);
+
+/// <summary><see cref="ReplacementId"/> is the new memory when the old one was replaced; null when it only ended.</summary>
+public sealed record MemoryCorrectionDto(Guid Id, MemoryDto Memory, Guid? ReplacementId);
 
 public sealed record JournalRequest(DateOnly? EntryDate, string? Content, string? Highlights, string? Gratitude,
     int? Rating, int? Mood, int? Energy, int? Stress, string[]? Tags, string? Source);
