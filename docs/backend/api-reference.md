@@ -292,3 +292,14 @@ Per-subscription review state lives in owner settings (`subscriptions.reviews`, 
 | POST | `.../review/cancellation` (`evidence` ≥ 8 characters, the merchant's confirmation; only then the subscription becomes cancelled) |
 
 The agent tool `SetSubscriptionStatus` now needs `evidence` for `cancelled` and goes through the same check.
+
+## Statement import batches
+
+A committed statement import that adds rows becomes a batch in owner settings (`finance.imports`, latest 20, no table). Importing the same file again adds nothing and creates no batch.
+
+| Method | Route |
+|--------|-------|
+| GET | `/finance/imports` (each batch: rows, imported, duplicates, how many of its rows still exist, how many were edited since, undone state) |
+| POST | `/finance/imports/{id}/undo` (removes only rows the batch created that still exist and were never edited; edited rows, duplicates of earlier rows and anything else with the same merchant stay; undoing again changes nothing; audit entry carries counts only) |
+
+`POST /finance/import` answers with `batchId` on a commit that added rows.

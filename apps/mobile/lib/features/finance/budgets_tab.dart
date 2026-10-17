@@ -50,6 +50,7 @@ class BudgetsTab extends StatefulWidget {
 
 class _BudgetsTabState extends State<BudgetsTab> {
   FinanceOverviewData? _data;
+  List<Map<String, dynamic>> _imports = const [];
   bool _loading = true;
   String? _error;
 
@@ -69,7 +70,22 @@ class _BudgetsTabState extends State<BudgetsTab> {
       );
       if (!mounted) return;
       final data = FinanceOverviewData.fromJson(response.data);
+      var imports = <Map<String, dynamic>>[];
+      try {
+        // A bonus: without the list there is simply nothing to undo here.
+        imports = jsonMaps(
+          (await widget.http.get<dynamic>('/api/v1/finance/imports')).data,
+        );
+      } on DioException {
+        // Keep going without it.
+      }
+      if (!mounted) return;
       setState(() {
+        _imports = [
+          for (final batch in imports)
+            if (batch['undone'] != true && asJsonInt(batch['stillThere']) > 0)
+              batch,
+        ].take(3).toList();
         _data = data;
         _loading = false;
         _error = data == null ? 'Could not load your finances.' : null;
@@ -216,6 +232,38 @@ class _BudgetsTabState extends State<BudgetsTab> {
     }
   }
 
+  Future<void> _undoImport(Map<String, dynamic> batch) async {
+    final id = jsonString(batch, 'id');
+    if (id == null) return;
+    final confirmed = await showJarvisConfirm(
+      context,
+      title: 'Undo this import?',
+      message:
+          'Removes the ${asJsonInt(batch['stillThere']) - asJsonInt(batch['edited'])} '
+          'rows it added that you have not changed. Rows you edited, and '
+          'anything you added yourself, stay.',
+      confirmLabel: 'Undo import',
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      final response = await widget.http.post<dynamic>(
+        '/api/v1/finance/imports/$id/undo',
+      );
+      final result = jsonObject(response.data) ?? const {};
+      if (!mounted) return;
+      final kept = asJsonInt(result['keptEdited']);
+      _toast(
+        'Removed ${asJsonInt(result['removed'])} rows'
+        '${kept > 0 ? ', kept $kept you edited' : ''}.',
+      );
+      await _load();
+    } on DioException catch (error) {
+      if (mounted) {
+        _toast(firstProblemMessage(error.response?.data) ?? 'Could not undo that import.');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = _data;
@@ -256,6 +304,28 @@ class _BudgetsTabState extends State<BudgetsTab> {
                     ),
                   ],
                 ),
+                for (final batch in _imports)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: SurfaceCard(
+                      key: Key('import-batch-${batch['id']}'),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Imported ${asJsonInt(batch['imported'])} rows'
+                              '${asJsonInt(batch['edited']) > 0 ? ' (${asJsonInt(batch['edited'])} edited since)' : ''}',
+                            ),
+                          ),
+                          TextButton(
+                            key: Key('import-undo-${batch['id']}'),
+                            onPressed: () => unawaited(_undoImport(batch)),
+                            child: const Text('Undo'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 12),
                 _forecast(context, data),
                 for (final alert in data.alerts)

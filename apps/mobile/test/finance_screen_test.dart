@@ -163,4 +163,54 @@ void main() {
     expect((posts[0].body as Map)['commit'], false);
     expect((posts[1].body as Map)['commit'], true);
   });
+
+  testWidgets('a recent import can be undone and says what was kept', (
+    tester,
+  ) async {
+    http
+      ..on('GET', '/api/v1/finance/imports', [
+        {
+          'id': 'b1',
+          'imported': 2,
+          'stillThere': 2,
+          'edited': 1,
+          'undone': false,
+        },
+        {
+          'id': 'b0',
+          'imported': 5,
+          'stillThere': 0,
+          'edited': 0,
+          'undone': false,
+        },
+        {
+          'id': 'bx',
+          'imported': 3,
+          'stillThere': 3,
+          'edited': 0,
+          'undone': true,
+        },
+      ])
+      ..on('POST', '/api/v1/finance/imports/b1/undo', {
+        'id': 'b1',
+        'removed': 1,
+        'keptEdited': 1,
+        'undone': true,
+      });
+    await show(tester);
+
+    expect(find.byKey(const Key('import-batch-b1')), findsOneWidget);
+    expect(find.byKey(const Key('import-batch-b0')), findsNothing);
+    expect(find.byKey(const Key('import-batch-bx')), findsNothing);
+    expect(find.textContaining('1 edited since'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('import-undo-b1')));
+    await tester.pumpAndSettle();
+    expect(find.text('Undo this import?'), findsOneWidget);
+    await tester.tap(find.text('Undo import'));
+    await tester.pumpAndSettle();
+
+    expect(http.sent('POST', '/api/v1/finance/imports/b1/undo'), hasLength(1));
+    expect(find.text('Removed 1 rows, kept 1 you edited.'), findsOneWidget);
+  });
 }
