@@ -20,7 +20,19 @@ public interface IAgentToolContributor
     IEnumerable<AITool> GetTools(AgentBuildContext context);
 }
 
-/// <summary>Adds per-turn context (memory, persona, skills, and similar) to the Jarvis agent.</summary>
+/// <summary>
+/// Adds owner-authored working style (persona, profile) to the system instructions. Sections follow the shared
+/// safety preamble and are framed as unable to override it.
+/// </summary>
+public interface IAgentInstructionContributor
+{
+    /// <summary>Lower values come first.</summary>
+    int Order { get; }
+
+    ValueTask<string?> GetInstructionsAsync(AgentBuildContext context, CancellationToken cancellationToken);
+}
+
+/// <summary>Adds per-turn context (memory, skills, and similar) to the Jarvis agent.</summary>
 public interface IAgentContextContributor
 {
     /// <summary>Lower values run first so stable context precedes turn-specific context.</summary>

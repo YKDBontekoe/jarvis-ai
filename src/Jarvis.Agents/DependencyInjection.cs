@@ -60,7 +60,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, McpSetupToolContributor>();
         services.AddScoped<IAgentContextContributor, McpContextContributor>();
         services.AddScoped<Jarvis.Application.Integrations.IMcpOAuthService, Jarvis.Mcp.McpOAuthService>();
-        services.AddScoped<IAgentContextContributor, Profiles.ProfileContextContributor>();
+        services.AddScoped<IAgentInstructionContributor, Profiles.ProfileInstructionContributor>();
         services.AddScoped<IAgentContextContributor, Projects.ProjectContextContributor>();
         services.AddScoped<IAgentToolContributor, Skills.SkillToolContributor>();
         services.AddScoped<IAgentContextContributor, Skills.SkillContextContributor>();
@@ -102,7 +102,7 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.People.Radar.IRadarToneAnalyzer, People.ModelRadarToneAnalyzer>();
         services.AddScoped<IAgentContextContributor, People.PeopleContextContributor>();
         services.AddScoped<IAgentToolContributor, Persona.PersonaToolContributor>();
-        services.AddScoped<IAgentContextContributor, Persona.PersonaContextContributor>();
+        services.AddScoped<IAgentInstructionContributor, Persona.PersonaInstructionContributor>();
         services.AddScoped<IAgentContextContributor, Learning.UserSummaryContextContributor>();
         services.AddSingleton<Memory.QueryEmbeddingCache>();
         services.AddScoped<IMemoryEmbedder, Memory.ResolverMemoryEmbedder>();

@@ -76,14 +76,14 @@ public sealed class PersonaTests
             new PersonaTrait(Guid.NewGuid(), "tone", "Be direct.", 1f, 1, "user", true, now, now)
         ]);
 
-        var rendered = PersonaContextProvider.Render(profile)!;
+        var rendered = PersonaPrompt.Render(profile)!;
 
-        Assert.StartsWith(PersonaContextProvider.Prefix, rendered);
+        Assert.StartsWith(PersonaPrompt.Prefix, rendered);
         Assert.Contains("Address the user as Sam.", rendered);
         Assert.Contains("Reply in Dutch", rendered);
         Assert.True(rendered.IndexOf("Be direct.", StringComparison.Ordinal) <
                     rendered.IndexOf("Use bullet lists", StringComparison.Ordinal), "Pinned traits come first.");
         Assert.Contains("I run a bakery", rendered);
-        Assert.Null(PersonaContextProvider.Render(PersonaProfile.Empty));
+        Assert.Null(PersonaPrompt.Render(PersonaProfile.Empty));
     }
 }

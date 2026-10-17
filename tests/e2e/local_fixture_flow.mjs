@@ -141,6 +141,21 @@ await step('background task runs through Temporal to completion', async () => {
   return { status: completed.status, summary: completed.summary?.slice(0, 60) };
 });
 
+await step('owner preferences reach the model through the system prompt', async () => {
+  const fresh = (await request('POST', '/conversations', { title: 'New conversation' }, [201])).data;
+  const greet = async () => (await request('POST', `/conversations/${fresh.id}/messages`, { content: 'Hello Jarvis' })).data.content;
+  await request('PUT', '/persona', { preferredName: 'Sam', replyLanguage: 'Dutch', customInstructions: null });
+  try {
+    assert.match(await greet(), /^Hello Sam!/);
+  } finally {
+    await request('PUT', '/persona', { preferredName: null, replyLanguage: null, customInstructions: null });
+  }
+  const other = (await request('POST', '/conversations', { title: 'New conversation' }, [201])).data;
+  const plain = (await request('POST', `/conversations/${other.id}/messages`, { content: 'Hello Jarvis' })).data.content;
+  assert.match(plain, /^Hello!/);
+  return { named: 'Hello Sam!', cleared: 'Hello!' };
+});
+
 await step('conversation history persists every turn', async () => {
   const details = (await request('GET', `/conversations/${conversation.id}`)).data;
   assert(details.messages.length >= 16, `expected at least 16 messages, got ${details.messages.length}`);

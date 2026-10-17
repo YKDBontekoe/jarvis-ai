@@ -261,12 +261,19 @@ function plan(prompt) {
     return text('## Result\n\nThe background task finished using the fixture model.\n\n- Finding one\n- Finding two');
 
   if (/^(hi|hello|hey)\b/.test(lower))
-    return text("Hello! I'm Jarvis. I can set reminders, remember your preferences, search your files, watch public data for changes, and run longer research in the background. What can I do for you?");
+    return text(`Hello${greetingName(prompt)}! I'm Jarvis. I can set reminders, remember your preferences, search your files, watch public data for changes, and run longer research in the background. What can I do for you?`);
 
   return text(`Here's a quick overview for **“${request.slice(0, 80)}”**:\n\n` +
     '1. I read your request and checked what I already know.\n2. I picked the most direct answer.\n3. I formatted it so it is easy to scan.\n\n' +
     '```python\nprint("Hello from Jarvis")\n```\n\n' +
     '> This reply comes from the deterministic Jarvis test model.');
+}
+
+// The owner's preferred name reaches the model through the system instructions, not a user-role message.
+function greetingName(prompt) {
+  const system = prompt.split('\nSystem instructions:\n')[1]?.split(/\nAvailable Jarvis functions|\nConversation:/)[0] ?? '';
+  const name = system.match(/^- Address the user as (.+)\.$/m)?.[1];
+  return name ? ` ${name}` : '';
 }
 
 function parseConversation(prompt) {

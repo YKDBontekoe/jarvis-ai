@@ -141,7 +141,7 @@ Owner-scoped `SKILL.md` documents import/export via `/api/v1/skills`. Agent load
 
 ## Persona
 
-Traits + custom instructions learned from user statements and reply ratings. Tools record traits (`PersonaAgentTools`); context injected each turn.
+Traits + custom instructions learned from user statements and reply ratings. Tools record traits (`PersonaAgentTools`); `PersonaInstructionContributor` puts them (name, language, strongest traits, custom instructions) in the system instructions after the safety preamble. Trait statements are single-line, at most 280 characters, and checked for credentials before saving.
 
 ## Assistant profiles
 

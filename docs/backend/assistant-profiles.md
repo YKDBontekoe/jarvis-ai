@@ -27,7 +27,7 @@ Profiles cannot change the owner’s model **provider** (Codex vs OpenRouter), c
 
 ## Agent assembly
 
-`JarvisAgent` resolves the snapshot into `AgentBuildContext.Profile`. `ProfileContextContributor` injects the profile as a **user-role** context block (not privileged system instructions) and states that it cannot override safety, approvals, or MCP allowlists. Skills, files, memory recall, persona learning, Remember, and the dreamed portrait honor the snapshot. `JarvisAgentFactory.BuildInstructions` stays the shared safety preamble.
+`JarvisAgent` resolves the snapshot into `AgentBuildContext.Profile`. `ProfileInstructionContributor` (like `PersonaInstructionContributor` for the owner's learned preferences, tone and custom instructions) adds the profile to the **system instructions**. `JarvisAgentFactory.CreateAsync` appends these sections after the shared safety preamble from `BuildInstructions`, under a line stating they tune tone, format, language and working style only and cannot override safety, approvals, untrusted-data rules, or MCP allowlists. Skills, files, memory recall, persona learning, Remember, and the dreamed portrait honor the snapshot; skills, memories and tool output stay per-turn context, not system text.
 
 ## HTTP
 

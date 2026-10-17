@@ -48,29 +48,22 @@ internal sealed class PersonaToolContributor(PersonaService persona, IOwnerSetti
         [AIFunctionFactory.Create(new PersonaAgentTools(persona, settings, currentUser, context.Profile).LearnPreferenceAsync)];
 }
 
-internal sealed class PersonaContextContributor(PersonaService persona) : IAgentContextContributor
+/// <summary>Adds the owner's custom instructions and strongest learned traits to the system instructions.</summary>
+internal sealed class PersonaInstructionContributor(PersonaService persona) : IAgentInstructionContributor
 {
     public int Order => -10;
 
-    public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
+    public async ValueTask<string?> GetInstructionsAsync(AgentBuildContext context,
+        CancellationToken cancellationToken) =>
         context.Profile is { IncludeOwnerPersona: false }
-            ? []
-            : [new PersonaContextProvider(persona, context.OwnerId)];
+            ? null
+            : PersonaPrompt.Render(await persona.GetAsync(context.OwnerId, cancellationToken));
 }
 
-/// <summary>Injects the owner's custom instructions and strongest learned traits at the start of every turn.</summary>
-internal sealed class PersonaContextProvider(PersonaService persona, Guid ownerId) : MessageAIContextProvider
+internal static class PersonaPrompt
 {
     internal const string Prefix = "Learned persona";
     private const int MaxTraits = 20;
-
-    protected override async ValueTask<IEnumerable<ChatMessage>> ProvideMessagesAsync(InvokingContext context,
-        CancellationToken cancellationToken = default)
-    {
-        var profile = await persona.GetAsync(ownerId, cancellationToken);
-        var content = Render(profile);
-        return content is null ? [] : [new ChatMessage(ChatRole.User, content)];
-    }
 
     internal static string? Render(PersonaProfile profile)
     {

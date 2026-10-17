@@ -31,10 +31,10 @@ public sealed class VoiceSessionContext(
         builder.AppendLine(JarvisAgentFactory.BuildInstructions(configuration["Jarvis:Instructions"], executingTask: false));
         builder.AppendLine(VoiceTools.VoiceRealtimeAppendix);
         if (profile is not null)
-            AppendBlock(builder, Profiles.ProfileContextProvider.Render(profile));
+            AppendBlock(builder, Profiles.ProfilePrompt.Render(profile));
         await AppendClockAsync(builder, ownerId, cancellationToken);
         if (profile is null || profile.IncludeOwnerPersona)
-            AppendBlock(builder, Persona.PersonaContextProvider.Render(await persona.GetAsync(ownerId, cancellationToken)));
+            AppendBlock(builder, Persona.PersonaPrompt.Render(await persona.GetAsync(ownerId, cancellationToken)));
         if (profile is null || profile.MemoryScope == Jarvis.Domain.Profiles.MemoryScopes.All)
         {
             var dreaming = await settings.GetAsync<DreamingState>(ownerId, LearningSections.DreamingState, cancellationToken);

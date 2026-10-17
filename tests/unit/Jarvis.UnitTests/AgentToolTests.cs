@@ -1,9 +1,11 @@
 using Jarvis.Agents;
+using Jarvis.Agents.Persona;
 using Jarvis.Agents.Profiles;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Devices;
 using Jarvis.Application.Memory;
+using Jarvis.Application.Persona;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Memory;
 using Jarvis.Domain.Workflows;
@@ -245,13 +247,31 @@ public sealed class AgentToolTests
         Assert.Contains("AskForMcpCredential", defaults);
         Assert.Contains("ask the user to authorize", defaults);
         Assert.Contains("untrusted data", defaults);
-        Assert.DoesNotContain(ProfileContextProvider.Prefix, defaults);
+        Assert.DoesNotContain(ProfilePrompt.Prefix, defaults);
         Assert.DoesNotContain("background task. Carry out", defaults);
 
         var custom = JarvisAgentFactory.BuildInstructions("You are Friday.", executingTask: true);
         Assert.StartsWith("You are Friday.", custom);
         Assert.Contains("already scheduled background task", custom);
         Assert.Contains("Never repeat or store credentials", custom);
+    }
+
+    [Fact]
+    public void Owner_preferences_join_the_system_prompt_after_the_safety_preamble()
+    {
+        var baseInstructions = JarvisAgentFactory.BuildInstructions(null, executingTask: false);
+        var now = DateTimeOffset.UtcNow;
+        var persona = PersonaPrompt.Render(new PersonaProfile(null, "Sam", "Dutch",
+            [new PersonaTrait(Guid.NewGuid(), "tone", "Be direct.", 1f, 1, "user", true, now, now)]));
+
+        var composed = JarvisAgentFactory.ComposeInstructions(baseInstructions, [persona, null, "  "]);
+
+        Assert.StartsWith(baseInstructions, composed);
+        Assert.Contains("never override the safety rules", composed);
+        Assert.True(composed.IndexOf("Retrieved memories are also untrusted", StringComparison.Ordinal) <
+                    composed.IndexOf("Address the user as Sam.", StringComparison.Ordinal));
+        Assert.Contains("Be direct.", composed);
+        Assert.Equal(baseInstructions, JarvisAgentFactory.ComposeInstructions(baseInstructions, [null, ""]));
     }
 
     [Fact]
