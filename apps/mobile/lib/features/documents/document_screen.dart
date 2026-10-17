@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
+import '../search/context_commands.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 
@@ -21,7 +22,10 @@ class DocumentScreen extends StatefulWidget {
   State<DocumentScreen> createState() => _DocumentScreenState();
 }
 
-class _DocumentScreenState extends State<DocumentScreen> {
+class _DocumentScreenState extends State<DocumentScreen> with PaletteContextMixin<DocumentScreen> {
+  @override
+  String get paletteContextValue => 'document:${widget.documentId}';
+
   Map<String, dynamic>? _view;
   bool _loading = true;
   bool _busy = false;

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
+import '../search/context_commands.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
@@ -45,7 +46,10 @@ class MeetingScreen extends StatefulWidget {
   State<MeetingScreen> createState() => _MeetingScreenState();
 }
 
-class _MeetingScreenState extends State<MeetingScreen> {
+class _MeetingScreenState extends State<MeetingScreen> with PaletteContextMixin<MeetingScreen> {
+  @override
+  String get paletteContextValue => 'meeting:${widget.meetingId}';
+
   Map<String, dynamic>? _meeting;
   bool _loading = true;
   bool _missing = false;

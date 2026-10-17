@@ -8,6 +8,7 @@ import '../entities/entity_ref.dart';
 import '../entities/entity_screen.dart';
 import '../files/files_screen.dart';
 import '../../json_maps.dart';
+import '../search/context_commands.dart';
 import '../tasks/task_details_screen.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
@@ -40,7 +41,10 @@ class ProjectScreen extends StatefulWidget {
   State<ProjectScreen> createState() => _ProjectScreenState();
 }
 
-class _ProjectScreenState extends State<ProjectScreen> {
+class _ProjectScreenState extends State<ProjectScreen> with PaletteContextMixin<ProjectScreen> {
+  @override
+  String get paletteContextValue => 'project:${widget.projectId}';
+
   Map<String, dynamic>? _project;
   Map<String, dynamic>? _nextAction;
   List<Map<String, dynamic>> _conversations = const [];

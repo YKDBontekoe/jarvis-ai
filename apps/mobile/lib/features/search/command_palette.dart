@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../api/api_errors.dart';
+import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import 'context_commands.dart';
 import 'quick_commands.dart';
 import 'recent_searches_store.dart';
 import 'search_api.dart';
@@ -64,6 +66,9 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
   String? _error;
   List<FederatedSearchHit> _results = const [];
   Set<String> _kindFilter = {};
+  // What the owner was looking at when the palette opened.
+  final String? _context = currentPaletteContext;
+  bool _running = false;
 
   @override
   void initState() {
@@ -121,6 +126,48 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
   void _runCommand(QuickCommand command) {
     Navigator.of(context).pop();
     widget.onUtility(command.destination);
+  }
+
+  Future<void> _runContext(ContextCommand command) async {
+    setState(() {
+      _running = true;
+      _error = null;
+    });
+    try {
+      final destination = await command.run(widget.http);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      widget.onUtility(destination);
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _running = false;
+        // Nothing is claimed as done: say what stopped it.
+        _error = '${command.label} did not work: ${firstProblemMessage(error.response?.data) ?? describeApiError(error)}';
+      });
+    }
+  }
+
+  List<Widget> _contextTiles(String query) {
+    final commands = matchContextCommands(_context, query);
+    if (commands.isEmpty) return const [];
+    return [
+      QuickCommandHeader('For this ${contextNoun(_context!)}'),
+      for (var i = 0; i < commands.length; i++)
+        ListTile(
+          key: Key('context-command-$i'),
+          enabled: !_running,
+          leading: Icon(commands[i].icon, size: 18),
+          title: Text(commands[i].label),
+          trailing: _running
+              ? const SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : null,
+          onTap: () => unawaited(_runContext(commands[i])),
+        ),
+    ];
   }
 
   Future<void> _openHit(FederatedSearchHit hit) async {
@@ -219,6 +266,7 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                         ? ListView(
                             padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
                             children: [
+                              ..._contextTiles(''),
                               const QuickCommandHeader('Create'),
                               for (final command in matchQuickCommands(''))
                                 QuickCommandTile(
@@ -257,6 +305,7 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                         : Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
+                              ..._contextTiles(_query.text),
                               for (final command in matchQuickCommands(_query.text))
                                 QuickCommandTile(
                                   command: command,

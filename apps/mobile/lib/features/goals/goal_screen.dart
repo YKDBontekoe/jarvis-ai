@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
+import '../search/context_commands.dart';
 import '../../schedule_format.dart' show deviceTimeZoneLookup;
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
@@ -27,7 +28,10 @@ class GoalScreen extends StatefulWidget {
   State<GoalScreen> createState() => _GoalScreenState();
 }
 
-class _GoalScreenState extends State<GoalScreen> {
+class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalScreen> {
+  @override
+  String get paletteContextValue => 'goal:${widget.goalId}';
+
   Map<String, dynamic>? _view;
   bool _loading = true;
   bool _busy = false;

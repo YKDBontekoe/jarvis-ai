@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
+import '../search/context_commands.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../comparisons/comparison_screen.dart';
@@ -30,7 +31,10 @@ class SubscriptionReviewScreen extends StatefulWidget {
       _SubscriptionReviewScreenState();
 }
 
-class _SubscriptionReviewScreenState extends State<SubscriptionReviewScreen> {
+class _SubscriptionReviewScreenState extends State<SubscriptionReviewScreen> with PaletteContextMixin<SubscriptionReviewScreen> {
+  @override
+  String get paletteContextValue => 'subscription:${widget.subscriptionId}';
+
   Map<String, dynamic>? _view;
   bool _loading = true;
   bool _busy = false;
