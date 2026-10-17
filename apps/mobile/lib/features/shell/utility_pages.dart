@@ -25,6 +25,7 @@ import '../coding/coding_runs_screen.dart';
 import '../comparisons/comparison_screen.dart';
 import '../comparisons/comparisons_screen.dart';
 import '../apps/app_goals_screen.dart';
+import '../apps/build_app_screen.dart';
 import '../documents/document_screen.dart';
 import '../documents/documents_screen.dart';
 import '../notifications/notification_settings_screen.dart';
@@ -129,6 +130,7 @@ Widget? utilityPageFor(
   'decisions' => DecisionsScreen(http: http),
   'comparisons' => ComparisonsScreen(http: http),
   'find-app' => AppGoalsScreen(http: http, onAskInChat: onAskInChat),
+  'build-app' => BuildAppScreen(http: http, onAskInChat: onAskInChat),
   final lesson when lesson.startsWith('lesson:') => LessonScreen(
     http: http,
     itemId: lesson.substring('lesson:'.length),

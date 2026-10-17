@@ -375,6 +375,16 @@ Deterministic rules over the owner's own facts; reading proposes only and never 
 
 Rules: a meeting in the next 24 hours with no prep note; an open accepted promise due within 3 days or late (older than 30 days it only asks whether it still matters); a subscription's notice day within 7 days (unless kept); a decision whose review day is within 7 days; free time of 45+ minutes today with a project's open next step. "Later" returns after 3 days, "handled", "wrong" and "useful" hide that opportunity, "fewer" or two "wrong" for a kind mute it for 30 days.
 
+### Self-built apps: review and builder
+
+Activation of a self-built app (`POST /custom-mcp-servers/{id}/activate`, and the chat tool) now needs the sha256 of the draft that was reviewed (400 `sha256` when omitted, so an old client cannot activate "whatever is current"), and that exact code must have passed a test. Without a passing test for the same hash, `overrideReason` (10 to 200 characters) is required; otherwise 409 `not_tested`. A reason is kept in the audit trail (`custom_app.activated_untested`). A startup test is labelled as that: it lists tools but does not prove each one works.
+
+| Method | Path |
+|---|---|
+| GET | `/custom-mcp-servers/{id}/review` (changed lines against the live version, dependencies added and removed, keys, `testStatus` `none`/`stale`/`failed`/`passed` with a plain `testLabel`, limits) |
+| GET | `/custom-mcp-servers/starters` (four ideas) |
+| POST | `/custom-mcp-servers/starters/compose` (`purpose` required; `inputs`, `data`, `result`, `changesOutside`) → `{prompt}` for chat |
+
 ### Mission starters and deliverables
 
 Starters only turn a few answers into a goal; the existing planner then makes the plan, which waits in `ready` until the owner starts it. The deliverable is assembled from the mission's own steps: nothing is invented, and the checks are run by code (every step finished, none failed or stopped, a final result exists, at least one web source is named). They say the work exists, not that it is right, and the response says so. Model cost is not tracked per mission, so only elapsed time is shown.

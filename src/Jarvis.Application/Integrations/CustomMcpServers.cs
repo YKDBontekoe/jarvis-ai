@@ -38,6 +38,15 @@ public sealed class CustomMcpScriptException(IReadOnlyList<string> errors)
     public IReadOnlyList<string> Errors { get; } = errors;
 }
 
+/// <summary>
+/// Activation was refused for a review reason: <see cref="Code"/> is <c>hash_required</c> (no reviewed version was
+/// named) or <c>not_tested</c> (no passing test for that exact code and no reason to go ahead anyway).
+/// </summary>
+public sealed class CustomMcpReviewException(string code, string message) : ArgumentException(message)
+{
+    public string Code { get; } = code;
+}
+
 public interface ICustomMcpServerStore
 {
     Task<IReadOnlyList<CustomMcpServerSummary>> ListAsync(Guid ownerId, CancellationToken cancellationToken);
@@ -117,21 +126,39 @@ public static class CustomMcpServerManager
         }
     }
 
-    /// <summary>Approves the current draft and turns the app on.</summary>
-    public static async Task<(CustomMcpServerSummary Server, UserMcpServer? Registered)> ActivateAsync(Guid ownerId,
-        Guid id, string? expectedSha256, ICustomMcpServerStore store, IUserMcpServerRegistry registry,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Approves exactly the draft the owner reviewed and turns the app on. The reviewed hash is required (a caller
+    /// that omits it is refused rather than activating whatever is current), and the code must have passed a test
+    /// unless the owner gives a reason to go ahead without one.
+    /// </summary>
+    public static async Task<(CustomMcpServerSummary Server, UserMcpServer? Registered, string? OverrideReason)>
+        ActivateAsync(Guid ownerId, Guid id, string? expectedSha256, ICustomMcpServerStore store,
+            IUserMcpServerRegistry registry, CancellationToken cancellationToken, string? overrideReason = null)
     {
         var detail = await store.GetAsync(ownerId, id, cancellationToken)
                      ?? throw new ArgumentException("That app does not exist.");
-        var sha = string.IsNullOrWhiteSpace(expectedSha256) ? detail.Server.DraftSha256 : expectedSha256.Trim();
+        if (string.IsNullOrWhiteSpace(expectedSha256))
+            throw new CustomMcpReviewException("hash_required",
+                "Say which version you reviewed: send the sha256 of the draft. Open the app to review its code first.");
+        var sha = expectedSha256.Trim();
         var check = CustomMcpScriptValidator.Validate(detail.DraftSource);
         if (!check.Ok) throw new CustomMcpScriptException(check.Errors);
+
+        var tested = detail.Server.LastTest is { Ok: true } test &&
+                     string.Equals(test.Sha256, sha, StringComparison.OrdinalIgnoreCase);
+        var reason = Clean(overrideReason, MaxOverrideReason);
+        if (!tested && (reason is null || reason.Length < MinOverrideReason))
+            throw new CustomMcpReviewException("not_tested",
+                "This exact code has not passed a test. Test it first, or say why you are switching it on without one.");
+
         var activated = await store.ActivateAsync(ownerId, id, sha, cancellationToken)
                         ?? throw new ArgumentException("The code changed since you reviewed it. Review the new version first.");
         var registered = await registry.SetEnabledAsync(ownerId, activated.RegistryServerId, true, cancellationToken);
-        return (activated, registered);
+        return (activated, registered, tested ? null : reason);
     }
+
+    public const int MinOverrideReason = 10;
+    public const int MaxOverrideReason = 200;
 
     public static async Task<bool> DeleteAsync(Guid ownerId, Guid id, ICustomMcpServerStore store,
         IUserMcpServerRegistry registry, CancellationToken cancellationToken)

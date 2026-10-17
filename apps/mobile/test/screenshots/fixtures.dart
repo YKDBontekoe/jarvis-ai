@@ -841,6 +841,12 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     'reviewNote': 'These checks only show that the work exists and is complete. They cannot tell whether it is right: read it before you rely on it.',
     'libraryItemId': null,
   },
+  'GET /api/v1/custom-mcp-servers/starters': [
+    {'id': 'tracker', 'title': 'A personal tracker', 'purpose': 'Log something each day and see the trend.', 'starter': 'A tracker for my water intake'},
+    {'id': 'lookup', 'title': 'A lookup on one source', 'purpose': 'Ask one website or API a narrow question.', 'starter': 'Look up today\'s exchange rate from a public API'},
+    {'id': 'helper', 'title': 'A project helper', 'purpose': 'Do a small repeated chore for one project.', 'starter': 'Turn my meeting notes into follow-ups'},
+    {'id': 'calculator', 'title': 'A comparison calculator', 'purpose': 'Compare two options with your own numbers.', 'starter': 'Compare two phone plans over 24 months'},
+  ],
   'GET /api/v1/setup': {
     'summary': '2 of 5 done. Next: connect your calendar.', 'done': 2, 'total': 5, 'nextGoalId': 'calendar',
     'goals': [

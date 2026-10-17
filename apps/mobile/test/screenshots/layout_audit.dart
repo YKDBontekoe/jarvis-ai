@@ -32,6 +32,7 @@ const destinations = [
   'story:s1',
   'lesson:i1',
   'find-app',
+  'build-app',
   'goal:g1',
   'memory',
   'journal',

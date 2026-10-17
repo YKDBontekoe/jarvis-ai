@@ -176,6 +176,84 @@ void main() {
     );
   });
 
+  testWidgets(
+    'code that has not passed a test needs a reason before it is switched on',
+    (tester) async {
+      http.on('GET', '/api/v1/custom-mcp-servers/c1', {
+        'server': {
+          'id': 'c1',
+          'name': 'Weather',
+          'revision': 2,
+          'activeRevision': 1,
+          'draftSha256': 'b' * 64,
+          'activeSha256': 'a' * 64,
+          'registryServerId': _serverId,
+          'lastTest': null,
+        },
+        'draftSource': '# /// script',
+        'revisions': <Object>[],
+      });
+      http.on('POST', '/api/v1/custom-mcp-servers/c1/activate', {'id': 'c1'});
+      await show(tester);
+
+      await tester.tap(find.byKey(const Key('app-detail-approve')));
+      await tester.pumpAndSettle();
+      expect(find.text('This code has not passed a test'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('app-override-reason')),
+        'short',
+      );
+      await tester.tap(find.byKey(const Key('app-override-confirm')));
+      await tester.pumpAndSettle();
+      expect(
+        http.sent('POST', '/api/v1/custom-mcp-servers/c1/activate'),
+        isEmpty,
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('app-override-reason')),
+        'It only does arithmetic and I read it.',
+      );
+      await tester.tap(find.byKey(const Key('app-override-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(
+        http.sent('POST', '/api/v1/custom-mcp-servers/c1/activate').single.body,
+        {
+          'sha256': 'b' * 64,
+          'overrideReason': 'It only does arithmetic and I read it.',
+        },
+      );
+    },
+  );
+
+  testWidgets(
+    'the review says what changed and what the test did and did not prove',
+    (tester) async {
+      http.on('GET', '/api/v1/custom-mcp-servers/c1/review', {
+        'firstVersion': false,
+        'added': 12,
+        'removed': 3,
+        'dependenciesAdded': ['httpx==0.28.1'],
+        'dependenciesRemoved': <Object>[],
+        'keys': ['weather_api_key'],
+        'testLabel': 'Startup test: the app starts and lists its tools. It does not prove each tool works.',
+      });
+      await show(tester);
+
+      expect(
+        find.textContaining(
+          '+12 −3 lines since the live version · adds httpx==0.28.1 · uses weather_api_key',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('does not prove each tool works'),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('pins the app to Home as its own tile', (tester) async {
     final tiles = TileLayoutController();
     await show(tester, tiles: tiles);
