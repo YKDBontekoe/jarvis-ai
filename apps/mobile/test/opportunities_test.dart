@@ -72,8 +72,8 @@ void main() {
       );
       await show(tester);
 
-      expect(find.text('It starts soon.'), findsOneWidget);
-      expect(find.text('Also: Also something related.'), findsOneWidget);
+      expect(find.textContaining('It starts soon.'), findsOneWidget);
+      expect(find.textContaining('Also: Also something related.'), findsOneWidget);
       await tester.tap(
         find.byKey(const Key('opportunity-open-meeting_prep:m1')),
       );
@@ -160,7 +160,7 @@ void main() {
       await show(tester);
 
       expect(find.text('Fewer follow-ups for now'), findsOneWidget);
-      expect(find.text('· Plan time for: Send the deck'), findsOneWidget);
+      expect(find.text('Plan time for: Send the deck'), findsOneWidget);
       await tester.tap(find.byKey(const Key('opportunity-unmute-follow_up')));
       await tester.pumpAndSettle();
 

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 
@@ -20,7 +21,11 @@ const _kindLabels = {
 /// it and where to act. Reading it proposes only; feedback quiets what you do
 /// not want, and what you found useful is kept as history.
 class OpportunitiesScreen extends StatefulWidget {
-  const OpportunitiesScreen({required this.http, required this.pageFor, super.key});
+  const OpportunitiesScreen({
+    required this.http,
+    required this.pageFor,
+    super.key,
+  });
 
   final Dio http;
 
@@ -60,7 +65,9 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = firstProblemMessage(error.response?.data) ?? 'Could not look for opportunities.';
+        _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not look for opportunities.';
       });
     }
   }
@@ -75,7 +82,11 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
     } on DioException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text(firstProblemMessage(error.response?.data) ?? 'That did not work.')),
+        SnackBar(
+          content: Text(
+            firstProblemMessage(error.response?.data) ?? 'That did not work.',
+          ),
+        ),
       );
     }
   }
@@ -88,22 +99,33 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
       );
       return;
     }
-    await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => page));
+    await Navigator.of(context)
+        .push<void>(MaterialPageRoute(builder: (_) => page));
     if (mounted) unawaited(_load());
   }
 
   Future<void> _unmute(String kind) async {
     try {
-      await widget.http.post<dynamic>('/api/v1/opportunities/unmute', data: {'kind': kind});
+      await widget.http.post<dynamic>(
+        '/api/v1/opportunities/unmute',
+        data: {'kind': kind},
+      );
     } on DioException {
       // Nothing to undo.
     }
     if (mounted) await _load();
   }
 
+  static const _kindIcons = {
+    'meeting_prep': PhosphorIconsRegular.calendarBlank,
+    'follow_up': PhosphorIconsRegular.arrowBendUpLeft,
+    'renewal': PhosphorIconsRegular.receipt,
+    'decision_review': PhosphorIconsRegular.gavel,
+    'free_slot': PhosphorIconsRegular.hourglassMedium,
+  };
+
   @override
   Widget build(BuildContext context) {
-    final colors = JarvisColors.of(context);
     return Scaffold(
       appBar: AppBar(title: const PageTitle('Worth doing')),
       body: _loading
@@ -123,32 +145,37 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
                           title: 'Nothing needs you right now',
                           message: 'When something is worth doing while there is still time, it shows up here with the reason.',
                         ),
-                      for (final item in _items) _card(item, colors),
+                      if (_items.isNotEmpty) _lead(_items.first),
+                      if (_items.length > 1)
+                        GroupLabel(
+                          'Also worth a look',
+                          count: _items.length - 1,
+                        ),
+                      for (var i = 1; i < _items.length; i++)
+                        _card(_items[i], i),
                       if (_muted.isNotEmpty) ...[
-                        const SectionHeader('Quieted'),
+                        const GroupLabel('Quieted'),
                         for (final kind in _muted)
-                          SurfaceCard(
+                          FeatureRow(
                             key: Key('opportunity-muted-$kind'),
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              children: [
-                                Expanded(child: Text('Fewer ${_kindLabels[kind] ?? kind} for now')),
-                                TextButton(
-                                  key: Key('opportunity-unmute-$kind'),
-                                  onPressed: () => unawaited(_unmute(kind)),
-                                  child: const Text('Bring back'),
-                                ),
-                              ],
+                            icon: PhosphorIconsRegular.bellSlash,
+                            quiet: true,
+                            title: 'Fewer ${_kindLabels[kind] ?? kind} for now',
+                            trailing: PillAction(
+                              key: Key('opportunity-unmute-$kind'),
+                              label: 'Bring back',
+                              onPressed: () => unawaited(_unmute(kind)),
                             ),
                           ),
                       ],
                       if (_history.isNotEmpty) ...[
-                        const SectionHeader('You found these useful'),
+                        const GroupLabel('You found these useful'),
                         for (final entry in _history.take(5))
-                          Padding(
+                          FeatureRow(
                             key: const Key('opportunity-history'),
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Text('· ${asJsonString(entry['title']) ?? ''}', style: TextStyle(color: colors.inkSoft)),
+                            icon: PhosphorIconsRegular.thumbsUp,
+                            quiet: true,
+                            title: asJsonString(entry['title']) ?? '',
                           ),
                       ],
                     ],
@@ -159,52 +186,95 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
     );
   }
 
-  Widget _card(Map<String, dynamic> item, JarvisColors colors) {
+  /// The one thing most worth doing, on the ink card.
+  Widget _lead(Map<String, dynamic> item) {
     final key = asJsonString(item['key']) ?? '';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: SurfaceCard(
+    final also = jsonStrings(item['also']);
+    return FadeSlideIn(
+      child: KeyedSubtree(
         key: Key('opportunity-$key'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(asJsonString(item['title']) ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            Text(asJsonString(item['whyNow']) ?? '', key: const Key('opportunity-why'), style: TextStyle(color: colors.inkSoft)),
-            for (final also in jsonStrings(item['also']))
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text('Also: $also', style: TextStyle(color: colors.muted, fontSize: 13)),
+        child: HeroCard(
+          label: 'Right now',
+          title: asJsonString(item['title']) ?? '',
+          subtitle: [
+            asJsonString(item['whyNow']) ?? '',
+            for (final line in also) 'Also: $line',
+          ].join('\n'),
+          footer: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              PillAction(
+                key: Key('opportunity-open-$key'),
+                primary: true,
+                onDark: true,
+                label: 'Open',
+                onPressed: () =>
+                    unawaited(_open(asJsonString(item['destination']) ?? '')),
               ),
-            Wrap(
-              spacing: 4,
-              children: [
-                FilledButton.tonal(
-                  key: Key('opportunity-open-$key'),
-                  onPressed: () => unawaited(_open(asJsonString(item['destination']) ?? '')),
-                  child: const Text('Open'),
-                ),
-                TextButton(
-                  key: Key('opportunity-useful-$key'),
-                  onPressed: () => unawaited(_feedback(item, 'useful')),
-                  child: const Text('Useful'),
-                ),
-                PopupMenuButton<String>(
-                  key: Key('opportunity-more-$key'),
-                  tooltip: 'Not now',
-                  onSelected: (verdict) => unawaited(_feedback(item, verdict)),
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'later', child: Text('Later')),
-                    PopupMenuItem(value: 'handled', child: Text('Already handled')),
-                    PopupMenuItem(value: 'wrong', child: Text('Wrong assumption')),
-                    PopupMenuItem(value: 'fewer', child: Text('Fewer like this')),
-                  ],
-                ),
-              ],
-            ),
-          ],
+              PillAction(
+                key: Key('opportunity-useful-$key'),
+                onDark: true,
+                icon: PhosphorIconsRegular.thumbsUp,
+                label: 'Useful',
+                onPressed: () => unawaited(_feedback(item, 'useful')),
+              ),
+              _notNow(item, key, onDark: true),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _notNow(Map<String, dynamic> item, String key, {bool onDark = false}) {
+    final colors = JarvisColors.of(context);
+    return PopupMenuButton<String>(
+      key: Key('opportunity-more-$key'),
+      tooltip: 'Not now',
+      icon: Icon(
+        PhosphorIconsRegular.dotsThree,
+        color: onDark ? colors.onInk : colors.ink,
+      ),
+      onSelected: (verdict) => unawaited(_feedback(item, verdict)),
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: 'later', child: Text('Later')),
+        PopupMenuItem(value: 'handled', child: Text('Already handled')),
+        PopupMenuItem(value: 'wrong', child: Text('Wrong assumption')),
+        PopupMenuItem(value: 'fewer', child: Text('Fewer like this')),
+      ],
+    );
+  }
+
+  Widget _card(Map<String, dynamic> item, int index) {
+    final key = asJsonString(item['key']) ?? '';
+    final also = jsonStrings(item['also']);
+    return FeatureRow(
+      key: Key('opportunity-$key'),
+      index: index,
+      icon:
+          _kindIcons[asJsonString(item['kind'])] ?? PhosphorIconsRegular.target,
+      title: asJsonString(item['title']) ?? '',
+      subtitle: [
+        asJsonString(item['whyNow']) ?? '',
+        for (final line in also) 'Also: $line',
+      ].join('\n'),
+      actions: [
+        PillAction(
+          key: Key('opportunity-open-$key'),
+          primary: true,
+          label: 'Open',
+          onPressed: () =>
+              unawaited(_open(asJsonString(item['destination']) ?? '')),
+        ),
+        PillAction(
+          key: Key('opportunity-useful-$key'),
+          icon: PhosphorIconsRegular.thumbsUp,
+          label: 'Useful',
+          onPressed: () => unawaited(_feedback(item, 'useful')),
+        ),
+        _notNow(item, key),
+      ],
     );
   }
 }

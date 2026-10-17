@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'story_screen.dart';
@@ -94,9 +95,15 @@ class _StoriesScreenState extends State<StoriesScreen> {
     }
   }
 
+  static String? _styleLabel(String? style) => switch (style) {
+    'recap' => 'Recap',
+    'retrospective' => 'Retrospective',
+    'what_changed' => 'What changed',
+    _ => null,
+  };
+
   @override
   Widget build(BuildContext context) {
-    final colors = JarvisColors.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const PageTitle('Stories'),
@@ -126,43 +133,41 @@ class _StoriesScreenState extends State<StoriesScreen> {
                                 'Pick a period and get a recap built from your '
                                 'decisions, tasks and journal. You edit it; '
                                 'nothing is shared.',
-                            action: FilledButton(
+                            action: PillAction(
                               key: const Key('story-start'),
+                              primary: true,
+                              icon: PhosphorIconsRegular.sparkle,
+                              label: 'Draft a recap',
                               onPressed: _create,
-                              child: const Text('Draft a recap'),
                             ),
                           ),
                         )
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            for (final story in _stories)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: SurfaceCard(
-                                  key: Key('story-${story['id']}'),
-                                  onTap: () =>
-                                      unawaited(_open(story['id'] as String)),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        asJsonString(story['title']) ?? 'Story',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${asJsonString(story['from']) ?? ''} – ${asJsonString(story['to']) ?? ''}'
-                                        '${asJsonInt(story['savedVersion']) == asJsonInt(story['version']) ? ' · saved' : ''}',
-                                        style: TextStyle(
-                                          color: colors.inkSoft,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                            for (var i = 0; i < _stories.length; i++)
+                              FeatureRow(
+                                key: Key('story-${_stories[i]['id']}'),
+                                index: i,
+                                icon: PhosphorIconsRegular.bookOpen,
+                                caption: _styleLabel(
+                                  asJsonString(_stories[i]['style']),
+                                ),
+                                title:
+                                    asJsonString(_stories[i]['title']) ??
+                                    'Story',
+                                subtitle:
+                                    '${asJsonString(_stories[i]['from']) ?? ''} – ${asJsonString(_stories[i]['to']) ?? ''}',
+                                trailing:
+                                    asJsonInt(_stories[i]['savedVersion']) ==
+                                        asJsonInt(_stories[i]['version'])
+                                    ? StatusPill(
+                                        label: 'Saved',
+                                        color: JarvisColors.of(context).accent,
+                                      )
+                                    : null,
+                                onTap: () => unawaited(
+                                  _open(_stories[i]['id'] as String),
                                 ),
                               ),
                           ],
@@ -197,6 +202,11 @@ class _NewStorySheetState extends State<_NewStorySheet> {
     'conversation': 'Chats',
   };
 
+  Widget _label(String text) => Padding(
+    padding: const EdgeInsets.fromLTRB(2, 18, 0, 8),
+    child: Text(text.toUpperCase(), style: JarvisType.capsOf(context)),
+  );
+
   String _date(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
@@ -207,10 +217,15 @@ class _NewStorySheetState extends State<_NewStorySheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('New story', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 12),
+          Text(
+            'New story',
+            style: JarvisType.displayOf(context).copyWith(fontSize: 26),
+          ),
+          const SizedBox(height: 4),
+          _label('Period'),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: [
               for (final days in const [7, 30, 90])
                 ChoiceChip(
@@ -221,8 +236,10 @@ class _NewStorySheetState extends State<_NewStorySheet> {
                 ),
             ],
           ),
+          _label('Style'),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: [
               for (final entry in _styles.entries)
                 ChoiceChip(
@@ -233,12 +250,20 @@ class _NewStorySheetState extends State<_NewStorySheet> {
                 ),
             ],
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Decisions, tasks and journal are included. Add more only if you want:',
+          _label('Also include'),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Decisions, tasks and journal are always in. Money, people and chats only if you choose.',
+              style: TextStyle(
+                color: JarvisColors.of(context).inkSoft,
+                fontSize: 13.5,
+              ),
+            ),
           ),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: [
               for (final entry in _optIn.entries)
                 FilterChip(
@@ -252,8 +277,11 @@ class _NewStorySheetState extends State<_NewStorySheet> {
             ],
           ),
           const SizedBox(height: 14),
-          FilledButton(
+          PillAction(
             key: const Key('story-create'),
+            primary: true,
+            icon: PhosphorIconsRegular.sparkle,
+            label: 'Draft it',
             onPressed: () {
               final now = DateTime.now();
               Navigator.pop<Map<String, Object?>>(context, {
@@ -264,7 +292,6 @@ class _NewStorySheetState extends State<_NewStorySheet> {
                   'kinds': ['decision', 'task', 'journal', ..._extra],
               });
             },
-            child: const Text('Draft it'),
           ),
         ],
       ),

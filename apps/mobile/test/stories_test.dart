@@ -116,7 +116,7 @@ void main() {
       await tester.tap(find.byKey(const Key('story-edit-save')));
       await tester.pumpAndSettle();
       expect(find.text('We booked the plumber'), findsOneWidget);
-      expect(find.textContaining('edited'), findsOneWidget);
+      expect(find.textContaining('EDITED'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('story-remove-i1')));
       await tester.pumpAndSettle();

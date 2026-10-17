@@ -23,6 +23,9 @@ Map<String, Object?> goal(
 
 Map<String, Object?> view({bool skipped = false}) => {
   'summary': '1 of 3 done.',
+  'done': 1,
+  'total': 3,
+  'nextGoalId': 'calendar',
   'goals': [
     goal('talk', done: true),
     goal('calendar', declined: skipped, destination: 'find-app'),
@@ -81,11 +84,11 @@ void main() {
     (tester) async {
       await show(tester);
 
-      expect(find.text('1 of 3 done.'), findsOneWidget);
+      expect(find.text('1 OF 3 DONE'), findsOneWidget);
       expect(find.byKey(const Key('setup-done-mark')), findsOneWidget);
     expect(find.text('Title talk'), findsOneWidget);
       expect(find.byKey(const Key('setup-act-talk')), findsNothing);
-      expect(find.byKey(const Key('setup-blocker-reminder')), findsOneWidget);
+      expect(find.textContaining('Needs sign-in'), findsOneWidget);
       expect(find.text('Sign in again'), findsOneWidget);
       expect(find.text('Not checked'), findsOneWidget);
       expect(find.byKey(const Key('setup-fix-push')), findsNothing);
@@ -112,7 +115,7 @@ void main() {
       expect(find.byKey(const Key('setup-skip-reminder')), findsNothing);
       await tester.tap(find.byKey(const Key('setup-skip-calendar')));
       await tester.pumpAndSettle();
-      expect(find.textContaining('skipped'), findsOneWidget);
+      expect(find.text('SKIPPED'), findsOneWidget);
       expect(find.byKey(const Key('setup-act-calendar')), findsNothing);
       await tester.tap(find.byKey(const Key('setup-reopen-calendar')));
       await tester.pumpAndSettle();

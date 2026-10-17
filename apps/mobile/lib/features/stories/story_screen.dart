@@ -6,7 +6,9 @@ import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
+import '../../ui/phosphor_icons.dart';
 
 /// One story: the moments in your words (edit, remove or reorder them without
 /// touching the records behind them), honest patterns with their limits, a
@@ -111,6 +113,15 @@ class _StoryScreenState extends State<StoryScreen> {
     }
   }
 
+  static const _kindIcons = {
+    'decision': PhosphorIconsRegular.gavel,
+    'task': PhosphorIconsRegular.checkCircle,
+    'journal': PhosphorIconsRegular.notebook,
+    'expense': PhosphorIconsRegular.wallet,
+    'contact': PhosphorIconsRegular.users,
+    'conversation': PhosphorIconsRegular.chatCircle,
+  };
+
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
@@ -120,6 +131,9 @@ class _StoryScreenState extends State<StoryScreen> {
     final counts = jsonObject(story['counts']) ?? const {};
     final note = asJsonString(story['patternsNote']);
     final reflection = asJsonString(story['reflection']);
+    final saved =
+        asJsonInt(story['savedVersion']) == asJsonInt(story['version']);
+    final kept = items.where((i) => i['removed'] != true).length;
     return Scaffold(
       appBar: AppBar(title: PageTitle(asJsonString(story['title']) ?? 'Story')),
       body: _loading
@@ -133,69 +147,81 @@ class _StoryScreenState extends State<StoryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        'Version ${asJsonInt(story['version'])}'
-                        '${asJsonInt(story['savedVersion']) == asJsonInt(story['version']) ? ' · saved privately to your Library' : ' · not saved yet'}',
-                        key: const Key('story-version'),
-                        style: TextStyle(color: colors.muted),
-                      ),
-                      if (counts.isNotEmpty)
-                        Text(
-                          counts.entries
-                              .map((e) => '${e.value} ${e.key}')
-                              .join(' · '),
-                          key: const Key('story-counts'),
-                          style: TextStyle(color: colors.inkSoft, fontSize: 13),
-                        ),
-                      const SizedBox(height: 8),
-                      if (items.isEmpty)
-                        const Text(
-                          'Nothing was recorded in this period.',
-                          key: Key('story-empty'),
-                        ),
-                      for (final item in items) _item(item, colors),
-                      if (patterns.isNotEmpty || note != null)
-                        const SectionHeader('Patterns'),
-                      for (final pattern in patterns)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: SurfaceCard(
-                            key: const Key('story-pattern'),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  asJsonString(pattern['headline']) ?? '',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                Text(asJsonString(pattern['detail']) ?? ''),
-                                Text(
-                                  asJsonString(pattern['limits']) ?? '',
-                                  style: TextStyle(
-                                    color: colors.muted,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
+                      FadeSlideIn(
+                        child: HeroCard(
+                          label:
+                              '${asJsonString(story['from']) ?? ''} – ${asJsonString(story['to']) ?? ''}',
+                          title: items.isEmpty
+                              ? 'Nothing recorded'
+                              : '$kept moment${kept == 1 ? '' : 's'}',
+                          subtitle: counts.isEmpty
+                              ? null
+                              : counts.entries
+                                    .map((e) => '${e.value} ${e.key}')
+                                    .join(' · '),
+                          footer: Text(
+                            'Version ${asJsonInt(story['version'])} · ${saved ? 'saved privately to your Library' : 'not saved yet'}',
+                            key: const Key('story-version'),
+                            style: TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 13,
+                              color: colors.onInk.withValues(alpha: .6),
                             ),
                           ),
                         ),
+                      ),
+                      if (counts.isNotEmpty)
+                        const SizedBox.shrink(key: Key('story-counts')),
+                      const GroupLabel('Moments'),
+                      if (items.isEmpty)
+                        const EmptyState(
+                          key: Key('story-empty'),
+                          icon: PhosphorIconsRegular.notebook,
+                          title: 'Nothing was recorded in this period',
+                          message: 'Try a longer period.',
+                        ),
+                      for (var i = 0; i < items.length; i++) _item(items[i], i),
+                      if (patterns.isNotEmpty || note != null)
+                        const GroupLabel('Patterns'),
+                      for (var i = 0; i < patterns.length; i++)
+                        FeatureRow(
+                          key: const Key('story-pattern'),
+                          index: i,
+                          icon: PhosphorIconsRegular.chartLine,
+                          title: asJsonString(patterns[i]['headline']) ?? '',
+                          subtitle:
+                              '${asJsonString(patterns[i]['detail']) ?? ''}\n${asJsonString(patterns[i]['limits']) ?? ''}',
+                        ),
                       if (note != null)
-                        Text(
-                          note,
+                        FeatureRow(
                           key: const Key('story-patterns-note'),
-                          style: TextStyle(color: colors.muted),
+                          icon: PhosphorIconsRegular.info,
+                          title: 'No patterns yet',
+                          subtitle: note,
+                          quiet: true,
                         ),
                       if (reflection != null) ...[
-                        const SectionHeader('One thing to think about'),
-                        Text(reflection, key: const Key('story-reflection')),
+                        const GroupLabel('One thing to think about'),
+                        FeatureRow(
+                          key: const Key('story-reflection'),
+                          icon: PhosphorIconsRegular.lightbulb,
+                          title: reflection,
+                        ),
                       ],
-                      const SectionHeader('Share a copy'),
-                      const Text('Leave out:'),
+                      const GroupLabel('Share a copy'),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Text(
+                          'Leave out:',
+                          style: TextStyle(
+                            color: colors.inkSoft,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                      ),
                       Wrap(
                         spacing: 8,
+                        runSpacing: 8,
                         children: [
                           for (final entry in const {
                             'journal': 'Journal',
@@ -214,12 +240,16 @@ class _StoryScreenState extends State<StoryScreen> {
                             ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       Wrap(
-                        spacing: 8,
+                        spacing: 10,
+                        runSpacing: 10,
                         children: [
-                          FilledButton(
+                          PillAction(
                             key: const Key('story-save'),
+                            primary: true,
+                            icon: PhosphorIconsRegular.bookmarkSimple,
+                            label: 'Save to Library',
                             onPressed: _busy
                                 ? null
                                 : () => unawaited(
@@ -230,14 +260,14 @@ class _StoryScreenState extends State<StoryScreen> {
                                       done: 'Saved privately to your Library.',
                                     ),
                                   ),
-                            child: const Text('Save to Library'),
                           ),
-                          OutlinedButton(
+                          PillAction(
                             key: const Key('story-export'),
+                            icon: PhosphorIconsRegular.copy,
+                            label: 'Copy as Markdown',
                             onPressed: _busy
                                 ? null
                                 : () => unawaited(_copyExport()),
-                            child: const Text('Copy as Markdown'),
                           ),
                         ],
                       ),
@@ -249,87 +279,71 @@ class _StoryScreenState extends State<StoryScreen> {
     );
   }
 
-  Widget _item(Map<String, dynamic> item, JarvisColors colors) {
+  Widget _item(Map<String, dynamic> item, int index) {
     final id = asJsonString(item['id']) ?? '';
     final removed = item['removed'] == true;
+    final kind = asJsonString(item['kind']) ?? '';
     final edited =
         asJsonString(item['text']) != asJsonString(item['originalText']);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: SurfaceCard(
-        key: Key('story-item-$id'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${asJsonString(item['date']) ?? ''} · ${asJsonString(item['kind']) ?? ''}${edited ? ' · edited' : ''}',
-              style: TextStyle(color: colors.muted, fontSize: 12),
-            ),
-            Text(
-              asJsonString(item['text']) ?? '',
-              style: TextStyle(
-                decoration: removed ? TextDecoration.lineThrough : null,
-              ),
-            ),
-            Wrap(
-              spacing: 4,
-              children: [
-                TextButton(
-                  key: Key('story-edit-$id'),
-                  onPressed: _busy ? null : () => unawaited(_edit(item)),
-                  child: const Text('Edit'),
-                ),
-                TextButton(
-                  key: Key('story-remove-$id'),
-                  onPressed: _busy
-                      ? null
-                      : () => unawaited(
-                          _send(
-                            () => widget.http.put<dynamic>(
-                              '$_path/items/$id/removed',
-                              data: {'removed': !removed},
-                            ),
-                          ),
-                        ),
-                  child: Text(removed ? 'Put back' : 'Leave out'),
-                ),
-                IconButton(
-                  key: Key('story-up-$id'),
-                  tooltip: 'Move earlier in the story',
-                  icon: const Icon(Icons.arrow_upward, size: 18),
-                  onPressed: _busy
-                      ? null
-                      : () => unawaited(
-                          _send(
-                            () => widget.http.post<dynamic>(
-                              '$_path/items/$id/move',
-                              data: {'direction': 'up'},
-                            ),
-                          ),
-                        ),
-                ),
-                IconButton(
-                  key: Key('story-down-$id'),
-                  tooltip: 'Move later in the story',
-                  icon: const Icon(Icons.arrow_downward, size: 18),
-                  onPressed: _busy
-                      ? null
-                      : () => unawaited(
-                          _send(
-                            () => widget.http.post<dynamic>(
-                              '$_path/items/$id/move',
-                              data: {'direction': 'down'},
-                            ),
-                          ),
-                        ),
-                ),
-              ],
-            ),
-          ],
-        ),
+    return FeatureRow(
+      key: Key('story-item-$id'),
+      index: index,
+      icon: _kindIcons[kind] ?? PhosphorIconsRegular.circle,
+      caption:
+          '${asJsonString(item['date']) ?? ''} · $kind${edited ? ' · edited' : ''}',
+      title: asJsonString(item['text']) ?? '',
+      quiet: removed,
+      strike: removed,
+      trailing: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleIconButton(
+            key: Key('story-up-$id'),
+            tooltip: 'Move earlier in the story',
+            icon: Icons.arrow_upward,
+            size: 36,
+            onPressed: _busy ? null : () => unawaited(_move(id, 'up')),
+          ),
+          CircleIconButton(
+            key: Key('story-down-$id'),
+            tooltip: 'Move later in the story',
+            icon: Icons.arrow_downward,
+            size: 36,
+            onPressed: _busy ? null : () => unawaited(_move(id, 'down')),
+          ),
+        ],
       ),
+      actions: [
+        PillAction(
+          key: Key('story-edit-$id'),
+          icon: PhosphorIconsRegular.pencilSimple,
+          label: 'Edit',
+          onPressed: _busy ? null : () => unawaited(_edit(item)),
+        ),
+        PillAction(
+          key: Key('story-remove-$id'),
+          label: removed ? 'Put back' : 'Leave out',
+          onPressed: _busy
+              ? null
+              : () => unawaited(
+                  _send(
+                    () => widget.http.put<dynamic>(
+                      '$_path/items/$id/removed',
+                      data: {'removed': !removed},
+                    ),
+                  ),
+                ),
+        ),
+      ],
     );
   }
+
+  Future<void> _move(String id, String direction) => _send(
+    () => widget.http.post<dynamic>(
+      '$_path/items/$id/move',
+      data: {'direction': direction},
+    ),
+  );
 }
 
 class _EditDialog extends StatefulWidget {

@@ -7,7 +7,9 @@ import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
+import '../../ui/phosphor_icons.dart';
 
 /// Getting started in plain words: what is done, what is next, what you chose
 /// to skip, and which connection is not ready, with the page that fixes it.
@@ -132,12 +134,22 @@ class _SetupScreenState extends State<SetupScreen> {
     }
   }
 
+  static const _goalIcons = {
+    'talk': PhosphorIconsRegular.chatCircle,
+    'reminder': PhosphorIconsRegular.alarm,
+    'calendar': PhosphorIconsRegular.calendarBlank,
+    'source': PhosphorIconsRegular.bookmarkSimple,
+    'brief': PhosphorIconsRegular.sunHorizon,
+  };
+
   @override
   Widget build(BuildContext context) {
-    final colors = JarvisColors.of(context);
     final view = _view ?? const <String, dynamic>{};
     final goals = jsonMaps(view['goals']);
     final capabilities = jsonMaps(view['capabilities']);
+    final done = asJsonInt(view['done']);
+    final total = asJsonInt(view['total']);
+    final next = goals.where((g) => g['id'] == view['nextGoalId']).firstOrNull;
     return Scaffold(
       appBar: AppBar(title: const PageTitle('Getting started')),
       body: _loading
@@ -151,26 +163,35 @@ class _SetupScreenState extends State<SetupScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        asJsonString(view['summary']) ?? '',
-                        key: const Key('setup-summary'),
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                      FadeSlideIn(
+                        child: KeyedSubtree(
+                          key: const Key('setup-summary'),
+                          child: HeroCard(
+                            label: '$done of $total done',
+                            title: next == null
+                                ? 'You are set up'
+                                : asJsonString(next['title']) ?? 'Next step',
+                            subtitle: next == null
+                                ? 'Anything you skipped can be turned on later.'
+                                : asJsonString(next['why']),
+                            segments: total,
+                            doneSegments: done,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      for (final goal in goals) _goal(goal, colors),
-                      const SectionHeader('What is connected'),
-                      for (final capability in capabilities)
-                        _capability(capability, colors),
+                      const GroupLabel('Your first steps'),
+                      for (var i = 0; i < goals.length; i++) _goal(goals[i], i),
+                      const GroupLabel('What is connected'),
+                      for (var i = 0; i < capabilities.length; i++)
+                        _capability(capabilities[i], i),
                       const SizedBox(height: 8),
                       Align(
                         alignment: Alignment.centerLeft,
-                        child: TextButton(
+                        child: PillAction(
                           key: const Key('setup-support'),
+                          icon: PhosphorIconsRegular.shieldCheck,
+                          label: 'Review a support report',
                           onPressed: _supportBundle,
-                          child: const Text('Review a support report'),
                         ),
                       ),
                     ],
@@ -181,82 +202,66 @@ class _SetupScreenState extends State<SetupScreen> {
     );
   }
 
-  Widget _goal(Map<String, dynamic> goal, JarvisColors colors) {
+  Widget _goal(Map<String, dynamic> goal, int index) {
     final id = asJsonString(goal['id']) ?? '';
     final done = goal['done'] == true;
     final declined = goal['declined'] == true;
     final blocker = asJsonString(goal['blocker']);
     final optional = const {'calendar', 'source', 'brief'}.contains(id);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: SurfaceCard(
-        key: Key('setup-goal-$id'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (done)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 6, top: 2),
-                    child: Icon(
-                      Icons.check_circle_outline,
-                      size: 18,
-                      key: Key('setup-done-mark'),
-                    ),
-                  ),
-                Expanded(
-                  child: Text(
-                    '${asJsonString(goal['title']) ?? ''}${declined ? ' · skipped' : ''}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
+    final colors = JarvisColors.of(context);
+    return FeatureRow(
+      key: Key('setup-goal-$id'),
+      index: index,
+      icon: done
+          ? PhosphorIconsRegular.checkCircle
+          : _goalIcons[id] ?? PhosphorIconsRegular.circle,
+      badgeColor: done ? colors.accent : colors.ink,
+      quiet: declined,
+      caption: declined
+          ? 'Skipped'
+          : done
+          ? 'Done'
+          : null,
+      title: asJsonString(goal['title']) ?? '',
+      subtitle: blocker != null && !done
+          ? '${asJsonString(goal['why']) ?? ''}\n$blocker'
+          : asJsonString(goal['why']),
+      actions: done
+          ? null
+          : [
+              if (!declined)
+                PillAction(
+                  key: Key('setup-act-$id'),
+                  primary: asJsonString(goal['id']) == _nextId,
+                  label: asJsonString(goal['action']) ?? 'Open',
+                  onPressed: () => unawaited(_act(goal)),
                 ),
-              ],
-            ),
-            Text(
-              asJsonString(goal['why']) ?? '',
-              style: TextStyle(color: colors.inkSoft),
-            ),
-            if (blocker != null && !done)
-              Text(
-                blocker,
-                key: Key('setup-blocker-$id'),
-                style: TextStyle(color: colors.muted, fontSize: 13),
-              ),
-            if (!done)
-              Wrap(
-                spacing: 8,
-                children: [
-                  if (!declined)
-                    TextButton(
-                      key: Key('setup-act-$id'),
-                      onPressed: () => unawaited(_act(goal)),
-                      child: Text(asJsonString(goal['action']) ?? 'Open'),
-                    ),
-                  if (optional && !declined)
-                    TextButton(
-                      key: Key('setup-skip-$id'),
-                      onPressed: () => unawaited(_choose(id, 'decline')),
-                      child: const Text('Not for me'),
-                    ),
-                  if (declined)
-                    TextButton(
-                      key: Key('setup-reopen-$id'),
-                      onPressed: () => unawaited(_choose(id, 'reopen')),
-                      child: const Text('Bring back'),
-                    ),
-                ],
-              ),
-          ],
-        ),
-      ),
+              if (optional && !declined)
+                PillAction(
+                  key: Key('setup-skip-$id'),
+                  label: 'Not for me',
+                  onPressed: () => unawaited(_choose(id, 'decline')),
+                ),
+              if (declined)
+                PillAction(
+                  key: Key('setup-reopen-$id'),
+                  label: 'Bring back',
+                  onPressed: () => unawaited(_choose(id, 'reopen')),
+                ),
+            ],
+      trailing: done
+          ? const Icon(Icons.check, size: 18, key: Key('setup-done-mark'))
+          : null,
     );
   }
 
-  Widget _capability(Map<String, dynamic> capability, JarvisColors colors) {
+  String? get _nextId => asJsonString(_view?['nextGoalId']);
+
+  Widget _capability(Map<String, dynamic> capability, int index) {
+    final colors = JarvisColors.of(context);
     final status = asJsonString(capability['status']) ?? '';
     final destination = asJsonString(capability['destination']);
+    final ready = status == 'ready';
     final label = switch (status) {
       'ready' => 'Ready',
       'not_connected' => 'Not connected',
@@ -264,48 +269,36 @@ class _SetupScreenState extends State<SetupScreen> {
       'unavailable' => 'Unavailable',
       _ => 'Not checked',
     };
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: SurfaceCard(
-        key: Key('setup-capability-${capability['id']}'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(
-                  asJsonString(capability['title']) ?? '',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: status == 'ready' ? colors.inkSoft : colors.muted,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-            Text(asJsonString(capability['detail']) ?? ''),
-            if (destination != null)
-              TextButton(
-                key: Key('setup-fix-${capability['id']}'),
-                onPressed: () {
-                  final page = widget.pageFor(destination);
-                  if (page != null) {
-                    unawaited(
-                      Navigator.of(context)
-                          .push<void>(MaterialPageRoute(builder: (_) => page)),
-                    );
-                  }
-                },
-                child: const Text('Open'),
-              ),
-          ],
-        ),
+    return FeatureRow(
+      key: Key('setup-capability-${capability['id']}'),
+      index: index,
+      icon: switch (capability['id']) {
+        'model' => PhosphorIconsRegular.brain,
+        'calendar' => PhosphorIconsRegular.calendarBlank,
+        'brief' => PhosphorIconsRegular.sunHorizon,
+        _ => PhosphorIconsRegular.bell,
+      },
+      title: asJsonString(capability['title']) ?? '',
+      subtitle: asJsonString(capability['detail']),
+      trailing: StatusPill(
+        label: label,
+        color: ready
+            ? colors.accent
+            : status == 'needs_reauth'
+            ? colors.warning
+            : colors.muted,
       ),
+      onTap: destination == null
+          ? null
+          : () {
+              final page = widget.pageFor(destination);
+              if (page != null) {
+                unawaited(
+                  Navigator.of(context)
+                      .push<void>(MaterialPageRoute(builder: (_) => page)),
+                );
+              }
+            },
     );
   }
 }
