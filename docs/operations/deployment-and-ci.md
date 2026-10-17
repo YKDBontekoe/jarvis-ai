@@ -38,6 +38,14 @@ the server's Codex CLI happens in the app (`/api/v1/settings/models/codex/sign-i
 
 Bootstrap and deploy scripts: `scripts/deploy/remote-up.sh` (generate, pull, migrate, replace, health-check), `scripts/deploy/publish-compose.sh`, `scripts/deploy/compose-env.sh`.
 
+Before replacing the API and worker, the deploy starts the Temporal prerequisites and waits for
+`temporal-namespace` to exit successfully. A failure prints the schema/server/namespace logs and stops the deploy
+with the existing application containers intact. Temporal's RPC listeners explicitly bind `0.0.0.0` inside the
+container: it has both an application and a database interface, and automatic IP selection can choose the latter,
+making the frontend unreachable from the API and namespace job. No Temporal ports are published on the host.
+The AppHost includes the static config's SHA-256 in `JARVIS_TEMPORAL_CONFIG_SHA256`, so changing the mounted config
+causes Compose to recreate Temporal and actually apply it; changing a bind-mounted file alone does not restart it.
+
 The migration command applies all missing migrations through the latest migration in
 the image. Migration timestamps can arrive out of order when feature branches merge;
 the last pending migration must never be used as a target because EF would revert

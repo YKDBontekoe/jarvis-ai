@@ -33,15 +33,20 @@ persistence:
 global:
   membership:
     maxJoinDuration: 30s
+    # All roles run in this one container. Explicit advertisement is required with wildcard listeners;
+    # their internal membership/RPC traffic can use loopback while clients use the application network.
+    broadcastAddress: "127.0.0.1"
 services:
+  # The server has application and database interfaces. Without an explicit bind it chooses only one,
+  # which may be the database network and unreachable to the namespace step, API, worker and UI.
   frontend:
-    rpc: { grpcPort: 7233, membershipPort: 6933, httpPort: 7243 }
+    rpc: { grpcPort: 7233, membershipPort: 6933, httpPort: 7243, bindOnIP: "0.0.0.0" }
   matching:
-    rpc: { grpcPort: 7235, membershipPort: 6935 }
+    rpc: { grpcPort: 7235, membershipPort: 6935, bindOnIP: "0.0.0.0" }
   history:
-    rpc: { grpcPort: 7234, membershipPort: 6934 }
+    rpc: { grpcPort: 7234, membershipPort: 6934, bindOnIP: "0.0.0.0" }
   worker:
-    rpc: { grpcPort: 7239, membershipPort: 6939 }
+    rpc: { grpcPort: 7239, membershipPort: 6939, bindOnIP: "0.0.0.0" }
 clusterMetadata:
   enableGlobalNamespace: false
   failoverVersionIncrement: 10
