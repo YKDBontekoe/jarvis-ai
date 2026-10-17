@@ -117,6 +117,7 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 | `RightNowCard`, `showWhySheet` | `features/home/right_now_card.dart` | The one leading card on Home |
 | `NeedsYouCard` | `features/home/needs_you_card.dart` | Things waiting on the owner |
 | `NoticedCard`, `EveningCard`, `DayOneCard`, `BriefCard`, `AskBar` | `features/home/` | Home sections |
+| `HeroCard`, `FeatureRow`, `PillAction`, `GroupLabel`, `SoftButton`, `InkButton` | `ui/feature_kit.dart` | The vocabulary for feature screens. One `HeroCard` (ink card, caps label, headline, optional segmented progress, footer) leads the screen; everything under it is `FeatureRow`s (icon badge, caps caption, title, detail, trailing, pill actions; entrance stagger; stacks under the text at large sizes) grouped by a `GroupLabel` (caps, optional count). Actions are `PillAction` (ink when primary, tonal otherwise, `compact` for several per row, `onDark` on a hero). Never bare `TextButton`s in cards. |
 | `PersonPanel` | `features/whatsapp/person_panel.dart` | About a person, beside a chat on wide screens |
 
 ## 7. Patterns

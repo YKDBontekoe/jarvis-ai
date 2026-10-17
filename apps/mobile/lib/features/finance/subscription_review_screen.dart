@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 import '../../json_maps.dart';
 import '../search/context_commands.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
+import '../../ui/phosphor_icons.dart';
 import '../comparisons/comparison_screen.dart';
 import 'negotiate_sheet.dart';
 
@@ -31,7 +33,8 @@ class SubscriptionReviewScreen extends StatefulWidget {
       _SubscriptionReviewScreenState();
 }
 
-class _SubscriptionReviewScreenState extends State<SubscriptionReviewScreen> with PaletteContextMixin<SubscriptionReviewScreen> {
+class _SubscriptionReviewScreenState extends State<SubscriptionReviewScreen>
+    with PaletteContextMixin<SubscriptionReviewScreen> {
   @override
   String get paletteContextValue => 'subscription:${widget.subscriptionId}';
 
@@ -248,106 +251,93 @@ class _SubscriptionReviewScreenState extends State<SubscriptionReviewScreen> wit
                               ? 'Cancelled${asJsonString(_review['cancelEvidence']) == null ? '' : ': ${_review['cancelEvidence']}'}'
                               : 'Not tracked as a subscription.',
                         ),
-                      const SectionHeader('What the records show'),
-                      SurfaceCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      const GroupLabel('What the records show'),
+                      for (final (i, fact) in jsonStrings(
+                        _view?['facts'],
+                      ).indexed)
+                        FeatureRow(
+                          key: Key('review-fact-$i'),
+                          index: i,
+                          icon: PhosphorIconsRegular.receipt,
+                          title: fact,
+                        ),
+                      if (_view?['quiet'] == true)
+                        FeatureRow(
+                          key: const Key('review-quiet'),
+                          icon: PhosphorIconsRegular.bellSlash,
+                          quiet: true,
+                          title: 'You chose to keep it; Jarvis is quiet about it for now.',
+                        ),
+                      if (saving != null)
+                        FeatureRow(
+                          key: const Key('review-saving'),
+                          index: 3,
+                          icon: PhosphorIconsRegular.trendDown,
+                          title: asJsonString(saving['basis']) ?? '',
+                        ),
+                      if (status == 'active') ...[
+                        const GroupLabel('What would you like to do?'),
+                        for (final (i, path) in paths.indexed)
+                          _pathCard(path, i),
+                        const GroupLabel('Along the way'),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
                           children: [
-                            for (final fact in jsonStrings(_view?['facts']))
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Text(
-                                  fact,
-                                  key: const Key('review-fact'),
-                                ),
-                              ),
-                            if (_view?['quiet'] == true)
-                              Text(
-                                'You chose to keep it; Jarvis is quiet about it for now.',
-                                key: const Key('review-quiet'),
-                                style: TextStyle(
-                                  color: colors.muted,
-                                  fontSize: 13,
-                                ),
-                              ),
+                            PillAction(
+                              key: const Key('review-pack-price'),
+                              icon: PhosphorIconsRegular.fileText,
+                              label: 'Price pack',
+                              onPressed: _busy
+                                  ? null
+                                  : () => unawaited(_pack('lower_price')),
+                            ),
+                            PillAction(
+                              key: const Key('review-pack-cancel'),
+                              icon: PhosphorIconsRegular.fileText,
+                              label: 'Cancellation pack',
+                              onPressed: _busy
+                                  ? null
+                                  : () => unawaited(_pack('cancel')),
+                            ),
+                            PillAction(
+                              key: const Key('review-follow-up'),
+                              icon: PhosphorIconsRegular.arrowBendUpLeft,
+                              label: _review['followUpCommitmentId'] == null
+                                  ? 'Track their reply'
+                                  : 'Their reply is tracked',
+                              onPressed: _busy
+                                  ? null
+                                  : () => unawaited(_followUp()),
+                            ),
+                            PillAction(
+                              key: const Key('review-confirm-price'),
+                              label: 'I have a lower price',
+                              onPressed: _busy
+                                  ? null
+                                  : () => unawaited(_confirmPrice()),
+                            ),
+                            PillAction(
+                              key: const Key('review-confirm-cancel'),
+                              label: 'They confirmed the cancellation',
+                              onPressed: _busy
+                                  ? null
+                                  : () => unawaited(_confirmCancel()),
+                            ),
                           ],
                         ),
-                      ),
-                      if (saving != null) ...[
-                        const SizedBox(height: 12),
-                        SurfaceCard(
-                          key: const Key('review-saving'),
-                          child: Text(asJsonString(saving['basis']) ?? ''),
-                        ),
-                      ],
-                      if (status == 'active') ...[
-                        const SizedBox(height: 16),
-                        const SectionHeader('What would you like to do?'),
-                        for (final path in paths) _pathCard(path, colors),
-                        const SizedBox(height: 16),
-                        const SectionHeader('Along the way'),
-                        SurfaceCard(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Wrap(
-                                spacing: 4,
-                                children: [
-                                  TextButton(
-                                    key: const Key('review-pack-price'),
-                                    onPressed: _busy
-                                        ? null
-                                        : () => unawaited(_pack('lower_price')),
-                                    child: const Text('Price pack'),
-                                  ),
-                                  TextButton(
-                                    key: const Key('review-pack-cancel'),
-                                    onPressed: _busy
-                                        ? null
-                                        : () => unawaited(_pack('cancel')),
-                                    child: const Text('Cancellation pack'),
-                                  ),
-                                  TextButton(
-                                    key: const Key('review-follow-up'),
-                                    onPressed: _busy
-                                        ? null
-                                        : () => unawaited(_followUp()),
-                                    child: Text(
-                                      _review['followUpCommitmentId'] == null
-                                          ? 'Track their reply'
-                                          : 'Their reply is tracked',
-                                    ),
-                                  ),
-                                  TextButton(
-                                    key: const Key('review-confirm-price'),
-                                    onPressed: _busy
-                                        ? null
-                                        : () => unawaited(_confirmPrice()),
-                                    child: const Text('I have a lower price'),
-                                  ),
-                                  TextButton(
-                                    key: const Key('review-confirm-cancel'),
-                                    onPressed: _busy
-                                        ? null
-                                        : () => unawaited(_confirmCancel()),
-                                    child: const Text(
-                                      'They confirmed the cancellation',
-                                    ),
-                                  ),
-                                ],
+                        if (_review['libraryItemId'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: Text(
+                              'A pack is saved in your Library.',
+                              key: const Key('review-pack-saved'),
+                              style: TextStyle(
+                                color: colors.muted,
+                                fontSize: 13,
                               ),
-                              if (_review['libraryItemId'] != null)
-                                Text(
-                                  'A pack is saved in your Library.',
-                                  key: const Key('review-pack-saved'),
-                                  style: TextStyle(
-                                    color: colors.muted,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                            ],
+                            ),
                           ),
-                        ),
                       ],
                     ],
                   ),
@@ -357,35 +347,29 @@ class _SubscriptionReviewScreenState extends State<SubscriptionReviewScreen> wit
     );
   }
 
-  Widget _pathCard(Map<String, dynamic> path, JarvisColors colors) {
+  Widget _pathCard(Map<String, dynamic> path, int index) {
     final id = asJsonString(path['id']) ?? '';
     final chosen = _review['choice'] == id;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: SurfaceCard(
-        key: Key('review-path-$id'),
-        onTap: _busy
-            ? null
-            : () => unawaited(switch (id) {
-                'investigate' => _compare(),
-                'negotiate' || 'cancel' => _negotiate(),
-                _ => _choose(id),
-              }),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${asJsonString(path['label']) ?? ''}${chosen ? ' · your choice' : ''}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              asJsonString(path['nextAction']) ?? '',
-              style: TextStyle(color: colors.inkSoft, fontSize: 13.5),
-            ),
-          ],
-        ),
-      ),
+    return FeatureRow(
+      key: Key('review-path-$id'),
+      index: index,
+      icon: switch (id) {
+        'keep' => PhosphorIconsRegular.checkCircle,
+        'investigate' => PhosphorIconsRegular.magnifyingGlass,
+        'negotiate' => PhosphorIconsRegular.chatText,
+        _ => PhosphorIconsRegular.xCircle,
+      },
+      caption: chosen ? 'Your choice' : null,
+      title: asJsonString(path['label']) ?? '',
+      subtitle: asJsonString(path['nextAction']),
+      trailing: const Icon(Icons.chevron_right, size: 20),
+      onTap: _busy
+          ? null
+          : () => unawaited(switch (id) {
+              'investigate' => _compare(),
+              'negotiate' || 'cancel' => _negotiate(),
+              _ => _choose(id),
+            }),
     );
   }
 }

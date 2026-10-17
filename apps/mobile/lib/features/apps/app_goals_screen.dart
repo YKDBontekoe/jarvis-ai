@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../integrations/integrations_screen.dart';
@@ -185,7 +186,8 @@ class _AppGoalsScreenState extends State<AppGoalsScreen> {
                     child: Text(_suggestion!),
                   )
                 else
-                  for (final goal in _goals) _card(goal, colors),
+                  for (var i = 0; i < _goals.length; i++)
+                    _card(_goals[i], i, colors),
               ],
             ),
           ),
@@ -194,7 +196,13 @@ class _AppGoalsScreenState extends State<AppGoalsScreen> {
     );
   }
 
-  Widget _card(Map<String, dynamic> goal, JarvisColors colors) {
+  static const _icons = {
+    'calendar': PhosphorIconsRegular.calendarBlank,
+    'mail': PhosphorIconsRegular.paperPlaneTilt,
+    'contacts': PhosphorIconsRegular.addressBook,
+  };
+
+  Widget _card(Map<String, dynamic> goal, int index, JarvisColors colors) {
     final id = asJsonString(goal['id']) ?? '';
     final ready = goal['status'] == 'ready';
     final capabilities = jsonObject(goal['capabilities']) ?? const {};
@@ -202,91 +210,85 @@ class _AppGoalsScreenState extends State<AppGoalsScreen> {
     final events = _events[id];
     String line(String label, List<String> items) =>
         items.isEmpty ? '' : '$label: ${items.join(', ')}';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: SurfaceCard(
-        key: Key('app-goal-$id'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    final facts = [
+      line('Reads', jsonStrings(capabilities['reads'])),
+      line('Prepares', jsonStrings(capabilities['prepares'])),
+      line('Changes', jsonStrings(capabilities['changes'])),
+      asJsonString(capabilities['needs']) ?? '',
+    ].where((text) => text.isNotEmpty);
+    return FeatureRow(
+      key: Key('app-goal-$id'),
+      index: index,
+      icon: _icons[id] ?? PhosphorIconsRegular.plugsConnected,
+      title: asJsonString(goal['title']) ?? '',
+      caption: ready ? 'Connected' : 'Not connected',
+      subtitle: asJsonString(goal['purpose']),
+      extra: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final fact in facts)
             Text(
-              asJsonString(goal['title']) ?? '',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              asJsonString(goal['purpose']) ?? '',
-              style: TextStyle(color: colors.inkSoft),
-            ),
-            const SizedBox(height: 8),
-            for (final text in [
-              line('Reads', jsonStrings(capabilities['reads'])),
-              line('Prepares', jsonStrings(capabilities['prepares'])),
-              line('Changes', jsonStrings(capabilities['changes'])),
-            ])
-              if (text.isNotEmpty)
-                Text(text, style: TextStyle(color: colors.muted, fontSize: 13)),
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                asJsonString(capabilities['needs']) ?? '',
-                style: TextStyle(color: colors.muted, fontSize: 13),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              asJsonString(goal['nextStep']) ?? '',
-              key: Key('app-goal-next-$id'),
+              fact,
               style: TextStyle(
-                color: ready ? colors.success : colors.ink,
-                fontWeight: FontWeight.w600,
+                fontFamily: 'Geist',
+                color: colors.muted,
+                fontSize: 13,
+                height: 1.35,
               ),
             ),
-            if (events != null)
-              Padding(
-                key: Key('app-goal-events-$id'),
-                padding: const EdgeInsets.only(top: 8),
-                child: events.isEmpty
-                    ? Text(
-                        'Nothing on today.',
-                        style: TextStyle(color: colors.inkSoft),
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          for (final event in events)
-                            Text('· ${asJsonString(event['title']) ?? ''}'),
-                        ],
-                      ),
-              ),
-            Wrap(
-              spacing: 4,
-              children: [
-                if (!ready)
-                  FilledButton(
-                    key: Key('app-goal-connect-$id'),
-                    onPressed: () => unawaited(_connect()),
-                    child: const Text('Connect'),
-                  ),
-                if (ready && tryAction != null)
-                  FilledButton.tonal(
-                    key: Key('app-goal-try-$id'),
-                    onPressed: _busy.contains(id)
-                        ? null
-                        : () => unawaited(_try(goal)),
-                    child: Text(asJsonString(tryAction['label']) ?? 'Try it'),
-                  ),
-                if (ready)
-                  TextButton(
-                    key: Key('app-goal-pin-$id'),
-                    onPressed: () => unawaited(_pin(goal)),
-                    child: Text(goal['pinned'] == true ? 'Unpin' : 'Pin this'),
-                  ),
-              ],
+          const SizedBox(height: 6),
+          Text(
+            asJsonString(goal['nextStep']) ?? '',
+            key: Key('app-goal-next-$id'),
+            style: TextStyle(
+              fontFamily: 'Geist',
+              color: ready ? colors.accent : colors.ink,
+              fontWeight: FontWeight.w600,
             ),
-          ],
-        ),
+          ),
+          if (events != null)
+            Padding(
+              key: Key('app-goal-events-$id'),
+              padding: const EdgeInsets.only(top: 8),
+              child: events.isEmpty
+                  ? Text(
+                      'Nothing on today.',
+                      style: TextStyle(color: colors.inkSoft),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final event in events)
+                          Text('· ${asJsonString(event['title']) ?? ''}'),
+                      ],
+                    ),
+            ),
+        ],
       ),
+      actions: [
+        if (!ready)
+          PillAction(
+            key: Key('app-goal-connect-$id'),
+            primary: true,
+            icon: PhosphorIconsRegular.plugsConnected,
+            label: 'Connect',
+            onPressed: () => unawaited(_connect()),
+          ),
+        if (ready && tryAction != null)
+          PillAction(
+            key: Key('app-goal-try-$id'),
+            primary: true,
+            label: asJsonString(tryAction['label']) ?? 'Try it',
+            onPressed: _busy.contains(id) ? null : () => unawaited(_try(goal)),
+          ),
+        if (ready)
+          PillAction(
+            key: Key('app-goal-pin-$id'),
+            icon: PhosphorIconsRegular.pushPin,
+            label: goal['pinned'] == true ? 'Unpin' : 'Pin this',
+            onPressed: () => unawaited(_pin(goal)),
+          ),
+      ],
     );
   }
 }

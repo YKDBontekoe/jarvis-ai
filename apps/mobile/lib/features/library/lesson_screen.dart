@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
+import '../../ui/phosphor_icons.dart';
 
 /// A short lesson built only from one saved item: quoted sentences with
 /// where they came from, fill-in questions and an explain-it-back prompt that
@@ -86,7 +88,9 @@ class _LessonScreenState extends State<LessonScreen> {
       });
     } on DioException catch (error) {
       if (mounted) {
-        _toast(firstProblemMessage(error.response?.data) ?? 'Could not check that.');
+        _toast(
+          firstProblemMessage(error.response?.data) ?? 'Could not check that.',
+        );
       }
     } finally {
       if (mounted) setState(() => _checking.remove(id));
@@ -111,7 +115,10 @@ class _LessonScreenState extends State<LessonScreen> {
       setState(_keep.clear);
     } on DioException catch (error) {
       if (mounted) {
-        _toast(firstProblemMessage(error.response?.data) ?? 'Could not keep those cards.');
+        _toast(
+          firstProblemMessage(error.response?.data) ??
+              'Could not keep those cards.',
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -123,7 +130,9 @@ class _LessonScreenState extends State<LessonScreen> {
     final colors = JarvisColors.of(context);
     final lesson = _lesson;
     return Scaffold(
-      appBar: AppBar(title: PageTitle(asJsonString(lesson?['title']) ?? 'Lesson')),
+      appBar: AppBar(
+        title: PageTitle(asJsonString(lesson?['title']) ?? 'Lesson'),
+      ),
       body: _loading
           ? const SkeletonList()
           : _error != null
@@ -135,35 +144,47 @@ class _LessonScreenState extends State<LessonScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        'About ${asJsonInt(lesson?['minutes'])} minutes',
-                        style: TextStyle(color: colors.muted),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(asJsonString(lesson?['overview']) ?? ''),
-                      const SizedBox(height: 8),
-                      Text(
-                        asJsonString(lesson?['note']) ?? '',
-                        key: const Key('lesson-note'),
-                        style: TextStyle(color: colors.muted, fontSize: 13),
-                      ),
-                      const SectionHeader('From your text'),
-                      for (final point in jsonMaps(lesson?['points']))
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: SurfaceCard(
-                            child: Text('“${asJsonString(point['text']) ?? ''}”'),
+                      FadeSlideIn(
+                        child: HeroCard(
+                          label:
+                              'About ${asJsonInt(lesson?['minutes'])} minutes',
+                          title: asJsonString(lesson?['overview']) ?? '',
+                          footer: Text(
+                            asJsonString(lesson?['note']) ?? '',
+                            key: const Key('lesson-note'),
+                            style: TextStyle(
+                              fontFamily: 'Geist',
+                              color: colors.onInk.withValues(alpha: .62),
+                              fontSize: 13,
+                              height: 1.35,
+                            ),
                           ),
                         ),
-                      const SectionHeader('Check yourself'),
+                      ),
+                      const GroupLabel('From your text'),
+                      for (final (i, point) in jsonMaps(
+                        lesson?['points'],
+                      ).indexed)
+                        FeatureRow(
+                          index: i,
+                          icon: PhosphorIconsRegular.bookmarkSimple,
+                          title: '“${asJsonString(point['text']) ?? ''}”',
+                        ),
+                      const GroupLabel('Check yourself'),
                       for (final question in jsonMaps(lesson?['questions']))
                         _question(question, colors),
                       if (_keep.isNotEmpty)
-                        FilledButton(
-                          key: const Key('lesson-keep-cards'),
-                          onPressed: _saving ? null : () => unawaited(_saveCards()),
-                          child: Text(
-                            'Keep ${_keep.length} card${_keep.length == 1 ? '' : 's'} for review',
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: PillAction(
+                            key: const Key('lesson-keep-cards'),
+                            primary: true,
+                            icon: PhosphorIconsRegular.bookmarkSimple,
+                            label:
+                                'Keep ${_keep.length} card${_keep.length == 1 ? '' : 's'} for review',
+                            onPressed: _saving
+                                ? null
+                                : () => unawaited(_saveCards()),
                           ),
                         ),
                     ],
@@ -206,9 +227,11 @@ class _LessonScreenState extends State<LessonScreen> {
             ),
             Align(
               alignment: Alignment.centerLeft,
-              child: TextButton(
+              child: SoftButton(
                 key: Key('lesson-check-$id'),
-                onPressed: _checking.contains(id) ? null : () => unawaited(_check(id)),
+                onPressed: _checking.contains(id)
+                    ? null
+                    : () => unawaited(_check(id)),
                 child: const Text('Check'),
               ),
             ),
@@ -223,7 +246,7 @@ class _LessonScreenState extends State<LessonScreen> {
                 style: TextStyle(color: colors.inkSoft, fontSize: 13),
               ),
               if (verdict != 'correct' && verdict != 'unsure')
-                TextButton(
+                SoftButton(
                   key: Key('lesson-correct-$id'),
                   onPressed: () => setState(() => _corrected.add(id)),
                   child: const Text('I was right, correct this'),

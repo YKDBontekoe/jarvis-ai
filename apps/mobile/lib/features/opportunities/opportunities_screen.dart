@@ -170,9 +170,9 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
                       ],
                       if (_history.isNotEmpty) ...[
                         const GroupLabel('You found these useful'),
-                        for (final entry in _history.take(5))
+                        for (final (i, entry) in _history.take(5).indexed)
                           FeatureRow(
-                            key: const Key('opportunity-history'),
+                            key: Key('opportunity-history-$i'),
                             icon: PhosphorIconsRegular.thumbsUp,
                             quiet: true,
                             title: asJsonString(entry['title']) ?? '',

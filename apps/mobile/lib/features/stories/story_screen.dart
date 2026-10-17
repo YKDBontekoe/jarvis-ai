@@ -185,7 +185,7 @@ class _StoryScreenState extends State<StoryScreen> {
                         const GroupLabel('Patterns'),
                       for (var i = 0; i < patterns.length; i++)
                         FeatureRow(
-                          key: const Key('story-pattern'),
+                          key: Key('story-pattern-$i'),
                           index: i,
                           icon: PhosphorIconsRegular.chartLine,
                           title: asJsonString(patterns[i]['headline']) ?? '',
@@ -315,12 +315,14 @@ class _StoryScreenState extends State<StoryScreen> {
       ),
       actions: [
         PillAction(
+          compact: true,
           key: Key('story-edit-$id'),
           icon: PhosphorIconsRegular.pencilSimple,
           label: 'Edit',
           onPressed: _busy ? null : () => unawaited(_edit(item)),
         ),
         PillAction(
+          compact: true,
           key: Key('story-remove-$id'),
           label: removed ? 'Put back' : 'Leave out',
           onPressed: _busy

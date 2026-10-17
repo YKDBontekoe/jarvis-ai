@@ -60,8 +60,8 @@ void main() {
       await show(tester);
 
       expect(find.text('Manage my calendar'), findsOneWidget);
-      expect(find.text('Reads: events list'), findsOneWidget);
-      expect(find.text('Changes: event create'), findsOneWidget);
+      expect(find.textContaining('Reads: events list'), findsOneWidget);
+      expect(find.textContaining('Changes: event create'), findsOneWidget);
       expect(find.text('Paste your private link.'), findsOneWidget);
       expect(
         find.byKey(const Key('app-goal-connect-calendar')),

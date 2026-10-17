@@ -96,9 +96,8 @@ class _OfflineBarState extends State<_OfflineBar> {
                       key: const ValueKey('offline-banner'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.labelMedium?.copyWith(color: colors.ink),
+                      style: Theme.of(context).textTheme.labelMedium
+                          ?.copyWith(color: colors.ink),
                     ),
                   ),
                 ),

@@ -117,6 +117,7 @@ class FeatureRow extends StatelessWidget {
     this.caption,
     this.trailing,
     this.actions,
+    this.extra,
     this.onTap,
     this.index = 0,
     this.quiet = false,
@@ -132,6 +133,9 @@ class FeatureRow extends StatelessWidget {
   /// A small meta line above the title (a date, a kind).
   final String? caption;
   final Widget? trailing;
+
+  /// Anything else to show under the text, above the actions.
+  final Widget? extra;
 
   /// Pill actions under the text.
   final List<Widget>? actions;
@@ -203,6 +207,13 @@ class FeatureRow extends StatelessWidget {
                   ],
                 ),
               ),
+              if (extra != null) ...[
+                const SizedBox(height: 10),
+                Padding(
+                  padding: EdgeInsets.only(left: stacked ? 0 : 48),
+                  child: extra,
+                ),
+              ],
               if (actions != null && actions!.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 Padding(
@@ -255,6 +266,7 @@ class PillAction extends StatelessWidget {
     this.icon,
     this.primary = false,
     this.onDark = false,
+    this.compact = false,
     super.key,
   });
 
@@ -265,6 +277,9 @@ class PillAction extends StatelessWidget {
 
   /// For use on a [HeroCard]: light pill when primary, translucent otherwise.
   final bool onDark;
+
+  /// A smaller pill (36 high) for several actions on one row.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -277,18 +292,19 @@ class PillAction extends StatelessWidget {
           ? (primary ? colors.ink : colors.onInk)
           : (primary ? colors.onInk : colors.ink),
       disabledBackgroundColor: colors.surfaceMuted,
-      minimumSize: const Size(0, 44),
-      padding: EdgeInsets.fromLTRB(icon == null ? 18 : 14, 0, 18, 0),
+      minimumSize: Size(0, compact ? 36 : 44),
+      tapTargetSize: compact ? MaterialTapTargetSize.shrinkWrap : null,
+      padding: EdgeInsets.fromLTRB(icon == null ? 16 : 12, 0, 16, 0),
       shape: const StadiumBorder(),
-      textStyle: const TextStyle(
+      textStyle: TextStyle(
         fontFamily: 'Geist',
-        fontSize: 14,
+        fontSize: compact ? 13.5 : 14,
         fontWeight: FontWeight.w600,
         letterSpacing: -.1,
       ),
     );
     final child = Text(label);
-    final leading = icon == null ? null : Icon(icon, size: 18);
+    final leading = icon == null ? null : Icon(icon, size: compact ? 16 : 18);
     if (primary) {
       return leading == null
           ? FilledButton(onPressed: onPressed, style: style, child: child)
@@ -349,6 +365,70 @@ class GroupLabel extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Drop-in for a `TextButton` inside a card: a small tonal pill.
+class SoftButton extends StatelessWidget {
+  const SoftButton({required this.onPressed, required this.child, super.key});
+
+  final VoidCallback? onPressed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return FilledButton(
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: colors.surfaceMuted,
+        foregroundColor: colors.ink,
+        disabledBackgroundColor: colors.surfaceMuted,
+        minimumSize: const Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        shape: const StadiumBorder(),
+        textStyle: const TextStyle(
+          fontFamily: 'Geist',
+          fontSize: 13.5,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -.1,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Drop-in for a `FilledButton` inside a card: a small ink pill.
+class InkButton extends StatelessWidget {
+  const InkButton({required this.onPressed, required this.child, super.key});
+
+  final VoidCallback? onPressed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return FilledButton(
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: colors.ink,
+        foregroundColor: colors.onInk,
+        disabledBackgroundColor: colors.surfaceMuted,
+        minimumSize: const Size(0, 40),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        shape: const StadiumBorder(),
+        textStyle: const TextStyle(
+          fontFamily: 'Geist',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -.1,
+        ),
+      ),
+      child: child,
     );
   }
 }

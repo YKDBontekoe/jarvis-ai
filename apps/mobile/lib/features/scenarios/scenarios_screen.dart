@@ -368,7 +368,7 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
       ),
       for (var i = 1; i < deltas.length; i++)
         FeatureRow(
-          key: const Key('scenario-delta'),
+          key: Key('scenario-delta-$i'),
           index: i + 1,
           icon: PhosphorIconsRegular.chartLine,
           caption: asJsonString(deltas[i]['label']),

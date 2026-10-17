@@ -122,11 +122,12 @@ void main() {
       http.on('GET', _path, _view());
       await show(tester, DocumentScreen(http: http.client(), documentId: 'd1'));
 
-      expect(find.text('Sources: project:p1'), findsOneWidget);
+      expect(find.textContaining('Sources: project:p1'), findsOneWidget);
       expect(find.text('[ADD: the next step]'), findsOneWidget);
       expect(find.textContaining('placeholders to fill'), findsOneWidget);
       expect(find.textContaining('does not send anything'), findsOneWidget);
-      expect(find.text('Version 1 · not saved yet'), findsOneWidget);
+      expect(find.text('Not saved yet'), findsOneWidget);
+      expect(find.text('VERSION 1'), findsOneWidget);
     },
   );
 
@@ -173,10 +174,11 @@ void main() {
         'body': 'Order the worktop.',
       });
       expect(find.text('Order the worktop.'), findsOneWidget);
-      expect(find.text('Next step · edited'), findsOneWidget);
+      expect(find.text('EDITED'), findsOneWidget);
+      expect(find.text('Next step'), findsOneWidget);
       expect(find.byKey(const Key('document-undo-next')), findsOneWidget);
       expect(
-        find.text('Kitchen: cook for ten.'),
+        find.textContaining('Kitchen: cook for ten.'),
         findsOneWidget,
       ); // the other section is untouched
     },
@@ -229,7 +231,7 @@ void main() {
         find.textContaining('Saved to your Library with its sources'),
         findsOneWidget,
       );
-      expect(find.text('Version 1 · saved to your Library'), findsOneWidget);
+      expect(find.text('Saved to your Library'), findsOneWidget);
     },
   );
 

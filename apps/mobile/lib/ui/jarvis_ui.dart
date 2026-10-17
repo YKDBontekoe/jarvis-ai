@@ -508,9 +508,8 @@ class EmptyState extends StatelessWidget {
                 Text(
                   title,
                   textAlign: TextAlign.center,
-                  style: JarvisType.displayOf(
-                    context,
-                  ).copyWith(fontSize: 21, letterSpacing: -.4),
+                  style: JarvisType.displayOf(context)
+                      .copyWith(fontSize: 21, letterSpacing: -.4),
                 ),
                 if (message != null) ...[
                   const SizedBox(height: 6),
@@ -621,9 +620,8 @@ class ListScreenBody extends StatelessWidget {
                 },
             // Short lists must still be pullable.
             child: ScrollConfiguration(
-              behavior: ScrollConfiguration.of(
-                context,
-              ).copyWith(physics: const AlwaysScrollableScrollPhysics()),
+              behavior: ScrollConfiguration.of(context)
+                  .copyWith(physics: const AlwaysScrollableScrollPhysics()),
               child: child,
             ),
           ),

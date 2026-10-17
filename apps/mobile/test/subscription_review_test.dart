@@ -96,7 +96,7 @@ void main() {
 
     expect(http.sent('POST', '$_path/choice').single.body, {'choice': 'keep'});
     expect(find.byKey(const Key('review-quiet')), findsOneWidget);
-    expect(find.textContaining('your choice'), findsOneWidget);
+    expect(find.text('YOUR CHOICE'), findsOneWidget);
   });
 
   testWidgets('a pack is saved to the Library and nothing is sent', (

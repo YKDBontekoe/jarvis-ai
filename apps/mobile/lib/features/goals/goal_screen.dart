@@ -7,7 +7,9 @@ import '../../json_maps.dart';
 import '../search/context_commands.dart';
 import '../../schedule_format.dart' show deviceTimeZoneLookup;
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
+import '../../ui/phosphor_icons.dart';
 
 const _feelings = {
   'on_track': 'On track',
@@ -28,7 +30,8 @@ class GoalScreen extends StatefulWidget {
   State<GoalScreen> createState() => _GoalScreenState();
 }
 
-class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalScreen> {
+class _GoalScreenState extends State<GoalScreen>
+    with PaletteContextMixin<GoalScreen> {
   @override
   String get paletteContextValue => 'goal:${widget.goalId}';
 
@@ -260,14 +263,8 @@ class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalSc
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (asJsonString(_goal['motivation']) case final why?)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Text(
-                            why,
-                            style: TextStyle(color: colors.inkSoft),
-                          ),
-                        ),
+                      _hero(status),
+                      const SizedBox(height: 12),
                       if (status != 'active')
                         InlineNotice(
                           key: const Key('goal-status-notice'),
@@ -276,8 +273,6 @@ class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalSc
                               ? 'Paused. Nothing is planned or suggested until you resume.'
                               : 'This goal is $status.',
                         ),
-                      if (_view?['checkInDue'] == true && status == 'active')
-                        _checkInPrompt(colors),
                       ..._progress(colors),
                       ..._planSection(colors, status),
                       ..._linked(colors),
@@ -290,34 +285,39 @@ class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalSc
     );
   }
 
-  Widget _checkInPrompt(JarvisColors colors) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: SurfaceCard(
-      key: const Key('goal-check-in-due'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Whenever you like: how is it going?',
-            style: TextStyle(color: colors.ink),
-          ),
-          const SizedBox(height: 8),
-          FilledButton(
-            key: const Key('goal-check-in'),
-            onPressed: _busy ? null : _checkIn,
-            child: const Text('Check in'),
-          ),
-        ],
+  Widget _hero(String status) {
+    final due = _view?['checkInDue'] == true && status == 'active';
+    final why = asJsonString(_goal['motivation']);
+    return FadeSlideIn(
+      child: KeyedSubtree(
+        key: due ? const Key('goal-check-in-due') : null,
+        child: HeroCard(
+          label: due ? 'Whenever you like' : 'Your why',
+          title: due
+              ? 'How is it going?'
+              : why ?? asJsonString(_goal['title']) ?? 'Goal',
+          subtitle: due ? why : null,
+          footer: due
+              ? PillAction(
+                  key: const Key('goal-check-in'),
+                  primary: true,
+                  onDark: true,
+                  icon: PhosphorIconsRegular.chatText,
+                  label: 'Check in',
+                  onPressed: _busy ? null : _checkIn,
+                )
+              : null,
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   List<Widget> _progress(JarvisColors colors) {
     final progress = jsonObject(_view?['progress']) ?? const {};
     final reflections = jsonMaps(progress['reflections']);
     final review = jsonObject(progress['interpretation']);
     return [
-      const SectionHeader('Where it stands'),
+      const GroupLabel('Where it stands'),
       SurfaceCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -359,7 +359,7 @@ class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalSc
               ),
               Align(
                 alignment: Alignment.centerRight,
-                child: TextButton(
+                child: SoftButton(
                   key: const Key('goal-review-dismiss'),
                   onPressed: _busy
                       ? null
@@ -381,7 +381,7 @@ class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalSc
           asJsonString(_goal['status']) == 'active')
         Align(
           alignment: Alignment.centerRight,
-          child: TextButton(
+          child: SoftButton(
             key: const Key('goal-check-in-early'),
             onPressed: _busy ? null : _checkIn,
             child: const Text('Add a check-in'),
@@ -404,7 +404,7 @@ class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalSc
       SectionHeader(
         'This week',
         trailing: status == 'active'
-            ? TextButton(
+            ? SoftButton(
                 key: const Key('goal-plan'),
                 onPressed: _busy ? null : _plan,
                 child: Text(items.isEmpty ? 'Plan my week' : 'Refresh'),
@@ -446,7 +446,7 @@ class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalSc
                       spacing: 4,
                       children: [
                         if (item['status'] == 'proposed')
-                          TextButton(
+                          SoftButton(
                             key: Key('goal-accept-${item['id']}'),
                             onPressed: _busy
                                 ? null
@@ -456,7 +456,7 @@ class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalSc
                             child: const Text('Accept'),
                           ),
                         if (item['status'] == 'accepted')
-                          TextButton(
+                          SoftButton(
                             key: Key('goal-schedule-${item['id']}'),
                             onPressed: _busy
                                 ? null
@@ -466,14 +466,14 @@ class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalSc
                             child: const Text('Add to today'),
                           ),
                         if (asJsonInt(item['minutes']) > 5)
-                          TextButton(
+                          SoftButton(
                             key: Key('goal-smaller-${item['id']}'),
                             onPressed: _busy
                                 ? null
                                 : () => unawaited(_reduce(item)),
                             child: const Text('Smaller'),
                           ),
-                        TextButton(
+                        SoftButton(
                           key: Key('goal-decline-${item['id']}'),
                           onPressed: _busy
                               ? null
@@ -482,7 +482,7 @@ class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalSc
                                 ),
                           child: const Text('Not this week'),
                         ),
-                        TextButton(
+                        SoftButton(
                           key: Key('goal-done-${item['id']}'),
                           onPressed: _busy
                               ? null
@@ -515,7 +515,7 @@ class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalSc
     final promises = jsonMaps(_view?['commitments']);
     if (project == null && habits.isEmpty && promises.isEmpty) return const [];
     return [
-      const SectionHeader('Linked'),
+      const GroupLabel('Linked'),
       SurfaceCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -551,7 +551,7 @@ class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalSc
       SectionHeader(
         'Experiment',
         trailing: running == null && status == 'active'
-            ? TextButton(
+            ? SoftButton(
                 key: const Key('goal-experiment-start'),
                 onPressed: _busy ? null : _startExperiment,
                 child: const Text('Try one'),
@@ -587,14 +587,14 @@ class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalSc
               Wrap(
                 spacing: 4,
                 children: [
-                  TextButton(
+                  SoftButton(
                     key: const Key('experiment-note'),
                     onPressed: _busy
                         ? null
                         : () => unawaited(_note(running['id'] as String)),
                     child: const Text('Add a note'),
                   ),
-                  TextButton(
+                  SoftButton(
                     key: const Key('experiment-keep'),
                     onPressed: _busy
                         ? null
@@ -602,7 +602,7 @@ class _GoalScreenState extends State<GoalScreen> with PaletteContextMixin<GoalSc
                               unawaited(_finish(running['id'] as String, true)),
                     child: const Text('Keep it'),
                   ),
-                  TextButton(
+                  SoftButton(
                     key: const Key('experiment-stop'),
                     onPressed: _busy
                         ? null
@@ -851,7 +851,7 @@ class _PromptDialogState extends State<_PromptDialog> {
       decoration: InputDecoration(labelText: widget.label),
     ),
     actions: [
-      TextButton(
+      SoftButton(
         onPressed: () => Navigator.pop(context),
         child: const Text('Cancel'),
       ),
