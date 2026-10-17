@@ -60,6 +60,9 @@ public static partial class ToolGroups
         new("projects", "Projects: what each is for, its status and the next action to take",
             ["GetProjects", "SetProjectOutcome", "SetProjectNextAction"],
             ProjectKeywords()),
+        new("comparisons", "Weigh options against criteria: create a comparison, record what is known, see the ranking",
+            ["CreateComparison", "SetComparisonCell", "GetComparison"],
+            ComparisonKeywords()),
         new("timeline", "Life timeline, on this day, life insights, routine and self-improvement suggestions",
             ["QueryTimeline", "OnThisDay", "GetLifeInsights", "GetRoutineSuggestions", "GetImprovementProposals"],
             TimelineKeywords()),
@@ -234,6 +237,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(project|next (step|action)|outcome|goal of|project(en)?|volgende (stap|actie)|doel van)", KeywordOptions)]
     private static partial Regex ProjectKeywords();
+
+    [GeneratedRegex(@"\b(compare|comparison|which (one|should)|pros and cons|versus|\bvs\b|choose between|shortlist|vergelijk|vergelijking|welke (moet|zal)|kiezen tussen)", KeywordOptions)]
+    private static partial Regex ComparisonKeywords();
 
     [GeneratedRegex(@"\b(timeline|on this day|this day last|years? ago|insight|routine|pattern|improvement|tijdlijn|vandaag \d+ jaar|jaar geleden|inzicht|patroon|verbeter)", KeywordOptions)]
     private static partial Regex TimelineKeywords();

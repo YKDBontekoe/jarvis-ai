@@ -20,6 +20,8 @@ import '../tasks/tasks_screen.dart';
 import '../agents/agents_screen.dart';
 import '../channels/channels_screen.dart';
 import '../coding/coding_runs_screen.dart';
+import '../comparisons/comparison_screen.dart';
+import '../comparisons/comparisons_screen.dart';
 import '../decisions/decisions_screen.dart';
 import '../entities/entity_ref.dart';
 import '../entities/entity_screen.dart';
@@ -108,6 +110,12 @@ Widget? utilityPageFor(
   ),
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'decisions' => DecisionsScreen(http: http),
+  'comparisons' => ComparisonsScreen(http: http),
+  final comparison when comparison.startsWith('comparison:') =>
+    ComparisonScreen(
+      http: http,
+      comparisonId: comparison.substring('comparison:'.length),
+    ),
   'today' => DayPlannerScreen(http: http, onAskInChat: onAskInChat),
   'timeline' => TimelineScreen(http: http),
   'missions' => MissionsScreen(http: http),

@@ -300,6 +300,56 @@ Map<String, Object?> projectDetails() => {
   'tasks': <Object>[],
 };
 
+Map<String, Object?> comparisonDetails() => {
+  'id': 'c1',
+  'definition': {
+    'title': 'Which boiler?',
+    'question': 'Replace the 2010 boiler before winter',
+    'criteria': [
+      {'id': 'price', 'name': 'Price', 'weight': 8},
+      {'id': 'noise', 'name': 'Noise', 'weight': 3},
+      {'id': 'warranty', 'name': 'Warranty', 'weight': 5},
+    ],
+    'options': [
+      {
+        'id': 'bosch',
+        'name': 'Bosch Condens 2300i',
+        'summary': null,
+        'cells': {
+          'price': {'score': 7, 'note': '€1,900 incl. fitting', 'source': 'quote-bosch.pdf', 'asOf': '2026-10-01'},
+          'noise': {'score': 8},
+          'warranty': {'score': null},
+        },
+      },
+      {
+        'id': 'vaillant',
+        'name': 'Vaillant ecoTEC',
+        'summary': null,
+        'cells': {
+          'price': {'score': 5, 'note': '€2,350 incl. fitting', 'source': 'quote-vaillant.pdf', 'asOf': '2026-10-03'},
+          'noise': {'score': 9},
+          'warranty': {'score': 9, 'note': '10 years'},
+        },
+      },
+    ],
+    'chosenOptionId': null,
+    'decisionId': null,
+  },
+  'result': {
+    'rows': [
+      {'optionId': 'bosch', 'name': 'Bosch Condens 2300i', 'score': 7.27, 'coverage': .69, 'unknownCriteria': ['Warranty'], 'rank': 1, 'tied': false, 'thin': false},
+      {'optionId': 'vaillant', 'name': 'Vaillant ecoTEC', 'score': 6.84, 'coverage': 1.0, 'unknownCriteria': <Object>[], 'rank': 2, 'tied': false, 'thin': false},
+    ],
+    'leaderId': 'bosch',
+    'leaderIsTied': false,
+    'sensitivity': [
+      {'criterionId': 'price', 'criterionName': 'Price', 'changesLeader': true, 'leaderWithout': 'Vaillant ecoTEC'},
+    ],
+    'warnings': <Object>[],
+  },
+  'libraryItemId': null,
+};
+
 List<Map<String, Object?>> reminders() {
   final now = _now();
   final today = DateTime(now.year, now.month, now.day);
@@ -625,6 +675,10 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   ],
   'GET /api/v1/projects': projects(),
   'GET /api/v1/projects/p2': projectDetails(),
+  'GET /api/v1/comparisons': [
+    {'id': 'c1', 'title': 'Which boiler?', 'options': 2, 'criteria': 3, 'leader': 'Bosch Condens 2300i', 'decided': false, 'updatedAt': '2026-10-10T10:00:00Z'},
+  ],
+  'GET /api/v1/comparisons/c1': comparisonDetails(),
   'GET /api/v1/home': home(),
   'GET /api/v1/home/context': homeContext(),
   // Every chat path is ".../chats/open" with the chat in the query, so one

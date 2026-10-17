@@ -121,6 +121,7 @@ api.MapModeEndpoints(app.Logger);
 api.MapRoutineEndpoints(app.Logger);
 api.MapImprovementEndpoints();
 api.MapDecisionEndpoints(app.Logger);
+api.MapComparisonEndpoints();
 api.MapMissionEndpoints(app.Logger);
 api.MapEventEndpoints();
 

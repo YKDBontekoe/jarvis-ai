@@ -14,7 +14,8 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 | A3 / F02.1.2 first group, F02.1.4 partial, F02.1.7 partial, F02.2 (message search, open at match) | verified | See checkpoint 2 |
 | A4 ask about this source (F09.1.2 partial) | verified | See checkpoint 3; end-to-end with a seeded file row (ClamAV cannot load signatures in this sandbox) |
 | A8 memory review and correction (F03.1.1–F03.1.3 first slice) | verified | See checkpoint 3 |
-| Everything else | planned | Next: A7 research comparison (Sprint B), then Sprint D |
+| A7 editable comparison (F26.1–F26.6 first slice, F08.1.2 partly) | verified | See checkpoint 4 |
+| Everything else | planned | Next: Sprint D (A5/A6 meetings, A10 weekly review) |
 
 ## Checkpoint 1: Slice A1, decisions and commitments in Needs you
 
@@ -46,3 +47,13 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **Tests.** Unit 1726 pass (`MemoryReviewTests` 10); integration `MemoryCorrectionTests` (4); Dart `memory_review_test` (7), `list_screens_test` (+3), full `flutter test` 744 pass, `flutter analyze` clean. Real stack: `memory_review_flow`, `ask_file_flow` (seeded file row via `JARVIS_E2E_PG_CONTAINER`), earlier flows still pass.
 - **Environment limit.** File upload returns 503 here because ClamAV cannot download signatures in this sandbox, so real upload and indexing were not exercised.
 - **Not done.** F03.1.4 do-not-learn options, F03.1.5 delayed-job fencing, F03.1.6 cross-session evals, F03.1.7 outcome tracking, F03.2 provenance for graph facts and reports. No screenshot of the review screen.
+
+## Checkpoint 4: A7 editable comparison
+
+- **Contract.** `comparisons` table (id, owner, title, project, library item, `definition` jsonb; migration `AddComparisons`). `ComparisonCalculator` (pure, `Application/Comparisons`): per option the weighted average over *known* criteria, `coverage` = known weight share, unknown never zero, ties within 0.05, ties broken by name so the same input always gives the same ranking, sensitivity = would removing one criterion change the leader, warnings (nothing to rank, mostly unknown, tied leaders). `ComparisonValidator` trims and limits (12 criteria, 8 options).
+- **Service.** Create/update (the decision link belongs to the server: an edit cannot forge or drop it), `SetCell` by id or name, `SaveToLibrary` (a tagged `report` note whose Markdown keeps unknowns, notes, dated sources and what could change the answer), `Decide` (logs one decision with the score and unknowns in its context; same option again returns the same decision; a different option is 409; nothing is bought or sent).
+- **Agent.** Tools `CreateComparison`, `SetComparisonCell`, `GetComparison` (group `comparisons`): the model records evidence and does not do the arithmetic; the tool text says to leave a cell out when it is not known.
+- **App.** Comparisons list + detail: ranking cards (tied / mostly unknown / chosen), sensitivity notice, weight sliders, per-option evidence cells with a "I know this" switch (off = unknown), source and date, Save to Library, Choose this one (sheet: how sure + review date). Large text fixed after the first screenshot squeezed the option name; the ranking row now wraps.
+- **Decisions.** Storage is a new table rather than a Library note because weights and cells must be edited and recomputed; the Library gets the rendered report. No new entity type, so a comparison is reached from Comparisons, quick commands and `comparison:{id}` destinations, not yet from search or related views.
+- **Tests.** Unit 1745 pass (`ComparisonTests` 10, `ComparisonServiceTests` 9); integration `ComparisonPersistenceTests` (1); Dart `comparisons_test` (6), full `flutter test` 750 pass, analyze clean. Real stack: `comparison_flow` (create, rank, cell edit, determinism, Library report, decide once, 409, link preserved) plus the earlier flows. Screenshots: `build/screenshots/audit-{phone,small,large-text}-comparison:c1.png`.
+- **Not done.** Quoting current prices (F26.2 live research), vendor watches (F26.7), shareable export without private budget (F26.8), a "what should I verify before buying" view (F26.5), comparisons from selected files (F09.1.5) other than via the tools.

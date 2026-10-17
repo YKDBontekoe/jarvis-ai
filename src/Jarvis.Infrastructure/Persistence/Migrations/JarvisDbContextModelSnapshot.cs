@@ -2084,6 +2084,49 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.ComparisonEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DefinitionJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("definition");
+
+                    b.Property<Guid?>("LibraryItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("library_item_id");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "UpdatedAt");
+
+                    b.ToTable("comparisons", (string)null);
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.ConversationCollectionAttachmentEntity", b =>
                 {
                     b.Property<Guid>("ConversationId")

@@ -139,6 +139,10 @@ Weeks run Monday to Sunday; a weekly habit's streak counts weeks that reached `t
 
 | Method | Path |
 |--------|------|
+| GET/POST/PUT/DELETE | `/comparisons`, `/comparisons/{id}` | Weigh options against criteria. A definition has `criteria` (id, name, weight 0–10), `options` (id, name, `cells`: criterion id → `{ score 0–10 or null for unknown, note, source, asOf }`) and the server adds `result`: per option a weighted average over the *known* criteria (`score`, `coverage`, `unknownCriteria`, `rank`, `tied`, `thin`), the `leaderId`, `sensitivity` (does removing a criterion change the leader) and `warnings`. An unknown is never a zero; scores within 0.05 tie. Limits: 12 criteria, 8 options, 100 comparisons per owner (409 past that) |
+| PUT | `/comparisons/{id}/cell` | `{ option, criterion, cell }` sets one answer, found by id or name |
+| POST | `/comparisons/{id}/library` | Saves the comparison as a tagged Library report (unknowns, notes, dated sources and what could change the answer stay in the text) |
+| POST | `/comparisons/{id}/decide` | `{ optionId, probability, reviewOn }` logs one decision (the context carries the score and what is still unknown); repeating it for the same option returns the same decision, a different option is 409. The decision link cannot be dropped by editing. Nothing is bought or sent |
 | GET | `/files`, `/files/search` |
 | POST | `/files/{id}/ask` | `{ profileId? }` starts a chat about one file: a new conversation titled "About …" with that file attached as its only source; 201 `{ conversationId, fileId, fileName, status }`. 404 for an unknown or deleting file; 409 when the profile restricts files to collections that do not contain it (attaching never widens a profile) |
 | GET | `/memory/review` | Memories worth a second look: learned lately (not by the owner), low confidence, expiring; each with `reasons`, `source` (label and, for a chat, `conversationId`/`messageId`), profile name and how many times it was corrected |
