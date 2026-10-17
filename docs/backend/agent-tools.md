@@ -12,6 +12,7 @@ Tools are exposed to the model through **Microsoft Agent Framework** `AITool` in
 | **PersonaToolContributor** | Record persona traits |
 | **ComparisonToolContributor** | `CreateComparison`, `SetComparisonCell`, `GetComparison` (options × weighted criteria; unknown stays unknown, the ranking is computed by the app not the model). Group `comparisons` |
 | **MeetingToolContributor** | `PrepareMeeting` (create + prep pack from the user's own records), `DebriefMeeting` (proposals only; the user accepts in the Meetings screen), `DraftMeetingFollowUp` (never sent). Group `meetings` |
+| **WeekFollowThroughToolContributor** | `GetWeekFollowThrough` (read-only: the week's fulfilled / overdue promises, decisions next week, projects needing a step, at most three optional suggestions the user accepts in the app) |
 | **ProjectToolContributor** | `GetProjects`, `SetProjectOutcome`, `SetProjectNextAction` (a project's outcome, status and next action; a link must be the owner's own promise, decision, reminder or task). Group `projects` |
 | **KnowledgeGraphToolContributor** | Graph search and proposed writes (approval-gated) |
 | **SurfaceToolContributor** | `RenderUi` generative cards |

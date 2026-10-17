@@ -16,7 +16,8 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 | A8 memory review and correction (F03.1.1–F03.1.3 first slice) | verified | See checkpoint 3 |
 | A7 editable comparison (F26.1–F26.6 first slice, F08.1.2 partly) | verified | See checkpoint 4 |
 | A5 meeting prep pack, A6 debrief into reviewed commitments, F22.1–F22.8 first slice | verified | See checkpoint 5 |
-| Everything else | planned | Next: A10 weekly review, then the rest of Sprint D |
+| A10 weekly review with one accepted action (F11.1.4–F11.1.5) | verified | See checkpoint 6 |
+| Everything else | planned | Next: F05 planner time blocks, F07, F12, F23, F25, then Sprints C and E |
 
 ## Checkpoint 1: Slice A1, decisions and commitments in Needs you
 
@@ -71,3 +72,12 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **Decision.** The debrief uses rules instead of a model so the demo is deterministic and works with no provider; a model reading remains a later addition behind the same candidate contract. Meetings are not yet an `EntityType`, so a meeting is reached from the Meetings screen, quick commands and prep refs (`meeting:id`), not search.
 - **Tests.** Unit 1781 pass (`MeetingExtractionTests` 24, `MeetingServiceTests` 12); Dart `meetings_test` (11), full `flutter test` 761 pass, analyze clean. Real stack: `meeting_flow` (prep from seeded records, agenda kept on refresh, debrief creates nothing, accept once, edited acceptance, decision needs confidence, dismiss, unsent follow-up without private text, bad input) plus all earlier flows. Screenshots: `build/screenshots/audit-{phone,small,large-text}-meeting:m1.png`.
 - **Not done.** Calendar write-back, recording or transcription, calendar-event identity beyond title and start (F22.1 stable link), proposed time blocks for accepted follow-through (F22.7), people-page open loops (F22.8 beyond the prep carry-forward), a model-based extraction, search for meetings.
+
+## Checkpoint 6: A10 weekly review follow-through
+
+- **What.** `WeekFollowThroughBuilder` (pure) counts the week in the owner's local Monday–Sunday from the actual records: accepted promises fulfilled or dropped that week (by local completion day), overdue and a-week-or-more overdue, decisions due next week, active projects with no next step or a finished one. Items behind each count are listed and capped. At most three suggestions, in a fixed order: give the most overdue "I owe" promise a new day, choose a project's next step, then the second overdue promise.
+- **Read-only generation.** `GET /reviews/weekly/follow-through` creates nothing (tested at service level and on the real stack). Accepting changes exactly one existing record: `plan_commitment` updates a promise's due day through `ICommitmentService.UpdateAsync` (its morning reminder follows; the same day again is a no-op); `project_next_step` goes through `IProjectFocusService.SetAsync` and keeps the outcome. Dismissed suggestions are kept in the owner settings section `weekly-review.followthrough` for 28 days.
+- **App.** A follow-through card on the weekly review (for the selected week): counts, items that open the real record, a quiet week says so, suggestions with the day or note chosen by the owner, "Not now".
+- **Tool.** `GetWeekFollowThrough` (read-only).
+- **Tests.** Unit 1794 pass (`WeekFollowThroughTests` 13); Dart `follow_through_test` (6), existing `weekly_review_screen_test` unchanged and passing, full `flutter test` 767, analyze clean. Real stack: `week_follow_through_flow` (counts reconcile, reading creates nothing, plan moves one promise with a reminder, project step keeps the outcome, dismiss, 400/404 cases).
+- **Not done.** Accepting into the day planner or as a project-linked reminder (F05), a "keep/change/stop" review of habits (F23.7), the narrator mentioning follow-through, widgets/briefings using the same counts (F01.1.7 beyond Home).

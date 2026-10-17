@@ -10,6 +10,7 @@ import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../decisions/decision_format.dart';
 import '../journal/journal_format.dart';
+import 'follow_through_card.dart';
 import 'mood_trend_chart.dart';
 import 'weekly_review_format.dart';
 
@@ -281,6 +282,16 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen> {
               ),
             ],
           ],
+          const SizedBox(height: 26),
+          ContentWidth(
+            child: FadeSlideIn(
+              index: 3,
+              child: FollowThroughCard(
+                http: widget.http,
+                weekStart: asJsonString(review?['weekStart']),
+              ),
+            ),
+          ),
           const SizedBox(height: 26),
           ContentWidth(
             child: FadeSlideIn(index: 3, child: _TrendCard(points: trend)),

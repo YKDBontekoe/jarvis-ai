@@ -92,6 +92,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Projects.ProjectToolContributor>();
         services.AddScoped<IAgentToolContributor, Comparisons.ComparisonToolContributor>();
         services.AddScoped<IAgentToolContributor, Meetings.MeetingToolContributor>();
+        services.AddScoped<IAgentToolContributor, Reviews.WeekFollowThroughToolContributor>();
         services.AddScoped<IAgentToolContributor, Library.LibraryToolContributor>();
         services.AddScoped<IAgentContextContributor, Library.LibraryContextContributor>();
         services.AddScoped<Jarvis.Application.Library.ILibraryDigester, Library.ModelLibraryDigester>();

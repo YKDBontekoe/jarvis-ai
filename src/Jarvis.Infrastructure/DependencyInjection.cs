@@ -117,6 +117,7 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Profiles.IAssistantProfileService, Jarvis.Application.Profiles.AssistantProfileService>();
         services.AddScoped<Jarvis.Application.Files.IDocumentCollectionRepository, DocumentCollectionRepository>();
         services.AddScoped<Jarvis.Application.Projects.IProjectStore, ProjectStore>();
+        services.AddScoped<Jarvis.Application.Reviews.IWeekFollowThroughService, Jarvis.Application.Reviews.WeekFollowThroughService>();
         services.AddScoped<Jarvis.Application.Memory.IMemoryReviewService, Jarvis.Application.Memory.MemoryReviewService>();
         services.AddScoped<Jarvis.Application.Projects.IProjectFocusService, Jarvis.Application.Projects.ProjectFocusService>();
         services.AddScoped<Jarvis.Application.Persona.IMessageFeedbackRepository, MessageFeedbackRepository>();
