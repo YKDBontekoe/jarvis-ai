@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../json_maps.dart';
 import '../../schedule_format.dart' show deviceTimeZoneLookup;
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../expenses/expense_models.dart' show dayLabel;
@@ -57,7 +58,8 @@ class _InboxScreenState extends State<InboxScreen> {
       try {
         // A bonus: without nudges the tab is just the promises.
         followUps = jsonMaps(
-          (await widget.http.get<dynamic>('/api/v1/commitments/follow-ups')).data,
+          (await widget.http.get<dynamic>('/api/v1/commitments/follow-ups'))
+              .data,
         );
       } on DioException {
         // Keep going.
@@ -157,20 +159,27 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   Future<void> _copyDraft(Map<String, dynamic> nudge) async {
-    await Clipboard.setData(ClipboardData(text: asJsonString(nudge['draft']) ?? ''));
+    await Clipboard.setData(
+      ClipboardData(text: asJsonString(nudge['draft']) ?? ''),
+    );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Draft copied. Nothing was sent.')),
     );
   }
 
-  Future<void> _quietNudge(Map<String, dynamic> nudge, {int? snoozeDays}) async {
+  Future<void> _quietNudge(
+    Map<String, dynamic> nudge, {
+    int? snoozeDays,
+  }) async {
     final id = asJsonString(nudge['commitmentId']);
     if (id == null) return;
     await _run(
       id,
       () => snoozeDays == null
-          ? widget.http.post<dynamic>('/api/v1/commitments/$id/follow-up/dismiss')
+          ? widget.http.post<dynamic>(
+              '/api/v1/commitments/$id/follow-up/dismiss',
+            )
           : widget.http.post<dynamic>(
               '/api/v1/commitments/$id/follow-up/snooze',
               data: {'days': snoozeDays},
@@ -214,9 +223,7 @@ class _InboxScreenState extends State<InboxScreen> {
           ],
         ),
         body: ContentWidth(
-          child: TabBarView(
-            children: [_threads(colors), _promises(colors)],
-          ),
+          child: TabBarView(children: [_threads(colors), _promises(colors)]),
         ),
       ),
     );
@@ -409,46 +416,40 @@ class _InboxScreenState extends State<InboxScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             children: [
-              for (final nudge in _followUps)
-                SurfaceCard(
+              for (final (i, nudge) in _followUps.indexed)
+                FeatureRow(
                   key: Key('followup-${nudge['commitmentId']}'),
-                  margin: const EdgeInsets.only(bottom: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${asJsonString(nudge['counterparty']) ?? ''} is '
-                        '${asJsonInt(nudge['daysOverdue'])} days late: '
-                        '${asJsonString(nudge['description']) ?? ''}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        asJsonString(nudge['draft']) ?? '',
-                        style: TextStyle(color: colors.inkSoft, fontSize: 14),
-                      ),
-                      Wrap(
-                        spacing: 4,
-                        children: [
-                          TextButton(
-                            key: Key('followup-copy-${nudge['commitmentId']}'),
-                            onPressed: () => unawaited(_copyDraft(nudge)),
-                            child: const Text('Copy draft'),
-                          ),
-                          TextButton(
-                            key: Key('followup-snooze-${nudge['commitmentId']}'),
-                            onPressed: () => unawaited(_quietNudge(nudge, snoozeDays: 7)),
-                            child: const Text('Not this week'),
-                          ),
-                          TextButton(
-                            key: Key('followup-dismiss-${nudge['commitmentId']}'),
-                            onPressed: () => unawaited(_quietNudge(nudge)),
-                            child: const Text('Don’t nudge'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                  index: i,
+                  icon: PhosphorIconsRegular.arrowBendUpLeft,
+                  badgeColor: colors.warning,
+                  caption: '${asJsonInt(nudge['daysOverdue'])} days late',
+                  title:
+                      '${asJsonString(nudge['counterparty']) ?? ''}: '
+                      '${asJsonString(nudge['description']) ?? ''}',
+                  subtitle: asJsonString(nudge['draft']),
+                  actions: [
+                    PillAction(
+                      key: Key('followup-copy-${nudge['commitmentId']}'),
+                      compact: true,
+                      primary: true,
+                      icon: PhosphorIconsRegular.copy,
+                      label: 'Copy draft',
+                      onPressed: () => unawaited(_copyDraft(nudge)),
+                    ),
+                    PillAction(
+                      key: Key('followup-snooze-${nudge['commitmentId']}'),
+                      compact: true,
+                      label: 'Not this week',
+                      onPressed: () =>
+                          unawaited(_quietNudge(nudge, snoozeDays: 7)),
+                    ),
+                    PillAction(
+                      key: Key('followup-dismiss-${nudge['commitmentId']}'),
+                      compact: true,
+                      label: 'Don’t nudge',
+                      onPressed: () => unawaited(_quietNudge(nudge)),
+                    ),
+                  ],
                 ),
               if (suggested.isNotEmpty) ...[
                 const SectionHeader('Jarvis found these in your chats'),
@@ -456,8 +457,7 @@ class _InboxScreenState extends State<InboxScreen> {
                   _commitmentCard(colors, item, today, suggestion: true),
                 const SizedBox(height: 12),
               ],
-              for (final item in accepted)
-                _commitmentCard(colors, item, today),
+              for (final item in accepted) _commitmentCard(colors, item, today),
             ],
           ),
         ),

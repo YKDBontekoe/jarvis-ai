@@ -3,6 +3,14 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import 'jarvis_ui.dart';
 
+/// The hero stays dark in both themes, like Home's Right now card, so these
+/// two are fixed rather than taken from the theme.
+const _heroBase = Color(0xFF16161D);
+const _heroText = Color(0xFFFFFFFF);
+
+/// Foreground for controls placed on a [HeroCard].
+const heroForeground = _heroText;
+
 /// The one saturated surface on a screen: a caps label, a headline, a line of
 /// context and an optional segmented progress bar, on the same ink card with
 /// a soft accent glow that Home's Right now card uses.
@@ -32,11 +40,11 @@ class HeroCard extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        color: colors.ink,
+        color: _heroBase,
         gradient: RadialGradient(
           center: const Alignment(.9, -1),
           radius: 1.3,
-          colors: [colors.accent.withValues(alpha: .38), colors.ink],
+          colors: [colors.accent.withValues(alpha: .38), _heroBase],
         ),
         boxShadow: JarvisShadows.soft(colors.brightness),
       ),
@@ -48,7 +56,7 @@ class HeroCard extends StatelessWidget {
             Text(
               label.toUpperCase(),
               style: JarvisType.capsOf(context)
-                  .copyWith(color: colors.onInk.withValues(alpha: .6)),
+                  .copyWith(color: _heroText.withValues(alpha: .6)),
             ),
             const SizedBox(height: 10),
             Text(
@@ -59,7 +67,7 @@ class HeroCard extends StatelessWidget {
                 height: 1.12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -.8,
-                color: colors.onInk,
+                color: _heroText,
               ),
             ),
             if (subtitle != null) ...[
@@ -70,7 +78,7 @@ class HeroCard extends StatelessWidget {
                   fontFamily: 'Geist',
                   fontSize: 15,
                   height: 1.4,
-                  color: colors.onInk.withValues(alpha: .72),
+                  color: _heroText.withValues(alpha: .72),
                 ),
               ),
             ],
@@ -90,8 +98,8 @@ class HeroCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(3),
                           color: i < doneSegments
-                              ? colors.onInk
-                              : colors.onInk.withValues(alpha: .2),
+                              ? _heroText
+                              : _heroText.withValues(alpha: .2),
                         ),
                       ),
                     ),
@@ -286,10 +294,10 @@ class PillAction extends StatelessWidget {
     final colors = JarvisColors.of(context);
     final style = FilledButton.styleFrom(
       backgroundColor: onDark
-          ? (primary ? colors.onInk : colors.onInk.withValues(alpha: .16))
+          ? (primary ? _heroText : _heroText.withValues(alpha: .16))
           : (primary ? colors.ink : colors.surfaceMuted),
       foregroundColor: onDark
-          ? (primary ? colors.ink : colors.onInk)
+          ? (primary ? _heroBase : _heroText)
           : (primary ? colors.onInk : colors.ink),
       disabledBackgroundColor: colors.surfaceMuted,
       minimumSize: Size(0, compact ? 36 : 44),
@@ -431,4 +439,22 @@ class InkButton extends StatelessWidget {
       child: child,
     );
   }
+}
+
+/// A quiet line for a [HeroCard] footer.
+class HeroNote extends StatelessWidget {
+  const HeroNote(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: TextStyle(
+      fontFamily: 'Geist',
+      fontSize: 13,
+      height: 1.35,
+      color: _heroText.withValues(alpha: .62),
+    ),
+  );
 }

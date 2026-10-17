@@ -68,6 +68,7 @@ void main() {
     ('phone', const Size(393, 852), 1.0),
     ('small', const Size(320, 640), 1.0),
     ('large-text', const Size(320, 640), 3.0),
+    ('dark', const Size(393, 852), 1.0),
   ]) {
     for (final destination in destinations) {
       screenshotTest('$destination on $name', (tester) async {
@@ -83,12 +84,13 @@ void main() {
               navigatorKey: navigator,
               debugShowCheckedModeBanner: false,
               builder: (context, child) => MediaQuery(
-                data: MediaQuery.of(context).copyWith(
-                  textScaler: TextScaler.linear(textScale),
-                ),
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(textScale)),
                 child: child!,
               ),
-              theme: buildJarvisTheme(),
+              theme: buildJarvisTheme(
+                brightness: name == 'dark' ? Brightness.dark : Brightness.light,
+              ),
               home: const Scaffold(),
             ),
           ),

@@ -149,15 +149,9 @@ class _LessonScreenState extends State<LessonScreen> {
                           label:
                               'About ${asJsonInt(lesson?['minutes'])} minutes',
                           title: asJsonString(lesson?['overview']) ?? '',
-                          footer: Text(
+                          footer: HeroNote(
                             asJsonString(lesson?['note']) ?? '',
                             key: const Key('lesson-note'),
-                            style: TextStyle(
-                              fontFamily: 'Geist',
-                              color: colors.onInk.withValues(alpha: .62),
-                              fontSize: 13,
-                              height: 1.35,
-                            ),
                           ),
                         ),
                       ),

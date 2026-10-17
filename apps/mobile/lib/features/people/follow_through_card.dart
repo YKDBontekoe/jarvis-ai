@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
+import '../../ui/phosphor_icons.dart';
 
 /// Where things stand with one person: the rhythm, birthday and open promises
 /// and whether suggestions for them are on. Read from
@@ -176,84 +178,66 @@ class _FollowThroughCardState extends State<FollowThroughCard> {
             ],
           ),
         ),
-        SurfaceCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                data.cadenceReason,
-                key: const Key('follow-through-cadence'),
-                style: TextStyle(
-                  color: data.cadenceStatus == 'due'
-                      ? colors.danger
-                      : colors.inkSoft,
-                  fontSize: 14,
-                ),
-              ),
-              if (data.birthday != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    data.birthday!,
-                    style: TextStyle(color: colors.inkSoft, fontSize: 14),
-                  ),
-                ),
-              for (final promise in data.promises)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(promise, style: const TextStyle(fontSize: 14)),
-                ),
-              if (!data.hasData)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    'Set a rhythm or a birthday and Jarvis can help you stay in touch.',
-                    style: TextStyle(color: colors.muted, fontSize: 13),
-                  ),
-                ),
-              if (data.quiet)
-                Padding(
-                  key: const Key('follow-through-quiet'),
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          data.mode == 'muted'
-                              ? 'Suggestions are muted.'
-                              : 'Suggestions are snoozed'
-                                    '${data.until == null ? '' : ' until ${data.until!.day}/${data.until!.month}'}.',
-                          style: TextStyle(color: colors.muted, fontSize: 13),
+        FeatureRow(
+          key: const Key('follow-through-cadence'),
+          icon: PhosphorIconsRegular.clock,
+          badgeColor: data.cadenceStatus == 'due'
+              ? colors.warning
+              : colors.accent,
+          title: data.cadenceReason,
+        ),
+        if (data.birthday != null)
+          FeatureRow(
+            index: 1,
+            icon: PhosphorIconsRegular.cake,
+            title: data.birthday!,
+          ),
+        for (final (i, promise) in data.promises.indexed)
+          FeatureRow(
+            index: i + 2,
+            icon: PhosphorIconsRegular.arrowsClockwise,
+            title: promise,
+          ),
+        if (!data.hasData)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Text(
+              'Set a rhythm or a birthday and Jarvis can help you stay in touch.',
+              style: TextStyle(color: colors.muted, fontSize: 13),
+            ),
+          ),
+        if (data.quiet)
+          FeatureRow(
+            key: const Key('follow-through-quiet'),
+            icon: PhosphorIconsRegular.bellSlash,
+            quiet: true,
+            title: data.mode == 'muted'
+                ? 'Suggestions are muted.'
+                : 'Suggestions are snoozed'
+                      '${data.until == null ? '' : ' until ${data.until!.day}/${data.until!.month}'}.',
+            trailing: SoftButton(
+              key: const Key('follow-through-undo'),
+              onPressed: _busy ? null : () => unawaited(_mode('on')),
+              child: const Text('Turn on'),
+            ),
+          )
+        else if (data.reasons.isNotEmpty)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SoftButton(
+              key: const Key('follow-through-not-useful'),
+              onPressed: _busy
+                  ? null
+                  : () => unawaited(
+                      _send(
+                        () => widget.http.post<dynamic>(
+                          '$_path/nudges/not-useful',
                         ),
                       ),
-                      TextButton(
-                        key: const Key('follow-through-undo'),
-                        onPressed: _busy ? null : () => unawaited(_mode('on')),
-                        child: const Text('Turn on'),
-                      ),
-                    ],
-                  ),
-                )
-              else if (data.reasons.isNotEmpty)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    key: const Key('follow-through-not-useful'),
-                    onPressed: _busy
-                        ? null
-                        : () => unawaited(
-                            _send(
-                              () => widget.http.post<dynamic>(
-                                '$_path/nudges/not-useful',
-                              ),
-                            ),
-                          ),
-                    child: const Text('Not useful'),
-                  ),
-                ),
-            ],
+                    ),
+              child: const Text('Not useful'),
+            ),
           ),
-        ),
       ],
     );
   }

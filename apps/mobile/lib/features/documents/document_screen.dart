@@ -156,14 +156,9 @@ class _DocumentScreenState extends State<DocumentScreen>
                               ? 'Ready to share'
                               : '$open thing${open == 1 ? '' : 's'} to check',
                           subtitle: 'Editing, saving and copying send nothing. Sharing is a step you take yourself.',
-                          footer: Text(
+                          footer: HeroNote(
                             saved ? 'Saved to your Library' : 'Not saved yet',
                             key: const Key('document-version'),
-                            style: TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 13,
-                              color: colors.onInk.withValues(alpha: .6),
-                            ),
                           ),
                         ),
                       ),

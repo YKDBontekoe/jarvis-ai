@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../expenses/expense_models.dart'
@@ -101,9 +102,9 @@ class _BudgetsTabState extends State<BudgetsTab> {
     }
   }
 
-  void _toast(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  void _toast(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   Future<void> _call(Future<void> Function() action) async {
     try {
@@ -259,7 +260,10 @@ class _BudgetsTabState extends State<BudgetsTab> {
       await _load();
     } on DioException catch (error) {
       if (mounted) {
-        _toast(firstProblemMessage(error.response?.data) ?? 'Could not undo that import.');
+        _toast(
+          firstProblemMessage(error.response?.data) ??
+              'Could not undo that import.',
+        );
       }
     }
   }
@@ -307,22 +311,18 @@ class _BudgetsTabState extends State<BudgetsTab> {
                 for (final batch in _imports)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: SurfaceCard(
+                    child: FeatureRow(
                       key: Key('import-batch-${batch['id']}'),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Imported ${asJsonInt(batch['imported'])} rows'
-                              '${asJsonInt(batch['edited']) > 0 ? ' (${asJsonInt(batch['edited'])} edited since)' : ''}',
-                            ),
-                          ),
-                          TextButton(
-                            key: Key('import-undo-${batch['id']}'),
-                            onPressed: () => unawaited(_undoImport(batch)),
-                            child: const Text('Undo'),
-                          ),
-                        ],
+                      icon: PhosphorIconsRegular.uploadSimple,
+                      caption: 'Statement import',
+                      title: 'Imported ${asJsonInt(batch['imported'])} rows',
+                      subtitle: asJsonInt(batch['edited']) > 0
+                          ? '${asJsonInt(batch['edited'])} edited since'
+                          : null,
+                      trailing: SoftButton(
+                        key: Key('import-undo-${batch['id']}'),
+                        onPressed: () => unawaited(_undoImport(batch)),
+                        child: const Text('Undo'),
                       ),
                     ),
                   ),

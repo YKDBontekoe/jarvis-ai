@@ -159,14 +159,9 @@ class _StoryScreenState extends State<StoryScreen> {
                               : counts.entries
                                     .map((e) => '${e.value} ${e.key}')
                                     .join(' · '),
-                          footer: Text(
+                          footer: HeroNote(
                             'Version ${asJsonInt(story['version'])} · ${saved ? 'saved privately to your Library' : 'not saved yet'}',
                             key: const Key('story-version'),
-                            style: TextStyle(
-                              fontFamily: 'Geist',
-                              fontSize: 13,
-                              color: colors.onInk.withValues(alpha: .6),
-                            ),
                           ),
                         ),
                       ),

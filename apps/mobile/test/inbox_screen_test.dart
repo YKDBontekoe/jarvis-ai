@@ -199,7 +199,7 @@ void main() {
       await tester.tap(find.byKey(const Key('inbox-tab-commitments')));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Piet is 5 days late'), findsOneWidget);
+      expect(find.textContaining('Piet: '), findsOneWidget);
       expect(find.textContaining('a quick check on'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('followup-copy-c2')));

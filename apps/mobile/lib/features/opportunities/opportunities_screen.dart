@@ -234,7 +234,7 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
       tooltip: 'Not now',
       icon: Icon(
         PhosphorIconsRegular.dotsThree,
-        color: onDark ? colors.onInk : colors.ink,
+        color: onDark ? heroForeground : colors.ink,
       ),
       onSelected: (verdict) => unawaited(_feedback(item, verdict)),
       itemBuilder: (_) => const [
