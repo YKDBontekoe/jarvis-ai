@@ -62,6 +62,20 @@ public sealed class CodexMultiMessageTests : IDisposable
     }
 
     [Fact]
+    public async Task Malformed_tool_arguments_on_the_retry_end_the_turn_with_a_reply()
+    {
+        // The fake answers every turn the same way, so the corrective retry is broken too.
+        var client = CreateClient(("msg-1", ToolCall("RenderUi", """{"kind":"choice","title":"Cut""")));
+
+        var streamed = await StreamTextAsync(client);
+        var response = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "Connect my calendar")],
+            new ChatOptions { Tools = [RenderUi] });
+
+        Assert.Equal(CodexCliChatClient.UnusableToolCallReply, streamed);
+        Assert.Equal(CodexCliChatClient.UnusableToolCallReply, response.Text);
+    }
+
+    [Fact]
     public void ParseLastResponse_reads_the_last_of_back_to_back_objects()
     {
         var raw = Text("first") + "\n" + Text("second");

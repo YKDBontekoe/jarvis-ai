@@ -862,4 +862,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('home-compact-header')), findsNothing);
   });
+
+  testWidgets('coming straight back to the app does not reload Home', (
+    tester,
+  ) async {
+    await show(tester);
+    final before = http.sent('GET', '/api/v1/home').length;
+    expect(before, greaterThan(0));
+
+    for (var i = 0; i < 3; i++) {
+      for (final state in const [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pumpAndSettle();
+    }
+
+    expect(http.sent('GET', '/api/v1/home').length, before);
+  });
 }

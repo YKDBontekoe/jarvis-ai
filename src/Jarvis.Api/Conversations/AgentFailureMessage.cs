@@ -20,6 +20,9 @@ internal static class AgentFailureMessage
         return ConversationTurnService.FailureMessage;
     }
 
+    /// <summary>True when the model provider refused the turn because the plan's usage limit or quota was hit.</summary>
+    public static bool IsRateLimited(Exception exception) => RateLimited(Flatten(exception));
+
     private static bool SignedOut(string text) =>
         Has(text, "401", "unauthorized", "missing bearer", "not logged in", "log in again", "login required",
             "token_expired", "refresh token");

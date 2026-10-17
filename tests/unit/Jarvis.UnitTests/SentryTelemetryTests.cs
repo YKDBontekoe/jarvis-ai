@@ -64,6 +64,18 @@ public class SentryTelemetryTests
     }
 
     [Fact]
+    public void UsedUpPlansAndRequestedCancellationsAreNotIssues()
+    {
+        Assert.False(JarvisSentryExceptions.ShouldCapture(new InvalidOperationException(
+            "Codex CLI model turn failed: You've hit your usage limit. Try again at 7:32 PM.")));
+        Assert.False(JarvisSentryExceptions.ShouldCapture(new OperationCanceledException()));
+        Assert.False(JarvisSentryExceptions.ShouldCapture(new TaskCanceledException()));
+        // An HttpClient timeout surfaces as a cancellation that wraps a TimeoutException: still an issue.
+        Assert.True(JarvisSentryExceptions.ShouldCapture(
+            new TaskCanceledException("timed out", new TimeoutException())));
+    }
+
+    [Fact]
     public void AiContentStaysOffUnlessConfigured()
     {
         Assert.False(JarvisSentry.RecordAiContent(new ConfigurationBuilder().Build()));

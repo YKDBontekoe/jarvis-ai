@@ -10,6 +10,7 @@ import 'appearance.dart';
 import 'error_reporting.dart';
 import 'features/chat/chat_screen.dart';
 import 'l10n/l10n.dart';
+import 'memory_watch.dart';
 import 'push/firebase_bootstrap.dart';
 import 'theme.dart';
 import 'ui/offline_banner.dart';
@@ -26,8 +27,10 @@ Future<void> main() async {
     options.tracesSampleRate = kReleaseMode ? 0.2 : 1.0;
     options.attachScreenshot = false;
     // attachViewHierarchy stays at the SDK default (off). A view dump would include chat text.
+    // No replays: every frame is masked, so they show nothing, and the replay
+    // buffer keeps capturing the screen, which costs memory on iOS.
     options.replay.sessionSampleRate = 0;
-    options.replay.onErrorSampleRate = 1;
+    options.replay.onErrorSampleRate = 0;
     options.privacy.maskAllText = true;
     options.privacy.maskAllImages = true;
     options.beforeSendLog = filterSentryLog;
@@ -38,6 +41,7 @@ Future<void> startJarvis({bool wrapWithSentry = false}) async {
   WidgetsFlutterBinding.ensureInitialized();
   if (wrapWithSentry) sentryTracingEnabled = true;
   installErrorReporting();
+  MemoryWatch.install();
   await initializeFirebase();
   final appearance = AppearanceController();
   await appearance.load();
