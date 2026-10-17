@@ -27,7 +27,7 @@ public static partial class ToolGroups
     [
         new("money", "Expenses, budgets, subscriptions, bank accounts, income, transactions and stock portfolio",
             ["LogExpense", "GetExpenses", "UpdateExpense", "DeleteExpense", "GetFinanceOverview", "GetBudgets",
-             "GetSubscriptions", "SetBudget", "RemoveBudget", "SetSubscriptionStatus", "RemindBeforeCharge",
+             "GetSubscriptions", "GetRenewalReview", "SetBudget", "RemoveBudget", "SetSubscriptionStatus", "RemindBeforeCharge",
              "StartSubscriptionNegotiation", "ImportBankStatement", "GetAccounts", "GetTransactions", "GetPortfolio",
              "AddAccount", "LogIncome", "RecordTrade", "SetHoldingPrice"],
             MoneyKeywords()),

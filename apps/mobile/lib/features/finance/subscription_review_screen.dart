@@ -1,0 +1,436 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+
+import '../../json_maps.dart';
+import '../../theme.dart';
+import '../../ui/jarvis_ui.dart';
+import '../comparisons/comparison_screen.dart';
+import 'negotiate_sheet.dart';
+
+/// The renewal review of one subscription: what the records show, the paths
+/// you can take and what each leads to, a pack saved to the Library, the
+/// provider's reply tracked as a promise, and only what you confirmed counted
+/// as saved or cancelled.
+class SubscriptionReviewScreen extends StatefulWidget {
+  const SubscriptionReviewScreen({
+    required this.http,
+    required this.subscriptionId,
+    this.onAskInChat,
+    super.key,
+  });
+
+  final Dio http;
+  final String subscriptionId;
+  final void Function(String prompt)? onAskInChat;
+
+  @override
+  State<SubscriptionReviewScreen> createState() =>
+      _SubscriptionReviewScreenState();
+}
+
+class _SubscriptionReviewScreenState extends State<SubscriptionReviewScreen> {
+  Map<String, dynamic>? _view;
+  bool _loading = true;
+  bool _busy = false;
+  String? _error;
+
+  String get _path =>
+      '/api/v1/finance/subscriptions/${widget.subscriptionId}/review';
+  Map<String, dynamic> get _subscription =>
+      jsonObject(_view?['subscription']) ?? const {};
+  Map<String, dynamic> get _review => jsonObject(_view?['review']) ?? const {};
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    try {
+      final response = await widget.http.get<dynamic>(_path);
+      if (!mounted) return;
+      setState(() {
+        _view = jsonObject(response.data);
+        _loading = false;
+        _error = null;
+      });
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not load this review.';
+      });
+    }
+  }
+
+  void _toast(String message) => ScaffoldMessenger.maybeOf(context)
+    ?..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(message)));
+
+  /// Runs a call; [apply] reads the answer. Returns whether it worked.
+  Future<bool> _run(
+    Future<Response<dynamic>> Function() call, {
+    void Function(dynamic data)? apply,
+    String? done,
+  }) async {
+    setState(() => _busy = true);
+    try {
+      final response = await call();
+      if (!mounted) return true;
+      if (apply != null) apply(response.data);
+      if (done != null) _toast(done);
+      return true;
+    } on DioException catch (error) {
+      if (mounted) {
+        _toast(
+          firstProblemMessage(error.response?.data) ?? 'That did not work.',
+        );
+      }
+      return false;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _replace(dynamic data) => setState(() => _view = jsonObject(data));
+
+  Future<void> _choose(String choice) async {
+    await _run(
+      () =>
+          widget.http.post<dynamic>('$_path/choice', data: {'choice': choice}),
+      apply: _replace,
+    );
+    if (choice == 'archive' && mounted) Navigator.of(context).maybePop();
+  }
+
+  Future<void> _compare() async {
+    String? id;
+    final ok = await _run(
+      () => widget.http.post<dynamic>('$_path/comparison'),
+      apply: (data) =>
+          id = jsonString(jsonObject(data) ?? const {}, 'comparisonId'),
+    );
+    if (!ok || id == null || !mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ComparisonScreen(http: widget.http, comparisonId: id!),
+      ),
+    );
+    if (mounted) unawaited(_load());
+  }
+
+  Future<void> _pack(String goal) async {
+    final ok = await _run(
+      () => widget.http.post<dynamic>('$_path/pack', data: {'goal': goal}),
+      done: 'Saved to your Library. Nothing was sent.',
+    );
+    if (ok && mounted) unawaited(_load());
+  }
+
+  Future<void> _negotiate() async {
+    final ask = widget.onAskInChat;
+    final choice = await showNegotiateSheet(
+      context,
+      merchant: asJsonString(_subscription['merchant']) ?? '',
+      savedCancelUrl: asJsonString(_subscription['cancelUrl']),
+      browserAvailable: ask != null,
+    );
+    if (choice == null || !mounted) return;
+    String? prompt;
+    final ok = await _run(
+      () => widget.http.post<dynamic>(
+        '/api/v1/finance/subscriptions/${widget.subscriptionId}/negotiate',
+        data: {
+          'goal': choice.goal,
+          'mode': choice.mode,
+          'cancelUrl': choice.cancelUrl,
+        },
+      ),
+      apply: (data) =>
+          prompt = jsonString(jsonObject(data) ?? const {}, 'prompt'),
+      done: choice.mode == 'browser'
+          ? null
+          : 'Jarvis is drafting the message. You will find it in Tasks.',
+    );
+    if (!ok || !mounted) return;
+    if (choice.mode == 'browser' && prompt != null && ask != null) {
+      Navigator.of(context).pop();
+      ask(prompt!);
+      return;
+    }
+    unawaited(_load());
+  }
+
+  Future<void> _followUp() => _run(
+    () => widget.http.post<dynamic>('$_path/follow-up', data: const {}),
+    apply: (_) => unawaited(_load()),
+    done: 'Tracking their reply in your promises.',
+  );
+
+  Future<String?> _ask(String title, String label, {bool numeric = false}) =>
+      showJarvisDialog<String>(
+        context: context,
+        builder: (_) =>
+            _FieldDialog(title: title, label: label, numeric: numeric),
+      );
+
+  Future<void> _confirmPrice() async {
+    final text = await _ask(
+      'The new price you have in writing',
+      'New price per charge',
+      numeric: true,
+    );
+    final amount = double.tryParse((text ?? '').replaceAll(',', '.'));
+    if (amount == null) return;
+    await _run(
+      () => widget.http.post<dynamic>(
+        '$_path/outcome',
+        data: {'confirmedAmount': amount},
+      ),
+      apply: _replace,
+      done: 'Saved. Only this confirmed price counts as a saving.',
+    );
+  }
+
+  Future<void> _confirmCancel() async {
+    final text = await _ask(
+      'Their confirmation',
+      'Reference number, or date and wording of their message',
+    );
+    if (text == null || text.isEmpty) return;
+    await _run(
+      () => widget.http.post<dynamic>(
+        '$_path/cancellation',
+        data: {'evidence': text},
+      ),
+      apply: _replace,
+      done: 'Marked cancelled, with their confirmation noted.',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final status = asJsonString(_subscription['status']) ?? 'active';
+    final saving = jsonObject(_view?['saving']);
+    final paths = jsonMaps(_view?['paths']);
+    return Scaffold(
+      appBar: AppBar(
+        title: PageTitle(
+          asJsonString(_subscription['merchant']) ?? 'Subscription',
+        ),
+      ),
+      body: _loading
+          ? const SkeletonList()
+          : _error != null
+          ? ErrorState(message: _error!, onRetry: _load)
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+              children: [
+                ContentWidth(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (status != 'active')
+                        InlineNotice(
+                          key: const Key('review-status'),
+                          tone: NoticeTone.info,
+                          message: status == 'cancelled'
+                              ? 'Cancelled${asJsonString(_review['cancelEvidence']) == null ? '' : ': ${_review['cancelEvidence']}'}'
+                              : 'Not tracked as a subscription.',
+                        ),
+                      const SectionHeader('What the records show'),
+                      SurfaceCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (final fact in jsonStrings(_view?['facts']))
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Text(
+                                  fact,
+                                  key: const Key('review-fact'),
+                                ),
+                              ),
+                            if (_view?['quiet'] == true)
+                              Text(
+                                'You chose to keep it; Jarvis is quiet about it for now.',
+                                key: const Key('review-quiet'),
+                                style: TextStyle(
+                                  color: colors.muted,
+                                  fontSize: 13,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (saving != null) ...[
+                        const SizedBox(height: 12),
+                        SurfaceCard(
+                          key: const Key('review-saving'),
+                          child: Text(asJsonString(saving['basis']) ?? ''),
+                        ),
+                      ],
+                      if (status == 'active') ...[
+                        const SizedBox(height: 16),
+                        const SectionHeader('What would you like to do?'),
+                        for (final path in paths) _pathCard(path, colors),
+                        const SizedBox(height: 16),
+                        const SectionHeader('Along the way'),
+                        SurfaceCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 4,
+                                children: [
+                                  TextButton(
+                                    key: const Key('review-pack-price'),
+                                    onPressed: _busy
+                                        ? null
+                                        : () => unawaited(_pack('lower_price')),
+                                    child: const Text('Price pack'),
+                                  ),
+                                  TextButton(
+                                    key: const Key('review-pack-cancel'),
+                                    onPressed: _busy
+                                        ? null
+                                        : () => unawaited(_pack('cancel')),
+                                    child: const Text('Cancellation pack'),
+                                  ),
+                                  TextButton(
+                                    key: const Key('review-follow-up'),
+                                    onPressed: _busy
+                                        ? null
+                                        : () => unawaited(_followUp()),
+                                    child: Text(
+                                      _review['followUpCommitmentId'] == null
+                                          ? 'Track their reply'
+                                          : 'Their reply is tracked',
+                                    ),
+                                  ),
+                                  TextButton(
+                                    key: const Key('review-confirm-price'),
+                                    onPressed: _busy
+                                        ? null
+                                        : () => unawaited(_confirmPrice()),
+                                    child: const Text('I have a lower price'),
+                                  ),
+                                  TextButton(
+                                    key: const Key('review-confirm-cancel'),
+                                    onPressed: _busy
+                                        ? null
+                                        : () => unawaited(_confirmCancel()),
+                                    child: const Text(
+                                      'They confirmed the cancellation',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (_review['libraryItemId'] != null)
+                                Text(
+                                  'A pack is saved in your Library.',
+                                  key: const Key('review-pack-saved'),
+                                  style: TextStyle(
+                                    color: colors.muted,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _pathCard(Map<String, dynamic> path, JarvisColors colors) {
+    final id = asJsonString(path['id']) ?? '';
+    final chosen = _review['choice'] == id;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SurfaceCard(
+        key: Key('review-path-$id'),
+        onTap: _busy
+            ? null
+            : () => unawaited(switch (id) {
+                'investigate' => _compare(),
+                'negotiate' || 'cancel' => _negotiate(),
+                _ => _choose(id),
+              }),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${asJsonString(path['label']) ?? ''}${chosen ? ' · your choice' : ''}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              asJsonString(path['nextAction']) ?? '',
+              style: TextStyle(color: colors.inkSoft, fontSize: 13.5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FieldDialog extends StatefulWidget {
+  const _FieldDialog({
+    required this.title,
+    required this.label,
+    required this.numeric,
+  });
+
+  final String title;
+  final String label;
+  final bool numeric;
+
+  @override
+  State<_FieldDialog> createState() => _FieldDialogState();
+}
+
+class _FieldDialogState extends State<_FieldDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.title),
+    content: TextField(
+      key: const Key('review-field'),
+      controller: _controller,
+      keyboardType: widget.numeric
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : null,
+      decoration: InputDecoration(labelText: widget.label),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        key: const Key('review-field-ok'),
+        onPressed: () => Navigator.pop(context, _controller.text.trim()),
+        child: const Text('Save'),
+      ),
+    ],
+  );
+}

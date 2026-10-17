@@ -276,3 +276,19 @@ Stored in owner settings (`goals`, no table). A goal links existing habits, one 
 | POST | `/goals/{id}/review/dismiss` (the keep/change/stop suggestion stays quiet 28 days) · `/goals/{id}/reset-season` (history kept, progress and plan restart) |
 
 A declined step is not proposed again for 28 days. The keep/change/stop suggestion is rule-based on the owner's own check-ins of the current season and needs two; a passed horizon suggests finishing or moving it.
+
+## Subscription renewal review
+
+Per-subscription review state lives in owner settings (`subscriptions.reviews`, no table). Nothing here contacts anyone.
+
+| Method | Route |
+|--------|-------|
+| GET | `/finance/subscriptions/{id}/review` (facts from the bank data with the estimate flagged, notice day, six paths each with its next action, the owner's choice, confirmed saving) |
+| POST | `/finance/subscriptions/{id}/review/choice` (`choice` `keep` (quiet 90 days) / `investigate` / `negotiate` / `cancel` / `remind` (sets the reminder) / `archive` (stops tracking); negotiate and cancel only note the choice) |
+| POST | `.../review/comparison` (starts one comparison with the current plan as the first option; the same id every time) |
+| POST | `.../review/pack` (`goal` `lower_price`/`cancel`, optional `projectId`: a report saved to the Library with account details as `[ADD]` placeholders and a confirmation checklist) |
+| POST | `.../review/follow-up` (`expectedBy`, default a week: the provider's reply as one accepted promise owed to the owner) |
+| POST | `.../review/outcome` (`confirmedAmount` must be lower than the current price; records a saving as a monthly equivalent with its basis and completes the follow-up; the detected charge is not rewritten) |
+| POST | `.../review/cancellation` (`evidence` ≥ 8 characters, the merchant's confirmation; only then the subscription becomes cancelled) |
+
+The agent tool `SetSubscriptionStatus` now needs `evidence` for `cancelled` and goes through the same check.

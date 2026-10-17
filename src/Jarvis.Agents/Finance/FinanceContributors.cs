@@ -8,14 +8,16 @@ namespace Jarvis.Agents.Finance;
 
 /// <summary>Finance tools work in every run; they only change the owner's own budgets and subscription choices.</summary>
 internal sealed class FinanceToolContributor(IFinanceService finance, ICurrentUser currentUser,
-    ISubscriptionNegotiationService? negotiation = null) : IAgentToolContributor
+    ISubscriptionNegotiationService? negotiation = null, ISubscriptionReviewService? review = null)
+    : IAgentToolContributor
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context)
     {
-        var tools = new FinanceAgentTools(finance, currentUser, negotiation);
+        var tools = new FinanceAgentTools(finance, currentUser, negotiation, review);
         yield return AIFunctionFactory.Create(tools.GetFinanceOverviewAsync);
         yield return AIFunctionFactory.Create(tools.GetBudgetsAsync);
         yield return AIFunctionFactory.Create(tools.GetSubscriptionsAsync);
+        yield return AIFunctionFactory.Create(tools.GetRenewalReviewAsync);
         if (context.IsBackgroundTask) yield break;
         yield return AIFunctionFactory.Create(tools.SetBudgetAsync);
         yield return AIFunctionFactory.Create(tools.RemoveBudgetAsync);

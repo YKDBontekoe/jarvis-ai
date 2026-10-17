@@ -14,6 +14,7 @@ import '../expenses/expense_models.dart'
 import '../tasks/task_details_screen.dart';
 import 'finance_models.dart';
 import 'negotiate_sheet.dart';
+import 'subscription_review_screen.dart';
 
 Future<String?> _pickStatement() async {
   final file = await FilePicker.pickFile(
@@ -99,6 +100,19 @@ class _BudgetsTabState extends State<BudgetsTab> {
         );
       }
     }
+  }
+
+  Future<void> _openReview(SubscriptionData item) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => SubscriptionReviewScreen(
+          http: widget.http,
+          subscriptionId: item.id,
+          onAskInChat: widget.onAskInChat,
+        ),
+      ),
+    );
+    if (mounted) await _load();
   }
 
   Future<void> _negotiate(SubscriptionData item) async {
@@ -468,6 +482,15 @@ class _BudgetsTabState extends State<BudgetsTab> {
                 ),
               ),
               child: const Text('Track again'),
+            ),
+          if (active)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: Key('subscription-review-${item.id}'),
+                onPressed: () => unawaited(_openReview(item)),
+                child: const Text('Review this subscription'),
+              ),
             ),
           if (active) ..._negotiation(context, item),
         ],
