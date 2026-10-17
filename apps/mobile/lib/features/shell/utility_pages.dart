@@ -23,6 +23,8 @@ import '../coding/coding_runs_screen.dart';
 import '../comparisons/comparison_screen.dart';
 import '../comparisons/comparisons_screen.dart';
 import '../apps/app_goals_screen.dart';
+import '../documents/document_screen.dart';
+import '../documents/documents_screen.dart';
 import '../goals/goal_screen.dart';
 import '../library/lesson_screen.dart';
 import '../scenarios/scenarios_screen.dart';
@@ -122,6 +124,11 @@ Widget? utilityPageFor(
   final lesson when lesson.startsWith('lesson:') => LessonScreen(
     http: http,
     itemId: lesson.substring('lesson:'.length),
+  ),
+  'documents' => DocumentsScreen(http: http),
+  final document when document.startsWith('document:') => DocumentScreen(
+    http: http,
+    documentId: document.substring('document:'.length),
   ),
   'scenarios' => ScenariosScreen(http: http),
   'goals' => GoalsScreen(http: http),

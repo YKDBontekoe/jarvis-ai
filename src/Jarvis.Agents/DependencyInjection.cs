@@ -94,6 +94,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Goals.GoalToolContributor>();
         services.AddScoped<IAgentToolContributor, Scenarios.ScenarioToolContributor>();
         services.AddScoped<IAgentToolContributor, Apps.AppGoalToolContributor>();
+        services.AddScoped<IAgentToolContributor, Documents.DocumentToolContributor>();
         services.AddScoped<IAgentToolContributor, Meetings.MeetingToolContributor>();
         services.AddScoped<IAgentToolContributor, Reviews.WeekFollowThroughToolContributor>();
         services.AddScoped<IAgentToolContributor, Library.LibraryToolContributor>();

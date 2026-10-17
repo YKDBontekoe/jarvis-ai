@@ -803,6 +803,25 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
       {'id': 'e1', 'kind': 'explain_back', 'prompt': 'In your own words, what is the main idea of “Sourdough basics”?', 'hint': 'Mention the key terms you remember from the points above.', 'source': {'quote': 'x', 'offset': 0}},
     ],
   },
+  'GET /api/v1/documents': [
+    {'id': 'd1', 'title': 'Home renovation: update 17 Oct 2026', 'kind': 'project_update', 'version': 3, 'savedVersion': 2},
+  ],
+  'GET /api/v1/documents/d1': {
+    'draft': {
+      'id': 'd1', 'title': 'Home renovation: update 17 Oct 2026', 'version': 3, 'savedVersion': 2,
+      'sections': [
+        {'id': 'where', 'heading': 'Where we are', 'body': 'Home renovation: Cook for ten people in the new kitchen by June. (status: active).', 'refs': ['project:p2'], 'edited': false, 'previous': null},
+        {'id': 'next', 'heading': 'Next step', 'body': 'Order the oak worktop first.', 'refs': ['project:p2'], 'edited': true, 'previous': 'Choose the tiles'},
+        {'id': 'promises', 'heading': 'Open promises', 'body': '- Owed to us by Rosa Visser: Send the tile quote (due 14 Oct 2026, late)', 'refs': ['commitment:c1'], 'edited': false, 'previous': null},
+        {'id': 'background', 'heading': 'Background', 'body': '[ADD: a source to cite]', 'refs': <Object>[], 'edited': false, 'previous': null},
+      ],
+    },
+    'checklist': [
+      {'text': '1 section(s) still have [ADD…] placeholders to fill or remove.', 'ok': false},
+      {'text': 'Names of people appear in the promises: check they should be seen by this audience.', 'ok': false},
+      {'text': 'Saving or exporting does not send anything. Sharing is a separate step you take yourself.', 'ok': true},
+    ],
+  },
   'GET /api/v1/goals': [
     {'id': 'g1', 'title': 'Run a 10k', 'status': 'active', 'checkInDue': true, 'checkInCount': 1, 'feeling': 'slipping', 'openPlanItems': 2, 'review': {'verdict': 'change', 'reason': 'Your last 2 check-ins mention slipping or stuck. What would make it easier?'}},
   ],

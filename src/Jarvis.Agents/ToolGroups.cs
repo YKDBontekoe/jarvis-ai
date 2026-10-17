@@ -64,6 +64,9 @@ public static partial class ToolGroups
         new("comparisons", "Weigh options against criteria: create a comparison, record what is known, see the ranking",
             ["CreateComparison", "SetComparisonCell", "GetComparison"],
             ComparisonKeywords()),
+        new("documents", "Draft a one-page project update from the user's own records, nothing is sent",
+            ["DraftProjectUpdate"],
+            DocumentKeywords()),
         new("apps", "Find which app can do a job for the user, what it could read or change, and how to connect it",
             ["FindAppForGoal"],
             AppGoalKeywords()),
@@ -253,6 +256,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(compare|comparison|which (one|should)|pros and cons|versus|\bvs\b|choose between|shortlist|vergelijk|vergelijking|welke (moet|zal)|kiezen tussen)", KeywordOptions)]
     private static partial Regex ComparisonKeywords();
+
+    [GeneratedRegex(@"\b(project update|status update|progress report|write (up )?(an? )?update|statusupdate|voortgangsrapport|schrijf (een )?update)", KeywordOptions)]
+    private static partial Regex DocumentKeywords();
 
     [GeneratedRegex(@"\b(connect (my|an?|the)|which app|what app|integrate|integration|hook up|can you (read|access) my (calendar|e-?mail|contacts)|koppel|verbind|welke app)", KeywordOptions)]
     private static partial Regex AppGoalKeywords();

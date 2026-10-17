@@ -156,6 +156,12 @@ const quickCommands = [
     keywords: ['connect', 'app', 'apps', 'integrate', 'calendar', 'email', 'contacts', 'koppel', 'verbind', 'welke app'],
   ),
   QuickCommand(
+    label: 'Go to Documents',
+    icon: PhosphorIconsRegular.notePencil,
+    destination: 'documents',
+    keywords: ['documents', 'document', 'update', 'report', 'draft', 'project update', 'rapport', 'concept', 'statusupdate'],
+  ),
+  QuickCommand(
     label: 'Go to What if',
     icon: PhosphorIconsRegular.sliders,
     destination: 'scenarios',

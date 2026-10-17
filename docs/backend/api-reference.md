@@ -347,3 +347,18 @@ Built without a model from the item's own text, so the same text always gives th
 | GET | `/library/{id}/lesson` (up to five quoted sentences with their offsets, three fill-in-the-blank questions and one explain-it-back prompt, a time estimate and an honesty note; 400 when the text is too thin to teach from) |
 | POST | `/library/{id}/lesson/check` (`questionId`, `answer`: verdict `correct` / `close` / `incorrect` / `unsure`, the expected answer and the quoted source; empty or "I don't know" is `unsure`; explain-it-back is checked against terms from the source and says it is not a judgement of understanding) |
 | POST | `/library/{id}/lesson/cards` (`questionIds`, only fill-in questions, at most five, into the existing SM-2 cards with the source sentence on the back; repeats are skipped) |
+
+## Documents (F27 first slice: project update)
+
+Drafts live in owner settings (`documents.drafts`, at most 20, no table). Creating, saving and exporting never send or share anything.
+
+| Method | Route |
+|--------|-------|
+| GET/POST | `/documents` (POST `kind` `project_update`, `projectId`, `audience` `team`/`client`/`self`, `language` `en`/`nl`: sections Where we are, Next step, Open promises (linked to the project), Background (the project's Library notes, max three), Open questions; every filled section carries `refs` (`project:`, `commitment:`, `library:`); unknowns are `[ADD: …]` placeholders and listed) |
+| GET/DELETE | `/documents/{id}` (GET adds a short review checklist: placeholders left, uncited sections, people named, "saving does not send") |
+| PUT | `/documents/{id}/sections/{sectionId}` (`body`, the owner's words; only that section changes, the previous text is kept) |
+| POST | `.../sections/{sectionId}/revise` (`action` `shorten` or `rebuild` from the sources) · `.../sections/{sectionId}/undo` |
+| POST | `/documents/{id}/save` (a Library report in the project with a Sources line per section, titled with the version; saving the same version again returns the same item) |
+| GET | `/documents/{id}/export?format=md\|txt` (a file download) |
+
+`POST /library/notes` now also takes an optional `projectId` (validated against the owner) so notes can be filed in a project.

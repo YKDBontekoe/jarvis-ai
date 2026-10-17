@@ -89,6 +89,7 @@ public static class LifeFeaturesRegistration
             Jarvis.Application.Inbox.CommitmentFollowUpService>();
         services.AddScoped<Jarvis.Application.Scenarios.IScenarioService, Jarvis.Application.Scenarios.ScenarioService>();
         services.AddScoped<Jarvis.Application.Integrations.IAppGoalService, Jarvis.Application.Integrations.AppGoalService>();
+        services.AddScoped<Jarvis.Application.Documents.IDocumentService, Jarvis.Application.Documents.DocumentService>();
         services.AddScoped<Jarvis.Application.Goals.IGoalService, Jarvis.Application.Goals.GoalService>();
         services.AddScoped<Jarvis.Application.Comparisons.IComparisonRepository, ComparisonRepository>();
         services.AddScoped<Jarvis.Application.Comparisons.IComparisonService, Jarvis.Application.Comparisons.ComparisonService>();

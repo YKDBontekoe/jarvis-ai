@@ -10,7 +10,7 @@ namespace Jarvis.Api.Endpoints;
 public sealed record ClipRequest(string? Url, string? Note);
 
 public sealed record NoteRequest(string? Title, string? Content, string? Kind, string? Url, string[]? Tags,
-    bool? MakeFlashcards);
+    bool? MakeFlashcards, Guid? ProjectId = null);
 
 public sealed record TagsRequest(string[]? Tags);
 
@@ -70,11 +70,14 @@ internal static class LibraryEndpoints
         }).WithName("ClipToLibrary");
 
         group.MapPost("/notes", async (NoteRequest request, ILibraryService library, IAuditEventStore audit,
-            ICurrentUser currentUser, CancellationToken ct) =>
+            Jarvis.Application.Projects.IProjectStore projects, ICurrentUser currentUser, CancellationToken ct) =>
         {
+            if (request.ProjectId is { } projectId &&
+                await projects.GetAsync(projectId, currentUser.OwnerId, ct) is null)
+                return EndpointHelpers.Invalid("projectId", "That project was not found.");
             var result = await library.AddNoteAsync(currentUser.OwnerId, new NoteDraft(request.Title, request.Content,
                 request.Kind?.Trim().ToLowerInvariant() ?? LibraryKinds.Note, request.Url, request.Tags,
-                LibraryOrigins.App, null, request.MakeFlashcards == true), ct);
+                LibraryOrigins.App, request.ProjectId, request.MakeFlashcards == true), ct);
             if (result.Succeeded) await AuditAsync(audit, logger, currentUser, "library.noted", result.Value!.Id, ct);
             return Respond(result, item => ToDto(item, false));
         }).WithName("AddLibraryNote");
