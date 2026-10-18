@@ -466,3 +466,13 @@ A trip workspace in owner settings (`trips`, at most 10 trips, 12 options, 80 it
 ### Mode context and focus
 
 `GET /modes/context` returns the card for the current mode: why (`source`, `reason`), time left, what is muted, what still reaches the phone, essentials that stay available, and a statement that a mode never grants a permission. `POST /modes/focus` (`intention` up to 200 characters, `minutes` 5–240, default 45) starts a timed manual Focus with one chosen next action; one session at a time. `POST /modes/focus/end` (`reflection` up to 500, optional) ends it and returns to automatic; an expired session is closed the same way and keeps no reflection unless given. `GET /modes/focus` lists the last 10 sessions. `POST /modes/correct` turns an automatic (guessed) mode into Normal until the guess would have ended; a mode the owner chose is refused (400). Sessions live in owner settings (`context-modes.focus`).
+
+### Home routines
+
+Routine templates (`morning`, `focus`, `leave`, `evening`), the devices a source reports and a per-routine plan the owner can edit. The only source today is an example fixture (`source: "fixture"`), so Jarvis is not connected to a real home and every run is a **simulation**: each action ends as `simulated`, `read` (with the value), `unavailable`, `not_run` (security controls such as locks are never run by a routine and need the owner's own approval), `skipped` (taken out by the owner) or `reversed`. A step that names a device uses that device and is `unavailable` when it is away; it never falls back to a different one. State lives in owner settings (`home.routines`: choices and the last 10 runs).
+
+| Method | Path |
+|---|---|
+| GET | `/home-routines` (templates, devices, notice), `/home-routines/runs`, `/home-routines/{id}/plan` |
+| PUT | `/home-routines/{id}/choices` (`removed` action ids, `devices` map of action id to a device that can do it; 400 otherwise) |
+| POST | `/home-routines/{id}/run`, `/home-routines/runs/{runId}/reverse` (only simulated reversible actions; once) |

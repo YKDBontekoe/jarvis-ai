@@ -82,6 +82,9 @@ public static partial class ToolGroups
         new("trips", "Plan a trip inside Jarvis: dates, options with dated and sourced prices, what is still unknown; nothing is booked",
             ["CreateTrip", "AddTripOption", "GetTrip"],
             TripKeywords()),
+        new("home-routines", "Preview what a home routine (morning, focus, leave, evening) would do; example devices, nothing is run",
+            ["PreviewHomeRoutine"],
+            HomeRoutineKeywords()),
         new("documents", "Draft a one-page project update from the user's own records, nothing is sent",
             ["DraftProjectUpdate"],
             DocumentKeywords()),
@@ -289,6 +292,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(save (that|this|it)|keep (that|this)|what did we (do|cover|save)|recap (this|our) (session|chat|call)|sla (dat|dit) op|wat hebben we gedaan)", KeywordOptions)]
     private static partial Regex VoiceCardKeywords();
+
+    [GeneratedRegex(@"\b(home routine|leave home|morning routine|evening routine|wind.?down|smart home|turn off the lights|thuisroutine|verlaat het huis|avondroutine)", KeywordOptions)]
+    private static partial Regex HomeRoutineKeywords();
 
     [GeneratedRegex(@"\b(trip|holiday|vacation|itinerary|flight|hotel|city break|weekend away|vakantie|reis|reisje|vlucht|hotel|stedentrip|uitje)", KeywordOptions)]
     private static partial Regex TripKeywords();

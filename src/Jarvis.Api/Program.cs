@@ -132,6 +132,7 @@ api.MapStoryEndpoints();
 api.MapSetupEndpoints();
 api.MapPreferenceEndpoints();
 api.MapTripEndpoints();
+api.MapHomeRoutineEndpoints();
 api.MapMeetingEndpoints();
 api.MapMissionEndpoints(app.Logger);
 api.MapEventEndpoints();

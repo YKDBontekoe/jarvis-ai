@@ -869,6 +869,30 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     'focusRunning': true, 'reflectionDue': false,
     'alwaysAvailable': ['Approvals stay one tap away.', 'You can switch the mode off at any time.', 'Reminders and problems still arrive.'],
   },
+  'GET /api/v1/home-routines': {
+    'routines': [
+      {'id': 'morning', 'title': 'Morning overview', 'description': 'A read-only look at your home before the day starts.', 'steps': [{'id': 'm-temp'}, {'id': 'm-door'}]},
+      {'id': 'focus', 'title': 'Start focus', 'description': 'Dim the room and save energy while you work.', 'steps': [{'id': 'f-light'}, {'id': 'f-living'}, {'id': 'f-eco'}]},
+      {'id': 'leave', 'title': 'Leave home', 'description': 'Switch things off and secure the door.', 'steps': [{'id': 'l-living'}, {'id': 'l-eco'}, {'id': 'l-lock'}]},
+    ],
+    'devices': [
+      {'id': 'light-living', 'name': 'Living room light', 'room': 'Living room', 'kind': 'light', 'present': true, 'reading': null, 'source': 'fixture'},
+      {'id': 'light-bedroom', 'name': 'Bedroom lamp', 'room': 'Bedroom', 'kind': 'light', 'present': false, 'reading': null, 'source': 'fixture'},
+      {'id': 'thermostat-hall', 'name': 'Hall thermostat', 'room': 'Hall', 'kind': 'climate', 'present': true, 'reading': '19.5 °C', 'source': 'fixture'},
+    ],
+    'source': 'fixture',
+    'notice': 'These are example devices. Jarvis is not connected to a real home, so a run only shows what it would do and changes nothing.',
+  },
+  'GET /api/v1/home-routines/focus/plan': {
+    'template': {'id': 'focus', 'title': 'Start focus', 'description': 'Dim the room and save energy while you work.'},
+    'summary': '2 of 3 would run, 1 unavailable.',
+    'simulation': true,
+    'steps': [
+      {'step': {'id': 'f-light', 'label': 'Turn off the bedroom lamp', 'readOnly': false, 'sensitive': false, 'reversible': true}, 'device': {'name': 'Bedroom lamp'}, 'status': 'unavailable', 'reason': 'Bedroom lamp is not reachable.'},
+      {'step': {'id': 'f-living', 'label': 'Turn off the living room light', 'readOnly': false, 'sensitive': false, 'reversible': true}, 'device': {'name': 'Living room light'}, 'status': 'ready', 'reason': 'Would run.'},
+      {'step': {'id': 'f-eco', 'label': 'Set the hall thermostat to eco', 'readOnly': false, 'sensitive': false, 'reversible': true}, 'device': {'name': 'Hall thermostat'}, 'status': 'removed', 'reason': 'You took this out.'},
+    ],
+  },
   'GET /api/v1/trips': [
     {'id': 't1', 'title': 'Lisbon in November', 'destination': 'Lisbon', 'start': '2026-11-12', 'end': '2026-11-15', 'unknowns': 3},
   ],

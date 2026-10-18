@@ -28,6 +28,8 @@ const destinations = [
   'home-zone',
   'trips',
   'modes',
+  'home-routines',
+  'home-routine:focus',
   'trip:t1',
   'queued-changes',
   'mission-starter',

@@ -291,3 +291,13 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **Inspectable and correctable (F35.7).** The reason is shown on the card; "Not right now" turns a wrong automatic mode (for example a meeting) into Normal until that guess would have ended. A mode the owner chose is never "corrected".
 - **Tests.** .NET `ModeContextTests` (10), Dart `modes_screen_test` (+5), screenshots `audit-*-modes` (light, dark, large text; also fixed a 3x-text overflow in the mode rows and header), real-stack `tests/e2e/modes_context_flow.mjs`.
 - **Not done in F35.** Attaching a profile, Home emphasis or routine draft to a mode (F35.2), the ambient privacy view (F35.3), voice entry points (F35.5), a grouped catch-up of held items (F35.6), reflection history screen, and the chosen next action coming from a plan item rather than free text.
+
+## Checkpoint 30: F36 first slice, home routines as a simulation on example devices
+
+- **Honest source (F36.1/F36.3).** Devices come from a labelled fixture; the screen and the API say Jarvis is not connected to a real home and a run changes nothing. No device is promised that is not in the source.
+- **Templates (F36.2).** Morning overview (read only), Start focus, Leave home, Evening wind-down; each action shows its device and capability.
+- **Plan and simulation (F36.3/F36.6).** Each action is ready, unavailable, needs approval or taken out; a summary says how many would run. A run lists per-action outcomes and never says everything succeeded when one device is away. A step that names an absent device stays unavailable and never moves to another device. Reversible simulated actions can be undone once.
+- **Gates (F36.4).** Security controls (the front door lock) are shown but never run by a routine; reads and effects are separate step kinds. The agent tool `PreviewHomeRoutine` only previews.
+- **Owner control (F36.5, in part).** The owner can take actions out and choose another capable device (validated); choices are stored per owner.
+- **Tests.** .NET `HomeRoutineTests` (9), Dart `home_routines_test` (4), screenshots `audit-*-home-routines` and `home-routine:focus` (light, dark, large text), real-stack `tests/e2e/home_routine_flow.mjs`.
+- **Not done in F36.** A real device source (Home Assistant through the connector) and discovery of its entities (F36.1), per-routine manual versus approved-automation invocation and Automation Studio linking (F36.5), privacy controls and "device not present" feedback for shared displays (F36.7), device selection UI in the app (the API accepts it), and running anything on real hardware.

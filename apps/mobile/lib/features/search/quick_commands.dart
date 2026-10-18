@@ -162,6 +162,12 @@ const quickCommands = [
     keywords: ['trip', 'travel', 'holiday', 'vacation', 'itinerary', 'flight', 'hotel', 'vakantie', 'reis', 'vlucht'],
   ),
   QuickCommand(
+    label: 'Home routines',
+    icon: PhosphorIconsRegular.house,
+    destination: 'home-routines',
+    keywords: ['home', 'routine', 'routines', 'lights', 'leave', 'evening', 'morning', 'thuis', 'routine', 'verlichting'],
+  ),
+  QuickCommand(
     label: 'Waiting to sync',
     icon: PhosphorIconsRegular.clock,
     destination: 'queued-changes',

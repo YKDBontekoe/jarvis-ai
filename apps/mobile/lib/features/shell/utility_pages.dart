@@ -15,6 +15,8 @@ import '../memory/memory_screen.dart';
 import '../missions/mission_result_screen.dart';
 import '../missions/mission_starter_screen.dart';
 import '../missions/missions_screen.dart';
+import '../home_routines/home_routines_screen.dart';
+import '../home_routines/routine_screen.dart';
 import '../modes/modes_screen.dart';
 import '../automations/automations_screen.dart';
 import '../reminders/reminders_screen.dart';
@@ -142,6 +144,11 @@ Widget? utilityPageFor(
   'notification-settings' => NotificationSettingsScreen(http: http),
   'home-zone' => HomeZoneScreen(http: http),
   'trips' => TripsScreen(http: http),
+  'home-routines' => HomeRoutinesScreen(http: http),
+  final routine when routine.startsWith('home-routine:') => RoutineScreen(
+    http: http,
+    routineId: routine.substring('home-routine:'.length),
+  ),
   final trip when trip.startsWith('trip:') => TripScreen(
     http: http,
     tripId: trip.substring('trip:'.length),
