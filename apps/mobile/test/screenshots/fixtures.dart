@@ -893,6 +893,16 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
       {'step': {'id': 'f-eco', 'label': 'Set the hall thermostat to eco', 'readOnly': false, 'sensitive': false, 'reversible': true}, 'device': {'name': 'Hall thermostat'}, 'status': 'removed', 'reason': 'You took this out.'},
     ],
   },
+  'GET /api/v1/profiles/presets': [
+      {'preset': {'id': 'planning', 'name': 'Planning partner', 'description': 'Helps you decide what to do next and when.', 'needsSources': false}, 'existingProfileId': 'p1', 'scope': {'memory': 'All your memories', 'files': 'All your documents', 'skills': 'All your skills', 'limits': []}},
+      {'preset': {'id': 'research', 'name': 'Research analyst', 'description': 'Answers from the sources you choose and says what is unknown.', 'needsSources': true}, 'existingProfileId': null, 'scope': {'memory': 'Only pinned memories', 'files': 'All your documents', 'skills': 'All your skills', 'limits': ['Does not recall all of your memories.', 'Cannot save new memories.']}},
+      {'preset': {'id': 'writing', 'name': 'Writing editor', 'description': 'Tightens your writing without changing what you mean.', 'needsSources': false}, 'existingProfileId': null, 'scope': {'memory': 'Memories made in this profile, plus pinned', 'files': 'All your documents', 'skills': 'All your skills', 'limits': []}},
+  ],
+  'GET /api/v1/outcomes/learned': {'applied': <Object>[], 'waiting': <Object>[], 'summary': 'Here is what Jarvis would change from what you told it. Nothing changes until you say so.'},
+  'GET /api/v1/outcomes/changes': [
+    {'change': {'id': 'c1', 'kind': 'style', 'artifactKind': 'project_update', 'value': 'short', 'title': 'Keep project update short', 'reason': 'You said project update was too long 3 times in the last 30 days.', 'before': 'The migration is going well overall. Most of the services have been moved across and tested, and a few smaller items are still outstanding.', 'after': 'Migration: 80% done. Left: reporting jobs, old cron entries.', 'synthetic': true, 'status': 'pending'}, 'effect': null},
+    {'change': {'id': 'c2', 'kind': 'quiet', 'artifactKind': 'opportunity', 'value': 'quiet', 'title': 'Stop volunteering opportunity suggestions', 'reason': 'You dismissed opportunity suggestions 4 times in the last 14 days.', 'before': 'Jarvis mentions a new opportunity when it notices one.', 'after': 'Jarvis mentions an opportunity only when you ask.', 'synthetic': true, 'status': 'applied'}, 'effect': null},
+  ],
   'GET /api/v1/trips': [
     {'id': 't1', 'title': 'Lisbon in November', 'destination': 'Lisbon', 'start': '2026-11-12', 'end': '2026-11-15', 'unknowns': 3},
   ],

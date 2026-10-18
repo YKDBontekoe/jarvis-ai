@@ -100,6 +100,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Setup.SetupToolContributor>();
         services.AddScoped<IAgentToolContributor, Trips.TripToolContributor>();
         services.AddScoped<IAgentToolContributor, HomeRoutines.HomeRoutineToolContributor>();
+        services.AddScoped<IAgentToolContributor, Profiles.ProfileGuidanceToolContributor>();
         services.AddScoped<IAgentToolContributor, Voice.VoiceCompanionToolContributor>();
         services.AddScoped<IAgentToolContributor, Missions.MissionResultToolContributor>();
         services.AddScoped<IAgentToolContributor, Notifications.NotificationToolContributor>();
@@ -110,6 +111,7 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Library.ILibraryDigester, Library.ModelLibraryDigester>();
         services.AddScoped<IAgentToolContributor, Modes.ModeToolContributor>();
         services.AddScoped<IAgentContextContributor, Modes.ModeContextContributor>();
+        services.AddScoped<IAgentContextContributor, Outcomes.OutcomeStyleContributor>();
         services.AddScoped<IAgentToolContributor, Missions.MissionToolContributor>();
         services.AddScoped<IAgentContextContributor, Missions.MissionContextContributor>();
         services.AddScoped<Jarvis.Application.Missions.IMissionPlanner, Missions.ModelMissionPlanner>();

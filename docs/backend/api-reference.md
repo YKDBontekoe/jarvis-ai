@@ -476,3 +476,22 @@ Routine templates (`morning`, `focus`, `leave`, `evening`), the devices a source
 | GET | `/home-routines` (templates, devices, notice), `/home-routines/runs`, `/home-routines/{id}/plan` |
 | PUT | `/home-routines/{id}/choices` (`removed` action ids, `devices` map of action id to a device that can do it; 400 otherwise) |
 | POST | `/home-routines/{id}/run`, `/home-routines/runs/{runId}/reverse` (only simulated reversible actions; once) |
+
+### Working styles (profile presets and suggestions)
+
+Five presets (`planning`, `research`, `writing`, `tutor`, `operator`) are templates for the existing assistant profiles: persona text and memory choices only. They never restrict to files or skills the owner has not picked (`needsSources` says when the owner still has to choose them) and creating one never makes it the default. `POST /profiles/suggest` (`text`, optional `currentProfileId`) returns a suggestion that names the words it matched, compares scope with the current profile (`scopeChange`), lists anything that would widen access (`broadens`) and always needs the owner's confirmation then; it creates and switches nothing. `GET /profiles/{id}/scope` returns a compact summary (skills, documents, memory, language, learning, limits) and notes that conversations already started keep the profile version they began with.
+
+| Method | Path |
+|---|---|
+| GET | `/profiles/presets`, `/profiles/{id}/scope` |
+| POST | `/profiles/presets/{presetId}/create` (400 if a profile with that name exists), `/profiles/suggest` |
+
+### Outcome learning
+
+Owner feedback tied to something Jarvis made (`artifactKind`: `project_update`, `story`, `comparison`, `mission_result`, `trip`, `scenario`, `opportunity`, `suggestion`) with one of `accepted`, `revised`, `dismissed`, `not_useful`, `wrong_assumption`, `too_much_effort`, `successful` and optionally `aspect` `too_long`/`too_short`. Silence is never stored. Three matching complaints in 30 days (or three dismissals of a volunteered kind in 14 days) produce a pending **behavior change**: a style preference or quieting a kind of suggestion, with its reason and a labelled made-up before/after. A change carries no tool, permission or scope field. Rejected or undone changes are never offered again; feedback is not pooled across profiles; a profile with `contributeToLearning` off, `captureSignals` off or `proposeImprovements` off stores or proposes nothing. Applied changes become a short style note for the agent (for that profile only), and the effect is reported as "too early to say" until a week has passed and then as a small-sample comparison, never as causation. State lives in owner settings (`outcomes`).
+
+| Method | Path |
+|---|---|
+| POST | `/outcomes/feedback` |
+| GET | `/outcomes/changes`, `/outcomes/learned` |
+| POST | `/outcomes/changes/{id}/apply`, `/reject`, `/undo` |

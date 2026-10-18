@@ -162,6 +162,18 @@ const quickCommands = [
     keywords: ['trip', 'travel', 'holiday', 'vacation', 'itinerary', 'flight', 'hotel', 'vakantie', 'reis', 'vlucht'],
   ),
   QuickCommand(
+    label: 'What Jarvis learned',
+    icon: PhosphorIconsRegular.sparkle,
+    destination: 'learned',
+    keywords: ['learned', 'learn', 'feedback', 'style', 'preferences', 'improve', 'geleerd', 'voorkeuren', 'verbeter'],
+  ),
+  QuickCommand(
+    label: 'Working styles',
+    icon: PhosphorIconsRegular.userCircle,
+    destination: 'working-styles',
+    keywords: ['profile', 'profiles', 'style', 'working style', 'tutor', 'writing', 'research', 'werkstijl', 'profiel'],
+  ),
+  QuickCommand(
     label: 'Home routines',
     icon: PhosphorIconsRegular.house,
     destination: 'home-routines',

@@ -29,6 +29,8 @@ const destinations = [
   'trips',
   'modes',
   'home-routines',
+  'working-styles',
+  'learned',
   'home-routine:focus',
   'trip:t1',
   'queued-changes',

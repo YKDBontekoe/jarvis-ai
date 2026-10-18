@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
+import '../outcomes/outcome_feedback_row.dart';
 import '../search/context_commands.dart';
 import '../../theme.dart';
 import '../../ui/feature_kit.dart';
@@ -181,6 +182,12 @@ class _DocumentScreenState extends State<DocumentScreen>
                               : colors.warning,
                           title: asJsonString(checklist[i]['text']) ?? '',
                         ),
+                      const SizedBox(height: 8),
+                      OutcomeFeedbackRow(
+                        http: widget.http,
+                        artifactKind: 'project_update',
+                        artifactId: widget.documentId,
+                      ),
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 10,

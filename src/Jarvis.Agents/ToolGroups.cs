@@ -82,6 +82,9 @@ public static partial class ToolGroups
         new("trips", "Plan a trip inside Jarvis: dates, options with dated and sourced prices, what is still unknown; nothing is booked",
             ["CreateTrip", "AddTripOption", "GetTrip"],
             TripKeywords()),
+        new("working-styles", "Suggest which assistant working style (profile) fits a task and what would change; only suggests",
+            ["SuggestWorkingStyle"],
+            WorkingStyleKeywords()),
         new("home-routines", "Preview what a home routine (morning, focus, leave, evening) would do; example devices, nothing is run",
             ["PreviewHomeRoutine"],
             HomeRoutineKeywords()),
@@ -292,6 +295,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(save (that|this|it)|keep (that|this)|what did we (do|cover|save)|recap (this|our) (session|chat|call)|sla (dat|dit) op|wat hebben we gedaan)", KeywordOptions)]
     private static partial Regex VoiceCardKeywords();
+
+    [GeneratedRegex(@"\b(working style|which profile|switch profile|assistant profile|writing mode|tutor mode|werkstijl|welk profiel|schakel profiel)", KeywordOptions)]
+    private static partial Regex WorkingStyleKeywords();
 
     [GeneratedRegex(@"\b(home routine|leave home|morning routine|evening routine|wind.?down|smart home|turn off the lights|thuisroutine|verlaat het huis|avondroutine)", KeywordOptions)]
     private static partial Regex HomeRoutineKeywords();
