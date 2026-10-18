@@ -385,4 +385,67 @@ void main() {
       expect(http.sent('POST', '/api/v1/modes/catch-up/clear'), hasLength(1));
     },
   );
+
+  testWidgets(
+    'a suggested profile that widens access says so and switches nothing',
+    (tester) async {
+      http.on('GET', '/api/v1/modes/suggestion', {
+        'mode': 'focus',
+        'label': 'Focus',
+        'profile': {
+          'id': 'p1',
+          'name': 'Planning partner',
+          'scopeChange': {
+            'details': ['Memory recall scope is different.'],
+          },
+          'broadens': ['It can recall more of your memories.'],
+        },
+        'routine': {'id': 'focus', 'title': 'Start focus'},
+        'visualOnly': ['Jarvis shows this as a suggestion.'],
+        'needsYou': [
+          'Nothing switches profile by itself; a switch that widens access asks you first.',
+        ],
+      });
+      await show(tester, ModesScreen(http: http.client(), now: _now));
+
+      expect(
+        find.text('Profile: Planning partner · Routine: Start focus'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('mode-suggestion-broadens')), findsOneWidget);
+      expect(
+        find.textContaining('Nothing switches profile by itself'),
+        findsOneWidget,
+      );
+      expect(http.requests.where((r) => r.method != 'GET'), isEmpty);
+    },
+  );
+
+  testWidgets('attaching a profile and routine to a mode saves both', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/profiles', [
+      {'id': 'p1', 'name': 'Research analyst'},
+    ]);
+    http.on('GET', '/api/v1/home-routines', {
+      'routines': [
+        {'id': 'focus', 'title': 'Start focus'},
+      ],
+    });
+    http.on('GET', '/api/v1/modes/attachments', <Object>[]);
+    http.on('PUT', '/api/v1/modes/focus/attachment', {'mode': 'focus'});
+    await show(tester, ModesScreen(http: http.client(), now: _now));
+
+    await tester.tap(find.byKey(const Key('mode-attach-focus')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('attach-profile-p1')));
+    await tester.tap(find.byKey(const Key('attach-routine-focus')));
+    await tester.tap(find.byKey(const Key('attach-save')));
+    await tester.pumpAndSettle();
+
+    final body =
+        http.sent('PUT', '/api/v1/modes/focus/attachment').single.body as Map;
+    expect(body['profileId'], 'p1');
+    expect(body['routineId'], 'focus');
+  });
 }

@@ -509,3 +509,7 @@ A saved starter for a recurring job: a name, one of the owner's profiles, option
 | GET / POST | `/workspaces` |
 | PUT / DELETE | `/workspaces/{id}` |
 | POST | `/workspaces/{id}/launch` |
+
+### Mode attachments
+
+`PUT /modes/{mode}/attachment` (`profileId`, `routineId`, both optional; neither clears it) saves the profile and/or home routine (`morning`, `focus`, `leave`, `evening`) the owner prefers in that mode; profiles must be the owner's. `GET /modes/attachments` lists them and `GET /modes/suggestion?currentProfileId=` returns what the **current** mode suggests: the profile with its scope change against the profile in use and anything that would widen access, the routine, `visualOnly` (what is only shown) and `needsYou` (what still takes the owner). Nothing switches or runs from an attachment. A deleted profile is reported as a `problem`, never replaced. State lives in owner settings (`context-modes.attachments`).

@@ -31,6 +31,7 @@ public static class SettingsSections
     public const string HomeRoutines = "home.routines";
     public const string Outcomes = "outcomes";
     public const string Workspaces = "workspaces";
+    public const string ModeAttachments = "context-modes.attachments";
     public const string CatchUp = "context-modes.catchup";
     public const string Routines = "routines";
     public const string PeopleRadar = "people-radar";

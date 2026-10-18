@@ -10,6 +10,8 @@ public sealed record ActiveModeRequest(string? Mode, int? Minutes);
 
 public sealed record ModeSettingsRequest(bool? Auto, string? SleepStart, string? SleepEnd);
 
+public sealed record ModeAttachmentRequest(Guid? ProfileId, string? RoutineId);
+
 public sealed record CatchUpDomainRequest(string? Domain, bool? Included);
 
 public sealed record FocusStartRequest(string? Intention, int? Minutes);
@@ -47,6 +49,23 @@ internal static class ModeEndpoints
 
         group.MapGet("/context", async (IModeContextService context, ICurrentUser currentUser, CancellationToken ct) =>
             Results.Ok(await context.GetAsync(currentUser.OwnerId, ct))).WithName("GetModeContext");
+
+        group.MapGet("/attachments", async (Guid? currentProfileId, IModeAttachmentService attachments,
+            ICurrentUser currentUser, CancellationToken ct) =>
+            Results.Ok(await attachments.ListAsync(currentUser.OwnerId, currentProfileId, ct))).WithName("ListModeAttachments");
+
+        group.MapGet("/suggestion", async (Guid? currentProfileId, IModeAttachmentService attachments,
+            ICurrentUser currentUser, CancellationToken ct) =>
+            Results.Ok(await attachments.SuggestAsync(currentUser.OwnerId, currentProfileId, ct))).WithName("GetModeSuggestion");
+
+        group.MapPut("/{mode}/attachment", async (string mode, ModeAttachmentRequest request, IModeAttachmentService attachments,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var result = await attachments.SetAsync(currentUser.OwnerId, mode, request.ProfileId, request.RoutineId, ct);
+            return result.Succeeded
+                ? Results.Ok(result.Value)
+                : ApiProblemResults.Validation(result.Field ?? "request", result.Message ?? "The request is invalid.");
+        }).WithName("SetModeAttachment");
 
         group.MapGet("/catch-up", async (ICatchUpService catchUp, ICurrentUser currentUser, CancellationToken ct) =>
             Results.Ok(await catchUp.GetAsync(currentUser.OwnerId, ct))).WithName("GetCatchUp");

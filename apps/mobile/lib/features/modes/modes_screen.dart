@@ -9,6 +9,7 @@ import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'ambient_screen.dart';
 import 'catch_up_card.dart';
+import 'mode_attachment.dart';
 import 'mode_context_card.dart';
 import 'modes_models.dart';
 
@@ -28,6 +29,7 @@ class _ModesScreenState extends State<ModesScreen> {
   ModeStateData? _state;
   Map<String, dynamic>? _card;
   Map<String, dynamic>? _catchUp;
+  Map<String, dynamic>? _suggestion;
   bool _loading = true;
   String? _error;
 
@@ -76,10 +78,76 @@ class _ModesScreenState extends State<ModesScreen> {
       if (mounted) setState(() => _card = null);
     }
     try {
+      final response = await widget.http.get<dynamic>(
+        '/api/v1/modes/suggestion',
+      );
+      if (mounted) setState(() => _suggestion = jsonObject(response.data));
+    } on DioException {
+      if (mounted) setState(() => _suggestion = null);
+    }
+    try {
       final response = await widget.http.get<dynamic>('/api/v1/modes/catch-up');
       if (mounted) setState(() => _catchUp = jsonObject(response.data));
     } on DioException {
       if (mounted) setState(() => _catchUp = null);
+    }
+  }
+
+  Future<void> _attach(ModeInfo mode) async {
+    List<Map<String, dynamic>> profiles = const [];
+    List<Map<String, dynamic>> routines = const [];
+    String? profileId;
+    String? routineId;
+    try {
+      profiles = jsonMaps(
+        (await widget.http.get<dynamic>('/api/v1/profiles')).data,
+      );
+      routines = jsonMaps(
+        jsonObject(
+          (await widget.http.get<dynamic>('/api/v1/home-routines')).data,
+        )?['routines'],
+      );
+      for (final item in jsonMaps(
+        (await widget.http.get<dynamic>('/api/v1/modes/attachments')).data,
+      )) {
+        if (asJsonString(item['mode']) == mode.id) {
+          profileId = asJsonString(jsonObject(item['profile'])?['id']);
+          routineId = asJsonString(jsonObject(item['routine'])?['id']);
+        }
+      }
+    } on DioException {
+      // The sheet still opens with what loaded.
+    }
+    if (!mounted) return;
+    final draft = await showModalBottomSheet<Map<String, Object?>>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => ModeAttachmentSheet(
+        label: mode.label,
+        profiles: profiles,
+        routines: routines,
+        profileId: profileId,
+        routineId: routineId,
+      ),
+    );
+    if (draft == null) return;
+    try {
+      await widget.http.put<dynamic>(
+        '/api/v1/modes/${mode.id}/attachment',
+        data: draft,
+      );
+      await _loadCard();
+    } on DioException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              firstProblemMessage(error.response?.data) ?? 'That did not work.',
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -215,6 +283,8 @@ class _ModesScreenState extends State<ModesScreen> {
                         onChanged: _reload,
                         onLeave: () => _switch('auto'),
                       ),
+                    if (_suggestion case final suggestion?)
+                      ModeSuggestionCard(data: suggestion),
                     if (_catchUp case final catchUp?)
                       CatchUpCard(
                         http: widget.http,
@@ -291,6 +361,12 @@ class _ModesScreenState extends State<ModesScreen> {
 
   Widget _modeRow(ModeStateData state, ModeInfo mode, bool large) {
     final actions = [
+      IconButton(
+        key: Key('mode-attach-${mode.id}'),
+        tooltip: 'Suggest a profile or routine in this mode',
+        icon: const Icon(PhosphorIconsRegular.sparkle, size: 20),
+        onPressed: () => unawaited(_attach(mode)),
+      ),
       IconButton(
         key: Key('mode-policy-${mode.id}'),
         tooltip: 'Notifications in this mode',

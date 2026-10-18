@@ -328,3 +328,10 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **Honest states.** A deleted profile or project is shown as "needs a fix" with the reason, and launch is refused rather than falling back to the default profile. The first message is only suggested, never sent for the owner.
 - **Tests.** .NET `WorkspaceTests` (5), Dart `workspaces_test` (4), screenshot `audit-*-workspaces`, real-stack `tests/e2e/workspace_flow.mjs`.
 - **Not done in F33.4.** Choosing sources (collections) per workspace (only meaningful as a subset of the profile's own, which needs the profile editor), sending the first message automatically, editing a workspace in the app (API supports it), and launching from the working-styles suggestion.
+
+## Checkpoint 34: F35.2, a preferred profile and routine per mode, as suggestions
+
+- **What.** The owner can attach a profile and/or a home routine to a mode from the mode list. While that mode is on, the Modes screen shows them as a suggestion with the scope change against the profile in use, anything that would widen access, and two plain lists: what is only shown, and what still needs the owner.
+- **What it does not do.** Nothing switches profile or runs a routine by itself; a profile switch that widens access still asks first, and a routine only previews (security controls need approval). A deleted profile is reported, never swapped for another.
+- **Tests.** .NET `ModeAttachmentTests` (6), Dart `modes_screen_test` (+2), screenshots via the Modes audit (light, dark, large text), real-stack `tests/e2e/mode_attachment_flow.mjs`.
+- **Not done in F35.** Applying Home emphasis per mode (no Home emphasis setting exists to attach), one-tap switch to the suggested profile from the card, the ambient privacy view (F35.3), voice entry points (F35.5), plan item as the focus action.

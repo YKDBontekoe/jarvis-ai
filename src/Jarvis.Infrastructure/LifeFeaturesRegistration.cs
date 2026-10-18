@@ -80,6 +80,7 @@ public static class LifeFeaturesRegistration
         services.AddScoped<IModeService, ModeService>();
         services.AddScoped<IModeContextService, ModeContextService>();
         services.AddScoped<ICatchUpService, CatchUpService>();
+        services.AddScoped<IModeAttachmentService, ModeAttachmentService>();
         services.AddScoped<Jarvis.Application.Notifications.INotificationPreferenceService, Jarvis.Application.Notifications.NotificationPreferenceService>();
         services.AddScoped<IPushDigestService, PushDigestService>();
 

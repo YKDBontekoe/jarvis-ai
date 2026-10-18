@@ -868,6 +868,14 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     'total': 3, 'stillHolding': false, 'since': '2026-10-18T03:00:00Z',
     'summary': '3 came in while pushes were quiet. 3 more are left out of this recap but still in your notifications.',
   },
+  'GET /api/v1/modes/suggestion': {
+    'mode': 'focus', 'label': 'Focus',
+    'profile': {'id': 'p1', 'name': 'Research analyst', 'scopeChange': {'details': ['Memory recall scope is different.']}, 'broadens': <Object>[]},
+    'routine': {'id': 'focus', 'title': 'Start focus'},
+    'visualOnly': ['Jarvis shows this profile and routine as a suggestion while the mode is on.'],
+    'needsYou': ['Nothing switches profile by itself; a switch that widens access asks you first.', 'A routine only previews what it would do. Running one is a step you take, and security controls always need your approval.'],
+    'problem': null,
+  },
   'GET /api/v1/modes/context': {
     'mode': 'focus', 'label': 'Focus', 'source': 'manual', 'reason': 'You switched on Focus until 14:50.', 'until': '2026-10-18T14:50:00', 'minutesLeft': 32, 'notifications': 'important',
     'muted': 'Only things that cannot wait reach your phone; everything else waits in the app.',
