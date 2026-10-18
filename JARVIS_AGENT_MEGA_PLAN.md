@@ -414,3 +414,9 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **What.** The owner keeps a list of topics (screen under Settings). A message that mentions one as whole words, ignoring case and accents, is not looked at for memories at all, a model-extracted memory that mentions one is not stored, and an improvement proposal for it is dropped. Saving something on purpose is never blocked.
 - **Tests.** .NET `DoNotLearnTests` (3, including the gate and per-owner privacy), Dart `do_not_learn_test` (3), screenshot `audit-*-do-not-learn`, real-stack `tests/e2e/do_not_learn_flow.mjs` (list behaviour; the chat extraction itself needs a model and was covered by the unit test of the gate).
 - **Not done in F03.** Per-profile do-not-learn lists, delayed-job fencing (F03.1.5), cross-session evals (F03.1.6), outcome tracking of memories (F03.1.7) and provenance for graph facts and reports (F03.2).
+
+## Checkpoint 43: F35.3, the ambient display hides names on a shared screen
+
+- **What.** The ambient desk display used to show event and reminder titles to anyone in the room. It now shows the time and "an event" or "a reminder" until the owner turns names on with the eye button; the choice is remembered on that device only (a phone and a hallway tablet can differ). Approvals still show as a count, never by name.
+- **Tests.** Dart `modes_screen_test` (hidden by default, the toggle reveals them, a remembered choice is honoured).
+- **Not done in F35.3.** A chosen project's next action and an optional briefing summary on the display (both would need the same hide-by-default rule), and a quiet clock style.

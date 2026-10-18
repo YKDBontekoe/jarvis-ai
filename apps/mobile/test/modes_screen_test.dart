@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jarvis_mobile/features/modes/ambient_screen.dart';
 import 'package:jarvis_mobile/features/modes/modes_models.dart';
 import 'package:jarvis_mobile/features/modes/modes_screen.dart';
@@ -75,6 +76,7 @@ void main() {
   late FixtureHttp http;
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     http = FixtureHttp();
     http.on('GET', '/api/v1/modes', _state());
   });
@@ -185,10 +187,37 @@ void main() {
 
     expect(find.text('14:05'), findsOneWidget);
     expect(find.text('Normal'), findsOneWidget);
-    expect(find.textContaining('Dentist'), findsOneWidget);
-    expect(find.textContaining('Call mum'), findsOneWidget);
+    // A shared screen shows the time but not what the event or reminder is called, until the owner allows it.
+    expect(find.textContaining('Dentist'), findsNothing);
+    expect(find.textContaining('Call mum'), findsNothing);
+    expect(find.text('Next: 15:30  an event'), findsOneWidget);
+    expect(find.text('Reminder: 16:00  a reminder'), findsOneWidget);
     expect(find.text('1 waiting for your approval'), findsOneWidget);
     expect(find.text('Phone battery 64%'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('ambient-privacy')));
+    await tester.pumpAndSettle();
+    expect(find.text('Next: 15:30  Dentist'), findsOneWidget);
+    expect(find.text('Reminder: 16:00  Call mum'), findsOneWidget);
+  });
+
+  testWidgets('the owner choice to show names is remembered on this device', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({'jarvis.ambient.showTitles': true});
+    http.on('GET', '/api/v1/home', {
+      'reminders': <Object>[],
+      'approvals': <Object>[],
+      'calendar': {
+        'connected': true,
+        'events': [
+          {'title': 'Dentist', 'startAt': '2026-10-05T15:30:00'},
+        ],
+      },
+    });
+    await show(tester, AmbientScreen(http: http.client(), now: _now));
+
+    expect(find.text('Next: 15:30  Dentist'), findsOneWidget);
   });
 
   testWidgets('the card says what is quiet and that a mode grants nothing', (
