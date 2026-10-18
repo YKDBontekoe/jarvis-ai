@@ -462,3 +462,7 @@ A trip workspace in owner settings (`trips`, at most 10 trips, 12 options, 80 it
 | PUT | `/trips/{id}/options/{optionId}/chosen` (`chosen`), `/trips/{id}/checklist/{entryId}` (`done`), `/trips/{id}/dates` (`start`, `end`) |
 | POST | `/trips/{id}/items`, `/trips/{id}/dates/preview` |
 | DELETE | `/trips/{id}/items/{itemId}` |
+
+### Mode context and focus
+
+`GET /modes/context` returns the card for the current mode: why (`source`, `reason`), time left, what is muted, what still reaches the phone, essentials that stay available, and a statement that a mode never grants a permission. `POST /modes/focus` (`intention` up to 200 characters, `minutes` 5–240, default 45) starts a timed manual Focus with one chosen next action; one session at a time. `POST /modes/focus/end` (`reflection` up to 500, optional) ends it and returns to automatic; an expired session is closed the same way and keeps no reflection unless given. `GET /modes/focus` lists the last 10 sessions. `POST /modes/correct` turns an automatic (guessed) mode into Normal until the guess would have ended; a mode the owner chose is refused (400). Sessions live in owner settings (`context-modes.focus`).

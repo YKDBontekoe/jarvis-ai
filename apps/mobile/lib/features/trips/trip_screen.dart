@@ -75,10 +75,11 @@ class _TripScreenState extends State<TripScreen> {
       final response = await call();
       if (mounted) setState(() => _view = jsonObject(response.data) ?? _view);
     } on DioException catch (error) {
-      if (mounted)
+      if (mounted) {
         _toast(
           firstProblemMessage(error.response?.data) ?? 'That did not work.',
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -132,13 +133,15 @@ class _TripScreenState extends State<TripScreen> {
         showDragHandle: true,
         builder: (_) => _ReplanSheet(preview: preview),
       );
-      if (confirmed == true)
+      if (confirmed == true) {
         await _send(() => widget.http.put<dynamic>('$_path/dates', data: body));
+      }
     } on DioException catch (error) {
-      if (mounted)
+      if (mounted) {
         _toast(
           firstProblemMessage(error.response?.data) ?? 'That did not work.',
         );
+      }
     }
   }
 
@@ -300,10 +303,9 @@ class _TripScreenState extends State<TripScreen> {
       caption: asJsonString(option['kind']),
       title: asJsonString(option['title']) ?? '',
       subtitle: [
-        if (price != null) price,
+        ?price,
         asJsonString(view['quoteNote']) ?? '',
-        if (asJsonString(option['cancellation']) case final cancellation?)
-          cancellation,
+        ?asJsonString(option['cancellation']),
       ].join('\n'),
       trailing: StatusPill(
         label: switch (state) {

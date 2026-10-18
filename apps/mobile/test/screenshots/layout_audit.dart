@@ -27,6 +27,7 @@ const destinations = [
   'setup',
   'home-zone',
   'trips',
+  'modes',
   'trip:t1',
   'queued-changes',
   'mission-starter',

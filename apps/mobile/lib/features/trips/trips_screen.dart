@@ -315,9 +315,9 @@ class _NewTripSheetState extends State<_NewTripSheet> {
               'end': dateKey(_end),
               'travelers': _travelers,
               'abroad': _abroad,
-              if (double.tryParse(_budget.text.trim().replaceAll(',', '.'))
-                  case final budget?)
-                'budget': budget,
+              'budget': ?double.tryParse(
+                _budget.text.trim().replaceAll(',', '.'),
+              ),
               'currency': 'EUR',
             }),
           ),

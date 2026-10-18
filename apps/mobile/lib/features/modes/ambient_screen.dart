@@ -34,7 +34,9 @@ class _AmbientScreenState extends State<AmbientScreen> {
   @override
   void initState() {
     super.initState();
-    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky));
+    unawaited(
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
+    );
     if (widget.now == null) {
       _tick = Timer.periodic(
         const Duration(seconds: 20),
@@ -66,7 +68,9 @@ class _AmbientScreenState extends State<AmbientScreen> {
       final events = jsonMaps(jsonObject(map?['calendar'])?['events']);
       setState(() {
         _mode = ModeStateData.fromJson(mode.data);
-        _nextReminder = reminders.isEmpty ? null : _line(reminders.first, 'dueAt');
+        _nextReminder = reminders.isEmpty
+            ? null
+            : _line(reminders.first, 'dueAt');
         _nextEvent = events.isEmpty ? null : _line(events.first, 'startAt');
         _battery = asJsonInt(jsonObject(map?['device'])?['batteryPercent'], -1);
         if (_battery! < 0) _battery = null;
@@ -122,7 +126,10 @@ class _AmbientScreenState extends State<AmbientScreen> {
                   ),
                 const SizedBox(height: 32),
                 if (_nextEvent != null)
-                  Text('Next: $_nextEvent', style: const TextStyle(color: soft, fontSize: 20)),
+                  Text(
+                    'Next: $_nextEvent',
+                    style: const TextStyle(color: soft, fontSize: 20),
+                  ),
                 if (_nextReminder != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -144,7 +151,10 @@ class _AmbientScreenState extends State<AmbientScreen> {
                     padding: const EdgeInsets.only(top: 24),
                     child: Text(
                       'Phone battery $_battery%',
-                      style: const TextStyle(color: Color(0xFF7C8092), fontSize: 14),
+                      style: const TextStyle(
+                        color: Color(0xFF7C8092),
+                        fontSize: 14,
+                      ),
                     ),
                   ),
               ],

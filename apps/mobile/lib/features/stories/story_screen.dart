@@ -73,10 +73,11 @@ class _StoryScreenState extends State<StoryScreen> {
       setState(() => _story = jsonObject(response.data) ?? _story);
       if (done != null) _toast(done);
     } on DioException catch (error) {
-      if (mounted)
+      if (mounted) {
         _toast(
           firstProblemMessage(error.response?.data) ?? 'That did not work.',
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -106,10 +107,11 @@ class _StoryScreenState extends State<StoryScreen> {
       await Clipboard.setData(ClipboardData(text: '${response.data}'));
       if (mounted) _toast('Copied as Markdown. Nothing was sent.');
     } on DioException catch (error) {
-      if (mounted)
+      if (mounted) {
         _toast(
           firstProblemMessage(error.response?.data) ?? 'Could not export it.',
         );
+      }
     }
   }
 

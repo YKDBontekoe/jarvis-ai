@@ -8,6 +8,7 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'ambient_screen.dart';
+import 'mode_context_card.dart';
 import 'modes_models.dart';
 
 /// The mode Jarvis is in (focus, meeting, sleep, …): switch it by hand, let
@@ -24,6 +25,7 @@ class ModesScreen extends StatefulWidget {
 
 class _ModesScreenState extends State<ModesScreen> {
   ModeStateData? _state;
+  Map<String, dynamic>? _card;
   bool _loading = true;
   String? _error;
 
@@ -43,6 +45,7 @@ class _ModesScreenState extends State<ModesScreen> {
       final response = await request();
       if (!mounted) return;
       final state = ModeStateData.fromJson(response.data);
+      unawaited(_loadCard());
       setState(() {
         _state = state ?? _state;
         _loading = false;
@@ -56,12 +59,24 @@ class _ModesScreenState extends State<ModesScreen> {
       if (_state == null) {
         setState(() => _error = message);
       } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }
+
+  /// The card is extra: older servers answer 404 and the screen works without it.
+  Future<void> _loadCard() async {
+    try {
+      final response = await widget.http.get<dynamic>('/api/v1/modes/context');
+      if (mounted) setState(() => _card = jsonObject(response.data));
+    } on DioException {
+      if (mounted) setState(() => _card = null);
+    }
+  }
+
+  Future<void> _reload() =>
+      _call(() => widget.http.get<dynamic>('/api/v1/modes'));
 
   Future<void> _switch(String mode, {int? minutes}) => _call(
     () => widget.http.put<dynamic>(
@@ -183,7 +198,18 @@ class _ModesScreenState extends State<ModesScreen> {
               ? const SizedBox.shrink()
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                  children: [_current(state), ..._list(state), _auto(state)],
+                  children: [
+                    _current(state),
+                    if (_card case final card?)
+                      ModeContextCard(
+                        http: widget.http,
+                        context: card,
+                        onChanged: _reload,
+                        onLeave: () => _switch('auto'),
+                      ),
+                    ..._list(state),
+                    _auto(state),
+                  ],
                 ),
         ),
       ),
@@ -194,28 +220,38 @@ class _ModesScreenState extends State<ModesScreen> {
     final colors = JarvisColors.of(context);
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 16),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          IconBadge(icon: modeIcon(state.mode), size: 44, color: colors.accent),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  state.label,
-                  key: const Key('mode-current'),
-                  style: Theme.of(context).textTheme.titleLarge,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              IconBadge(
+                icon: modeIcon(state.mode),
+                size: 44,
+                color: colors.accent,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      state.label,
+                      key: const Key('mode-current'),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    Text(state.reason, style: TextStyle(color: colors.inkSoft)),
+                    Text(
+                      notificationLevelLabel(state.notifications),
+                      style: TextStyle(color: colors.muted, fontSize: 12.5),
+                    ),
+                  ],
                 ),
-                Text(state.reason, style: TextStyle(color: colors.inkSoft)),
-                Text(
-                  notificationLevelLabel(state.notifications),
-                  style: TextStyle(color: colors.muted, fontSize: 12.5),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          if (state.manual)
+          if (state.manual && _card == null)
             TextButton(
               key: const Key('mode-auto'),
               onPressed: () => unawaited(_switch('auto')),
@@ -226,53 +262,75 @@ class _ModesScreenState extends State<ModesScreen> {
     );
   }
 
-  List<Widget> _list(ModeStateData state) => [
-    for (final mode in state.modes)
-      SurfaceCard(
-        key: Key('mode-${mode.id}'),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-        child: Row(
-          children: [
-            IconBadge(icon: modeIcon(mode.id), size: 36),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    mode.label,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    mode.description,
-                    style: TextStyle(
-                      color: JarvisColors.of(context).inkSoft,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              key: Key('mode-policy-${mode.id}'),
-              tooltip: 'Notifications in this mode',
-              icon: const Icon(PhosphorIconsRegular.bellSlash, size: 20),
-              onPressed: () => unawaited(_pickPolicy(mode)),
-            ),
-            FilledButton.tonal(
-              key: Key('mode-switch-${mode.id}'),
-              onPressed: state.mode == mode.id && state.manual
-                  ? null
-                  : () => unawaited(
-                      _switch(mode.id, minutes: mode.id == 'normal' ? null : 120),
-                    ),
-              child: Text(state.mode == mode.id ? 'On' : 'Use for 2 h'),
-            ),
-          ],
+  List<Widget> _list(ModeStateData state) {
+    final large = MediaQuery.textScalerOf(context).scale(1) > 1.5;
+    return [
+      for (final mode in state.modes)
+        SurfaceCard(
+          key: Key('mode-${mode.id}'),
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+          child: _modeRow(state, mode, large),
         ),
+    ];
+  }
+
+  Widget _modeRow(ModeStateData state, ModeInfo mode, bool large) {
+    final actions = [
+      IconButton(
+        key: Key('mode-policy-${mode.id}'),
+        tooltip: 'Notifications in this mode',
+        icon: const Icon(PhosphorIconsRegular.bellSlash, size: 20),
+        onPressed: () => unawaited(_pickPolicy(mode)),
       ),
-  ];
+      FilledButton.tonal(
+        key: Key('mode-switch-${mode.id}'),
+        onPressed: state.mode == mode.id && state.manual
+            ? null
+            : () => unawaited(
+                _switch(mode.id, minutes: mode.id == 'normal' ? null : 120),
+              ),
+        child: Text(state.mode == mode.id ? 'On' : 'Use for 2 h'),
+      ),
+    ];
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(mode.label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        Text(
+          mode.description,
+          style: TextStyle(
+            color: JarvisColors.of(context).inkSoft,
+            fontSize: 13,
+          ),
+        ),
+      ],
+    );
+    final badge = IconBadge(icon: modeIcon(mode.id), size: 36);
+    if (large) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          badge,
+          const SizedBox(height: 8),
+          body,
+          const SizedBox(height: 4),
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: actions,
+          ),
+        ],
+      );
+    }
+    return Row(
+      children: [
+        badge,
+        const SizedBox(width: 12),
+        Expanded(child: body),
+        ...actions,
+      ],
+    );
+  }
 
   Widget _auto(ModeStateData state) => SurfaceCard(
     margin: const EdgeInsets.only(top: 6),

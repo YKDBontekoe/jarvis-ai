@@ -283,3 +283,11 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **Agent.** `CreateTrip`, `AddTripOption`, `GetTrip` (tool group `trips`).
 - **Tests.** .NET `TripTests` (13), Dart `trips_test` (5), screenshots `audit-*-trips` / `trip:t1` (light, dark, large text), real-stack `tests/e2e/trip_flow.mjs`.
 - **Not done in F24.** Pulling bookings from mail or calendar, live price lookups, maps and travel-time estimates beyond the entered minutes, sharing a trip, packing lists per weather, currency conversion, and creating the calendar holds on acceptance (they are only proposals today). The date-range picker interaction is not covered by a widget test (preview/confirm is covered through the service and e2e).
+
+## Checkpoint 29: F35 first slice, a mode card, focus sessions and correctable guesses
+
+- **Card (F35.1).** Each mode shows why it is on, time left, what is quiet, what still reaches the phone, and an exit. It states that a mode only changes pushes and reply length and never grants a permission or approves anything (acceptance: changing mode grants nothing).
+- **Focus (F35.4).** "Start focus" sets a timed manual Focus (5–240 min) with one next action in the owner's words, shows only that action in a hero, keeps approvals and the exit visible, and ends with an optional one-line reflection. Manual mode keeps precedence and expires on its own; an expired session asks for a reflection and can be skipped. Ending never switches off a different mode the owner chose afterwards. Agent tool `StartFocus` (group `modes`).
+- **Inspectable and correctable (F35.7).** The reason is shown on the card; "Not right now" turns a wrong automatic mode (for example a meeting) into Normal until that guess would have ended. A mode the owner chose is never "corrected".
+- **Tests.** .NET `ModeContextTests` (10), Dart `modes_screen_test` (+5), screenshots `audit-*-modes` (light, dark, large text; also fixed a 3x-text overflow in the mode rows and header), real-stack `tests/e2e/modes_context_flow.mjs`.
+- **Not done in F35.** Attaching a profile, Home emphasis or routine draft to a mode (F35.2), the ambient privacy view (F35.3), voice entry points (F35.5), a grouped catch-up of held items (F35.6), reflection history screen, and the chosen next action coming from a plan item rather than free text.

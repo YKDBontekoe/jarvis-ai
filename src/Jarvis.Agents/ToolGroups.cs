@@ -108,7 +108,7 @@ public static partial class ToolGroups
             ["PlanMission", "RunMission", "GetMissions", "PauseOrResumeMission", "CancelMission", "GetMissionResult"],
             MissionKeywords()),
         new("modes", "Assistant modes such as focus or travel: get or set the current mode",
-            ["GetCurrentMode", "SetMode"],
+            ["GetCurrentMode", "SetMode", "StartFocus"],
             ModeKeywords()),
         new("devices", "The user's connected phones and computers: list, battery, location, clipboard, notify, open URL",
             ["ListDevices", "GetDeviceBattery", "NotifyDevice", "GetDeviceLocation", "ReadDeviceClipboard",

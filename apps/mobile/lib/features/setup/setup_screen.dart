@@ -72,10 +72,11 @@ class _SetupScreenState extends State<SetupScreen> {
       );
       if (mounted) setState(() => _view = jsonObject(response.data) ?? _view);
     } on DioException catch (error) {
-      if (mounted)
+      if (mounted) {
         _toast(
           firstProblemMessage(error.response?.data) ?? 'That did not work.',
         );
+      }
     }
   }
 
@@ -126,11 +127,12 @@ class _SetupScreenState extends State<SetupScreen> {
         ),
       );
     } on DioException catch (error) {
-      if (mounted)
+      if (mounted) {
         _toast(
           firstProblemMessage(error.response?.data) ??
               'Could not build the report.',
         );
+      }
     }
   }
 

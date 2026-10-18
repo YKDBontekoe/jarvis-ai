@@ -92,10 +92,11 @@ class _HomeZoneScreenState extends State<HomeZoneScreen> {
       if (confirmed != true || !mounted) return;
       await _save(id);
     } on DioException catch (error) {
-      if (mounted)
+      if (mounted) {
         _toast(
           firstProblemMessage(error.response?.data) ?? 'That did not work.',
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -109,10 +110,11 @@ class _HomeZoneScreenState extends State<HomeZoneScreen> {
       );
       if (mounted) setState(() => _view = jsonObject(response.data) ?? _view);
     } on DioException catch (error) {
-      if (mounted)
+      if (mounted) {
         _toast(
           firstProblemMessage(error.response?.data) ?? 'Could not save it.',
         );
+      }
     }
   }
 

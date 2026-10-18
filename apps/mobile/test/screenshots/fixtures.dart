@@ -851,6 +851,24 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     'homeTimeZone': 'Europe/Amsterdam', 'source': 'brief', 'chosen': false, 'localNow': 'Sat 17 Oct 14:07',
     'explanation': 'You never chose one, so Jarvis borrows the zone from your morning brief.',
   },
+  'GET /api/v1/modes': {
+    'mode': 'focus', 'label': 'Focus', 'source': 'manual', 'reason': 'You switched on Focus until 14:50.', 'until': '2026-10-18T14:50:00', 'notifications': 'important', 'auto': true, 'sleepStart': '23:00', 'sleepEnd': '07:00',
+    'modes': [
+      {'id': 'normal', 'label': 'Normal', 'description': 'Everything as usual.', 'notifications': 'all', 'tone': null, 'customised': false},
+      {'id': 'focus', 'label': 'Focus', 'description': 'Only reminders and approvals buzz your phone. Short, to-the-point replies.', 'notifications': 'important', 'tone': null, 'customised': false},
+      {'id': 'sleep', 'label': 'Sleep', 'description': 'Do not disturb. Nothing buzzes your phone.', 'notifications': 'none', 'tone': null, 'customised': false},
+    ],
+  },
+  'GET /api/v1/modes/context': {
+    'mode': 'focus', 'label': 'Focus', 'source': 'manual', 'reason': 'You switched on Focus until 14:50.', 'until': '2026-10-18T14:50:00', 'minutesLeft': 32, 'notifications': 'important',
+    'muted': 'Only things that cannot wait reach your phone; everything else waits in the app.',
+    'stillReaches': ['Reminders', 'Approvals', 'Triggered watches'],
+    'effects': 'A mode only changes which pushes reach your phone and how short Jarvis replies are. It never grants a permission, approves anything or does anything for you.',
+    'canCorrect': false, 'exitLabel': 'Switch it off',
+    'focus': {'id': 'f1', 'intention': 'Finish the report outline', 'startedAt': '2026-10-18T14:05:00', 'endsAt': '2026-10-18T14:50:00', 'endedAt': null, 'reflection': null},
+    'focusRunning': true, 'reflectionDue': false,
+    'alwaysAvailable': ['Approvals stay one tap away.', 'You can switch the mode off at any time.', 'Reminders and problems still arrive.'],
+  },
   'GET /api/v1/trips': [
     {'id': 't1', 'title': 'Lisbon in November', 'destination': 'Lisbon', 'start': '2026-11-12', 'end': '2026-11-15', 'unknowns': 3},
   ],

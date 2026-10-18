@@ -72,10 +72,11 @@ class _MissionResultScreenState extends State<MissionResultScreen> {
       setState(() => _result = jsonObject(response.data) ?? _result);
       _toast('Saved privately to your Library.');
     } on DioException catch (error) {
-      if (mounted)
+      if (mounted) {
         _toast(
           firstProblemMessage(error.response?.data) ?? 'Could not save it.',
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
