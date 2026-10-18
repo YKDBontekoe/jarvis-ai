@@ -301,4 +301,88 @@ void main() {
         http.sent('POST', '/api/v1/modes/focus/end').single.body as Map;
     expect(body.containsKey('reflection'), isFalse);
   });
+
+  testWidgets('the catch-up groups what was held and lets a kind be left out', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/modes/catch-up', {
+      'groups': [
+        {
+          'domain': 'approvals',
+          'title': 'Needs your decision',
+          'locked': true,
+          'included': true,
+          'count': 1,
+          'items': [
+            {'title': 'Send the quote', 'count': 1},
+          ],
+        },
+        {
+          'domain': 'updates',
+          'title': 'Updates and ideas',
+          'locked': false,
+          'included': true,
+          'count': 2,
+          'items': [
+            {'title': 'Report finished', 'count': 2},
+          ],
+        },
+      ],
+      'total': 3,
+      'stillHolding': false,
+      'summary': '3 came in while pushes were quiet.',
+    });
+    http.on('PUT', '/api/v1/modes/catch-up/domains', {
+      'groups': <Object>[],
+      'total': 0,
+    });
+    http.on('POST', '/api/v1/modes/catch-up/clear', {
+      'groups': <Object>[],
+      'total': 0,
+    });
+    await show(tester, ModesScreen(http: http.client(), now: _now));
+
+    expect(find.text('Send the quote'), findsOneWidget);
+    expect(find.textContaining('Report finished ×2'), findsOneWidget);
+    expect(find.byKey(const Key('catch-up-toggle-approvals')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('catch-up-toggle-updates')));
+    await tester.pumpAndSettle();
+    final body =
+        http.sent('PUT', '/api/v1/modes/catch-up/domains').single.body as Map;
+    expect(body['domain'], 'updates');
+    expect(body['included'], false);
+  });
+
+  testWidgets(
+    'clearing the catch-up asks the server and is offered only once pushes are back',
+    (tester) async {
+      http.on('GET', '/api/v1/modes/catch-up', {
+        'groups': [
+          {
+            'domain': 'reminders',
+            'title': 'Reminders',
+            'locked': false,
+            'included': true,
+            'count': 1,
+            'items': [
+              {'title': 'Take medication', 'count': 1},
+            ],
+          },
+        ],
+        'total': 1,
+        'stillHolding': false,
+        'summary': 'ok',
+      });
+      http.on('POST', '/api/v1/modes/catch-up/clear', {
+        'groups': <Object>[],
+        'total': 0,
+      });
+      await show(tester, ModesScreen(http: http.client(), now: _now));
+
+      await tester.tap(find.byKey(const Key('catch-up-clear')));
+      await tester.pumpAndSettle();
+      expect(http.sent('POST', '/api/v1/modes/catch-up/clear'), hasLength(1));
+    },
+  );
 }

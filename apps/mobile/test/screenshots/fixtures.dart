@@ -859,6 +859,15 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
       {'id': 'sleep', 'label': 'Sleep', 'description': 'Do not disturb. Nothing buzzes your phone.', 'notifications': 'none', 'tone': null, 'customised': false},
     ],
   },
+  'GET /api/v1/modes/catch-up': {
+    'groups': [
+      {'domain': 'approvals', 'title': 'Needs your decision', 'locked': true, 'included': true, 'count': 1, 'items': [{'title': 'Send the quote', 'count': 1, 'at': '2026-10-18T07:10:00Z'}]},
+      {'domain': 'reminders', 'title': 'Reminders', 'locked': false, 'included': true, 'count': 2, 'items': [{'title': 'Take medication', 'count': 2, 'at': '2026-10-18T07:00:00Z'}]},
+      {'domain': 'updates', 'title': 'Updates and ideas', 'locked': false, 'included': false, 'count': 3, 'items': <Object>[]},
+    ],
+    'total': 3, 'stillHolding': false, 'since': '2026-10-18T03:00:00Z',
+    'summary': '3 came in while pushes were quiet. 3 more are left out of this recap but still in your notifications.',
+  },
   'GET /api/v1/modes/context': {
     'mode': 'focus', 'label': 'Focus', 'source': 'manual', 'reason': 'You switched on Focus until 14:50.', 'until': '2026-10-18T14:50:00', 'minutesLeft': 32, 'notifications': 'important',
     'muted': 'Only things that cannot wait reach your phone; everything else waits in the app.',

@@ -8,6 +8,7 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'ambient_screen.dart';
+import 'catch_up_card.dart';
 import 'mode_context_card.dart';
 import 'modes_models.dart';
 
@@ -26,6 +27,7 @@ class ModesScreen extends StatefulWidget {
 class _ModesScreenState extends State<ModesScreen> {
   ModeStateData? _state;
   Map<String, dynamic>? _card;
+  Map<String, dynamic>? _catchUp;
   bool _loading = true;
   String? _error;
 
@@ -72,6 +74,12 @@ class _ModesScreenState extends State<ModesScreen> {
       if (mounted) setState(() => _card = jsonObject(response.data));
     } on DioException {
       if (mounted) setState(() => _card = null);
+    }
+    try {
+      final response = await widget.http.get<dynamic>('/api/v1/modes/catch-up');
+      if (mounted) setState(() => _catchUp = jsonObject(response.data));
+    } on DioException {
+      if (mounted) setState(() => _catchUp = null);
     }
   }
 
@@ -206,6 +214,12 @@ class _ModesScreenState extends State<ModesScreen> {
                         context: card,
                         onChanged: _reload,
                         onLeave: () => _switch('auto'),
+                      ),
+                    if (_catchUp case final catchUp?)
+                      CatchUpCard(
+                        http: widget.http,
+                        data: catchUp,
+                        onChanged: _loadCard,
                       ),
                     ..._list(state),
                     _auto(state),
