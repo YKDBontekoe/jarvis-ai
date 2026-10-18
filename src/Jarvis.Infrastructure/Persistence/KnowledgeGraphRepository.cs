@@ -241,10 +241,13 @@ public sealed class KnowledgeGraphRepository(JarvisDbContext db) : IKnowledgeGra
             cancellationToken);
         if (keep is null || absorb is null) return false;
         var now = DateTimeOffset.UtcNow;
-        var aliases = ParseAliases(keep.AliasesJson);
-        if (!aliases.Contains(absorb.Name, StringComparer.OrdinalIgnoreCase) && aliases.Count < 10)
-            aliases.Add(absorb.Name);
-        keep.AliasesJson = JsonSerializer.Serialize(aliases);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var aliases = ParseAliases(keep.AliasesJson).Concat(ParseAliases(absorb.AliasesJson))
+            .Append(absorb.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var aliasesJson = JsonSerializer.Serialize(aliases);
+        if (aliasesJson.Length > 2_000)
+            throw new ArgumentException("The combined aliases exceed the entity limit; review them before merging.");
+        keep.AliasesJson = aliasesJson;
         keep.UpdatedAt = now;
         if (string.IsNullOrWhiteSpace(keep.Summary) && !string.IsNullOrWhiteSpace(absorb.Summary))
             keep.Summary = absorb.Summary;
@@ -254,6 +257,7 @@ public sealed class KnowledgeGraphRepository(JarvisDbContext db) : IKnowledgeGra
             .ExecuteUpdateAsync(set => set.SetProperty(x => x.ObjectId, keepId), cancellationToken);
         db.GraphEntities.Remove(absorb);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return true;
     }
 
@@ -270,6 +274,16 @@ public sealed class KnowledgeGraphRepository(JarvisDbContext db) : IKnowledgeGra
         if (cache.TryGetValue(key, out var cached)) return cached;
         var entity = await db.GraphEntities.SingleOrDefaultAsync(x => x.OwnerId == ownerId && x.Key == key,
             cancellationToken);
+        if (entity is null)
+        {
+            // A merged/renamed identity must not be recreated under an old name, including the owner's name.
+            var withAliases = await db.GraphEntities.Where(x => x.OwnerId == ownerId && x.AliasesJson != "[]")
+                .ToListAsync(cancellationToken);
+            var matches = withAliases.Where(x => ParseAliases(x.AliasesJson)
+                .Any(alias => string.Equals(alias, trimmed, StringComparison.OrdinalIgnoreCase))).ToArray();
+            if (matches.Length > 1) return null; // Ambiguous aliases need explicit owner review.
+            entity = matches.SingleOrDefault();
+        }
         if (entity is null)
         {
             if (await db.GraphEntities.CountAsync(x => x.OwnerId == ownerId, cancellationToken) >= MaxEntitiesPerOwner)

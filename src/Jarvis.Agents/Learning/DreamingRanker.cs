@@ -113,10 +113,9 @@ internal static class DreamingRanker
             // Recall counts persist on the memory itself, so nightly dreaming in the worker sees what chat recalled in
             // the API process. The in-process tracker overlaps with them, so take the larger rather than the sum.
             var recallHits = Math.Max(recall.Hits, memory.AccessCount);
-            // A memory recalled on a later day than it was written is a spaced-repetition signal: it stayed useful.
-            var recalledLater = memory.LastAccessedAt is { } accessed && accessed.Date > memory.CreatedAt.Date ? 1 : 0;
             var signalCount = Math.Max(1, 1 + mentions + recallHits);
-            var uniqueSources = 1 + mentionDays + Math.Max(Math.Max(0, recall.Queries), recalledLater);
+            // Retrieval measures usefulness, not independent confirmation that the statement is still true.
+            var uniqueSources = 1 + mentionDays;
             var first = memory.CreatedAt;
             var last = new[]
             {

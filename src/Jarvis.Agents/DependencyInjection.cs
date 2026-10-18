@@ -126,6 +126,12 @@ public static class DependencyInjection
         services.AddSingleton<Jarvis.Application.Learning.IMemoryRecallTracker, Learning.MemoryRecallTracker>();
         services.AddScoped<Learning.ReflectionService>();
         services.AddScoped<Learning.HeartbeatService>();
+        services.Configure<Learning.MemoryReviewOptions>(configuration.GetSection("Memory:Review"));
+        services.AddSingleton(provider => new Learning.MemoryReviewClient(new CodexCliChatClient(
+            provider.GetRequiredService<CodexExecutable>(), enableWebSearch: false,
+            turnTimeoutSeconds: turnTimeoutSeconds,
+            processLimiter: provider.GetRequiredService<CodexProcessLimiter>(), access: CodexAccess.Strict)));
+        services.AddScoped<Learning.MemoryQualityReviewService>();
         services.AddScoped<Learning.DreamingService>();
         services.AddScoped<IDailyBriefingNarrator, DailyBriefingNarrator>();
         services.AddScoped<IConversationSummarizer, ConversationSummarizer>();

@@ -79,7 +79,7 @@ public sealed class DreamingTests
         var used = Assert.Single(staged, item => item.MemoryId == recalled.Id);
         var idle = Assert.Single(staged, item => item.MemoryId == untouched.Id);
         Assert.Equal(6, used.SignalCount);
-        Assert.Equal(2, used.UniqueSources);
+        Assert.Equal(1, used.UniqueSources);
         Assert.Equal(Now.AddDays(-1), used.LastSeenAt);
         Assert.True(DreamingRanker.Score(used, Now) > DreamingRanker.Score(idle, Now));
     }
@@ -119,7 +119,7 @@ public sealed class DreamingTests
 
         Assert.Equal(1, outcome.Deduplicated);
         Assert.Contains(store.Items, item => item.Id == keeper.Id);
-        Assert.DoesNotContain(store.Items, item => item.Id == copy.Id);
+        Assert.Contains(store.Items, item => item.Id == copy.Id && item.ValidUntil == Now);
     }
 
     [Theory]
@@ -211,7 +211,7 @@ public sealed class DreamingTests
                         {"category":"tone","statement":"Use token ghp_abcdefghijklmnopqrstuvwxyz0123456789","confidence":0.9}],
              "memories":[{"action":"merge","kind":"fact","content":"The user lives in Amsterdam.","importance":0.85,"confidence":0.95,"targetMemoryId":"TARGET"},
                          {"action":"add","kind":"fact","content":"Weak one-off guess.","importance":0.4,"confidence":0.4}],
-             "facts":[{"subject":"user","subjectType":"person","predicate":"lives_in","object":"Amsterdam","objectIsEntity":true,"exclusive":true},
+             "facts":[{"subject":"user","subjectType":"person","predicate":"lives_in","object":"Amsterdam","objectIsEntity":true,"exclusive":true,"sourceMemoryId":"TARGET"},
                       {"subject":"user","predicate":"token","object":"ghp_abcdefghijklmnopqrstuvwxyz0123456789"}],
              "userSummary":"The user lives in Amsterdam and is settling in at home.",
              "diary":"I folded the day's notes into a quieter map of home."}
@@ -228,6 +228,8 @@ public sealed class DreamingTests
         Assert.Equal(0, outcome.Promoted);
         Assert.Equal("Be direct and skip small talk.", Assert.Single((await persona.GetAsync(Owner, default)).TraitList).Statement);
         Assert.Equal("lives_in", Assert.Single(graph.Facts).Predicate);
+        Assert.NotNull(Assert.Single(graph.Sources));
+        Assert.NotEqual(existing.Id, graph.Sources[0]);
         Assert.Contains(notifications.Created, item => item.Type == "learning.dreamed");
         Assert.Contains(outcome.Diary, entry => entry.Phase == "diary");
         Assert.Contains("merged", outcome.Summary);
@@ -506,6 +508,78 @@ public sealed class DreamingTests
         Assert.Equal(MemoryRecallTracker.Hash("Where do I live?"), MemoryRecallTracker.Hash("where  do I live?"));
     }
 
+    [Fact]
+    public async Task Dreaming_does_not_write_graph_facts_without_a_scoped_source_memory()
+    {
+        var settings = new InMemorySettingsStore();
+        var store = new DreamMemoryStore();
+        store.Add(Owner, "fact", "The user lives in Delft.", .7f, .95f, Now.AddDays(-4));
+        var graph = new RecordingGraph();
+        var reply = """
+            {"facts":[{"subject":"user","predicate":"lives_in","object":"Amsterdam","objectIsEntity":true},
+            {"subject":"user","predicate":"lives_in","object":"Utrecht","objectIsEntity":true,
+            "sourceMemoryId":"00000000-0000-0000-0000-000000000001"}]}
+            """;
+        await Create(settings, new PersonaService(settings), store, graph,
+            new RecordingNotifications(), reply).SweepAsync(Owner, true, TestContext.Current.CancellationToken);
+        Assert.Empty(graph.Facts);
+    }
+
+    [Fact]
+    public async Task Semantic_merge_expires_all_cited_fragments_and_keeps_history()
+    {
+        var settings = new InMemorySettingsStore();
+        var store = new DreamMemoryStore();
+        var first = store.Add(Owner, "preference", "Enjoys Dune.", .7f, .95f, Now.AddDays(-4));
+        var second = store.Add(Owner, "preference", "Houdt van Arrival.", .7f, .95f, Now.AddDays(-2));
+        var reply = $$"""
+            {"memories":[{"action":"merge","kind":"preference","content":"Enjoys Dune and Arrival.",
+            "importance":0.7,"confidence":0.98,"targetMemoryId":"{{first.Id}}",
+            "evidenceMemoryIds":["{{first.Id}}","{{second.Id}}"],"absorbedMemoryIds":["{{second.Id}}"]}]}
+            """;
+        var outcome = await Create(settings, new PersonaService(settings), store, new RecordingGraph(),
+            new RecordingNotifications(), reply).SweepAsync(Owner, true, TestContext.Current.CancellationToken);
+        Assert.Equal(1, outcome.Merged);
+        Assert.Equal(1, outcome.Deduplicated);
+        Assert.Equal(3, store.Items.Count);
+        Assert.Single(store.Items, m => m.ValidUntil is null);
+        Assert.Equal(2, store.Items.Count(m => m.ValidUntil == Now));
+    }
+
+    [Theory]
+    [InlineData("unknown")]
+    [InlineData("pinned")]
+    [InlineData("journal")]
+    [InlineData("profile")]
+    [InlineData("low_confidence")]
+    [InlineData("missing_evidence")]
+    [InlineData("disabled")]
+    public async Task Semantic_merge_rejects_unsafe_absorption(string invalid)
+    {
+        var settings = new InMemorySettingsStore();
+        await settings.SaveAsync(Owner, SettingsSections.Learning,
+            LearningSettings.Default with { AutoApplyLowRiskMemory = invalid != "disabled" },
+            TestContext.Current.CancellationToken);
+        var store = new DreamMemoryStore();
+        var first = store.Add(Owner, "preference", "Enjoys Dune.", .7f, .95f, Now.AddDays(-4));
+        var second = store.Add(Owner, "preference", "Enjoys Arrival.", .7f, .95f, Now.AddDays(-2));
+        store.Items[1] = second with { IsPinned = invalid == "pinned",
+            SourceType = invalid == "journal" ? "journal" : "conversation",
+            ProfileId = invalid == "profile" ? Guid.NewGuid() : null };
+        var absorbed = invalid == "unknown" ? Guid.NewGuid() : second.Id;
+        var confidence = invalid == "low_confidence" ? "0.9" : "0.98";
+        var evidence = invalid == "missing_evidence" ? "[]" : $"[\"{first.Id}\",\"{absorbed}\"]";
+        var reply = $$"""
+            {"memories":[{"action":"merge","kind":"preference","content":"Enjoys Dune and Arrival.",
+            "importance":0.7,"confidence":{{confidence}},"targetMemoryId":"{{first.Id}}",
+            "evidenceMemoryIds":{{evidence}},"absorbedMemoryIds":["{{absorbed}}"]}]}
+            """;
+        var outcome = await Create(settings, new PersonaService(settings), store, new RecordingGraph(),
+            new RecordingNotifications(), reply).SweepAsync(Owner, true, TestContext.Current.CancellationToken);
+        Assert.Equal(0, outcome.Merged);
+        Assert.All(store.Items, m => Assert.Null(m.ValidUntil));
+    }
+
     private static DreamingService Create(InMemorySettingsStore settings, PersonaService persona,
         DreamMemoryStore memories, RecordingGraph graph, RecordingNotifications notifications, string reply,
         FrozenClock? clock = null) =>
@@ -613,8 +687,14 @@ public sealed class DreamingTests
             return Task.FromResult<MemoryRecord?>(replacement);
         }
 
-        public Task<MemoryRecord?> ExpireAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+        public Task<MemoryRecord?> ExpireAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+        {
+            var index = Items.FindIndex(m => m.Id == id && m.OwnerId == ownerId && !m.IsPinned &&
+                (m.ValidUntil is null || m.ValidUntil > Now));
+            if (index < 0) return Task.FromResult<MemoryRecord?>(null);
+            Items[index] = Items[index] with { ValidUntil = Now, UpdatedAt = Now };
+            return Task.FromResult<MemoryRecord?>(Items[index]);
+        }
 
         public Task<MemoryRecord?> GetAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
             Task.FromResult(Items.FirstOrDefault(item => item.Id == id && item.OwnerId == ownerId));
@@ -647,11 +727,13 @@ public sealed class DreamingTests
     private sealed class RecordingGraph : IKnowledgeGraphRepository
     {
         public List<GraphFact> Facts { get; } = [];
+        public List<Guid?> Sources { get; } = [];
 
         public Task<int> MergeAsync(Guid ownerId, IReadOnlyList<GraphFact> facts, Guid? sourceMemoryId,
             CancellationToken cancellationToken)
         {
             Facts.AddRange(facts);
+            Sources.Add(sourceMemoryId);
             return Task.FromResult(facts.Count);
         }
 

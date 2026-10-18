@@ -16,7 +16,9 @@ public enum ModelPurpose
     /// <summary>Reflection, dreaming, durable background tasks, and other deeper reasoning jobs.</summary>
     Reasoning,
     /// <summary>Image understanding such as OCR during file indexing.</summary>
-    Vision
+    Vision,
+    /// <summary>Tool-free nightly memory quality judge through the authenticated Codex CLI.</summary>
+    MemoryReview
 }
 
 /// <summary>Resolves the owner's configured model provider for a purpose.</summary>
@@ -38,7 +40,8 @@ internal sealed class ChatClientResolver(
     OpenAiCompatibleClientFactory clientFactory,
     IModelUsageRecorder usage,
     IModelPriceLookup prices,
-    ILogger<ChatClientResolver> logger) : IChatClientResolver
+    ILogger<ChatClientResolver> logger,
+    Jarvis.Agents.Learning.MemoryReviewClient? memoryReviewClient = null) : IChatClientResolver
 {
     private readonly Dictionary<(Guid, ModelPurpose, string, string?, string?, string?), IChatClient> _chatClients = [];
     private readonly Dictionary<Guid, EmbeddingModel?> _embeddingModels = [];
@@ -46,6 +49,15 @@ internal sealed class ChatClientResolver(
     public async Task<IChatClient> GetChatClientAsync(Guid ownerId, ModelPurpose purpose,
         CancellationToken cancellationToken, ModelSettings? overlay = null)
     {
+        if (purpose == ModelPurpose.MemoryReview)
+        {
+            // This judge always uses Codex, independently of interactive provider/model preferences.
+            var judge = memoryReviewClient?.Client
+                ?? throw new InvalidOperationException("The strict Codex memory review client is not registered.");
+            judge = new BackgroundPriorityChatClient(judge);
+            return new UsageRecordingChatClient(judge, usage, prices, ownerId, UsageProviders.Codex,
+                UsagePurposes.Reasoning, logger);
+        }
         var ownerSettings = await GetSettingsAsync(ownerId, cancellationToken);
         var settings = overlay is null ? ownerSettings : Merge(ownerSettings, overlay);
         var cacheKey = (ownerId, purpose, settings.Provider, settings.ChatModel, settings.FastModel,

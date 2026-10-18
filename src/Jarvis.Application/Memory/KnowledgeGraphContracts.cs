@@ -83,7 +83,8 @@ public static class GraphNames
     public static string Key(string name)
     {
         var trimmed = name.Trim();
-        if (trimmed.Equals("me", StringComparison.OrdinalIgnoreCase) ||
+        if (trimmed.Equals("you", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Equals("me", StringComparison.OrdinalIgnoreCase) ||
             trimmed.Equals("user", StringComparison.OrdinalIgnoreCase) ||
             trimmed.Equals("the user", StringComparison.OrdinalIgnoreCase))
             return UserKey;

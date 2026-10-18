@@ -56,6 +56,7 @@ public static class LearningSections
 {
     public const string HeartbeatState = "heartbeat-state";
     public const string DreamingState = "dreaming-state";
+    public const string MemoryQualityReview = "memory-quality-review";
 }
 
 public sealed record DreamingWorkflowInput(Guid OwnerId);

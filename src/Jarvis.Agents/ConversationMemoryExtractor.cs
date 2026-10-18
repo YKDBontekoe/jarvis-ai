@@ -62,6 +62,13 @@ internal sealed class ConversationMemoryExtractor(
                     Do not store passwords, access tokens, private keys, financial account details, or other credentials.
                     Do not store sensitive health, sexual, religious, political, or precise-location data.
                     Return [] when there is no clear durable memory. Keep each memory concise and standalone.
+                    Store one independently updateable topic per memory; do not bundle employment, family and gym schedules.
+                    Semantic duplicates count across languages and different wording: enrich the existing record instead
+                    of adding an overlapping summary. Never drop still-supported details when enriching.
+                    A progress update should supersede its earlier in-progress description only for that same dated event.
+                    Setup errors, pending deployments and temporary tool availability are operational state, not enduring
+                    personal facts. Do not save them as permanent memories; do not infer success from a request or plan.
+                    Distinguish observations from guesses about someone else's preferences; preserve attribution.
                     today is the user's local date. Write dates as the message means them, never relative words: "next month"
                     becomes the month and year, "on Friday" becomes the date, so the memory stays true when read later.
                     validUntil is null for lasting information. For a temporary situation that is worth remembering for now
