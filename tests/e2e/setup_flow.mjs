@@ -27,7 +27,13 @@ console.log('Reading setup...');
 const first = await request('GET', '/setup');
 assert.equal(first.status, 200, first.text);
 assert.deepEqual(first.data.goals.map((g) => g.id), ['talk', 'reminder', 'calendar', 'source', 'brief']);
-assert.ok(first.data.capabilities.some((c) => c.id === 'push' && c.status === 'unsupported'));
+// Push delivery is not configured on this stack, and the server now says so instead of "cannot check".
+const push = first.data.capabilities.find((c) => c.id === 'push');
+assert.equal(push.status, 'unavailable');
+assert.match(push.detail, /only appear in the app/);
+for (const id of ['apps', 'scanner', 'storage']) assert.ok(first.data.capabilities.some((c) => c.id === id), `${id} is reported`);
+assert.ok(['ready', 'unavailable'].includes(first.data.capabilities.find((c) => c.id === 'scanner').status));
+assert.ok(['ready', 'unavailable'].includes(first.data.capabilities.find((c) => c.id === 'storage').status));
 const model = first.data.capabilities.find((c) => c.id === 'model');
 assert.ok(['ready', 'not_connected', 'needs_reauth'].includes(model.status), model.status);
 assert.equal(first.data.total, 5);

@@ -17,6 +17,9 @@ public sealed class WorkflowRepository(JarvisDbContext db,
     Jarvis.Application.Events.IJarvisEventBus? spine = null) : IReminderRepository, INotificationRepository,
     IPushDeviceRepository, IJarvisTaskRepository
 {
+    public Task<int> CountAsync(Guid ownerId, CancellationToken cancellationToken) =>
+        db.PushDevices.AsNoTracking().CountAsync(x => x.OwnerId == ownerId, cancellationToken);
+
     public async Task<PushDeviceRecord> RegisterAsync(Guid ownerId, string token, string platform,
         CancellationToken cancellationToken)
     {

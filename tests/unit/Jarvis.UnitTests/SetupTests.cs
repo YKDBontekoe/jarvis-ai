@@ -109,6 +109,8 @@ public sealed class SetupTests
         public int LibraryItems;
         public bool BriefOn;
         public string[] Mcp = [];
+        public int PushDevices;
+        public bool BrokenApp;
 
         public SetupService Service => new(
             Fake<IConversationStore>.Create(("ListAsync", _ => (IReadOnlyList<Conversation>)
@@ -122,8 +124,9 @@ public sealed class SetupTests
                 Enumerable.Range(0, LibraryItems).Select(_ => new LibraryItem(Guid.NewGuid(), Owner, "note", null, "t", "", [], [], "c", "app", null, Now, Now)).ToArray())),
             Fake<IIntegrationCredentialStore>.Create(("GetStatusAsync", _ => null)),
             Fake<IUserMcpServerRegistry>.Create(("ListAsync", _ => (IReadOnlyList<UserMcpServer>)Mcp
-                .Select(name => new UserMcpServer(name, name, "https://example.com", [], Now, false)).ToArray())),
-            Settings);
+                .Select(name => new UserMcpServer(name, name, "https://example.com", [], Now, false, IsValid: !BrokenApp)).ToArray())),
+            Settings,
+            Fake<IPushDeviceRepository>.Create(("CountAsync", _ => PushDevices)));
     }
 
     [Fact]
@@ -155,5 +158,53 @@ public sealed class SetupTests
 
         await world.Service.ReopenAsync(Owner, "calendar", default);
         Assert.False((await world.Service.GetAsync(Owner, true, null, default)).Goals.Single(g => g.Id == "calendar").Declined);
+    }
+
+    [Fact]
+    public async Task Capabilities_state_push_apps_scanner_and_storage_honestly_when_the_server_looked()
+    {
+        var world = new World { Mcp = ["Calendar", "Mail"], BrokenApp = true, PushDevices = 0 };
+
+        var view = await world.Service.GetAsync(Owner, true, null, default, new SetupEnvironment(false, false, true));
+        string Status(string id) => view.Capabilities.Single(c => c.Id == id).Status;
+        string Detail(string id) => view.Capabilities.Single(c => c.Id == id).Detail;
+
+        Assert.Equal("unavailable", Status("push"));
+        Assert.Contains("only appear in the app", Detail("push"));
+        Assert.Equal("unavailable", Status("apps"));
+        Assert.Contains("2 of 2 apps need attention", Detail("apps"));
+        Assert.Equal("unavailable", Status("scanner"));
+        Assert.Contains("uploads are refused", Detail("scanner"));
+        Assert.Equal("ready", Status("storage"));
+    }
+
+    [Fact]
+    public async Task A_registered_phone_is_ready_but_never_claimed_to_show_pushes()
+    {
+        var world = new World { PushDevices = 2 };
+
+        var view = await world.Service.GetAsync(Owner, true, null, default, new SetupEnvironment(true, true, true));
+        var push = view.Capabilities.Single(c => c.Id == "push");
+
+        Assert.Equal("ready", push.Status);
+        Assert.Contains("2 phones registered", push.Detail);
+        Assert.Contains("not something Jarvis can see", push.Detail);
+        Assert.Equal("not_connected", view.Capabilities.Single(c => c.Id == "apps").Status);
+        var none = await new World().Service.GetAsync(Owner, true, null, default, new SetupEnvironment(true, null, null));
+        Assert.Equal("not_connected", none.Capabilities.Single(c => c.Id == "push").Status);
+        Assert.Equal("unsupported", none.Capabilities.Single(c => c.Id == "scanner").Status);
+    }
+
+    [Fact]
+    public async Task Without_a_check_the_old_capabilities_are_unchanged_and_the_bundle_has_no_names()
+    {
+        var plain = await new World().Service.GetAsync(Owner, true, null, default);
+        Assert.Equal("unsupported", plain.Capabilities.Single(c => c.Id == "push").Status);
+        Assert.DoesNotContain(plain.Capabilities, c => c.Id is "apps" or "scanner" or "storage");
+
+        var world = new World { Mcp = ["Secret Name"], BrokenApp = true };
+        var view = await world.Service.GetAsync(Owner, true, null, default, new SetupEnvironment(true, true, true));
+        var bundle = SetupRules.Bundle(view, "1.0", Now);
+        Assert.DoesNotContain("Secret Name", string.Join(' ', bundle.Capabilities.Select(c => c.Detail)));
     }
 }

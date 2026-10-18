@@ -176,6 +176,7 @@ public interface IPushDeviceRepository
 {
     Task<PushDeviceRecord> RegisterAsync(Guid ownerId, string token, string platform, CancellationToken cancellationToken);
     Task<bool> RemoveAsync(Guid ownerId, string token, CancellationToken cancellationToken);
+    Task<int> CountAsync(Guid ownerId, CancellationToken cancellationToken);
 }
 
 public interface IJarvisTaskRepository

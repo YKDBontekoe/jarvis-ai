@@ -396,3 +396,9 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **Summary time (F19.1.3).** The owner can choose a time for the "while you were away" summary (08:00, 12:00, 18:00 in the app; any HH:mm in the API). It then goes once a day at that time in the home zone instead of as soon as the mode ends; with nothing chosen nothing changes. Approvals and problems are never held for it.
 - **Tests.** .NET `NotificationDeliveryTruthTests` (5), `CatchUpTests` (+3), integration `NotificationDeliveryTests` (+1, real PostgreSQL and the new migration), Dart `notification_delivery_test` (3), `notification_settings_test` (+1), real-stack `tests/e2e/notification_delivery_flow.mjs`.
 - **Not done in F19.** "Action completed" as a delivery state for approvals, urgency and per-source preferences, grouping or de-duplicating by source, and device-side receipt (needs the push provider's feedback, which Jarvis does not get).
+
+## Checkpoint 40: F18, harmless probes and the push registration status
+
+- **Probes (F18.1.4/F18.1.5).** Setup now says whether push delivery is set up on the server, whether a phone is registered (a registered phone is never claimed to show pushes), how many connected apps need attention (counts only, never names, so the support bundle stays name-free), whether the upload scanner answers (a few harmless local bytes, 3-second limit) and whether file storage answers (a read of a key that does not exist). A failed or slow check is "unavailable" with what stops working.
+- **Tests.** .NET `SetupTests` (+3), extended `tests/e2e/setup_flow.mjs` (this stack has no push configuration and no virus scanner, so it checks the honest statuses).
+- **Not done in F18.** Reauth detection for a connector whose token expired (apps only report invalid or missing-secret configuration), the timezone to message to reminder to Home guided demo (F18.1.7), making Home's day-one card use `/setup`, and F18.2.

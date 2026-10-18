@@ -534,3 +534,7 @@ A saved starter for a recurring job: a name, one of the owner's profiles, option
 ### Notification delivery truth and summary time
 
 `GET /notifications/{id}/delivery` returns what happened to one notification as steps: `created`; per registered phone `provider_accepted` (handed to the push service; Jarvis cannot see when a phone shows it), `held` (a mode kept it back, it is in the catch-up), `app_only` (the owner's choice for that kind), `waiting`, `retrying`, `failed` or `unrecorded` (processed before outcomes were recorded); `not_pushed` when no phone is registered; and `read` or `unread` from the app. Outcomes are stored on `push_deliveries.outcome` (migration `AddPushDeliveryOutcome`). `GET`/`PUT /notifications/digest` (`time` as `HH:mm`, empty clears) sets when the "while you were away" summary is sent: as soon as pushes are allowed (default) or once a day at that time in the home zone. Approvals and problems are never held for the summary.
+
+### Setup probes
+
+`GET /setup` and the support bundle now report four more capabilities from harmless checks: `apps` (counts connected apps and how many need attention, never names), `push` (not set up on the server, no phone registered, or N phones registered; a registered phone is never claimed to show pushes), `scanner` (the upload scanner is shown a few harmless local bytes with a 3-second limit; nothing is kept) and `storage` (asks for a key that does not exist). A check that fails or times out is `unavailable` with what stops working; one that was not run is `unsupported`.

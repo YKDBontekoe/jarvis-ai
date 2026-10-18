@@ -35,7 +35,17 @@ public sealed record SetupFacts(
     bool CalendarConnected,
     bool HasLibraryItem,
     bool BriefEnabled,
-    string? BriefTime);
+    string? BriefTime,
+    SetupEnvironment? Environment = null,
+    int PushDevices = 0,
+    int AppsTotal = 0,
+    int AppsNeedingAttention = 0);
+
+/// <summary>
+/// What the server could check without sending or creating anything an owner would notice: whether push delivery is set
+/// up, and whether the upload scanner and file storage answer. Null means it was not checked.
+/// </summary>
+public sealed record SetupEnvironment(bool PushConfigured, bool? ScannerReachable, bool? StorageReachable);
 
 /// <summary>One thing Jarvis depends on, whether it can be used now, and the page that fixes it.</summary>
 public sealed record Capability(string Id, string Title, string Status, string Detail, string? Destination);
@@ -75,6 +85,39 @@ public sealed record SupportBundle(
 public static class SetupRules
 {
     public static IReadOnlyList<Capability> Capabilities(SetupFacts facts) =>
+        facts.Environment is null ? Base(facts) : Base(facts).Where(c => c.Id != "push")
+            .Concat(Environmental(facts, facts.Environment)).ToArray();
+
+    private static IReadOnlyList<Capability> Environmental(SetupFacts facts, SetupEnvironment environment) =>
+    [
+        new("apps", "Connected apps",
+            facts.AppsTotal == 0 ? CapabilityStatuses.NotConnected
+                : facts.AppsNeedingAttention > 0 ? CapabilityStatuses.Unavailable : CapabilityStatuses.Ready,
+            facts.AppsTotal == 0 ? "No apps connected. That is fine; connect one only when you want it."
+                : facts.AppsNeedingAttention > 0
+                    ? $"{facts.AppsNeedingAttention} of {facts.AppsTotal} apps need attention. Open Find an app to fix them."
+                    : $"{facts.AppsTotal} app{(facts.AppsTotal == 1 ? "" : "s")} connected.",
+            facts.AppsNeedingAttention > 0 || facts.AppsTotal == 0 ? "find-app" : null),
+        new("push", "Notifications on this phone",
+            !environment.PushConfigured ? CapabilityStatuses.Unavailable
+                : facts.PushDevices == 0 ? CapabilityStatuses.NotConnected : CapabilityStatuses.Ready,
+            !environment.PushConfigured
+                ? "Push delivery is not set up on this server, so notifications only appear in the app."
+                : facts.PushDevices == 0
+                    ? "No phone is registered for push yet. Allow notifications on your phone."
+                    : $"{facts.PushDevices} phone{(facts.PushDevices == 1 ? "" : "s")} registered. Whether a phone shows a push is not something Jarvis can see.",
+            environment.PushConfigured && facts.PushDevices > 0 ? null : "notifications"),
+        Probe("scanner", "Upload scanning", environment.ScannerReachable,
+            "Uploads are scanned before they are kept.", "The upload scanner is not reachable, so uploads are refused until it is."),
+        Probe("storage", "File storage", environment.StorageReachable,
+            "Files can be stored and read.", "File storage is not reachable, so uploads and downloads will fail until it is.")
+    ];
+
+    private static Capability Probe(string id, string title, bool? reachable, string ready, string down) =>
+        new(id, title, reachable switch { true => CapabilityStatuses.Ready, false => CapabilityStatuses.Unavailable, _ => CapabilityStatuses.Unsupported },
+            reachable switch { true => ready, false => down, _ => "Jarvis did not check this." }, null);
+
+    private static IReadOnlyList<Capability> Base(SetupFacts facts) =>
     [
         new("model", "Jarvis's brain",
             facts.ModelSignedIn ? CapabilityStatuses.Ready
@@ -144,7 +187,8 @@ public sealed record SetupOperation(bool Succeeded, string? Field = null, string
 
 public interface ISetupService
 {
-    Task<SetupView> GetAsync(Guid ownerId, bool modelSignedIn, string? modelProblem, CancellationToken cancellationToken);
+    Task<SetupView> GetAsync(Guid ownerId, bool modelSignedIn, string? modelProblem, CancellationToken cancellationToken,
+        SetupEnvironment? environment = null);
     Task<SetupOperation> DeclineAsync(Guid ownerId, string goalId, CancellationToken cancellationToken);
     Task<SetupOperation> ReopenAsync(Guid ownerId, string goalId, CancellationToken cancellationToken);
 }
@@ -156,10 +200,11 @@ public sealed class SetupService(
     Library.ILibraryService library,
     IIntegrationCredentialStore credentials,
     IUserMcpServerRegistry servers,
-    IOwnerSettingsStore settings) : ISetupService
+    IOwnerSettingsStore settings,
+    Workflows.IPushDeviceRepository? pushDevices = null) : ISetupService
 {
     public async Task<SetupView> GetAsync(Guid ownerId, bool modelSignedIn, string? modelProblem,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, SetupEnvironment? environment = null)
     {
         var packs = await IntegrationPackCatalog.ListAsync(credentials, servers, ownerId, cancellationToken);
         var calendar = packs.FirstOrDefault(p => p.Pack.Id == IntegrationPackIds.Calendar);
@@ -170,6 +215,18 @@ public sealed class SetupService(
             calendar is { } c && (c.McpServerId is not null || c.Pack.SupportsIcs && c.HasIcs),
             (await library.ListAsync(ownerId, new Library.LibraryQuery(null, null, null, 1), cancellationToken)).Count > 0,
             brief is { Enabled: true }, brief?.LocalTime.ToString("HH:mm"));
+        if (environment is not null)
+        {
+            var installed = await servers.ListAsync(ownerId, cancellationToken);
+            facts = facts with
+            {
+                Environment = environment,
+                PushDevices = pushDevices is null ? 0 : await pushDevices.CountAsync(ownerId, cancellationToken),
+                AppsTotal = installed.Count,
+                AppsNeedingAttention = installed.Count(server => server is { Enabled: true, IsValid: false } ||
+                                                                 server.Secrets?.Any(secret => secret is { Required: true, IsSet: false }) == true)
+            };
+        }
         var journey = await settings.GetAsync<SetupJourney>(ownerId, SetupJourney.Section, cancellationToken);
         return SetupRules.Build(facts, journey?.Declined ?? []);
     }
