@@ -240,6 +240,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _queueMessage(MessageEntry message, String conversationId);
   Future<void> _flushOutbox();
   Future<void> _cancelQueued(MessageEntry entry);
+  Future<void> _sendQueuedNow(MessageEntry entry);
   void _showPhotoSources();
   Future<void> _enqueueIncomingPhotos(List<IncomingPhoto> incoming);
   bool get _canSummarize;

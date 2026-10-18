@@ -738,6 +738,9 @@ mixin _ChatScreenUi on _ChatScreenController {
       onCancelQueued: entry.queued
           ? () => unawaited(_cancelQueued(entry))
           : null,
+      onSendQueuedNow: entry.queued
+          ? () => unawaited(_sendQueuedNow(entry))
+          : null,
       onRegenerate:
           !entry.isUser &&
               !entry.pending &&

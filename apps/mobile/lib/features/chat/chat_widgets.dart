@@ -15,6 +15,7 @@ import 'image_paste_stub.dart'
     if (dart.library.js_interop) 'image_paste_web.dart';
 import 'incoming_photos.dart';
 import 'mcp_setup.dart';
+import 'outbox_store.dart';
 import 'tool_catalog.dart';
 
 part 'chat_message_widgets.dart';

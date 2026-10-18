@@ -106,19 +106,18 @@ class OutboxStore {
 
   static const storageKey = 'jarvis.outbox.v1';
 
-  /// Older messages are dropped rather than sent long after the fact.
-  static const maxAge = Duration(days: 2);
+  /// A message older than this is never sent by itself (what it answers may have moved on). It stays visible as
+  /// expired until the owner sends it on purpose or discards it.
+  static const autoSendWithin = Duration(days: 2);
   static const maxItems = 50;
 
   final SharedPreferences? _prefs;
   final List<OutboxMessage> _items;
 
-  static Future<OutboxStore> open({DateTime? now}) async {
+  static Future<OutboxStore> open() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final store = OutboxStore._(prefs, _decode(prefs.getString(storageKey)));
-      store._dropExpired(now ?? DateTime.now());
-      return store;
+      return OutboxStore._(prefs, _decode(prefs.getString(storageKey)));
     } catch (_) {
       return OutboxStore.memory();
     }
@@ -173,11 +172,9 @@ class OutboxStore {
     await _prefs?.remove(storageKey);
   }
 
-  void _dropExpired(DateTime now) {
-    final before = _items.length;
-    _items.removeWhere((item) => now.difference(item.queuedAt) > maxAge);
-    if (_items.length != before) _save();
-  }
+  /// True when [item] waited longer than [autoSendWithin], so it must not go out without the owner.
+  static bool isExpired(OutboxMessage item, DateTime now) =>
+      now.difference(item.queuedAt) > autoSendWithin;
 
   Future<void> _save() async {
     final prefs = _prefs;
