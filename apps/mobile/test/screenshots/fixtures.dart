@@ -924,6 +924,18 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     {'workspace': {'id': 'w1', 'name': 'Weekly research', 'instruction': 'Summarise what changed since last week'}, 'profileName': 'Research analyst', 'projectName': 'Home renovation', 'problem': null, 'scope': {'memory': 'Only pinned memories', 'files': '1 document collection', 'limits': ['Cannot save new memories.']}},
     {'workspace': {'id': 'w2', 'name': 'Monday planning', 'instruction': null}, 'profileName': null, 'projectName': null, 'problem': 'Its profile was deleted. Choose another one.', 'scope': null},
   ],
+  'GET /api/v1/attention': {
+    'items': [
+      {'id': 'approval:a1', 'kind': 'approval', 'title': 'Approve or decline: SendEmail', 'detail': 'Jarvis is waiting for your answer.', 'urgency': 'now', 'destination': 'approvals', 'dueOn': null, 'daysOverdue': 0, 'locked': true},
+      {'id': 'task-failed:t1', 'kind': 'problem', 'title': 'Summarise the inbox', 'detail': 'The mail connector timed out.', 'urgency': 'now', 'destination': 'task:t1', 'dueOn': null, 'daysOverdue': 0, 'locked': true},
+      {'id': 'commitment:c1', 'kind': 'commitment', 'title': 'Send the deck', 'detail': 'You owe Rosa', 'urgency': 'late', 'destination': 'commitment:c1', 'dueOn': '2026-10-15', 'daysOverdue': 3, 'locked': false},
+      {'id': 'decision:d1', 'kind': 'decision', 'title': 'Review: Switch bank', 'detail': 'You predicted “It works” at 70%.', 'urgency': 'today', 'destination': 'decision:d1', 'dueOn': '2026-10-18', 'daysOverdue': 0, 'locked': false},
+      {'id': 'suggested-promises', 'kind': 'suggested_promise', 'title': '2 possible promises to review', 'detail': 'Jarvis noticed these in your messages. Nothing counts until you accept it.', 'urgency': 'review', 'destination': 'commitments', 'dueOn': null, 'daysOverdue': 0, 'locked': false},
+    ],
+    'snoozed': 1,
+    'counts': {'approval': 1, 'problem': 1, 'commitment': 1, 'decision': 1, 'suggested_promise': 1},
+    'summary': '5 need you; 2 are waiting on your answer or went wrong.',
+  },
   'GET /api/v1/trips': [
     {'id': 't1', 'title': 'Lisbon in November', 'destination': 'Lisbon', 'start': '2026-11-12', 'end': '2026-11-15', 'unknowns': 3},
   ],

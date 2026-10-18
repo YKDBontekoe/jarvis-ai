@@ -513,3 +513,12 @@ A saved starter for a recurring job: a name, one of the owner's profiles, option
 ### Mode attachments
 
 `PUT /modes/{mode}/attachment` (`profileId`, `routineId`, both optional; neither clears it) saves the profile and/or home routine (`morning`, `focus`, `leave`, `evening`) the owner prefers in that mode; profiles must be the owner's. `GET /modes/attachments` lists them and `GET /modes/suggestion?currentProfileId=` returns what the **current** mode suggests: the profile with its scope change against the profile in use and anything that would widen access, the routine, `visualOnly` (what is only shown) and `needsYou` (what still takes the owner). Nothing switches or runs from an attachment. A deleted profile is reported as a `problem`, never replaced. State lives in owner settings (`context-modes.attachments`).
+
+### Attention queue (Needs you)
+
+`GET /attention` returns one ordered queue: approvals Jarvis is waiting on, tasks paused for approval, recent failed tasks and reminders (`problem`), late then due-today promises, decisions whose review day has come, and one review item for possible promises Jarvis only noticed. Order is urgency (`now`, `late`, `today`, `review`), then kind, then how late. At most 20 per kind and 60 in total. `POST /attention/{id}/snooze` (`days` 1–14) hides an item and `DELETE /attention/{id}/snooze` brings it back; snoozes expire by themselves. Approvals, paused tasks and problems are `locked` and cannot be put away (400). Snoozing never changes the underlying record. Snoozes live in owner settings (`attention`).
+
+| Method | Path |
+|---|---|
+| GET | `/attention` |
+| POST / DELETE | `/attention/{id}/snooze` |

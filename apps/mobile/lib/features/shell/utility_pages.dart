@@ -15,6 +15,7 @@ import '../memory/memory_screen.dart';
 import '../missions/mission_result_screen.dart';
 import '../missions/mission_starter_screen.dart';
 import '../missions/missions_screen.dart';
+import '../attention/attention_screen.dart';
 import '../home_routines/home_routines_screen.dart';
 import '../outcomes/learned_screen.dart';
 import '../profiles/working_styles_screen.dart';
@@ -149,6 +150,11 @@ Widget? utilityPageFor(
   'trips' => TripsScreen(http: http),
   'home-routines' => HomeRoutinesScreen(http: http),
   'working-styles' => WorkingStylesScreen(http: http),
+  'attention' => AttentionScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+    onAskInChat: onAskInChat,
+  ),
   'workspaces' => WorkspacesScreen(
     http: http,
     onOpenConversation: onOpenConversation,

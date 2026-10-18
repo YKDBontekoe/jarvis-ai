@@ -9,7 +9,7 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 
 | Item | Status | Checkpoint |
 |---|---|---|
-| A1 / F01 attention queue | first-slice (Home Needs you sources only) | 1 |
+| A1 / F01 attention queue | first-slice plus the unified queue screen | 1, 35 |
 | A2 / F04 project outcome and next action | first-slice | 2 |
 | A3 / F02 search | first-slice (people, promises, decisions, messages) | 2 |
 | A4 / F09 ask about a source | first-slice | 3 |
@@ -361,3 +361,10 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **What it does not do.** Nothing switches profile or runs a routine by itself; a profile switch that widens access still asks first, and a routine only previews (security controls need approval). A deleted profile is reported, never swapped for another.
 - **Tests.** .NET `ModeAttachmentTests` (6), Dart `modes_screen_test` (+2), screenshots via the Modes audit (light, dark, large text), real-stack `tests/e2e/mode_attachment_flow.mjs`.
 - **Not done in F35.** Applying Home emphasis per mode (no Home emphasis setting exists to attach), one-tap switch to the suggested profile from the card, the ambient privacy view (F35.3), voice entry points (F35.5), plan item as the focus action.
+
+## Checkpoint 35: F01, the unified Needs you queue
+
+- **What.** One server queue (`/attention`) behind "Needs you": approvals, tasks paused for approval, recent failed tasks and reminders, late and due-today promises, decisions due, and one review item for possible promises. Home's "See all" opens the full screen instead of only Approvals.
+- **Rules.** Order is urgency, then kind, then how late; bounded per kind and overall; approvals, paused tasks and problems are locked and cannot be put away; other items can be put away for 1 to 14 days and come back by themselves; the underlying records are never touched; the summary counts what is put away instead of hiding it.
+- **Tests.** .NET `AttentionQueueTests` (7), Dart `attention_test` (4), screenshot `audit-*-attention`, real-stack `tests/e2e/attention_flow.mjs`.
+- **Not done in F01.** More sources (inbox threads waiting on a reply, goal check-ins, renewals, people follow-ups) still show in their own screens, per-item inline actions (Done, Reply) in the queue rather than opening the owning page, widgets and briefings using the same queue, a push when something new arrives, and a deep link from a widget (device only).

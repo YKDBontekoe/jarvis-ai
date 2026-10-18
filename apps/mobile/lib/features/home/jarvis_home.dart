@@ -700,7 +700,6 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final now = _now;
     final upcoming = upcomingItems(_briefing, now);
-    final approvals = jsonMaps(_briefing?['approvals']);
     final calendar = _briefing?['calendar'];
     final calendarOff =
         calendar is Map && calendar['connected'] == false && _briefing != null;
@@ -792,9 +791,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                               ? null
                               : (item, draft) =>
                                     widget.onReplyWith!(item.id, draft),
-                          onSeeAll: approvals.isEmpty
-                              ? null
-                              : () => widget.onOpen('approvals'),
+                          onSeeAll: () => widget.onOpen('attention'),
                           onAction: (item, action) =>
                               unawaited(_needsYou(item, action)),
                         ),
