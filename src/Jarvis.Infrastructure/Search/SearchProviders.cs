@@ -1,6 +1,11 @@
 using Jarvis.Application.Channels;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Decisions;
+using Jarvis.Application.Goals;
+using Jarvis.Application.Journal;
+using Jarvis.Application.Missions;
+using Jarvis.Application.Projects;
+using Jarvis.Application.Trips;
 using Jarvis.Application.Inbox;
 using Jarvis.Application.People;
 using Jarvis.Application.Files;
@@ -60,6 +65,21 @@ internal static class SearchRoutes
 
     public static SearchRouteTarget Decision(Guid decisionId) => new("decision",
         new Dictionary<string, string> { ["decisionId"] = decisionId.ToString() });
+
+    public static SearchRouteTarget Journal(DateOnly day) => new("journal",
+        new Dictionary<string, string> { ["date"] = day.ToString("yyyy-MM-dd") });
+
+    public static SearchRouteTarget Project(Guid projectId) => new("project",
+        new Dictionary<string, string> { ["projectId"] = projectId.ToString() });
+
+    public static SearchRouteTarget Mission(Guid missionId) => new("mission",
+        new Dictionary<string, string> { ["missionId"] = missionId.ToString() });
+
+    public static SearchRouteTarget Goal(Guid goalId) => new("goal",
+        new Dictionary<string, string> { ["goalId"] = goalId.ToString() });
+
+    public static SearchRouteTarget Trip(Guid tripId) => new("trip",
+        new Dictionary<string, string> { ["tripId"] = tripId.ToString() });
 
     public static SearchRouteTarget CodingRun(Guid runId) => new("coding_run",
         new Dictionary<string, string> { ["runId"] = runId.ToString() });
@@ -388,5 +408,122 @@ public sealed class MessageSearchProvider(IConversationStore conversations) : IF
         var end = Math.Min(flat.Length, start + ExcerptLength);
         start = Math.Max(0, end - ExcerptLength);
         return (start > 0 ? "…" : "") + flat[start..end].Trim() + (end < flat.Length ? "…" : "");
+    }
+}
+
+/// <summary>Journal entries by what was written. Owner-only: the agent never searches them.</summary>
+public sealed class JournalSearchProvider(IJournalService journal) : IFederatedSearchProvider
+{
+    public const int Scan = 400;
+    public string ProviderId => "journal";
+    public IReadOnlySet<string> ResultKinds => new HashSet<string> { SearchResultKinds.Journal };
+
+    public async Task<IReadOnlyList<FederatedSearchResult>> SearchAsync(Guid ownerId, string query, int limit,
+        CancellationToken cancellationToken)
+    {
+        var normalized = SearchRanking.NormalizeQuery(query);
+        var hits = new List<FederatedSearchResult>();
+        foreach (var entry in await journal.ListAsync(ownerId, null, null, Scan, cancellationToken))
+        {
+            var text = string.Join(' ', entry.Content, entry.Highlights ?? "", entry.Gratitude ?? "", string.Join(' ', entry.Tags));
+            if (!SearchRanking.MatchesQuery(text, normalized)) continue;
+            hits.Add(new FederatedSearchResult(SearchResultKinds.Journal, entry.Id.ToString(), entry.EntryDate.ToString("d MMM yyyy"),
+                SearchRanking.TruncateSummary(entry.Content, 120), new DateTimeOffset(entry.EntryDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
+                SearchRoutes.Journal(entry.EntryDate), SearchRanking.TextRelevance(text, normalized), false));
+        }
+        return SearchRanking.Best(hits, limit);
+    }
+}
+
+public sealed class ProjectSearchProvider(IProjectStore projects) : IFederatedSearchProvider
+{
+    public string ProviderId => "projects";
+    public IReadOnlySet<string> ResultKinds => new HashSet<string> { SearchResultKinds.Project };
+
+    public async Task<IReadOnlyList<FederatedSearchResult>> SearchAsync(Guid ownerId, string query, int limit,
+        CancellationToken cancellationToken)
+    {
+        var normalized = SearchRanking.NormalizeQuery(query);
+        var hits = new List<FederatedSearchResult>();
+        foreach (var project in await projects.ListAsync(ownerId, cancellationToken))
+        {
+            if (!SearchRanking.MatchesQuery(project.Name, normalized) &&
+                !SearchRanking.MatchesQuery(project.Description ?? "", normalized) &&
+                !SearchRanking.MatchesQuery(project.Outcome ?? "", normalized))
+                continue;
+            hits.Add(new FederatedSearchResult(SearchResultKinds.Project, project.Id.ToString(), project.Name,
+                SearchRanking.TruncateSummary(project.Outcome ?? project.Description ?? project.Status, 120), project.UpdatedAt,
+                SearchRoutes.Project(project.Id),
+                Math.Max(SearchRanking.TextRelevance(project.Name, normalized),
+                    SearchRanking.TextRelevance(project.Outcome ?? project.Description ?? "", normalized) * .7), false));
+        }
+        return SearchRanking.Best(hits, limit);
+    }
+}
+
+public sealed class MissionSearchProvider(IMissionRepository missions) : IFederatedSearchProvider
+{
+    public string ProviderId => "missions";
+    public IReadOnlySet<string> ResultKinds => new HashSet<string> { SearchResultKinds.Mission };
+
+    public async Task<IReadOnlyList<FederatedSearchResult>> SearchAsync(Guid ownerId, string query, int limit,
+        CancellationToken cancellationToken)
+    {
+        var normalized = SearchRanking.NormalizeQuery(query);
+        var hits = new List<FederatedSearchResult>();
+        foreach (var mission in await missions.ListAsync(ownerId, cancellationToken))
+        {
+            if (!SearchRanking.MatchesQuery(mission.Title, normalized) && !SearchRanking.MatchesQuery(mission.Goal, normalized))
+                continue;
+            hits.Add(new FederatedSearchResult(SearchResultKinds.Mission, mission.Id.ToString(), mission.Title,
+                $"{mission.Status} · {SearchRanking.TruncateSummary(mission.Goal, 100)}", mission.UpdatedAt,
+                SearchRoutes.Mission(mission.Id),
+                Math.Max(SearchRanking.TextRelevance(mission.Title, normalized), SearchRanking.TextRelevance(mission.Goal, normalized) * .7), false));
+        }
+        return SearchRanking.Best(hits, limit);
+    }
+}
+
+public sealed class GoalSearchProvider(IGoalService goals) : IFederatedSearchProvider
+{
+    public string ProviderId => "goals";
+    public IReadOnlySet<string> ResultKinds => new HashSet<string> { SearchResultKinds.Goal };
+
+    public async Task<IReadOnlyList<FederatedSearchResult>> SearchAsync(Guid ownerId, string query, int limit,
+        CancellationToken cancellationToken)
+    {
+        var normalized = SearchRanking.NormalizeQuery(query);
+        var hits = new List<FederatedSearchResult>();
+        foreach (var goal in await goals.ListAsync(ownerId, true, cancellationToken))
+        {
+            if (!SearchRanking.MatchesQuery(goal.Title, normalized)) continue;
+            hits.Add(new FederatedSearchResult(SearchResultKinds.Goal, goal.Id.ToString(), goal.Title,
+                goal.CheckInDue ? $"{goal.Status} · check-in due" : goal.Status, null, SearchRoutes.Goal(goal.Id),
+                SearchRanking.TextRelevance(goal.Title, normalized), false));
+        }
+        return SearchRanking.Best(hits, limit);
+    }
+}
+
+public sealed class TripSearchProvider(ITripService trips) : IFederatedSearchProvider
+{
+    public string ProviderId => "trips";
+    public IReadOnlySet<string> ResultKinds => new HashSet<string> { SearchResultKinds.Trip };
+
+    public async Task<IReadOnlyList<FederatedSearchResult>> SearchAsync(Guid ownerId, string query, int limit,
+        CancellationToken cancellationToken)
+    {
+        var normalized = SearchRanking.NormalizeQuery(query);
+        var hits = new List<FederatedSearchResult>();
+        foreach (var trip in await trips.ListAsync(ownerId, cancellationToken))
+        {
+            if (!SearchRanking.MatchesQuery(trip.Title, normalized) && !SearchRanking.MatchesQuery(trip.Destination, normalized))
+                continue;
+            hits.Add(new FederatedSearchResult(SearchResultKinds.Trip, trip.Id.ToString(), trip.Title,
+                $"{trip.Destination} · {trip.Start:d MMM} to {trip.End:d MMM}", new DateTimeOffset(trip.Start.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
+                SearchRoutes.Trip(trip.Id),
+                Math.Max(SearchRanking.TextRelevance(trip.Title, normalized), SearchRanking.TextRelevance(trip.Destination, normalized) * .8), false));
+        }
+        return SearchRanking.Best(hits, limit);
     }
 }

@@ -522,3 +522,7 @@ A saved starter for a recurring job: a name, one of the owner's profiles, option
 |---|---|
 | GET | `/attention` |
 | POST / DELETE | `/attention/{id}/snooze` |
+
+### Search groups and date window
+
+`GET /search` also covers `journal` (owner-only, like `message`: the agent's `SearchEverything` never returns either), `project`, `mission`, `goal` and `trip`. `from` and `to` (`yyyy-MM-dd`, inclusive) keep only hits dated inside that window; a hit with no date is left out rather than guessed, and `from` after `to` is a 400. Routes: `journal` carries `date`, the others `projectId`, `missionId`, `goalId`, `tripId`.

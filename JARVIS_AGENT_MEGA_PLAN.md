@@ -375,3 +375,10 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **Honesty.** Only answers are counted. A suggestion nobody rated is unknown, never a yes; fewer than three answers says "too few to say"; old answers age out after 30 days.
 - **Tests.** .NET `OutcomeLearningTests` (+2), Dart `learned_test` (+1), extended `tests/e2e/outcome_learning_flow.mjs`.
 - **Not done in F34.2.** Automatically linking an accepted suggestion to the record it produced (for example the commitment made from a possible promise) without the owner pressing a button, and recording "used" from the destination page itself.
+
+## Checkpoint 37: F02, more search groups and a date window
+
+- **Groups.** Journal entries (owner-only, never given to the agent), projects, missions, goals and trips join people, promises, decisions and messages. Each has a typed route the app opens (journal, `project:{id}`, missions, `goal:{id}`, `trip:{id}`). Also fixed a side effect: adding kinds had shrunk the per-kind cap from 3 to 2 hits, so the cap is now sized for the original 13 kinds.
+- **Filter.** A time window (any time, week, month, year) sends `from`; hits without a date are left out, never guessed.
+- **Tests.** .NET `LifeSearchProviderTests` (+3), `FederatedSearchTests` (+1), Dart `search_screen_test` (3), real-stack `tests/e2e/search_groups_flow.mjs`.
+- **Not done in F02.** Library, finance and app groups, a project filter, relevance fusion across providers beyond the current ranking, accent folding in message text, and a benchmark.

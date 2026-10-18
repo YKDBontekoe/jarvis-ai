@@ -24,6 +24,11 @@ public static class SearchServiceCollectionExtensions
         services.AddScoped<IFederatedSearchProvider, PersonSearchProvider>();
         services.AddScoped<IFederatedSearchProvider, CommitmentSearchProvider>();
         services.AddScoped<IFederatedSearchProvider, DecisionSearchProvider>();
+        services.AddScoped<IFederatedSearchProvider, JournalSearchProvider>();
+        services.AddScoped<IFederatedSearchProvider, ProjectSearchProvider>();
+        services.AddScoped<IFederatedSearchProvider, MissionSearchProvider>();
+        services.AddScoped<IFederatedSearchProvider, GoalSearchProvider>();
+        services.AddScoped<IFederatedSearchProvider, TripSearchProvider>();
         return services;
     }
 }

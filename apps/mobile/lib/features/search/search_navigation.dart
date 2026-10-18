@@ -181,6 +181,24 @@ Future<void> navigateSearchRoute(
     case 'coding_run':
       onUtility('coding');
       return;
+    case 'journal':
+      onUtility('journal');
+      return;
+    case 'project':
+      final projectId = route.parameters['projectId'];
+      onUtility(projectId == null ? 'projects' : 'project:$projectId');
+      return;
+    case 'mission':
+      onUtility('missions');
+      return;
+    case 'goal':
+      final goalId = route.parameters['goalId'];
+      onUtility(goalId == null ? 'goals' : 'goal:$goalId');
+      return;
+    case 'trip':
+      final tripId = route.parameters['tripId'];
+      onUtility(tripId == null ? 'trips' : 'trip:$tripId');
+      return;
     default:
       return;
   }

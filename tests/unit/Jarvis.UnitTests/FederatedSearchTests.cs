@@ -31,6 +31,24 @@ public sealed class FederatedSearchTests
     }
 
     [Fact]
+    public async Task A_date_window_keeps_hits_inside_it_and_drops_undated_ones()
+    {
+        FederatedSearchResult Dated(string id, DateTimeOffset? at) => new(SearchResultKinds.Memory, id, "café " + id, null, at,
+            new SearchRouteTarget("memory", new Dictionary<string, string>()), .8, false);
+        var inside = Dated("inside", new DateTimeOffset(2026, 10, 15, 0, 0, 0, TimeSpan.Zero));
+        var outside = Dated("outside", new DateTimeOffset(2026, 12, 1, 0, 0, 0, TimeSpan.Zero));
+        var undated = Dated("undated", null);
+        var service = CreateService(new StubProvider("memories", SearchResultKinds.Memory, Owner, "café",
+            _ => Task.FromResult<IReadOnlyList<FederatedSearchResult>>([inside, outside, undated])));
+
+        var window = new SearchWindow(new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 10, 31, 0, 0, 0, TimeSpan.Zero));
+        var response = await service.SearchAsync(Owner, "café", null, CancellationToken.None, window);
+
+        Assert.Equal("inside", Assert.Single(response.Results).Id);
+        Assert.Contains((await service.SearchAsync(Owner, "café", null, CancellationToken.None)).Results, r => r.Id == "undated");
+    }
+
+    [Fact]
     public async Task Owner_id_is_required_at_boundary()
     {
         var service = CreateService(new StubProvider("memories", SearchResultKinds.Memory, Owner, "x"));

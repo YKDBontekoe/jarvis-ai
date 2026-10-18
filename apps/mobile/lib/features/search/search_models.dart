@@ -75,4 +75,9 @@ const searchKindLabels = <String, String>{
   'graph_entity': 'Knowledge graph',
   'channel_thread': 'Channels',
   'coding_run': 'Coding runs',
+  'journal': 'Journal',
+  'project': 'Projects',
+  'mission': 'Missions',
+  'goal': 'Goals',
+  'trip': 'Trips',
 };

@@ -16,7 +16,7 @@ public sealed class FederatedSearchService(
     private readonly IFederatedSearchProvider[] _providers = providers.ToArray();
 
     public async Task<FederatedSearchResponse> SearchAsync(Guid ownerId, string query,
-        IReadOnlySet<string>? kindsFilter, CancellationToken cancellationToken)
+        IReadOnlySet<string>? kindsFilter, CancellationToken cancellationToken, SearchWindow? window = null)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(ownerId, Guid.Empty);
         var normalizedQuery = SearchRanking.NormalizeQuery(query);
@@ -34,7 +34,8 @@ public sealed class FederatedSearchService(
         var outcomes = await Task.WhenAll(providerTasks);
 
         var statuses = outcomes.Select(item => item.Status).ToArray();
-        var merged = outcomes.SelectMany(item => item.Results).ToList();
+        var merged = outcomes.SelectMany(item => item.Results)
+            .Where(hit => window is null || window.Contains(hit.Timestamp)).ToList();
         var ranked = RankAndCap(merged, normalizedQuery);
         return new FederatedSearchResponse(ranked, statuses);
     }
@@ -87,7 +88,8 @@ public sealed class FederatedSearchService(
 
     private List<FederatedSearchResult> RankAndCap(IReadOnlyList<FederatedSearchResult> results, string query)
     {
-        var perKindCap = Math.Max(2, _options.MaxTotal / Math.Max(1, SearchResultKinds.All.Count));
+        // Sized for the original 13 kinds, so adding kinds does not shrink how many hits each one may show.
+        var perKindCap = Math.Max(2, _options.MaxTotal / 13);
         var scored = results
             .Select(hit => hit with
             {

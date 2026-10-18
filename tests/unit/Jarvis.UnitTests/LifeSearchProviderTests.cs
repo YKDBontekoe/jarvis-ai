@@ -134,4 +134,59 @@ public sealed class LifeSearchProviderTests
     {
         Assert.True(SearchResultKinds.IsValidFilter(new HashSet<string> { "person", "commitment", "decision" }));
     }
+
+    [Fact]
+    public async Task Journal_is_found_by_what_was_written_and_is_owner_only()
+    {
+        var entry = new Jarvis.Domain.Journal.JournalEntry(Guid.CreateVersion7(), Owner, new DateOnly(2026, 10, 2), "written",
+            "Walked along the canal and felt calm", null, null, 4, null, null, null, ["walk"], null, At, At);
+        var provider = new JournalSearchProvider(Fake<Jarvis.Application.Journal.IJournalService>.Create(
+            ("ListAsync", _ => (IReadOnlyList<Jarvis.Domain.Journal.JournalEntry>)[entry])));
+
+        var hit = Assert.Single(await provider.SearchAsync(Owner, "canal", 8, CancellationToken.None));
+        Assert.Equal("journal", hit.Route.Kind);
+        Assert.Equal("2026-10-02", hit.Route.Parameters["date"]);
+        Assert.Empty(await provider.SearchAsync(Owner, "mountain", 8, CancellationToken.None));
+        Assert.Contains(SearchResultKinds.Journal, SearchResultKinds.OwnerOnly);
+        Assert.Contains(SearchResultKinds.Message, SearchResultKinds.OwnerOnly);
+        Assert.DoesNotContain(SearchResultKinds.Project, SearchResultKinds.OwnerOnly);
+    }
+
+    [Fact]
+    public async Task Projects_missions_goals_and_trips_are_found_with_typed_routes()
+    {
+        var project = new Jarvis.Application.Projects.ProjectRecord(Guid.CreateVersion7(), "Home renovation", null, null, "blue", At, At, 0, 0, 0,
+            "Kitchen done by March");
+        var mission = new Jarvis.Domain.Missions.Mission(Guid.CreateVersion7(), Owner, "Compare ovens", "Find the best oven",
+            "completed", null, null, null, At, At, null, null);
+        var goal = new Jarvis.Application.Goals.GoalSummary(Guid.CreateVersion7(), "Run a 10k", "active", true, 2, null, null, null, 0);
+        var trip = new Jarvis.Application.Trips.TripSummary(Guid.CreateVersion7(), "Lisbon in November", "Lisbon", new DateOnly(2026, 11, 12), new DateOnly(2026, 11, 15), 2);
+
+        var projectHit = Assert.Single(await new ProjectSearchProvider(Fake<Jarvis.Application.Projects.IProjectStore>.Create(
+            ("ListAsync", _ => (IReadOnlyList<Jarvis.Application.Projects.ProjectRecord>)[project]))).SearchAsync(Owner, "kitchen", 8, CancellationToken.None));
+        Assert.Equal(project.Id.ToString(), projectHit.Route.Parameters["projectId"]);
+
+        var missionHit = Assert.Single(await new MissionSearchProvider(Fake<Jarvis.Application.Missions.IMissionRepository>.Create(
+            ("ListAsync", _ => (IReadOnlyList<Jarvis.Domain.Missions.Mission>)[mission]))).SearchAsync(Owner, "oven", 8, CancellationToken.None));
+        Assert.Equal("mission", missionHit.Route.Kind);
+
+        var goalHit = Assert.Single(await new GoalSearchProvider(Fake<Jarvis.Application.Goals.IGoalService>.Create(
+            ("ListAsync", _ => (IReadOnlyList<Jarvis.Application.Goals.GoalSummary>)[goal]))).SearchAsync(Owner, "10k", 8, CancellationToken.None));
+        Assert.Contains("check-in due", goalHit.Summary);
+
+        var tripHit = Assert.Single(await new TripSearchProvider(Fake<Jarvis.Application.Trips.ITripService>.Create(
+            ("ListAsync", _ => (IReadOnlyList<Jarvis.Application.Trips.TripSummary>)[trip]))).SearchAsync(Owner, "lisbon", 8, CancellationToken.None));
+        Assert.Equal("trip", tripHit.Route.Kind);
+    }
+
+    [Fact]
+    public void A_date_window_keeps_dated_hits_inside_it_and_drops_undated_ones()
+    {
+        var window = new SearchWindow(new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 10, 31, 23, 59, 59, TimeSpan.Zero));
+
+        Assert.True(window.Contains(new DateTimeOffset(2026, 10, 15, 0, 0, 0, TimeSpan.Zero)));
+        Assert.False(window.Contains(new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero)));
+        Assert.False(window.Contains(null));
+        Assert.True(new SearchWindow(null, null).Contains(At));
+    }
 }
