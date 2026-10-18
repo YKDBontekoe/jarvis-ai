@@ -18,6 +18,7 @@ import '../missions/missions_screen.dart';
 import '../home_routines/home_routines_screen.dart';
 import '../outcomes/learned_screen.dart';
 import '../profiles/working_styles_screen.dart';
+import '../profiles/workspaces_screen.dart';
 import '../home_routines/routine_screen.dart';
 import '../modes/modes_screen.dart';
 import '../automations/automations_screen.dart';
@@ -148,6 +149,10 @@ Widget? utilityPageFor(
   'trips' => TripsScreen(http: http),
   'home-routines' => HomeRoutinesScreen(http: http),
   'working-styles' => WorkingStylesScreen(http: http),
+  'workspaces' => WorkspacesScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+  ),
   'learned' => LearnedScreen(http: http),
   final routine when routine.startsWith('home-routine:') => RoutineScreen(
     http: http,

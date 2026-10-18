@@ -499,3 +499,13 @@ Owner feedback tied to something Jarvis made (`artifactKind`: `project_update`, 
 ### Catch-up (what a quiet mode held back)
 
 `GET /modes/catch-up` groups the pushes a mode kept off the phone (and the ones the digest already summed up in the last 24 hours) by notification kind: `approvals`, `reminders`, `problems`, `briefings`, `updates`. `stillHolding` says the mode is still quiet. `PUT /modes/catch-up/domains` (`domain`, `included`) leaves a kind out of the recap or puts it back; approvals and problems cannot be left out (400). A kind left out is not summed up in the digest push (and no push is sent when everything is left out) but its notifications stay in the app. `POST /modes/catch-up/clear` removes what was already summed up; anything still held stays. Preferences live in owner settings (`context-modes.catchup`).
+
+### Workspaces
+
+A saved starter for a recurring job: a name, one of the owner's profiles, optionally one of their projects and a first message (up to 400 characters). At most 12. A workspace holds no files, skills or memory scope of its own: the chat it starts uses the profile's snapshot, so it can never reach more than the profile allows. `POST /workspaces/{id}/launch` returns what to start (`profileId`, `projectId`, `title`, `openingMessage`, and the profile's scope summary) and marks it used; the app then creates the conversation with the existing `POST /conversations`. If the profile or project was deleted the workspace lists a `problem` and launch is refused (400). State lives in owner settings (`workspaces`).
+
+| Method | Path |
+|---|---|
+| GET / POST | `/workspaces` |
+| PUT / DELETE | `/workspaces/{id}` |
+| POST | `/workspaces/{id}/launch` |

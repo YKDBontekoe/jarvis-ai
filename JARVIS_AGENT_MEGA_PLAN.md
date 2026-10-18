@@ -320,3 +320,11 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **Honesty.** The summary says whether pushes are still held, and counts the left-out items instead of hiding them. Items only come from what the digest already stored (titles, no bodies).
 - **Tests.** .NET `CatchUpTests` (7, plus the existing `PushDigestTests` still pass), Dart `modes_screen_test` (+2), real-stack `tests/e2e/catch_up_flow.mjs` (endpoint behaviour; holding real pushes needs a delivered notification during a quiet mode and was covered by unit tests, not end to end). The catch-up card sits below the first screen of the Modes audit screenshot, so I did not look at it rendered; the layout audit (light, dark, large text) passes.
 - **Not done in F35.** F35.2 (attach a profile, Home emphasis or routine draft to a mode), F35.3 (ambient privacy view), F35.5 (voice entry points), a plan item as the focus action.
+
+## Checkpoint 33: F33.4, workspace starters
+
+- **What.** A workspace saves a profile (and optionally a project) plus a first message for a job the owner repeats. Starting it opens a normal chat bound to that profile and project through the existing conversation endpoint, so snapshots, switch confirmation and model constraints are untouched.
+- **No extra access (acceptance).** The stored record has no file, skill, collection or memory field; the scope shown is always the profile's own summary, and a test asserts the record cannot carry one. A restricted profile therefore cannot reach more through a workspace.
+- **Honest states.** A deleted profile or project is shown as "needs a fix" with the reason, and launch is refused rather than falling back to the default profile. The first message is only suggested, never sent for the owner.
+- **Tests.** .NET `WorkspaceTests` (5), Dart `workspaces_test` (4), screenshot `audit-*-workspaces`, real-stack `tests/e2e/workspace_flow.mjs`.
+- **Not done in F33.4.** Choosing sources (collections) per workspace (only meaningful as a subset of the profile's own, which needs the profile editor), sending the first message automatically, editing a workspace in the app (API supports it), and launching from the working-styles suggestion.

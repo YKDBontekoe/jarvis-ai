@@ -99,6 +99,7 @@ public static class LifeFeaturesRegistration
         services.AddScoped<Jarvis.Application.Voice.IVoiceCompanionService, Jarvis.Application.Voice.VoiceCompanionService>();
         services.AddScoped<Jarvis.Application.Preferences.IOwnerPreferenceService, Jarvis.Application.Preferences.OwnerPreferenceService>();
         services.AddScoped<Jarvis.Application.Trips.ITripService, Jarvis.Application.Trips.TripService>();
+        services.AddScoped<Jarvis.Application.Profiles.IWorkspaceService, Jarvis.Application.Profiles.WorkspaceService>();
         services.AddScoped<Jarvis.Application.Profiles.IProfileGuidanceService, Jarvis.Application.Profiles.ProfileGuidanceService>();
         services.AddScoped<Jarvis.Application.Outcomes.IOutcomeLearningService, Jarvis.Application.Outcomes.OutcomeLearningService>();
         services.AddScoped<Jarvis.Application.HomeRoutines.IHomeRoutineService, Jarvis.Application.HomeRoutines.HomeRoutineService>();

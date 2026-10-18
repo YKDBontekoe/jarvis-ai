@@ -912,6 +912,10 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     {'change': {'id': 'c1', 'kind': 'style', 'artifactKind': 'project_update', 'value': 'short', 'title': 'Keep project update short', 'reason': 'You said project update was too long 3 times in the last 30 days.', 'before': 'The migration is going well overall. Most of the services have been moved across and tested, and a few smaller items are still outstanding.', 'after': 'Migration: 80% done. Left: reporting jobs, old cron entries.', 'synthetic': true, 'status': 'pending'}, 'effect': null},
     {'change': {'id': 'c2', 'kind': 'quiet', 'artifactKind': 'opportunity', 'value': 'quiet', 'title': 'Stop volunteering opportunity suggestions', 'reason': 'You dismissed opportunity suggestions 4 times in the last 14 days.', 'before': 'Jarvis mentions a new opportunity when it notices one.', 'after': 'Jarvis mentions an opportunity only when you ask.', 'synthetic': true, 'status': 'applied'}, 'effect': null},
   ],
+  'GET /api/v1/workspaces': [
+    {'workspace': {'id': 'w1', 'name': 'Weekly research', 'instruction': 'Summarise what changed since last week'}, 'profileName': 'Research analyst', 'projectName': 'Home renovation', 'problem': null, 'scope': {'memory': 'Only pinned memories', 'files': '1 document collection', 'limits': ['Cannot save new memories.']}},
+    {'workspace': {'id': 'w2', 'name': 'Monday planning', 'instruction': null}, 'profileName': null, 'projectName': null, 'problem': 'Its profile was deleted. Choose another one.', 'scope': null},
+  ],
   'GET /api/v1/trips': [
     {'id': 't1', 'title': 'Lisbon in November', 'destination': 'Lisbon', 'start': '2026-11-12', 'end': '2026-11-15', 'unknowns': 3},
   ],

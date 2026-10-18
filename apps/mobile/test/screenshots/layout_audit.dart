@@ -30,6 +30,7 @@ const destinations = [
   'modes',
   'home-routines',
   'working-styles',
+  'workspaces',
   'learned',
   'home-routine:focus',
   'trip:t1',

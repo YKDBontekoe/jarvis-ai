@@ -168,6 +168,12 @@ const quickCommands = [
     keywords: ['learned', 'learn', 'feedback', 'style', 'preferences', 'improve', 'geleerd', 'voorkeuren', 'verbeter'],
   ),
   QuickCommand(
+    label: 'Workspaces',
+    icon: PhosphorIconsRegular.appWindow,
+    destination: 'workspaces',
+    keywords: ['workspace', 'workspaces', 'recurring', 'routine job', 'start a job', 'werkruimte'],
+  ),
+  QuickCommand(
     label: 'Working styles',
     icon: PhosphorIconsRegular.userCircle,
     destination: 'working-styles',
