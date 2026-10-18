@@ -449,3 +449,16 @@ Recaps built from the timeline (`ITimelineService`) for a chosen window (at most
 | PUT | `/stories/{id}/items/{itemId}` (`text`), `/stories/{id}/items/{itemId}/removed` (`removed`) |
 | POST | `/stories/{id}/items/{itemId}/move` (`direction` `up`/`down`; 409 at the end), `/stories/{id}/save` (private Library report, one per version) |
 | GET | `/stories/{id}/export?redact=journal,people,expense,…` (Markdown; leaves out those kinds, counts and patterns) |
+
+### Trips
+
+A trip workspace in owner settings (`trips`, at most 10 trips, 12 options, 80 itinerary items, 60 days). Options carry a price, currency, `quotedOn`, the dates quoted for (`forStart`/`forEnd`) and `sourceUrl`; the view derives a quote state per option: `current` (within 7 days, source and matching dates), `outdated`, `unquoted` (no source or date) and `other_dates`. Only chosen options in the trip currency are summed into the budget; other currencies are listed, not converted. One transport and one stay can be chosen; a `sold_out` option cannot. The checklist comes from the trip's facts and points to official sources for entry rules. Holds are proposals only: nothing is booked, bought or written to a calendar. Changing dates is previewed first; applying shifts items and marks them unverified.
+
+| Method | Path |
+|---|---|
+| GET / POST | `/trips` (POST: `title`, `destination`, `start`, `end`, `travelers`, `abroad`, `budget`, `currency`, …) |
+| GET / PUT / DELETE | `/trips/{id}` |
+| POST / DELETE | `/trips/{id}/options`, `/trips/{id}/options/{optionId}` |
+| PUT | `/trips/{id}/options/{optionId}/chosen` (`chosen`), `/trips/{id}/checklist/{entryId}` (`done`), `/trips/{id}/dates` (`start`, `end`) |
+| POST | `/trips/{id}/items`, `/trips/{id}/dates/preview` |
+| DELETE | `/trips/{id}/items/{itemId}` |

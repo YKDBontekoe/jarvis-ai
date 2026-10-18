@@ -98,6 +98,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Opportunities.OpportunityToolContributor>();
         services.AddScoped<IAgentToolContributor, Stories.StoryToolContributor>();
         services.AddScoped<IAgentToolContributor, Setup.SetupToolContributor>();
+        services.AddScoped<IAgentToolContributor, Trips.TripToolContributor>();
         services.AddScoped<IAgentToolContributor, Voice.VoiceCompanionToolContributor>();
         services.AddScoped<IAgentToolContributor, Missions.MissionResultToolContributor>();
         services.AddScoped<IAgentToolContributor, Notifications.NotificationToolContributor>();

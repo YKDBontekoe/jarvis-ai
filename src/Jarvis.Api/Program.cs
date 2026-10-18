@@ -131,6 +131,7 @@ api.MapOpportunityEndpoints();
 api.MapStoryEndpoints();
 api.MapSetupEndpoints();
 api.MapPreferenceEndpoints();
+api.MapTripEndpoints();
 api.MapMeetingEndpoints();
 api.MapMissionEndpoints(app.Logger);
 api.MapEventEndpoints();

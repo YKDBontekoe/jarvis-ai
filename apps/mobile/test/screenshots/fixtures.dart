@@ -851,6 +851,31 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     'homeTimeZone': 'Europe/Amsterdam', 'source': 'brief', 'chosen': false, 'localNow': 'Sat 17 Oct 14:07',
     'explanation': 'You never chose one, so Jarvis borrows the zone from your morning brief.',
   },
+  'GET /api/v1/trips': [
+    {'id': 't1', 'title': 'Lisbon in November', 'destination': 'Lisbon', 'start': '2026-11-12', 'end': '2026-11-15', 'unknowns': 3},
+  ],
+  'GET /api/v1/trips/t1': {
+    'trip': {'id': 't1', 'title': 'Lisbon in November', 'destination': 'Lisbon', 'start': '2026-11-12', 'end': '2026-11-15', 'currency': 'EUR', 'travelers': 2, 'abroad': true},
+    'options': [
+      {'option': {'id': 'o1', 'kind': 'transport', 'title': 'TAP 08:15', 'chosen': true, 'cancellation': 'Free cancellation until 5 Nov'}, 'quote': 'current', 'quoteNote': 'Quoted 16 Oct from its source.', 'priceText': 'EUR 240.00'},
+      {'option': {'id': 'o2', 'kind': 'stay', 'title': 'Hotel Alfama', 'chosen': false}, 'quote': 'outdated', 'quoteNote': 'Quoted 12 days ago. Prices change: check it again.', 'priceText': 'EUR 410.00'},
+    ],
+    'days': [
+      {'date': '2026-11-12', 'freeMinutes': 600, 'flags': <Object>[], 'items': [
+        {'item': {'id': 'i1', 'kind': 'travel', 'title': 'Flight to Lisbon', 'place': 'AMS', 'start': '08:15:00', 'end': '11:00:00'}, 'flags': [{'code': 'unverified', 'text': 'Not verified against a source.'}]},
+      ]},
+      {'date': '2026-11-13', 'freeMinutes': 60, 'flags': [{'code': 'full', 'text': 'Only 60 min of unplanned time. Leave room.'}], 'items': <Object>[]},
+    ],
+    'budget': {'currency': 'EUR', 'budget': 1500, 'chosen': 240},
+    'checklist': [
+      {'id': 'documents', 'group': 'Documents', 'text': 'Passport or ID, and any visa or entry paperwork', 'note': 'Requirements change. Check the official government source; this list is not proof you may enter.', 'done': false},
+      {'id': 'tickets', 'group': 'Before you go', 'text': 'Tickets and bookings saved where you can open them offline', 'note': null, 'done': true},
+    ],
+    'holds': [
+      {'title': 'Flight to Lisbon', 'date': '2026-11-12', 'at': '08:15:00', 'why': 'Departure'},
+    ],
+    'unknowns': ['No stay chosen yet.', '1 itinerary item not verified against a source.'],
+  },
   'GET /api/v1/setup': {
     'summary': '2 of 5 done. Next: connect your calendar.', 'done': 2, 'total': 5, 'nextGoalId': 'calendar',
     'goals': [

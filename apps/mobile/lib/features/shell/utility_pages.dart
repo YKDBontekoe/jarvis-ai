@@ -30,6 +30,8 @@ import '../documents/document_screen.dart';
 import '../documents/documents_screen.dart';
 import '../notifications/notification_settings_screen.dart';
 import '../settings/home_zone_screen.dart';
+import '../trips/trip_screen.dart';
+import '../trips/trips_screen.dart';
 import '../settings/queued_changes_screen.dart';
 import '../setup/setup_screen.dart';
 import '../stories/stories_screen.dart';
@@ -139,6 +141,11 @@ Widget? utilityPageFor(
   ),
   'notification-settings' => NotificationSettingsScreen(http: http),
   'home-zone' => HomeZoneScreen(http: http),
+  'trips' => TripsScreen(http: http),
+  final trip when trip.startsWith('trip:') => TripScreen(
+    http: http,
+    tripId: trip.substring('trip:'.length),
+  ),
   'queued-changes' => QueuedChangesScreen(http: http),
   'setup' => SetupScreen(
     http: http,

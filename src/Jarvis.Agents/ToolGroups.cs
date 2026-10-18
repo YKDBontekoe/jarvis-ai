@@ -79,6 +79,9 @@ public static partial class ToolGroups
         new("voice-cards", "In a voice session: save the card just shown, and recap what was saved and what is still open",
             ["SaveShownCard", "GetSessionRecap"],
             VoiceCardKeywords()),
+        new("trips", "Plan a trip inside Jarvis: dates, options with dated and sourced prices, what is still unknown; nothing is booked",
+            ["CreateTrip", "AddTripOption", "GetTrip"],
+            TripKeywords()),
         new("documents", "Draft a one-page project update from the user's own records, nothing is sent",
             ["DraftProjectUpdate"],
             DocumentKeywords()),
@@ -286,6 +289,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(save (that|this|it)|keep (that|this)|what did we (do|cover|save)|recap (this|our) (session|chat|call)|sla (dat|dit) op|wat hebben we gedaan)", KeywordOptions)]
     private static partial Regex VoiceCardKeywords();
+
+    [GeneratedRegex(@"\b(trip|holiday|vacation|itinerary|flight|hotel|city break|weekend away|vakantie|reis|reisje|vlucht|hotel|stedentrip|uitje)", KeywordOptions)]
+    private static partial Regex TripKeywords();
 
     [GeneratedRegex(@"\b(project update|status update|progress report|write (up )?(an? )?update|statusupdate|voortgangsrapport|schrijf (een )?update)", KeywordOptions)]
     private static partial Regex DocumentKeywords();

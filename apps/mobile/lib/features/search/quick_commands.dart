@@ -156,6 +156,12 @@ const quickCommands = [
     keywords: ['connect', 'app', 'apps', 'integrate', 'calendar', 'email', 'contacts', 'koppel', 'verbind', 'welke app'],
   ),
   QuickCommand(
+    label: 'Plan a trip',
+    icon: PhosphorIconsRegular.airplaneTilt,
+    destination: 'trips',
+    keywords: ['trip', 'travel', 'holiday', 'vacation', 'itinerary', 'flight', 'hotel', 'vakantie', 'reis', 'vlucht'],
+  ),
+  QuickCommand(
     label: 'Waiting to sync',
     icon: PhosphorIconsRegular.clock,
     destination: 'queued-changes',
