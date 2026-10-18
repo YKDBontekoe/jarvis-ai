@@ -408,3 +408,9 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **What.** A chat message written without a connection used to be dropped silently after two days. It is now kept: the transcript says how long it has waited ("Written 3 h ago. Waiting for a connection; it sends by itself."), and past two days it says it will not go out by itself because it may be out of date, with Send now and Cancel (Cancel puts the text back in the composer). The automatic flush stops at an expired message so nothing behind it goes first.
 - **Tests.** Dart `outbox_store_test` (kept and marked expired, the note wording, Send now only when expired, fresh messages unchanged). The flush itself runs inside the chat screen and was not covered by a new widget test.
 - **Not done in F17.** Editing a queued change instead of only retrying or discarding it, other command kinds, a "needs review" conflict when a schedule changed, per-surface "saved age" beyond chat, browser persistence (F17.1.8), and device airplane-mode checks.
+
+## Checkpoint 42: F03.1.4, topics Jarvis must never learn from
+
+- **What.** The owner keeps a list of topics (screen under Settings). A message that mentions one as whole words, ignoring case and accents, is not looked at for memories at all, a model-extracted memory that mentions one is not stored, and an improvement proposal for it is dropped. Saving something on purpose is never blocked.
+- **Tests.** .NET `DoNotLearnTests` (3, including the gate and per-owner privacy), Dart `do_not_learn_test` (3), screenshot `audit-*-do-not-learn`, real-stack `tests/e2e/do_not_learn_flow.mjs` (list behaviour; the chat extraction itself needs a model and was covered by the unit test of the gate).
+- **Not done in F03.** Per-profile do-not-learn lists, delayed-job fencing (F03.1.5), cross-session evals (F03.1.6), outcome tracking of memories (F03.1.7) and provenance for graph facts and reports (F03.2).

@@ -538,3 +538,7 @@ A saved starter for a recurring job: a name, one of the owner's profiles, option
 ### Setup probes
 
 `GET /setup` and the support bundle now report four more capabilities from harmless checks: `apps` (counts connected apps and how many need attention, never names), `push` (not set up on the server, no phone registered, or N phones registered; a registered phone is never claimed to show pushes), `scanner` (the upload scanner is shown a few harmless local bytes with a 3-second limit; nothing is kept) and `storage` (asks for a key that does not exist). A check that fails or times out is `unavailable` with what stops working; one that was not run is `unsupported`.
+
+### Never learn about
+
+`GET`/`PUT /memories/do-not-learn` (`topics`, up to 30 of up to 60 characters; the list is replaced, cleaned and de-duplicated ignoring case and accents). A chat, voice or task message that mentions a topic as whole words is not looked at for memories at all (`ConversationMemoryGate`), a memory the model extracts that mentions one is not stored, and an improvement proposal for such a memory is dropped. Saving something on purpose ("remember that…") is never blocked by this list. State lives in owner settings (`learning.do-not-learn`).

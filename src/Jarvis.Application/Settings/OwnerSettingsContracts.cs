@@ -35,6 +35,7 @@ public static class SettingsSections
     public const string Attention = "attention";
     public const string Locale = "preferences.locale";
     public const string DigestTime = "notifications.digest";
+    public const string DoNotLearn = "learning.do-not-learn";
     public const string CatchUp = "context-modes.catchup";
     public const string Routines = "routines";
     public const string PeopleRadar = "people-radar";

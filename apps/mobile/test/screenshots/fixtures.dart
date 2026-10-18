@@ -942,6 +942,7 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     'currencies': ['EUR', 'USD', 'GBP', 'CHF'],
     'explanation': 'Jarvis replies in your language unless you write in another one or the profile in use sets its own. The base currency is the default for new budgets and trips; nothing is converted.',
   },
+  'GET /api/v1/memories/do-not-learn': {'topics': ['My health', 'Money worries']},
   'GET /api/v1/trips': [
     {'id': 't1', 'title': 'Lisbon in November', 'destination': 'Lisbon', 'start': '2026-11-12', 'end': '2026-11-15', 'unknowns': 3},
   ],

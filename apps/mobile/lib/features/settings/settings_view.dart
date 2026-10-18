@@ -47,6 +47,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         destination: 'home-zone',
       ),
       (
+        title: 'Never learn about',
+        subtitle: 'Topics Jarvis must not remember from chats',
+        icon: PhosphorIconsRegular.eye,
+        destination: 'do-not-learn',
+      ),
+      (
         title: 'Language and currency',
         subtitle: 'Reply language and the default for budgets',
         icon: PhosphorIconsRegular.globeSimple,

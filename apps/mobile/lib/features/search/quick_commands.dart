@@ -192,6 +192,12 @@ const quickCommands = [
     keywords: ['offline', 'queue', 'waiting', 'sync', 'pending', 'wachten', 'synchroniseren'],
   ),
   QuickCommand(
+    label: 'Never learn about',
+    icon: PhosphorIconsRegular.eye,
+    destination: 'do-not-learn',
+    keywords: ['learn', 'forget', 'private', 'memory', 'topic', 'vergeet', 'privé', 'niet onthouden'],
+  ),
+  QuickCommand(
     label: 'Language and currency',
     icon: PhosphorIconsRegular.globeSimple,
     destination: 'locale',

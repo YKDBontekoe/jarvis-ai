@@ -6,6 +6,10 @@ using Jarvis.Application.Memory;
 
 namespace Jarvis.Api.Endpoints;
 
+public sealed record DoNotLearnRequest(List<string>? Topics);
+
+public sealed record DoNotLearnView(IReadOnlyList<string> Topics);
+
 internal static class MemoryEndpoints
 {
     public static RouteGroupBuilder MapMemoryEndpoints(this RouteGroupBuilder api, ILogger logger)
@@ -114,6 +118,18 @@ internal static class MemoryEndpoints
                 "high", true, null, JsonSerializer.Serialize(new { resourceId = id }), ct);
             return Results.NoContent();
         }).WithName("DeleteMemory");
+
+        // Topics the owner never wants learned from. Saving something on purpose is never blocked by this list.
+        api.MapGet("/memories/do-not-learn", async (IDoNotLearnService doNotLearn, ICurrentUser currentUser,
+            CancellationToken ct) => Results.Ok(new DoNotLearnView(await doNotLearn.ListAsync(currentUser.OwnerId, ct))))
+            .WithName("GetDoNotLearn");
+
+        api.MapPut("/memories/do-not-learn", async (DoNotLearnRequest request, IDoNotLearnService doNotLearn,
+            ICurrentUser currentUser, CancellationToken ct) =>
+            await doNotLearn.SetAsync(currentUser.OwnerId, request.Topics, ct) is { } saved
+                ? Results.Ok(new DoNotLearnView(saved))
+                : EndpointHelpers.Invalid("topics",
+                    $"Use up to {DoNotLearnRules.MaxTopics} topics of up to {DoNotLearnRules.MaxTopicLength} characters.")).WithName("SetDoNotLearn");
 
         return api;
     }
