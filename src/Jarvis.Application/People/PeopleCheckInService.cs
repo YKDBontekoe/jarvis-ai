@@ -47,8 +47,7 @@ public sealed class PeopleCheckInService(
 
         if (watched.Length == 0 && !radarWatching) return new PeopleCheckInResult(false, now, 0, 0);
 
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
-        var zone = LocalClock.TryFind(zoneId, out var found) ? found : TimeZoneInfo.Utc;
+        var zone = (await Preferences.OwnerZoneResolver.ResolveAsync(settings, briefings, ownerId, cancellationToken)).Zone;
         var today = PeopleCalendar.LocalDate(now, zone);
         var fireToday = LocalClock.Resolve(today.ToDateTime(LocalCheckInTime), zone);
         if (now < fireToday) return new PeopleCheckInResult(true, fireToday, 0, 0);

@@ -847,6 +847,10 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     {'id': 'helper', 'title': 'A project helper', 'purpose': 'Do a small repeated chore for one project.', 'starter': 'Turn my meeting notes into follow-ups'},
     {'id': 'calculator', 'title': 'A comparison calculator', 'purpose': 'Compare two options with your own numbers.', 'starter': 'Compare two phone plans over 24 months'},
   ],
+  'GET /api/v1/preferences': {
+    'homeTimeZone': 'Europe/Amsterdam', 'source': 'brief', 'chosen': false, 'localNow': 'Sat 17 Oct 14:07',
+    'explanation': 'You never chose one, so Jarvis borrows the zone from your morning brief.',
+  },
   'GET /api/v1/setup': {
     'summary': '2 of 5 done. Next: connect your calendar.', 'done': 2, 'total': 5, 'nextGoalId': 'calendar',
     'goals': [

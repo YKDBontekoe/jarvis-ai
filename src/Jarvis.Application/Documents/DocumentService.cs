@@ -195,8 +195,7 @@ public sealed class DocumentService(
 
     private async Task<DateOnly> TodayAsync(Guid ownerId, CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
-        var zone = LocalClock.TryFind(zoneId, out var found) ? found : TimeZoneInfo.Utc;
+        var zone = (await Preferences.OwnerZoneResolver.ResolveAsync(settings, briefings, ownerId, cancellationToken)).Zone;
         return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), zone).DateTime);
     }
 }

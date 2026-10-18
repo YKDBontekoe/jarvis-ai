@@ -9,7 +9,8 @@ public sealed class PeopleService(
     IKnowledgeGraphRepository graph,
     IDailyBriefingRepository briefings,
     IPeopleCheckInScheduler? scheduler = null,
-    TimeProvider? timeProvider = null) : IPeopleService
+    TimeProvider? timeProvider = null,
+    Settings.IOwnerSettingsStore? settings = null) : IPeopleService
 {
     private const int MaxFacts = 12;
     private const int MaxSuggestions = 20;
@@ -152,8 +153,7 @@ public sealed class PeopleService(
 
     public async Task<TimeZoneInfo> GetTimeZoneAsync(Guid ownerId, CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
-        return LocalClock.TryFind(zoneId, out var zone) ? zone : TimeZoneInfo.Utc;
+        return (await Preferences.OwnerZoneResolver.ResolveAsync(settings, briefings, ownerId, cancellationToken)).Zone;
     }
 
     /// <summary>

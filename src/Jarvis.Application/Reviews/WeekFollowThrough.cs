@@ -265,7 +265,6 @@ public sealed class WeekFollowThroughService(
 
     private async Task<TimeZoneInfo> ZoneAsync(Guid ownerId, CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
-        return LocalClock.TryFind(zoneId, out var zone) ? zone : TimeZoneInfo.Utc;
+        return (await Preferences.OwnerZoneResolver.ResolveAsync(settings, briefings, ownerId, cancellationToken)).Zone;
     }
 }

@@ -156,6 +156,12 @@ const quickCommands = [
     keywords: ['connect', 'app', 'apps', 'integrate', 'calendar', 'email', 'contacts', 'koppel', 'verbind', 'welke app'],
   ),
   QuickCommand(
+    label: 'Time zone',
+    icon: PhosphorIconsRegular.globeSimple,
+    destination: 'home-zone',
+    keywords: ['time zone', 'timezone', 'zone', 'home', 'travel', 'tijdzone', 'thuis'],
+  ),
+  QuickCommand(
     label: 'Build an app',
     icon: PhosphorIconsRegular.puzzlePiece,
     destination: 'build-app',

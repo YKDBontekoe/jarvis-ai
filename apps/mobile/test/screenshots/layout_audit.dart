@@ -25,6 +25,7 @@ const destinations = [
   'documents',
   'document:d1',
   'setup',
+  'home-zone',
   'mission-starter',
   'mission-result:m1',
   'notification-settings',

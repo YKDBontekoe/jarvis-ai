@@ -35,6 +35,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         destination: 'voice-settings',
       ),
       (
+        title: 'Time zone',
+        subtitle: 'Where your day starts and ends',
+        icon: PhosphorIconsRegular.globeSimple,
+        destination: 'home-zone',
+      ),
+      (
         title: 'Morning briefing',
         subtitle: 'When your daily summary arrives',
         icon: PhosphorIconsRegular.sunHorizon,

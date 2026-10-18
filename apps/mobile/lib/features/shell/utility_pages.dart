@@ -29,6 +29,7 @@ import '../apps/build_app_screen.dart';
 import '../documents/document_screen.dart';
 import '../documents/documents_screen.dart';
 import '../notifications/notification_settings_screen.dart';
+import '../settings/home_zone_screen.dart';
 import '../setup/setup_screen.dart';
 import '../stories/stories_screen.dart';
 import '../stories/story_screen.dart';
@@ -136,6 +137,7 @@ Widget? utilityPageFor(
     itemId: lesson.substring('lesson:'.length),
   ),
   'notification-settings' => NotificationSettingsScreen(http: http),
+  'home-zone' => HomeZoneScreen(http: http),
   'setup' => SetupScreen(
     http: http,
     onAskInChat: onAskInChat,

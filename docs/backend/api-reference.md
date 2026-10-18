@@ -375,6 +375,18 @@ Deterministic rules over the owner's own facts; reading proposes only and never 
 
 Rules: a meeting in the next 24 hours with no prep note; an open accepted promise due within 3 days or late (older than 30 days it only asks whether it still matters); a subscription's notice day within 7 days (unless kept); a decision whose review day is within 7 days; free time of 45+ minutes today with a project's open next step. "Later" returns after 3 days, "handled", "wrong" and "useful" hide that opportunity, "fewer" or two "wrong" for a kind mute it for 30 days.
 
+### Preferences: home time zone
+
+One precedence for every feature (`ZonePolicy`): the zone a single action names, else the zone a saved schedule carries, else the owner's home zone: the one they chose (`preferences.home`), then the zone borrowed from the morning brief (labelled `brief`, not a choice), then UTC as an admitted default (`default`). A phone's zone is only offered in the app; it never changes anything on its own, and changing the home zone moves nothing already scheduled (reminders and the brief keep their own zones). Used by Goals, Documents, the week follow-through, people check-ins and everything that reads the timeline day.
+
+| Method | Path |
+|---|---|
+| GET | `/preferences` (`homeTimeZone`, `source` `chosen`/`brief`/`default`, `chosen`, `localNow`, `explanation`) |
+| PUT | `/preferences/home-zone` (`timeZoneId`; empty or null goes back to automatic; 400 for unknown zones) |
+| POST | `/preferences/home-zone/preview` (what would change and what would not, and the time there now; changes nothing) |
+
+Written behaviour (tests): a local time that does not exist (clocks jump forward) runs an hour later; a repeated local time uses the first occurrence; midnight rolls over in the owner's zone, not UTC.
+
 ### Voice companion cards
 
 When a voice tool call answers something with rows (what needs you, a comparison), the same call stores a card with those rows and publishes `voice.card` to the conversation's group, so the screen and the spoken words name the same real entities. The voice summarises; the card holds the rows. Cards live in owner settings (`voice.cards`, latest 30). "Save that" means the only card shown in the last 3 minutes; with two or more the tool returns a short choice instead of guessing. A put-away card cannot be saved. The recap counts saved, put away and still open, and states that nothing was sent, accepted or changed outside Jarvis by voice.
