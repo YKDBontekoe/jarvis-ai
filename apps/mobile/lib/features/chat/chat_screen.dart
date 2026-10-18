@@ -15,6 +15,7 @@ import 'package:signalr_netcore/signalr_client.dart';
 import '../../api/api_config.dart';
 import '../../api/api_errors.dart';
 import '../../api/jarvis_http.dart';
+import '../../api/mutation_queue.dart';
 import '../../api/offline_cache.dart';
 import '../../auth/auth_session.dart';
 import '../../auth/auth_validation.dart';
@@ -148,7 +149,16 @@ class _ChatScreenState extends _ChatScreenController
       },
     );
     // Widget tests serve canned responses; a cache shared across them would leak data between tests.
-    if (!usesDebugJarvisHttpAdapter) OfflineCache.instance.attach(_http);
+    if (!usesDebugJarvisHttpAdapter) {
+      OfflineCache.instance.attach(_http);
+      // Changes made offline are kept for this server only, and sent once Jarvis answers again.
+      OfflineCache.instance.state.addListener(_syncQueuedChanges);
+      unawaited(
+        MutationQueue.instance
+            .bind(_http.options.baseUrl)
+            .then((_) => _syncQueuedChanges(force: true)),
+      );
+    }
     attachJarvisAuthInterceptor(
       http: _http,
       auth: _auth,
@@ -324,8 +334,16 @@ class _ChatScreenState extends _ChatScreenController
     }
   }
 
+  /// Sends queued offline changes once the connection is back and someone is signed in.
+  void _syncQueuedChanges({bool force = false}) {
+    if (_signedOut || _signingOut || _restoringSession) return;
+    if (!force && OfflineCache.instance.isOffline) return;
+    unawaited(MutationQueue.instance.drain(_http));
+  }
+
   @override
   void dispose() {
+    OfflineCache.instance.state.removeListener(_syncQueuedChanges);
     WidgetsBinding.instance.removeObserver(this);
     unawaited(PlaceReminderTracker.instance.detach());
     unawaited(_widgetClicks?.cancel());

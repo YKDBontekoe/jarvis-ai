@@ -63,6 +63,27 @@ public sealed class WorkflowSchedulingRecoveryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Marking_a_done_reminder_done_again_succeeds_once_and_never_for_someone_else()
+    {
+        var owner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var reminders = new WorkflowRepository(database);
+        var reminder = new Reminder(owner, "Call the plumber", DateTimeOffset.UtcNow.AddHours(3));
+        database.Reminders.Add(reminder);
+        await database.SaveChangesAsync();
+
+        var first = await reminders.MarkDoneAsync(reminder.Id, owner, CancellationToken.None);
+        var replay = await reminders.MarkDoneAsync(reminder.Id, owner, CancellationToken.None);
+        var stranger = await reminders.MarkDoneAsync(reminder.Id, Guid.CreateVersion7(), CancellationToken.None);
+
+        Assert.Equal("completed", first!.Status);
+        Assert.Equal("completed", replay!.Status);
+        Assert.Equal(first.CompletedAt, replay.CompletedAt);
+        Assert.Null(stranger);
+        Assert.Equal(1, await database.AuditEvents.CountAsync(e => e.Action == "reminder.completed" && e.OwnerId == owner));
+    }
+
+    [Fact]
     public async Task Place_reminders_fire_from_positions_and_stay_out_of_temporal()
     {
         var owner = Guid.CreateVersion7();

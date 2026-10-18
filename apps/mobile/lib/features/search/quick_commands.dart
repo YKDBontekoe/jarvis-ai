@@ -156,6 +156,12 @@ const quickCommands = [
     keywords: ['connect', 'app', 'apps', 'integrate', 'calendar', 'email', 'contacts', 'koppel', 'verbind', 'welke app'],
   ),
   QuickCommand(
+    label: 'Waiting to sync',
+    icon: PhosphorIconsRegular.clock,
+    destination: 'queued-changes',
+    keywords: ['offline', 'queue', 'waiting', 'sync', 'pending', 'wachten', 'synchroniseren'],
+  ),
+  QuickCommand(
     label: 'Time zone',
     icon: PhosphorIconsRegular.globeSimple,
     destination: 'home-zone',

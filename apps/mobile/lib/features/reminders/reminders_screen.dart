@@ -21,6 +21,8 @@ import '../review/weekly_review_screen.dart';
 import '../notifications/notification_details_screen.dart';
 import '../notifications/notification_routing.dart';
 import '../../schedule_format.dart';
+import '../../api/mutation_queue.dart';
+import '../../api/offline_cache.dart';
 import '../../json_maps.dart';
 import '../tasks/task_details_screen.dart';
 import '../../theme.dart';
@@ -386,7 +388,23 @@ abstract class _RemindersController extends State<RemindersScreen>
       await widget.http.post<dynamic>('/api/v1/reminders/$id/complete');
       await _load();
       if (mounted) _showMessage('Marked as done.');
-    } on DioException {
+    } on DioException catch (error) {
+      if (OfflineCache.isConnectionFailure(error)) {
+        // Not done yet: it is kept on this phone and sent when Jarvis answers again.
+        final queued = await MutationQueue.instance.enqueue(
+          kind: MutationKinds.reminderComplete,
+          targetId: id,
+          label: 'Mark “${reminder['title'] ?? 'reminder'}” as done',
+          group: 'reminder:$id',
+        );
+        if (mounted) {
+          _showMessage(
+            queued.problem ??
+                'No connection. This is saved on your phone and will be sent when Jarvis is back. It is not done yet.',
+          );
+        }
+        return;
+      }
       if (mounted) _showError('Jarvis could not update that reminder.');
     } catch (_) {
       if (mounted) _showError('Jarvis could not update that reminder.');
