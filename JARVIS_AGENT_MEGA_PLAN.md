@@ -5,19 +5,45 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 
 ## Ledger
 
-| Item | Status | Notes |
+`first-slice` = the first useful vertical slice is verified (unit, widget, real-stack e2e where it has an endpoint); the checkpoint lists what is still open. Update this table whenever a checkpoint closes more of a feature.
+
+| Item | Status | Checkpoint |
 |---|---|---|
-| A1 / F01.1.2 first sources (accepted commitments, due decisions) | verified | See checkpoint 1 |
-| F01.2.3 failed optimistic action restores the row | verified | Applies to promises and reminders |
-| F01.1.1, F01.1.3–F01.1.8, F01.2.1 (full queue), F01.2.4–F01.2.8 | planned | Shared attention contract, tasks/inbox sources, full queue screen |
-| A2 / F04.1.1, F04.1.4 (project outcome, status, next action) | verified | See checkpoint 2 |
-| A3 / F02.1.2 first group, F02.1.4 partial, F02.1.7 partial, F02.2 (message search, open at match) | verified | See checkpoint 2 |
-| A4 ask about this source (F09.1.2 partial) | verified | See checkpoint 3; end-to-end with a seeded file row (ClamAV cannot load signatures in this sandbox) |
-| A8 memory review and correction (F03.1.1–F03.1.3 first slice) | verified | See checkpoint 3 |
-| A7 editable comparison (F26.1–F26.6 first slice, F08.1.2 partly) | verified | See checkpoint 4 |
-| A5 meeting prep pack, A6 debrief into reviewed commitments, F22.1–F22.8 first slice | verified | See checkpoint 5 |
-| A10 weekly review with one accepted action (F11.1.4–F11.1.5) | verified | See checkpoint 6 |
-| Everything else | planned | Next: F05 planner time blocks, F07, F12, F23, F25, then Sprints C and E |
+| A1 / F01 attention queue | first-slice (Home Needs you sources only) | 1 |
+| A2 / F04 project outcome and next action | first-slice | 2 |
+| A3 / F02 search | first-slice (people, promises, decisions, messages) | 2 |
+| A4 / F09 ask about a source | first-slice | 3 |
+| A8 / F03 memory review | first-slice | 3 |
+| A7 / F26 / F08 comparison | first-slice | 4 |
+| A5, A6 / F22 meetings | first-slice | 5 |
+| A10 / F11 weekly review follow-through | first-slice | 6 |
+| F05 promise to plan | first-slice | 7 |
+| F07 relationship follow-through | first-slice | 8 |
+| F23 goals | first-slice | 9 |
+| F25 subscription renewal review | first-slice | 10 |
+| F12 statement imports | first-slice | 11 |
+| F06 promise links and nudges | first-slice (no mail ingestion) | 12 |
+| A12 / F30 scenario | first-slice | 13 |
+| A9 / F21 app connection | first-slice | 14 |
+| F10 automation templates | first-slice | 15 |
+| F28 lessons | first-slice | 16 |
+| F27 project update | first-slice | 17 |
+| F31 opportunity radar | first-slice | 18 |
+| F32 command palette | first-slice | 19 |
+| F29 life stories | first-slice | 20 |
+| F18 setup | first-slice | 21 |
+| F19 notification preferences | first-slice | 22 |
+| F13 mission starters | first-slice | 23 |
+| F14 custom app builder | first-slice | 24 |
+| F20 voice companion | first-slice | 25 |
+| F16 home time zone | first-slice | 26 |
+| F17 offline queue | first-slice | 27 |
+| F24 trips | first-slice | 28 |
+| F35 context modes | first-slice plus focus, catch-up, attachments | 29, 32, 34 |
+| F36 home routines | first-slice (simulation only) | 30 |
+| F33 working styles and workspaces | first-slice plus workspaces | 31, 33 |
+| F34 outcome learning | first-slice | 31 |
+| F15 native capture and widgets | blocked-external (needs device builds) | none |
 
 ## Checkpoint 1: Slice A1, decisions and commitments in Needs you
 
