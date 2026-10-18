@@ -1253,6 +1253,11 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("next_attempt_at");
 
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("outcome");
+
                     b.HasKey("NotificationId", "DeviceId");
 
                     b.HasIndex("DeviceId");

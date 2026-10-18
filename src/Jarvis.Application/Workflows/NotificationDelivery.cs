@@ -29,6 +29,9 @@ public interface IPushDeliveryQueue
     Task<IReadOnlyList<PushDeliveryKey>> ListDueAsync(int maxCount, CancellationToken cancellationToken);
     Task<PushDeliveryClaim> TryClaimAsync(PushDeliveryKey key, TimeSpan lease, CancellationToken cancellationToken);
     Task MarkDeliveredAsync(PushDeliveryKey key, CancellationToken cancellationToken);
+
+    /// <summary>Ends a delivery with the truth about it: <c>held</c>, <c>app_only</c> or <c>provider_accepted</c>.</summary>
+    Task MarkOutcomeAsync(PushDeliveryKey key, string outcome, CancellationToken cancellationToken);
     Task RecordFailureAsync(PushDeliveryKey key, int attempts, string error, CancellationToken cancellationToken);
 
     /// <summary>Removes a device whose token the push provider rejected, along with its queued deliveries.</summary>

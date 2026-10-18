@@ -91,6 +91,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationRepository, WorkflowRepository>();
         services.AddScoped<IPushDeviceRepository, WorkflowRepository>();
         services.AddScoped<IPushDeliveryQueue, PushDeliveryRepository>();
+        services.AddScoped<Jarvis.Application.Notifications.INotificationDeliveryReader, NotificationDeliveryReader>();
         services.AddScoped<INotificationFeed, NotificationFeed>();
         services.AddScoped<IConditionWatchRepository, ConditionWatchRepository>();
         services.AddScoped<IFileRepository, FileRepository>();

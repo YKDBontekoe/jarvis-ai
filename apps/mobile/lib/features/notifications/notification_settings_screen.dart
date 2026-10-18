@@ -24,6 +24,7 @@ class NotificationSettingsScreen extends StatefulWidget {
 class _NotificationSettingsScreenState
     extends State<NotificationSettingsScreen> {
   Map<String, dynamic>? _view;
+  Map<String, dynamic>? _digest;
   bool _loading = true;
   String? _error;
   final Set<String> _busy = {};
@@ -45,6 +46,7 @@ class _NotificationSettingsScreenState
         _loading = false;
         _error = null;
       });
+      unawaited(_loadDigest());
     } on DioException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -53,6 +55,41 @@ class _NotificationSettingsScreenState
             firstProblemMessage(error.response?.data) ??
             'Could not load your notification settings.';
       });
+    }
+  }
+
+  /// Extra: older servers answer 404 and the screen simply leaves the section out.
+  Future<void> _loadDigest() async {
+    try {
+      final response = await widget.http.get<dynamic>(
+        '/api/v1/notifications/digest',
+      );
+      if (mounted) setState(() => _digest = jsonObject(response.data));
+    } on DioException {
+      if (mounted) setState(() => _digest = null);
+    }
+  }
+
+  Future<void> _setDigest(String? time) async {
+    try {
+      final response = await widget.http.put<dynamic>(
+        '/api/v1/notifications/digest',
+        data: {'time': time ?? ''},
+      );
+      if (mounted) {
+        setState(() => _digest = jsonObject(response.data) ?? _digest);
+      }
+    } on DioException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              firstProblemMessage(error.response?.data) ?? 'That did not work.',
+            ),
+          ),
+        );
     }
   }
 
@@ -119,6 +156,37 @@ class _NotificationSettingsScreenState
                       const GroupLabel('Buzz my phone for'),
                       for (var i = 0; i < categories.length; i++)
                         _category(categories[i], i),
+                      if (_digest case final digest?) ...[
+                        const GroupLabel('Summary of what was held'),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                          child: Text(
+                            asJsonString(digest['explanation']) ?? '',
+                            key: const Key('digest-explanation'),
+                            style: TextStyle(
+                              color: JarvisColors.of(context).inkSoft,
+                            ),
+                          ),
+                        ),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final (label, time) in const [
+                              ('As soon as allowed', null),
+                              ('08:00', '08:00'),
+                              ('12:00', '12:00'),
+                              ('18:00', '18:00'),
+                            ])
+                              ChoiceChip(
+                                key: Key('digest-time-${time ?? 'now'}'),
+                                label: Text(label),
+                                selected: asJsonString(digest['time']) == time,
+                                onSelected: (_) => unawaited(_setDigest(time)),
+                              ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

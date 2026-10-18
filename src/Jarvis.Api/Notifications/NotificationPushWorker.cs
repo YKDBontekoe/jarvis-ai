@@ -84,7 +84,9 @@ public sealed class NotificationPushWorker(
                     await HoldForDigestAsync(scope.ServiceProvider, work, cancellationToken);
                 if (decision.Outcome != PushOutcomes.Push)
                 {
-                    await queue.MarkDeliveredAsync(candidate, cancellationToken);
+                    await queue.MarkOutcomeAsync(candidate,
+                        decision.Outcome == PushOutcomes.Held ? PushDeliveryOutcomes.Held : PushDeliveryOutcomes.AppOnly,
+                        cancellationToken);
                     continue;
                 }
             }

@@ -1,3 +1,4 @@
+using Jarvis.Application.Preferences;
 using Jarvis.Application.Settings;
 using Jarvis.Application.Workflows;
 
@@ -33,7 +34,8 @@ public sealed class PushDigestService(
     IOwnerSettingsStore settings,
     IModeService modes,
     INotificationRepository notifications,
-    TimeProvider? timeProvider = null) : IPushDigestService
+    TimeProvider? timeProvider = null,
+    IDailyBriefingRepository? briefings = null) : IPushDigestService
 {
     public const string DigestType = "digest.while_away";
     public const int MaxHeld = 50;
@@ -64,6 +66,7 @@ public sealed class PushDigestService(
         var state = await settings.GetAsync<PushDigestState>(ownerId, SettingsSections.PushDigest, cancellationToken);
         if (state is null || state.Items.Count == 0) return false;
         if (!await modes.ShouldPushAsync(ownerId, DigestType, cancellationToken)) return false;
+        if (!await ScheduleAllowsAsync(ownerId, state, cancellationToken)) return false;
 
         // Domains the owner left out of the recap stay in the app; they are just not summed up in the push.
         var catchUp = await settings.GetAsync<CatchUpPreferences>(ownerId, SettingsSections.CatchUp, cancellationToken)
@@ -77,6 +80,19 @@ public sealed class PushDigestService(
         await settings.SaveAsync(ownerId, SettingsSections.PushDigest,
             new PushDigestState(null, state.Items, _clock.GetUtcNow()), cancellationToken);
         return included.Length > 0;
+    }
+
+    /// <summary>The owner's chosen summary time, if any, in their home zone.</summary>
+    private async Task<bool> ScheduleAllowsAsync(Guid ownerId, PushDigestState state, CancellationToken cancellationToken)
+    {
+        var time = (await settings.GetAsync<DigestPreferences>(ownerId, SettingsSections.DigestTime, cancellationToken))?.Time;
+        if (DigestSchedule.Parse(time) is null) return true;
+        var zone = briefings is null
+            ? TimeZoneInfo.Utc
+            : (await OwnerZoneResolver.ResolveAsync(settings, briefings, ownerId, cancellationToken)).Zone;
+        var now = _clock.GetUtcNow();
+        var lastLocal = state.LastAt is { } last ? TimeZoneInfo.ConvertTime(last, zone) : (DateTimeOffset?)null;
+        return DigestSchedule.IsDue(time, TimeZoneInfo.ConvertTime(now, zone), lastLocal);
     }
 
     public Task<IReadOnlyList<Guid>> ListOwnersAsync(CancellationToken cancellationToken) =>

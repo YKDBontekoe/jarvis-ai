@@ -616,12 +616,52 @@ class _RemindersScreenState extends _RemindersController {
                                 )]!,
                               ),
                             const SizedBox(height: 6),
-                            Text(
-                              _formatDate(notification['createdAt']),
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: JarvisColors.of(context).muted,
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 12,
+                              children: [
+                                Text(
+                                  _formatDate(notification['createdAt']),
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: JarvisColors.of(context).muted,
+                                      ),
+                                ),
+                                InkWell(
+                                  key: Key(
+                                    'notification-delivery-${notification['id']}',
                                   ),
+                                  onTap: () => unawaited(
+                                    showModalBottomSheet<void>(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      showDragHandle: true,
+                                      builder: (_) => NotificationDeliverySheet(
+                                        http: widget.http,
+                                        notificationId:
+                                            asJsonString(notification['id']) ??
+                                            '',
+                                      ),
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 6,
+                                    ),
+                                    child: Text(
+                                      'How it was delivered',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: JarvisColors.of(
+                                              context,
+                                            ).accent,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

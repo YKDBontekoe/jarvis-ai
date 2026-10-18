@@ -1,3 +1,4 @@
+using Jarvis.Application.Modes;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Notifications;
@@ -45,6 +46,21 @@ internal static class NotificationEndpoints
 
         // What reaches the phone, per kind of notification, and what each mode does about it. The notification list
         // is never filtered by any of this: everything stays inspectable in the app.
+        api.MapGet("/notifications/{id:guid}/delivery", async (Guid id, INotificationDeliveryReader reader,
+            ICurrentUser currentUser, CancellationToken ct) =>
+            await reader.GetAsync(currentUser.OwnerId, id, ct) is { } facts
+                ? Results.Ok(NotificationDeliveryRules.Describe(facts))
+                : Results.NotFound()).WithName("GetNotificationDelivery");
+
+        api.MapGet("/notifications/digest", async (IDigestScheduleService digest, ICurrentUser currentUser,
+            CancellationToken ct) => Results.Ok(await digest.GetAsync(currentUser.OwnerId, ct))).WithName("GetDigestTime");
+
+        api.MapPut("/notifications/digest", async (DigestTimeRequest request, IDigestScheduleService digest,
+            ICurrentUser currentUser, CancellationToken ct) =>
+            await digest.SetAsync(currentUser.OwnerId, request.Time, ct) is { } view
+                ? Results.Ok(view)
+                : EndpointHelpers.Invalid("time", "Use a time like 08:00.")).WithName("SetDigestTime");
+
         api.MapGet("/notifications/preferences", async (INotificationPreferenceService preferences,
             ICurrentUser currentUser, CancellationToken ct) =>
             Results.Ok(await preferences.GetAsync(currentUser.OwnerId, ct))).WithName("GetNotificationPreferences");

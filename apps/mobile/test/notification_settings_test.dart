@@ -119,4 +119,37 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('a summary time can be chosen and cleared', (tester) async {
+    http.on('GET', '/api/v1/notifications/digest', {
+      'time': null,
+      'explanation': 'Sent as soon as pushes are allowed again.',
+    });
+    http.on('PUT', '/api/v1/notifications/digest', {
+      'time': '08:00',
+      'explanation': 'Once a day at 08:00.',
+    });
+    await show(tester);
+
+    expect(
+      find.text('Sent as soon as pushes are allowed again.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('digest-time-08:00')));
+    await tester.pumpAndSettle();
+
+    expect(
+      (http.sent('PUT', '/api/v1/notifications/digest').single.body
+          as Map)['time'],
+      '08:00',
+    );
+    expect(find.text('Once a day at 08:00.'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('digest-time-now')));
+    await tester.pumpAndSettle();
+    expect(
+      (http.sent('PUT', '/api/v1/notifications/digest').last.body
+          as Map)['time'],
+      '',
+    );
+  });
 }

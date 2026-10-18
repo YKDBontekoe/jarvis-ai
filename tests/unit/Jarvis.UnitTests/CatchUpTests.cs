@@ -152,4 +152,48 @@ public sealed class CatchUpTests
         Assert.Equal("Mine", (await world.CatchUp.GetAsync(Owner, default)).Groups.Single().Items.Single().Title);
         Assert.Equal("Theirs", (await world.CatchUp.GetAsync(Other, default)).Groups.Single().Items.Single().Title);
     }
+
+    [Fact]
+    public void A_set_summary_time_waits_for_that_time_and_goes_once_a_day()
+    {
+        var at = (int h, int m) => new DateTimeOffset(2026, 10, 19, h, m, 0, TimeSpan.Zero);
+
+        Assert.True(DigestSchedule.IsDue(null, at(3, 0), null));
+        Assert.False(DigestSchedule.IsDue("08:00", at(7, 59), null));
+        Assert.True(DigestSchedule.IsDue("08:00", at(8, 0), null));
+        Assert.False(DigestSchedule.IsDue("08:00", at(9, 0), at(8, 1)));
+        Assert.True(DigestSchedule.IsDue("08:00", at(9, 0), at(8, 1).AddDays(-1)));
+        Assert.True(DigestSchedule.IsDue("garbage", at(1, 0), null));
+    }
+
+    [Fact]
+    public async Task The_digest_holds_until_the_chosen_time_in_the_owners_zone()
+    {
+        var world = new World();
+        await world.Hold("reminder.due", "Take medication");
+        world.PushAllowed = true;
+        await new DigestScheduleService(world.Settings).SetAsync(Owner, "09:00", default);
+
+        Assert.False(await world.Digest.FlushIfDueAsync(Owner, default));
+        Assert.Empty(world.Sent);
+
+        world.Time.Time = Now.AddHours(2);
+        Assert.True(await world.Digest.FlushIfDueAsync(Owner, default));
+        Assert.Single(world.Sent);
+    }
+
+    [Fact]
+    public async Task The_summary_time_is_validated_and_can_be_cleared()
+    {
+        var service = new DigestScheduleService(new InMemorySettingsStore());
+
+        Assert.Null(await service.SetAsync(Owner, "25:00", default));
+        Assert.Null(await service.SetAsync(Owner, "8am", default));
+        var saved = await service.SetAsync(Owner, "07:05", default);
+        Assert.Equal("07:05", saved!.Time);
+        Assert.Contains("once a day, at 07:05", saved.Explanation);
+        var cleared = await service.SetAsync(Owner, "", default);
+        Assert.Null(cleared!.Time);
+        Assert.Contains("as soon as pushes are allowed", cleared.Explanation);
+    }
 }
