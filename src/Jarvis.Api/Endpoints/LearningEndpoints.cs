@@ -7,7 +7,7 @@ using Jarvis.Application.Settings;
 namespace Jarvis.Api.Endpoints;
 
 public sealed record LearningStatusDto(LearningSettings Settings, HeartbeatState State, DreamingState Dreaming,
-    IReadOnlyList<AuditEventDto> Activity);
+    IReadOnlyList<AuditEventDto> Activity, MemoryQualityReview? MemoryReview = null);
 
 internal static class LearningEndpoints
 {
@@ -84,7 +84,7 @@ internal static class LearningEndpoints
                 await settings.GetAsync<LearningSettings>(ownerId, SettingsSections.Learning, ct) ?? LearningSettings.Default,
                 await settings.GetAsync<HeartbeatState>(ownerId, LearningSections.HeartbeatState, ct) ?? new HeartbeatState(),
                 await settings.GetAsync<DreamingState>(ownerId, LearningSections.DreamingState, ct) ?? new DreamingState(),
-                activity));
+                activity, await settings.GetAsync<MemoryQualityReview>(ownerId, LearningSections.MemoryQualityReview, ct)));
         }).WithName("GetLearningStatus");
 
         api.MapPost("/learning/run", async (HeartbeatService heartbeat, ICurrentUser currentUser,

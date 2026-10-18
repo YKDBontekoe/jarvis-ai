@@ -241,6 +241,7 @@ public sealed class SemanticMemoryTests
 
     [Theory]
     [InlineData("Me", "user")]
+    [InlineData("You", "user")]
     [InlineData("the user", "user")]
     [InlineData("  St. Mary's  ", "stmarys")]
     public void Graph_names_normalize_to_stable_keys(string name, string key)

@@ -63,6 +63,7 @@ async function handle(request) {
     case 'model/list':
       return send({ id: request.id, result: { data: [
         { id: MODEL, model: MODEL, inputModalities: ['text', 'image'], isDefault: true },
+        { id: 'gpt-6.1-sol', model: 'gpt-6.1-sol', inputModalities: ['text'], isDefault: false },
       ], nextCursor: null } });
     case 'thread/realtime/listVoices':
       return send({ id: request.id, result: { voices: {
@@ -99,6 +100,12 @@ const text = value => ({ type: 'text', text: value, name: '', argumentsJson: '' 
 const call = (name, args) => ({ type: 'tool_call', text: '', name, argumentsJson: JSON.stringify(args) });
 
 function plan(prompt) {
+  if (prompt.includes("You are Jarvis's independent nightly memory quality judge"))
+    return text('{"findings":[]}');
+  if (prompt.includes('updating the durable portrait of the user from their memories'))
+    return text('{"userSummary":"The user keeps a personal knowledge base and prefers accurate, well-supported memories."}');
+  if (prompt.includes('consolidating memory the way sleep consolidates human memory'))
+    return text('{"themes":[],"persona":[],"memories":[],"facts":[],"diary":"Reviewed the available memories without inventing facts."}');
   if (prompt.includes('Extract at most three useful long-term memories')) return text('[]');
   if (prompt.includes('Reorder saved-memory candidates')) return text('[]');
 

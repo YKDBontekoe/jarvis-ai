@@ -23,6 +23,37 @@ public sealed class KnowledgeMemoryTests : IAsyncLifetime
     public ValueTask DisposeAsync() => _postgres.DisposeAsync();
 
     [Fact]
+    public async Task Merged_aliases_are_reused_by_future_graph_extraction_and_remain_owner_scoped()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var owner = Guid.CreateVersion7();
+        var otherOwner = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var graph = new KnowledgeGraphRepository(database);
+        var now = DateTimeOffset.UtcNow;
+        await graph.MergeAsync(owner, [
+            new GraphFact("user", "person", "likes", "tea", null, false, false, now, .9f),
+            new GraphFact("Alex", "person", "likes", "coffee", null, false, false, now, .9f)
+        ], null, ct);
+        var canonical = (await graph.FindEntityAsync(owner, "user", null, ct))!.Entity;
+        var alias = (await graph.FindEntityAsync(owner, "Alex", null, ct))!.Entity;
+        Assert.True(await graph.MergeEntitiesAsync(owner, canonical.Id, alias.Id, ct));
+        await graph.MergeAsync(owner, [new GraphFact("Alex", "person", "likes", "cycling", null,
+            false, false, now, .9f)], null, ct);
+        await graph.MergeAsync(owner, [new GraphFact("You", "person", "likes", "walking", null,
+            false, false, now, .9f)], null, ct);
+        Assert.Single(await graph.ListEntitiesAsync(owner, null, 100, ct));
+        var current = (await graph.FindEntityAsync(owner, "user", null, ct))!;
+        Assert.Contains("Alex", current.Entity.Aliases);
+        Assert.Contains(current.Current, relation => relation.ObjectValue == "cycling");
+        await graph.MergeAsync(otherOwner, [new GraphFact("Alex", "person", "likes", "chess", null,
+            false, false, now, .9f)], null, ct);
+        var other = (await graph.FindEntityAsync(otherOwner, "Alex", null, ct))!;
+        Assert.NotEqual(canonical.Id, other.Entity.Id);
+        Assert.DoesNotContain(current.Current, relation => relation.ObjectValue == "chess");
+    }
+
+    [Fact]
     public async Task Exclusive_facts_close_the_previous_value_and_keep_history()
     {
         var owner = Guid.CreateVersion7();

@@ -158,7 +158,7 @@ Owner-defined profiles snapshot persona, skills, collections, model class, and l
 Dream diary and portrait are visible under Settings → Learning; diary text is **not** used as a promotion source.
 
 Dreaming stages **every** active memory (up to 500) for near-duplicate detection, and counts persisted recalls
-(`access_count`, `last_accessed_at`; a recall on a later day counts as a second source). The REM model call reviews a
+(`access_count`, `last_accessed_at`) as usefulness signals, not independent confirmation of truth. The REM model call reviews a
 bounded set: memories written or changed since the last dream first, then the strongest staged candidates.
 
 Settings: `/api/v1/settings/learning`.
@@ -196,3 +196,31 @@ Settings (`learning`): `captureSignals`, `traceRetentionDays`, `proposeImproveme
 | Agents | `src/Jarvis.Agents/Memory/`, `Learning/`, `Persona/`, `Skills/` |
 | Infrastructure persistence | `src/Jarvis.Infrastructure/Persistence/` |
 | Dedicated memory package | `src/Jarvis.Memory/` |
+
+### Nightly memory quality review
+
+Before consolidation, a separate tool-free Codex CLI judge reviews the active memory bank and graph, including old
+records. It defaults to `gpt-6.1-sol` with `high` reasoning, independent of the interactive provider/model. Its
+transport uses `CodexAccess.Strict`: no shell, web search, native MCP, file writes or tool network access. It shares
+the process limiter at background priority and records token usage. A failed/unavailable model records `failed`;
+there is no silent model substitution or false “clean dataset” result.
+
+Configure `Memory:Review:Enabled` (default true), `Model`, `ReasoningEffort`, and `TimeoutSeconds` (default 180,
+clamped 10–300). No extra API key is needed; it uses the installed CLI's signed-in session. Review findings are
+owner-scoped under `memory-quality-review`, exposed as `memoryReview` on `GET /api/v1/learning/status`, and counted
+in the dream diary. They cite memory/entity IDs and propose corrections; they are not executable actions or sources
+of facts. The review is bounded to 500 complete memories / 140,000 memory characters and the union of 200 connected and 200 recent graph entities (including orphans); partial
+coverage is explicit. Invalid responses are failures. IDs outside the supplied owner-scoped set are rejected.
+
+The consolidation prompt prioritizes cited issues but must verify them against source text. A semantic merge can
+name up to eight `absorbedMemoryIds` plus `evidenceMemoryIds`; the replacement must preserve all supported details.
+Absorption requires confidence ≥0.95, valid evidence IDs, matching kind/profile, and unpinned, non-journal, timeless
+records. An explicit supersede requires a separate newer evidence memory. Old records expire and their derived graph
+facts close; they are not hard-deleted. `AutoApplyLowRiskMemory=false` blocks automatic merges/supersedes and duplicate
+expiry. Findings remain available for review. The default portrait omits transient setup blockers and unresolved
+contradictions. Graph extraction uses aliases and unambiguous parent/child/sibling directions; persistence reuses
+known aliases so merged identities do not reappear on the next indexing pass.
+
+Dreaming graph facts must cite a `sourceMemoryId` from the supplied active memories. Consolidation carries those
+references to the replacement memory and rejects unsourced/unknown IDs, instead of creating provenance-free facts
+with a fresh nightly timestamp. Ordinary file/graph indexing continues to attach its own memory source.

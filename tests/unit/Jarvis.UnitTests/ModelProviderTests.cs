@@ -179,6 +179,31 @@ public sealed class ModelProviderTests
         Assert.False(models[0].SupportsTools);
     }
 
+    [Fact]
+    public async Task Memory_review_uses_strict_codex_transport_and_explicit_judge_model_despite_owner_settings()
+    {
+        var settings = new InMemorySettingsStore();
+        await settings.SaveAsync(Owner, SettingsSections.Models,
+            new ModelSettings(ModelSettings.OpenRouter, "other/chat", ReasoningEffort: "low"),
+            TestContext.Current.CancellationToken);
+        var interactive = new NamedClient("interactive");
+        var judge = new NamedClient("strict-judge");
+        var resolver = new ChatClientResolver(interactive, settings, new InMemoryCredentialStore(),
+            new OpenAiCompatibleClientFactory(new ConfigurationBuilder().Build(), NullLoggerFactory.Instance), new RecordingUsageRecorder(),
+            new NoPrices(), NullLogger<ChatClientResolver>.Instance,
+            new Jarvis.Agents.Learning.MemoryReviewClient(judge));
+        var client = await resolver.GetChatClientAsync(Owner, ModelPurpose.MemoryReview,
+            TestContext.Current.CancellationToken);
+        await client.GetResponseAsync([new ChatMessage(ChatRole.User, "review")], new ChatOptions
+        {
+            ModelId = "gpt-6.1-sol", AdditionalProperties = new() { ["reasoning_effort"] = "high" }
+        }, TestContext.Current.CancellationToken);
+        Assert.Null(interactive.LastOptions);
+        Assert.Equal("gpt-6.1-sol", judge.LastOptions?.ModelId);
+        Assert.Equal("high", judge.LastOptions?.AdditionalProperties?["reasoning_effort"]);
+        Assert.Equal(true, judge.LastOptions?.AdditionalProperties?[Jarvis.Agents.CodexCliChatClient.BackgroundPriorityProperty]);
+    }
+
     private static ChatClientResolver CreateResolver(IChatClient codex, IOwnerSettingsStore settings,
         IIntegrationCredentialStore credentials, RecordingUsageRecorder? recorder = null) =>
         new(codex, settings, credentials,
