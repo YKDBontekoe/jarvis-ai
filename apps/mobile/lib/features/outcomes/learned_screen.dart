@@ -118,6 +118,20 @@ class _LearnedScreenState extends State<LearnedScreen> {
                             : 'Your changes are on',
                         subtitle: asJsonString(_card?['summary']),
                       ),
+                      for (final (i, stat) in jsonMaps(
+                        _card?['suggestions'],
+                      ).indexed)
+                        FeatureRow(
+                          key: Key('suggestion-stat-${stat['kind']}'),
+                          index: i,
+                          icon: PhosphorIconsRegular.chatCircle,
+                          caption: 'YOUR ANSWERS',
+                          title: (asJsonString(stat['kind']) ?? '').replaceAll(
+                            '_',
+                            ' ',
+                          ),
+                          subtitle: asJsonString(stat['statement']),
+                        ),
                       if (waiting.isNotEmpty) const GroupLabel('To review'),
                       for (final (i, view) in waiting.indexed)
                         _change(view, i, pending: true),

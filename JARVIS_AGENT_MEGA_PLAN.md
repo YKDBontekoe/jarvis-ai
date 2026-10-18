@@ -368,3 +368,10 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **Rules.** Order is urgency, then kind, then how late; bounded per kind and overall; approvals, paused tasks and problems are locked and cannot be put away; other items can be put away for 1 to 14 days and come back by themselves; the underlying records are never touched; the summary counts what is put away instead of hiding it.
 - **Tests.** .NET `AttentionQueueTests` (7), Dart `attention_test` (4), screenshot `audit-*-attention`, real-stack `tests/e2e/attention_flow.mjs`.
 - **Not done in F01.** More sources (inbox threads waiting on a reply, goal check-ins, renewals, people follow-ups) still show in their own screens, per-item inline actions (Done, Reply) in the queue rather than opening the owning page, widgets and briefings using the same queue, a push when something new arrives, and a deep link from a widget (device only).
+
+## Checkpoint 36: F34.2, whether suggestions were used
+
+- **What.** Feedback on volunteered suggestions (opportunities, general suggestions) is summarised per kind in "What Jarvis learned": how many the owner used and how many not in the last 30 days. Opportunities has a "How was this?" row.
+- **Honesty.** Only answers are counted. A suggestion nobody rated is unknown, never a yes; fewer than three answers says "too few to say"; old answers age out after 30 days.
+- **Tests.** .NET `OutcomeLearningTests` (+2), Dart `learned_test` (+1), extended `tests/e2e/outcome_learning_flow.mjs`.
+- **Not done in F34.2.** Automatically linking an accepted suggestion to the record it produced (for example the commitment made from a possible promise) without the owner pressing a button, and recording "used" from the destination page itself.

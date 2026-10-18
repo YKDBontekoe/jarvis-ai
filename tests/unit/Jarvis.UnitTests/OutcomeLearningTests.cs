@@ -198,4 +198,35 @@ public sealed class OutcomeLearningTests
         Assert.Null(await store.GetAsync<OutcomeState>(Owner, SettingsSections.Outcomes, default));
         Assert.Empty(await service.ChangesAsync(Owner, default));
     }
+
+    [Fact]
+    public async Task Suggestion_use_counts_only_answers_and_says_when_there_are_too_few()
+    {
+        var (service, _, _) = Create();
+        Assert.Empty((await service.LearnedAsync(Owner, default)).Suggestions);
+
+        await Say(service, 2, kind: "opportunity", signal: "accepted", aspect: null);
+        var few = (await service.LearnedAsync(Owner, default)).Suggestions.Single();
+        Assert.Equal(2, few.Rated);
+        Assert.Contains("too few", few.Statement);
+
+        await Say(service, 1, kind: "opportunity", signal: "not_useful", aspect: null);
+        await Say(service, 1, kind: "opportunity", signal: "revised", aspect: "too_long");
+        var enough = (await service.LearnedAsync(Owner, default)).Suggestions.Single();
+        Assert.Equal(2, enough.Used);
+        Assert.Equal(1, enough.NotUsed);
+        Assert.Equal(3, enough.Rated);
+        Assert.Contains("You used 2 of the 3 you answered", enough.Statement);
+        Assert.Contains("not counted", enough.Statement);
+    }
+
+    [Fact]
+    public async Task Old_answers_age_out_of_the_suggestion_summary()
+    {
+        var (service, time, _) = Create();
+        await Say(service, 3, kind: "suggestion", signal: "accepted", aspect: null);
+        time.Time = Start.AddDays(45);
+
+        Assert.Empty((await service.LearnedAsync(Owner, default)).Suggestions);
+    }
 }

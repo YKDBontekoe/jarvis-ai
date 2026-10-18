@@ -493,7 +493,7 @@ Owner feedback tied to something Jarvis made (`artifactKind`: `project_update`, 
 | Method | Path |
 |---|---|
 | POST | `/outcomes/feedback` |
-| GET | `/outcomes/changes`, `/outcomes/learned` |
+| GET | `/outcomes/changes`, `/outcomes/learned` (also `suggestions`: per volunteered kind how many suggestions the owner used and did not use in 30 days; only answers are counted, and fewer than three says so) |
 | POST | `/outcomes/changes/{id}/apply`, `/reject`, `/undo` |
 
 ### Catch-up (what a quiet mode held back)

@@ -63,6 +63,16 @@ assert.equal((await request('POST', `/outcomes/changes/${story.change.id}/reject
 for (let i = 0; i < 3; i += 1) await say(detailed);
 assert.equal((await request('GET', '/outcomes/changes')).data.some((c) => c.change.artifactKind === 'story'), false);
 
+console.log('Suggestion answers count only what was answered...');
+const before = (await request('GET', '/outcomes/learned')).data.suggestions.find((x) => x.kind === 'suggestion');
+await say({ artifactKind: 'suggestion', signal: 'accepted' });
+await say({ artifactKind: 'suggestion', signal: 'accepted' });
+await say({ artifactKind: 'suggestion', signal: 'not_useful' });
+const after = (await request('GET', '/outcomes/learned')).data.suggestions.find((x) => x.kind === 'suggestion');
+assert.equal(after.rated - (before?.rated ?? 0), 3);
+assert.equal(after.used - (before?.used ?? 0), 2);
+assert.match(after.statement, /did not answer are not counted|too few|No answers/);
+
 console.log('Refusals...');
 assert.equal((await say({ artifactKind: 'nope', signal: 'accepted' })).status, 400);
 assert.equal((await say({ artifactKind: 'trip', signal: 'silence' })).status, 400);

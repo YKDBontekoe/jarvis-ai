@@ -70,7 +70,12 @@ public sealed record ChangeEffect(int Before, int After, int DaysSince, string S
 
 public sealed record ChangeView(BehaviorChange Change, ChangeEffect? Effect);
 
-public sealed record LearnedCard(IReadOnlyList<ChangeView> Applied, IReadOnlyList<ChangeView> Waiting, string Summary);
+/// <summary>What the owner said about one kind of suggestion in the last 30 days. Only answers are counted: a suggestion
+/// nobody rated is unknown, never a yes.</summary>
+public sealed record SuggestionStat(string Kind, int Used, int NotUsed, int Rated, string Statement);
+
+public sealed record LearnedCard(IReadOnlyList<ChangeView> Applied, IReadOnlyList<ChangeView> Waiting, string Summary,
+    IReadOnlyList<SuggestionStat> Suggestions);
 
 public static class OutcomeRules
 {
@@ -154,6 +159,29 @@ public static class OutcomeRules
             : $"{before} complaints before, {after} since. That is a small sample and does not show the change caused it.";
         return new ChangeEffect(before, after, days, statement);
     }
+
+    public const int MinRated = 3;
+
+    public static readonly IReadOnlySet<string> UsedSignals = new HashSet<string> { OutcomeSignals.Accepted, OutcomeSignals.Successful };
+
+    public static readonly IReadOnlySet<string> NotUsedSignals = new HashSet<string>
+        { OutcomeSignals.Dismissed, OutcomeSignals.NotUseful, OutcomeSignals.WrongAssumption, OutcomeSignals.TooMuchEffort };
+
+    /// <summary>Per volunteered kind: how many suggestions the owner used and how many not. Revisions are neither.</summary>
+    public static IReadOnlyList<SuggestionStat> SuggestionStats(IReadOnlyList<OutcomeFeedback> feedback, DateTimeOffset now) =>
+        OutcomeArtifacts.Volunteered.Select(kind =>
+        {
+            var mine = feedback.Where(f => f.ArtifactKind == kind && f.At >= now.AddDays(-WindowDays)).ToArray();
+            var used = mine.Count(f => UsedSignals.Contains(f.Signal));
+            var notUsed = mine.Count(f => NotUsedSignals.Contains(f.Signal));
+            var rated = used + notUsed;
+            var statement = rated == 0
+                ? "No answers yet, so Jarvis does not know."
+                : rated < MinRated
+                    ? $"You answered {rated} so far. That is too few to say anything."
+                    : $"You used {used} of the {rated} you answered. Suggestions you did not answer are not counted.";
+            return new SuggestionStat(kind, used, notUsed, rated, statement);
+        }).Where(s => s.Rated > 0).ToArray();
 
     public static string? StyleNote(OutcomeState state, Guid? profileId)
     {
@@ -271,7 +299,8 @@ public sealed class OutcomeLearningService(IOwnerSettingsStore settings, IAssist
             : waiting.Length > 0
                 ? "Here is what Jarvis would change from what you told it. Nothing changes until you say so."
                 : "These changes are on. You can undo any of them.";
-        return new LearnedCard(applied, waiting, summary);
+        var state = await LoadAsync(ownerId, cancellationToken);
+        return new LearnedCard(applied, waiting, summary, OutcomeRules.SuggestionStats(state.Feedback, now));
     }
 
     public async Task<string?> StyleNoteAsync(Guid ownerId, Guid? profileId, CancellationToken cancellationToken) =>

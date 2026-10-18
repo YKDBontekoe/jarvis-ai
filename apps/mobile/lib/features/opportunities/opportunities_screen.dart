@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../outcomes/outcome_feedback_row.dart';
 import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
@@ -167,6 +168,13 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
                               onPressed: () => unawaited(_unmute(kind)),
                             ),
                           ),
+                      ],
+                      if (_items.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        OutcomeFeedbackRow(
+                          http: widget.http,
+                          artifactKind: 'opportunity',
+                        ),
                       ],
                       if (_history.isNotEmpty) ...[
                         const GroupLabel('You found these useful'),

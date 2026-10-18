@@ -155,4 +155,27 @@ void main() {
       expect(find.textContaining('kept out of learning'), findsOneWidget);
     },
   );
+
+  testWidgets('suggestion answers are shown with their limits', (tester) async {
+    http.on('GET', '/api/v1/outcomes/learned', {
+      'summary': 'x',
+      'suggestions': [
+        {
+          'kind': 'opportunity',
+          'used': 2,
+          'notUsed': 1,
+          'rated': 3,
+          'statement': 'You used 2 of the 3 you answered. Suggestions you did not answer are not counted.',
+        },
+      ],
+    });
+    http.on('GET', '/api/v1/outcomes/changes', <Object>[]);
+    await show(tester, LearnedScreen(http: http.client()));
+
+    expect(
+      find.byKey(const Key('suggestion-stat-opportunity')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('not counted'), findsOneWidget);
+  });
 }
