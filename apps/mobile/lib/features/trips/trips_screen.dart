@@ -318,7 +318,6 @@ class _NewTripSheetState extends State<_NewTripSheet> {
               'budget': ?double.tryParse(
                 _budget.text.trim().replaceAll(',', '.'),
               ),
-              'currency': 'EUR',
             }),
           ),
         ],

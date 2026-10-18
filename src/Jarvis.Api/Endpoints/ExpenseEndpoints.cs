@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using System.Globalization;
 using System.Text.Json;
 using Jarvis.Api.Errors;
@@ -40,9 +42,9 @@ internal static class ExpenseEndpoints
         var group = api.MapGroup("/expenses");
 
         group.MapGet("", async (string? month, string? category, IExpenseService expenses,
-            IDailyBriefingRepository briefings, ICurrentUser currentUser, CancellationToken ct) =>
+            IDailyBriefingRepository briefings, IOwnerSettingsStore settings, ICurrentUser currentUser, CancellationToken ct) =>
         {
-            var (year, monthNumber) = await ResolveMonthAsync(month, briefings, currentUser, ct) ?? (0, 0);
+            var (year, monthNumber) = await ResolveMonthAsync(month, briefings, settings, currentUser, ct) ?? (0, 0);
             if (year == 0) return EndpointHelpers.Invalid("month", "Use the month format YYYY-MM.");
             if (category is not null && !ExpenseCategories.IsValid(category))
                 return EndpointHelpers.Invalid("category", "Unknown category.");
@@ -87,10 +89,10 @@ internal static class ExpenseEndpoints
         }).WithName("GetExpense");
 
         group.MapPost("", async (ExpenseRequest request, IExpenseService expenses,
-            IDailyBriefingRepository briefings, IAuditEventStore audit, ICurrentUser currentUser,
+            IDailyBriefingRepository briefings, IOwnerSettingsStore settings, IAuditEventStore audit, ICurrentUser currentUser,
             CancellationToken ct) =>
         {
-            var today = await TodayAsync(briefings, currentUser, ct);
+            var today = await TodayAsync(briefings, settings, currentUser, ct);
             var source = request.ReceiptFileId is null ? ExpenseSources.App : ExpenseSources.Receipt;
             var result = await expenses.CreateAsync(currentUser.OwnerId, ToDraft(request, source), today,
                 skipDuplicates: false, ct);
@@ -101,7 +103,7 @@ internal static class ExpenseEndpoints
         }).WithName("CreateExpense");
 
         group.MapPut("/{id:guid}", async (Guid id, ExpenseRequest request, IExpenseService expenses,
-            IDailyBriefingRepository briefings, IAuditEventStore audit, ICurrentUser currentUser,
+            IDailyBriefingRepository briefings, IOwnerSettingsStore settings, IAuditEventStore audit, ICurrentUser currentUser,
             CancellationToken ct) =>
         {
             // The app sends the whole expense; empty merchant and note clear them.
@@ -111,7 +113,7 @@ internal static class ExpenseEndpoints
                 Note = request.Note ?? ""
             };
             var result = await expenses.UpdateAsync(id, currentUser.OwnerId, draft,
-                await TodayAsync(briefings, currentUser, ct), ct);
+                await TodayAsync(briefings, settings, currentUser, ct), ct);
             if (Failed(result) is { } failure) return failure;
             await AuditAsync(audit, logger, currentUser, "expense.updated", id, ct);
             return Results.Ok(ToDto(result.Value!));
@@ -159,11 +161,11 @@ internal static class ExpenseEndpoints
         source, request.Kind, request.AccountId, request.TransferAccountId);
 
     private static async Task<(int Year, int Month)?> ResolveMonthAsync(string? month,
-        IDailyBriefingRepository briefings, ICurrentUser currentUser, CancellationToken ct)
+        IDailyBriefingRepository briefings, IOwnerSettingsStore settings, ICurrentUser currentUser, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(month))
         {
-            var today = await TodayAsync(briefings, currentUser, ct);
+            var today = await TodayAsync(briefings, settings, currentUser, ct);
             return (today.Year, today.Month);
         }
         return DateOnly.TryParseExact(month.Trim() + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture,
@@ -180,10 +182,10 @@ internal static class ExpenseEndpoints
     };
 
     /// <summary>"Today" in the owner's configured time zone, falling back to UTC.</summary>
-    private static async Task<DateOnly> TodayAsync(IDailyBriefingRepository briefings, ICurrentUser currentUser,
+    private static async Task<DateOnly> TodayAsync(IDailyBriefingRepository briefings, IOwnerSettingsStore settings, ICurrentUser currentUser,
         CancellationToken ct)
     {
-        var zoneId = (await briefings.GetAsync(currentUser.OwnerId, ct))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, currentUser.OwnerId, ct);
         var zone = LocalClock.TryFind(zoneId, out var found) ? found : TimeZoneInfo.Utc;
         return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(TimeProvider.System.GetUtcNow(), zone).DateTime);
     }

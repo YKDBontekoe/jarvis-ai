@@ -936,6 +936,12 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     'counts': {'approval': 1, 'problem': 1, 'commitment': 1, 'decision': 1, 'suggested_promise': 1},
     'summary': '5 need you; 2 are waiting on your answer or went wrong.',
   },
+  'GET /api/v1/preferences/locale': {
+    'language': 'nl', 'languageName': 'Nederlands', 'baseCurrency': 'EUR',
+    'languages': [{'code': 'en', 'name': 'English'}, {'code': 'nl', 'name': 'Nederlands'}, {'code': 'de', 'name': 'Deutsch'}],
+    'currencies': ['EUR', 'USD', 'GBP', 'CHF'],
+    'explanation': 'Jarvis replies in your language unless you write in another one or the profile in use sets its own. The base currency is the default for new budgets and trips; nothing is converted.',
+  },
   'GET /api/v1/trips': [
     {'id': 't1', 'title': 'Lisbon in November', 'destination': 'Lisbon', 'start': '2026-11-12', 'end': '2026-11-15', 'unknowns': 3},
   ],

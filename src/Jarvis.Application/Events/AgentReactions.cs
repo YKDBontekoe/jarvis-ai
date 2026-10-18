@@ -1,3 +1,4 @@
+using Jarvis.Application.Preferences;
 using System.Text;
 using Jarvis.Application.Settings;
 using Jarvis.Application.Workflows;
@@ -151,7 +152,7 @@ public sealed class AgentReactionHandler(
         var state = await settings.GetAsync<AgentReactionState>(ev.OwnerId, AgentReactionState.Section,
             cancellationToken) ?? AgentReactionState.Empty;
         var zone = TimeZoneInfo.Utc;
-        if ((await briefings.GetAsync(ev.OwnerId, cancellationToken))?.TimeZoneId is { Length: > 0 } zoneId)
+        if (await OwnerZoneResolver.ZoneIdAsync(settings, briefings, ev.OwnerId, cancellationToken) is { Length: > 0 } zoneId)
         {
             try { zone = TimeZoneInfo.FindSystemTimeZoneById(zoneId); }
             catch (Exception exception) when (exception is TimeZoneNotFoundException or InvalidTimeZoneException) { }

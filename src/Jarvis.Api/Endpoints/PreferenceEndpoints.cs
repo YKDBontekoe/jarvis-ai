@@ -5,6 +5,8 @@ namespace Jarvis.Api.Endpoints;
 
 public sealed record HomeZoneRequest(string? TimeZoneId);
 
+public sealed record LocaleRequest(string? Language, string? Currency);
+
 /// <summary>
 /// The owner's own preferences. The home time zone is what the owner chose here; a device's zone is only ever offered,
 /// never trusted to change anything. Changing it moves nothing that is already scheduled.
@@ -33,6 +35,16 @@ internal static class PreferenceEndpoints
                 ? Results.Ok(preview)
                 : EndpointHelpers.Invalid("timeZoneId", "That is not a time zone Jarvis knows."))
             .WithName("PreviewHomeZone");
+
+        group.MapGet("/locale", async (IOwnerLocaleService locale, ICurrentUser user, CancellationToken ct) =>
+            Results.Ok(await locale.GetAsync(user.OwnerId, ct))).WithName("GetLocale");
+
+        group.MapPut("/locale", async (LocaleRequest request, IOwnerLocaleService locale, ICurrentUser user,
+            CancellationToken ct) =>
+        {
+            var (view, field, error) = await locale.SetAsync(user.OwnerId, request.Language, request.Currency, ct);
+            return view is not null ? Results.Ok(view) : EndpointHelpers.Invalid(field ?? "locale", error ?? "The request is invalid.");
+        }).WithName("SetLocale");
 
         return api;
     }

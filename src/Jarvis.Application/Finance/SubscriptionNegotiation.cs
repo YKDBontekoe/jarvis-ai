@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using System.Globalization;
 using System.Net;
 using System.Text;
@@ -162,7 +164,8 @@ public sealed class SubscriptionNegotiationService(
     IFinanceRepository repository,
     IJarvisTaskService tasks,
     IDailyBriefingRepository briefings,
-    TimeProvider? timeProvider = null) : ISubscriptionNegotiationService
+    TimeProvider? timeProvider = null,
+    IOwnerSettingsStore? settings = null) : ISubscriptionNegotiationService
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
@@ -198,7 +201,7 @@ public sealed class SubscriptionNegotiationService(
             }
         }
 
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, ownerId, cancellationToken);
         LocalClock.TryFind(zoneId, out var zone);
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
         var prompt = SubscriptionNegotiationPrompt.Build(subscription, chosenGoal, chosenMode, today);

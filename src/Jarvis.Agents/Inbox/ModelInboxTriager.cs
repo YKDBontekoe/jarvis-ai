@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -16,7 +18,8 @@ namespace Jarvis.Agents.Inbox;
 /// suggestions until accepted. When the model fails, the rule-based triage answers instead.
 /// </summary>
 internal sealed class ModelInboxTriager(IChatClientResolver chatClients, IDailyBriefingRepository briefings,
-    ILogger<ModelInboxTriager> logger) : IInboxTriager
+    ILogger<ModelInboxTriager> logger,
+    IOwnerSettingsStore? settings = null) : IInboxTriager
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
 
@@ -25,7 +28,7 @@ internal sealed class ModelInboxTriager(IChatClientResolver chatClients, IDailyB
     {
         var isGroup = thread.ChatId is not null && thread.ChatId.EndsWith("@g.us", StringComparison.Ordinal);
         var fallback = InboxHeuristics.Triage(messages, isGroup, now);
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, ownerId, cancellationToken);
         var zone = LocalClock.TryFind(zoneId, out var found) ? found : TimeZoneInfo.Utc;
 
         var request = new StringBuilder();

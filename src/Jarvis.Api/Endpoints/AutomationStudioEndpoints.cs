@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using System.Text;
 using System.Text.Json;
 using Jarvis.Api.Security;
@@ -42,11 +44,11 @@ internal static class AutomationStudioEndpoints
             .WithName("ListAutomationTemplates");
 
         group.MapPost("/templates/{templateId}/create", async (string templateId, IAutomationRuleService automations,
-            IDailyBriefingRepository briefings, ICurrentUser user, CancellationToken ct) =>
+            IDailyBriefingRepository briefings, IOwnerSettingsStore settings, ICurrentUser user, CancellationToken ct) =>
         {
             var template = AutomationTemplates.Find(templateId);
             if (template is null) return Results.NotFound();
-            var zoneId = (await briefings.GetAsync(user.OwnerId, ct))?.TimeZoneId;
+            var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, user.OwnerId, ct);
             var definition = template.Build(LocalClock.TryFind(zoneId, out var zone) ? zone.Id : "UTC");
             var json = JsonDocument.Parse(AutomationDefinitionJson.Serialize(definition)).RootElement.Clone();
             var rule = await automations.CreateAsync(user.OwnerId, new SaveAutomationRuleRequest(template.Title, json), ct);

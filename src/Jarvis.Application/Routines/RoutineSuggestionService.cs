@@ -1,3 +1,4 @@
+using Jarvis.Application.Preferences;
 using System.Text.Json;
 using Jarvis.Application.Automations;
 using Jarvis.Application.Settings;
@@ -36,7 +37,7 @@ public sealed class RoutineSuggestionService(
         if (!force && state.LastRefreshAt is { } last && now - last < RoutineRules.RefreshInterval)
             return await PendingAsync(ownerId, cancellationToken);
 
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, ownerId, cancellationToken);
         LocalClock.TryFind(zoneId, out var zone);
         var events = await CollectAsync(ownerId, zone, now, cancellationToken);
         var mined = RoutineMinerEngine.Mine(events, zone, now);

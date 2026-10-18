@@ -112,6 +112,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Modes.ModeToolContributor>();
         services.AddScoped<IAgentContextContributor, Modes.ModeContextContributor>();
         services.AddScoped<IAgentContextContributor, Outcomes.OutcomeStyleContributor>();
+        services.AddScoped<IAgentContextContributor, Preferences.LocaleContextContributor>();
         services.AddScoped<IAgentToolContributor, Missions.MissionToolContributor>();
         services.AddScoped<IAgentContextContributor, Missions.MissionContextContributor>();
         services.AddScoped<Jarvis.Application.Missions.IMissionPlanner, Missions.ModelMissionPlanner>();

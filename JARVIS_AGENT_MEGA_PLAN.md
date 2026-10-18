@@ -382,3 +382,10 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **Filter.** A time window (any time, week, month, year) sends `from`; hits without a date are left out, never guessed.
 - **Tests.** .NET `LifeSearchProviderTests` (+3), `FederatedSearchTests` (+1), Dart `search_screen_test` (3), real-stack `tests/e2e/search_groups_flow.mjs`.
 - **Not done in F02.** Library, finance and app groups, a project filter, relevance fusion across providers beyond the current ranking, accent folding in message text, and a benchmark.
+
+## Checkpoint 38: F16, language, base currency and every zone lookup on the resolver
+
+- **Zone (F16.1.5).** The 17 remaining "brief zone or UTC" lookups (reminders, journal, expenses and finance, timeline, library, routines, habits, promises and decisions, people follow-through, inbox triage, the heartbeat, automations) now use `OwnerZoneResolver` through an optional settings parameter, so a chosen home zone applies everywhere. The three endpoint helpers and the automation template builder too.
+- **Language and currency (F16.1.1).** The owner can choose a reply language and a base currency (screen under Settings). Reply language has one stated precedence: the active profile's, then the owner's, otherwise the message's. A new trip without a currency takes the base currency. Nothing is converted or guessed.
+- **Tests.** .NET `OwnerLocaleTests` (5), `OwnerZoneTests` (+1: promises follow the chosen zone), Dart `locale_test` (3), real-stack `tests/e2e/locale_flow.mjs` (two zones 25 hours apart prove "today" follows the chosen zone).
+- **Not done in F16.** Number and date formatting from the language in the app, base currency in finance and budgets (only trips use it so far), the all-day-event and birthday cases in the written behaviour, a travel override with an end date, and F16.2: Dutch strings for the app and the accessibility audit.

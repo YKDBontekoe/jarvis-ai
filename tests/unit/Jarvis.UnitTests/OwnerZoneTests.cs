@@ -148,4 +148,22 @@ public sealed class OwnerZoneTests
         Assert.Equal(new DateOnly(2026, 10, 17), utc);
         Assert.Equal(new DateOnly(2026, 10, 17), behind);
     }
+
+    [Fact]
+    public async Task Promises_follow_the_chosen_home_zone_not_the_brief_zone()
+    {
+        // 23:30 UTC on the 17th is already the 18th in Auckland and still the 17th in UTC.
+        var world = new World { BriefZone = "UTC" };
+        await world.Settings.SaveAsync(Owner, HomeZoneSettings.Section, new HomeZoneSettings("Pacific/Auckland"), default);
+        var commitments = new Jarvis.Application.Inbox.CommitmentService(
+            Fake<Jarvis.Application.Inbox.IInboxRepository>.Create(), Fake<IReminderService>.Create(), world.Briefings,
+            new Clock(), settings: world.Settings);
+
+        Assert.Equal(new DateOnly(2026, 10, 18), await commitments.TodayAsync(Owner, default));
+
+        var plain = new Jarvis.Application.Inbox.CommitmentService(
+            Fake<Jarvis.Application.Inbox.IInboxRepository>.Create(), Fake<IReminderService>.Create(), world.Briefings,
+            new Clock(), settings: new InMemorySettingsStore());
+        Assert.Equal(new DateOnly(2026, 10, 17), await plain.TodayAsync(Owner, default));
+    }
 }

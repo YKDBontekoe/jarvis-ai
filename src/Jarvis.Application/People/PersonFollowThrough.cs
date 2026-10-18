@@ -1,3 +1,4 @@
+using Jarvis.Application.Preferences;
 using Jarvis.Application.Inbox;
 using Jarvis.Application.Settings;
 using Jarvis.Application.Workflows;
@@ -234,7 +235,7 @@ public sealed class PersonFollowThroughService(
     private async Task<(DateOnly Today, TimeZoneInfo Zone)> TodayAsync(Guid ownerId,
         CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, ownerId, cancellationToken);
         var zone = LocalClock.TryFind(zoneId, out var found) ? found : TimeZoneInfo.Utc;
         return (PeopleCalendar.LocalDate(clock.GetUtcNow(), zone), zone);
     }

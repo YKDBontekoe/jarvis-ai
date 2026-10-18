@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using System.Globalization;
 using System.Text;
 using Jarvis.Application.Expenses;
@@ -469,7 +471,7 @@ public sealed class FinanceService(IFinanceRepository repository, IExpenseServic
 
     private async Task<TimeZoneInfo> ZoneAsync(Guid ownerId, CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, ownerId, cancellationToken);
         return LocalClock.TryFind(zoneId, out var zone) ? zone : TimeZoneInfo.Utc;
     }
 
@@ -504,14 +506,15 @@ public sealed class FinanceService(IFinanceRepository repository, IExpenseServic
 /// month's expenses count, so importing old statements stays quiet.
 /// </summary>
 public sealed class BudgetExpenseObserver(IFinanceRepository repository, IExpenseRepository expenses,
-    INotificationRepository notifications, IDailyBriefingRepository briefings, TimeProvider? timeProvider = null)
+    INotificationRepository notifications, IDailyBriefingRepository briefings, TimeProvider? timeProvider = null,
+    IOwnerSettingsStore? settings = null)
     : IExpenseObserver
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
     public async Task OnExpenseCreatedAsync(Expense expense, CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(expense.OwnerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, expense.OwnerId, cancellationToken);
         var zone = LocalClock.TryFind(zoneId, out var found) ? found : TimeZoneInfo.Utc;
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), zone).DateTime);
         if (expense.SpentOn.Year != today.Year || expense.SpentOn.Month != today.Month) return;

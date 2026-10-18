@@ -526,3 +526,7 @@ A saved starter for a recurring job: a name, one of the owner's profiles, option
 ### Search groups and date window
 
 `GET /search` also covers `journal` (owner-only, like `message`: the agent's `SearchEverything` never returns either), `project`, `mission`, `goal` and `trip`. `from` and `to` (`yyyy-MM-dd`, inclusive) keep only hits dated inside that window; a hit with no date is left out rather than guessed, and `from` after `to` is a 400. Routes: `journal` carries `date`, the others `projectId`, `missionId`, `goalId`, `tripId`.
+
+### Language and currency
+
+`GET /preferences/locale` and `PUT /preferences/locale` (`language` one of `en`, `nl`, `de`, `fr`, `es`; `currency` one of a short list of ISO codes; an empty string clears a choice and an omitted field is left alone). Nothing is guessed from the phone or a message. The reply language is a default for the agent with one precedence: the active profile's own reply language, then this choice, otherwise the language of the message. A new trip without a currency uses the base currency (nothing is ever converted). State lives in owner settings (`preferences.locale`). The home time zone now also drives promises, decisions, habits, the journal, expenses, finance, timeline, library, routines, inbox triage, the heartbeat and reminders through `OwnerZoneResolver` (chosen zone, then the morning brief's, then UTC).

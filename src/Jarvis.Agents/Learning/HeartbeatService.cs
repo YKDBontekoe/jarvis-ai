@@ -1,3 +1,4 @@
+using Jarvis.Application.Preferences;
 using System.Text.Json;
 using Jarvis.Application.Approvals;
 using Jarvis.Application.Audit;
@@ -264,7 +265,7 @@ public sealed class HeartbeatService(
 
     private async Task<TimeZoneInfo> ResolveTimeZoneAsync(Guid ownerId, CancellationToken cancellationToken)
     {
-        var zone = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
+        var zone = await OwnerZoneResolver.ZoneIdAsync(settingsStore, briefings, ownerId, cancellationToken);
         if (string.IsNullOrWhiteSpace(zone)) return TimeZoneInfo.Utc;
         try { return TimeZoneInfo.FindSystemTimeZoneById(zone); }
         catch (Exception exception) when (exception is TimeZoneNotFoundException or InvalidTimeZoneException)

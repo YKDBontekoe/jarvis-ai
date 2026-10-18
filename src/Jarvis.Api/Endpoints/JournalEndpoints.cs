@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using System.Text.Json;
 using Jarvis.Api.Errors;
 using Jarvis.Application.Audit;
@@ -23,10 +25,10 @@ internal static class JournalEndpoints
             })
             .WithName("ListJournalEntries");
 
-        journal.MapGet("/summary", async (IJournalService service, IDailyBriefingRepository briefings,
+        journal.MapGet("/summary", async (IJournalService service, IDailyBriefingRepository briefings, IOwnerSettingsStore settings,
                 ICurrentUser currentUser, int? days, CancellationToken ct) =>
             {
-                var today = await TodayAsync(briefings, currentUser, ct);
+                var today = await TodayAsync(briefings, settings, currentUser, ct);
                 return Results.Ok(await service.SummarizeAsync(currentUser.OwnerId, days ?? 30, today, ct));
             })
             .WithName("GetJournalSummary");
@@ -38,10 +40,10 @@ internal static class JournalEndpoints
             return entry is null ? Results.NotFound() : Results.Ok(entry.ToDto());
         }).WithName("GetJournalEntry");
 
-        journal.MapPost("", async (JournalRequest request, IJournalService service, IDailyBriefingRepository briefings,
+        journal.MapPost("", async (JournalRequest request, IJournalService service, IDailyBriefingRepository briefings, IOwnerSettingsStore settings,
             IAuditEventStore audit, ICurrentUser currentUser, CancellationToken ct) =>
         {
-            var today = await TodayAsync(briefings, currentUser, ct);
+            var today = await TodayAsync(briefings, settings, currentUser, ct);
             var draft = ToDraft(request, today);
             var errors = JournalRules.Validate(draft, today);
             if (errors.Count > 0) return ApiProblemResults.Validation(errors);
@@ -52,12 +54,12 @@ internal static class JournalEndpoints
         }).WithName("CreateJournalEntry");
 
         journal.MapPut("/{id:guid}", async (Guid id, JournalRequest request, IJournalService service,
-            IDailyBriefingRepository briefings, IAuditEventStore audit, ICurrentUser currentUser,
+            IDailyBriefingRepository briefings, IOwnerSettingsStore settings, IAuditEventStore audit, ICurrentUser currentUser,
             CancellationToken ct) =>
         {
             var existing = await service.GetAsync(id, currentUser.OwnerId, ct);
             if (existing is null) return Results.NotFound();
-            var today = await TodayAsync(briefings, currentUser, ct);
+            var today = await TodayAsync(briefings, settings, currentUser, ct);
             // Editing keeps how the entry was created unless the client says otherwise.
             var draft = ToDraft(request with { Source = request.Source ?? existing.Source }, today);
             var errors = JournalRules.Validate(draft, today);
@@ -86,10 +88,10 @@ internal static class JournalEndpoints
         request.Mood, request.Energy, request.Stress, request.Tags, request.Source ?? JournalSources.Written);
 
     /// <summary>"Today" in the owner's configured time zone, falling back to UTC.</summary>
-    private static async Task<DateOnly> TodayAsync(IDailyBriefingRepository briefings, ICurrentUser currentUser,
+    private static async Task<DateOnly> TodayAsync(IDailyBriefingRepository briefings, IOwnerSettingsStore settings, ICurrentUser currentUser,
         CancellationToken ct)
     {
-        var zoneId = (await briefings.GetAsync(currentUser.OwnerId, ct))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, currentUser.OwnerId, ct);
         var zone = LocalClock.TryFind(zoneId, out var found) ? found : TimeZoneInfo.Utc;
         return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(TimeProvider.System.GetUtcNow(), zone).DateTime);
     }

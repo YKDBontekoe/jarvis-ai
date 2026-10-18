@@ -47,6 +47,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         destination: 'home-zone',
       ),
       (
+        title: 'Language and currency',
+        subtitle: 'Reply language and the default for budgets',
+        icon: PhosphorIconsRegular.globeSimple,
+        destination: 'locale',
+      ),
+      (
         title: 'Morning briefing',
         subtitle: 'When your daily summary arrives',
         icon: PhosphorIconsRegular.sunHorizon,

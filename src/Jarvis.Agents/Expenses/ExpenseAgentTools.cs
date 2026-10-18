@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using System.ComponentModel;
 using System.Globalization;
 using System.Text;
@@ -18,7 +20,8 @@ namespace Jarvis.Agents.Expenses;
 /// </summary>
 internal sealed class ExpenseAgentTools(IExpenseService expenses, IConversationStore conversations,
     IDailyBriefingRepository briefings, IAuditEventStore audit, ICurrentUser currentUser, ILogger logger,
-    TimeProvider clock, Guid? conversationId)
+    TimeProvider clock, Guid? conversationId,
+    IOwnerSettingsStore? settings = null)
 {
     private const int MaxListed = 40;
     private const int RecentPhotoMessages = 20;
@@ -213,7 +216,7 @@ internal sealed class ExpenseAgentTools(IExpenseService expenses, IConversationS
 
     private async Task<DateOnly> TodayAsync(CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(currentUser.OwnerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, currentUser.OwnerId, cancellationToken);
         var zone = LocalClock.TryFind(zoneId, out var found) ? found : TimeZoneInfo.Utc;
         return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), zone).DateTime);
     }

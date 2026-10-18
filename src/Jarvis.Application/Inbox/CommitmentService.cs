@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Inbox;
 
@@ -7,7 +9,8 @@ public sealed class CommitmentService(IInboxRepository repository, IReminderServ
     IDailyBriefingRepository briefings, TimeProvider? timeProvider = null,
     Events.IJarvisEventBus? events = null,
     Projects.IProjectStore? projects = null,
-    People.IPeopleRepository? people = null) : ICommitmentService
+    People.IPeopleRepository? people = null,
+    IOwnerSettingsStore? settings = null) : ICommitmentService
 {
     public const int DueSoonDays = 7;
     private static readonly TimeOnly ReminderTime = new(9, 0);
@@ -294,7 +297,7 @@ public sealed class CommitmentService(IInboxRepository repository, IReminderServ
 
     private async Task<TimeZoneInfo> ZoneAsync(Guid ownerId, CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, ownerId, cancellationToken);
         return LocalClock.TryFind(zoneId, out var zone) ? zone : TimeZoneInfo.Utc;
     }
 }

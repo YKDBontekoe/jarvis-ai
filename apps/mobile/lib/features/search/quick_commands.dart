@@ -192,6 +192,12 @@ const quickCommands = [
     keywords: ['offline', 'queue', 'waiting', 'sync', 'pending', 'wachten', 'synchroniseren'],
   ),
   QuickCommand(
+    label: 'Language and currency',
+    icon: PhosphorIconsRegular.globeSimple,
+    destination: 'locale',
+    keywords: ['language', 'currency', 'euro', 'dollar', 'dutch', 'taal', 'valuta', 'nederlands'],
+  ),
+  QuickCommand(
     label: 'Time zone',
     icon: PhosphorIconsRegular.globeSimple,
     destination: 'home-zone',

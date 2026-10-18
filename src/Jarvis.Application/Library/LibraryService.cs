@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using Jarvis.Application.Automations;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Library;
@@ -5,13 +7,14 @@ using Jarvis.Domain.Library;
 namespace Jarvis.Application.Library;
 
 public sealed class LibraryService(ILibraryRepository repository, IWebPageFetcher fetcher, ILibraryDigester digester,
-    IDailyBriefingRepository briefings, TimeProvider? timeProvider = null) : ILibraryService
+    IDailyBriefingRepository briefings, TimeProvider? timeProvider = null,
+    IOwnerSettingsStore? settings = null) : ILibraryService
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
     public async Task<DateOnly> TodayAsync(Guid ownerId, CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, ownerId, cancellationToken);
         var zone = LocalClock.TryFind(zoneId, out var found) ? found : TimeZoneInfo.Utc;
         return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), zone).DateTime);
     }

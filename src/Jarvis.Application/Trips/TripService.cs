@@ -32,7 +32,7 @@ public interface ITripService
 }
 
 public sealed class TripService(IOwnerSettingsStore settings, Preferences.IOwnerPreferenceService? zone = null,
-    TimeProvider? timeProvider = null) : ITripService
+    TimeProvider? timeProvider = null, Preferences.IOwnerLocaleService? locale = null) : ITripService
 {
     private readonly TimeProvider _clock = timeProvider ?? TimeProvider.System;
 
@@ -52,6 +52,9 @@ public sealed class TripService(IOwnerSettingsStore settings, Preferences.IOwner
     public async Task<TripOperation<TripView>> CreateAsync(Guid ownerId, TripInput input,
         CancellationToken cancellationToken)
     {
+        // A trip without a stated currency uses the owner's base currency, when they chose one.
+        if (input.Currency is null && locale is not null && (await locale.GetAsync(ownerId, cancellationToken)).BaseCurrency is { } baseCurrency)
+            input = input with { Currency = baseCurrency };
         var trips = (await LoadAsync(ownerId, cancellationToken)).ToList();
         if (trips.Count >= TripRules.MaxTrips)
             return TripOperation<TripView>.Invalid("trip", $"You can keep up to {TripRules.MaxTrips} trips. Remove one first.");

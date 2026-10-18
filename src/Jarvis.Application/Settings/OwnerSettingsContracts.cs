@@ -33,6 +33,7 @@ public static class SettingsSections
     public const string Workspaces = "workspaces";
     public const string ModeAttachments = "context-modes.attachments";
     public const string Attention = "attention";
+    public const string Locale = "preferences.locale";
     public const string CatchUp = "context-modes.catchup";
     public const string Routines = "routines";
     public const string PeopleRadar = "people-radar";

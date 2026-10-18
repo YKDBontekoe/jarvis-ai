@@ -1,3 +1,4 @@
+using Jarvis.Application.Preferences;
 using Jarvis.Application.Settings;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Habits;
@@ -305,7 +306,7 @@ public sealed class HabitService(
     {
         if (!string.IsNullOrWhiteSpace(settings.TimeZoneId) && LocalClock.TryFind(settings.TimeZoneId, out var own))
             return own;
-        var briefingZone = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
+        var briefingZone = await OwnerZoneResolver.ZoneIdAsync(settingsStore, briefings, ownerId, cancellationToken);
         return LocalClock.TryFind(briefingZone, out var zone) ? zone : TimeZoneInfo.Utc;
     }
 

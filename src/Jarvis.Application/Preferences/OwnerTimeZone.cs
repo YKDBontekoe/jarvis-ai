@@ -60,6 +60,11 @@ public static class ZonePolicy
 /// <summary>The one place that answers "what is this owner's home zone?".</summary>
 public static class OwnerZoneResolver
 {
+    /// <summary>The home zone's id for features that only need the name: chosen, else the brief's, else UTC.</summary>
+    public static async Task<string> ZoneIdAsync(IOwnerSettingsStore? settings, IDailyBriefingRepository briefings,
+        Guid ownerId, CancellationToken cancellationToken) =>
+        (await ResolveAsync(settings, briefings, ownerId, cancellationToken)).Id;
+
     public static async Task<OwnerZone> ResolveAsync(IOwnerSettingsStore? settings, IDailyBriefingRepository briefings,
         Guid ownerId, CancellationToken cancellationToken)
     {

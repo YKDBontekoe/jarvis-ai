@@ -17,6 +17,7 @@ import '../missions/mission_starter_screen.dart';
 import '../missions/missions_screen.dart';
 import '../attention/attention_screen.dart';
 import '../home_routines/home_routines_screen.dart';
+import '../settings/locale_screen.dart';
 import '../outcomes/learned_screen.dart';
 import '../profiles/working_styles_screen.dart';
 import '../profiles/workspaces_screen.dart';
@@ -147,6 +148,7 @@ Widget? utilityPageFor(
   ),
   'notification-settings' => NotificationSettingsScreen(http: http),
   'home-zone' => HomeZoneScreen(http: http),
+  'locale' => LocaleScreen(http: http),
   'trips' => TripsScreen(http: http),
   'home-routines' => HomeRoutinesScreen(http: http),
   'working-styles' => WorkingStylesScreen(http: http),

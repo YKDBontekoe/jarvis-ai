@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using Jarvis.Application.Expenses;
 using Jarvis.Application.Habits;
 using Jarvis.Application.Journal;
@@ -12,7 +14,8 @@ public sealed class TimelineService(
     IHabitRepository habits,
     IJarvisTaskRepository tasks,
     IDailyBriefingRepository briefings,
-    TimeProvider? timeProvider = null) : ITimelineService
+    TimeProvider? timeProvider = null,
+    IOwnerSettingsStore? settings = null) : ITimelineService
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
@@ -130,7 +133,7 @@ public sealed class TimelineService(
 
     private async Task<TimeZoneInfo> ZoneAsync(Guid ownerId, CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, ownerId, cancellationToken);
         return LocalClock.TryFind(zoneId, out var zone) ? zone : TimeZoneInfo.Utc;
     }
 
