@@ -56,6 +56,7 @@ import '../shell/jarvis_tab_bar.dart';
 import '../shell/utility_pages.dart';
 import '../whatsapp/whatsapp_chat_screen.dart';
 import '../voice/chat_gpt_voices.dart';
+import '../voice/voice_cards.dart';
 import '../voice/voice_errors.dart';
 import '../voice/voice_stage.dart';
 import 'chat_entries.dart';

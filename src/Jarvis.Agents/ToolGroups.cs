@@ -76,6 +76,9 @@ public static partial class ToolGroups
         new("notification-settings", "Why something did or did not buzz the phone: per-kind choices and the current mode",
             ["ExplainNotifications"],
             NotificationSettingsKeywords()),
+        new("voice-cards", "In a voice session: save the card just shown, and recap what was saved and what is still open",
+            ["SaveShownCard", "GetSessionRecap"],
+            VoiceCardKeywords()),
         new("documents", "Draft a one-page project update from the user's own records, nothing is sent",
             ["DraftProjectUpdate"],
             DocumentKeywords()),
@@ -280,6 +283,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(why (didn'?t|did) i (get|receive)|what will (buzz|ping|notify)|notification settings|which notifications|do not disturb|waarom kreeg ik|welke meldingen)", KeywordOptions)]
     private static partial Regex NotificationSettingsKeywords();
+
+    [GeneratedRegex(@"\b(save (that|this|it)|keep (that|this)|what did we (do|cover|save)|recap (this|our) (session|chat|call)|sla (dat|dit) op|wat hebben we gedaan)", KeywordOptions)]
+    private static partial Regex VoiceCardKeywords();
 
     [GeneratedRegex(@"\b(project update|status update|progress report|write (up )?(an? )?update|statusupdate|voortgangsrapport|schrijf (een )?update)", KeywordOptions)]
     private static partial Regex DocumentKeywords();

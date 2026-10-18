@@ -375,6 +375,17 @@ Deterministic rules over the owner's own facts; reading proposes only and never 
 
 Rules: a meeting in the next 24 hours with no prep note; an open accepted promise due within 3 days or late (older than 30 days it only asks whether it still matters); a subscription's notice day within 7 days (unless kept); a decision whose review day is within 7 days; free time of 45+ minutes today with a project's open next step. "Later" returns after 3 days, "handled", "wrong" and "useful" hide that opportunity, "fewer" or two "wrong" for a kind mute it for 30 days.
 
+### Voice companion cards
+
+When a voice tool call answers something with rows (what needs you, a comparison), the same call stores a card with those rows and publishes `voice.card` to the conversation's group, so the screen and the spoken words name the same real entities. The voice summarises; the card holds the rows. Cards live in owner settings (`voice.cards`, latest 30). "Save that" means the only card shown in the last 3 minutes; with two or more the tool returns a short choice instead of guessing. A put-away card cannot be saved. The recap counts saved, put away and still open, and states that nothing was sent, accepted or changed outside Jarvis by voice.
+
+| Method | Path |
+|---|---|
+| GET | `/voice/{conversationId}/cards`, `/voice/{conversationId}/recap` |
+| POST | `/voice/cards/{cardId}/save` (one private Library note, tags `voice`, `private`; again returns the same item), `/voice/cards/{cardId}/dismiss` |
+
+Chat tools in a voice session: `SaveShownCard` (optional `which`) and `GetSessionRecap`.
+
 ### Self-built apps: review and builder
 
 Activation of a self-built app (`POST /custom-mcp-servers/{id}/activate`, and the chat tool) now needs the sha256 of the draft that was reviewed (400 `sha256` when omitted, so an old client cannot activate "whatever is current"), and that exact code must have passed a test. Without a passing test for the same hash, `overrideReason` (10 to 200 characters) is required; otherwise 409 `not_tested`. A reason is kept in the audit trail (`custom_app.activated_untested`). A startup test is labelled as that: it lists tools but does not prove each one works.
