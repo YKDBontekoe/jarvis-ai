@@ -507,6 +507,25 @@ public sealed class ImprovementServiceTests
     }
 
     [Fact]
+    public async Task The_miner_adds_last_nights_skill_runs_to_the_skills_current_version()
+    {
+        var world = new World();
+        var skill = (await world.Skills.UpsertAsync(Owner,
+            new SkillDraft("trip-planning", "Use when planning trips.", "1. Ask for dates."), SkillSources.Learned,
+            SkillStatuses.Active, true, null, default))!;
+        TurnTraceRecord Run(double hoursAgo, string outcome) =>
+            new(Guid.NewGuid(), Owner, Guid.NewGuid(), null, null, "interactive", [], ["trip-planning"],
+                [new TurnToolCall("SearchMemory", ToolOutcomes.Completed, 30)], 100, outcome, Start.AddHours(-hoursAgo));
+        var store = new StubLearningStore { Traces = [Run(24, "completed"), Run(30, "completed"), Run(26, "failed")] };
+
+        await Miner(world, store, new StubLessonDrafter()).RefreshAsync(Owner, default);
+        await Miner(world, store, new StubLessonDrafter()).RefreshAsync(Owner, default);
+
+        var counted = world.Skills.Items.Single(item => item.Id == skill.Id);
+        Assert.Equal((3, 2), (counted.OutcomeRuns, counted.OutcomeSuccesses));
+    }
+
+    [Fact]
     public async Task With_proposals_switched_off_the_miner_does_nothing()
     {
         var world = new World();

@@ -48,7 +48,8 @@ internal sealed class SkillsContextProvider(ISkillRepository skills, Guid ownerI
         var active = (await skills.ListAsync(ownerId, cancellationToken))
             .Where(skill => skill.Status == SkillStatuses.Active)
             .Where(skill => ProfileScope.AllowsSkill(profile, skill.Id))
-            .OrderByDescending(skill => skill.UseCount).ThenByDescending(skill => skill.UpdatedAt)
+            .OrderByDescending(SkillOutcomeRules.Score).ThenByDescending(skill => skill.UseCount)
+            .ThenByDescending(skill => skill.UpdatedAt)
             .Take(MaxListed)
             .ToArray();
         var builder = new StringBuilder();

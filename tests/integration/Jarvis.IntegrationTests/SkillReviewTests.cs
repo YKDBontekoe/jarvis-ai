@@ -87,6 +87,37 @@ public sealed class SkillReviewTests : IAsyncLifetime
             SkillSources.Learned, SkillStatuses.Proposed, respectLock: true, "test", default));
     }
 
+    [Fact]
+    public async Task Outcome_counts_add_up_and_start_over_when_the_text_changes()
+    {
+        var owner = Guid.CreateVersion7();
+        var skill = await Save(owner, Draft("trip-planning", "1. Ask for dates and budget."), SkillSources.Learned, SkillStatuses.Active);
+        var counted = DateTimeOffset.UtcNow.AddHours(-6);
+
+        await using (var database = CreateDbContext())
+        {
+            var repository = new SkillRepository(database);
+            await repository.AddOutcomesAsync(owner, new Dictionary<Guid, SkillOutcomeDelta> { [skill.Id] = new(4, 3, counted) }, default);
+            await repository.AddOutcomesAsync(owner, new Dictionary<Guid, SkillOutcomeDelta>
+            {
+                [skill.Id] = new(2, 0, counted.AddHours(1)), [Guid.CreateVersion7()] = new(9, 9, counted)
+            }, default);
+        }
+
+        await using (var read = CreateDbContext())
+        {
+            var totals = (await new SkillRepository(read).GetAsync(skill.Id, owner, default))!;
+            Assert.Equal((6, 3), (totals.OutcomeRuns, totals.OutcomeSuccesses));
+            Assert.Equal(counted.AddHours(1), totals.OutcomeCountedAt!.Value, TimeSpan.FromMilliseconds(1));
+        }
+
+        var rewritten = await Save(owner, Draft("trip-planning", "1. Ask for dates.\n2. Prefer trains."),
+            SkillSources.Learned, SkillStatuses.Active);
+
+        Assert.Equal((0, 0, 2), (rewritten.OutcomeRuns, rewritten.OutcomeSuccesses, rewritten.Version));
+        Assert.True(rewritten.OutcomeCountedAt > DateTimeOffset.UtcNow.AddMinutes(-1));
+    }
+
     private JarvisDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<JarvisDbContext>()

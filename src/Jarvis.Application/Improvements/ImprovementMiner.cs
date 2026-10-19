@@ -51,10 +51,19 @@ public sealed class ImprovementMiner(
         var signals = await learning.ListSignalsAsync(ownerId, since, cancellationToken);
         // Count last night's lessons first, so one that hurt is out of force before new ones are weighed against it.
         await CountLessonsAsync(ownerId, traces, signals, now, cancellationToken);
+        await CountSkillOutcomesAsync(ownerId, traces, signals, now, cancellationToken);
         var added = new MiningResult(await MineSkillsAsync(ownerId, traces, now, cancellationToken),
             await MineReviewsAsync(ownerId, traces, signals, now, since, cancellationToken),
             await MineLessonsAsync(ownerId, traces, signals, now, owner.AutoApplyLowRiskMemory, cancellationToken));
         return added;
+    }
+
+    /// <summary>Adds last night's runs and how they went to each skill's current version.</summary>
+    private async Task CountSkillOutcomesAsync(Guid ownerId, IReadOnlyList<TurnTraceRecord> traces,
+        IReadOnlyList<LearningSignalRecord> signals, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var deltas = SkillOutcomeEngine.Tally(traces, signals, await skills.ListAsync(ownerId, cancellationToken), now);
+        if (deltas.Count > 0) await skills.AddOutcomesAsync(ownerId, deltas, cancellationToken);
     }
 
     private async Task CountLessonsAsync(Guid ownerId, IReadOnlyList<TurnTraceRecord> traces,

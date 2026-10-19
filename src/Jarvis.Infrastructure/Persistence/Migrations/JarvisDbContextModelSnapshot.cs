@@ -4389,6 +4389,22 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("name");
 
+                    b.Property<DateTimeOffset?>("OutcomeCountedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("outcome_counted_at");
+
+                    b.Property<int>("OutcomeRuns")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("outcome_runs");
+
+                    b.Property<int>("OutcomeSuccesses")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("outcome_successes");
+
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")
                         .HasColumnName("owner_id");

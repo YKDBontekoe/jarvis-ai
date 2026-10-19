@@ -7,7 +7,7 @@ namespace Jarvis.Api.Endpoints;
 
 public sealed record SkillDto(Guid Id, string Name, string Description, string Instructions, string Source,
     string Status, bool IsLocked, int Version, int UseCount, DateTimeOffset? LastUsedAt, DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt, int OutcomeRuns = 0, int OutcomeSuccesses = 0);
 public sealed record SkillDetailsDto(SkillDto Skill, IReadOnlyList<SkillRevisionRecord> Revisions);
 public sealed record SaveSkillRequest(string? Name, string? Description, string? Instructions);
 public sealed record SkillStatusRequest(string? Status);
@@ -128,5 +128,5 @@ internal static class SkillEndpoints
 
     private static SkillDto ToDto(SkillRecord skill) => new(skill.Id, skill.Name, skill.Description,
         skill.Instructions, skill.Source, skill.Status, skill.IsLocked, skill.Version, skill.UseCount,
-        skill.LastUsedAt, skill.CreatedAt, skill.UpdatedAt);
+        skill.LastUsedAt, skill.CreatedAt, skill.UpdatedAt, skill.OutcomeRuns, skill.OutcomeSuccesses);
 }

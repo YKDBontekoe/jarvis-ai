@@ -257,6 +257,24 @@ internal sealed class InMemorySkillRepository : ISkillRepository
         return Task.FromResult<SkillRecord?>(Items[index]);
     }
 
+    public Task AddOutcomesAsync(Guid ownerId, IReadOnlyDictionary<Guid, SkillOutcomeDelta> deltas,
+        CancellationToken cancellationToken)
+    {
+        foreach (var (id, delta) in deltas)
+        {
+            var index = Items.FindIndex(x => x.Id == id && x.OwnerId == ownerId);
+            if (index >= 0)
+                Items[index] = Items[index] with
+                {
+                    OutcomeRuns = Items[index].OutcomeRuns + delta.Runs,
+                    OutcomeSuccesses = Items[index].OutcomeSuccesses + delta.Successes,
+                    OutcomeCountedAt = delta.CountedThrough
+                };
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task<SkillRecord?> SetStatusAsync(Guid id, Guid ownerId, string status, CancellationToken cancellationToken) =>
         Update(id, skill => skill with { Status = status });
 

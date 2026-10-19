@@ -140,21 +140,7 @@ public static class LessonCounterEngine
         IReadOnlyList<LearningSignalRecord> signals, IReadOnlyDictionary<Guid, LessonPayload> inForce, DateTimeOffset now)
     {
         var through = now - LessonRules.CountingDelay;
-        var thumbs = new Dictionary<Guid, string>();
-        foreach (var signal in signals.Where(s => s.MessageId is not null &&
-                                                  s.Kind is LearningSignalKinds.ThumbsDown or LearningSignalKinds.ThumbsUp)
-                     .OrderBy(s => s.CreatedAt))
-            thumbs[signal.MessageId!.Value] = signal.Kind;
-        var regenerated = signals.Where(s => s.Kind == LearningSignalKinds.Regenerate && s.MessageId is not null)
-            .Select(s => s.MessageId!.Value).ToHashSet();
-        var corrected = new HashSet<Guid>();
-        foreach (var correction in signals.Where(s => s.Kind == LearningSignalKinds.Correction))
-        {
-            var reply = traces.Where(trace => trace.ConversationId == correction.ConversationId &&
-                                              trace.CreatedAt <= correction.CreatedAt)
-                .OrderByDescending(trace => trace.CreatedAt).FirstOrDefault();
-            if (reply is not null) corrected.Add(reply.Id);
-        }
+        var feedback = TurnFeedback.From(traces, signals);
 
         var result = new Dictionary<Guid, LessonTally>();
         foreach (var (id, payload) in inForce)
@@ -166,12 +152,8 @@ public static class LessonCounterEngine
                 if (lastInjected is null || trace.CreatedAt > lastInjected) lastInjected = trace.CreatedAt;
                 if (trace.CreatedAt > through || trace.CreatedAt <= (payload.CountedThrough ?? DateTimeOffset.MinValue))
                     continue;
-                var messageId = trace.MessageId;
-                var thumb = messageId is { } m && thumbs.TryGetValue(m, out var kind) ? kind : null;
-                var bad = thumb == LearningSignalKinds.ThumbsDown || corrected.Contains(trace.Id) ||
-                          (messageId is { } r && regenerated.Contains(r));
-                if (bad) harmful++;
-                else if (thumb == LearningSignalKinds.ThumbsUp) helpful++;
+                if (feedback.Bad.Contains(trace.Id)) harmful++;
+                else if (feedback.Good.Contains(trace.Id)) helpful++;
             }
 
             result[id] = new LessonTally(helpful, harmful, lastInjected, through);

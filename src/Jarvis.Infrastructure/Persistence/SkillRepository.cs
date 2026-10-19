@@ -18,9 +18,12 @@ public sealed class SkillEntity
     public DateTimeOffset? LastUsedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    public int OutcomeRuns { get; set; }
+    public int OutcomeSuccesses { get; set; }
+    public DateTimeOffset? OutcomeCountedAt { get; set; }
 
     public SkillRecord ToRecord() => new(Id, OwnerId, Name, Description, Instructions, Source, Status, IsLocked,
-        Version, UseCount, LastUsedAt, CreatedAt, UpdatedAt);
+        Version, UseCount, LastUsedAt, CreatedAt, UpdatedAt, OutcomeRuns, OutcomeSuccesses, OutcomeCountedAt);
 }
 
 public sealed class SkillRevisionEntity
@@ -99,6 +102,10 @@ public sealed class SkillRepository(JarvisDbContext db) : ISkillRepository
         existing.Description = draft.Description;
         existing.Instructions = draft.Instructions;
         existing.Version++;
+        // The counts describe how the previous text did; the new version starts from nothing.
+        existing.OutcomeRuns = 0;
+        existing.OutcomeSuccesses = 0;
+        existing.OutcomeCountedAt = now;
         existing.UpdatedAt = now;
         if (source == SkillSources.User) existing.IsLocked = true;
         db.SkillRevisions.Add(new SkillRevisionEntity
@@ -142,4 +149,15 @@ public sealed class SkillRepository(JarvisDbContext db) : ISkillRepository
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(x => x.UseCount, x => x.UseCount + 1)
                 .SetProperty(x => x.LastUsedAt, DateTimeOffset.UtcNow), cancellationToken);
+
+    public async Task AddOutcomesAsync(Guid ownerId, IReadOnlyDictionary<Guid, SkillOutcomeDelta> deltas,
+        CancellationToken cancellationToken)
+    {
+        foreach (var (id, delta) in deltas)
+            await db.Skills.Where(x => x.Id == id && x.OwnerId == ownerId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.OutcomeRuns, x => x.OutcomeRuns + delta.Runs)
+                    .SetProperty(x => x.OutcomeSuccesses, x => x.OutcomeSuccesses + delta.Successes)
+                    .SetProperty(x => x.OutcomeCountedAt, delta.CountedThrough), cancellationToken);
+    }
 }
