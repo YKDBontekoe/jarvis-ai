@@ -293,6 +293,55 @@ public static class AgentSessionJson
         }
     }
 
+    /// <summary>
+    /// Every approval request in the stored history that never got an answer. The agent framework refuses to run
+    /// while any request is unanswered, so a resume has to answer the leftovers as well as the one just decided.
+    /// </summary>
+    public static IReadOnlyList<AgentToolApprovalRequest> GetUnansweredApprovals(string sessionJson)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(sessionJson);
+            if (!TryFindMessages(document.RootElement, out var messages)) return [];
+
+            var requests = new List<AgentToolApprovalRequest>();
+            var answeredRequests = new HashSet<string>(StringComparer.Ordinal);
+            var answeredCalls = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var message in messages.EnumerateArray())
+            {
+                if (!message.TryGetProperty("contents", out var contents) || contents.ValueKind != JsonValueKind.Array)
+                    continue;
+                foreach (var content in contents.EnumerateArray())
+                {
+                    var type = content.TryGetProperty("$type", out var typeElement) ? typeElement.GetString() : null;
+                    if (type is "functionApprovalRequest" or "toolApprovalRequest")
+                    {
+                        if (TryReadApproval(content, out var request)) requests.Add(request);
+                    }
+                    else if (type is "toolApproval" or "functionApproval"
+                             or "toolApprovalResponse" or "functionApprovalResponse")
+                    {
+                        if ((ReadString(content, "id") ?? ReadString(content, "requestId")) is { } id)
+                            answeredRequests.Add(id);
+                    }
+                    else if (type is "functionCall" or "functionResult" && ReadString(content, "callId") is { } callId)
+                    {
+                        answeredCalls.Add(callId);
+                    }
+                }
+            }
+
+            return requests
+                .Where(request => !answeredRequests.Contains(request.RequestId) &&
+                                  !answeredCalls.Contains(request.ToolCallId))
+                .ToArray();
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
     public static bool HasAnsweredApproval(string sessionJson, string requestId, string toolCallId)
     {
         if (string.IsNullOrEmpty(requestId) && string.IsNullOrEmpty(toolCallId)) return false;

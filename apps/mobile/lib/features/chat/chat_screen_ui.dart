@@ -567,26 +567,34 @@ mixin _ChatScreenUi on _ChatScreenController {
                                     24,
                                   ),
                                   itemCount: _entries.length,
-                                  itemBuilder: (context, index) => Align(
-                                    alignment: Alignment.topCenter,
-                                    child: ConstrainedBox(
-                                      constraints: const BoxConstraints(
-                                        maxWidth: 760,
-                                      ),
-                                      child: SizedBox(
-                                        width: double.infinity,
-                                        child: FadeSlideIn(
-                                          animate: index >= _settledEntries,
-                                          offset: 14,
-                                          scale: .94,
-                                          alignment: _entryOrigin(
-                                            _entries[index],
+                                  // The transcript can shrink between this build and layout (a sign-out or a
+                                  // conversation switch clears it), so a stale index must not read past the end.
+                                  itemBuilder: (context, index) =>
+                                      index >= _entries.length
+                                      ? const SizedBox.shrink()
+                                      : Align(
+                                          alignment: Alignment.topCenter,
+                                          child: ConstrainedBox(
+                                            constraints: const BoxConstraints(
+                                              maxWidth: 760,
+                                            ),
+                                            child: SizedBox(
+                                              width: double.infinity,
+                                              child: FadeSlideIn(
+                                                animate:
+                                                    index >= _settledEntries,
+                                                offset: 14,
+                                                scale: .94,
+                                                alignment: _entryOrigin(
+                                                  _entries[index],
+                                                ),
+                                                child: _entryView(
+                                                  _entries[index],
+                                                ),
+                                              ),
+                                            ),
                                           ),
-                                          child: _entryView(_entries[index]),
                                         ),
-                                      ),
-                                    ),
-                                  ),
                                 ),
                               ),
                             ),

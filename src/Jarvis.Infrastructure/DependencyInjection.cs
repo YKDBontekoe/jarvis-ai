@@ -101,7 +101,8 @@ public static class DependencyInjection
         services.AddScoped<ICustomMcpServerStore, CustomMcpServerStore>();
         services.AddHttpClient<IMcpCatalog, Jarvis.Infrastructure.Integrations.OfficialMcpRegistryCatalog>(client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(12);
+            // The registry answers searches in anywhere from half a second to over twenty.
+            client.Timeout = TimeSpan.FromSeconds(35);
             client.MaxResponseContentBufferSize = 4 * 1024 * 1024;
             client.DefaultRequestHeaders.UserAgent.ParseAdd("jarvis-mcp-catalog/1.0");
         });

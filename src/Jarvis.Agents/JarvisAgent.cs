@@ -51,21 +51,31 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
     {
         var agent = await GetAgentAsync(conversationId, cancellationToken);
         var sessionJson = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
-        ChatMessage[] input;
-        if (sessionJson is not null &&
-            AgentSessionJson.HasAnsweredApproval(sessionJson, approval.RequestId, approval.ToolCallId))
-        {
-            input = [];
-        }
-        else
+        List<AIContent> responses = [];
+        if (sessionJson is null ||
+            !AgentSessionJson.HasAnsweredApproval(sessionJson, approval.RequestId, approval.ToolCallId))
         {
             var arguments = ToolCallArguments.Parse(approval.ArgumentsJson);
             var functionCall = new FunctionCallContent(approval.ToolCallId, approval.ToolName, arguments);
             var approvalRequest = new ToolApprovalRequestContent(approval.RequestId, functionCall);
-            var response = approvalRequest.CreateResponse(approval.Approved,
-                approval.Approved ? null : "The user rejected this tool call.");
-            input = [new ChatMessage(ChatRole.User, [response])];
+            responses.Add(approvalRequest.CreateResponse(approval.Approved,
+                approval.Approved ? null : "The user rejected this tool call."));
         }
+
+        // The framework will not run while any earlier request in the history is unanswered. One that is still
+        // open here was left behind by an abandoned turn, so close it as declined instead of failing the resume.
+        if (sessionJson is not null)
+        {
+            foreach (var stale in AgentSessionJson.GetUnansweredApprovals(sessionJson)
+                         .Where(request => request.RequestId != approval.RequestId))
+            {
+                var staleCall = new FunctionCallContent(stale.ToolCallId, stale.ToolName,
+                    ToolCallArguments.Parse(stale.ArgumentsJson));
+                responses.Add(new ToolApprovalRequestContent(stale.RequestId, staleCall)
+                    .CreateResponse(false, "This tool call was never answered and was skipped."));
+            }
+        }
+        ChatMessage[] input = responses.Count == 0 ? [] : [new ChatMessage(ChatRole.User, responses)];
 
         var session = await LoadSessionAsync(agent, conversationId, cancellationToken);
         await foreach (var update in RunAndSaveAsync(agent, conversationId, input, session, cancellationToken))
