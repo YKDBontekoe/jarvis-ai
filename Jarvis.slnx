@@ -24,6 +24,7 @@
   <Folder Name="/tests/eval/">
     <Project Path="tests/eval/Jarvis.CompactionEval/Jarvis.CompactionEval.csproj" />
     <Project Path="tests/eval/Jarvis.DreamingEval/Jarvis.DreamingEval.csproj" />
+    <Project Path="tests/eval/Jarvis.LessonEval/Jarvis.LessonEval.csproj" />
     <Project Path="tests/eval/Jarvis.ExtractionEval/Jarvis.ExtractionEval.csproj" />
     <Project Path="tests/eval/Jarvis.FileEval/Jarvis.FileEval.csproj" />
     <Project Path="tests/eval/Jarvis.GraphEval/Jarvis.GraphEval.csproj" />

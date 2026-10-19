@@ -18,9 +18,14 @@ internal sealed class TurnTraceConfiguration : IEntityTypeConfiguration<TurnTrac
         builder.Property(x => x.MemoryIdsJson).HasColumnName("memory_ids_json").HasColumnType("jsonb").IsRequired();
         builder.Property(x => x.SkillsJson).HasColumnName("skills_json").HasColumnType("jsonb").IsRequired();
         builder.Property(x => x.ToolsJson).HasColumnName("tools_json").HasColumnType("jsonb").IsRequired();
+        builder.Property(x => x.LessonIdsJson).HasColumnName("lesson_ids_json").HasColumnType("jsonb").HasDefaultValue("[]").IsRequired();
         builder.Property(x => x.TotalMs).HasColumnName("total_ms");
         builder.Property(x => x.Outcome).HasColumnName("outcome").HasMaxLength(30).IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");
+        builder.Property(x => x.ModelCalls).HasColumnName("model_calls");
+        builder.Property(x => x.InputTokens).HasColumnName("input_tokens");
+        builder.Property(x => x.CachedInputTokens).HasColumnName("cached_input_tokens");
+        builder.Property(x => x.OutputTokens).HasColumnName("output_tokens");
         builder.HasIndex(x => new { x.OwnerId, x.CreatedAt });
         builder.HasIndex(x => new { x.OwnerId, x.MessageId });
     }

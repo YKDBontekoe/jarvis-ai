@@ -27,6 +27,11 @@ dotnet run --project tests/eval/Jarvis.ExtractionEval -- --case expire-car
 
 `EXTRACTION_EVAL_BASE_URL` points it at any other OpenAI-compatible endpoint, such as a local model server.
 
+The run ends with a gate and exits 1 unless at least `--min-pass` (default 0.95) of the cases pass with at most
+`--max-harmful` (0) harmful writes and `--max-forbidden` (0) stored relative dates; a single `--case` is not gated. The
+defaults are the recorded baseline below, so a model that scores lower needs a lower `--min-pass`. The nightly
+[Learning evals](../../../.github/workflows/learning-evals.yml) workflow runs it.
+
 `--codex` runs extraction through Jarvis's own Codex app-server client instead, the default production path. It uses the
 ChatGPT account signed in under `CODEX_HOME` (`codex login --device-auth`), the account's default model unless
 `EXTRACTION_EVAL_MODEL` names one, and `EXTRACTION_EVAL_CODEX` as the executable (default `codex`):

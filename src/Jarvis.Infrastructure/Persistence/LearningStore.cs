@@ -32,14 +32,23 @@ public sealed class TurnTraceEntity
     public string MemoryIdsJson { get; set; } = "[]";
     public string SkillsJson { get; set; } = "[]";
     public string ToolsJson { get; set; } = "[]";
+    public string LessonIdsJson { get; set; } = "[]";
     public int TotalMs { get; set; }
     public string Outcome { get; set; } = "completed";
     public DateTimeOffset CreatedAt { get; set; }
 
+    /// <summary>Null for rows written before usage was kept, or for runs that made no counted model call.</summary>
+    public int? ModelCalls { get; set; }
+    public long? InputTokens { get; set; }
+    public long? CachedInputTokens { get; set; }
+    public long? OutputTokens { get; set; }
+
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     public TurnTraceRecord ToRecord() => new(Id, OwnerId, ConversationId, MessageId, ProfileId, Kind,
-        Read<Guid>(MemoryIdsJson), Read<string>(SkillsJson), Read<TurnToolCall>(ToolsJson), TotalMs, Outcome, CreatedAt);
+        Read<Guid>(MemoryIdsJson), Read<string>(SkillsJson), Read<TurnToolCall>(ToolsJson), TotalMs, Outcome, CreatedAt,
+        ModelCalls is { } calls ? new TurnUsage(calls, InputTokens ?? 0, CachedInputTokens ?? 0, OutputTokens ?? 0) : null,
+        Read<Guid>(LessonIdsJson));
 
     public static string Write<T>(IReadOnlyList<T> items) => JsonSerializer.Serialize(items, Json);
 
@@ -76,7 +85,12 @@ public sealed class LearningStore(JarvisDbContext db) : ILearningStore
             SkillsJson = TurnTraceEntity.Write(trace.Skills.Select(name => Limit(name, 64)!).ToArray()),
             ToolsJson = TurnTraceEntity.Write(trace.Tools.Take(MaxToolsPerTrace)
                 .Select(call => call with { Tool = Limit(call.Tool, 120)! }).ToArray()),
-            TotalMs = Math.Max(0, trace.TotalMs), Outcome = trace.Outcome, CreatedAt = trace.CreatedAt
+            LessonIdsJson = TurnTraceEntity.Write(trace.LessonIds),
+            TotalMs = Math.Max(0, trace.TotalMs), Outcome = trace.Outcome, CreatedAt = trace.CreatedAt,
+            ModelCalls = trace.Usage is { ModelCalls: > 0 } usage ? usage.ModelCalls : null,
+            InputTokens = trace.Usage is { ModelCalls: > 0 } ? trace.Usage.InputTokens : null,
+            CachedInputTokens = trace.Usage is { ModelCalls: > 0 } ? trace.Usage.CachedInputTokens : null,
+            OutputTokens = trace.Usage is { ModelCalls: > 0 } ? trace.Usage.OutputTokens : null
         });
         await db.SaveChangesAsync(cancellationToken);
     }

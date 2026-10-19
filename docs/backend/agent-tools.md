@@ -35,6 +35,12 @@ Every tool stays registered and callable, but the model is not shown all of them
 
 The full name list goes along in `ChatOptions.AdditionalProperties["jarvis_callable_tools"]`, so a call to a tool that exists but was not shown is still valid: it runs through normal function invocation (with its approval) and its group is shown from the next step on. Groups are worked out from the conversation messages, so nothing extra is stored. A plain turn shows about a third of the tool schema text. `jarvis.agent.tools.offered` and `jarvis.agent.tools.deferred` (meter `Jarvis.ToolGroups`) record the counts per call. Turn it off with `Jarvis__ToolGroups__Enabled=false`. Voice (`CollectFunctions`) still gets every tool.
 
+Context blocks that context providers inject are User-role messages too, but they are not the user's words: `ToolGroups.IsInjectedContext` (source `AIContextProvider`) keeps them out of keyword matching and the three-message window, and the chat-history provider (`JarvisAgentFactory.CreateHistoryProvider`) does not store them, so each turn rebuilds them fresh instead of replaying old copies. Replayed history is stamped differently and still counts.
+
+**Guidance gating.** Contributors that only add feature guidance (money, journal, inbox, library, planner, whatsapp, timeline, missions) implement `IGroupedContextContributor`. The factory wraps their providers in `ToolGroupGatedContextProvider`, which runs them only while the group is active by the rule above over the stored history plus the new request, so that text is not sent on turns that do not use the feature.
+
+**Limits on tool use** (`ToolFailureFeedback`): a result over `Jarvis:Agent:MaxToolResultChars` (default 16000) is cut to its head and tail with a `[truncated N characters]` marker, which also covers direct MCP tools that cap nothing themselves. The same tool with the same arguments may run twice in one turn (counted since the user's latest message); the third call is refused with a message telling the model to reuse the earlier result or change approach, and shows up as an input failure in the trace. `Jarvis:Agent:MaxToolIterations` (default 24) bounds the model-call loop in one run.
+
 When you add a tool that only matters for one feature, add its name to the right group (or a new group with keywords). `ToolGroupTests` checks that every listed name is a real tool.
 
 ## Core tool catalog

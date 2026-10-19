@@ -7,7 +7,7 @@ using Jarvis.Application.Skills;
 namespace Jarvis.Application.Improvements;
 
 /// <summary>How many proposals one mining pass added.</summary>
-public sealed record MiningResult(int Skills, int Reviews);
+public sealed record MiningResult(int Skills, int Reviews, int Lessons = 0, int Refinements = 0);
 
 /// <summary>Drafts the instructions of a skill from a tool sequence Jarvis keeps repeating. Returns null if nothing usable.</summary>
 public interface ISkillDrafter
@@ -29,7 +29,9 @@ public sealed class ImprovementMiner(
     IMemoryService memories,
     ISkillDrafter drafter,
     IOwnerSettingsStore settings,
-    TimeProvider? timeProvider = null) : IImprovementMiner
+    TimeProvider? timeProvider = null,
+    ILessonDrafter? lessonDrafter = null,
+    ISkillRefiner? skillRefiner = null) : IImprovementMiner
 {
     /// <summary>Each draft is a model call, so a night drafts at most this many.</summary>
     public const int MaxDraftsPerRun = 2;
@@ -48,8 +50,100 @@ public sealed class ImprovementMiner(
         var since = now.AddDays(-SkillMinerEngine.WindowDays);
         var traces = await learning.ListTracesAsync(ownerId, since, MaxTraces, cancellationToken);
         var signals = await learning.ListSignalsAsync(ownerId, since, cancellationToken);
+        // Count last night's lessons first, so one that hurt is out of force before new ones are weighed against it.
+        await CountLessonsAsync(ownerId, traces, signals, now, cancellationToken);
+        await CountSkillOutcomesAsync(ownerId, traces, signals, now, cancellationToken);
         var added = new MiningResult(await MineSkillsAsync(ownerId, traces, now, cancellationToken),
-            await MineReviewsAsync(ownerId, traces, signals, now, since, cancellationToken));
+            await MineReviewsAsync(ownerId, traces, signals, now, since, cancellationToken),
+            await MineLessonsAsync(ownerId, traces, signals, now, owner.AutoApplyLowRiskMemory, cancellationToken),
+            await MineRefinementsAsync(ownerId, traces, signals, cancellationToken));
+        return added;
+    }
+
+    /// <summary>Adds last night's runs and how they went to each skill's current version.</summary>
+    private async Task CountSkillOutcomesAsync(Guid ownerId, IReadOnlyList<TurnTraceRecord> traces,
+        IReadOnlyList<LearningSignalRecord> signals, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var deltas = SkillOutcomeEngine.Tally(traces, signals, await skills.ListAsync(ownerId, cancellationToken), now);
+        if (deltas.Count > 0) await skills.AddOutcomesAsync(ownerId, deltas, cancellationToken);
+    }
+
+    /// <summary>Offers a redraft of each skill whose runs mostly go badly. Never applied without the owner.</summary>
+    private async Task<int> MineRefinementsAsync(Guid ownerId, IReadOnlyList<TurnTraceRecord> traces,
+        IReadOnlyList<LearningSignalRecord> signals, CancellationToken cancellationToken)
+    {
+        if (skillRefiner is null) return 0;
+        var candidates = new List<ProposalCandidate>();
+        var drafts = 0;
+        // Counts were just brought up to date, so read the skills again.
+        foreach (var skill in SkillRefineEngine.Candidates(await skills.ListAsync(ownerId, cancellationToken)))
+        {
+            var fingerprint = SkillRefineRules.Fingerprint(skill);
+            var evidence = SkillRefineEngine.Collect(skill, traces, signals);
+            var summary = $"“{skill.Name}” went well {skill.OutcomeSuccesses} of {skill.OutcomeRuns} times since it last changed." +
+                          (evidence.FailedTools.Count == 0
+                              ? string.Empty
+                              : $" Tools that failed in it: {string.Join(", ", evidence.FailedTools.Select(tool => $"{tool.Key} ×{tool.Value}"))}.");
+            var confidence = Math.Min(0.9, 0.5 + 0.05 * skill.OutcomeRuns);
+            var existing = await repository.FindByFingerprintAsync(ownerId, fingerprint, cancellationToken);
+            if (existing is not null)
+            {
+                // Already offered (or decided): carry the saved draft so a pending row keeps following the data.
+                candidates.Add(new ProposalCandidate(ImprovementKinds.SkillRefine, fingerprint, existing.Title, summary,
+                    confidence, existing.PayloadJson));
+                continue;
+            }
+
+            if (drafts >= SkillRefineRules.MaxDraftsPerRun) continue;
+            drafts++;
+            var draft = await skillRefiner.RefineAsync(ownerId, skill, evidence, cancellationToken);
+            if (draft is null) continue;
+            candidates.Add(new ProposalCandidate(ImprovementKinds.SkillRefine, fingerprint,
+                $"Improve “{skill.Name}”", summary, confidence,
+                JsonSerializer.Serialize(new SkillRefinePayload(skill.Name, draft.Description, draft.Instructions,
+                    skill.Version), JsonOptions)));
+        }
+
+        return await improvements.SyncAsync(ownerId, SkillRefineRules.FingerprintPrefix, candidates, cancellationToken);
+    }
+
+    private async Task CountLessonsAsync(Guid ownerId, IReadOnlyList<TurnTraceRecord> traces,
+        IReadOnlyList<LearningSignalRecord> signals, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var inForce = await improvements.LessonsInForceAsync(ownerId, cancellationToken);
+        if (inForce.Count == 0) return;
+        var tallies = LessonCounterEngine.Tally(traces, signals,
+            inForce.ToDictionary(lesson => lesson.ProposalId, lesson => lesson.Payload), now);
+        await improvements.ApplyLessonTalliesAsync(ownerId, tallies, now, cancellationToken);
+    }
+
+    private async Task<int> MineLessonsAsync(Guid ownerId, IReadOnlyList<TurnTraceRecord> traces,
+        IReadOnlyList<LearningSignalRecord> signals, DateTimeOffset now, bool autoApply,
+        CancellationToken cancellationToken)
+    {
+        if (lessonDrafter is null) return 0;
+        var inForce = await improvements.LessonsInForceAsync(ownerId, cancellationToken);
+        if (inForce.Count >= LessonRules.MaxInForce) return 0;
+        var covered = inForce.SelectMany(lesson => lesson.Payload.Tools).ToHashSet(StringComparer.Ordinal);
+        var added = 0;
+        var drafts = 0;
+        foreach (var finding in LessonMinerEngine.Mine(traces, signals, now))
+        {
+            if (covered.Contains(finding.Tool)) continue;
+            var fingerprint = LessonRules.Fingerprint(finding.Tool, now);
+            if (await repository.FindByFingerprintAsync(ownerId, fingerprint, cancellationToken) is not null) continue;
+            if (drafts >= LessonRules.MaxDraftsPerRun) break;
+            drafts++;
+            var text = await lessonDrafter.DraftAsync(ownerId, finding, cancellationToken);
+            if (string.IsNullOrWhiteSpace(text)) continue;
+            var evidence = $"{finding.Tool} was part of {finding.Incidents} turns in the last {LessonRules.WindowDays} " +
+                           $"days that went wrong ({string.Join(", ", finding.Reasons.Select(reason => reason.Replace('_', ' ')))}).";
+            var candidate = new ProposalCandidate(ImprovementKinds.Lesson, fingerprint, $"Lesson: {text}", evidence,
+                LessonMinerEngine.Confidence(finding),
+                JsonSerializer.Serialize(new LessonPayload(text, [finding.Tool]), JsonOptions));
+            if (await improvements.ProposeLessonAsync(ownerId, candidate, autoApply, cancellationToken)) added++;
+        }
+
         return added;
     }
 

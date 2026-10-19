@@ -17,6 +17,7 @@ const CONTEXT_PREFIXES = [
   'Active condition watches',
   'An unrelated task',
   'Available skills',
+  'Lessons from your own earlier mistakes',
   'Learned persona',
   'Knowledge graph',
   'Connected devices',
@@ -117,6 +118,21 @@ function plan(prompt) {
     return text(JSON.stringify(extractGraph(parseConversation(prompt).request)));
   if (prompt.includes('You are Jarvis reflecting on recent work with your user'))
     return text(JSON.stringify(reflect(parseConversation(prompt).request)));
+
+  if (prompt.includes('You improve a reusable skill for the Jarvis assistant')) {
+    let skill = {};
+    try { skill = JSON.parse(parseConversation(prompt).request); } catch { /* keep an empty skill */ }
+    return text(JSON.stringify({
+      description: skill.description ?? 'Use when this skill applies.',
+      instructions: `1. Check the inputs first.\n2. ${String(skill.instructions ?? 'Do the task').replace(/^1\.\s*/, '')}`,
+    }));
+  }
+
+  if (prompt.includes('You write one short lesson for the Jarvis assistant')) {
+    let tool = 'the tool';
+    try { tool = JSON.parse(parseConversation(prompt).request).tool ?? tool; } catch { /* keep the generic name */ }
+    return text(JSON.stringify({ lesson: `Check the inputs before calling ${tool}, and try a narrower call first.` }));
+  }
 
   const conversation = parseConversation(prompt);
   const tools = new Set([...prompt.matchAll(/^- ([A-Za-z_]+): /gm)].map(match => match[1]));
@@ -277,7 +293,8 @@ function plan(prompt) {
 }
 
 function parseConversation(prompt) {
-  const body = prompt.split('\nConversation:\n')[1]?.split('\nReturn only the JSON object')[0] ?? '';
+  const body = (prompt.split('\nConversation:\n')[1] ?? '').split('\nAvailable Jarvis functions')[0]
+    .split('\nReturn only the JSON object')[0];
   const blocks = [];
   for (const part of body.split(/\n\[(user|assistant|tool|system)\]\n/).slice(1).entries()) blocks.push(part[1]);
   const messages = [];

@@ -233,8 +233,20 @@ internal sealed class InMemorySkillRepository : ISkillRepository
     public Task<SkillRecord?> FindByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken) =>
         Task.FromResult(Items.FirstOrDefault(x => x.OwnerId == ownerId && x.Name == name));
 
+    private readonly Dictionary<Guid, List<SkillRevisionRecord>> _revisions = [];
+
     public Task<IReadOnlyList<SkillRevisionRecord>> ListRevisionsAsync(Guid id, Guid ownerId,
-        CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SkillRevisionRecord>>([]);
+        CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SkillRevisionRecord>>(
+        Items.Any(item => item.Id == id && item.OwnerId == ownerId) && _revisions.TryGetValue(id, out var list)
+            ? [.. list.OrderByDescending(revision => revision.Version)]
+            : []);
+
+    private void Remember(SkillRecord skill, string source, string? note)
+    {
+        if (!_revisions.TryGetValue(skill.Id, out var list)) _revisions[skill.Id] = list = [];
+        list.Add(new SkillRevisionRecord(skill.Version, skill.Description, skill.Instructions, source, note,
+            DateTimeOffset.UtcNow));
+    }
 
     public Task<SkillRecord?> UpsertAsync(Guid ownerId, SkillDraft draft, string source, string statusForNew,
         bool respectLock, string? changeNote, CancellationToken cancellationToken)
@@ -246,15 +258,39 @@ internal sealed class InMemorySkillRepository : ISkillRepository
             var created = new SkillRecord(Guid.NewGuid(), ownerId, draft.Name, draft.Description, draft.Instructions,
                 source, statusForNew, source == SkillSources.User, 1, 0, null, now, now);
             Items.Add(created);
+            Remember(created, source, changeNote);
             return Task.FromResult<SkillRecord?>(created);
         }
         if (respectLock && Items[index].IsLocked) return Task.FromResult<SkillRecord?>(null);
         Items[index] = Items[index] with
         {
             Description = draft.Description, Instructions = draft.Instructions, Version = Items[index].Version + 1,
-            UpdatedAt = now
+            UpdatedAt = now, OutcomeRuns = 0, OutcomeSuccesses = 0, OutcomeCountedAt = now,
+            Status = source == SkillSources.Learned && statusForNew != SkillStatuses.Active &&
+                     Items[index].Status == SkillStatuses.Active
+                ? SkillStatuses.Proposed
+                : Items[index].Status
         };
+        Remember(Items[index], source, changeNote);
         return Task.FromResult<SkillRecord?>(Items[index]);
+    }
+
+    public Task AddOutcomesAsync(Guid ownerId, IReadOnlyDictionary<Guid, SkillOutcomeDelta> deltas,
+        CancellationToken cancellationToken)
+    {
+        foreach (var (id, delta) in deltas)
+        {
+            var index = Items.FindIndex(x => x.Id == id && x.OwnerId == ownerId);
+            if (index >= 0)
+                Items[index] = Items[index] with
+                {
+                    OutcomeRuns = Items[index].OutcomeRuns + delta.Runs,
+                    OutcomeSuccesses = Items[index].OutcomeSuccesses + delta.Successes,
+                    OutcomeCountedAt = delta.CountedThrough
+                };
+        }
+
+        return Task.CompletedTask;
     }
 
     public Task<SkillRecord?> SetStatusAsync(Guid id, Guid ownerId, string status, CancellationToken cancellationToken) =>

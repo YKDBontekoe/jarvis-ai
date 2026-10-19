@@ -9,8 +9,10 @@ public static class ImprovementKinds
     public const string Memory = "memory";
     public const string Skill = "skill";
     public const string Review = "review";
+    public const string Lesson = "lesson";
+    public const string SkillRefine = "skill_refine";
 
-    public static bool IsValid(string? kind) => kind is Memory or Skill or Review;
+    public static bool IsValid(string? kind) => kind is Memory or Skill or Review or Lesson or SkillRefine;
 }
 
 /// <summary>
@@ -80,6 +82,17 @@ public sealed record SkillPayload(string Name, string Description, string Instru
 /// </summary>
 public sealed record ReviewPayload(string Action, string? Target);
 
+/// <summary>
+/// A short instruction Jarvis wrote for itself after a tool kept going wrong. It is in force while its proposal is
+/// accepted or applied. <see cref="Helpful"/> and <see cref="Harmful"/> count the rated turns it was shown in;
+/// <see cref="CountedThrough"/> marks the last trace already counted so a night never counts a turn twice.
+/// </summary>
+public sealed record LessonPayload(string Text, IReadOnlyList<string> Tools, int Helpful = 0, int Harmful = 0,
+    DateTimeOffset? LastInjectedAt = null, DateTimeOffset? CountedThrough = null);
+
+/// <summary>A lesson that is in force, with the proposal row that carries it.</summary>
+public sealed record LessonEntry(Guid ProposalId, LessonPayload Payload, DateTimeOffset CreatedAt);
+
 public static class ReviewActions
 {
     public const string DisableSkill = "disable_skill";
@@ -140,6 +153,23 @@ public interface IImprovementService
     /// </summary>
     Task<MemoryOutcome> SaveOrProposeMemoryAsync(Guid ownerId, MemoryCandidate candidate, bool autoApply,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Files a drafted lesson: in force at once when <paramref name="autoApply"/> is on and it is confident enough,
+    /// otherwise waiting for the owner. Returns false when the owner already decided on this fingerprint or there is no room.
+    /// </summary>
+    Task<bool> ProposeLessonAsync(Guid ownerId, ProposalCandidate candidate, bool autoApply,
+        CancellationToken cancellationToken);
+
+    /// <summary>The lessons currently in force for this owner.</summary>
+    Task<IReadOnlyList<LessonEntry>> LessonsInForceAsync(Guid ownerId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Adds the night's helpful and harmful counts to the lessons, turns off one that hurt more than it helped, and
+    /// retires one that has not been shown for a long time. Returns how many lessons were switched off.
+    /// </summary>
+    Task<int> ApplyLessonTalliesAsync(Guid ownerId, IReadOnlyDictionary<Guid, LessonTally> tallies,
+        DateTimeOffset now, CancellationToken cancellationToken);
 
     Task<ImprovementView?> AcceptAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
     Task<bool> DismissAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);

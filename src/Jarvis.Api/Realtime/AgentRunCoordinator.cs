@@ -180,7 +180,7 @@ public sealed class AgentRunCoordinator(
             var (memories, skills) = turnTrace.Snapshot();
             learning.RecordTrace(ownerId, new TurnTraceDraft(conversationId, trace.MessageId,
                 taskId is null ? TurnKinds.Interactive : TurnKinds.Task, memories, skills, trace.Tools,
-                (int)Math.Min(int.MaxValue, elapsed.TotalMilliseconds), outcome));
+                (int)Math.Min(int.MaxValue, elapsed.TotalMilliseconds), outcome, turnTrace.Usage(), turnTrace.Lessons()));
         }
     }
 

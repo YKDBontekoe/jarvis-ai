@@ -23,13 +23,15 @@ internal sealed class JournalToolContributor(IJournalService journal, IDailyBrie
 }
 
 /// <summary>Tells the agent how to help the user journal, without loading entries into every turn.</summary>
-internal sealed class JournalContextContributor : IAgentContextContributor
+internal sealed class JournalContextContributor : IGroupedContextContributor
 {
     internal const string Guidance = """
         Journaling: the user keeps a private journal in Jarvis. When they ask to journal, or talk through their day, listen and ask one gentle follow-up at a time (highlights, what was hard, what they are grateful for), then offer to save it with SaveJournalEntry. Ask for a 1-5 mood, energy, or stress rating or a 1-10 day rating only if they want to give one; never invent ratings. Saved entries are part of memory, so use SearchMemory to recall what they wrote before. Do not give unsolicited advice about entries.
         """;
 
     public int Order => 45;
+
+    public string ToolGroupId => "journal";
 
     public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
         context.IsBackgroundTask ? [] : [new JournalGuidanceProvider(Guidance)];

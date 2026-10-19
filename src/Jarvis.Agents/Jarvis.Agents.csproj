@@ -13,5 +13,6 @@
     <InternalsVisibleTo Include="Jarvis.ExtractionEval" />
     <InternalsVisibleTo Include="Jarvis.CompactionEval" />
     <InternalsVisibleTo Include="Jarvis.DreamingEval" />
+    <InternalsVisibleTo Include="Jarvis.LessonEval" />
   </ItemGroup>
 </Project>

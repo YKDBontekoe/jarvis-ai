@@ -155,15 +155,6 @@ public sealed partial class CodexCliChatClient
             prompt.AppendLine("\nSystem instructions:");
             prompt.AppendLine(options.Instructions);
         }
-        if (tools.Count > 0)
-        {
-            prompt.AppendLine("\nAvailable Jarvis functions (Jarvis validates and executes these; do not claim execution):");
-            foreach (var tool in tools)
-            {
-                prompt.Append("- ").Append(tool.Name).Append(": ").AppendLine(tool.Description ?? string.Empty);
-                prompt.Append("  Input JSON Schema: ").AppendLine(tool.JsonSchema.GetRawText());
-            }
-        }
         prompt.AppendLine("\nConversation:");
         var toolNamesByCallId = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var message in messages)
@@ -206,6 +197,17 @@ public sealed partial class CodexCliChatClient
                     prompt.Append(content.GetType().Name).Append(": ").AppendLine(JsonSerializer.Serialize(content, PromptJsonOptions));
                 if (prompt.Length > MaxPromptLength)
                     throw new InvalidOperationException("The conversation context exceeds the Codex CLI request size limit.");
+            }
+        }
+        // Tool schemas come after the conversation: the instructions and history form a prefix that only grows, so a
+        // change in the offered groups (LoadTools, a deferred tool being called) invalidates just this tail.
+        if (tools.Count > 0)
+        {
+            prompt.AppendLine("\nAvailable Jarvis functions (Jarvis validates and executes these; do not claim execution):");
+            foreach (var tool in tools)
+            {
+                prompt.Append("- ").Append(tool.Name).Append(": ").AppendLine(tool.Description ?? string.Empty);
+                prompt.Append("  Input JSON Schema: ").AppendLine(tool.JsonSchema.GetRawText());
             }
         }
         prompt.AppendLine("\nReturn only the JSON object required by the output schema.");

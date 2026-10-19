@@ -18,7 +18,8 @@ using OpenAI;
 // every memory of the case, so this measures the extraction decision, not retrieval (Jarvis.MemoryEval covers that).
 //   EXTRACTION_EVAL_API_KEY=... EXTRACTION_EVAL_MODEL=openai/gpt-5-mini dotnet run --project tests/eval/Jarvis.ExtractionEval
 // EXTRACTION_EVAL_BASE_URL defaults to OpenRouter. "--runs N" repeats every case, "--case id" runs one case,
-// "--dry-run" only validates the dataset.
+// "--dry-run" only validates the dataset. The run exits 1 unless "--min-pass" (default 0.95) of the cases pass with at
+// most "--max-harmful" (0) harmful writes and "--max-forbidden" (0) stored relative dates.
 var json = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 var datasetIndex = Array.IndexOf(args, "--dataset");
 var datasetPath = datasetIndex >= 0 ? args[datasetIndex + 1] : Path.Combine(AppContext.BaseDirectory, "dataset.json");
@@ -78,6 +79,15 @@ Console.WriteLine($"Extra writes     {results.Sum(result => result.Extra)}");
 Console.WriteLine($"Harmful writes   {results.Sum(result => result.Harmful)}  (replaced or ended a memory the case did not expect)");
 Console.WriteLine($"Relative dates   {results.Sum(result => result.Forbidden)}  (stored text with a forbidden phrase)");
 Console.WriteLine($"Latency p50      {Percentile(results, 0.5):0.0}s, p95 {Percentile(results, 0.95):0.0}s");
+
+// Thresholds default to the recorded baseline (README): everything passes, nothing harmful, no relative dates.
+// A single "--case" is for debugging and is not gated.
+if (caseIndex < 0 && !EvalGate.Report(Console.Out,
+        EvalGate.AtLeast("cases passed", (double)results.Count(result => result.Passed) / results.Count,
+            EvalGate.Option(args, "--min-pass", 0.95)),
+        EvalGate.AtMost("harmful writes", results.Sum(result => result.Harmful), EvalGate.Option(args, "--max-harmful", 0)),
+        EvalGate.AtMost("relative dates", results.Sum(result => result.Forbidden), EvalGate.Option(args, "--max-forbidden", 0))))
+    Environment.ExitCode = 1;
 
 async Task<IReadOnlyList<Write>> RunCaseAsync(EvalCase item)
 {

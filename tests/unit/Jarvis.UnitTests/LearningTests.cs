@@ -108,6 +108,50 @@ public sealed class LearningTests
     }
 
     [Fact]
+    public async Task Reflection_tells_the_model_how_often_replies_were_corrected_regenerated_or_declined()
+    {
+        var model = new StaticReplyClient("""{"persona":[],"skills":[],"memories":[],"insights":[]}""");
+        var signals = new[]
+        {
+            Signal(LearningSignalKinds.Correction), Signal(LearningSignalKinds.Correction),
+            Signal(LearningSignalKinds.Regenerate), Signal(LearningSignalKinds.ApprovalDenied),
+            Signal(LearningSignalKinds.ThumbsUp)
+        };
+
+        await Reflect(model, signals).ReflectAsync(Owner, new LearningSettings(), Now.AddDays(-1), default);
+
+        using var request = System.Text.Json.JsonDocument.Parse(model.LastRequest!);
+        var counts = request.RootElement.GetProperty("reply_signals");
+        Assert.Equal((2, 1, 1), (counts.GetProperty("corrections").GetInt32(),
+            counts.GetProperty("regenerations").GetInt32(), counts.GetProperty("declined_approvals").GetInt32()));
+    }
+
+    [Fact]
+    public async Task Reflection_leaves_reply_signals_out_when_there_were_none()
+    {
+        var model = new StaticReplyClient("""{"persona":[],"skills":[],"memories":[],"insights":[]}""");
+
+        await Reflect(model, [Signal(LearningSignalKinds.ThumbsUp)])
+            .ReflectAsync(Owner, new LearningSettings(), Now.AddDays(-1), default);
+
+        using var request = System.Text.Json.JsonDocument.Parse(model.LastRequest!);
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, request.RootElement.GetProperty("reply_signals").ValueKind);
+    }
+
+    private static LearningSignalRecord Signal(string kind) =>
+        new(Guid.NewGuid(), Owner, kind, Guid.NewGuid(), null, null, null, null, null, Now.AddHours(-3));
+
+    private static ReflectionService Reflect(StaticReplyClient model, IReadOnlyList<LearningSignalRecord> signals) =>
+        new(TestHistory.Create([new Message(Guid.NewGuid(), "user", "Plan my week please.")]),
+            Fake<IMessageFeedbackRepository>.Create(
+                ("ListUnprocessedAsync", _ => (IReadOnlyList<MessageFeedbackRecord>)[])),
+            new PersonaService(new InMemorySettingsStore()), new InMemorySkillRepository(),
+            Fake<IMemoryService>.Create(("ListAsync", _ => (IReadOnlyList<MemoryRecord>)[])),
+            new RecordingNotifications(), new NullAudit(), new FixedChatClientResolver(model),
+            NullLogger<ReflectionService>.Instance, learning: Fake<ILearningStore>.Create(
+                ("ListSignalsAsync", _ => (IReadOnlyList<LearningSignalRecord>)signals)));
+
+    [Fact]
     public async Task Reflection_skips_the_model_when_nothing_happened()
     {
         var client = new StaticReplyClient("{}");
@@ -211,12 +255,14 @@ public sealed class LearningTests
     private sealed class StaticReplyClient(string reply) : IChatClient
     {
         public int Calls { get; private set; }
+        public string? LastRequest { get; private set; }
         public void Dispose() { }
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             Calls++;
+            LastRequest = messages.LastOrDefault()?.Text;
             return System.Threading.Tasks.Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, reply)));
         }
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,

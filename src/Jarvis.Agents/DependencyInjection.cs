@@ -88,6 +88,9 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Routines.RoutineToolContributor>();
         services.AddScoped<IAgentToolContributor, Improvements.ImprovementToolContributor>();
         services.AddScoped<Jarvis.Application.Improvements.ISkillDrafter, Improvements.ModelSkillDrafter>();
+        services.AddScoped<Jarvis.Application.Improvements.ILessonDrafter, Improvements.ModelLessonDrafter>();
+        services.AddScoped<Jarvis.Application.Improvements.ISkillRefiner, Improvements.ModelSkillRefiner>();
+        services.AddScoped<IAgentContextContributor, Improvements.LessonContextContributor>();
         services.AddScoped<IAgentToolContributor, Decisions.DecisionToolContributor>();
         services.AddScoped<IAgentToolContributor, Projects.ProjectToolContributor>();
         services.AddScoped<IAgentToolContributor, Comparisons.ComparisonToolContributor>();

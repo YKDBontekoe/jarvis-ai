@@ -46,9 +46,13 @@ public sealed class JarvisAgentFactory(
         if (toolGroups)
             tools.Add(ToolGroups.CreateLoadTools(tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal)));
 
+        var history = CreateHistoryProvider();
         List<AIContextProvider> contextProviders = [.. contextContributors
             .OrderBy(contributor => contributor.Order)
-            .SelectMany(contributor => contributor.CreateProviders(context))];
+            .SelectMany(contributor => contributor.CreateProviders(context).Select(provider =>
+                toolGroups && contributor is IGroupedContextContributor grouped
+                    ? new ToolGroupGatedContextProvider(provider, grouped.ToolGroupId, history)
+                    : provider))];
         contextProviders.Add(CreateCompactionProvider(loggerFactory, context.OwnerId));
 
         // Below function invocation: every tool stays callable, the model is shown the groups this turn needs.
@@ -65,11 +69,28 @@ public sealed class JarvisAgentFactory(
                 Tools = tools,
                 AllowMultipleToolCalls = false
             }),
+            ChatHistoryProvider = history,
             AIContextProviders = contextProviders
         }, loggerFactory, services);
-        ToolFailureFeedback.Configure(agent.ChatClient.GetService<FunctionInvokingChatClient>());
+        ToolFailureFeedback.Configure(agent.ChatClient.GetService<FunctionInvokingChatClient>(),
+            configuration.GetValue("Jarvis:Agent:MaxToolResultChars", ToolFailureFeedback.DefaultMaxResultChars),
+            configuration.GetValue("Jarvis:Agent:MaxToolIterations", ToolFailureFeedback.DefaultMaxIterations));
         return agent;
     }
+
+    /// <summary>
+    /// Context blocks are rebuilt every turn; storing them would resend and re-summarize stale copies forever, and
+    /// would make keyword tool selection read them as the user's words on later turns.
+    /// </summary>
+    internal static InMemoryChatHistoryProvider CreateHistoryProvider() =>
+        new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions
+        {
+            StorageInputRequestMessageFilter = messages => messages.Where(IsStoredRequestMessage)
+        });
+
+    /// <summary>True for what the user (or a tool round) sent; false for blocks a context provider injected.</summary>
+    internal static bool IsStoredRequestMessage(ChatMessage message) =>
+        message.GetAgentRequestMessageSourceType() == AgentRequestMessageSourceType.External;
 
     /// <summary>The same Jarvis + MCP functions used in chat, collected for the voice MCP host.</summary>
     public IReadOnlyList<AIFunction> CollectFunctions(IEnumerable<AITool> mcpTools, AgentBuildContext context) =>
