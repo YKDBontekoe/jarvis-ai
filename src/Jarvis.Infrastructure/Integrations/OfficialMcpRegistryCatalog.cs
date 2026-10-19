@@ -85,11 +85,13 @@ public sealed partial class OfficialMcpRegistryCatalog(HttpClient http, IConfigu
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             return await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
         }
-        catch (Exception exception) when (exception is HttpRequestException or JsonException or
-                                              TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested &&
+                                          exception is HttpRequestException or JsonException or TaskCanceledException)
         {
             LogRegistryFailure(logger, exception.GetType().Name);
-            throw new McpCatalogUnavailableException("The app catalog is not answering right now. Try again soon.");
+            throw new McpCatalogUnavailableException(exception is TaskCanceledException
+                ? "The app catalog took too long to answer. Try again soon."
+                : "The app catalog is not answering right now. Try again soon.");
         }
     }
 
@@ -103,7 +105,16 @@ public sealed partial class OfficialMcpRegistryCatalog(HttpClient http, IConfigu
     {
         var now = DateTimeOffset.UtcNow;
         if (Cache.TryGetValue(key, out var cached) && cached.Expires > now) return (T)cached.Value;
-        var value = await load();
+        T value;
+        try
+        {
+            value = await load();
+        }
+        catch (McpCatalogUnavailableException) when (cached.Value is T lastGood)
+        {
+            // Better an older answer than an error while the registry is slow.
+            return lastGood;
+        }
         if (Cache.Count >= MaxCachedResponses)
         {
             foreach (var stale in Cache.Where(pair => pair.Value.Expires <= now).Select(pair => pair.Key).ToArray())

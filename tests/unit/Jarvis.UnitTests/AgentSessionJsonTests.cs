@@ -198,4 +198,26 @@ public sealed class AgentSessionJsonTests
         Assert.True(AgentSessionJson.HasAnsweredApproval(liveAnswered, "req-1", "c1"));
         Assert.False(AgentSessionJson.HasAnsweredApproval(liveAnswered, "req-2", "c2"));
     }
+    [Fact]
+    public void ListsEveryApprovalRequestThatNeverGotAnAnswer()
+    {
+        const string session = """
+            {"stateBag":{"messages":[
+              {"role":"user","contents":[{"text":"Do things","$type":"text"}]},
+              {"role":"assistant","contents":[
+                {"id":"req-1","$type":"functionApprovalRequest","functionCall":{"callId":"c1","name":"A","arguments":{"x":1}}}
+              ]},
+              {"role":"user","contents":[{"id":"req-1","$type":"toolApprovalResponse"}]},
+              {"role":"assistant","contents":[
+                {"id":"req-2","$type":"functionApprovalRequest","functionCall":{"callId":"c2","name":"B"}},
+                {"id":"req-3","$type":"functionApprovalRequest","functionCall":{"callId":"c3","name":"C"}}
+              ]}
+            ]}}
+            """;
+
+        var unanswered = AgentSessionJson.GetUnansweredApprovals(session);
+
+        Assert.Equal(["req-2", "req-3"], unanswered.Select(request => request.RequestId));
+        Assert.Empty(AgentSessionJson.GetUnansweredApprovals("not json"));
+    }
 }
