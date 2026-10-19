@@ -226,14 +226,12 @@ class _JarvisOrbState extends State<JarvisOrb> with TickerProviderStateMixin {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: JarvisColors.of(
-            context,
-          ).accent.withValues(alpha: .28 * (1 - progress)),
+          color: JarvisColors.of(context).accent
+              .withValues(alpha: .28 * (1 - progress)),
           width: 1.5,
         ),
-        color: JarvisColors.of(
-          context,
-        ).violet.withValues(alpha: .06 * (1 - progress)),
+        color: JarvisColors.of(context).violet
+            .withValues(alpha: .06 * (1 - progress)),
       ),
     ),
   );

@@ -931,6 +931,9 @@ class _TodoRow extends StatelessWidget {
     final minutes = asJsonInt(item['minutes']);
     final start = jsonDate(item['startAt'], local: true);
     final title = asJsonString(item['title']) ?? 'Untitled';
+    final fromPromise = (asJsonString(item['sourceRef']) ?? '').startsWith(
+      'commitment:',
+    );
     final when = done
         ? 'Done'
         : start == null
@@ -973,7 +976,7 @@ class _TodoRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${durationLabel(minutes)}  ·  $when',
+                    '${durationLabel(minutes)}  ·  $when${fromPromise ? '  ·  From a promise' : ''}',
                     style: TextStyle(color: colors.inkSoft, fontSize: 12.5),
                   ),
                 ],

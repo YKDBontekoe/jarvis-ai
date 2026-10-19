@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using System.Globalization;
 using System.Text;
 using Jarvis.Application.Expenses;
@@ -9,7 +11,7 @@ namespace Jarvis.Application.Finance;
 
 public sealed class FinanceService(IFinanceRepository repository, IExpenseService expenseService,
     IExpenseRepository expenses, IReminderService reminders, IDailyBriefingRepository briefings,
-    TimeProvider? timeProvider = null) : IFinanceService
+    TimeProvider? timeProvider = null, Jarvis.Application.Settings.IOwnerSettingsStore? settings = null) : IFinanceService
 {
     private static readonly TimeOnly ReminderTime = new(9, 0);
     private const int UpcomingDays = 14;
@@ -308,16 +310,82 @@ public sealed class FinanceService(IFinanceRepository repository, IExpenseServic
                 rows.Take(FinanceRules.PreviewRows).ToArray());
 
         int imported = 0, duplicates = 0, unreadable = parsed.Unreadable;
+        var created = new List<Guid>();
         foreach (var row in rows)
         {
             var result = await expenseService.CreateAsync(ownerId, new ExpenseDraft(row.Amount, row.Currency,
                 row.Merchant, null, row.Note, row.Date, null, ExpenseSources.Import), today, true, cancellationToken);
             if (!result.Succeeded) unreadable++;
             else if (result.Value!.IsDuplicate) duplicates++;
-            else imported++;
+            else
+            {
+                imported++;
+                created.Add(result.Value.Expense.Id);
+            }
+        }
+        Guid? batchId = null;
+        if (settings is not null && imported > 0)
+        {
+            batchId = Guid.NewGuid();
+            var state = await settings.GetAsync<ImportBatchState>(ownerId, ImportBatchState.Section,
+                cancellationToken);
+            var batch = new ImportBatch(batchId.Value, clock.GetUtcNow(), rows.Length, imported, duplicates, created);
+            await settings.SaveAsync(ownerId, ImportBatchState.Section,
+                new ImportBatchState(new[] { batch }.Concat(state?.Batches ?? []).Take(ImportBatchState.Keep).ToArray()),
+                cancellationToken);
         }
         return new ImportReport(true, rows.Length, imported, duplicates, parsed.IncomeSkipped, unreadable, problem,
-            rows.Take(FinanceRules.PreviewRows).ToArray());
+            rows.Take(FinanceRules.PreviewRows).ToArray(), batchId);
+    }
+
+    public async Task<IReadOnlyList<ImportBatchView>> ListImportsAsync(Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        if (settings is null) return [];
+        var state = await settings.GetAsync<ImportBatchState>(ownerId, ImportBatchState.Section, cancellationToken);
+        var views = new List<ImportBatchView>();
+        foreach (var batch in state?.Batches ?? [])
+            views.Add(await ViewAsync(ownerId, batch, cancellationToken));
+        return views;
+    }
+
+    public async Task<FinanceOperation<ImportBatchView>> UndoImportAsync(Guid ownerId, Guid batchId,
+        CancellationToken cancellationToken)
+    {
+        if (settings is null) return FinanceOperation<ImportBatchView>.NotFound();
+        var state = await settings.GetAsync<ImportBatchState>(ownerId, ImportBatchState.Section, cancellationToken);
+        var batch = state?.Batches.FirstOrDefault(item => item.Id == batchId);
+        if (batch is null) return FinanceOperation<ImportBatchView>.NotFound();
+        if (batch.UndoneAt is not null)
+            return FinanceOperation<ImportBatchView>.Ok(await ViewAsync(ownerId, batch, cancellationToken));
+
+        int removed = 0, kept = 0;
+        foreach (var id in batch.ExpenseIds)
+        {
+            var row = await expenseService.GetAsync(id, ownerId, cancellationToken);
+            if (row is null) continue;
+            if (row.UpdatedAt != row.CreatedAt) kept++;
+            else if (await expenseService.DeleteAsync(id, ownerId, cancellationToken)) removed++;
+        }
+        var undone = batch with { UndoneAt = clock.GetUtcNow(), Removed = removed, KeptEdited = kept };
+        await settings.SaveAsync(ownerId, ImportBatchState.Section,
+            new ImportBatchState(state!.Batches.Select(item => item.Id == batchId ? undone : item).ToArray()),
+            cancellationToken);
+        return FinanceOperation<ImportBatchView>.Ok(await ViewAsync(ownerId, undone, cancellationToken));
+    }
+
+    private async Task<ImportBatchView> ViewAsync(Guid ownerId, ImportBatch batch, CancellationToken cancellationToken)
+    {
+        int there = 0, edited = 0;
+        foreach (var id in batch.ExpenseIds)
+        {
+            var row = await expenseService.GetAsync(id, ownerId, cancellationToken);
+            if (row is null) continue;
+            there++;
+            if (row.UpdatedAt != row.CreatedAt) edited++;
+        }
+        return new ImportBatchView(batch.Id, batch.At, batch.Rows, batch.Imported, batch.Duplicates, there, edited,
+            batch.UndoneAt is not null, batch.Removed, batch.KeptEdited);
     }
 
     public async Task<string> ExportCsvAsync(Guid ownerId, DateOnly from, DateOnly to, string? category,
@@ -403,7 +471,7 @@ public sealed class FinanceService(IFinanceRepository repository, IExpenseServic
 
     private async Task<TimeZoneInfo> ZoneAsync(Guid ownerId, CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, ownerId, cancellationToken);
         return LocalClock.TryFind(zoneId, out var zone) ? zone : TimeZoneInfo.Utc;
     }
 
@@ -438,14 +506,15 @@ public sealed class FinanceService(IFinanceRepository repository, IExpenseServic
 /// month's expenses count, so importing old statements stays quiet.
 /// </summary>
 public sealed class BudgetExpenseObserver(IFinanceRepository repository, IExpenseRepository expenses,
-    INotificationRepository notifications, IDailyBriefingRepository briefings, TimeProvider? timeProvider = null)
+    INotificationRepository notifications, IDailyBriefingRepository briefings, TimeProvider? timeProvider = null,
+    IOwnerSettingsStore? settings = null)
     : IExpenseObserver
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
     public async Task OnExpenseCreatedAsync(Expense expense, CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(expense.OwnerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, expense.OwnerId, cancellationToken);
         var zone = LocalClock.TryFind(zoneId, out var found) ? found : TimeZoneInfo.Utc;
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), zone).DateTime);
         if (expense.SpentOn.Year != today.Year || expense.SpentOn.Month != today.Month) return;

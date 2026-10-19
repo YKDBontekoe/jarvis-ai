@@ -17,6 +17,7 @@ internal sealed class PushDeliveryConfiguration : IEntityTypeConfiguration<PushD
             builder.Property(x => x.LeaseUntil).HasColumnName("lease_until");
             builder.Property(x => x.DeliveredAt).HasColumnName("delivered_at");
             builder.Property(x => x.LastError).HasColumnName("last_error").HasMaxLength(500);
+            builder.Property(x => x.Outcome).HasColumnName("outcome").HasMaxLength(20);
             builder.HasOne<Notification>().WithMany().HasForeignKey(x => x.NotificationId)
                 .OnDelete(DeleteBehavior.Cascade);
             builder.HasOne<PushDevice>().WithMany().HasForeignKey(x => x.DeviceId)

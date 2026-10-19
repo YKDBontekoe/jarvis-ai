@@ -1,6 +1,8 @@
+using Jarvis.Application.Decisions;
 using Jarvis.Application.Devices;
 using Jarvis.Application.Home;
 using Jarvis.Application.Approvals;
+using Jarvis.Application.Inbox;
 using Jarvis.Application.Integrations;
 using Jarvis.Application.Learning;
 using Jarvis.Application.Settings;
@@ -18,7 +20,9 @@ public sealed class HomeBriefingService(
     IDeviceTelemetryStore telemetry,
     IIntegrationCredentialStore credentials,
     IUserMcpServerRegistry mcpServers,
-    INotificationRepository notifications) : IHomeBriefingService
+    INotificationRepository notifications,
+    ICommitmentService commitments,
+    IDecisionRepository decisions) : IHomeBriefingService
 {
     /// <summary>A briefing older than this belongs to an earlier day and is not shown.</summary>
     public static readonly TimeSpan BriefingFreshness = TimeSpan.FromHours(18);
@@ -59,6 +63,10 @@ public sealed class HomeBriefingService(
             IntegrationPackIds.Provider(IntegrationPackIds.Calendar), cancellationToken);
         var device = await telemetry.GetAsync(ownerId, cancellationToken);
         var servers = await mcpServers.ListAsync(ownerId, cancellationToken);
+        var today = await commitments.TodayAsync(ownerId, cancellationToken);
+        var dueCommitments = HomeAttention.Commitments(
+            await commitments.ListAsync(ownerId, null, CommitmentStatuses.Open, false, cancellationToken), today);
+        var dueDecisions = HomeAttention.Decisions(await decisions.ListAsync(ownerId, cancellationToken), today);
         var packs = new List<HomePackDto>();
         foreach (var pack in IntegrationPackCatalog.All)
         {
@@ -82,7 +90,9 @@ public sealed class HomeBriefingService(
                 device.Latitude is not null && device.Longitude is not null, device.ReportedAt),
             brief is null ? null : new HomeBriefingScheduleDto(brief.Enabled, brief.LocalTime, brief.TimeZoneId),
             packs,
-            await LatestBriefingAsync(ownerId, now, cancellationToken));
+            await LatestBriefingAsync(ownerId, now, cancellationToken),
+            dueCommitments,
+            dueDecisions);
     }
 
     private async Task<HomeBriefingNoteDto?> LatestBriefingAsync(Guid ownerId, DateTimeOffset now,

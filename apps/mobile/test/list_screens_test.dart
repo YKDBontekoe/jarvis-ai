@@ -9,6 +9,7 @@ import 'package:jarvis_mobile/features/files/files_screen.dart';
 import 'package:jarvis_mobile/features/memory/memory_screen.dart';
 import 'package:jarvis_mobile/features/tasks/tasks_screen.dart';
 import 'package:jarvis_mobile/features/profiles/profiles_screen.dart';
+import 'package:jarvis_mobile/ui/phosphor_icons.dart';
 
 import 'support/fixture_http.dart';
 
@@ -71,6 +72,105 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('notes.txt'), findsOneWidget);
     expect(find.text('Work docs'), findsOneWidget);
+  });
+
+  testWidgets('Ask Jarvis about a file opens a chat that has only that file attached', (
+    tester,
+  ) async {
+    http
+      ..on('GET', '/api/v1/files', [
+        {
+          'id': 'f1',
+          'fileName': 'quote.pdf',
+          'sizeBytes': 12,
+          'processingStatus': 'ready',
+        },
+        {
+          'id': 'f2',
+          'fileName': 'broken.pdf',
+          'sizeBytes': 12,
+          'processingStatus': 'failed',
+        },
+      ])
+      ..on('GET', '/api/v1/collections', <Object>[])
+      ..on('POST', '/api/v1/files/f1/ask', {
+        'conversationId': 'chat-1',
+        'fileId': 'f1',
+        'fileName': 'quote.pdf',
+        'status': 'ready',
+      }, status: 201);
+    final opened = <String>[];
+    await show(
+      tester,
+      FilesScreen(
+        http: http.client(),
+        onOpenConversation: (id) async => opened.add(id),
+      ),
+    );
+
+    await tester.tap(find.byIcon(PhosphorIconsRegular.dotsThree).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ask Jarvis about this'));
+    await tester.pumpAndSettle();
+
+    expect(http.sent('POST', '/api/v1/files/f1/ask'), hasLength(1));
+    expect(opened, ['chat-1']);
+
+    // A file that failed to index cannot be asked about.
+    await tester.tap(find.byIcon(PhosphorIconsRegular.dotsThree).last);
+    await tester.pumpAndSettle();
+    expect(find.text('Ask Jarvis about this'), findsNothing);
+  });
+
+  testWidgets('a profile that cannot read the file explains why instead of opening a chat', (
+    tester,
+  ) async {
+    http
+      ..on('GET', '/api/v1/files', [
+        {
+          'id': 'f1',
+          'fileName': 'quote.pdf',
+          'sizeBytes': 12,
+          'processingStatus': 'ready',
+        },
+      ])
+      ..on('GET', '/api/v1/collections', <Object>[])
+      ..on('POST', '/api/v1/files/f1/ask', {
+        'message': 'That assistant profile cannot read this file.',
+      }, status: 409);
+    final opened = <String>[];
+    await show(
+      tester,
+      FilesScreen(
+        http: http.client(),
+        onOpenConversation: (id) async => opened.add(id),
+      ),
+    );
+
+    await tester.tap(find.byIcon(PhosphorIconsRegular.dotsThree).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ask Jarvis about this'));
+    await tester.pumpAndSettle();
+
+    expect(opened, isEmpty);
+    expect(find.textContaining('cannot read this file'), findsWidgets);
+  });
+
+  testWidgets('without a chat to open, Files offers no Ask action', (tester) async {
+    http
+      ..on('GET', '/api/v1/files', [
+        {
+          'id': 'f1',
+          'fileName': 'quote.pdf',
+          'sizeBytes': 12,
+          'processingStatus': 'ready',
+        },
+      ])
+      ..on('GET', '/api/v1/collections', <Object>[]);
+    await show(tester, FilesScreen(http: http.client()));
+    await tester.tap(find.byIcon(PhosphorIconsRegular.dotsThree).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Ask Jarvis about this'), findsNothing);
   });
 
   testWidgets('a new collection needs a name, stops at 80 characters and is created on enter', (

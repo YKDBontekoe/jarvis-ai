@@ -51,8 +51,12 @@ public sealed class PushDeliveryRepository(JarvisDbContext db) : IPushDeliveryQu
     }
 
     public Task MarkDeliveredAsync(PushDeliveryKey key, CancellationToken cancellationToken) =>
+        MarkOutcomeAsync(key, Jarvis.Application.Notifications.PushDeliveryOutcomes.ProviderAccepted, cancellationToken);
+
+    public Task MarkOutcomeAsync(PushDeliveryKey key, string outcome, CancellationToken cancellationToken) =>
         Delivery(key).ExecuteUpdateAsync(update => update
             .SetProperty(x => x.DeliveredAt, DateTimeOffset.UtcNow)
+            .SetProperty(x => x.Outcome, outcome)
             .SetProperty(x => x.LeaseUntil, (DateTimeOffset?)null)
             .SetProperty(x => x.LastError, (string?)null), cancellationToken);
 
@@ -147,4 +151,21 @@ public sealed class NotificationFeed(JarvisDbContext db) : INotificationFeed
         db.ToolApprovals.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == approvalId && x.OwnerId == ownerId && x.Status == "pending",
                 cancellationToken);
+}
+
+public sealed class NotificationDeliveryReader(JarvisDbContext db) : Jarvis.Application.Notifications.INotificationDeliveryReader
+{
+    public async Task<Jarvis.Application.Notifications.NotificationDeliveryFacts?> GetAsync(Guid ownerId, Guid notificationId,
+        CancellationToken cancellationToken)
+    {
+        var notification = await db.Notifications.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Id == notificationId && x.OwnerId == ownerId, cancellationToken);
+        if (notification is null) return null;
+        var rows = await db.PushDeliveries.AsNoTracking().Where(x => x.NotificationId == notificationId)
+            .ToListAsync(cancellationToken);
+        var devices = rows.Select(x => new Jarvis.Application.Notifications.DeviceDelivery(x.Outcome, x.Attempts, x.DeliveredAt,
+            x.LastError, x.DeliveredAt is null && x.Attempts >= IPushDeliveryQueue.MaxAttempts)).ToArray();
+        return new Jarvis.Application.Notifications.NotificationDeliveryFacts(notification.Id, notification.Type,
+            notification.Title, notification.CreatedAt, notification.ReadAt, devices);
+    }
 }

@@ -44,16 +44,38 @@ void main() {
     expect((await OutboxStore.open()).isEmpty, isTrue);
   });
 
-  test('drops messages older than two days', () async {
-    final now = DateTime(2026, 10, 3, 12);
-    final outbox = await OutboxStore.open(now: now);
-    await outbox.add(
-      _message('old', 'c1', at: now.subtract(const Duration(days: 3))),
-    );
-    await outbox.add(_message('new', 'c1', at: now));
+  test(
+    'an old message is kept and marked expired instead of being dropped',
+    () async {
+      final now = DateTime(2026, 10, 3, 12);
+      final outbox = await OutboxStore.open();
+      await outbox.add(
+        _message('old', 'c1', at: now.subtract(const Duration(days: 3))),
+      );
+      await outbox.add(_message('new', 'c1', at: now));
 
-    final reopened = await OutboxStore.open(now: now);
-    expect(reopened.forConversation('c1').map((item) => item.id), ['new']);
+      final items = (await OutboxStore.open()).forConversation('c1');
+      expect(items.map((item) => item.id), ['old', 'new']);
+      expect(OutboxStore.isExpired(items[0], now), isTrue);
+      expect(OutboxStore.isExpired(items[1], now), isFalse);
+    },
+  );
+
+  test('a waiting message says how long it has waited and when it stops sending by itself', () {
+    final now = DateTime(2026, 10, 3, 12);
+
+    expect(queuedNote(null, now), 'Waiting for a connection. Sends by itself.');
+    expect(
+      queuedNote(now.subtract(const Duration(minutes: 5)), now),
+      'Written 5 min ago. Waiting for a connection; it sends by itself.',
+    );
+    expect(
+      queuedNote(now.subtract(const Duration(hours: 3)), now),
+      contains('3 h ago'),
+    );
+    final stale = queuedNote(now.subtract(const Duration(days: 3)), now);
+    expect(stale, contains('3 d ago'));
+    expect(stale, contains('will not go out by itself'));
   });
 
   test('ignores corrupt stored data', () async {
@@ -87,6 +109,57 @@ void main() {
     );
     await tester.tap(find.text('Cancel'));
     expect(cancelled, 1);
+  });
+
+  testWidgets(
+    'an expired message offers Send now and is not promised to send by itself',
+    (tester) async {
+      var sent = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildJarvisTheme(),
+          home: Scaffold(
+            body: MessageBubble(
+              message: MessageEntry(
+                role: 'user',
+                content: 'Book a table',
+                outboxId: 'o1',
+                queuedAt: DateTime.now().subtract(const Duration(days: 3)),
+              ),
+              onCancelQueued: () {},
+              onSendQueuedNow: () => sent++,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.textContaining('will not go out by itself'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('queued-send-now')));
+      expect(sent, 1);
+    },
+  );
+
+  testWidgets('a fresh waiting message has no Send now', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildJarvisTheme(),
+        home: Scaffold(
+          body: MessageBubble(
+            message: MessageEntry(
+              role: 'user',
+              content: 'Book a table',
+              outboxId: 'o1',
+              queuedAt: DateTime.now().subtract(const Duration(minutes: 2)),
+            ),
+            onCancelQueued: () {},
+            onSendQueuedNow: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('queued-send-now')), findsNothing);
+    expect(find.textContaining('sends by itself'), findsOneWidget);
   });
 
   group('arrivedMessageId', () {

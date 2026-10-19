@@ -315,6 +315,10 @@ public sealed class AccountsAndPortfolioTests
     private sealed class FixedFinance : IFinanceService
     {
         public Task<DateOnly> TodayAsync(Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(Today);
+        public Task<IReadOnlyList<ImportBatchView>> ListImportsAsync(Guid ownerId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+        public Task<FinanceOperation<ImportBatchView>> UndoImportAsync(Guid ownerId, Guid batchId,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<BudgetStatus>> BudgetStatusAsync(Guid ownerId, int year, int month, DateOnly today,
             CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<FinanceOperation<Budget>> SetBudgetAsync(Guid ownerId, string? category, decimal? limit,

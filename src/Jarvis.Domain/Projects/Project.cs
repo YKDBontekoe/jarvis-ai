@@ -11,6 +11,15 @@ public sealed class Project
     public const int MaxInstructionsLength = 8_000;
     public const int MaxProjectsPerOwner = 100;
     public const string DefaultColor = "blue";
+    public const int MaxOutcomeLength = 300;
+    public const int MaxNextActionNoteLength = 200;
+
+    public const string StatusActive = "active";
+    public const string StatusCompleted = "completed";
+    public const string StatusArchived = "archived";
+
+    public static readonly IReadOnlySet<string> Statuses =
+        new HashSet<string>(StringComparer.Ordinal) { StatusActive, StatusCompleted, StatusArchived };
 
     /// <summary>Accent colors the app knows how to paint; anything else falls back to <see cref="DefaultColor"/>.</summary>
     public static readonly IReadOnlySet<string> Colors =
@@ -35,6 +44,44 @@ public sealed class Project
     public string Color { get; private set; } = DefaultColor;
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    /// <summary>What the owner is trying to achieve with the project, in their words.</summary>
+    public string? Outcome { get; private set; }
+
+    public string Status { get; private set; } = StatusActive;
+
+    /// <summary>The owner's chosen next step: a typed link to an existing thing, a short note, or both.</summary>
+    public string? NextActionType { get; private set; }
+    public Guid? NextActionId { get; private set; }
+    public string? NextActionNote { get; private set; }
+
+    /// <summary>
+    /// Sets the outcome and next action together, so a link and its note never drift apart. A null
+    /// <paramref name="status"/> leaves the status as it is.
+    /// </summary>
+    public void SetFocus(string? outcome, string? status, string? nextActionType, Guid? nextActionId,
+        string? nextActionNote)
+    {
+        var cleanOutcome = string.IsNullOrWhiteSpace(outcome) ? null : outcome.Trim();
+        if (cleanOutcome is { Length: > MaxOutcomeLength })
+            throw new ArgumentException($"Outcome must be {MaxOutcomeLength} characters or fewer.", nameof(outcome));
+        var cleanNote = string.IsNullOrWhiteSpace(nextActionNote) ? null : nextActionNote.Trim();
+        if (cleanNote is { Length: > MaxNextActionNoteLength })
+            throw new ArgumentException($"The note must be {MaxNextActionNoteLength} characters or fewer.",
+                nameof(nextActionNote));
+        var cleanStatus = string.IsNullOrWhiteSpace(status) ? Status : status.Trim().ToLowerInvariant();
+        if (!Statuses.Contains(cleanStatus))
+            throw new ArgumentException("Use active, completed or archived.", nameof(status));
+        if ((nextActionType is null) != (nextActionId is null))
+            throw new ArgumentException("A linked next action needs both a type and an id.", nameof(nextActionType));
+
+        Outcome = cleanOutcome;
+        Status = cleanStatus;
+        NextActionType = nextActionType;
+        NextActionId = nextActionId;
+        NextActionNote = cleanNote;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
 
     public void Update(string name, string? description, string? instructions, string? color)
     {

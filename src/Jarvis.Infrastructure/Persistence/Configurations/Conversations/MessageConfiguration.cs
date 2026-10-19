@@ -16,5 +16,7 @@ internal sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
             builder.Property(x => x.CitationsJson).HasColumnName("citations_json").HasColumnType("jsonb");
             builder.Property(x => x.AttachmentsJson).HasColumnName("attachments_json").HasColumnType("jsonb");
             builder.HasIndex(x => new { x.ConversationId, x.CreatedAt, x.Id });
+            // Searching what was said ("where did we talk about the boiler?") is an ILIKE on the content.
+            builder.HasIndex(x => x.Content).HasMethod("gin").HasOperators("gin_trgm_ops");
         }
 }

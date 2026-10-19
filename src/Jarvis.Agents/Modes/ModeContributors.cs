@@ -5,14 +5,15 @@ using Microsoft.Extensions.AI;
 
 namespace Jarvis.Agents.Modes;
 
-internal sealed class ModeToolContributor(IModeService modes, ICurrentUser currentUser) : IAgentToolContributor
+internal sealed class ModeToolContributor(IModeService modes, ICurrentUser currentUser, IModeContextService contextService) : IAgentToolContributor
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context)
     {
-        var tools = new ModeAgentTools(modes, currentUser);
+        var tools = new ModeAgentTools(modes, currentUser, contextService);
         yield return AIFunctionFactory.Create(tools.GetCurrentModeAsync);
         if (context.IsBackgroundTask) yield break;
         yield return AIFunctionFactory.Create(tools.SetModeAsync);
+        yield return AIFunctionFactory.Create(tools.StartFocusAsync);
     }
 }
 

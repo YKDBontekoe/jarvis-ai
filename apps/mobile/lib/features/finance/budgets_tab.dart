@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../expenses/expense_models.dart'
@@ -14,6 +15,7 @@ import '../expenses/expense_models.dart'
 import '../tasks/task_details_screen.dart';
 import 'finance_models.dart';
 import 'negotiate_sheet.dart';
+import 'subscription_review_screen.dart';
 
 Future<String?> _pickStatement() async {
   final file = await FilePicker.pickFile(
@@ -49,6 +51,7 @@ class BudgetsTab extends StatefulWidget {
 
 class _BudgetsTabState extends State<BudgetsTab> {
   FinanceOverviewData? _data;
+  List<Map<String, dynamic>> _imports = const [];
   bool _loading = true;
   String? _error;
 
@@ -68,7 +71,22 @@ class _BudgetsTabState extends State<BudgetsTab> {
       );
       if (!mounted) return;
       final data = FinanceOverviewData.fromJson(response.data);
+      var imports = <Map<String, dynamic>>[];
+      try {
+        // A bonus: without the list there is simply nothing to undo here.
+        imports = jsonMaps(
+          (await widget.http.get<dynamic>('/api/v1/finance/imports')).data,
+        );
+      } on DioException {
+        // Keep going without it.
+      }
+      if (!mounted) return;
       setState(() {
+        _imports = [
+          for (final batch in imports)
+            if (batch['undone'] != true && asJsonInt(batch['stillThere']) > 0)
+              batch,
+        ].take(3).toList();
         _data = data;
         _loading = false;
         _error = data == null ? 'Could not load your finances.' : null;
@@ -84,9 +102,9 @@ class _BudgetsTabState extends State<BudgetsTab> {
     }
   }
 
-  void _toast(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  void _toast(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   Future<void> _call(Future<void> Function() action) async {
     try {
@@ -99,6 +117,19 @@ class _BudgetsTabState extends State<BudgetsTab> {
         );
       }
     }
+  }
+
+  Future<void> _openReview(SubscriptionData item) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => SubscriptionReviewScreen(
+          http: widget.http,
+          subscriptionId: item.id,
+          onAskInChat: widget.onAskInChat,
+        ),
+      ),
+    );
+    if (mounted) await _load();
   }
 
   Future<void> _negotiate(SubscriptionData item) async {
@@ -202,6 +233,41 @@ class _BudgetsTabState extends State<BudgetsTab> {
     }
   }
 
+  Future<void> _undoImport(Map<String, dynamic> batch) async {
+    final id = jsonString(batch, 'id');
+    if (id == null) return;
+    final confirmed = await showJarvisConfirm(
+      context,
+      title: 'Undo this import?',
+      message:
+          'Removes the ${asJsonInt(batch['stillThere']) - asJsonInt(batch['edited'])} '
+          'rows it added that you have not changed. Rows you edited, and '
+          'anything you added yourself, stay.',
+      confirmLabel: 'Undo import',
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      final response = await widget.http.post<dynamic>(
+        '/api/v1/finance/imports/$id/undo',
+      );
+      final result = jsonObject(response.data) ?? const {};
+      if (!mounted) return;
+      final kept = asJsonInt(result['keptEdited']);
+      _toast(
+        'Removed ${asJsonInt(result['removed'])} rows'
+        '${kept > 0 ? ', kept $kept you edited' : ''}.',
+      );
+      await _load();
+    } on DioException catch (error) {
+      if (mounted) {
+        _toast(
+          firstProblemMessage(error.response?.data) ??
+              'Could not undo that import.',
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = _data;
@@ -242,6 +308,24 @@ class _BudgetsTabState extends State<BudgetsTab> {
                     ),
                   ],
                 ),
+                for (final batch in _imports)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: FeatureRow(
+                      key: Key('import-batch-${batch['id']}'),
+                      icon: PhosphorIconsRegular.uploadSimple,
+                      caption: 'Statement import',
+                      title: 'Imported ${asJsonInt(batch['imported'])} rows',
+                      subtitle: asJsonInt(batch['edited']) > 0
+                          ? '${asJsonInt(batch['edited'])} edited since'
+                          : null,
+                      trailing: SoftButton(
+                        key: Key('import-undo-${batch['id']}'),
+                        onPressed: () => unawaited(_undoImport(batch)),
+                        child: const Text('Undo'),
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 12),
                 _forecast(context, data),
                 for (final alert in data.alerts)
@@ -468,6 +552,15 @@ class _BudgetsTabState extends State<BudgetsTab> {
                 ),
               ),
               child: const Text('Track again'),
+            ),
+          if (active)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: Key('subscription-review-${item.id}'),
+                onPressed: () => unawaited(_openReview(item)),
+                child: const Text('Review this subscription'),
+              ),
             ),
           if (active) ..._negotiation(context, item),
         ],

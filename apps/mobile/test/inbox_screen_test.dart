@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/inbox/inbox_models.dart';
 import 'package:jarvis_mobile/features/inbox/inbox_screen.dart';
+import 'package:jarvis_mobile/schedule_format.dart';
 
 import 'support/fixture_http.dart';
 
@@ -57,6 +59,7 @@ void main() {
 
   setUp(() {
     http = FixtureHttp();
+    deviceTimeZoneLookup = () async => 'Europe/Amsterdam';
     http.on('GET', '/api/v1/inbox', _inbox());
     http.on('GET', '/api/v1/commitments', _commitments());
   });
@@ -138,4 +141,84 @@ void main() {
     expect(post['counterparty'], 'Anna');
     expect(post['direction'], 'i_owe');
   });
+
+  testWidgets('Plan today sends the promise as the source, only for accepted ones', (
+    tester,
+  ) async {
+    http.on('POST', '/api/v1/planner/today/items', {'id': 'i1'});
+    await show(tester);
+    await tester.tap(find.byKey(const Key('inbox-tab-commitments')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('commitment-plan-c2')), findsNothing);
+    await tester.tap(find.byKey(const Key('commitment-plan-c1')));
+    await tester.pumpAndSettle();
+
+    final post = http.sent('POST', '/api/v1/planner/today/items').single;
+    expect((post.body as Map)['sourceRef'], 'commitment:c1');
+    expect(post.query['timeZone'], 'Europe/Amsterdam');
+    expect(find.textContaining('Added to today'), findsOneWidget);
+  });
+
+  testWidgets('a refused plan shows the reason and no success note', (
+    tester,
+  ) async {
+    http.on('POST', '/api/v1/planner/today/items', {
+      'detail': 'That promise was not found.',
+    }, status: 400);
+    await show(tester);
+    await tester.tap(find.byKey(const Key('inbox-tab-commitments')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('commitment-plan-c1')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('That promise was not found.'), findsOneWidget);
+    expect(find.textContaining('Added to today'), findsNothing);
+  });
+
+  testWidgets(
+    'an overdue owed-to-me promise offers a draft to copy, snooze or dismiss',
+    (tester) async {
+      http
+        ..on('GET', '/api/v1/commitments/follow-ups', [
+          {
+            'commitmentId': 'c2',
+            'counterparty': 'Piet',
+            'description': 'Offerte sturen',
+            'daysOverdue': 5,
+            'draft': 'Hi Piet, a quick check on "Offerte sturen".',
+          },
+        ])
+        ..on('POST', '/api/v1/commitments/c2/follow-up/snooze', null, status: 204)
+        ..on('POST', '/api/v1/commitments/c2/follow-up/dismiss', null, status: 204);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async => null,
+      );
+      await show(tester);
+      await tester.tap(find.byKey(const Key('inbox-tab-commitments')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Piet: '), findsOneWidget);
+      expect(find.textContaining('a quick check on'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('followup-copy-c2')));
+      await tester.pump();
+      expect(find.text('Draft copied. Nothing was sent.'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('followup-snooze-c2')));
+      await tester.pumpAndSettle();
+      expect(
+        http.sent('POST', '/api/v1/commitments/c2/follow-up/snooze').single.body,
+        {'days': 7},
+      );
+
+      await tester.tap(find.byKey(const Key('followup-dismiss-c2')));
+      await tester.pumpAndSettle();
+      expect(
+        http.sent('POST', '/api/v1/commitments/c2/follow-up/dismiss'),
+        hasLength(1),
+      );
+    },
+  );
 }

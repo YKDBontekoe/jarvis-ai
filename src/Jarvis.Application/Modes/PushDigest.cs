@@ -1,3 +1,4 @@
+using Jarvis.Application.Preferences;
 using Jarvis.Application.Settings;
 using Jarvis.Application.Workflows;
 
@@ -7,7 +8,8 @@ namespace Jarvis.Application.Modes;
 public sealed record HeldPush(Guid NotificationId, string Type, string Title, DateTimeOffset At);
 
 /// <summary>Pushes held back by a mode such as Sleep or Meeting, waiting to be summed up once pushes are allowed again.</summary>
-public sealed record PushDigestState(IReadOnlyList<HeldPush>? Held = null)
+public sealed record PushDigestState(IReadOnlyList<HeldPush>? Held = null, IReadOnlyList<HeldPush>? Last = null,
+    DateTimeOffset? LastAt = null)
 {
     public IReadOnlyList<HeldPush> Items => Held ?? [];
 }
@@ -32,7 +34,8 @@ public sealed class PushDigestService(
     IOwnerSettingsStore settings,
     IModeService modes,
     INotificationRepository notifications,
-    TimeProvider? timeProvider = null) : IPushDigestService
+    TimeProvider? timeProvider = null,
+    IDailyBriefingRepository? briefings = null) : IPushDigestService
 {
     public const string DigestType = "digest.while_away";
     public const int MaxHeld = 50;
@@ -63,12 +66,33 @@ public sealed class PushDigestService(
         var state = await settings.GetAsync<PushDigestState>(ownerId, SettingsSections.PushDigest, cancellationToken);
         if (state is null || state.Items.Count == 0) return false;
         if (!await modes.ShouldPushAsync(ownerId, DigestType, cancellationToken)) return false;
+        if (!await ScheduleAllowsAsync(ownerId, state, cancellationToken)) return false;
 
-        await notifications.CreateAsync(ownerId, DigestType, "While you were away", Compose(state.Items), null,
-            cancellationToken);
-        // Cleared after the notification exists: a crash in between repeats the digest rather than losing it.
-        await settings.SaveAsync(ownerId, SettingsSections.PushDigest, new PushDigestState(), cancellationToken);
-        return true;
+        // Domains the owner left out of the recap stay in the app; they are just not summed up in the push.
+        var catchUp = await settings.GetAsync<CatchUpPreferences>(ownerId, SettingsSections.CatchUp, cancellationToken)
+                      ?? new CatchUpPreferences();
+        var included = state.Items.Where(item => !catchUp.IsExcluded(Notifications.NotificationCategories.For(item.Type))).ToArray();
+        if (included.Length > 0)
+            await notifications.CreateAsync(ownerId, DigestType, "While you were away", Compose(included), null,
+                cancellationToken);
+        // Cleared after the notification exists: a crash in between repeats the digest rather than losing it. What
+        // was held stays available as the in-app catch-up until the owner clears it.
+        await settings.SaveAsync(ownerId, SettingsSections.PushDigest,
+            new PushDigestState(null, state.Items, _clock.GetUtcNow()), cancellationToken);
+        return included.Length > 0;
+    }
+
+    /// <summary>The owner's chosen summary time, if any, in their home zone.</summary>
+    private async Task<bool> ScheduleAllowsAsync(Guid ownerId, PushDigestState state, CancellationToken cancellationToken)
+    {
+        var time = (await settings.GetAsync<DigestPreferences>(ownerId, SettingsSections.DigestTime, cancellationToken))?.Time;
+        if (DigestSchedule.Parse(time) is null) return true;
+        var zone = briefings is null
+            ? TimeZoneInfo.Utc
+            : (await OwnerZoneResolver.ResolveAsync(settings, briefings, ownerId, cancellationToken)).Zone;
+        var now = _clock.GetUtcNow();
+        var lastLocal = state.LastAt is { } last ? TimeZoneInfo.ConvertTime(last, zone) : (DateTimeOffset?)null;
+        return DigestSchedule.IsDue(time, TimeZoneInfo.ConvertTime(now, zone), lastLocal);
     }
 
     public Task<IReadOnlyList<Guid>> ListOwnersAsync(CancellationToken cancellationToken) =>

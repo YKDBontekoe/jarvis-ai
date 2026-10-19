@@ -8,6 +8,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import 'lesson_screen.dart';
 import 'library_models.dart';
 
 /// Pages, notes and research reports the owner keeps, with spaced-repetition
@@ -51,7 +52,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
     try {
       final library = await widget.http.get<dynamic>(
         '/api/v1/library',
-        queryParameters: {if (_search.text.trim().isNotEmpty) 'q': _search.text.trim()},
+        queryParameters: {
+          if (_search.text.trim().isNotEmpty) 'q': _search.text.trim(),
+        },
       );
       final cards = await widget.http.get<dynamic>('/api/v1/library/cards/due');
       if (!mounted) return;
@@ -59,11 +62,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
       final cardMap = jsonObject(cards.data);
       setState(() {
         _items = [
-          for (final item in jsonMaps(map?['items'])) ?LibraryItemData.fromJson(item),
+          for (final item in jsonMaps(map?['items']))
+            ?LibraryItemData.fromJson(item),
         ];
         _stats = CardStatsData.fromJson(map?['cards']);
         _due = [
-          for (final card in jsonMaps(cardMap?['cards'])) ?FlashcardData.fromJson(card),
+          for (final card in jsonMaps(cardMap?['cards']))
+            ?FlashcardData.fromJson(card),
         ];
         _revealed = false;
         _loading = false;
@@ -80,9 +85,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
   }
 
-  void _toast(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  void _toast(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   Future<void> _guard(String working, Future<void> Function() action) async {
     setState(() => _busy = true);
@@ -106,10 +111,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
     );
     if (values == null) return;
     await _guard('Saving', () async {
-      await widget.http.post<dynamic>('/api/v1/library/clip', data: {
-        'url': values['url'],
-        if (values['note']!.isNotEmpty) 'note': values['note'],
-      });
+      await widget.http.post<dynamic>(
+        '/api/v1/library/clip',
+        data: {
+          'url': values['url'],
+          if (values['note']!.isNotEmpty) 'note': values['note'],
+        },
+      );
       _toast('Saved to your library.');
       await _load();
     });
@@ -118,15 +126,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Future<void> _addNote() async {
     final values = await _ask(
       title: 'Write a note',
-      fields: const [('title', 'Title'), ('content', 'What do you want to keep?')],
+      fields: const [
+        ('title', 'Title'),
+        ('content', 'What do you want to keep?'),
+      ],
       multiline: 'content',
     );
     if (values == null) return;
     await _guard('Saving', () async {
-      await widget.http.post<dynamic>('/api/v1/library/notes', data: {
-        'title': values['title'],
-        'content': values['content'],
-      });
+      await widget.http.post<dynamic>(
+        '/api/v1/library/notes',
+        data: {'title': values['title'], 'content': values['content']},
+      );
       await _load();
     });
   }
@@ -140,9 +151,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
     );
     if (values == null) return;
     await _guard('Starting', () async {
-      await widget.http.post<dynamic>('/api/v1/library/research', data: {
-        'question': values['question'],
-      });
+      await widget.http.post<dynamic>(
+        '/api/v1/library/research',
+        data: {'question': values['question']},
+      );
       _toast('Research started. A cited report lands here when it is done.');
     });
   }
@@ -174,11 +186,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
     if (!mounted) return;
     final shown = full ?? item;
+    var learn = false;
     final deleted = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder: (context) => _ItemSheet(
         item: shown,
+        onLearn: () {
+          learn = true;
+          Navigator.pop(context, false);
+        },
         onOpenLink: shown.url == null
             ? null
             : () => unawaited(
@@ -189,6 +206,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
               ),
       ),
     );
+    if (learn && mounted) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => LessonScreen(http: widget.http, itemId: item.id),
+        ),
+      );
+      if (mounted) unawaited(_load());
+      return;
+    }
     if (deleted == true) {
       await _guard('Deleting', () async {
         await widget.http.delete<dynamic>('/api/v1/library/${item.id}');
@@ -423,10 +449,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
 }
 
 class _ItemSheet extends StatelessWidget {
-  const _ItemSheet({required this.item, this.onOpenLink});
+  const _ItemSheet({required this.item, this.onOpenLink, this.onLearn});
 
   final LibraryItemData item;
   final VoidCallback? onOpenLink;
+  final VoidCallback? onLearn;
 
   @override
   Widget build(BuildContext context) {
@@ -452,12 +479,17 @@ class _ItemSheet extends StatelessWidget {
             for (final point in item.keyPoints)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
-                child: Text('• $point', style: TextStyle(color: colors.inkSoft)),
+                child: Text(
+                  '• $point',
+                  style: TextStyle(color: colors.inkSoft),
+                ),
               ),
             if (content.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
-                content.length > 2500 ? '${content.substring(0, 2500)}…' : content,
+                content.length > 2500
+                    ? '${content.substring(0, 2500)}…'
+                    : content,
                 style: TextStyle(color: colors.inkSoft, fontSize: 13.5),
               ),
             ],
@@ -468,9 +500,21 @@ class _ItemSheet extends StatelessWidget {
                   TextButton.icon(
                     key: const Key('library-open-link'),
                     onPressed: onOpenLink,
-                    icon: const Icon(PhosphorIconsRegular.arrowSquareOut, size: 18),
+                    icon: const Icon(
+                      PhosphorIconsRegular.arrowSquareOut,
+                      size: 18,
+                    ),
                     label: const Text('Open original'),
                   ),
+                TextButton.icon(
+                  key: const Key('library-learn'),
+                  onPressed: onLearn,
+                  icon: const Icon(
+                    PhosphorIconsRegular.graduationCap,
+                    size: 18,
+                  ),
+                  label: const Text('Learn this'),
+                ),
                 const Spacer(),
                 TextButton(
                   key: const Key('library-delete'),

@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Google.Apis.Auth.OAuth2;
 using Jarvis.Application.Modes;
+using Jarvis.Application.Notifications;
 using Jarvis.Application.Workflows;
 
 namespace Jarvis.Api.Notifications;
@@ -73,14 +74,21 @@ public sealed class NotificationPushWorker(
             handled++;
             if (claim.Work is not { } work) continue;
 
-            // Modes such as Sleep or Meeting keep a push off the phone. The notification stays in the app, and a
-            // short record of it is held so one "while you were away" digest can follow when pushes resume.
-            if (scope.ServiceProvider.GetService<IModeService>() is { } modes &&
-                !await modes.ShouldPushAsync(work.OwnerId, work.Notification.Type, cancellationToken))
+            // The owner's per-kind choice and the current mode (Sleep, Meeting…) decide whether this buzzes the
+            // phone. A held push keeps a short record so one "while you were away" digest can follow; a push the
+            // owner chose to keep in the app is simply not sent. The notification itself always stays in the app.
+            if (scope.ServiceProvider.GetService<INotificationPreferenceService>() is { } preferences)
             {
-                await HoldForDigestAsync(scope.ServiceProvider, work, cancellationToken);
-                await queue.MarkDeliveredAsync(candidate, cancellationToken);
-                continue;
+                var decision = await preferences.DecideAsync(work.OwnerId, work.Notification.Type, cancellationToken);
+                if (decision.Outcome == PushOutcomes.Held)
+                    await HoldForDigestAsync(scope.ServiceProvider, work, cancellationToken);
+                if (decision.Outcome != PushOutcomes.Push)
+                {
+                    await queue.MarkOutcomeAsync(candidate,
+                        decision.Outcome == PushOutcomes.Held ? PushDeliveryOutcomes.Held : PushDeliveryOutcomes.AppOnly,
+                        cancellationToken);
+                    continue;
+                }
             }
 
             try

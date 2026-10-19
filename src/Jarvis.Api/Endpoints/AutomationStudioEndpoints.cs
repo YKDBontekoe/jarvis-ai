@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using System.Text;
 using System.Text.Json;
 using Jarvis.Api.Security;
@@ -14,8 +16,11 @@ public sealed record SimulateRequest(JsonElement Definition, SampleEventRequest?
 
 public sealed record WebhookCreateRequest(string? Name);
 
+public sealed record AutomationTemplatePreviewStep(string Label, string? Title, string? Body, bool NeedsApproval);
+
 public sealed record AutomationTemplateDto(string Id, string Title, string Description, string Category,
-    string Trigger, int Actions, bool NeedsApproval);
+    string Trigger, int Actions, bool NeedsApproval, string? SuccessCriterion = null,
+    IReadOnlyList<AutomationTemplatePreviewStep>? Preview = null);
 
 public sealed record WebhookDto(Guid Id, string Name, string TokenHint, int UseCount, DateTimeOffset? LastUsedAt,
     DateTimeOffset CreatedAt);
@@ -39,11 +44,11 @@ internal static class AutomationStudioEndpoints
             .WithName("ListAutomationTemplates");
 
         group.MapPost("/templates/{templateId}/create", async (string templateId, IAutomationRuleService automations,
-            IDailyBriefingRepository briefings, ICurrentUser user, CancellationToken ct) =>
+            IDailyBriefingRepository briefings, IOwnerSettingsStore settings, ICurrentUser user, CancellationToken ct) =>
         {
             var template = AutomationTemplates.Find(templateId);
             if (template is null) return Results.NotFound();
-            var zoneId = (await briefings.GetAsync(user.OwnerId, ct))?.TimeZoneId;
+            var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, user.OwnerId, ct);
             var definition = template.Build(LocalClock.TryFind(zoneId, out var zone) ? zone.Id : "UTC");
             var json = JsonDocument.Parse(AutomationDefinitionJson.Serialize(definition)).RootElement.Clone();
             var rule = await automations.CreateAsync(user.OwnerId, new SaveAutomationRuleRequest(template.Title, json), ct);
@@ -133,9 +138,17 @@ internal static class AutomationStudioEndpoints
     private static AutomationTemplateDto ToDto(AutomationTemplate template)
     {
         var definition = template.Build("UTC");
+        // A preview needs an event to read from; an event-triggered template gets a neutral example of its own kind.
+        var sample = definition.Trigger is EventTriggerDefinition eventTrigger
+            ? new AutomationEvent(eventTrigger.EventKind, "Example", "Example detail", null, null,
+                DateTimeOffset.UtcNow).Normalize()
+            : null;
+        var preview = AutomationSimulator.Simulate(definition, sample, DateTimeOffset.UtcNow).Steps
+            .Select(step => new AutomationTemplatePreviewStep(step.Label, step.Title, step.Body, step.NeedsApproval))
+            .ToArray();
         return new AutomationTemplateDto(template.Id, template.Title, template.Description, template.Category,
             AutomationSimulator.DescribeTrigger(definition.Trigger), definition.Actions.Count,
-            definition.Actions.Any(AutomationActionPolicy.RequiresApproval));
+            definition.Actions.Any(AutomationActionPolicy.RequiresApproval), template.SuccessCriterion, preview);
     }
 
     private static WebhookDto ToDto(AutomationWebhookRecord x) =>

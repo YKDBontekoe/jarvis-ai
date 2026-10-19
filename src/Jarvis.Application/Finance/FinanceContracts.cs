@@ -147,7 +147,30 @@ public sealed record ImportReport(
     int IncomeSkipped,
     int Unreadable,
     string? Problem,
-    IReadOnlyList<ImportRow> Preview);
+    IReadOnlyList<ImportRow> Preview,
+    Guid? BatchId = null);
+
+/// <summary>One committed import, kept so it can be undone. Only rows it created are ever removed.</summary>
+public sealed record ImportBatch(
+    Guid Id,
+    DateTimeOffset At,
+    int Rows,
+    int Imported,
+    int Duplicates,
+    IReadOnlyList<Guid> ExpenseIds,
+    DateTimeOffset? UndoneAt = null,
+    int Removed = 0,
+    int KeptEdited = 0);
+
+/// <summary>Owner settings section <see cref="Section"/>: the latest import batches, newest first.</summary>
+public sealed record ImportBatchState(IReadOnlyList<ImportBatch> Batches)
+{
+    public const string Section = "finance.imports";
+    public const int Keep = 20;
+}
+
+public sealed record ImportBatchView(Guid Id, DateTimeOffset At, int Rows, int Imported, int Duplicates,
+    int StillThere, int Edited, bool Undone, int Removed, int KeptEdited);
 
 public enum FinanceFailure
 {
@@ -204,4 +227,14 @@ public interface IFinanceService
     Task<string> ExportCsvAsync(Guid ownerId, DateOnly from, DateOnly to, string? category,
         CancellationToken cancellationToken);
     Task<DateOnly> TodayAsync(Guid ownerId, CancellationToken cancellationToken);
+
+    /// <summary>Committed imports with how many of their rows still exist unchanged.</summary>
+    Task<IReadOnlyList<ImportBatchView>> ListImportsAsync(Guid ownerId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Removes the rows an import created that still exist and were never edited. Edited rows, rows that were
+    /// duplicates of earlier ones, and anything else with the same merchant stay. Undoing twice does nothing more.
+    /// </summary>
+    Task<FinanceOperation<ImportBatchView>> UndoImportAsync(Guid ownerId, Guid batchId,
+        CancellationToken cancellationToken);
 }

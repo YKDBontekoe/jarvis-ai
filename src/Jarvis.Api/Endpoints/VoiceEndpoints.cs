@@ -5,6 +5,7 @@ using Jarvis.Api.Realtime;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Security;
 using Jarvis.Application.Settings;
+using Jarvis.Application.Voice;
 using Jarvis.Application.Workflows;
 using Microsoft.AspNetCore.SignalR;
 
@@ -108,7 +109,7 @@ internal static class VoiceEndpoints
         api.MapPost("/voice/internal/{conversationId:guid}/tools/{toolName}", async (Guid conversationId,
             string toolName, VoiceToolCallRequest request, HttpRequest httpRequest, IConfiguration configuration,
             IConversationStore conversations, IJarvisTaskRepository tasks, VoiceBackendSession voice,
-            CancellationToken ct) =>
+            IVoiceCompanionService companion, IHubContext<JarvisEventsHub> hub, CancellationToken ct) =>
         {
             if (!VoiceWorkerAuthorized(httpRequest, configuration)) return Results.Unauthorized();
             if (string.IsNullOrWhiteSpace(toolName) || toolName.Length > 200)
@@ -120,8 +121,41 @@ internal static class VoiceEndpoints
                 ? json.GetRawText()
                 : "{}";
             var result = await voice.InvokeAsync(request.OwnerId, conversationId, toolName, arguments, ct);
+            if (!result.IsError && !result.ApprovalRequired)
+                await PublishCompanionCardAsync(companion, hub, request.OwnerId, conversationId, toolName, arguments, ct);
             return Results.Ok(new VoiceToolCallResultDto(result.Result, result.IsError, result.ApprovalRequired));
         }).WithName("InvokeVoiceBackendTool").AllowAnonymous();
+
+        // The cards the voice session showed, what was saved or put away, and a recap that keeps those apart.
+        api.MapGet("/voice/{conversationId:guid}/cards", async (Guid conversationId, IVoiceCompanionService companion,
+            IConversationStore conversations, ICurrentUser currentUser, CancellationToken ct) =>
+            await conversations.GetAsync(conversationId, currentUser.OwnerId, ct) is null
+                ? Results.NotFound()
+                : Results.Ok(await companion.ListAsync(currentUser.OwnerId, conversationId, ct)))
+            .WithName("ListVoiceCards");
+
+        api.MapGet("/voice/{conversationId:guid}/recap", async (Guid conversationId, IVoiceCompanionService companion,
+            IConversationStore conversations, ICurrentUser currentUser, CancellationToken ct) =>
+            await conversations.GetAsync(conversationId, currentUser.OwnerId, ct) is null
+                ? Results.NotFound()
+                : Results.Ok(await companion.RecapAsync(currentUser.OwnerId, conversationId, ct)))
+            .WithName("GetVoiceRecap");
+
+        api.MapPost("/voice/cards/{cardId}/save", async (string cardId, IVoiceCompanionService companion,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var result = await companion.SaveAsync(currentUser.OwnerId, cardId, ct);
+            return result.Succeeded ? Results.Ok(result.Value)
+                : result.NotFound ? Results.NotFound()
+                : EndpointHelpers.Invalid(result.Field ?? "card", result.Message ?? "It could not be saved.");
+        }).WithName("SaveVoiceCard");
+
+        api.MapPost("/voice/cards/{cardId}/dismiss", async (string cardId, IVoiceCompanionService companion,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var result = await companion.DismissAsync(currentUser.OwnerId, cardId, ct);
+            return result.Succeeded ? Results.Ok(result.Value) : Results.NotFound();
+        }).WithName("DismissVoiceCard");
 
         api.MapPost("/voice/internal/{conversationId:guid}/utterance", async (Guid conversationId,
             VoiceUtteranceRequest request, HttpRequest httpRequest, IConfiguration configuration,
@@ -175,5 +209,22 @@ internal static class VoiceEndpoints
         return new VoiceSettingsDto(stored.HandsFree, stored.Captions, selected, status.Voices.DefaultVoice,
             status.Voices.Voices.Select(voice => new CodexVoiceDto(voice.Id, voice.Name, voice.IsDefault)).ToArray(),
             status.VoiceError);
+    }
+
+    private static async Task PublishCompanionCardAsync(IVoiceCompanionService companion,
+        IHubContext<JarvisEventsHub> hub, Guid ownerId, Guid conversationId, string toolName, string arguments,
+        CancellationToken ct)
+    {
+        try
+        {
+            if (await companion.CardForToolAsync(ownerId, conversationId, toolName, arguments, ct) is { } card)
+                await hub.Clients.Group(JarvisEventsHub.GroupName(conversationId))
+                    .SendAsync("voice.card", new { conversationId, card }, ct);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // The spoken answer already went out; a missing card only means the owner has to ask again.
+            _ = exception;
+        }
     }
 }

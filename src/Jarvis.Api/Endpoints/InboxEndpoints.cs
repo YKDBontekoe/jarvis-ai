@@ -22,11 +22,14 @@ public sealed record InboxTriageDto(InboxThreadDto Thread, IReadOnlyList<Commitm
 
 public sealed record CommitmentDto(Guid Id, string Direction, string Counterparty, string Description,
     DateOnly? DueOn, string Status, bool Suggested, string Source, Guid? InboxThreadId, bool HasReminder,
-    DateTimeOffset? CompletedAt, DateTimeOffset CreatedAt);
+    DateTimeOffset? CompletedAt, DateTimeOffset CreatedAt, Guid? ProjectId = null, Guid? PersonId = null);
 
 public sealed record CommitmentRequest(string? Direction, string? Counterparty, string? Description, DateOnly? DueOn);
 
-public sealed record CommitmentUpdateRequest(string? Description, DateOnly? DueOn, bool? ClearDue, string? Status);
+public sealed record CommitmentUpdateRequest(string? Description, DateOnly? DueOn, bool? ClearDue, string? Status,
+    Guid? ProjectId = null, Guid? PersonId = null, bool? ClearProject = null, bool? ClearPerson = null);
+
+public sealed record FollowUpSnoozeRequest(int? Days);
 
 /// <summary>
 /// The unified inbox and the commitments ledger. Audit entries carry ids only, never message text or promises.
@@ -101,6 +104,25 @@ internal static class InboxEndpoints
             return Results.Ok(list.Select(ToDto).ToArray());
         }).WithName("ListCommitments");
 
+        group.MapGet("/follow-ups", async (string? language, ICommitmentFollowUpService followUps,
+            ICurrentUser currentUser, CancellationToken ct) =>
+            Results.Ok(await followUps.ListAsync(currentUser.OwnerId, language, ct))).WithName("ListCommitmentFollowUps");
+
+        group.MapPost("/{id:guid}/follow-up/snooze", async (Guid id, FollowUpSnoozeRequest request,
+            ICommitmentFollowUpService followUps, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            if (request.Days is not (>= 1 and <= CommitmentFollowUpRules.MaxSnoozeDays))
+                return EndpointHelpers.Invalid("days", $"Snooze for 1 to {CommitmentFollowUpRules.MaxSnoozeDays} days.");
+            return await followUps.SnoozeAsync(currentUser.OwnerId, id, request.Days.Value, ct)
+                ? Results.NoContent()
+                : Results.NotFound();
+        }).WithName("SnoozeCommitmentFollowUp");
+
+        group.MapPost("/{id:guid}/follow-up/dismiss", async (Guid id, ICommitmentFollowUpService followUps,
+            ICurrentUser currentUser, CancellationToken ct) =>
+            await followUps.DismissAsync(currentUser.OwnerId, id, ct) ? Results.NoContent() : Results.NotFound())
+            .WithName("DismissCommitmentFollowUp");
+
         group.MapPost("", async (CommitmentRequest request, ICommitmentService commitments, IAuditEventStore audit,
             ICurrentUser currentUser, CancellationToken ct) =>
         {
@@ -133,6 +155,13 @@ internal static class InboxEndpoints
                     : await commitments.SetStatusAsync(id, currentUser.OwnerId, request.Status, ct);
                 if (!result.Succeeded) return Respond(result, ToDto);
             }
+            if (request.ProjectId is not null || request.PersonId is not null || request.ClearProject == true ||
+                request.ClearPerson == true)
+            {
+                result = await commitments.SetLinksAsync(id, currentUser.OwnerId, request.ProjectId, request.PersonId,
+                    request.ClearProject == true, request.ClearPerson == true, ct);
+                if (!result.Succeeded) return Respond(result, ToDto);
+            }
             if (result is null) return EndpointHelpers.Invalid("request", "Nothing to change.");
             await AuditAsync(audit, logger, currentUser, "commitment.updated", id, ct);
             return Respond(result, ToDto);
@@ -163,7 +192,7 @@ internal static class InboxEndpoints
 
     internal static CommitmentDto ToDto(Commitment x) => new(x.Id, x.Direction, x.Counterparty, x.Description,
         x.DueOn, x.Status, x.Suggested, x.Source, x.InboxThreadId, x.ReminderId is not null, x.CompletedAt,
-        x.CreatedAt);
+        x.CreatedAt, x.ProjectId, x.PersonId);
 
     private static Task AuditAsync(IAuditEventStore audit, ILogger logger, ICurrentUser currentUser, string action,
         Guid resourceId, CancellationToken ct) =>

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../api/mutation_queue.dart';
 import '../api/offline_cache.dart';
 import '../l10n/l10n.dart';
 import '../theme.dart';
@@ -65,13 +66,23 @@ class _OfflineBarState extends State<_OfflineBar> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      ValueListenableBuilder<List<QueuedMutation>>(
+        valueListenable: MutationQueue.instance.items,
+        builder: (context, _, _) => _bar(context),
+      );
+
+  Widget _bar(BuildContext context) {
     final colors = JarvisColors.of(context);
     final savedAt = widget.state.savedAt;
     final l10n = context.l10n;
-    final label = savedAt == null
+    final base = savedAt == null
         ? l10n.offline
         : l10n.offlineShowingSaved(offlineAge(savedAt, DateTime.now(), l10n));
+    final queued = MutationQueue.instance.waiting;
+    final label = queued == 0
+        ? base
+        : '$base · $queued change${queued == 1 ? '' : 's'} waiting to send';
     return Material(
       color: colors.warningSoft,
       child: SafeArea(
@@ -96,9 +107,8 @@ class _OfflineBarState extends State<_OfflineBar> {
                       key: const ValueKey('offline-banner'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.labelMedium?.copyWith(color: colors.ink),
+                      style: Theme.of(context).textTheme.labelMedium
+                          ?.copyWith(color: colors.ink),
                     ),
                   ),
                 ),

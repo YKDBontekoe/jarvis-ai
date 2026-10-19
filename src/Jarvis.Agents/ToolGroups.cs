@@ -27,7 +27,7 @@ public static partial class ToolGroups
     [
         new("money", "Expenses, budgets, subscriptions, bank accounts, income, transactions and stock portfolio",
             ["LogExpense", "GetExpenses", "UpdateExpense", "DeleteExpense", "GetFinanceOverview", "GetBudgets",
-             "GetSubscriptions", "SetBudget", "RemoveBudget", "SetSubscriptionStatus", "RemindBeforeCharge",
+             "GetSubscriptions", "GetRenewalReview", "SetBudget", "RemoveBudget", "SetSubscriptionStatus", "RemindBeforeCharge",
              "StartSubscriptionNegotiation", "ImportBankStatement", "GetAccounts", "GetTransactions", "GetPortfolio",
              "AddAccount", "LogIncome", "RecordTrade", "SetHoldingPrice"],
             MoneyKeywords()),
@@ -37,13 +37,14 @@ public static partial class ToolGroups
             InboxKeywords()),
         new("library", "Saved articles and notes, flashcards, clipping a URL, deep research reports",
             ["SearchLibrary", "GetLibraryItem", "SaveToLibrary", "GetLibraryDigest", "GetDueFlashcards",
-             "GradeFlashcard", "AddFlashcards", "ClipUrlToLibrary", "StartDeepResearch"],
+             "GradeFlashcard", "AddFlashcards", "ClipUrlToLibrary", "StartDeepResearch", "TeachFromLibraryItem",
+             "CheckLessonAnswer"],
             LibraryKeywords()),
         new("planner", "Today's day plan: show it, plan the day, add, complete or remove items",
             ["GetTodayPlan", "AddToDayPlan", "PlanMyDay", "CompleteDayPlanItem", "RemoveDayPlanItem"],
             PlannerKeywords()),
         new("people", "Contacts the user keeps up with: details, birthdays, logging contact, relationship radar",
-            ["GetPeople", "SavePerson", "LogContact", "RemovePerson", "GetRelationshipRadar"],
+            ["GetPeople", "SavePerson", "LogContact", "RemovePerson", "GetRelationshipRadar", "GetPersonFollowThrough"],
             PeopleKeywords()),
         new("whatsapp", "Read, search and send WhatsApp messages in chats the user turned on",
             ["ListWhatsAppChats", "ReadWhatsAppChat", "SearchWhatsAppMessages", "SendWhatsAppMessage"],
@@ -57,6 +58,51 @@ public static partial class ToolGroups
         new("decisions", "Decision journal: log and resolve decisions, see calibration",
             ["LogDecision", "ResolveDecision", "GetDecisions", "GetCalibration"],
             DecisionKeywords()),
+        new("projects", "Projects: what each is for, its status and the next action to take",
+            ["GetProjects", "SetProjectOutcome", "SetProjectNextAction"],
+            ProjectKeywords()),
+        new("comparisons", "Weigh options against criteria: create a comparison, record what is known, see the ranking",
+            ["CreateComparison", "SetComparisonCell", "GetComparison"],
+            ComparisonKeywords()),
+        new("opportunities", "What is worth acting on now: meetings to prepare for, promises to follow up, renewals, decisions, free time",
+            ["GetOpportunities"],
+            OpportunityKeywords()),
+        new("stories", "Draft a recap, retrospective or what-changed story from the user's own timeline; stored as an editable draft, nothing is shared",
+            ["DraftLifeStory"],
+            StoryKeywords()),
+        new("setup", "How far setup is: steps done, skipped or open, and what is not connected",
+            ["GetSetupStatus"],
+            SetupKeywords()),
+        new("notification-settings", "Why something did or did not buzz the phone: per-kind choices and the current mode",
+            ["ExplainNotifications"],
+            NotificationSettingsKeywords()),
+        new("voice-cards", "In a voice session: save the card just shown, and recap what was saved and what is still open",
+            ["SaveShownCard", "GetSessionRecap"],
+            VoiceCardKeywords()),
+        new("trips", "Plan a trip inside Jarvis: dates, options with dated and sourced prices, what is still unknown; nothing is booked",
+            ["CreateTrip", "AddTripOption", "GetTrip"],
+            TripKeywords()),
+        new("working-styles", "Suggest which assistant working style (profile) fits a task and what would change; only suggests",
+            ["SuggestWorkingStyle"],
+            WorkingStyleKeywords()),
+        new("home-routines", "Preview what a home routine (morning, focus, leave, evening) would do; example devices, nothing is run",
+            ["PreviewHomeRoutine"],
+            HomeRoutineKeywords()),
+        new("documents", "Draft a one-page project update from the user's own records, nothing is sent",
+            ["DraftProjectUpdate"],
+            DocumentKeywords()),
+        new("apps", "Find which app can do a job for the user, what it could read or change, and how to connect it",
+            ["FindAppForGoal"],
+            AppGoalKeywords()),
+        new("scenarios", "What-if arithmetic: compare a cost or a pace now and with an alternative, nothing is changed",
+            ["CompareCostScenario", "CompareTimeScenario"],
+            ScenarioKeywords()),
+        new("goals", "Goals: how they are going, check-ins in the user's words, a small proposed plan for the week",
+            ["GetGoals", "AddGoalCheckIn", "ProposeGoalPlan"],
+            GoalKeywords()),
+        new("meetings", "Meetings: prepare from the user's own records, debrief into proposed decisions and promises, draft a follow-up",
+            ["PrepareMeeting", "DebriefMeeting", "DraftMeetingFollowUp"],
+            MeetingKeywords()),
         new("timeline", "Life timeline, on this day, life insights, routine and self-improvement suggestions",
             ["QueryTimeline", "OnThisDay", "GetLifeInsights", "GetRoutineSuggestions", "GetImprovementProposals"],
             TimelineKeywords()),
@@ -65,10 +111,10 @@ public static partial class ToolGroups
              "CreateAutomationFromTemplate", "EnableAutomation", "DisableAutomation", "RunAutomation"],
             AutomationKeywords()),
         new("missions", "Multi-step missions run by a crew of background tasks: plan, run, pause, cancel",
-            ["PlanMission", "RunMission", "GetMissions", "PauseOrResumeMission", "CancelMission"],
+            ["PlanMission", "RunMission", "GetMissions", "PauseOrResumeMission", "CancelMission", "GetMissionResult"],
             MissionKeywords()),
         new("modes", "Assistant modes such as focus or travel: get or set the current mode",
-            ["GetCurrentMode", "SetMode"],
+            ["GetCurrentMode", "SetMode", "StartFocus"],
             ModeKeywords()),
         new("devices", "The user's connected phones and computers: list, battery, location, clipboard, notify, open URL",
             ["ListDevices", "GetDeviceBattery", "NotifyDevice", "GetDeviceLocation", "ReadDeviceClipboard",
@@ -208,7 +254,7 @@ public static partial class ToolGroups
     [GeneratedRegex(@"\b(inbox|e-?mail|mail|thread|unread|triage|commitment|promis|follow[- ]?up|owe|reply to|respond to|beloofd|belofte|toezegging|ongelezen)", KeywordOptions)]
     private static partial Regex InboxKeywords();
 
-    [GeneratedRegex(@"\b(library|article|read later|saved? (this|it|link)|clip|bookmark|flashcard|study|quiz me|deep research|research report|digest|bibliotheek|artikel|opslaan|onderzoek)", KeywordOptions)]
+    [GeneratedRegex(@"\b(library|article|read later|saved? (this|it|link)|clip|bookmark|flashcard|study|quiz me|teach me|lesson|explain this article|leer me|les over|deep research|research report|digest|bibliotheek|artikel|opslaan|onderzoek)", KeywordOptions)]
     private static partial Regex LibraryKeywords();
 
     [GeneratedRegex(@"\b(plan (my|the|for)|day plan|today'?s plan|my day|schedule (my|the) day|agenda|to-?do|planning|dagplan|mijn dag|vandaag plannen)", KeywordOptions)]
@@ -228,6 +274,51 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(decision|decide|decided|calibration|prediction|beslis|besluit|beslissing|voorspelling)", KeywordOptions)]
     private static partial Regex DecisionKeywords();
+
+    [GeneratedRegex(@"\b(project|next (step|action)|outcome|goal of|project(en)?|volgende (stap|actie)|doel van)", KeywordOptions)]
+    private static partial Regex ProjectKeywords();
+
+    [GeneratedRegex(@"\b(compare|comparison|which (one|should)|pros and cons|versus|\bvs\b|choose between|shortlist|vergelijk|vergelijking|welke (moet|zal)|kiezen tussen)", KeywordOptions)]
+    private static partial Regex ComparisonKeywords();
+
+    [GeneratedRegex(@"\b(what should i do (next|now)|what('?s| is) coming up|anything (i )?(should|need to) (do|know)|what needs my attention|what am i missing|wat moet ik (nu )?doen|wat komt eraan|wat heeft aandacht nodig)", KeywordOptions)]
+    private static partial Regex OpportunityKeywords();
+
+    [GeneratedRegex(@"\b(recap|retrospective|year in review|month in review|what changed (this|last|over)|my story|life story|terugblik|jaaroverzicht|maandoverzicht|wat is er veranderd)", KeywordOptions)]
+    private static partial Regex StoryKeywords();
+
+    [GeneratedRegex(@"\b(set ?up|getting started|what('?s| is) (connected|not working)|is (my )?\w+ connected|what (is|isn't) set up|first week|instellen|wat is er ingesteld|is .{1,20} gekoppeld)", KeywordOptions)]
+    private static partial Regex SetupKeywords();
+
+    [GeneratedRegex(@"\b(why (didn'?t|did) i (get|receive)|what will (buzz|ping|notify)|notification settings|which notifications|do not disturb|waarom kreeg ik|welke meldingen)", KeywordOptions)]
+    private static partial Regex NotificationSettingsKeywords();
+
+    [GeneratedRegex(@"\b(save (that|this|it)|keep (that|this)|what did we (do|cover|save)|recap (this|our) (session|chat|call)|sla (dat|dit) op|wat hebben we gedaan)", KeywordOptions)]
+    private static partial Regex VoiceCardKeywords();
+
+    [GeneratedRegex(@"\b(working style|which profile|switch profile|assistant profile|writing mode|tutor mode|werkstijl|welk profiel|schakel profiel)", KeywordOptions)]
+    private static partial Regex WorkingStyleKeywords();
+
+    [GeneratedRegex(@"\b(home routine|leave home|morning routine|evening routine|wind.?down|smart home|turn off the lights|thuisroutine|verlaat het huis|avondroutine)", KeywordOptions)]
+    private static partial Regex HomeRoutineKeywords();
+
+    [GeneratedRegex(@"\b(trip|holiday|vacation|itinerary|flight|hotel|city break|weekend away|vakantie|reis|reisje|vlucht|hotel|stedentrip|uitje)", KeywordOptions)]
+    private static partial Regex TripKeywords();
+
+    [GeneratedRegex(@"\b(project update|status update|progress report|write (up )?(an? )?update|statusupdate|voortgangsrapport|schrijf (een )?update)", KeywordOptions)]
+    private static partial Regex DocumentKeywords();
+
+    [GeneratedRegex(@"\b(connect (my|an?|the)|which app|what app|integrate|integration|hook up|can you (read|access) my (calendar|e-?mail|contacts)|koppel|verbind|welke app)", KeywordOptions)]
+    private static partial Regex AppGoalKeywords();
+
+    [GeneratedRegex(@"\b(what if|what[- ]if|scenario|break[- ]even|how long would|how many weeks|would i save|save if|switch(ing)? to|wat als|scenario|hoe lang zou|zou ik besparen|overstappen)", KeywordOptions)]
+    private static partial Regex ScenarioKeywords();
+
+    [GeneratedRegex(@"\b(goals?|check[- ]?in on|making progress|my progress|experiment|doelen?|vooruitgang|voortgang|experiment)", KeywordOptions)]
+    private static partial Regex GoalKeywords();
+
+    [GeneratedRegex(@"\b(meeting|agenda|debrief|prep(are)? (me )?for|follow[- ]?up|standup|stand-up|1[:-]1|one[- ]on[- ]one|vergadering|overleg|bespreking|afspraak met|voorbereiden)", KeywordOptions)]
+    private static partial Regex MeetingKeywords();
 
     [GeneratedRegex(@"\b(timeline|on this day|this day last|years? ago|insight|routine|pattern|improvement|tijdlijn|vandaag \d+ jaar|jaar geleden|inzicht|patroon|verbeter)", KeywordOptions)]
     private static partial Regex TimelineKeywords();

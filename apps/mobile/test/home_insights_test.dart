@@ -63,9 +63,10 @@ void main() {
     });
 
     test('the time of day changes the defaults', () {
-      List<String> at(int hour) => homeSuggestions(
-        now: DateTime(2026, 10, 16, hour),
-      ).map((s) => s.label).toList();
+      List<String> at(int hour) =>
+          homeSuggestions(now: DateTime(2026, 10, 16, hour))
+              .map((s) => s.label)
+              .toList();
       expect(at(14), contains("What's left today?"));
       expect(at(21), contains('Plan tomorrow'));
       expect(at(21).length, greaterThanOrEqualTo(2));
@@ -155,6 +156,78 @@ void main() {
       ]);
       expect(items[4].detail, startsWith('Noor asked: Are you in?'));
       expect(items.last.title, 'Catch up on Tom');
+    });
+
+    test('promises and decisions that are due join the list, once', () {
+      final items = needsYouItems(
+        now: now,
+        briefing: {
+          'reminders': [
+            {
+              'id': 'r-promise',
+              'title': 'Due today: Send the deck (for Rosa)',
+              'dueAt': _iso(now.subtract(const Duration(minutes: 30))),
+              'status': 'pending',
+            },
+            {
+              'id': 'r-decision',
+              'title': 'Check outcome: Switch bank',
+              'dueAt': _iso(now.subtract(const Duration(minutes: 30))),
+              'status': 'pending',
+            },
+            {
+              'id': 'r-plain',
+              'title': 'Bring the charger',
+              'dueAt': _iso(now.subtract(const Duration(minutes: 30))),
+              'status': 'pending',
+            },
+          ],
+          'commitments': [
+            {
+              'id': 'c1',
+              'direction': 'i_owe',
+              'counterparty': 'Rosa',
+              'description': 'Send the deck',
+              'daysOverdue': 2,
+              'reminderId': 'r-promise',
+            },
+            {
+              'id': 'c2',
+              'direction': 'owed_to_me',
+              'counterparty': 'Tom',
+              'description': 'Share the invoice',
+              'daysOverdue': 0,
+            },
+          ],
+          'decisions': [
+            {
+              'id': 'd1',
+              'title': 'Switch bank',
+              'prediction': 'Fees drop',
+              'daysOverdue': 1,
+              'reminderId': 'r-decision',
+            },
+          ],
+        },
+      );
+      expect(items.map((i) => (i.kind, i.id)), [
+        (NeedsYouKind.reminder, 'r-plain'),
+        (NeedsYouKind.commitment, 'c1'),
+        (NeedsYouKind.commitment, 'c2'),
+        (NeedsYouKind.decision, 'd1'),
+      ]);
+      expect(items[1].title, 'Send the deck');
+      expect(items[1].detail, 'You promised Rosa · Overdue · 2 days');
+      expect(items[1].overdue, isTrue);
+      expect(items[2].detail, 'Tom promised you · Due today');
+      expect(items[2].overdue, isFalse);
+      expect(items[3].detail, 'Time to check how it went · 1 day ago');
+      expect(items[3].hint, 'You predicted: Fees drop');
+    });
+
+    test('a briefing without promises or decisions adds nothing', () {
+      final items = needsYouItems(now: now, briefing: {'approvals': []});
+      expect(items, isEmpty);
     });
 
     test('caps the list', () {

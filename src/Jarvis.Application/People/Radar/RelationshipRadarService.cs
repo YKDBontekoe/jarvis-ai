@@ -182,8 +182,11 @@ public sealed class RelationshipRadarService(
         if (config.LastNudgedAt is { } last && now - last < TimeSpan.FromDays(RadarRules.NudgeRepeatDays))
             return new RadarDailyResult(0);
 
+        var prefs = await settings.GetAsync<PersonNudgeSettings>(ownerId, PersonNudgeSettings.Section,
+            cancellationToken) ?? new PersonNudgeSettings();
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
         var worrying = (await BuildReportsAsync(ownerId, all, cancellationToken))
-            .Where(x => x.Severity >= 2)
+            .Where(x => x.Severity >= 2 && !prefs.IsQuiet(x.PersonId, today))
             .OrderByDescending(x => x.Severity).ThenBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
         if (worrying.Length == 0) return new RadarDailyResult(0);

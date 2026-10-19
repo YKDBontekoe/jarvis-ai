@@ -16,6 +16,7 @@ public sealed record MemoryRecord(
     Guid? ProfileId = null,
     int AccessCount = 0,
     DateTimeOffset? LastAccessedAt = null,
-    string? SearchHints = null);
+    string? SearchHints = null,
+    Guid? SupersededById = null);
 
 public sealed record MemorySearchHit(MemoryRecord Memory, double Score);

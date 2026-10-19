@@ -84,6 +84,55 @@ public sealed class ProjectStoreTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Keeps_the_outcome_and_next_action_per_owner_and_leaves_old_updates_alone()
+    {
+        var owner = Guid.CreateVersion7();
+        var commitment = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var projects = new ProjectStore(database);
+        var project = await projects.CreateAsync(owner, new ProjectInput("Taxes", null, "Answer in Dutch.", null),
+            CancellationToken.None);
+        Assert.Equal("active", project.Status);
+        Assert.Null(project.NextAction);
+
+        var focused = await projects.SetFocusAsync(project.Id, owner,
+            new ProjectFocusInput("File before July", null, new ProjectNextAction("commitment", commitment, "Gather receipts")),
+            CancellationToken.None);
+        Assert.Equal("File before July", focused!.Outcome);
+        Assert.Equal(commitment, focused.NextAction!.Id);
+
+        // The old edit form knows nothing about outcomes: saving it must not wipe them.
+        await projects.UpdateAsync(project.Id, owner, new ProjectInput("Taxes 2026", null, "Answer in Dutch.", "green"),
+            CancellationToken.None);
+        var reread = await projects.GetAsync(project.Id, owner, CancellationToken.None);
+        Assert.Equal("File before July", reread!.Outcome);
+        Assert.Equal("Gather receipts", reread.NextAction!.Note);
+
+        var context = await projects.GetContextForConversationAsync(
+            await SeedConversationAsync(owner, project.Id), owner, CancellationToken.None);
+        Assert.Equal("File before July", context!.Outcome);
+
+        Assert.Null(await projects.SetFocusAsync(project.Id, Guid.CreateVersion7(),
+            new ProjectFocusInput("Mine now", null, null), CancellationToken.None));
+        var completed = await projects.SetFocusAsync(project.Id, owner,
+            new ProjectFocusInput("File before July", "completed", null), CancellationToken.None);
+        Assert.Equal("completed", completed!.Status);
+        Assert.Null(completed.NextAction);
+        Assert.Equal("File before July", (await projects.GetAsync(project.Id, owner, CancellationToken.None))!.Outcome);
+    }
+
+    private async Task<Guid> SeedConversationAsync(Guid owner, Guid projectId)
+    {
+        await using var seed = CreateDbContext();
+        var chat = new Conversation(owner, "Receipts");
+        seed.Conversations.Add(chat);
+        await seed.SaveChangesAsync();
+        chat.MoveToProject(projectId);
+        await seed.SaveChangesAsync();
+        return chat.Id;
+    }
+
+    [Fact]
     public async Task Creates_a_task_inside_a_project_only_for_its_owner()
     {
         var owner = Guid.CreateVersion7();

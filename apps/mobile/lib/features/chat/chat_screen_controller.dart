@@ -45,6 +45,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   bool _voiceCaptions = true;
   String? _voiceCaption;
   String? _voiceCaptionRole;
+  List<Map<String, dynamic>> _voiceCards = [];
   String _voicePhase = 'idle';
   String _voiceName = '';
   bool _voiceMuted = false;
@@ -215,6 +216,10 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _createAndOpenConversation();
   Future<void> _switchConversationProfile();
   void _openUtility(String destination);
+
+  Future<void> _voiceCardAction(String id, String action);
+
+  Future<void> _showVoiceRecap();
   void _showInPane(String destination, Widget page);
   Future<void> _openUtilityPage(String destination, Widget page);
   Future<void> _refreshUnreadNotifications();
@@ -235,6 +240,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _queueMessage(MessageEntry message, String conversationId);
   Future<void> _flushOutbox();
   Future<void> _cancelQueued(MessageEntry entry);
+  Future<void> _sendQueuedNow(MessageEntry entry);
   void _showPhotoSources();
   Future<void> _enqueueIncomingPhotos(List<IncomingPhoto> incoming);
   bool get _canSummarize;

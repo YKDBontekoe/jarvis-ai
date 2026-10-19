@@ -45,6 +45,7 @@ class _McpServerDetailScreenState extends State<McpServerDetailScreen> {
   Map<String, dynamic>? _server;
   Map<String, dynamic>? _connection;
   Map<String, dynamic>? _custom;
+  Map<String, dynamic>? _review;
   bool _loading = true;
   bool _busy = false;
   bool _testing = false;
@@ -69,11 +70,11 @@ class _McpServerDetailScreenState extends State<McpServerDetailScreen> {
     Map<String, dynamic>? server;
     Map<String, dynamic>? connection;
     Map<String, dynamic>? custom;
+    Map<String, dynamic>? review;
     try {
       final connections = jsonMaps(
-        (await widget.http.get<dynamic>(
-          '/api/v1/integrations/connections',
-        )).data,
+        (await widget.http.get<dynamic>('/api/v1/integrations/connections'))
+            .data,
       );
       connection = connections
           .where(
@@ -97,19 +98,26 @@ class _McpServerDetailScreenState extends State<McpServerDetailScreen> {
       try {
         final summary =
             jsonMaps(
-                  (await widget.http.get<dynamic>(
-                    '/api/v1/custom-mcp-servers',
-                  )).data,
+                  (await widget.http.get<dynamic>('/api/v1/custom-mcp-servers'))
+                      .data,
                 )
                 .where((item) => item['registryServerId'] == widget.serverId)
                 .firstOrNull;
         final id = asJsonString(summary?['id']);
         if (id != null) {
           custom = jsonObject(
-            (await widget.http.get<dynamic>(
-              '/api/v1/custom-mcp-servers/$id',
-            )).data,
+            (await widget.http.get<dynamic>('/api/v1/custom-mcp-servers/$id'))
+                .data,
           );
+          try {
+            review = jsonObject(
+              (await widget.http.get<dynamic>(
+                '/api/v1/custom-mcp-servers/$id/review',
+              )).data,
+            );
+          } catch (_) {
+            // The review is a help; approving still works without it.
+          }
         }
       } catch (_) {
         // Older servers have no self-built apps.
@@ -120,6 +128,7 @@ class _McpServerDetailScreenState extends State<McpServerDetailScreen> {
       _server = server;
       _connection = connection;
       _custom = custom;
+      _review = review;
       _error = error;
       _loading = false;
     });
@@ -306,22 +315,32 @@ class _McpServerDetailScreenState extends State<McpServerDetailScreen> {
     final test = jsonObject(server['lastTest']);
     final tested =
         test?['ok'] == true && test?['sha256'] == server['draftSha256'];
-    final confirmed = await showJarvisConfirm(
-      context,
-      title: 'Switch on ${asJsonString(server['name']) ?? 'this app'}?',
-      message: [
-        'Jarvis runs this code in a locked-down helper, away from your data. '
-            'Each action still asks for your OK unless you allowed it.',
-        if (!tested) 'This version has not passed a test yet.',
-      ].join(' '),
-      confirmLabel: 'Switch on',
-      icon: PhosphorIconsRegular.shieldCheck,
-    );
-    if (!confirmed || !mounted) return;
+    String? reason;
+    if (tested) {
+      final confirmed = await showJarvisConfirm(
+        context,
+        title: 'Switch on ${asJsonString(server['name']) ?? 'this app'}?',
+        message:
+            'Jarvis runs this code in a locked-down helper, away from your '
+            'data. Each action still asks for your OK unless you allowed it.',
+        confirmLabel: 'Switch on',
+        icon: PhosphorIconsRegular.shieldCheck,
+      );
+      if (!confirmed || !mounted) return;
+    } else {
+      reason = await showJarvisDialog<String>(
+        context: context,
+        builder: (_) => const _OverrideDialog(),
+      );
+      if (reason == null || !mounted) return;
+    }
     await _run(
       () => widget.http.post<dynamic>(
         '/api/v1/custom-mcp-servers/$id/activate',
-        data: {'sha256': asJsonString(server['draftSha256'])},
+        data: {
+          'sha256': asJsonString(server['draftSha256']),
+          'overrideReason': ?reason,
+        },
       ),
       'Could not switch the app on.',
     );
@@ -702,6 +721,19 @@ class _McpServerDetailScreenState extends State<McpServerDetailScreen> {
                   : 'Version $revision is live.',
               style: const TextStyle(fontWeight: FontWeight.w500),
             ),
+            if (_review case final review?) ...[
+              const SizedBox(height: 8),
+              Text(
+                _changeSummary(review),
+                key: const Key('app-review-changes'),
+                style: TextStyle(color: colors.inkSoft, fontSize: 13.5),
+              ),
+              Text(
+                asJsonString(review['testLabel']) ?? '',
+                key: const Key('app-review-test'),
+                style: TextStyle(color: colors.muted, fontSize: 13),
+              ),
+            ],
             if (testedDraft) ...[
               const SizedBox(height: 8),
               InlineNotice(
@@ -750,9 +782,8 @@ class _McpServerDetailScreenState extends State<McpServerDetailScreen> {
             _CodeBlock(title: 'Code · version $revision', code: draft),
             if (revisions.length > 1)
               Theme(
-                data: Theme.of(
-                  context,
-                ).copyWith(dividerColor: Colors.transparent),
+                data: Theme.of(context)
+                    .copyWith(dividerColor: Colors.transparent),
                 child: ExpansionTile(
                   tilePadding: EdgeInsets.zero,
                   shape: const Border(),
@@ -791,6 +822,21 @@ class _McpServerDetailScreenState extends State<McpServerDetailScreen> {
         ),
       ),
     ];
+  }
+
+  String _changeSummary(Map<String, dynamic> review) {
+    final parts = <String>[
+      review['firstVersion'] == true
+          ? 'First version: ${asJsonInt(review['added'])} lines of code'
+          : '+${asJsonInt(review['added'])} −${asJsonInt(review['removed'])} lines since the live version',
+      for (final dependency in jsonStrings(review['dependenciesAdded']))
+        'adds $dependency',
+      for (final dependency in jsonStrings(review['dependenciesRemoved']))
+        'drops $dependency',
+      if (jsonStrings(review['keys']).isNotEmpty)
+        'uses ${jsonStrings(review['keys']).join(', ')}',
+    ];
+    return '${parts.join(' · ')}.';
   }
 
   Widget _footer(BuildContext context) {
@@ -934,4 +980,61 @@ class _CodeBlock extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Switching on code that has not passed a test needs a reason, kept in the
+/// activity log.
+class _OverrideDialog extends StatefulWidget {
+  const _OverrideDialog();
+
+  @override
+  State<_OverrideDialog> createState() => _OverrideDialogState();
+}
+
+class _OverrideDialogState extends State<_OverrideDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('This code has not passed a test'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Test it first if you can. To switch it on anyway, say why. '
+          'Your reason is kept in the activity log.',
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const Key('app-override-reason'),
+          controller: _controller,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'For example: it only does arithmetic and I read it.',
+          ),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        key: const Key('app-override-confirm'),
+        onPressed: () {
+          final text = _controller.text.trim();
+          if (text.length >= 10) Navigator.pop(context, text);
+        },
+        child: const Text('Switch on anyway'),
+      ),
+    ],
+  );
 }

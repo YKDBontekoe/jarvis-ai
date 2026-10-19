@@ -12,7 +12,17 @@ import '../integrations/integrations_screen.dart';
 import '../integrations/server_detail_screen.dart';
 import '../tiles/app_tiles.dart';
 import '../memory/memory_screen.dart';
+import '../missions/mission_result_screen.dart';
+import '../missions/mission_starter_screen.dart';
 import '../missions/missions_screen.dart';
+import '../attention/attention_screen.dart';
+import '../home_routines/home_routines_screen.dart';
+import '../memory/do_not_learn_screen.dart';
+import '../settings/locale_screen.dart';
+import '../outcomes/learned_screen.dart';
+import '../profiles/working_styles_screen.dart';
+import '../profiles/workspaces_screen.dart';
+import '../home_routines/routine_screen.dart';
 import '../modes/modes_screen.dart';
 import '../automations/automations_screen.dart';
 import '../reminders/reminders_screen.dart';
@@ -20,6 +30,28 @@ import '../tasks/tasks_screen.dart';
 import '../agents/agents_screen.dart';
 import '../channels/channels_screen.dart';
 import '../coding/coding_runs_screen.dart';
+import '../comparisons/comparison_screen.dart';
+import '../comparisons/comparisons_screen.dart';
+import '../apps/app_goals_screen.dart';
+import '../apps/build_app_screen.dart';
+import '../documents/document_screen.dart';
+import '../documents/documents_screen.dart';
+import '../notifications/notification_settings_screen.dart';
+import '../settings/home_zone_screen.dart';
+import '../trips/trip_screen.dart';
+import '../trips/trips_screen.dart';
+import '../settings/queued_changes_screen.dart';
+import '../setup/setup_screen.dart';
+import '../stories/stories_screen.dart';
+import '../stories/story_screen.dart';
+import '../finance/subscription_review_screen.dart';
+import '../goals/goal_screen.dart';
+import '../opportunities/opportunities_screen.dart';
+import '../library/lesson_screen.dart';
+import '../scenarios/scenarios_screen.dart';
+import '../goals/goals_screen.dart';
+import '../meetings/meeting_screen.dart';
+import '../meetings/meetings_screen.dart';
 import '../decisions/decisions_screen.dart';
 import '../entities/entity_ref.dart';
 import '../entities/entity_screen.dart';
@@ -108,9 +140,93 @@ Widget? utilityPageFor(
   ),
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'decisions' => DecisionsScreen(http: http),
+  'comparisons' => ComparisonsScreen(http: http),
+  'find-app' => AppGoalsScreen(http: http, onAskInChat: onAskInChat),
+  'build-app' => BuildAppScreen(http: http, onAskInChat: onAskInChat),
+  final lesson when lesson.startsWith('lesson:') => LessonScreen(
+    http: http,
+    itemId: lesson.substring('lesson:'.length),
+  ),
+  'notification-settings' => NotificationSettingsScreen(http: http),
+  'home-zone' => HomeZoneScreen(http: http),
+  'locale' => LocaleScreen(http: http),
+  'do-not-learn' => DoNotLearnScreen(http: http),
+  'trips' => TripsScreen(http: http),
+  'home-routines' => HomeRoutinesScreen(http: http),
+  'working-styles' => WorkingStylesScreen(http: http),
+  'attention' => AttentionScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+    onAskInChat: onAskInChat,
+  ),
+  'workspaces' => WorkspacesScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+  ),
+  'learned' => LearnedScreen(http: http),
+  final routine when routine.startsWith('home-routine:') => RoutineScreen(
+    http: http,
+    routineId: routine.substring('home-routine:'.length),
+  ),
+  final trip when trip.startsWith('trip:') => TripScreen(
+    http: http,
+    tripId: trip.substring('trip:'.length),
+  ),
+  'queued-changes' => QueuedChangesScreen(http: http),
+  'setup' => SetupScreen(
+    http: http,
+    onAskInChat: onAskInChat,
+    pageFor: (destination) =>
+        utilityPageFor(destination, http, onAskInChat: onAskInChat),
+  ),
+  'stories' => StoriesScreen(http: http),
+  final story when story.startsWith('story:') => StoryScreen(
+    http: http,
+    storyId: story.substring('story:'.length),
+  ),
+  'documents' => DocumentsScreen(http: http),
+  final document when document.startsWith('document:') => DocumentScreen(
+    http: http,
+    documentId: document.substring('document:'.length),
+  ),
+  'opportunities' => OpportunitiesScreen(
+    http: http,
+    pageFor: (destination) => utilityPageFor(
+      destination == 'plan-today' ? 'today' : destination,
+      http,
+      onAskInChat: onAskInChat,
+    ),
+  ),
+  final subscription when subscription.startsWith('subscription:') =>
+    SubscriptionReviewScreen(
+      http: http,
+      subscriptionId: subscription.substring('subscription:'.length),
+      onAskInChat: onAskInChat,
+    ),
+  'scenarios' => ScenariosScreen(http: http),
+  'goals' => GoalsScreen(http: http),
+  final goal when goal.startsWith('goal:') => GoalScreen(
+    http: http,
+    goalId: goal.substring('goal:'.length),
+  ),
+  'meetings' => MeetingsScreen(http: http),
+  final meeting when meeting.startsWith('meeting:') => MeetingScreen(
+    http: http,
+    meetingId: meeting.substring('meeting:'.length),
+  ),
+  final comparison when comparison.startsWith('comparison:') =>
+    ComparisonScreen(
+      http: http,
+      comparisonId: comparison.substring('comparison:'.length),
+    ),
   'today' => DayPlannerScreen(http: http, onAskInChat: onAskInChat),
   'timeline' => TimelineScreen(http: http),
   'missions' => MissionsScreen(http: http),
+  'mission-starter' => MissionStarterScreen(http: http),
+  final result when result.startsWith('mission-result:') => MissionResultScreen(
+    http: http,
+    missionId: result.substring('mission-result:'.length),
+  ),
   'modes' => ModesScreen(http: http),
   'library' => LibraryScreen(http: http),
   'inbox' => InboxScreen(http: http),
@@ -139,7 +255,7 @@ Widget? utilityPageFor(
     onOpenConversation: onOpenConversation,
     initialTab: RemindersTab.notifications,
   ),
-  'files' => FilesScreen(http: http),
+  'files' => FilesScreen(http: http, onOpenConversation: onOpenConversation),
   'audit' => ActivityScreen(
     http: http,
     onOpenConversation: onOpenConversation,

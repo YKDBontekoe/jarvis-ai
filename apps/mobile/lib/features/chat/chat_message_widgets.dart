@@ -10,6 +10,7 @@ class MessageBubble extends StatefulWidget {
     this.photoLoader,
     this.onRegenerate,
     this.onCancelQueued,
+    this.onSendQueuedNow,
     this.thinkingLabel = 'Thinking',
     super.key,
   });
@@ -36,6 +37,9 @@ class MessageBubble extends StatefulWidget {
 
   /// Drops a message that is waiting for a connection.
   final VoidCallback? onCancelQueued;
+
+  /// For a waiting message that expired: send it now, on the owner's word.
+  final VoidCallback? onSendQueuedNow;
 
   @override
   State<MessageBubble> createState() => _MessageBubbleState();
@@ -315,15 +319,31 @@ class _MessageBubbleState extends State<MessageBubble> {
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
-                      'Waiting for a connection. Sends by itself.',
+                      queuedNote(message.queuedAt, DateTime.now()),
+                      key: const Key('queued-note'),
                       style: TextStyle(
                         fontSize: 12.5,
                         color: JarvisColors.of(context).muted,
                       ),
                     ),
                   ),
+                  if (_expired(message) && widget.onSendQueuedNow != null)
+                    TextButton(
+                      key: const Key('queued-send-now'),
+                      onPressed: widget.onSendQueuedNow,
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        textStyle: const TextStyle(
+                          fontFamily: 'Geist',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      child: const Text('Send now'),
+                    ),
                   if (widget.onCancelQueued != null)
                     TextButton(
+                      key: const Key('queued-cancel'),
                       onPressed: widget.onCancelQueued,
                       style: TextButton.styleFrom(
                         visualDensity: VisualDensity.compact,
@@ -781,4 +801,26 @@ class _StreamingPulseState extends State<StreamingPulse>
             ),
     );
   }
+}
+
+bool _expired(MessageEntry message) =>
+    message.queuedAt != null &&
+    DateTime.now().difference(message.queuedAt!) > OutboxStore.autoSendWithin;
+
+/// What a waiting message says about itself: how long it has waited, and
+/// whether it will still go out by itself.
+String queuedNote(DateTime? queuedAt, DateTime now) {
+  if (queuedAt == null) return 'Waiting for a connection. Sends by itself.';
+  final age = now.difference(queuedAt);
+  final ago = age.inMinutes < 1
+      ? 'just now'
+      : age.inHours < 1
+      ? '${age.inMinutes} min ago'
+      : age.inDays < 1
+      ? '${age.inHours} h ago'
+      : '${age.inDays} d ago';
+  if (age > OutboxStore.autoSendWithin) {
+    return 'Written $ago and not sent. It will not go out by itself because it may be out of date.';
+  }
+  return 'Written $ago. Waiting for a connection; it sends by itself.';
 }

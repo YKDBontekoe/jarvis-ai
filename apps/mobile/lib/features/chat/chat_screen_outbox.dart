@@ -31,6 +31,7 @@ mixin _ChatScreenOutbox on _ChatScreenController {
         role: 'user',
         content: item.content,
         outboxId: item.id,
+        queuedAt: item.queuedAt,
         photos: [
           for (final photo in item.photos)
             MessagePhoto(fileId: photo.fileId, fileName: photo.fileName),
@@ -59,6 +60,7 @@ mixin _ChatScreenOutbox on _ChatScreenController {
       content: message.content,
       photos: message.photos,
       outboxId: item.id,
+      queuedAt: item.queuedAt,
     );
     if (index >= 0) {
       _entries[index] = queued;
@@ -97,6 +99,8 @@ mixin _ChatScreenOutbox on _ChatScreenController {
     try {
       for (final item in _outbox.forConversation(conversationId)) {
         if (!mounted || _conversationId != conversationId) return;
+        // An old message waits for the owner (Send now or Discard); nothing behind it goes first.
+        if (OutboxStore.isExpired(item, DateTime.now())) return;
         final List<Map<String, dynamic>> recent;
         try {
           final response = await _http.get<dynamic>(
@@ -145,6 +149,27 @@ mixin _ChatScreenOutbox on _ChatScreenController {
       _flushingOutbox = false;
       _scheduleOutboxRetry();
     }
+  }
+
+  /// Sends a waiting message now, on the owner's word, even if it is old.
+  Future<void> _sendQueuedNow(MessageEntry entry) async {
+    final id = entry.outboxId;
+    final item = id == null
+        ? null
+        : _outbox
+              .forConversation(_conversationId ?? '')
+              .where((queued) => queued.id == id)
+              .firstOrNull;
+    if (item == null) return;
+    await _outbox.remove(item.id);
+    if (!mounted) return;
+    setState(() => _entries.remove(entry));
+    _lastSendQueued = false;
+    await _send(item.content, [
+      for (final photo in item.photos)
+        MessagePhoto(fileId: photo.fileId, fileName: photo.fileName),
+    ]);
+    _scheduleOutboxRetry();
   }
 
   /// Drops a waiting message and puts its text back in an empty composer.

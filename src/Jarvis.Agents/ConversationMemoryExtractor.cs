@@ -16,7 +16,8 @@ internal sealed class ConversationMemoryExtractor(
     IAuditEventStore auditEvents,
     ILogger<ConversationMemoryExtractor> logger,
     IDailyBriefingRepository? briefings = null,
-    TimeProvider? clock = null) : IConversationMemoryExtractor
+    TimeProvider? clock = null,
+    IDoNotLearnService? doNotLearn = null) : IConversationMemoryExtractor
 {
     /// <summary>The longest a temporary situation may stay valid before it needs restating.</summary>
     private static readonly TimeSpan MaxTemporaryValidity = TimeSpan.FromDays(366);
@@ -127,6 +128,9 @@ internal sealed class ConversationMemoryExtractor(
                 content.Length > 500 || candidate.Confidence is < MinimumConfidence or > 1f ||
                 candidate.Importance is < 0f or > 1f || MemoryAgentTools.LooksLikeSecret(content))
                 continue;
+
+            // A memory that turns out to be about a topic the owner never wants learned is not stored, whatever the message said.
+            if (doNotLearn is not null && await doNotLearn.MentionsAsync(ownerId, content, cancellationToken)) continue;
 
             DateTimeOffset? validUntil = null;
             if (!string.IsNullOrWhiteSpace(candidate.ValidUntil))

@@ -578,4 +578,131 @@ void main() {
       expect(find.textContaining('read-along'), findsWidgets);
     });
   });
+
+  group('follow-through', () {
+    Map<String, Object?> view({
+      String mode = 'on',
+      bool quiet = false,
+      List<String> reasons = const ['You last talked 12 days ago.'],
+    }) => {
+      'hasData': true,
+      'cadence': {
+        'status': 'due',
+        'reason': 'You last talked 12 days ago and wanted to stay in touch every week.',
+      },
+      'birthday': {'daysUntil': 3},
+      'promises': [
+        {'direction': 'i_owe', 'description': 'Send the deck'},
+      ],
+      'reasons': reasons,
+      'nudge': {'mode': mode, 'quiet': quiet, 'notUsefulCount': 0},
+    };
+
+    Future<void> open(WidgetTester tester) async {
+      http.on('GET', '/api/v1/people/p1', {
+        'person': _person('p1', 'Anna'),
+        'facts': <Object?>[],
+      });
+      await show(
+        tester,
+        PersonDetailScreen(
+          http: http.client(),
+          person: PersonData.fromJson(_person('p1', 'Anna'))!,
+        ),
+      );
+    }
+
+    testWidgets('shows the rhythm, birthday and promises together', (
+      tester,
+    ) async {
+      http.on('GET', '/api/v1/people/p1/follow-through', view());
+      await open(tester);
+
+      expect(find.byKey(const Key('follow-through-cadence')), findsOneWidget);
+      expect(find.textContaining('every week'), findsOneWidget);
+      expect(find.text('Birthday in 3 days'), findsOneWidget);
+      expect(find.text('You owe: Send the deck'), findsOneWidget);
+    });
+
+    testWidgets('not useful quiets the person and can be turned back on', (
+      tester,
+    ) async {
+      http.on('GET', '/api/v1/people/p1/follow-through', view());
+      http.on(
+        'POST',
+        '/api/v1/people/p1/nudges/not-useful',
+        view(mode: 'snoozed', quiet: true),
+      );
+      http.on('PUT', '/api/v1/people/p1/nudges', view());
+      await open(tester);
+
+      await tester.tap(find.byKey(const Key('follow-through-not-useful')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('follow-through-quiet')), findsOneWidget);
+      expect(find.byKey(const Key('follow-through-not-useful')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('follow-through-undo')));
+      await tester.pumpAndSettle();
+      expect(
+        (http.sent('PUT', '/api/v1/people/p1/nudges').single.body
+            as Map)['mode'],
+        'on',
+      );
+      expect(find.byKey(const Key('follow-through-quiet')), findsNothing);
+    });
+
+    testWidgets('the menu snoozes for a week', (tester) async {
+      http.on('GET', '/api/v1/people/p1/follow-through', view());
+      http.on(
+        'PUT',
+        '/api/v1/people/p1/nudges',
+        view(mode: 'snoozed', quiet: true),
+      );
+      await open(tester);
+
+      await tester.tap(find.byKey(const Key('follow-through-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Snooze for a week'));
+      await tester.pumpAndSettle();
+
+      expect(http.sent('PUT', '/api/v1/people/p1/nudges').single.body, {
+        'mode': 'snoozed',
+        'snoozeDays': 7,
+      });
+    });
+
+    testWidgets('a refused change shows the reason', (tester) async {
+      http.on('GET', '/api/v1/people/p1/follow-through', view());
+      http.on('PUT', '/api/v1/people/p1/nudges', {
+        'detail': 'Snooze for 1 to 365 days.',
+      }, status: 400);
+      await open(tester);
+
+      await tester.tap(find.byKey(const Key('follow-through-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mute suggestions'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Snooze for 1 to 365 days.'), findsOneWidget);
+    });
+
+    testWidgets('without data the card says how to get suggestions', (
+      tester,
+    ) async {
+      http.on('GET', '/api/v1/people/p1/follow-through', {
+        'hasData': false,
+        'cadence': {
+          'status': 'none',
+          'reason': 'No keep-in-touch rhythm is set.',
+        },
+        'promises': <Object?>[],
+        'reasons': <Object?>[],
+        'nudge': {'mode': 'on', 'quiet': false},
+      });
+      await open(tester);
+
+      expect(find.textContaining('Set a rhythm or a birthday'), findsOneWidget);
+      expect(find.byKey(const Key('follow-through-not-useful')), findsNothing);
+    });
+  });
 }

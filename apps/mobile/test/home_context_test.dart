@@ -447,6 +447,53 @@ void main() {
       expect(find.text('r2'), findsOneWidget);
       expect(find.byKey(const Key('home-needs-you-more')), findsNothing);
     });
+
+    testWidgets('a promise offers Done, and a failed Done brings it back', (
+      tester,
+    ) async {
+      const promise = NeedsYouItem(
+        kind: NeedsYouKind.commitment,
+        id: 'c1',
+        title: 'Send the deck',
+        detail: 'You promised Rosa · Due today',
+      );
+      const decision = NeedsYouItem(
+        kind: NeedsYouKind.decision,
+        id: 'd1',
+        title: 'Switch bank',
+        detail: 'Time to check how it went',
+      );
+      final acted = <(NeedsYouKind, NeedsYouAction)>[];
+      var failed = <String>{};
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        _app(
+          StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return NeedsYouCard(
+                items: const [promise, decision],
+                failed: failed,
+                onAction: (item, action) => acted.add((item.kind, action)),
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('home-needs-you-button-Review')));
+      expect(acted.last, (NeedsYouKind.decision, NeedsYouAction.open));
+
+      await tester.tap(find.byKey(const Key('home-needs-you-button-Done')));
+      await tester.pumpAndSettle();
+      expect(acted.last, (NeedsYouKind.commitment, NeedsYouAction.done));
+      expect(find.text('Send the deck'), findsNothing);
+
+      // The server refused: the row is back instead of hidden for good.
+      rebuild(() => failed = {'c1'});
+      await tester.pumpAndSettle();
+      expect(find.text('Send the deck'), findsOneWidget);
+    });
   });
 
   testWidgets('the hold preview offers quick replies to a person', (

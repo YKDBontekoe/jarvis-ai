@@ -53,6 +53,19 @@ public sealed class ProjectStore(JarvisDbContext db) : IProjectStore
         return ToRecord(project, await CountsAsync(ownerId, [project.Id], cancellationToken));
     }
 
+    public async Task<ProjectRecord?> SetFocusAsync(Guid projectId, Guid ownerId, ProjectFocusInput input,
+        CancellationToken cancellationToken)
+    {
+        var project = await db.Projects
+            .SingleOrDefaultAsync(x => x.Id == projectId && x.OwnerId == ownerId, cancellationToken);
+        if (project is null) return null;
+        project.SetFocus(input.Outcome, input.Status, input.NextAction?.Type, input.NextAction?.Id,
+            input.NextAction?.Note);
+        AddAudit(ownerId, "project.focus_changed", project.Id);
+        await db.SaveChangesAsync(cancellationToken);
+        return ToRecord(project, await CountsAsync(ownerId, [project.Id], cancellationToken));
+    }
+
     public async Task<bool> DeleteAsync(Guid projectId, Guid ownerId, CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -142,7 +155,8 @@ public sealed class ProjectStore(JarvisDbContext db) : IProjectStore
         var listed = await files.OrderByDescending(x => x.CreatedAt).Take(MaxContextFiles)
             .Select(x => new ProjectFileReference(x.Id, x.FileName, x.ProcessingStatus))
             .ToListAsync(cancellationToken);
-        return new ProjectContext(project.Id, project.Name, project.Description, project.Instructions, listed, total);
+        return new ProjectContext(project.Id, project.Name, project.Description, project.Instructions, listed, total,
+            project.Outcome, NextActionOf(project));
     }
 
     /// <summary>True when there is no target or the owner's target project exists; marks it as used.</summary>
@@ -180,7 +194,13 @@ public sealed class ProjectStore(JarvisDbContext db) : IProjectStore
     private static ProjectRecord ToRecord(Project project, Counts counts) =>
         new(project.Id, project.Name, project.Description, project.Instructions, project.Color, project.CreatedAt,
             project.UpdatedAt, counts.Conversations.GetValueOrDefault(project.Id),
-            counts.Files.GetValueOrDefault(project.Id), counts.Tasks.GetValueOrDefault(project.Id));
+            counts.Files.GetValueOrDefault(project.Id), counts.Tasks.GetValueOrDefault(project.Id),
+            project.Outcome, project.Status, NextActionOf(project));
+
+    private static ProjectNextAction? NextActionOf(Project project) =>
+        project.NextActionType is null && project.NextActionNote is null
+            ? null
+            : new ProjectNextAction(project.NextActionType, project.NextActionId, project.NextActionNote);
 
     private void AddAudit(Guid ownerId, string action, Guid projectId) =>
         db.AuditEvents.Add(new AuditEvent(ownerId, "projects", action, "low", true,

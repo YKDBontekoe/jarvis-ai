@@ -38,9 +38,11 @@ public sealed class MemoryRepository(JarvisDbContext db) : IMemoryRepository
         var now = DateTimeOffset.UtcNow;
         existing.ValidUntil = now;
         existing.UpdatedAt = now;
+        var replacementId = Guid.CreateVersion7();
+        existing.SupersededById = replacementId;
         var replacement = new MemoryEntity
         {
-            Id = Guid.CreateVersion7(), OwnerId = ownerId, Kind = kind, Content = content,
+            Id = replacementId, OwnerId = ownerId, Kind = kind, Content = content,
             Importance = importance, Confidence = confidence, Embedding = null, EmbeddingModel = null, GraphIndexedAt = null,
             SourceType = sourceType, SourceId = sourceId, CreatedAt = now, UpdatedAt = now,
             ValidUntil = null, IsPinned = false, ProfileId = existing.ProfileId,
@@ -53,6 +55,25 @@ public sealed class MemoryRepository(JarvisDbContext db) : IMemoryRepository
             .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.ValidTo, now), cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return replacement.ToRecord();
+    }
+
+    public async Task<IReadOnlyList<MemoryRecord>> ListHistoryAsync(Guid id, Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        // Walk back through the versions that were replaced to get here, newest first. A chain is short (one step per
+        // correction); the cap only guards against a cycle that should never exist.
+        var history = new List<MemoryRecord>();
+        var current = id;
+        for (var step = 0; step < 20; step++)
+        {
+            var previous = await db.Memories.AsNoTracking()
+                .Where(x => x.OwnerId == ownerId && x.SupersededById == current)
+                .OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+            if (previous is null) break;
+            history.Add(previous.ToRecord());
+            current = previous.Id;
+        }
+        return history;
     }
 
     public async Task<MemoryRecord?> ExpireAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import 'working_styles_screen.dart';
 
 part 'profile_editor_sheet.dart';
 
@@ -100,6 +101,21 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     appBar: AppBar(
       title: const PageTitle('Profiles'),
       actions: [
+        HeaderAction(
+          key: const Key('profiles-styles'),
+          label: 'Working styles',
+          icon: PhosphorIconsRegular.sparkle,
+          collapsesWhenNarrow: true,
+          onPressed: () => unawaited(
+            Navigator.of(context)
+                .push<void>(
+                  MaterialPageRoute(
+                    builder: (_) => WorkingStylesScreen(http: widget.http),
+                  ),
+                )
+                .then((_) => mounted ? _load() : null),
+          ),
+        ),
         HeaderAction(
           label: 'New',
           icon: PhosphorIconsRegular.plus,

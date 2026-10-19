@@ -46,4 +46,6 @@ public sealed record Commitment(
     Guid? ReminderId,
     DateTimeOffset? CompletedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    Guid? ProjectId = null,
+    Guid? PersonId = null);

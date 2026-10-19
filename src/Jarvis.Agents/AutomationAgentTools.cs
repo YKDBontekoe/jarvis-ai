@@ -7,7 +7,8 @@ using Jarvis.Domain.Automations;
 namespace Jarvis.Agents;
 
 internal sealed class AutomationAgentTools(IAutomationRuleService automations, ICurrentUser currentUser,
-    Jarvis.Application.Workflows.IDailyBriefingRepository? briefings = null, TimeProvider? clock = null)
+    Jarvis.Application.Workflows.IDailyBriefingRepository? briefings = null, TimeProvider? clock = null,
+    Jarvis.Application.Settings.IOwnerSettingsStore? settings = null)
 {
     internal const string EventDocs =
         "Trigger kinds: schedule {kind,localTime:\"HH:mm:ss\",timeZoneId,weekdays?}, manual, reminder_due, " +
@@ -143,7 +144,7 @@ internal sealed class AutomationAgentTools(IAutomationRuleService automations, I
     {
         var template = AutomationTemplates.Find(templateId);
         if (template is null) return "There is no template with that id. Use ListAutomationTemplates.";
-        var zoneId = briefings is null ? null : (await briefings.GetAsync(currentUser.OwnerId, cancellationToken))?.TimeZoneId;
+        var zoneId = briefings is null ? null : await Jarvis.Application.Preferences.OwnerZoneResolver.ZoneIdAsync(settings, briefings, currentUser.OwnerId, cancellationToken);
         var definition = template.Build(Jarvis.Application.Workflows.LocalClock.TryFind(zoneId, out var zone) ? zone.Id : "UTC");
         var element = JsonDocument.Parse(AutomationDefinitionJson.Serialize(definition)).RootElement.Clone();
         var rule = await automations.CreateAsync(currentUser.OwnerId, new SaveAutomationRuleRequest(template.Title, element),

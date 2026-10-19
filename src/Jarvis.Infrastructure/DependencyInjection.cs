@@ -59,6 +59,8 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Memory.IGraphQuestionService,
             Jarvis.Application.Memory.GraphQuestionService>();
         services.AddScoped<Jarvis.Application.People.IPeopleCheckInService, Jarvis.Application.People.PeopleCheckInService>();
+        services.AddScoped<Jarvis.Application.People.IPersonFollowThroughService,
+            Jarvis.Application.People.PersonFollowThroughService>();
         services.AddScoped<Jarvis.Application.People.Radar.IPersonLinkRepository, PersonLinkRepository>();
         services.AddScoped<Jarvis.Application.People.Radar.IChatActivityStats, WhatsAppAssistantRepository>();
         services.AddScoped<Jarvis.Application.People.Radar.IRelationshipRadarService,
@@ -89,6 +91,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationRepository, WorkflowRepository>();
         services.AddScoped<IPushDeviceRepository, WorkflowRepository>();
         services.AddScoped<IPushDeliveryQueue, PushDeliveryRepository>();
+        services.AddScoped<Jarvis.Application.Notifications.INotificationDeliveryReader, NotificationDeliveryReader>();
         services.AddScoped<INotificationFeed, NotificationFeed>();
         services.AddScoped<IConditionWatchRepository, ConditionWatchRepository>();
         services.AddScoped<IFileRepository, FileRepository>();
@@ -117,6 +120,9 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Profiles.IAssistantProfileService, Jarvis.Application.Profiles.AssistantProfileService>();
         services.AddScoped<Jarvis.Application.Files.IDocumentCollectionRepository, DocumentCollectionRepository>();
         services.AddScoped<Jarvis.Application.Projects.IProjectStore, ProjectStore>();
+        services.AddScoped<Jarvis.Application.Reviews.IWeekFollowThroughService, Jarvis.Application.Reviews.WeekFollowThroughService>();
+        services.AddScoped<Jarvis.Application.Memory.IMemoryReviewService, Jarvis.Application.Memory.MemoryReviewService>();
+        services.AddScoped<Jarvis.Application.Projects.IProjectFocusService, Jarvis.Application.Projects.ProjectFocusService>();
         services.AddScoped<Jarvis.Application.Persona.IMessageFeedbackRepository, MessageFeedbackRepository>();
         services.AddScoped<Jarvis.Application.Usage.IModelUsageRecorder, ModelUsageRecorder>();
         services.AddScoped<Jarvis.Application.Usage.IUsageDashboard, UsageDashboardService>();

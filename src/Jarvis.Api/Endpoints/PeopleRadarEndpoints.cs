@@ -11,6 +11,8 @@ public sealed record PersonLinkRequest(Guid? ConnectionId, string? ChatId);
 
 public sealed record RadarSettingsRequest(bool? ToneEnabled);
 
+public sealed record PersonNudgeRequest(string? Mode, int? SnoozeDays);
+
 /// <summary>
 /// The relationship radar: link a person to their WhatsApp chat and see how the two of you keep in touch, from
 /// message times alone. Only chats the owner reads along with have messages. Audit entries carry ids, never names
@@ -44,6 +46,26 @@ internal static class PeopleRadarEndpoints
             CancellationToken ct) =>
             await radar.PersonAsync(user.OwnerId, id, ct) is { } view ? Results.Ok(view) : Results.NotFound())
             .WithName("GetPersonRadar");
+
+        people.MapGet("/{id:guid}/follow-through", async (Guid id, IPersonFollowThroughService service,
+            ICurrentUser user, CancellationToken ct) =>
+            await service.GetAsync(user.OwnerId, id, ct) is { } view ? Results.Ok(view) : Results.NotFound())
+            .WithName("GetPersonFollowThrough");
+
+        people.MapPut("/{id:guid}/nudges", async (Guid id, PersonNudgeRequest request,
+            IPersonFollowThroughService service, ICurrentUser user, CancellationToken ct) =>
+        {
+            var result = await service.SetNudgeAsync(user.OwnerId, id, request.Mode ?? string.Empty,
+                request.SnoozeDays, ct);
+            return Failed(result) ?? Results.Ok(result.Value);
+        }).WithName("SetPersonNudges");
+
+        people.MapPost("/{id:guid}/nudges/not-useful", async (Guid id, IPersonFollowThroughService service,
+            ICurrentUser user, CancellationToken ct) =>
+        {
+            var result = await service.NotUsefulAsync(user.OwnerId, id, ct);
+            return Failed(result) ?? Results.Ok(result.Value);
+        }).WithName("MarkPersonNudgeNotUseful");
 
         people.MapGet("/{id:guid}/links", async (Guid id, IRelationshipRadarService radar, ICurrentUser user,
             CancellationToken ct) =>

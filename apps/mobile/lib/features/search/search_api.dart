@@ -3,20 +3,30 @@ import 'package:dio/dio.dart';
 import '../../json_maps.dart';
 import 'search_models.dart';
 
-Future<({List<FederatedSearchHit> results, List<SearchProviderStatus> providers})> federatedSearch(
+Future<
+  ({List<FederatedSearchHit> results, List<SearchProviderStatus> providers})
+>
+federatedSearch(
   Dio http,
   String query, {
   Set<String>? kinds,
+  DateTime? from,
 }) async {
   final trimmed = query.trim();
   if (trimmed.isEmpty) {
-    return (results: <FederatedSearchHit>[], providers: <SearchProviderStatus>[]);
+    return (
+      results: <FederatedSearchHit>[],
+      providers: <SearchProviderStatus>[],
+    );
   }
   final response = await http.get<Object?>(
     '/api/v1/search',
     queryParameters: {
       'query': trimmed,
       if (kinds != null && kinds.isNotEmpty) 'kinds': kinds.join(','),
+      if (from != null)
+        'from':
+            '${from.year.toString().padLeft(4, '0')}-${from.month.toString().padLeft(2, '0')}-${from.day.toString().padLeft(2, '0')}',
     },
   );
   final body = jsonObject(response.data);

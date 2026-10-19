@@ -10,7 +10,7 @@ namespace Jarvis.Api.Endpoints;
 public sealed record ClipRequest(string? Url, string? Note);
 
 public sealed record NoteRequest(string? Title, string? Content, string? Kind, string? Url, string[]? Tags,
-    bool? MakeFlashcards);
+    bool? MakeFlashcards, Guid? ProjectId = null);
 
 public sealed record TagsRequest(string[]? Tags);
 
@@ -70,11 +70,14 @@ internal static class LibraryEndpoints
         }).WithName("ClipToLibrary");
 
         group.MapPost("/notes", async (NoteRequest request, ILibraryService library, IAuditEventStore audit,
-            ICurrentUser currentUser, CancellationToken ct) =>
+            Jarvis.Application.Projects.IProjectStore projects, ICurrentUser currentUser, CancellationToken ct) =>
         {
+            if (request.ProjectId is { } projectId &&
+                await projects.GetAsync(projectId, currentUser.OwnerId, ct) is null)
+                return EndpointHelpers.Invalid("projectId", "That project was not found.");
             var result = await library.AddNoteAsync(currentUser.OwnerId, new NoteDraft(request.Title, request.Content,
                 request.Kind?.Trim().ToLowerInvariant() ?? LibraryKinds.Note, request.Url, request.Tags,
-                LibraryOrigins.App, null, request.MakeFlashcards == true), ct);
+                LibraryOrigins.App, request.ProjectId, request.MakeFlashcards == true), ct);
             if (result.Succeeded) await AuditAsync(audit, logger, currentUser, "library.noted", result.Value!.Id, ct);
             return Respond(result, item => ToDto(item, false));
         }).WithName("AddLibraryNote");
@@ -111,6 +114,41 @@ internal static class LibraryEndpoints
                 ? Results.Accepted($"/api/v1/tasks/{result.Value!.Task.Id}", new { taskId = result.Value.Task.Id, title = result.Value.Task.Title })
                 : Respond(result, x => x);
         }).WithName("StartDeepResearch");
+
+        // A short lesson built only from the owner's saved text: quoted points, questions and an answer key that
+        // always comes from the same source. Nothing is stored until the owner picks cards to keep.
+        group.MapGet("/{id:guid}/lesson", async (Guid id, ILibraryService library, ICurrentUser currentUser,
+            CancellationToken ct) =>
+        {
+            var item = await library.GetAsync(id, currentUser.OwnerId, ct);
+            if (item is null) return Results.NotFound();
+            return LessonBuilder.Build(item) is { } lesson
+                ? Results.Ok(lesson)
+                : EndpointHelpers.Invalid("item", "There is not enough text in this item to teach from.");
+        }).WithName("GetLesson");
+
+        group.MapPost("/{id:guid}/lesson/check", async (Guid id, LessonCheckRequest request, ILibraryService library,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var item = await library.GetAsync(id, currentUser.OwnerId, ct);
+            if (item is null) return Results.NotFound();
+            return LessonBuilder.Check(item, request.QuestionId, request.Answer) is { } grade
+                ? Results.Ok(grade)
+                : EndpointHelpers.Invalid("questionId", "That question is not part of this lesson.");
+        }).WithName("CheckLessonAnswer");
+
+        group.MapPost("/{id:guid}/lesson/cards", async (Guid id, LessonCardsRequest request, ILibraryService library,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var item = await library.GetAsync(id, currentUser.OwnerId, ct);
+            if (item is null) return Results.NotFound();
+            var drafts = LessonBuilder.Cards(item, request.QuestionIds ?? []);
+            if (drafts.Count == 0)
+                return EndpointHelpers.Invalid("questionIds", "Pick at least one fill-in question to keep as a card.");
+            var today = await library.TodayAsync(currentUser.OwnerId, ct);
+            var added = await library.AddCardsAsync(currentUser.OwnerId, id, drafts, today, ct);
+            return Results.Ok(new { added = added.Count, skipped = drafts.Count - added.Count });
+        }).WithName("KeepLessonCards");
 
         var cards = group.MapGroup("/cards");
 

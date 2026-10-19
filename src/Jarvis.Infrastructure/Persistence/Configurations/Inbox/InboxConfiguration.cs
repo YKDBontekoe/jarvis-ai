@@ -68,10 +68,14 @@ internal sealed class CommitmentConfiguration : IEntityTypeConfiguration<Commitm
         builder.Property(x => x.Source).HasColumnName("source").HasMaxLength(12).IsRequired();
         builder.Property(x => x.InboxThreadId).HasColumnName("inbox_thread_id");
         builder.Property(x => x.ReminderId).HasColumnName("reminder_id");
+        builder.Property(x => x.ProjectId).HasColumnName("project_id");
+        builder.Property(x => x.PersonId).HasColumnName("person_id");
         builder.Property(x => x.CompletedAt).HasColumnName("completed_at");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         builder.HasIndex(x => new { x.OwnerId, x.Status });
+        builder.HasIndex(x => new { x.OwnerId, x.ProjectId });
+        builder.HasIndex(x => new { x.OwnerId, x.PersonId });
         builder.HasIndex(x => new { x.OwnerId, x.DueOn });
     }
 }

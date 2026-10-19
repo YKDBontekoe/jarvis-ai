@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using System.ComponentModel;
 using System.Globalization;
 using System.Text.Json;
@@ -12,7 +14,8 @@ namespace Jarvis.Agents.Journal;
 
 internal sealed class JournalAgentTools(IJournalService journal, IDailyBriefingRepository briefings,
     IAuditEventStore audit, ICurrentUser currentUser, ILogger logger, TimeProvider clock,
-    AssistantProfileSnapshot? profile = null)
+    AssistantProfileSnapshot? profile = null,
+    IOwnerSettingsStore? settings = null)
 {
     private const int MaxResultCharacters = 6_000;
 
@@ -96,7 +99,7 @@ internal sealed class JournalAgentTools(IJournalService journal, IDailyBriefingR
 
     private async Task<DateOnly> TodayAsync(CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(currentUser.OwnerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, currentUser.OwnerId, cancellationToken);
         var zone = LocalClock.TryFind(zoneId, out var found) ? found : TimeZoneInfo.Utc;
         return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), zone).DateTime);
     }

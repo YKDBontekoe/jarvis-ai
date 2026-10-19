@@ -119,7 +119,15 @@ List<HomeSuggestion> homeSuggestions({
 String _short(String text) =>
     text.length <= 22 ? text : '${text.substring(0, 21).trimRight()}…';
 
-enum NeedsYouKind { approval, reminder, person, task, catchUp }
+enum NeedsYouKind {
+  approval,
+  reminder,
+  commitment,
+  decision,
+  person,
+  task,
+  catchUp,
+}
 
 /// One thing on Home that is waiting on the person, with what tapping it does.
 @immutable
@@ -179,8 +187,11 @@ List<ChatListItem> waitingOnYou(ChatList? chats, DateTime now) {
 }
 
 /// What needs the person now, most urgent first: approvals Jarvis is waiting
-/// on, reminders that are due, people waiting for a reply, tasks that stopped
-/// to ask, and catch-ups.
+/// on, reminders that are due, promises due or late, decisions to review,
+/// people waiting for a reply, tasks that stopped to ask, and catch-ups.
+///
+/// A promise or decision brings its own reminder, so that reminder is left out
+/// here: the same obligation never shows twice.
 List<NeedsYouItem> needsYouItems({
   required DateTime now,
   Map<String, dynamic>? briefing,
@@ -188,6 +199,12 @@ List<NeedsYouItem> needsYouItems({
   int max = 8,
 }) {
   final items = <NeedsYouItem>[];
+  final commitments = jsonMaps(briefing?['commitments']);
+  final decisions = jsonMaps(briefing?['decisions']);
+  final covered = <String>{
+    for (final entry in [...commitments, ...decisions])
+      ?asJsonString(entry['reminderId']),
+  };
   for (final approval in jsonMaps(briefing?['approvals'])) {
     final id = asJsonString(approval['id']);
     if (id == null) continue;
@@ -212,6 +229,7 @@ List<NeedsYouItem> needsYouItems({
     final due = jsonDate(reminder['dueAt'], local: true);
     final status = asJsonString(reminder['status']);
     if (id == null || title == null || due == null) continue;
+    if (covered.contains(id)) continue;
     if (status == 'done' || status == 'cancelled' || status == 'completed') {
       continue;
     }
@@ -225,6 +243,46 @@ List<NeedsYouItem> needsYouItems({
         title: title,
         detail: late.inMinutes < 2 ? 'Due now' : 'Overdue · ${_span(late)}',
         overdue: late.inMinutes >= 2,
+      ),
+    );
+  }
+  for (final promise in commitments) {
+    final id = asJsonString(promise['id']);
+    final description = asJsonString(promise['description']);
+    if (id == null || description == null) continue;
+    final late = asJsonInt(promise['daysOverdue']);
+    final who = asJsonString(promise['counterparty']) ?? 'Someone';
+    final owed = asJsonString(promise['direction']) == 'owed_to_me';
+    items.add(
+      NeedsYouItem(
+        kind: NeedsYouKind.commitment,
+        id: id,
+        title: description,
+        detail: [
+          owed ? '$who promised you' : 'You promised $who',
+          late > 0 ? 'Overdue · ${_days(late)}' : 'Due today',
+        ].join(' · '),
+        overdue: late > 0,
+        hint: owed ? 'Follow up if you have not heard back' : null,
+      ),
+    );
+  }
+  for (final decision in decisions) {
+    final id = asJsonString(decision['id']);
+    final title = asJsonString(decision['title']);
+    if (id == null || title == null) continue;
+    final late = asJsonInt(decision['daysOverdue']);
+    final prediction = asJsonString(decision['prediction']);
+    items.add(
+      NeedsYouItem(
+        kind: NeedsYouKind.decision,
+        id: id,
+        title: title,
+        detail: late > 0
+            ? 'Time to check how it went · ${_days(late)} ago'
+            : 'Time to check how it went',
+        overdue: late > 0,
+        hint: prediction == null ? null : 'You predicted: $prediction',
       ),
     );
   }
@@ -289,6 +347,8 @@ String _ago(DateTime time, DateTime now) {
   if (gap.inMinutes < 1) return 'just now';
   return '${_span(gap)} ago';
 }
+
+String _days(int days) => days == 1 ? '1 day' : '$days days';
 
 String _span(Duration gap) {
   if (gap.inMinutes < 60) return '${gap.inMinutes} min';

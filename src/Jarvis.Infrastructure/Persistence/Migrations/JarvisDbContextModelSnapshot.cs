@@ -19,7 +19,7 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
@@ -415,6 +415,11 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Content");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Content"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Content"), new[] { "gin_trgm_ops" });
+
                     b.HasIndex("ConversationId", "CreatedAt", "Id");
 
                     b.ToTable("messages", (string)null);
@@ -781,9 +786,36 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("name");
 
+                    b.Property<Guid?>("NextActionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("next_action_id");
+
+                    b.Property<string>("NextActionNote")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("next_action_note");
+
+                    b.Property<string>("NextActionType")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("next_action_type");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("outcome");
+
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")
                         .HasColumnName("owner_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("active")
+                        .HasColumnName("status");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1220,6 +1252,11 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("NextAttemptAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("outcome");
 
                     b.HasKey("NotificationId", "DeviceId");
 
@@ -2012,6 +2049,14 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("owner_id");
 
+                    b.Property<Guid?>("PersonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("person_id");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
                     b.Property<Guid?>("ReminderId")
                         .HasColumnType("uuid")
                         .HasColumnName("reminder_id");
@@ -2040,6 +2085,10 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OwnerId", "DueOn");
 
+                    b.HasIndex("OwnerId", "PersonId");
+
+                    b.HasIndex("OwnerId", "ProjectId");
+
                     b.HasIndex("OwnerId", "Status");
 
                     b.ToTable("commitments", null, t =>
@@ -2050,6 +2099,49 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_commitments_status", "status IN ('open', 'done', 'dropped')");
                         });
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.ComparisonEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DefinitionJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("definition");
+
+                    b.Property<Guid?>("LibraryItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("library_item_id");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "UpdatedAt");
+
+                    b.ToTable("comparisons", (string)null);
                 });
 
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.ConversationCollectionAttachmentEntity", b =>
@@ -3412,6 +3504,51 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.MeetingEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DocumentJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("document");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<DateTimeOffset?>("StartsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("starts_at");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "ProjectId");
+
+                    b.HasIndex("OwnerId", "StartsAt");
+
+                    b.ToTable("meetings", (string)null);
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.MemoryEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3493,6 +3630,10 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(60)")
                         .HasColumnName("source_type");
 
+                    b.Property<Guid?>("SupersededById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("superseded_by_id");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -3516,6 +3657,8 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.HasIndex("SearchVector");
 
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchVector"), "gin");
+
+                    b.HasIndex("SupersededById");
 
                     b.HasIndex("OwnerId", "Kind");
 

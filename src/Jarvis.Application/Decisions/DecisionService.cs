@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using Jarvis.Application.Timeline;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Decisions;
@@ -8,7 +10,8 @@ public sealed class DecisionService(
     IDecisionRepository repository,
     IReminderService reminders,
     IDailyBriefingRepository briefings,
-    TimeProvider? timeProvider = null) : IDecisionService
+    TimeProvider? timeProvider = null,
+    IOwnerSettingsStore? settings = null) : IDecisionService
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
@@ -172,7 +175,7 @@ public sealed class DecisionService(
 
     private async Task<TimeZoneInfo> ZoneAsync(Guid ownerId, CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, ownerId, cancellationToken);
         LocalClock.TryFind(zoneId, out var zone);
         return zone;
     }

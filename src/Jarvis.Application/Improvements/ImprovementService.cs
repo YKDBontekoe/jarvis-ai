@@ -15,7 +15,8 @@ public sealed class ImprovementService(
     INotificationRepository notifications,
     IOwnerSettingsStore settings,
     IAuditEventStore audit,
-    TimeProvider? timeProvider = null) : IImprovementService
+    TimeProvider? timeProvider = null,
+    Memory.IDoNotLearnService? doNotLearn = null) : IImprovementService
 {
     private const int MaxTitle = 300;
     private const int MaxEvidence = 600;
@@ -85,6 +86,8 @@ public sealed class ImprovementService(
     {
         if (candidate.Confidence < ImprovementRules.MemoryReviewMinConfidence ||
             string.IsNullOrWhiteSpace(candidate.Content))
+            return MemoryOutcome.Dropped;
+        if (doNotLearn is not null && await doNotLearn.MentionsAsync(ownerId, candidate.Content, cancellationToken))
             return MemoryOutcome.Dropped;
 
         var fingerprint = ImprovementRules.MemoryFingerprint(candidate.Kind, candidate.Content);

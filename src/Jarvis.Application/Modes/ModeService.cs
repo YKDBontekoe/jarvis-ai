@@ -1,3 +1,4 @@
+using Jarvis.Application.Preferences;
 using System.Collections.Concurrent;
 using Jarvis.Application.Integrations;
 using Jarvis.Application.Settings;
@@ -115,7 +116,7 @@ public sealed class ModeService(IOwnerSettingsStore settings, IDailyBriefingRepo
 
     private async Task<ModeState> BuildAsync(Guid ownerId, ModeSettings stored, CancellationToken cancellationToken)
     {
-        var zoneId = (await briefings.GetAsync(ownerId, cancellationToken))?.TimeZoneId;
+        var zoneId = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, ownerId, cancellationToken);
         var zone = LocalClock.TryFind(zoneId, out var found) ? found : TimeZoneInfo.Utc;
         var now = clock.GetUtcNow();
         // Only the calendar costs a lookup, and only when automatic modes could use it.

@@ -29,9 +29,12 @@ const uploadableFileExtensions = [
 const maxUploadBytes = 20 * 1024 * 1024;
 
 class FilesScreen extends StatefulWidget {
-  const FilesScreen({required this.http, super.key});
+  const FilesScreen({required this.http, this.onOpenConversation, super.key});
 
   final Dio http;
+
+  /// Opens a chat. Without it a file cannot be asked about from here.
+  final Future<void> Function(String conversationId)? onOpenConversation;
 
   @override
   State<FilesScreen> createState() => _FilesScreenState();
@@ -150,6 +153,46 @@ class _FilesScreenState extends State<FilesScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Starts a chat about one file, with that file attached as its only source.
+  Future<void> _ask(Map<String, dynamic> file) async {
+    final id = jsonString(file, 'id');
+    final open = widget.onOpenConversation;
+    if (id == null || open == null) return;
+    setState(() => _busy = true);
+    String? conversationId;
+    try {
+      final response = await widget.http.post<dynamic>('/api/v1/files/$id/ask');
+      final body = jsonObject(response.data);
+      conversationId = asJsonString(body?['conversationId']);
+      final status = asJsonString(body?['status']);
+      if (mounted && status != null && status != 'ready' && status != 'indexed') {
+        ScaffoldMessenger.maybeOf(context)
+          ?..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Jarvis is still reading this file. Answers may be partial.',
+              ),
+            ),
+          );
+      }
+    } on DioException catch (error) {
+      if (mounted) {
+        _showError(
+          error.response?.statusCode == 404
+              ? 'That file is gone.'
+              : (firstProblemMessage(error.response?.data) ??
+                    'Jarvis could not start a chat about this file.'),
+        );
+      }
+    } catch (_) {
+      if (mounted) _showError('Jarvis could not start a chat about this file.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (conversationId != null && mounted) await open(conversationId);
   }
 
   Future<void> _retryIndexing(Map<String, dynamic> file) async {
@@ -383,6 +426,8 @@ class _FilesScreenState extends State<FilesScreen> {
                     onSelected: (action) {
                       if (action == 'open') {
                         _download(file);
+                      } else if (action == 'ask') {
+                        _ask(file);
                       } else if (action == 'retry') {
                         _retryIndexing(file);
                       } else if (action == 'delete') {
@@ -402,6 +447,17 @@ class _FilesScreenState extends State<FilesScreen> {
                           contentPadding: EdgeInsets.zero,
                         ),
                       ),
+                      if (widget.onOpenConversation != null &&
+                          status != 'failed' &&
+                          status != 'deleting')
+                        const PopupMenuItem(
+                          value: 'ask',
+                          child: ListTile(
+                            leading: Icon(PhosphorIconsRegular.chatCircle),
+                            title: Text('Ask Jarvis about this'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
                       if (status == 'failed')
                         const PopupMenuItem(
                           value: 'retry',

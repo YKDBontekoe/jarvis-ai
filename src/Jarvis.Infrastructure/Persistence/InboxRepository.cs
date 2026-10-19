@@ -64,12 +64,14 @@ public sealed class CommitmentEntity
     public string Source { get; set; } = CommitmentSources.Manual;
     public Guid? InboxThreadId { get; set; }
     public Guid? ReminderId { get; set; }
+    public Guid? ProjectId { get; set; }
+    public Guid? PersonId { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
     public Commitment ToRecord() => new(Id, OwnerId, Direction, Counterparty, Description, DueOn, Status, Suggested,
-        Source, InboxThreadId, ReminderId, CompletedAt, CreatedAt, UpdatedAt);
+        Source, InboxThreadId, ReminderId, CompletedAt, CreatedAt, UpdatedAt, ProjectId, PersonId);
 
     public void Apply(Commitment commitment)
     {
@@ -82,6 +84,8 @@ public sealed class CommitmentEntity
         Source = commitment.Source;
         InboxThreadId = commitment.InboxThreadId;
         ReminderId = commitment.ReminderId;
+        ProjectId = commitment.ProjectId;
+        PersonId = commitment.PersonId;
         CompletedAt = commitment.CompletedAt;
         UpdatedAt = commitment.UpdatedAt;
     }

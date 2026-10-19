@@ -11,11 +11,24 @@ public static class SearchResultKinds
     public const string GraphEntity = "graph_entity";
     public const string ChannelThread = "channel_thread";
     public const string CodingRun = "coding_run";
+    public const string Message = "message";
+    public const string Person = "person";
+    public const string Commitment = "commitment";
+    public const string Decision = "decision";
+    public const string Journal = "journal";
+    public const string Project = "project";
+    public const string Mission = "mission";
+    public const string Goal = "goal";
+    public const string Trip = "trip";
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
-        Conversation, Memory, File, Task, Reminder, Skill, GraphEntity, ChannelThread, CodingRun
+        Conversation, Memory, File, Task, Reminder, Skill, GraphEntity, ChannelThread, CodingRun, Message, Person,
+        Commitment, Decision, Journal, Project, Mission, Goal, Trip
     };
+
+    /// <summary>Private writing: shown on the owner's own search screen, never handed to the agent or a restricted profile.</summary>
+    public static readonly IReadOnlySet<string> OwnerOnly = new HashSet<string>(StringComparer.Ordinal) { Message, Journal };
 
     public static bool IsValid(string? kind) => kind is not null && All.Contains(kind);
 
@@ -36,6 +49,12 @@ public sealed record FederatedSearchResult(
     double Relevance,
     bool IsPinned);
 
+/// <summary>Only hits dated inside the window are kept. A hit with no date is left out, not guessed.</summary>
+public sealed record SearchWindow(DateTimeOffset? From, DateTimeOffset? To)
+{
+    public bool Contains(DateTimeOffset? at) => at is { } value && (From is null || value >= From) && (To is null || value <= To);
+}
+
 public sealed record SearchProviderStatus(string ProviderId, bool Succeeded, string? Error);
 
 public sealed record FederatedSearchResponse(
@@ -53,7 +72,7 @@ public interface IFederatedSearchProvider
 public interface IFederatedSearchService
 {
     Task<FederatedSearchResponse> SearchAsync(Guid ownerId, string query, IReadOnlySet<string>? kindsFilter,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken, SearchWindow? window = null);
 }
 
 public sealed class FederatedSearchOptions

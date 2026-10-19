@@ -17,6 +17,9 @@ public sealed class WorkflowRepository(JarvisDbContext db,
     Jarvis.Application.Events.IJarvisEventBus? spine = null) : IReminderRepository, INotificationRepository,
     IPushDeviceRepository, IJarvisTaskRepository
 {
+    public Task<int> CountAsync(Guid ownerId, CancellationToken cancellationToken) =>
+        db.PushDevices.AsNoTracking().CountAsync(x => x.OwnerId == ownerId, cancellationToken);
+
     public async Task<PushDeviceRecord> RegisterAsync(Guid ownerId, string token, string platform,
         CancellationToken cancellationToken)
     {
@@ -360,9 +363,12 @@ public sealed class WorkflowRepository(JarvisDbContext db,
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var reminder = await GetLockedReminderAsync(id, cancellationToken);
-        if (reminder is null || reminder.OwnerId != ownerId || reminder.IsRecurring || reminder.LocationRepeats ||
-            reminder.Status != "pending")
+        if (reminder is null || reminder.OwnerId != ownerId || reminder.IsRecurring || reminder.LocationRepeats)
             return null;
+        // Marking something done that already is done changes nothing and succeeds, so a change that was queued
+        // offline and replayed (or done on another device meanwhile) ends in one outcome.
+        if (reminder.Status == "completed") return reminder.ToRecord();
+        if (reminder.Status != "pending") return null;
         reminder.MarkDone();
         AddAuditEvent(ownerId, "reminders", "reminder.completed", "low", true, reminder.Id);
         await PostReminderMessageAsync(reminder, LinkedConversationCopy.ReminderMarkedDone(reminder.Title),

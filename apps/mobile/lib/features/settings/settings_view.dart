@@ -35,6 +35,30 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         destination: 'voice-settings',
       ),
       (
+        title: 'Waiting to sync',
+        subtitle: 'Changes made without a connection',
+        icon: PhosphorIconsRegular.clock,
+        destination: 'queued-changes',
+      ),
+      (
+        title: 'Time zone',
+        subtitle: 'Where your day starts and ends',
+        icon: PhosphorIconsRegular.globeSimple,
+        destination: 'home-zone',
+      ),
+      (
+        title: 'Never learn about',
+        subtitle: 'Topics Jarvis must not remember from chats',
+        icon: PhosphorIconsRegular.eye,
+        destination: 'do-not-learn',
+      ),
+      (
+        title: 'Language and currency',
+        subtitle: 'Reply language and the default for budgets',
+        icon: PhosphorIconsRegular.globeSimple,
+        destination: 'locale',
+      ),
+      (
         title: 'Morning briefing',
         subtitle: 'When your daily summary arrives',
         icon: PhosphorIconsRegular.sunHorizon,

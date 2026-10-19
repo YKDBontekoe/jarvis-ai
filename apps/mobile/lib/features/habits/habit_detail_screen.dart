@@ -4,6 +4,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../api/mutation_queue.dart';
+import '../../api/offline_cache.dart';
 import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
@@ -45,7 +47,30 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
         _changed = true;
       });
     } on DioException catch (error) {
-      _showError(error, 'Could not update that day.');
+      if (OfflineCache.isConnectionFailure(error)) {
+        final key = habitDateKey(day);
+        final queued = await MutationQueue.instance.enqueue(
+          kind: MutationKinds.habitCheckIn,
+          targetId: _habit.id,
+          label: '${done ? 'Check in' : 'Undo check-in'} “${_habit.name}” for $key',
+          group: 'habit:${_habit.id}:$key',
+          payload: {'date': key, 'done': done},
+        );
+        if (mounted) {
+          ScaffoldMessenger.maybeOf(context)
+            ?..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                content: Text(
+                  queued.problem ??
+                      'No connection. This is saved on your phone and will be sent when Jarvis is back. It is not recorded yet.',
+                ),
+              ),
+            );
+        }
+      } else {
+        _showError(error, 'Could not update that day.');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

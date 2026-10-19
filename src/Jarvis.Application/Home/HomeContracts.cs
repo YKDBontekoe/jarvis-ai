@@ -10,7 +10,9 @@ public sealed record HomeBriefingDto(
     HomeDeviceDto? Device,
     HomeBriefingScheduleDto? Briefing,
     IReadOnlyList<HomePackDto> Packs,
-    HomeBriefingNoteDto? LatestBriefing = null);
+    HomeBriefingNoteDto? LatestBriefing = null,
+    IReadOnlyList<HomeCommitmentDto>? Commitments = null,
+    IReadOnlyList<HomeDecisionDto>? Decisions = null);
 
 /// <summary>Today's morning briefing as it was delivered, so Home can show it.</summary>
 public sealed record HomeBriefingNoteDto(Guid Id, string Title, string Body, DateTimeOffset CreatedAt, bool Read);

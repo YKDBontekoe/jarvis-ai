@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../ui/phosphor_icons.dart';
 
 import 'knowledge_graph_screen.dart';
+import 'memory_review_screen.dart';
 import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
@@ -279,6 +280,19 @@ class _MemoryScreenState extends State<MemoryScreen> {
     appBar: AppBar(
       title: const PageTitle('Memory'),
       actions: [
+        IconButton(
+          key: const Key('memory-review-open'),
+          tooltip: 'Review what Jarvis learned',
+          onPressed: () => Navigator.of(context).push<void>(
+            MaterialPageRoute(
+              builder: (_) => MemoryReviewScreen(
+                http: widget.http,
+                onOpenConversation: widget.onOpenConversation,
+              ),
+            ),
+          ),
+          icon: const Icon(PhosphorIconsRegular.listChecks),
+        ),
         IconButton(
           tooltip: 'Knowledge graph',
           onPressed: () => Navigator.of(context).push<void>(

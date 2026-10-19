@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import 'voice_cards.dart';
 
 /// Full-screen voice session. The phase comes from the LiveKit room so the
 /// page can show listening, thinking, and speaking without guessing from text.
@@ -22,8 +23,22 @@ class VoiceStage extends StatelessWidget {
     this.error,
     this.onToggleMute,
     this.level,
+    this.cards = const [],
+    this.onCardOpen,
+    this.onCardSave,
+    this.onCardDismiss,
+    this.onRecap,
     super.key,
   });
+
+  /// Cards the voice answers put on screen, and what to do with them.
+  final List<Map<String, dynamic>> cards;
+  final ValueChanged<String>? onCardOpen;
+  final ValueChanged<String>? onCardSave;
+  final ValueChanged<String>? onCardDismiss;
+
+  /// Shown once the session is over and cards were used.
+  final VoidCallback? onRecap;
 
   /// Live loudness of whoever is talking, 0 to 1; the orb moves with it.
   final ValueGetter<double>? level;
@@ -81,9 +96,8 @@ class VoiceStage extends StatelessWidget {
                         _title,
                         key: ValueKey(phase),
                         textAlign: TextAlign.center,
-                        style: JarvisType.displayOf(
-                          context,
-                        ).copyWith(fontSize: 40),
+                        style: JarvisType.displayOf(context)
+                            .copyWith(fontSize: 40),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -102,6 +116,23 @@ class VoiceStage extends StatelessWidget {
                       const SizedBox(height: 22),
                       _CaptionCard(role: captionRole, text: caption!),
                     ],
+                    if (cards.isNotEmpty)
+                      VoiceCompanionCards(
+                        cards: cards,
+                        onOpen: onCardOpen ?? (_) {},
+                        onSave: onCardSave ?? (_) {},
+                        onDismiss: onCardDismiss ?? (_) {},
+                      ),
+                    if (!_live && onRecap != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: TextButton.icon(
+                          key: const Key('voice-recap-open'),
+                          onPressed: onRecap,
+                          icon: const Icon(PhosphorIconsRegular.listChecks),
+                          label: const Text('See what we did'),
+                        ),
+                      ),
                     if (error != null)
                       InlineNotice(
                         message: error!,
@@ -235,12 +266,15 @@ class _VoicePill extends StatelessWidget {
           color: JarvisColors.of(context).inkSoft,
         ),
         const SizedBox(width: 6),
-        Text(
-          'ChatGPT voice · $voiceName',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: JarvisColors.of(context).inkSoft,
+        Flexible(
+          child: Text(
+            'ChatGPT voice · $voiceName',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: JarvisColors.of(context).inkSoft,
+            ),
           ),
         ),
       ],
@@ -275,9 +309,8 @@ class _CaptionCard extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 6,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(height: 1.35),
+            style: Theme.of(context).textTheme.bodyLarge
+                ?.copyWith(height: 1.35),
           ),
         ],
       ),
@@ -402,10 +435,8 @@ class _ConnectingHintState extends State<_ConnectingHint> {
       _message,
       key: ValueKey(_message),
       textAlign: TextAlign.center,
-      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-        color: JarvisColors.of(context).inkSoft,
-        height: 1.4,
-      ),
+      style: Theme.of(context).textTheme.bodyLarge
+          ?.copyWith(color: JarvisColors.of(context).inkSoft, height: 1.4),
     ),
   );
 }

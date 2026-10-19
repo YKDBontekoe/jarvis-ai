@@ -193,6 +193,88 @@ public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, 
         return new MessagePage(descending, nextCursor, hasMore);
     }
 
+    public async Task<IReadOnlyList<MessageSearchHit>> SearchMessagesAsync(Guid ownerId, string query, int limit,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        var trimmed = query.Trim();
+        if (trimmed.Length == 0) return [];
+        var pattern = "%" + trimmed.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+        // The trigram index on messages.content drives the ILIKE; the owner join keeps every other owner's text out.
+        var rows = await (
+                from message in db.Messages.AsNoTracking()
+                join conversation in db.Conversations.AsNoTracking() on message.ConversationId equals conversation.Id
+                where conversation.OwnerId == ownerId &&
+                      (message.Role == "user" || message.Role == "assistant") &&
+                      EF.Functions.ILike(message.Content, pattern, "\\") &&
+                      !db.Tasks.Any(task => task.ConversationId == conversation.Id)
+                orderby message.CreatedAt descending, message.Id descending
+                select new { message, conversation.Title })
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+        return rows.Select(row => new MessageSearchHit(row.message, row.Title)).ToArray();
+    }
+
+    public async Task<MessageSearchHit?> FindMessageAsync(Guid ownerId, Guid messageId,
+        CancellationToken cancellationToken)
+    {
+        var row = await (
+                from message in db.Messages.AsNoTracking()
+                join conversation in db.Conversations.AsNoTracking() on message.ConversationId equals conversation.Id
+                where message.Id == messageId && conversation.OwnerId == ownerId
+                select new { message, conversation.Title })
+            .SingleOrDefaultAsync(cancellationToken);
+        return row is null ? null : new MessageSearchHit(row.message, row.Title);
+    }
+
+    public async Task<MessageWindow?> GetMessageWindowAsync(Guid conversationId, Guid messageId, int before,
+        int after, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(before, 0);
+        ArgumentOutOfRangeException.ThrowIfLessThan(after, 0);
+        var anchor = await db.Messages.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.ConversationId == conversationId && x.Id == messageId, cancellationToken);
+        if (anchor is null) return null;
+
+        var older = await db.Messages.AsNoTracking()
+            .Where(x => x.ConversationId == conversationId &&
+                        (x.CreatedAt < anchor.CreatedAt || x.CreatedAt == anchor.CreatedAt && x.Id.CompareTo(anchor.Id) < 0))
+            .OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
+            .Take(before + 1).ToListAsync(cancellationToken);
+        var hasOlder = older.Count > before;
+        if (hasOlder) older.RemoveAt(older.Count - 1);
+        older.Reverse();
+
+        var newer = await db.Messages.AsNoTracking()
+            .Where(x => x.ConversationId == conversationId &&
+                        (x.CreatedAt > anchor.CreatedAt || x.CreatedAt == anchor.CreatedAt && x.Id.CompareTo(anchor.Id) > 0))
+            .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id)
+            .Take(after + 1).ToListAsync(cancellationToken);
+        var hasNewer = newer.Count > after;
+        if (hasNewer) newer.RemoveAt(newer.Count - 1);
+
+        var items = older.Append(anchor).Concat(newer).ToList();
+        return new MessageWindow(items,
+            hasOlder ? new MessageCursor(items[0].CreatedAt, items[0].Id) : null, hasOlder,
+            hasNewer ? new MessageCursor(items[^1].CreatedAt, items[^1].Id) : null, hasNewer);
+    }
+
+    public async Task<MessageWindow> GetMessagesAfterAsync(Guid conversationId, MessageCursor after, int limit,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(limit, MessagePage.MaximumSize);
+        var newer = await db.Messages.AsNoTracking()
+            .Where(x => x.ConversationId == conversationId &&
+                        (x.CreatedAt > after.CreatedAt || x.CreatedAt == after.CreatedAt && x.Id.CompareTo(after.Id) > 0))
+            .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id)
+            .Take(limit + 1).ToListAsync(cancellationToken);
+        var hasNewer = newer.Count > limit;
+        if (hasNewer) newer.RemoveAt(newer.Count - 1);
+        return new MessageWindow(newer, null, false,
+            hasNewer && newer.Count > 0 ? new MessageCursor(newer[^1].CreatedAt, newer[^1].Id) : null, hasNewer);
+    }
+
     public async Task AddMessageAsync(Message message, CancellationToken cancellationToken)
     {
         db.Messages.Add(message);

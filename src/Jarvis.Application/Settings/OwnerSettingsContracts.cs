@@ -27,6 +27,16 @@ public static class SettingsSections
     public const string WeeklyReview = "weekly-review";
     public const string StandingApprovals = "standing-approvals";
     public const string Modes = "context-modes";
+    public const string Focus = "context-modes.focus";
+    public const string HomeRoutines = "home.routines";
+    public const string Outcomes = "outcomes";
+    public const string Workspaces = "workspaces";
+    public const string ModeAttachments = "context-modes.attachments";
+    public const string Attention = "attention";
+    public const string Locale = "preferences.locale";
+    public const string DigestTime = "notifications.digest";
+    public const string DoNotLearn = "learning.do-not-learn";
+    public const string CatchUp = "context-modes.catchup";
     public const string Routines = "routines";
     public const string PeopleRadar = "people-radar";
     public const string Autonomy = "autonomy";

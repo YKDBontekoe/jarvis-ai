@@ -25,6 +25,8 @@ public sealed record SaveAssistantProfileRequest(
     bool AllowRemember = true,
     bool? IsDefault = null);
 
+public sealed record ProfileSuggestRequest(string? Text, Guid? CurrentProfileId);
+
 public sealed record SwitchConversationProfileRequest(Guid ProfileId, bool Confirm = false);
 
 internal static class ProfileEndpoints
@@ -36,6 +38,33 @@ internal static class ProfileEndpoints
         group.MapGet("", async (IAssistantProfileService profiles, ICurrentUser currentUser, CancellationToken ct) =>
                 Results.Ok(await profiles.ListAsync(currentUser.OwnerId, ct)))
             .WithName("ListAssistantProfiles");
+
+        group.MapGet("/presets", async (IProfileGuidanceService guidance, ICurrentUser currentUser, CancellationToken ct) =>
+            Results.Ok(await guidance.PresetsAsync(currentUser.OwnerId, ct))).WithName("ListProfilePresets");
+
+        group.MapPost("/presets/{presetId}/create", async (string presetId, IProfileGuidanceService guidance,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var result = await guidance.CreateFromPresetAsync(currentUser.OwnerId, presetId, ct);
+            return result switch
+            {
+                { NotFound: true } => Results.NotFound(),
+                { Succeeded: false } => EndpointHelpers.Invalid(result.Field ?? "preset", result.Message ?? "Could not create it."),
+                _ => Results.Created($"/api/v1/profiles/{result.Value!.Id}", result.Value)
+            };
+        }).WithName("CreateProfileFromPreset");
+
+        group.MapPost("/suggest", async (ProfileSuggestRequest request, IProfileGuidanceService guidance,
+            ICurrentUser currentUser, CancellationToken ct) =>
+            Results.Ok(await guidance.SuggestAsync(currentUser.OwnerId, request.Text, request.CurrentProfileId, ct)))
+            .WithName("SuggestProfile");
+
+        group.MapGet("/{id:guid}/scope", async (Guid id, IProfileGuidanceService guidance, ICurrentUser currentUser,
+            CancellationToken ct) =>
+        {
+            var result = await guidance.ScopeAsync(currentUser.OwnerId, id, ct);
+            return result.Succeeded ? Results.Ok(result.Value) : Results.NotFound();
+        }).WithName("GetProfileScope");
 
         group.MapGet("/{id:guid}", async (Guid id, IAssistantProfileService profiles, ICurrentUser currentUser,
             CancellationToken ct) =>

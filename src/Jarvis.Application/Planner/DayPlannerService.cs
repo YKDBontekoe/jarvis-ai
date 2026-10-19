@@ -1,3 +1,4 @@
+using Jarvis.Application.Inbox;
 using Jarvis.Application.Integrations;
 using Jarvis.Application.Settings;
 using Jarvis.Application.Workflows;
@@ -14,7 +15,8 @@ public sealed class DayPlannerService(
     IIntegrationCredentialStore credentials,
     IReminderService reminders,
     IDailyBriefingRepository briefings,
-    TimeProvider? timeProvider = null) : IDayPlannerService
+    TimeProvider? timeProvider = null,
+    ICommitmentService? commitments = null) : IDayPlannerService
 {
     public const string Section = "planner.day";
     public const int MaxItems = 30;
@@ -43,14 +45,39 @@ public sealed class DayPlannerService(
     public async Task<DayPlanItemDto> AddItemAsync(Guid ownerId, AddDayPlanItemRequest request, string? timeZoneId,
         CancellationToken cancellationToken)
     {
-        var title = CleanTitle(request.Title);
+        var sourceRef = await ResolveSourceAsync(ownerId, request, cancellationToken);
+        var title = CleanTitle(string.IsNullOrWhiteSpace(request.Title) ? sourceRef?.Description : request.Title);
         var minutes = CleanMinutes(request.Minutes ?? DefaultMinutes);
         var day = await LoadDayAsync(ownerId, timeZoneId, cancellationToken);
+        // Planning the same promise twice would only double its time on the timeline.
+        var existing = sourceRef is null
+            ? null
+            : day.State.Items.FirstOrDefault(item => !item.Done && item.SourceRef == sourceRef.Ref);
+        if (existing is not null) return ToDto(existing);
         if (day.State.Items.Count >= MaxItems)
             throw new ArgumentException($"A day plan holds at most {MaxItems} to-dos. Finish or remove one first.");
-        var item = new DayPlanItem(Guid.NewGuid(), title, minutes, false, null, clock.GetUtcNow());
+        var item = new DayPlanItem(Guid.NewGuid(), title, minutes, false, null, clock.GetUtcNow(), sourceRef?.Ref);
         await SaveAsync(ownerId, day.State with { Items = [.. day.State.Items, item] }, cancellationToken);
         return ToDto(item);
+    }
+
+    private sealed record ResolvedSource(string Ref, string Description);
+
+    private async Task<ResolvedSource?> ResolveSourceAsync(Guid ownerId, AddDayPlanItemRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.SourceRef)) return null;
+        const string prefix = "commitment:";
+        var raw = request.SourceRef.Trim();
+        if (!raw.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ||
+            !Guid.TryParse(raw[prefix.Length..], out var id))
+            throw new ArgumentException("Only a promise can be planned from here (commitment:<id>).");
+        if (commitments is null) throw new ArgumentException("Promises are not available.");
+        var commitment = await commitments.GetAsync(id, ownerId, cancellationToken);
+        if (commitment is null) throw new ArgumentException("That promise was not found.");
+        if (commitment.Suggested || commitment.Status != CommitmentStatuses.Open)
+            throw new ArgumentException("Only an open, accepted promise can be planned.");
+        return new ResolvedSource(prefix + commitment.Id, commitment.Description);
     }
 
     public async Task<DayPlanItemDto?> UpdateItemAsync(Guid ownerId, Guid itemId, UpdateDayPlanItemRequest request,
@@ -273,7 +300,7 @@ public sealed class DayPlannerService(
         settings.SaveAsync(ownerId, Section, state, cancellationToken);
 
     private static DayPlanItemDto ToDto(DayPlanItem item) =>
-        new(item.Id, item.Title, item.Minutes, item.Done, item.StartAt, item.StartAt?.AddMinutes(item.Minutes));
+        new(item.Id, item.Title, item.Minutes, item.Done, item.StartAt, item.StartAt?.AddMinutes(item.Minutes), item.SourceRef);
 
     private static string CleanTitle(string? title)
     {

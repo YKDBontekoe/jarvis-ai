@@ -19,8 +19,31 @@ public static class SearchRanking
         return blended;
     }
 
-    public static string NormalizeQuery(string query) =>
-        query.Trim().Normalize(NormalizationForm.FormKC).ToLowerInvariant();
+    /// <summary>Trimmed, lower-case and without accents, so "Joel" finds "Joël" and "cafe" finds "café".</summary>
+    public static string NormalizeQuery(string query)
+    {
+        var decomposed = query.Trim().Normalize(NormalizationForm.FormKD);
+        var folded = new StringBuilder(decomposed.Length);
+        foreach (var character in decomposed)
+        {
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(character) !=
+                System.Globalization.UnicodeCategory.NonSpacingMark)
+                folded.Append(character);
+        }
+        return folded.ToString().Normalize(NormalizationForm.FormC).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// The best <paramref name="limit"/> hits by relevance, then newest, then title, so which hits survive does not
+    /// depend on the order a repository happened to return them in.
+    /// </summary>
+    public static IReadOnlyList<FederatedSearchResult> Best(IEnumerable<FederatedSearchResult> hits, int limit) =>
+        hits.OrderByDescending(hit => hit.Relevance)
+            .ThenByDescending(hit => hit.Timestamp ?? DateTimeOffset.MinValue)
+            .ThenBy(hit => hit.Title, StringComparer.Ordinal)
+            .ThenBy(hit => hit.Id, StringComparer.Ordinal)
+            .Take(limit)
+            .ToArray();
 
     public static bool MatchesQuery(string haystack, string normalizedQuery)
     {

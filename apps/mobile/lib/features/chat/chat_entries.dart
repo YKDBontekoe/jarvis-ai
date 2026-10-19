@@ -103,6 +103,7 @@ class MessageEntry extends ChatEntry {
     this.citations = const [],
     this.photos = const [],
     this.outboxId,
+    this.queuedAt,
   });
 
   final String role;
@@ -127,6 +128,9 @@ class MessageEntry extends ChatEntry {
   /// Set while this message waits on the device for a connection.
   final String? outboxId;
 
+  /// When a waiting message was written, so the transcript can say how long it has waited.
+  final DateTime? queuedAt;
+
   bool get queued => outboxId != null;
 
   bool get isUser => role == 'user';
@@ -148,6 +152,7 @@ class MessageEntry extends ChatEntry {
     citations: citations ?? this.citations,
     photos: photos,
     outboxId: outboxId,
+    queuedAt: queuedAt,
   );
 }
 

@@ -38,6 +38,9 @@ class _SearchScreenState extends State<SearchScreen> {
   String? _error;
   List<FederatedSearchHit> _results = const [];
   Set<String> _kindFilter = {};
+
+  /// Only hits from the last N days; null means any time. Hits with no date are left out when set.
+  int? _windowDays;
   List<String> _recent = const [];
 
   @override
@@ -63,7 +66,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _scheduleSearch() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 220), () => unawaited(_runSearch()));
+    _debounce = Timer(
+      const Duration(milliseconds: 220),
+      () => unawaited(_runSearch()),
+    );
   }
 
   Future<void> _runSearch() async {
@@ -85,6 +91,9 @@ class _SearchScreenState extends State<SearchScreen> {
         widget.http,
         text,
         kinds: _kindFilter.isEmpty ? null : _kindFilter,
+        from: _windowDays == null
+            ? null
+            : DateTime.now().subtract(Duration(days: _windowDays!)),
       );
       if (!mounted) return;
       setState(() {
@@ -150,7 +159,10 @@ class _SearchScreenState extends State<SearchScreen> {
               onSubmitted: (_) => unawaited(_runSearch()),
               decoration: const InputDecoration(
                 hintText: 'Search conversations, memories, files…',
-                prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass, size: 18),
+                prefixIcon: Icon(
+                  PhosphorIconsRegular.magnifyingGlass,
+                  size: 18,
+                ),
               ),
             ),
           ),
@@ -178,6 +190,32 @@ class _SearchScreenState extends State<SearchScreen> {
                             _kindFilter = {..._kindFilter}..remove(kind);
                           }
                         });
+                        _scheduleSearch();
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: Row(
+              children: [
+                for (final (label, days) in const [
+                  ('Any time', null),
+                  ('Past week', 7),
+                  ('Past month', 30),
+                  ('Past year', 365),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      key: Key('search-window-${days ?? 'any'}'),
+                      label: Text(label),
+                      selected: _windowDays == days,
+                      onSelected: (_) {
+                        setState(() => _windowDays = days);
                         _scheduleSearch();
                       },
                     ),
@@ -287,9 +325,8 @@ class SearchResultsBody extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     searchKindLabels[hit.kind] ?? hit.kind,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: JarvisColors.of(context).inkSoft,
-                    ),
+                    style: Theme.of(context).textTheme.labelSmall
+                        ?.copyWith(color: JarvisColors.of(context).inkSoft),
                   ),
                   if (hit.summary != null && hit.summary!.isNotEmpty) ...[
                     const SizedBox(height: 6),

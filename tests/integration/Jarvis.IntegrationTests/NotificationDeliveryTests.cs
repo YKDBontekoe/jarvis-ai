@@ -50,6 +50,40 @@ public sealed class NotificationDeliveryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Each_ending_is_recorded_as_what_it_was_and_the_reader_never_shows_another_owners_notification()
+    {
+        var owner = Guid.CreateVersion7();
+        var held = await SeedDeliveryAsync(owner, "reminder.due", sourceId: null);
+        var appOnly = await SeedDeliveryAsync(Guid.CreateVersion7(), "task.completed", sourceId: null, token: "token-b");
+        var sent = await SeedDeliveryAsync(Guid.CreateVersion7(), "reminder.due", sourceId: null, token: "token-c");
+        var appOnlyOwner = await OwnerOfAsync(appOnly);
+        var sentOwner = await OwnerOfAsync(sent);
+
+        await using var database = CreateDbContext();
+        var queue = new PushDeliveryRepository(database);
+        await queue.MarkOutcomeAsync(held, "held", CancellationToken.None);
+        await queue.MarkOutcomeAsync(appOnly, "app_only", CancellationToken.None);
+        await queue.MarkDeliveredAsync(sent, CancellationToken.None);
+
+        var reader = new NotificationDeliveryReader(database);
+        async Task<string> OutcomeOf(Guid who, PushDeliveryKey key) =>
+            Jarvis.Application.Notifications.NotificationDeliveryRules.Describe(
+                (await reader.GetAsync(who, key.NotificationId, CancellationToken.None))!).Steps[1].State;
+
+        Assert.Equal("held", await OutcomeOf(owner, held));
+        Assert.Equal("app_only", await OutcomeOf(appOnlyOwner, appOnly));
+        Assert.Equal("provider_accepted", await OutcomeOf(sentOwner, sent));
+        Assert.Null(await reader.GetAsync(Guid.CreateVersion7(), held.NotificationId, CancellationToken.None));
+    }
+
+    private async Task<Guid> OwnerOfAsync(PushDeliveryKey key)
+    {
+        await using var database = CreateDbContext();
+        return await database.Notifications.AsNoTracking().Where(x => x.Id == key.NotificationId)
+            .Select(x => x.OwnerId).SingleAsync();
+    }
+
+    [Fact]
     public async Task Drops_an_approval_push_once_the_approval_is_resolved()
     {
         var owner = Guid.CreateVersion7();
@@ -119,10 +153,10 @@ public sealed class NotificationDeliveryTests : IAsyncLifetime
         Assert.Equal([all[1].Id], (await feed.ListAfterAsync(afterFirst, 10, CancellationToken.None)).Select(x => x.Id));
     }
 
-    private async Task<PushDeliveryKey> SeedDeliveryAsync(Guid owner, string type, Guid? sourceId)
+    private async Task<PushDeliveryKey> SeedDeliveryAsync(Guid owner, string type, Guid? sourceId, string token = "device-token")
     {
         await using var seed = CreateDbContext();
-        var device = new PushDevice(owner, "device-token", "ios");
+        var device = new PushDevice(owner, token, "ios");
         var notification = new Notification(Guid.CreateVersion7(), owner, type, "Title", "Body", sourceId);
         seed.PushDevices.Add(device);
         seed.Notifications.Add(notification);

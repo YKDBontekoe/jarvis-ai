@@ -6,7 +6,10 @@ namespace Jarvis.Api.Endpoints;
 public sealed record ProjectConversationDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     bool Pinned);
 public sealed record ProjectDetailsDto(ProjectRecord Project, IReadOnlyList<ProjectConversationDto> Conversations,
-    IReadOnlyList<FileDto> Files, IReadOnlyList<JarvisTaskDto> Tasks);
+    IReadOnlyList<FileDto> Files, IReadOnlyList<JarvisTaskDto> Tasks, ProjectNextActionView? NextAction = null);
+
+/// <summary>Replaces the outcome and next action. <c>status</c> is optional; an absent <c>nextAction</c> clears it.</summary>
+public sealed record ProjectFocusRequest(string? Outcome, string? Status, ProjectNextAction? NextAction);
 
 /// <summary>Moves an item into a project, or out of its project when <see cref="ProjectId"/> is null.</summary>
 public sealed record AssignProjectRequest(Guid? ProjectId);
@@ -38,7 +41,7 @@ internal static class ProjectEndpoints
         }).WithName("CreateProject");
 
         api.MapGet("/projects/{projectId:guid}", async (Guid projectId, IProjectStore projects,
-            ICurrentUser currentUser, CancellationToken ct) =>
+            IProjectFocusService focus, ICurrentUser currentUser, CancellationToken ct) =>
         {
             var project = await projects.GetAsync(projectId, currentUser.OwnerId, ct);
             var contents = project is null ? null : await projects.GetContentsAsync(projectId, currentUser.OwnerId, ct);
@@ -47,8 +50,25 @@ internal static class ProjectEndpoints
                 contents.Conversations.Select(item => new ProjectConversationDto(item.Id, item.Title, item.CreatedAt,
                     item.UpdatedAt, item.PinnedAt is not null)).ToArray(),
                 contents.Files.Select(file => file.ToDto()).ToArray(),
-                contents.Tasks.Select(task => task.ToDto()).ToArray()));
+                contents.Tasks.Select(task => task.ToDto()).ToArray(),
+                await focus.DescribeAsync(currentUser.OwnerId, project, ct)));
         }).WithName("GetProject");
+
+        api.MapPut("/projects/{projectId:guid}/focus", async (Guid projectId, ProjectFocusRequest request,
+            IProjectFocusService focus, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            try
+            {
+                var project = await focus.SetAsync(currentUser.OwnerId, projectId,
+                    new ProjectFocusInput(request.Outcome, request.Status, request.NextAction), ct);
+                if (project is null) return Results.NotFound();
+                return Results.Ok(new { project, nextAction = await focus.DescribeAsync(currentUser.OwnerId, project, ct) });
+            }
+            catch (ArgumentException exception)
+            {
+                return EndpointHelpers.Invalid(exception.ParamName ?? "outcome", exception.Message);
+            }
+        }).WithName("SetProjectFocus");
 
         api.MapPut("/projects/{projectId:guid}", async (Guid projectId, ProjectInput request, IProjectStore projects,
             ICurrentUser currentUser, CancellationToken ct) =>

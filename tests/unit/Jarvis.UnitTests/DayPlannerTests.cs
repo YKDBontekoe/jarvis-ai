@@ -1,8 +1,10 @@
 using Jarvis.Agents.Planner;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Inbox;
 using Jarvis.Application.Integrations;
 using Jarvis.Application.Planner;
 using Jarvis.Application.Workflows;
+using Jarvis.Domain.Inbox;
 using Xunit;
 
 namespace Jarvis.UnitTests;
@@ -191,15 +193,123 @@ public sealed class DayPlannerTests
         Assert.Contains("approval", PlannerContextContributor.Guidance);
     }
 
+    private static Commitment Promise(Guid owner, string description = "Send Rosa the deck", bool suggested = false,
+        string status = CommitmentStatuses.Open) =>
+        new(Guid.NewGuid(), owner, CommitmentDirections.IOwe, "Rosa", description, null, status, suggested,
+            CommitmentSources.Chat, null, null, null, Morning, Morning);
+
+    private static ICommitmentService Promises(params Commitment[] all) => Fake<ICommitmentService>.Create(
+        ("GetAsync", args => all.FirstOrDefault(item => item.Id == (Guid)args[0]! && item.OwnerId == (Guid)args[1]!)));
+
+    [Fact]
+    public async Task A_promise_becomes_a_to_do_titled_after_it_and_remembers_where_it_came_from()
+    {
+        var promise = Promise(Owner);
+        var (service, _, _, _) = Create(Morning, Promises(promise));
+
+        var item = await service.AddItemAsync(Owner,
+            new AddDayPlanItemRequest(null, 45, $"commitment:{promise.Id}"), Amsterdam, default);
+
+        Assert.Equal("Send Rosa the deck", item.Title);
+        Assert.Equal(45, item.Minutes);
+        Assert.Equal($"commitment:{promise.Id}", item.SourceRef);
+        var today = await service.GetTodayAsync(Owner, Amsterdam, default);
+        Assert.Equal($"commitment:{promise.Id}", Assert.Single(today.Items).SourceRef);
+    }
+
+    [Fact]
+    public async Task Planning_the_same_open_promise_twice_returns_the_first_to_do()
+    {
+        var promise = Promise(Owner);
+        var (service, _, _, _) = Create(Morning, Promises(promise));
+        var request = new AddDayPlanItemRequest(null, null, $"commitment:{promise.Id}");
+
+        var first = await service.AddItemAsync(Owner, request, Amsterdam, default);
+        var second = await service.AddItemAsync(Owner, request, Amsterdam, default);
+
+        Assert.Equal(first.Id, second.Id);
+        Assert.Single((await service.GetTodayAsync(Owner, Amsterdam, default)).Items);
+    }
+
+    [Fact]
+    public async Task A_finished_promise_to_do_can_be_planned_again_for_a_new_slot()
+    {
+        var promise = Promise(Owner);
+        var (service, _, _, _) = Create(Morning, Promises(promise));
+        var request = new AddDayPlanItemRequest(null, null, $"commitment:{promise.Id}");
+        var first = await service.AddItemAsync(Owner, request, Amsterdam, default);
+        await service.UpdateItemAsync(Owner, first.Id, new UpdateDayPlanItemRequest(Done: true), Amsterdam, default);
+
+        var second = await service.AddItemAsync(Owner, request, Amsterdam, default);
+
+        Assert.NotEqual(first.Id, second.Id);
+    }
+
+    [Fact]
+    public async Task A_given_title_wins_over_the_promise_description()
+    {
+        var promise = Promise(Owner);
+        var (service, _, _, _) = Create(Morning, Promises(promise));
+
+        var item = await service.AddItemAsync(Owner,
+            new AddDayPlanItemRequest("Draft the deck", 60, $"commitment:{promise.Id}"), Amsterdam, default);
+
+        Assert.Equal("Draft the deck", item.Title);
+    }
+
+    [Theory]
+    [InlineData("commitment:not-a-guid")]
+    [InlineData("task:00000000-0000-0000-0000-000000000001")]
+    public async Task A_source_that_is_not_a_promise_is_rejected(string sourceRef)
+    {
+        var (service, _, _, _) = Create(Morning, Promises());
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.AddItemAsync(Owner, new AddDayPlanItemRequest("x", null, sourceRef), Amsterdam, default));
+    }
+
+    [Fact]
+    public async Task Another_owners_suggested_or_closed_promises_cannot_be_planned()
+    {
+        var theirs = Promise(Other);
+        var suggested = Promise(Owner, suggested: true);
+        var done = Promise(Owner, status: CommitmentStatuses.Done);
+        var (service, _, _, _) = Create(Morning, Promises(theirs, suggested, done));
+
+        foreach (var id in new[] { theirs.Id, suggested.Id, done.Id, Guid.NewGuid() })
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                service.AddItemAsync(Owner, new AddDayPlanItemRequest(null, null, $"commitment:{id}"), Amsterdam,
+                    default));
+        Assert.Empty((await service.GetTodayAsync(Owner, Amsterdam, default)).Items);
+    }
+
+    [Fact]
+    public async Task A_promise_to_do_gets_a_block_like_any_other_and_finishing_it_leaves_the_promise_open()
+    {
+        var promise = Promise(Owner);
+        var (service, _, _, _) = Create(Morning, Promises(promise));
+        var item = await service.AddItemAsync(Owner,
+            new AddDayPlanItemRequest(null, 30, $"commitment:{promise.Id}"), Amsterdam, default);
+
+        var planned = await service.PlanAsync(Owner, Amsterdam, default);
+        Assert.Equal(1, planned.Scheduled);
+        var done = await service.UpdateItemAsync(Owner, item.Id, new UpdateDayPlanItemRequest(Done: true), Amsterdam,
+            default);
+
+        Assert.True(done!.Done);
+        Assert.Equal($"commitment:{promise.Id}", done.SourceRef);
+        // The fake service has no Complete handler, so any attempt to close the promise would throw above.
+    }
+
     private static (DayPlannerService Service, FakeReminders Reminders, FakeCalendar Calendar, MutableClock Clock)
-        Create(DateTimeOffset now)
+        Create(DateTimeOffset now, ICommitmentService? commitments = null)
     {
         var clock = new MutableClock(now);
         var reminders = new FakeReminders();
         var calendar = new FakeCalendar();
         var credentials = new InMemoryCredentialStore();
         var service = new DayPlannerService(new InMemorySettingsStore(), calendar, new CalendarAwareCredentials(
-            credentials, calendar), reminders, new NoBriefing(), clock);
+            credentials, calendar), reminders, new NoBriefing(), clock, commitments);
         return (service, reminders, calendar, clock);
     }
 

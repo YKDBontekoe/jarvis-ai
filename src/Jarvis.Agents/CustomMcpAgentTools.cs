@@ -86,13 +86,14 @@ internal sealed class CustomMcpAgentTools(ICustomMcpServerStore store, IUserMcpS
     public async Task<string> ActivateCustomMcpServerAsync(
         [Description("The app id.")] string id,
         [Description("sha256 of the reviewed draft, from WriteCustomMcpServer or TestCustomMcpServer.")] string sha256,
+        [Description("Only if the user explicitly says to switch it on without a passing test: their reason in their own words (10+ characters). Never invent one.")] string? overrideReason = null,
         CancellationToken cancellationToken = default)
     {
         if (!Guid.TryParse(id, out var customId)) return "Pass the app id from WriteCustomMcpServer.";
         try
         {
-            var (server, registered) = await CustomMcpServerManager.ActivateAsync(currentUser.OwnerId, customId,
-                sha256, store, registry, cancellationToken);
+            var (server, registered, _) = await CustomMcpServerManager.ActivateAsync(currentUser.OwnerId, customId,
+                sha256, store, registry, cancellationToken, overrideReason);
             var missing = registered?.Secrets?.Where(secret => secret.Required && !secret.IsSet)
                 .Select(secret => secret.Name).ToArray() ?? [];
             var next = missing.Length == 0
@@ -105,6 +106,7 @@ internal sealed class CustomMcpAgentTools(ICustomMcpServerStore store, IUserMcpS
             return $"'{server.Name}' revision {server.ActiveRevision} is live (server id {server.RegistryServerId}).{tested} {next}";
         }
         catch (CustomMcpScriptException exception) { return "Not activated: " + string.Join(" ", exception.Errors); }
+        catch (CustomMcpReviewException exception) when (exception.Code == "not_tested") { return "Not activated: this exact code has not passed a test. Call TestCustomMcpServer first. Only the user can decide to switch it on without a test."; }
         catch (ArgumentException exception) { return $"Not activated: {exception.Message}"; }
     }
 

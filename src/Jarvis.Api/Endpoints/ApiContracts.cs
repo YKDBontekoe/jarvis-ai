@@ -32,7 +32,8 @@ public sealed record MessageDto(Guid Id, string Role, string Content, DateTimeOf
     IReadOnlyList<FileCitationDto>? Citations = null, IReadOnlyList<MessageAttachmentDto>? Attachments = null);
 public sealed record FileCitationDto(Guid FileId, string DisplayName, Guid ChunkId, int ChunkIndex, string Excerpt,
     int? PageNumber, string SourceStatus = "available");
-public sealed record MessagePageDto(IReadOnlyList<MessageDto> Items, string? NextCursor, bool HasMore);
+public sealed record MessagePageDto(IReadOnlyList<MessageDto> Items, string? NextCursor, bool HasMore,
+    string? NewerCursor = null, bool HasNewer = false, string? AnchorId = null);
 /// <summary>
 /// <paramref name="RememberHours"/> limits an always-allow to that many hours; <paramref name="RememberScope"/> is
 /// <c>all</c> (default) or <c>tasks</c>, which only covers background task and automation runs.
@@ -56,6 +57,9 @@ public sealed record ReminderPlaceDto(string? Name, double? Latitude, double? Lo
 /// <summary>Snooze for a number of minutes from now, or until an exact moment.</summary>
 public sealed record SnoozeReminderRequest(int? Minutes = null, DateTimeOffset? Until = null);
 public sealed record NotificationActionRequest(string? Action, int? Minutes = null);
+public sealed record NotificationPreferenceRequest(string? Push);
+
+public sealed record DigestTimeRequest(string? Time);
 public sealed record NotificationActionResponse(string Action, ReminderDto? Reminder);
 public sealed record ReminderDto(Guid Id, string Title, DateTimeOffset DueAt, string Status, DateTimeOffset CreatedAt,
     DateTimeOffset? CompletedAt, string Recurrence, int Weekdays, string TimeZoneId, TimeOnly? LocalTime,
@@ -88,6 +92,10 @@ public sealed record MemoryRequest(string? Kind, string? Content, float Importan
 public sealed record MemoryDto(Guid Id, string Kind, string Content, float Importance, float Confidence,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, DateTimeOffset? ValidUntil, bool IsPinned, string? SourceType);
 public sealed record MemoryHitDto(MemoryDto Memory, double Score);
+public sealed record MemoryCorrectionRequest(string? Content);
+
+/// <summary><see cref="ReplacementId"/> is the new memory when the old one was replaced; null when it only ended.</summary>
+public sealed record MemoryCorrectionDto(Guid Id, MemoryDto Memory, Guid? ReplacementId);
 
 public sealed record JournalRequest(DateOnly? EntryDate, string? Content, string? Highlights, string? Gratitude,
     int? Rating, int? Mood, int? Energy, int? Stress, string[]? Tags, string? Source);

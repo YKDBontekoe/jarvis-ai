@@ -3,6 +3,46 @@ part of 'chat_screen.dart';
 // ignore_for_file: annotate_overrides
 
 mixin _ChatScreenVoice on _ChatScreenController {
+  /// Saves a card to the Library or puts it away. A put-away card is removed
+  /// from the screen so it cannot be acted on again.
+  Future<void> _voiceCardAction(String id, String action) async {
+    try {
+      final response = await _http.post<dynamic>('/api/v1/voice/cards/$id/$action');
+      final updated = jsonObject(response.data);
+      if (!mounted || updated == null) return;
+      setState(() {
+        _voiceCards = [
+          for (final card in _voiceCards)
+            if (card['id'] != id)
+              card
+            else if (action == 'save')
+              updated,
+        ];
+      });
+    } on DioException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(firstProblemMessage(error.response?.data) ?? 'That did not work.'),
+          ),
+        );
+    }
+  }
+
+  Future<void> _showVoiceRecap() async {
+    final conversationId = _conversationId;
+    if (conversationId == null) return;
+    try {
+      final response = await _http.get<dynamic>('/api/v1/voice/$conversationId/recap');
+      final recap = jsonObject(response.data);
+      if (mounted && recap != null) await showVoiceRecap(context, recap);
+    } on DioException {
+      // The recap is a convenience; the cards on screen still show their state.
+    }
+  }
+
   Future<void> _toggleVoice() async {
     if (_voiceActive || _voiceStarting) {
       await _stopVoice();
@@ -30,6 +70,7 @@ mixin _ChatScreenVoice on _ChatScreenController {
       _voiceReconnecting = false;
       _voiceCaption = null;
       _voiceCaptionRole = null;
+      _voiceCards = [];
       _selectedDestination = 2;
       _error = null;
     });

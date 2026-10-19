@@ -19,6 +19,27 @@ public interface IConversationStore
     Task<IReadOnlyList<Message>> GetMessagesAsync(Guid conversationId, CancellationToken cancellationToken);
     Task<MessagePage> GetMessagePageAsync(Guid conversationId, MessageCursor? before, int limit,
         CancellationToken cancellationToken);
+    /// <summary>
+    /// Messages the owner (or Jarvis) wrote that contain <paramref name="query"/>, newest first. Tool messages and the
+    /// conversations of background tasks are left out.
+    /// </summary>
+    Task<IReadOnlyList<MessageSearchHit>> SearchMessagesAsync(Guid ownerId, string query, int limit,
+        CancellationToken cancellationToken);
+
+    /// <summary>One message with its conversation's title, only when the conversation is the owner's.</summary>
+    Task<MessageSearchHit?> FindMessageAsync(Guid ownerId, Guid messageId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The messages around <paramref name="messageId"/>: up to <paramref name="before"/> older and
+    /// <paramref name="after"/> newer ones, oldest first. Null when the message is not in the conversation.
+    /// </summary>
+    Task<MessageWindow?> GetMessageWindowAsync(Guid conversationId, Guid messageId, int before, int after,
+        CancellationToken cancellationToken);
+
+    /// <summary>The next <paramref name="limit"/> messages after <paramref name="after"/>, oldest first.</summary>
+    Task<MessageWindow> GetMessagesAfterAsync(Guid conversationId, MessageCursor after, int limit,
+        CancellationToken cancellationToken);
+
     Task AddMessageAsync(Message message, CancellationToken cancellationToken);
     /// <summary>Removes one message of a conversation, with its feedback; true when it existed.</summary>
     Task<bool> DeleteMessageAsync(Guid conversationId, Guid messageId, CancellationToken cancellationToken);
@@ -27,6 +48,16 @@ public interface IConversationStore
 }
 
 public sealed record MessageCursor(DateTimeOffset CreatedAt, Guid Id);
+
+/// <summary>A message that matched a search, with the title of the conversation it is in.</summary>
+public sealed record MessageSearchHit(Message Message, string ConversationTitle);
+
+/// <summary>
+/// A stretch of a transcript. <see cref="OlderCursor"/> continues backwards with the usual <c>cursor</c> paging and
+/// <see cref="NewerCursor"/> forwards; either is null when that end of the conversation is reached.
+/// </summary>
+public sealed record MessageWindow(IReadOnlyList<Message> Items, MessageCursor? OlderCursor, bool HasOlder,
+    MessageCursor? NewerCursor, bool HasNewer);
 
 public sealed record MessagePage(IReadOnlyList<Message> Items, MessageCursor? NextCursor, bool HasMore)
 {

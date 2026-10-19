@@ -110,6 +110,9 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   /// Items an action is running on, so their rows can show it.
   final Set<String> _pending = {};
 
+  /// Needs you rows whose server call failed, so the card brings them back.
+  final Set<String> _failed = {};
+
   /// Drives the parallax glow, the receding greeting and the compact header.
   final _scroll = ScrollController();
 
@@ -571,15 +574,68 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
         );
       case (NeedsYouKind.reminder, _):
         widget.onOpen('reminders');
+      case (NeedsYouKind.commitment, NeedsYouAction.done):
+        await _fulfil(item.id);
+      case (NeedsYouKind.commitment, _):
+        widget.onOpen('inbox');
+      case (NeedsYouKind.decision, _):
+        widget.onOpen('decisions');
     }
+  }
+
+  /// Marks an accepted promise done. A failure brings its row back.
+  Future<void> _fulfil(String id) async {
+    if (_pending.contains(id)) return;
+    setState(() {
+      _pending.add(id);
+      _failed.remove(id);
+    });
+    var ok = true;
+    try {
+      await widget.source.http.patch<dynamic>(
+        '/api/v1/commitments/$id',
+        data: {'status': 'done'},
+      );
+    } catch (_) {
+      ok = false;
+    }
+    if (!mounted) return;
+    setState(() {
+      _pending.remove(id);
+      if (ok) {
+        _failed.remove(id);
+      } else {
+        _failed.add(id);
+      }
+    });
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(ok ? 'Marked as done' : 'Could not mark it as done'),
+        ),
+      );
+    widget.source.invalidate();
+    final briefing = await widget.source.briefing();
+    if (mounted) setState(() => _briefing = briefing);
   }
 
   Future<void> _remind(String id, String action) async {
     if (_pending.contains(id)) return;
-    setState(() => _pending.add(id));
+    setState(() {
+      _pending.add(id);
+      _failed.remove(id);
+    });
     final outcome = await widget.source.act('reminders', action, id);
     if (!mounted) return;
-    setState(() => _pending.remove(id));
+    setState(() {
+      _pending.remove(id);
+      if (outcome.ok) {
+        _failed.remove(id);
+      } else {
+        _failed.add(id);
+      }
+    });
     ScaffoldMessenger.maybeOf(context)
       ?..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(outcome.message)));
@@ -644,7 +700,6 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final now = _now;
     final upcoming = upcomingItems(_briefing, now);
-    final approvals = jsonMaps(_briefing?['approvals']);
     final calendar = _briefing?['calendar'];
     final calendarOff =
         calendar is Map && calendar['connected'] == false && _briefing != null;
@@ -731,13 +786,12 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                           ),
                           http: widget.source.http,
                           pending: _pending,
+                          failed: _failed,
                           onReplyWith: widget.onReplyWith == null
                               ? null
                               : (item, draft) =>
                                     widget.onReplyWith!(item.id, draft),
-                          onSeeAll: approvals.isEmpty
-                              ? null
-                              : () => widget.onOpen('approvals'),
+                          onSeeAll: () => widget.onOpen('attention'),
                           onAction: (item, action) =>
                               unawaited(_needsYou(item, action)),
                         ),

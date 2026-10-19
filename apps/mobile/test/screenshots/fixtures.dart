@@ -67,8 +67,7 @@ List<Map<String, Object?>> messages() => [
   {
     'id': 'm1',
     'role': 'user',
-    'content':
-        'Can you plan a relaxed weekend in Lisbon for two? We land Friday at 18:40.',
+    'content': 'Can you plan a relaxed weekend in Lisbon for two? We land Friday at 18:40.',
   },
   {
     'id': 'm2',
@@ -96,8 +95,7 @@ Want me to add the dinner booking to your calendar and remind you to reserve on 
   {
     'id': 'm4',
     'role': 'assistant',
-    'content':
-        'Done — I set a reminder for **Wednesday at 10:00** to book Cervejaria Ramiro. The calendar entry needs your OK first.',
+    'content': 'Done — I set a reminder for **Wednesday at 10:00** to book Cervejaria Ramiro. The calendar entry needs your OK first.',
   },
 ];
 
@@ -106,8 +104,7 @@ List<Map<String, Object?>> approvals() => [
     'id': 'a1',
     'conversationId': conversationId,
     'toolName': 'CreateCalendarEvent',
-    'argumentsJson':
-        '{"title":"Dinner at Cervejaria Ramiro","start":"Friday 21:00","location":"Av. Almirante Reis 1"}',
+    'argumentsJson': '{"title":"Dinner at Cervejaria Ramiro","start":"Friday 21:00","location":"Av. Almirante Reis 1"}',
     'status': 'pending',
   },
 ];
@@ -143,8 +140,7 @@ Map<String, Object?> home() {
   final now = _now();
   final today = DateTime(now.year, now.month, now.day);
   return {
-    'portrait':
-        'A calm Friday. Two things need you: the dinner booking and the bank summary that is waiting on your approval.',
+    'portrait': 'A calm Friday. Two things need you: the dinner booking and the bank summary that is waiting on your approval.',
     'reminders': [
       {
         'id': 'r1',
@@ -164,6 +160,25 @@ Map<String, Object?> home() {
       },
     ],
     'approvals': approvals(),
+    'commitments': [
+      {
+        'id': 'c-deck',
+        'direction': 'i_owe',
+        'counterparty': 'Rosa',
+        'description': 'Send Rosa the pitch deck',
+        'daysOverdue': 2,
+        'source': 'whatsapp',
+      },
+    ],
+    'decisions': [
+      {
+        'id': 'd-bank',
+        'title': 'Switch to the new bank',
+        'prediction': 'Monthly fees drop by half',
+        'probability': 0.7,
+        'daysOverdue': 0,
+      },
+    ],
     'latestBriefing': {
       'id': 'n-brief',
       'title': 'Your morning briefing',
@@ -257,6 +272,166 @@ List<Map<String, Object?>> projects() => [
   {'id': 'p1', 'name': 'Lisbon trip', 'color': 'orange'},
   {'id': 'p2', 'name': 'Home renovation', 'color': 'teal'},
 ];
+
+Map<String, Object?> projectDetails() => {
+  'project': {
+    'id': 'p2',
+    'name': 'Home renovation',
+    'description': 'A new kitchen before summer',
+    'instructions': 'Compare at least three quotes and answer in Dutch.',
+    'color': 'teal',
+    'createdAt': '2026-09-01T10:00:00Z',
+    'updatedAt': '2026-10-10T10:00:00Z',
+    'conversationCount': 1,
+    'fileCount': 0,
+    'taskCount': 0,
+    'outcome': 'Cook for ten people in the new kitchen by June.',
+    'status': 'active',
+  },
+  'nextAction': {
+    'type': 'commitment',
+    'id': 'c-deck',
+    'note': 'Before the plumber comes on Friday',
+    'title': 'Send Rosa the tile quotes',
+    'state': 'open',
+  },
+  'conversations': <Object>[],
+  'files': <Object>[],
+  'tasks': <Object>[],
+};
+
+Map<String, Object?> comparisonDetails() => {
+  'id': 'c1',
+  'definition': {
+    'title': 'Which boiler?',
+    'question': 'Replace the 2010 boiler before winter',
+    'criteria': [
+      {'id': 'price', 'name': 'Price', 'weight': 8},
+      {'id': 'noise', 'name': 'Noise', 'weight': 3},
+      {'id': 'warranty', 'name': 'Warranty', 'weight': 5},
+    ],
+    'options': [
+      {
+        'id': 'bosch',
+        'name': 'Bosch Condens 2300i',
+        'summary': null,
+        'cells': {
+          'price': {'score': 7, 'note': '€1,900 incl. fitting', 'source': 'quote-bosch.pdf', 'asOf': '2026-10-01'},
+          'noise': {'score': 8},
+          'warranty': {'score': null},
+        },
+      },
+      {
+        'id': 'vaillant',
+        'name': 'Vaillant ecoTEC',
+        'summary': null,
+        'cells': {
+          'price': {'score': 5, 'note': '€2,350 incl. fitting', 'source': 'quote-vaillant.pdf', 'asOf': '2026-10-03'},
+          'noise': {'score': 9},
+          'warranty': {'score': 9, 'note': '10 years'},
+        },
+      },
+    ],
+    'chosenOptionId': null,
+    'decisionId': null,
+  },
+  'result': {
+    'rows': [
+      {'optionId': 'bosch', 'name': 'Bosch Condens 2300i', 'score': 7.27, 'coverage': .69, 'unknownCriteria': ['Warranty'], 'rank': 1, 'tied': false, 'thin': false},
+      {'optionId': 'vaillant', 'name': 'Vaillant ecoTEC', 'score': 6.84, 'coverage': 1.0, 'unknownCriteria': <Object>[], 'rank': 2, 'tied': false, 'thin': false},
+    ],
+    'leaderId': 'bosch',
+    'leaderIsTied': false,
+    'sensitivity': [
+      {'criterionId': 'price', 'criterionName': 'Price', 'changesLeader': true, 'leaderWithout': 'Vaillant ecoTEC'},
+    ],
+    'warnings': <Object>[],
+  },
+  'libraryItemId': null,
+};
+
+Map<String, Object?> meetingDetails() => {
+  'id': 'm1',
+  'title': 'Kitchen sync with Rosa',
+  'startsAt': '2026-10-20T14:00:00Z',
+  'projectId': 'p2',
+  'document': {
+    'purpose': 'Agree the tiles and who books the plumber',
+    'template': 'project_update',
+    'participants': [
+      {'name': 'Rosa Visser', 'personId': null},
+    ],
+    'agenda': [
+      {'id': 'a1', 'text': 'Agree the tiles and who books the plumber', 'shared': true},
+      {'id': 'a2', 'text': 'Close the loop with Rosa: Send the tile quotes', 'shared': true},
+      {'id': 'a3', 'text': 'Is the budget realistic?', 'shared': false},
+    ],
+    'privateNotes': null,
+    'prep': {
+      'builtAt': '2026-10-17T09:00:00Z',
+      'items': [
+        {'section': 'Project', 'kind': 'fact', 'text': '“Home renovation” is for: Cook for ten people in the new kitchen by June.', 'ref': 'project:11111111-1111-7111-8111-111111111111'},
+        {'section': 'Open loops', 'kind': 'fact', 'text': 'You owe Rosa Visser: Send the tile quotes — 3 days overdue', 'ref': 'commitment:22222222-2222-7222-8222-222222222222'},
+        {'section': 'Decisions', 'kind': 'fact', 'text': 'Open decision: Pick a plumber. You predicted “It arrives on time” (60% sure), review 2026-11-02.', 'ref': 'decision:33333333-3333-7333-8333-333333333333'},
+        {'section': 'Questions', 'kind': 'question', 'text': 'What is the next step, who owns it and by when?', 'ref': null},
+      ],
+    },
+    'debriefText': null,
+    'candidates': [
+      {'id': 'i_owe-1', 'kind': 'i_owe', 'text': "I'll send Rosa the revised quote by Friday.", 'counterparty': 'Rosa Visser', 'dueOn': '2026-10-23', 'dueText': 'friday', 'evidence': '', 'state': 'pending', 'resultRef': null},
+      {'id': 'they_owe-1', 'kind': 'they_owe', 'text': 'Rosa will confirm the plumber next week.', 'counterparty': 'Rosa Visser', 'dueOn': null, 'dueText': 'next week', 'evidence': '', 'state': 'pending', 'resultRef': null},
+    ],
+  },
+};
+
+Map<String, Object?> goalDetails() => {
+  'goal': {
+    'id': 'g1',
+    'title': 'Run a 10k',
+    'motivation': 'Feel fit before the summer.',
+    'status': 'active',
+    'weeklyMinutes': 90,
+    'checkInEveryDays': 7,
+    'habitIds': ['h1'],
+    'commitmentIds': <Object>[],
+    'plan': {
+      'weekStart': '2026-10-12',
+      'omittedForTime': 1,
+      'items': [
+        {'id': 's1', 'title': 'Pick a training plan', 'minutes': 30, 'status': 'proposed', 'ref': 'project:p2', 'key': 'project:p2'},
+        {'id': 's2', 'title': 'Run ×2 this week', 'minutes': 40, 'status': 'accepted', 'ref': 'habit:h1', 'key': 'habit:h1'},
+      ],
+    },
+    'experiments': [
+      {
+        'id': 'e1',
+        'change': 'Run before breakfast',
+        'expectedBenefit': 'More energy',
+        'status': 'running',
+        'reviewOn': '2026-10-31',
+        'notes': [
+          {'on': '2026-10-15', 'text': 'Slept badly, ran anyway'},
+        ],
+      },
+    ],
+  },
+  'checkInDue': true,
+  'habits': [
+    {'id': 'h1', 'name': 'Run', 'thisWeekCount': 1, 'targetPerWeek': 3},
+  ],
+  'project': {'id': 'p2', 'name': 'Marathon', 'nextAction': 'Pick a training plan'},
+  'commitments': <Object>[],
+  'progress': {
+    'measured': ['Run: 1 of 3 this week', '0 planned steps done this week'],
+    'reflections': [
+      {'feeling': 'slipping', 'progress': 'Ran once', 'friction': 'Rainy week', 'adjustment': 'Try mornings'},
+    ],
+    'interpretation': {
+      'verdict': 'change',
+      'reason': 'Your last 2 check-ins mention slipping or stuck. What would make it easier?',
+    },
+  },
+};
 
 List<Map<String, Object?>> reminders() {
   final now = _now();
@@ -546,8 +721,7 @@ Map<String, Object?> whatsAppChats() {
           unread: 9,
         ),
         'catchUp': {
-          'summary':
-              'Noor is booking the bouldering gym for Saturday at 10:00 and asked who is in.',
+          'summary': 'Noor is booking the bouldering gym for Saturday at 10:00 and asked who is in.',
           'toReply': [
             {'who': 'Noor', 'about': 'Are you in on Saturday?'},
           ],
@@ -583,6 +757,297 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
     {'id': 'n1', 'type': 'reminder.due', 'title': 'Water the basil'},
   ],
   'GET /api/v1/projects': projects(),
+  'GET /api/v1/projects/p2': projectDetails(),
+  'GET /api/v1/comparisons': [
+    {'id': 'c1', 'title': 'Which boiler?', 'options': 2, 'criteria': 3, 'leader': 'Bosch Condens 2300i', 'decided': false, 'updatedAt': '2026-10-10T10:00:00Z'},
+  ],
+  'GET /api/v1/comparisons/c1': comparisonDetails(),
+  'POST /api/v1/scenarios/evaluate': {
+    'kind': 'savings',
+    'baseline': {'label': 'Now', 'primary': 311.76, 'unit': 'EUR', 'summary': '12.99 EUR a month for 24 months, 311.76 in total.'},
+    'alternative': {'label': 'Alternative', 'primary': 227.76, 'unit': 'EUR', 'summary': '9.49 EUR a month for 24 months plus 0.00 once, 227.76 in total.'},
+    'deltas': [
+      {'label': 'Total over the period', 'value': 84.0, 'unit': 'EUR', 'explanation': '(12.99 × 24 + 0.00) − (9.49 × 24 + 0.00) = 84.00'},
+      {'label': 'Per month', 'value': 3.5, 'unit': 'EUR', 'explanation': '12.99 − 9.49 = 3.50 a month'},
+    ],
+    'notes': ['Assumes the prices stay as entered. Nothing here changes a budget, account or subscription.'],
+  },
+  'GET /api/v1/apps/goals': {
+    'goals': [
+      {
+        'id': 'calendar', 'title': 'Manage my calendar', 'purpose': 'See what is on today and plan around it. Jarvis reads your events; adding one asks you first.',
+        'packId': 'calendar', 'packName': 'Calendar', 'status': 'not_connected',
+        'nextStep': 'Paste your calendar\'s private link to connect.',
+        'capabilities': {'reads': ['calendar events list'], 'prepares': <Object>[], 'changes': ['calendar event create'], 'needs': 'A private calendar link from your calendar provider.'},
+        'try': null, 'pinned': false,
+      },
+      {
+        'id': 'mail', 'title': 'Deal with my email', 'purpose': 'Search your mail and draft replies for you to send.',
+        'packId': 'mail', 'packName': 'Mail', 'status': 'ready', 'nextStep': 'Connected. Try it below or pin it.',
+        'capabilities': {'reads': ['list emails', 'search emails'], 'prepares': ['draft email'], 'changes': <Object>[], 'needs': 'You sign in once with your provider. Jarvis never sees your password.'},
+        'try': {'label': 'Show my latest emails', 'kind': 'chat_prompt', 'prompt': 'x'}, 'pinned': true,
+      },
+    ],
+    'unmatched': false,
+    'suggestion': null,
+  },
+  'GET /api/v1/library/i1/lesson': {
+    'itemId': 'i1', 'title': 'Sourdough basics', 'overview': 'How a sourdough starter works.', 'minutes': 4,
+    'note': 'Every point is a sentence from your saved text, quoted with where it is. Nothing here is invented.',
+    'points': [
+      {'text': 'Feeding the starter every day keeps the yeast active and the dough rising reliably.', 'source': {'quote': 'x', 'offset': 0}},
+      {'text': 'A warm kitchen speeds up fermentation, while a cold fridge slows it down.', 'source': {'quote': 'x', 'offset': 90}},
+    ],
+    'questions': [
+      {'id': 'b1', 'kind': 'blank', 'prompt': 'Fill in the missing word: Feeding the starter every day keeps the _____ active and the dough rising reliably.', 'hint': 'It starts with “y” and has 5 letters.', 'source': {'quote': 'x', 'offset': 0}},
+      {'id': 'e1', 'kind': 'explain_back', 'prompt': 'In your own words, what is the main idea of “Sourdough basics”?', 'hint': 'Mention the key terms you remember from the points above.', 'source': {'quote': 'x', 'offset': 0}},
+    ],
+  },
+  'GET /api/v1/notifications/preferences': {
+    'currentMode': 'normal', 'currentModeLabel': 'Normal', 'summary': '1 kind of notification stays in the app only, by your choice.',
+    'categories': [
+      {'id': 'approvals', 'title': 'Needs your decision', 'description': 'Jarvis waiting for you to approve something. These always buzz, because nothing happens until you answer.', 'locked': true, 'setting': 'on', 'now': {'outcome': 'push', 'reason': 'x'}, 'modes': []},
+      {'id': 'reminders', 'title': 'Reminders', 'description': 'Your reminders when they are due.', 'locked': false, 'setting': 'on', 'now': {'outcome': 'push', 'reason': 'x'}, 'modes': []},
+      {'id': 'problems', 'title': 'Something went wrong', 'description': 'A reminder, task or mission that failed. These always buzz, and stay in the app either way.', 'locked': true, 'setting': 'on', 'now': {'outcome': 'push', 'reason': 'x'}, 'modes': []},
+      {'id': 'briefings', 'title': 'Briefings', 'description': 'Your morning brief and weekly review.', 'locked': false, 'setting': 'on', 'now': {'outcome': 'push', 'reason': 'x'}, 'modes': [{'mode':'meeting','label':'Meeting','outcome':'held'},{'mode':'sleep','label':'Sleep','outcome':'held'}]},
+      {'id': 'updates', 'title': 'Updates and ideas', 'description': 'Finished tasks, things Jarvis learned, budget alerts and check-ins.', 'locked': false, 'setting': 'quiet', 'now': {'outcome': 'app_only', 'reason': 'x'}, 'modes': [{'mode':'meeting','label':'Meeting','outcome':'held'},{'mode':'sleep','label':'Sleep','outcome':'held'}]},
+    ],
+  },
+  'GET /api/v1/missions/templates': [
+    {'id': 'decision', 'title': 'Research a decision', 'purpose': 'Weigh the options for a choice you have to make and recommend one, with the evidence.', 'deliverable': 'A short report.', 'questions': <Object>[]},
+    {'id': 'brief', 'title': 'Prepare a project brief', 'purpose': 'Pull what Jarvis knows about a project into a one-page brief you can share.', 'deliverable': 'A one-page brief.', 'questions': <Object>[]},
+    {'id': 'compare', 'title': 'Compare proposals', 'purpose': 'Line up offers or quotes side by side and show the differences that matter.', 'deliverable': 'A comparison.', 'questions': <Object>[]},
+    {'id': 'meeting', 'title': 'Assemble a meeting pack', 'purpose': 'Gather everything you need for a meeting: background, open points and questions to ask.', 'deliverable': 'A pack.', 'questions': <Object>[]},
+  ],
+  'GET /api/v1/missions/m1/deliverable': {
+    'missionId': 'm1', 'title': 'Pick a laptop for travel', 'status': 'completed',
+    'headline': 'The 13-inch model is the best fit: lightest, 14 hours of battery, inside the budget.',
+    'sections': [
+      {'stepKey': 'research', 'title': 'Research the options', 'role': 'researcher', 'text': 'Three models fit under 1,500 euro. The 13-inch weighs 1.1 kg.'},
+      {'stepKey': 'compare', 'title': 'Compare them', 'role': 'planner', 'text': 'Battery: 14 h, 11 h, 9 h. Weight: 1.1, 1.4, 1.6 kg.'},
+    ],
+    'evidence': [
+      {'url': 'https://example.com/laptops/13', 'host': 'example.com', 'stepTitle': 'Research the options'},
+    ],
+    'checks': [
+      {'id': 'finished', 'label': 'Every step has finished', 'ok': true},
+      {'id': 'nothing-failed', 'label': 'No step failed or was stopped', 'ok': true},
+      {'id': 'result', 'label': 'There is a final result', 'ok': true},
+      {'id': 'sources', 'label': 'At least one source is named', 'ok': true},
+    ],
+    'limitations': <Object>[],
+    'nextDecisions': ['Decide what to do with this: save it, refine it, or start a follow-up mission.'],
+    'effort': 'Took about 12 minutes. Model cost is not tracked per mission, so none is shown.',
+    'reviewNote': 'These checks only show that the work exists and is complete. They cannot tell whether it is right: read it before you rely on it.',
+    'libraryItemId': null,
+  },
+  'GET /api/v1/custom-mcp-servers/starters': [
+    {'id': 'tracker', 'title': 'A personal tracker', 'purpose': 'Log something each day and see the trend.', 'starter': 'A tracker for my water intake'},
+    {'id': 'lookup', 'title': 'A lookup on one source', 'purpose': 'Ask one website or API a narrow question.', 'starter': 'Look up today\'s exchange rate from a public API'},
+    {'id': 'helper', 'title': 'A project helper', 'purpose': 'Do a small repeated chore for one project.', 'starter': 'Turn my meeting notes into follow-ups'},
+    {'id': 'calculator', 'title': 'A comparison calculator', 'purpose': 'Compare two options with your own numbers.', 'starter': 'Compare two phone plans over 24 months'},
+  ],
+  'GET /api/v1/preferences': {
+    'homeTimeZone': 'Europe/Amsterdam', 'source': 'brief', 'chosen': false, 'localNow': 'Sat 17 Oct 14:07',
+    'explanation': 'You never chose one, so Jarvis borrows the zone from your morning brief.',
+  },
+  'GET /api/v1/modes': {
+    'mode': 'focus', 'label': 'Focus', 'source': 'manual', 'reason': 'You switched on Focus until 14:50.', 'until': '2026-10-18T14:50:00', 'notifications': 'important', 'auto': true, 'sleepStart': '23:00', 'sleepEnd': '07:00',
+    'modes': [
+      {'id': 'normal', 'label': 'Normal', 'description': 'Everything as usual.', 'notifications': 'all', 'tone': null, 'customised': false},
+      {'id': 'focus', 'label': 'Focus', 'description': 'Only reminders and approvals buzz your phone. Short, to-the-point replies.', 'notifications': 'important', 'tone': null, 'customised': false},
+      {'id': 'sleep', 'label': 'Sleep', 'description': 'Do not disturb. Nothing buzzes your phone.', 'notifications': 'none', 'tone': null, 'customised': false},
+    ],
+  },
+  'GET /api/v1/modes/catch-up': {
+    'groups': [
+      {'domain': 'approvals', 'title': 'Needs your decision', 'locked': true, 'included': true, 'count': 1, 'items': [{'title': 'Send the quote', 'count': 1, 'at': '2026-10-18T07:10:00Z'}]},
+      {'domain': 'reminders', 'title': 'Reminders', 'locked': false, 'included': true, 'count': 2, 'items': [{'title': 'Take medication', 'count': 2, 'at': '2026-10-18T07:00:00Z'}]},
+      {'domain': 'updates', 'title': 'Updates and ideas', 'locked': false, 'included': false, 'count': 3, 'items': <Object>[]},
+    ],
+    'total': 3, 'stillHolding': false, 'since': '2026-10-18T03:00:00Z',
+    'summary': '3 came in while pushes were quiet. 3 more are left out of this recap but still in your notifications.',
+  },
+  'GET /api/v1/modes/suggestion': {
+    'mode': 'focus', 'label': 'Focus',
+    'profile': {'id': 'p1', 'name': 'Research analyst', 'scopeChange': {'details': ['Memory recall scope is different.']}, 'broadens': <Object>[]},
+    'routine': {'id': 'focus', 'title': 'Start focus'},
+    'visualOnly': ['Jarvis shows this profile and routine as a suggestion while the mode is on.'],
+    'needsYou': ['Nothing switches profile by itself; a switch that widens access asks you first.', 'A routine only previews what it would do. Running one is a step you take, and security controls always need your approval.'],
+    'problem': null,
+  },
+  'GET /api/v1/modes/context': {
+    'mode': 'focus', 'label': 'Focus', 'source': 'manual', 'reason': 'You switched on Focus until 14:50.', 'until': '2026-10-18T14:50:00', 'minutesLeft': 32, 'notifications': 'important',
+    'muted': 'Only things that cannot wait reach your phone; everything else waits in the app.',
+    'stillReaches': ['Reminders', 'Approvals', 'Triggered watches'],
+    'effects': 'A mode only changes which pushes reach your phone and how short Jarvis replies are. It never grants a permission, approves anything or does anything for you.',
+    'canCorrect': false, 'exitLabel': 'Switch it off',
+    'focus': {'id': 'f1', 'intention': 'Finish the report outline', 'startedAt': '2026-10-18T14:05:00', 'endsAt': '2026-10-18T14:50:00', 'endedAt': null, 'reflection': null},
+    'focusRunning': true, 'reflectionDue': false,
+    'alwaysAvailable': ['Approvals stay one tap away.', 'You can switch the mode off at any time.', 'Reminders and problems still arrive.'],
+  },
+  'GET /api/v1/home-routines': {
+    'routines': [
+      {'id': 'morning', 'title': 'Morning overview', 'description': 'A read-only look at your home before the day starts.', 'steps': [{'id': 'm-temp'}, {'id': 'm-door'}]},
+      {'id': 'focus', 'title': 'Start focus', 'description': 'Dim the room and save energy while you work.', 'steps': [{'id': 'f-light'}, {'id': 'f-living'}, {'id': 'f-eco'}]},
+      {'id': 'leave', 'title': 'Leave home', 'description': 'Switch things off and secure the door.', 'steps': [{'id': 'l-living'}, {'id': 'l-eco'}, {'id': 'l-lock'}]},
+    ],
+    'devices': [
+      {'id': 'light-living', 'name': 'Living room light', 'room': 'Living room', 'kind': 'light', 'present': true, 'reading': null, 'source': 'fixture'},
+      {'id': 'light-bedroom', 'name': 'Bedroom lamp', 'room': 'Bedroom', 'kind': 'light', 'present': false, 'reading': null, 'source': 'fixture'},
+      {'id': 'thermostat-hall', 'name': 'Hall thermostat', 'room': 'Hall', 'kind': 'climate', 'present': true, 'reading': '19.5 °C', 'source': 'fixture'},
+    ],
+    'source': 'fixture',
+    'notice': 'These are example devices. Jarvis is not connected to a real home, so a run only shows what it would do and changes nothing.',
+  },
+  'GET /api/v1/home-routines/focus/plan': {
+    'template': {'id': 'focus', 'title': 'Start focus', 'description': 'Dim the room and save energy while you work.'},
+    'summary': '2 of 3 would run, 1 unavailable.',
+    'simulation': true,
+    'steps': [
+      {'step': {'id': 'f-light', 'label': 'Turn off the bedroom lamp', 'readOnly': false, 'sensitive': false, 'reversible': true}, 'device': {'name': 'Bedroom lamp'}, 'status': 'unavailable', 'reason': 'Bedroom lamp is not reachable.'},
+      {'step': {'id': 'f-living', 'label': 'Turn off the living room light', 'readOnly': false, 'sensitive': false, 'reversible': true}, 'device': {'name': 'Living room light'}, 'status': 'ready', 'reason': 'Would run.'},
+      {'step': {'id': 'f-eco', 'label': 'Set the hall thermostat to eco', 'readOnly': false, 'sensitive': false, 'reversible': true}, 'device': {'name': 'Hall thermostat'}, 'status': 'removed', 'reason': 'You took this out.'},
+    ],
+  },
+  'GET /api/v1/profiles/presets': [
+      {'preset': {'id': 'planning', 'name': 'Planning partner', 'description': 'Helps you decide what to do next and when.', 'needsSources': false}, 'existingProfileId': 'p1', 'scope': {'memory': 'All your memories', 'files': 'All your documents', 'skills': 'All your skills', 'limits': []}},
+      {'preset': {'id': 'research', 'name': 'Research analyst', 'description': 'Answers from the sources you choose and says what is unknown.', 'needsSources': true}, 'existingProfileId': null, 'scope': {'memory': 'Only pinned memories', 'files': 'All your documents', 'skills': 'All your skills', 'limits': ['Does not recall all of your memories.', 'Cannot save new memories.']}},
+      {'preset': {'id': 'writing', 'name': 'Writing editor', 'description': 'Tightens your writing without changing what you mean.', 'needsSources': false}, 'existingProfileId': null, 'scope': {'memory': 'Memories made in this profile, plus pinned', 'files': 'All your documents', 'skills': 'All your skills', 'limits': []}},
+  ],
+  'GET /api/v1/outcomes/learned': {'applied': <Object>[], 'waiting': <Object>[], 'summary': 'Here is what Jarvis would change from what you told it. Nothing changes until you say so.'},
+  'GET /api/v1/outcomes/changes': [
+    {'change': {'id': 'c1', 'kind': 'style', 'artifactKind': 'project_update', 'value': 'short', 'title': 'Keep project update short', 'reason': 'You said project update was too long 3 times in the last 30 days.', 'before': 'The migration is going well overall. Most of the services have been moved across and tested, and a few smaller items are still outstanding.', 'after': 'Migration: 80% done. Left: reporting jobs, old cron entries.', 'synthetic': true, 'status': 'pending'}, 'effect': null},
+    {'change': {'id': 'c2', 'kind': 'quiet', 'artifactKind': 'opportunity', 'value': 'quiet', 'title': 'Stop volunteering opportunity suggestions', 'reason': 'You dismissed opportunity suggestions 4 times in the last 14 days.', 'before': 'Jarvis mentions a new opportunity when it notices one.', 'after': 'Jarvis mentions an opportunity only when you ask.', 'synthetic': true, 'status': 'applied'}, 'effect': null},
+  ],
+  'GET /api/v1/workspaces': [
+    {'workspace': {'id': 'w1', 'name': 'Weekly research', 'instruction': 'Summarise what changed since last week'}, 'profileName': 'Research analyst', 'projectName': 'Home renovation', 'problem': null, 'scope': {'memory': 'Only pinned memories', 'files': '1 document collection', 'limits': ['Cannot save new memories.']}},
+    {'workspace': {'id': 'w2', 'name': 'Monday planning', 'instruction': null}, 'profileName': null, 'projectName': null, 'problem': 'Its profile was deleted. Choose another one.', 'scope': null},
+  ],
+  'GET /api/v1/attention': {
+    'items': [
+      {'id': 'approval:a1', 'kind': 'approval', 'title': 'Approve or decline: SendEmail', 'detail': 'Jarvis is waiting for your answer.', 'urgency': 'now', 'destination': 'approvals', 'dueOn': null, 'daysOverdue': 0, 'locked': true},
+      {'id': 'task-failed:t1', 'kind': 'problem', 'title': 'Summarise the inbox', 'detail': 'The mail connector timed out.', 'urgency': 'now', 'destination': 'task:t1', 'dueOn': null, 'daysOverdue': 0, 'locked': true},
+      {'id': 'commitment:c1', 'kind': 'commitment', 'title': 'Send the deck', 'detail': 'You owe Rosa', 'urgency': 'late', 'destination': 'commitment:c1', 'dueOn': '2026-10-15', 'daysOverdue': 3, 'locked': false},
+      {'id': 'decision:d1', 'kind': 'decision', 'title': 'Review: Switch bank', 'detail': 'You predicted “It works” at 70%.', 'urgency': 'today', 'destination': 'decision:d1', 'dueOn': '2026-10-18', 'daysOverdue': 0, 'locked': false},
+      {'id': 'suggested-promises', 'kind': 'suggested_promise', 'title': '2 possible promises to review', 'detail': 'Jarvis noticed these in your messages. Nothing counts until you accept it.', 'urgency': 'review', 'destination': 'commitments', 'dueOn': null, 'daysOverdue': 0, 'locked': false},
+    ],
+    'snoozed': 1,
+    'counts': {'approval': 1, 'problem': 1, 'commitment': 1, 'decision': 1, 'suggested_promise': 1},
+    'summary': '5 need you; 2 are waiting on your answer or went wrong.',
+  },
+  'GET /api/v1/preferences/locale': {
+    'language': 'nl', 'languageName': 'Nederlands', 'baseCurrency': 'EUR',
+    'languages': [{'code': 'en', 'name': 'English'}, {'code': 'nl', 'name': 'Nederlands'}, {'code': 'de', 'name': 'Deutsch'}],
+    'currencies': ['EUR', 'USD', 'GBP', 'CHF'],
+    'explanation': 'Jarvis replies in your language unless you write in another one or the profile in use sets its own. The base currency is the default for new budgets and trips; nothing is converted.',
+  },
+  'GET /api/v1/memories/do-not-learn': {'topics': ['My health', 'Money worries']},
+  'GET /api/v1/trips': [
+    {'id': 't1', 'title': 'Lisbon in November', 'destination': 'Lisbon', 'start': '2026-11-12', 'end': '2026-11-15', 'unknowns': 3},
+  ],
+  'GET /api/v1/trips/t1': {
+    'trip': {'id': 't1', 'title': 'Lisbon in November', 'destination': 'Lisbon', 'start': '2026-11-12', 'end': '2026-11-15', 'currency': 'EUR', 'travelers': 2, 'abroad': true},
+    'options': [
+      {'option': {'id': 'o1', 'kind': 'transport', 'title': 'TAP 08:15', 'chosen': true, 'cancellation': 'Free cancellation until 5 Nov'}, 'quote': 'current', 'quoteNote': 'Quoted 16 Oct from its source.', 'priceText': 'EUR 240.00'},
+      {'option': {'id': 'o2', 'kind': 'stay', 'title': 'Hotel Alfama', 'chosen': false}, 'quote': 'outdated', 'quoteNote': 'Quoted 12 days ago. Prices change: check it again.', 'priceText': 'EUR 410.00'},
+    ],
+    'days': [
+      {'date': '2026-11-12', 'freeMinutes': 600, 'flags': <Object>[], 'items': [
+        {'item': {'id': 'i1', 'kind': 'travel', 'title': 'Flight to Lisbon', 'place': 'AMS', 'start': '08:15:00', 'end': '11:00:00'}, 'flags': [{'code': 'unverified', 'text': 'Not verified against a source.'}]},
+      ]},
+      {'date': '2026-11-13', 'freeMinutes': 60, 'flags': [{'code': 'full', 'text': 'Only 60 min of unplanned time. Leave room.'}], 'items': <Object>[]},
+    ],
+    'budget': {'currency': 'EUR', 'budget': 1500, 'chosen': 240},
+    'checklist': [
+      {'id': 'documents', 'group': 'Documents', 'text': 'Passport or ID, and any visa or entry paperwork', 'note': 'Requirements change. Check the official government source; this list is not proof you may enter.', 'done': false},
+      {'id': 'tickets', 'group': 'Before you go', 'text': 'Tickets and bookings saved where you can open them offline', 'note': null, 'done': true},
+    ],
+    'holds': [
+      {'title': 'Flight to Lisbon', 'date': '2026-11-12', 'at': '08:15:00', 'why': 'Departure'},
+    ],
+    'unknowns': ['No stay chosen yet.', '1 itinerary item not verified against a source.'],
+  },
+  'GET /api/v1/setup': {
+    'summary': '2 of 5 done. Next: connect your calendar.', 'done': 2, 'total': 5, 'nextGoalId': 'calendar',
+    'goals': [
+      {'id': 'talk', 'title': 'Talk to Jarvis', 'why': 'Ask anything; Jarvis learns what you care about.', 'done': true, 'declined': false, 'action': 'Start a chat', 'destination': null, 'blocker': null},
+      {'id': 'reminder', 'title': 'Set a reminder', 'why': 'Say what and when; Jarvis tells you at that time.', 'done': true, 'declined': false, 'action': 'Make a reminder', 'destination': 'reminders', 'blocker': null},
+      {'id': 'calendar', 'title': 'Connect your calendar', 'why': 'See what is on today and plan around it.', 'done': false, 'declined': false, 'action': 'Connect', 'destination': 'find-app', 'blocker': null},
+      {'id': 'source', 'title': 'Add something to read', 'why': 'Save a page or note so Jarvis can answer from it.', 'done': false, 'declined': true, 'action': 'Open the Library', 'destination': 'library', 'blocker': null},
+      {'id': 'brief', 'title': 'Choose when you get a brief', 'why': 'A short morning summary of the day.', 'done': false, 'declined': false, 'action': 'Choose a time', 'destination': 'briefing', 'blocker': null},
+    ],
+    'capabilities': [
+      {'id': 'model', 'title': 'Jarvis\'s brain', 'status': 'ready', 'detail': 'Signed in, so Jarvis can answer.', 'destination': null},
+      {'id': 'calendar', 'title': 'Calendar', 'status': 'not_connected', 'detail': 'Not connected. That is fine; connect it only if you want help with your agenda.', 'destination': 'find-app'},
+      {'id': 'brief', 'title': 'Morning brief', 'status': 'not_connected', 'detail': 'Off. Choose a time if you want one.', 'destination': 'briefing'},
+      {'id': 'push', 'title': 'Notifications on this phone', 'status': 'unsupported', 'detail': 'Jarvis cannot check from here whether this phone is registered. Open Notifications to see.', 'destination': 'notifications'},
+    ],
+  },
+  'GET /api/v1/stories': [
+    {'id': 's1', 'title': 'Recap: 18 Sep – 17 Oct 2026', 'style': 'recap', 'from': '2026-09-18', 'to': '2026-10-17', 'version': 2, 'savedVersion': 1},
+  ],
+  'GET /api/v1/stories/s1': {
+    'id': 's1', 'title': 'Recap: 18 Sep – 17 Oct 2026', 'style': 'recap', 'from': '2026-09-18', 'to': '2026-10-17',
+    'kinds': ['decision', 'task', 'journal'], 'version': 2, 'savedVersion': 1,
+    'counts': {'decision': 1, 'task': 2, 'journal': 1},
+    'items': [
+      {'id': 'i1', 'kind': 'decision', 'date': '2026-09-25', 'text': 'Switch to the credit union', 'originalText': 'Switch bank', 'sourceRef': 'decision:d1', 'removed': false},
+      {'id': 'i2', 'kind': 'task', 'date': '2026-10-02', 'text': 'Book the plumber', 'originalText': 'Book the plumber', 'sourceRef': 'task:t1', 'removed': false},
+      {'id': 'i3', 'kind': 'journal', 'date': '2026-10-09', 'text': 'Good day: Walked along the canal and felt calm.', 'originalText': 'Good day: Walked along the canal and felt calm.', 'sourceRef': 'journal:j1', 'removed': true},
+    ],
+    'patterns': [
+      {'headline': 'Mood is higher on days with exercise', 'detail': 'Across the window.', 'limits': 'Based on 20 days with data over 18 Sep – 17 Oct. This shows what went together, not why.'},
+    ],
+    'patternsNote': null,
+    'reflection': 'What did choosing “Switch to the credit union” teach you about what matters to you?',
+  },
+  'GET /api/v1/documents': [
+    {'id': 'd1', 'title': 'Home renovation: update 17 Oct 2026', 'kind': 'project_update', 'version': 3, 'savedVersion': 2},
+  ],
+  'GET /api/v1/documents/d1': {
+    'draft': {
+      'id': 'd1', 'title': 'Home renovation: update 17 Oct 2026', 'version': 3, 'savedVersion': 2,
+      'sections': [
+        {'id': 'where', 'heading': 'Where we are', 'body': 'Home renovation: Cook for ten people in the new kitchen by June. (status: active).', 'refs': ['project:p2'], 'edited': false, 'previous': null},
+        {'id': 'next', 'heading': 'Next step', 'body': 'Order the oak worktop first.', 'refs': ['project:p2'], 'edited': true, 'previous': 'Choose the tiles'},
+        {'id': 'promises', 'heading': 'Open promises', 'body': '- Owed to us by Rosa Visser: Send the tile quote (due 14 Oct 2026, late)', 'refs': ['commitment:c1'], 'edited': false, 'previous': null},
+        {'id': 'background', 'heading': 'Background', 'body': '[ADD: a source to cite]', 'refs': <Object>[], 'edited': false, 'previous': null},
+      ],
+    },
+    'checklist': [
+      {'text': '1 section(s) still have [ADD…] placeholders to fill or remove.', 'ok': false},
+      {'text': 'Names of people appear in the promises: check they should be seen by this audience.', 'ok': false},
+      {'text': 'Saving or exporting does not send anything. Sharing is a separate step you take yourself.', 'ok': true},
+    ],
+  },
+  'GET /api/v1/opportunities': {
+    'items': [
+      {
+        'key': 'meeting_prep:m1', 'kind': 'meeting_prep', 'groupKey': 'project:p2', 'title': 'Prepare for “Kitchen sync”',
+        'whyNow': 'It starts in about 2 hours and has no prep note yet.', 'evidence': ['meeting:m1'], 'destination': 'meeting:m1',
+        'urgency': 3, 'windowEnds': '2026-10-17', 'also': ['You promised this to Rosa; it is 2 days late.'],
+      },
+      {
+        'key': 'renewal:s1:20261022', 'kind': 'renewal', 'groupKey': 'subscription:s1', 'title': 'Review Netflix before it renews',
+        'whyNow': 'The next charge (15.99 EUR) is expected 22 Oct; decide by 20 Oct. A comparison and a price pack can be prepared.',
+        'evidence': ['subscription:s1'], 'destination': 'subscription:s1', 'urgency': 2, 'windowEnds': '2026-10-20', 'also': <Object>[],
+      },
+    ],
+    'history': [
+      {'key': 'k1', 'kind': 'follow_up', 'title': 'Plan time for: Send the deck', 'on': '2026-10-10'},
+    ],
+    'mutedKinds': ['free_slot'],
+  },
+  'GET /api/v1/goals': [
+    {'id': 'g1', 'title': 'Run a 10k', 'status': 'active', 'checkInDue': true, 'checkInCount': 1, 'feeling': 'slipping', 'openPlanItems': 2, 'review': {'verdict': 'change', 'reason': 'Your last 2 check-ins mention slipping or stuck. What would make it easier?'}},
+  ],
+  'GET /api/v1/goals/g1': goalDetails(),
+  'GET /api/v1/meetings': [
+    {'id': 'm1', 'title': 'Kitchen sync with Rosa', 'startsAt': '2026-10-20T14:00:00Z', 'projectId': 'p2', 'open': 2, 'accepted': 0, 'updatedAt': '2026-10-17T09:00:00Z'},
+  ],
+  'GET /api/v1/meetings/events': <Object>[],
+  'GET /api/v1/meetings/m1': meetingDetails(),
   'GET /api/v1/home': home(),
   'GET /api/v1/home/context': homeContext(),
   // Every chat path is ".../chats/open" with the chat in the query, so one

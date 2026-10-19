@@ -19,6 +19,8 @@ internal sealed class LibraryToolContributor(ILibraryService library, IResearchS
         yield return AIFunctionFactory.Create(tools.GetLibraryItemAsync);
         yield return AIFunctionFactory.Create(tools.SaveToLibraryAsync);
         yield return AIFunctionFactory.Create(tools.GetLibraryDigestAsync);
+        yield return AIFunctionFactory.Create(tools.TeachFromLibraryItemAsync);
+        yield return AIFunctionFactory.Create(tools.CheckLessonAnswerAsync);
         yield return AIFunctionFactory.Create(tools.GetDueFlashcardsAsync);
         yield return AIFunctionFactory.Create(tools.GradeFlashcardAsync);
         yield return AIFunctionFactory.Create(tools.AddFlashcardsAsync);

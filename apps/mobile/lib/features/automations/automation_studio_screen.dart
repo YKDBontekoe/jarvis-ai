@@ -281,6 +281,24 @@ class _AutomationStudioScreenState extends State<AutomationStudioScreen> {
                   '${asJsonBool(template['needsApproval']) ? ' · asks for approval' : ''}',
                   style: TextStyle(color: colors.muted, fontSize: 12.5),
                 ),
+                for (final step in jsonMaps(template['preview']))
+                  Padding(
+                    key: Key('template-preview-${jsonId(template)}'),
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'Then: ${asJsonString(step['title']) ?? asJsonString(step['label']) ?? ''}',
+                      style: TextStyle(color: colors.inkSoft, fontSize: 12.5),
+                    ),
+                  ),
+                if (asJsonString(template['successCriterion']) case final goal?)
+                  Padding(
+                    key: Key('template-success-${jsonId(template)}'),
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'What good looks like: $goal',
+                      style: TextStyle(color: colors.muted, fontSize: 12.5),
+                    ),
+                  ),
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(

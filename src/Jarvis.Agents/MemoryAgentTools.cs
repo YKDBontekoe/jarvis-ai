@@ -121,6 +121,39 @@ internal sealed partial class MemoryAgentTools(IMemoryService memories, MemoryRe
         return $"Saved {(pin ? "pinned " : string.Empty)}{record.Kind} memory (memory ID {record.Id}).";
     }
 
+    [Description("Correct one saved memory when the user says it is wrong or has changed (for example \"Thursdays now\"). The old version stays as history and stops being used; the corrected one replaces it in later answers. Find the memory ID with the memory search first. Pinned memories cannot be replaced this way.")]
+    public async Task<string> CorrectMemoryAsync(
+        [Description("The GUID of the memory to correct.")] string memoryId,
+        [Description("The corrected statement: one concise, standalone sentence about the user.")] string content,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Guid.TryParse(memoryId, out var id)) return "I could not correct that memory because its ID was invalid.";
+        var text = content?.Trim() ?? string.Empty;
+        if (text.Length is < 3 or > 2_000) return "The correction must contain 3 to 2,000 characters.";
+        if (LooksLikeSecret(text))
+            return "I did not save that correction because it appears to contain a credential or secret.";
+        if (!ProfileScope.AllowsRemember(profile)) return "Remembering facts is turned off for this assistant profile.";
+        var current = await memories.GetAsync(id, currentUser.OwnerId, cancellationToken);
+        if (current is null || !ProfileScope.AllowsMemory(profile, current)) return $"Memory {id} was not found.";
+        if (current.IsPinned) return "That memory is pinned. Ask the user to edit or unpin it in Memory.";
+        if (current.ValidUntil is { } until && until <= DateTimeOffset.UtcNow) return "That memory is no longer current.";
+
+        var replacement = await memories.ReplaceAsync(id, currentUser.OwnerId, current.Kind, text,
+            Math.Max(current.Importance, 0.7f), 0.95f, cancellationToken, sourceType: "user");
+        if (replacement is null) return "That memory could not be replaced; it may have changed. Search again.";
+        try
+        {
+            await audit.AppendAsync(currentUser.OwnerId, "memory", "memory.corrected", "moderate", true, null,
+                JsonSerializer.Serialize(new { resourceId = id, replacementId = replacement.Id, source = "agent" }),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(exception, "Could not append memory.corrected audit for {MemoryId}.", id);
+        }
+        return $"Corrected. The new memory is {replacement.Id}; the old one is kept as history and no longer used.";
+    }
+
     [Description("Permanently delete one saved memory when the user asks Jarvis to forget it. Find the memory ID with the memory search first. The user must approve this action.")]
     public async Task<string> ForgetMemoryAsync(
         [Description("The GUID of the memory to delete.")] string memoryId,

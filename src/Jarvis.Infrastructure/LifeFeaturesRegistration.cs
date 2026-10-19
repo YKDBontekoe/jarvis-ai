@@ -78,11 +78,42 @@ public static class LifeFeaturesRegistration
 
         // Context modes: stored in the owner's settings, so no tables of their own.
         services.AddScoped<IModeService, ModeService>();
+        services.AddScoped<IModeContextService, ModeContextService>();
+        services.AddScoped<ICatchUpService, CatchUpService>();
+        services.AddScoped<IDigestScheduleService, DigestScheduleService>();
+        services.AddScoped<Jarvis.Application.Memory.IDoNotLearnService, Jarvis.Application.Memory.DoNotLearnService>();
+        services.AddScoped<IModeAttachmentService, ModeAttachmentService>();
+        services.AddScoped<Jarvis.Application.Notifications.INotificationPreferenceService, Jarvis.Application.Notifications.NotificationPreferenceService>();
         services.AddScoped<IPushDigestService, PushDigestService>();
 
         // Decision journal: predictions with a confidence, resolved later and scored for calibration.
         services.AddScoped<IDecisionRepository, DecisionRepository>();
         services.AddScoped<IDecisionService, DecisionService>();
+        services.AddScoped<Jarvis.Application.Finance.ISubscriptionReviewService,
+            Jarvis.Application.Finance.SubscriptionReviewService>();
+        services.AddScoped<Jarvis.Application.Inbox.ICommitmentFollowUpService,
+            Jarvis.Application.Inbox.CommitmentFollowUpService>();
+        services.AddScoped<Jarvis.Application.Scenarios.IScenarioService, Jarvis.Application.Scenarios.ScenarioService>();
+        services.AddScoped<Jarvis.Application.Integrations.IAppGoalService, Jarvis.Application.Integrations.AppGoalService>();
+        services.AddScoped<Jarvis.Application.Documents.IDocumentService, Jarvis.Application.Documents.DocumentService>();
+        services.AddScoped<Jarvis.Application.Opportunities.IOpportunityService, Jarvis.Application.Opportunities.OpportunityService>();
+        services.AddScoped<Jarvis.Application.Stories.IStoryService, Jarvis.Application.Stories.StoryService>();
+        services.AddScoped<Jarvis.Application.Missions.IMissionDeliverableService, Jarvis.Application.Missions.MissionDeliverableService>();
+        services.AddScoped<Jarvis.Application.Voice.IVoiceCompanionService, Jarvis.Application.Voice.VoiceCompanionService>();
+        services.AddScoped<Jarvis.Application.Preferences.IOwnerPreferenceService, Jarvis.Application.Preferences.OwnerPreferenceService>();
+        services.AddScoped<Jarvis.Application.Trips.ITripService, Jarvis.Application.Trips.TripService>();
+        services.AddScoped<Jarvis.Application.Preferences.IOwnerLocaleService, Jarvis.Application.Preferences.OwnerLocaleService>();
+        services.AddScoped<Jarvis.Application.Attention.IAttentionService, Jarvis.Application.Attention.AttentionService>();
+        services.AddScoped<Jarvis.Application.Profiles.IWorkspaceService, Jarvis.Application.Profiles.WorkspaceService>();
+        services.AddScoped<Jarvis.Application.Profiles.IProfileGuidanceService, Jarvis.Application.Profiles.ProfileGuidanceService>();
+        services.AddScoped<Jarvis.Application.Outcomes.IOutcomeLearningService, Jarvis.Application.Outcomes.OutcomeLearningService>();
+        services.AddScoped<Jarvis.Application.HomeRoutines.IHomeRoutineService, Jarvis.Application.HomeRoutines.HomeRoutineService>();
+        services.AddScoped<Jarvis.Application.Setup.ISetupService, Jarvis.Application.Setup.SetupService>();
+        services.AddScoped<Jarvis.Application.Goals.IGoalService, Jarvis.Application.Goals.GoalService>();
+        services.AddScoped<Jarvis.Application.Comparisons.IComparisonRepository, ComparisonRepository>();
+        services.AddScoped<Jarvis.Application.Comparisons.IComparisonService, Jarvis.Application.Comparisons.ComparisonService>();
+        services.AddScoped<Jarvis.Application.Meetings.IMeetingRepository, MeetingRepository>();
+        services.AddScoped<Jarvis.Application.Meetings.IMeetingService, Jarvis.Application.Meetings.MeetingService>();
 
         // Routine miner: repeated behaviour turned into suggested automations.
         services.AddScoped<IRoutineSuggestionRepository, RoutineSuggestionRepository>();

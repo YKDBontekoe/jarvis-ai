@@ -354,8 +354,74 @@ public sealed class FinanceTests
         Assert.Contains("could not read", broken);
     }
 
+    private const string Statement = "Date,Description,Amount\n2026-10-01,Netflix,-13.99\n2026-10-02,Bakker Jansen,-4.20\n";
+
+    [Fact]
+    public async Task A_committed_import_gets_a_batch_and_a_preview_or_repeat_does_not()
+    {
+        var (service, _, _, _) = Create(new InMemorySettingsStore());
+
+        var preview = await service.ImportAsync(Owner, Statement, false, null, Today, default);
+        var first = await service.ImportAsync(Owner, Statement, true, null, Today, default);
+        var repeat = await service.ImportAsync(Owner, Statement, true, null, Today, default);
+
+        Assert.Null(preview.BatchId);
+        Assert.NotNull(first.BatchId);
+        Assert.Null(repeat.BatchId); // nothing new, nothing to undo
+        var batch = Assert.Single(await service.ListImportsAsync(Owner, default));
+        Assert.Equal((2, 2, 0), (batch.Rows, batch.StillThere, batch.Edited));
+    }
+
+    [Fact]
+    public async Task Undo_removes_only_untouched_rows_of_the_batch_and_keeps_edited_and_unrelated_ones()
+    {
+        var (service, expenses, _, _) = Create(new InMemorySettingsStore());
+        var unrelated = Spend(Today, 13.99m, "Netflix", "subscriptions");
+        var report = await service.ImportAsync(Owner, Statement, true, null, Today, default);
+        expenses.Expenses.Add(unrelated with { Id = Guid.NewGuid(), Amount = 9m }); // same merchant, later, by hand
+        var netflix = expenses.Expenses.First(x => x.Merchant == "Netflix" && x.Source == ExpenseSources.Import);
+        var index = expenses.Expenses.IndexOf(netflix);
+        expenses.Expenses[index] = netflix with { UpdatedAt = netflix.CreatedAt.AddHours(1), Note = "family plan" };
+
+        var undone = (await service.UndoImportAsync(Owner, report.BatchId!.Value, default)).Value!;
+
+        Assert.True(undone.Undone);
+        Assert.Equal((1, 1), (undone.Removed, undone.KeptEdited));
+        Assert.Equal(2, expenses.Expenses.Count);
+        Assert.Contains(expenses.Expenses, x => x.Id == netflix.Id);
+        Assert.Contains(expenses.Expenses, x => x.Amount == 9m);
+        Assert.DoesNotContain(expenses.Expenses, x => x.Merchant == "Bakker Jansen");
+    }
+
+    [Fact]
+    public async Task Undoing_twice_or_another_owners_batch_changes_nothing()
+    {
+        var (service, expenses, _, _) = Create(new InMemorySettingsStore());
+        var report = await service.ImportAsync(Owner, Statement, true, null, Today, default);
+        await service.UndoImportAsync(Owner, report.BatchId!.Value, default);
+        expenses.Expenses.Add(Spend(Today, 4.2m, "Bakker Jansen", "groceries"));
+
+        var again = await service.UndoImportAsync(Owner, report.BatchId!.Value, default);
+        var stranger = await service.UndoImportAsync(Guid.NewGuid(), report.BatchId!.Value, default);
+
+        Assert.True(again.Value!.Undone);
+        Assert.Single(expenses.Expenses);
+        Assert.Equal(FinanceFailure.NotFound, stranger.Failure);
+    }
+
+    [Fact]
+    public async Task Only_the_latest_twenty_batches_are_kept()
+    {
+        var (service, _, _, _) = Create(new InMemorySettingsStore());
+        for (var i = 0; i < 22; i++)
+            await service.ImportAsync(Owner, $"Date,Description,Amount\n2026-10-01,Shop {i},-{i + 1}.00\n", true,
+                null, Today, default);
+
+        Assert.Equal(ImportBatchState.Keep, (await service.ListImportsAsync(Owner, default)).Count);
+    }
+
     private static (FinanceService Service, FakeExpenses Expenses, FakeFinanceRepository Repository,
-        RecordingReminders Reminders) Create()
+        RecordingReminders Reminders) Create(Jarvis.Application.Settings.IOwnerSettingsStore? settings = null)
     {
         var expenses = new FakeExpenses();
         var repository = new FakeFinanceRepository();
@@ -363,7 +429,7 @@ public sealed class FinanceTests
         var files = Fake<IFileService>.Create(("GetAsync", _ => null));
         var expenseService = new ExpenseService(expenses, files, new FixedClock());
         var service = new FinanceService(repository, expenseService, expenses, reminders.Service,
-            Fake<IDailyBriefingRepository>.Create(("GetAsync", _ => null)), new FixedClock());
+            Fake<IDailyBriefingRepository>.Create(("GetAsync", _ => null)), new FixedClock(), settings);
         return (service, expenses, repository, reminders);
     }
 

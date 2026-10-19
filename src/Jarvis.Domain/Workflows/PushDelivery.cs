@@ -19,6 +19,10 @@ public sealed class PushDelivery
     public DateTimeOffset? DeliveredAt { get; private set; }
     public string? LastError { get; private set; }
 
+    /// <summary>How the push ended: <c>provider_accepted</c>, <c>held</c> (a mode kept it back) or <c>app_only</c>
+    /// (the owner chose to keep this kind in the app). Null while it is still waiting or being retried.</summary>
+    public string? Outcome { get; private set; }
+
     public void Fail(DateTimeOffset now, string error, bool permanent)
     {
         LeaseUntil = null;

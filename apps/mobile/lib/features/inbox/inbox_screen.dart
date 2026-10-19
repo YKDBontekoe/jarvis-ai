@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
+import '../../schedule_format.dart' show deviceTimeZoneLookup;
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../expenses/expense_models.dart' show dayLabel;
@@ -27,6 +29,7 @@ class InboxScreen extends StatefulWidget {
 class _InboxScreenState extends State<InboxScreen> {
   InboxData? _inbox;
   List<CommitmentData> _commitments = const [];
+  List<Map<String, dynamic>> _followUps = const [];
   bool _loading = true;
   String? _error;
   String _filter = 'needs_reply';
@@ -51,8 +54,19 @@ class _InboxScreenState extends State<InboxScreen> {
         '/api/v1/commitments',
         queryParameters: {'status': 'open'},
       );
+      var followUps = <Map<String, dynamic>>[];
+      try {
+        // A bonus: without nudges the tab is just the promises.
+        followUps = jsonMaps(
+          (await widget.http.get<dynamic>('/api/v1/commitments/follow-ups'))
+              .data,
+        );
+      } on DioException {
+        // Keep going.
+      }
       if (!mounted) return;
       setState(() {
+        _followUps = followUps;
         _inbox = InboxData.fromJson(inbox.data);
         _commitments = [
           for (final item in jsonMaps(commitments.data))
@@ -72,13 +86,14 @@ class _InboxScreenState extends State<InboxScreen> {
     }
   }
 
-  Future<void> _run(String id, Future<void> Function() action) async {
+  Future<bool> _run(String id, Future<void> Function() action) async {
     setState(() => _busy.add(id));
     try {
       await action();
       await _load();
+      return true;
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -86,6 +101,7 @@ class _InboxScreenState extends State<InboxScreen> {
           ),
         ),
       );
+      return false;
     } finally {
       if (mounted) setState(() => _busy.remove(id));
     }
@@ -123,6 +139,54 @@ class _InboxScreenState extends State<InboxScreen> {
     ),
   );
 
+  /// Puts the promise on today's plan; it stays open until the owner finishes it.
+  Future<void> _planToday(CommitmentData item) async {
+    final zone = await deviceTimeZoneLookup();
+    final added = await _run(
+      item.id,
+      () => widget.http.post<dynamic>(
+        '/api/v1/planner/today/items',
+        queryParameters: zone == null ? null : {'timeZone': zone},
+        data: {'sourceRef': 'commitment:${item.id}'},
+      ),
+    );
+    if (!added || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Added to today. Plan your day to place it.'),
+      ),
+    );
+  }
+
+  Future<void> _copyDraft(Map<String, dynamic> nudge) async {
+    await Clipboard.setData(
+      ClipboardData(text: asJsonString(nudge['draft']) ?? ''),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Draft copied. Nothing was sent.')),
+    );
+  }
+
+  Future<void> _quietNudge(
+    Map<String, dynamic> nudge, {
+    int? snoozeDays,
+  }) async {
+    final id = asJsonString(nudge['commitmentId']);
+    if (id == null) return;
+    await _run(
+      id,
+      () => snoozeDays == null
+          ? widget.http.post<dynamic>(
+              '/api/v1/commitments/$id/follow-up/dismiss',
+            )
+          : widget.http.post<dynamic>(
+              '/api/v1/commitments/$id/follow-up/snooze',
+              data: {'days': snoozeDays},
+            ),
+    );
+  }
+
   Future<void> _addCommitment() async {
     final result = await showJarvisDialog<Map<String, String>>(
       context: context,
@@ -159,9 +223,7 @@ class _InboxScreenState extends State<InboxScreen> {
           ],
         ),
         body: ContentWidth(
-          child: TabBarView(
-            children: [_threads(colors), _promises(colors)],
-          ),
+          child: TabBarView(children: [_threads(colors), _promises(colors)]),
         ),
       ),
     );
@@ -354,14 +416,48 @@ class _InboxScreenState extends State<InboxScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             children: [
+              for (final (i, nudge) in _followUps.indexed)
+                FeatureRow(
+                  key: Key('followup-${nudge['commitmentId']}'),
+                  index: i,
+                  icon: PhosphorIconsRegular.arrowBendUpLeft,
+                  badgeColor: colors.warning,
+                  caption: '${asJsonInt(nudge['daysOverdue'])} days late',
+                  title:
+                      '${asJsonString(nudge['counterparty']) ?? ''}: '
+                      '${asJsonString(nudge['description']) ?? ''}',
+                  subtitle: asJsonString(nudge['draft']),
+                  actions: [
+                    PillAction(
+                      key: Key('followup-copy-${nudge['commitmentId']}'),
+                      compact: true,
+                      primary: true,
+                      icon: PhosphorIconsRegular.copy,
+                      label: 'Copy draft',
+                      onPressed: () => unawaited(_copyDraft(nudge)),
+                    ),
+                    PillAction(
+                      key: Key('followup-snooze-${nudge['commitmentId']}'),
+                      compact: true,
+                      label: 'Not this week',
+                      onPressed: () =>
+                          unawaited(_quietNudge(nudge, snoozeDays: 7)),
+                    ),
+                    PillAction(
+                      key: Key('followup-dismiss-${nudge['commitmentId']}'),
+                      compact: true,
+                      label: 'Don’t nudge',
+                      onPressed: () => unawaited(_quietNudge(nudge)),
+                    ),
+                  ],
+                ),
               if (suggested.isNotEmpty) ...[
                 const SectionHeader('Jarvis found these in your chats'),
                 for (final item in suggested)
                   _commitmentCard(colors, item, today, suggestion: true),
                 const SizedBox(height: 12),
               ],
-              for (final item in accepted)
-                _commitmentCard(colors, item, today),
+              for (final item in accepted) _commitmentCard(colors, item, today),
             ],
           ),
         ),
@@ -429,6 +525,13 @@ class _InboxScreenState extends State<InboxScreen> {
                   child: const Text('Dismiss'),
                 )
               else ...[
+                TextButton(
+                  key: Key('commitment-plan-${item.id}'),
+                  onPressed: _busy.contains(item.id)
+                      ? null
+                      : () => unawaited(_planToday(item)),
+                  child: const Text('Plan today'),
+                ),
                 TextButton(
                   key: Key('commitment-done-${item.id}'),
                   onPressed: () => unawaited(_setCommitment(item, 'done')),

@@ -1,3 +1,5 @@
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Settings;
 using System.ComponentModel;
 using System.Globalization;
 using System.Text;
@@ -13,7 +15,8 @@ internal sealed partial class ReminderAgentTools(
     IReminderService reminders,
     ICurrentUser currentUser,
     IDailyBriefingRepository briefings,
-    IDeviceTelemetryStore? telemetry = null)
+    IDeviceTelemetryStore? telemetry = null,
+    IOwnerSettingsStore? settings = null)
 {
     private const int MaxListedReminders = 20;
     private static readonly TimeSpan FreshPosition = TimeSpan.FromMinutes(15);
@@ -39,7 +42,7 @@ internal sealed partial class ReminderAgentTools(
         }
 
         var zone = string.IsNullOrWhiteSpace(timeZoneId)
-            ? (await briefings.GetAsync(currentUser.OwnerId, cancellationToken))?.TimeZoneId
+            ? await OwnerZoneResolver.ZoneIdAsync(settings, briefings, currentUser.OwnerId, cancellationToken)
             : timeZoneId;
 
         try
@@ -113,7 +116,7 @@ internal sealed partial class ReminderAgentTools(
 
         try
         {
-            var zone = (await briefings.GetAsync(currentUser.OwnerId, cancellationToken))?.TimeZoneId;
+            var zone = await OwnerZoneResolver.ZoneIdAsync(settings, briefings, currentUser.OwnerId, cancellationToken);
             var reminder = await reminders.CreateAsync(currentUser.OwnerId, new CreateReminderRequest(title,
                 DateTimeOffset.UtcNow, TimeZoneId: zone,
                 Place: new ReminderPlace(name, lat, lon, radius ?? 150, edge, everyVisit)), cancellationToken);

@@ -29,8 +29,12 @@ Map<String, Object?> _project({
   'taskCount': tasks,
 };
 
-Map<String, Object?> _details() => {
-  'project': _project(),
+Map<String, Object?> _details({
+  String? outcome,
+  Map<String, Object?>? nextAction,
+}) => {
+  'project': {..._project(), 'outcome': outcome},
+  'nextAction': nextAction,
   'conversations': [
     {
       'id': 'c1',
@@ -150,6 +154,108 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Compare the quotes'), findsOneWidget);
     expect(find.text('Completed'), findsOneWidget);
+  });
+
+  testWidgets('outcome and next step show, and saving sends one focus update', (
+    tester,
+  ) async {
+    http
+      ..on(
+        'GET',
+        '/api/v1/projects/$_id',
+        _details(
+          outcome: 'Cook for ten by June',
+          nextAction: {
+            'type': 'commitment',
+            'id': 'c1',
+            'note': 'Before Friday',
+            'title': 'Order the tiles',
+            'state': 'done',
+          },
+        ),
+      )
+      ..on('GET', '/api/v1/commitments', [
+        {
+          'id': 'c2',
+          'description': 'Call the electrician',
+          'counterparty': 'Joël',
+          'suggested': false,
+        },
+        {
+          'id': 'c3',
+          'description': 'Only suggested',
+          'counterparty': 'Tom',
+          'suggested': true,
+        },
+      ])
+      ..on('PUT', '/api/v1/projects/$_id/focus', {
+        'project': {..._project(), 'outcome': 'Cook for twelve'},
+        'nextAction': {
+          'type': 'commitment',
+          'id': 'c2',
+          'note': null,
+          'title': 'Call the electrician',
+          'state': 'open',
+        },
+      });
+    await show(tester, ProjectScreen(http: http.client(), projectId: _id));
+
+    expect(find.text('Cook for ten by June'), findsOneWidget);
+    expect(find.text('Order the tiles'), findsOneWidget);
+    expect(find.text('Done. Choose what comes next.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('project-focus')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('project-outcome-field')),
+      'Cook for twelve',
+    );
+    await tester.tap(find.byKey(const Key('project-link-title')).first);
+    // Unlink the finished one, then link another open promise.
+    await tester.tap(find.text('Unlink'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('project-link-promise')));
+    await tester.pumpAndSettle();
+    expect(find.text('Call the electrician'), findsOneWidget);
+    expect(find.text('Only suggested'), findsNothing);
+    await tester.tap(find.text('Call the electrician'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('project-status-completed')));
+    await tester.tap(find.byKey(const Key('project-focus-save')));
+    await tester.pumpAndSettle();
+
+    final sent =
+        http.sent('PUT', '/api/v1/projects/$_id/focus').single.body as Map;
+    expect(sent['outcome'], 'Cook for twelve');
+    expect(sent['status'], 'completed');
+    expect(sent['nextAction'], {
+      'type': 'commitment',
+      'id': 'c2',
+      'note': 'Before Friday',
+    });
+  });
+
+  testWidgets('a project with no outcome invites one and clears the next step', (
+    tester,
+  ) async {
+    http
+      ..on('GET', '/api/v1/projects/$_id', _details())
+      ..on('PUT', '/api/v1/projects/$_id/focus', {
+        'project': _project(),
+        'nextAction': null,
+      });
+    await show(tester, ProjectScreen(http: http.client(), projectId: _id));
+    expect(find.text('What should this project achieve?'), findsOneWidget);
+    expect(find.text('Nothing chosen yet'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('project-focus')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('project-focus-save')));
+    await tester.pumpAndSettle();
+    final sent =
+        http.sent('PUT', '/api/v1/projects/$_id/focus').single.body as Map;
+    expect(sent['outcome'], isNull);
+    expect(sent['nextAction'], isNull);
   });
 
   testWidgets('a deleted project says so instead of failing', (tester) async {

@@ -62,6 +62,10 @@ class FederatedSearchHit {
 
 const searchKindLabels = <String, String>{
   'conversation': 'Conversations',
+  'message': 'Messages',
+  'person': 'People',
+  'commitment': 'Promises',
+  'decision': 'Decisions',
   'memory': 'Memories',
   'file': 'Files',
   'task': 'Tasks',
@@ -71,4 +75,9 @@ const searchKindLabels = <String, String>{
   'graph_entity': 'Knowledge graph',
   'channel_thread': 'Channels',
   'coding_run': 'Coding runs',
+  'journal': 'Journal',
+  'project': 'Projects',
+  'mission': 'Missions',
+  'goal': 'Goals',
+  'trip': 'Trips',
 };

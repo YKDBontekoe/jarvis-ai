@@ -738,6 +738,9 @@ mixin _ChatScreenUi on _ChatScreenController {
       onCancelQueued: entry.queued
           ? () => unawaited(_cancelQueued(entry))
           : null,
+      onSendQueuedNow: entry.queued
+          ? () => unawaited(_sendQueuedNow(entry))
+          : null,
       onRegenerate:
           !entry.isUser &&
               !entry.pending &&
@@ -812,6 +815,11 @@ mixin _ChatScreenUi on _ChatScreenController {
     onPrimary: () => unawaited(_toggleVoice()),
     onToggleMute: _voiceActive ? () => unawaited(_toggleVoiceMute()) : null,
     level: _voiceActive ? _voiceLevel : null,
+    cards: _voiceCards,
+    onCardOpen: (destination) => _fromShell(() => _openUtility(destination)),
+    onCardSave: (id) => unawaited(_voiceCardAction(id, 'save')),
+    onCardDismiss: (id) => unawaited(_voiceCardAction(id, 'dismiss')),
+    onRecap: _voiceCards.isEmpty ? null : () => unawaited(_showVoiceRecap()),
   );
 
   Widget _settingsBody() => SettingsView(

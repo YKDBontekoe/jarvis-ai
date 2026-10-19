@@ -7,7 +7,8 @@ public sealed record AutomationTemplate(
     string Title,
     string Description,
     string Category,
-    Func<string, AutomationRuleDefinition> Build);
+    Func<string, AutomationRuleDefinition> Build,
+    string? SuccessCriterion = null);
 
 /// <summary>
 /// Ready-made automations. Instantiating one creates a normal draft the owner reviews, edits and switches on; none
@@ -65,6 +66,34 @@ public static class AutomationTemplates
             "Notifies you when a logged expense mentions a category you want to keep an eye on.", "Money",
             _ => Make(new EventTriggerDefinition(AutomationEventKinds.ExpenseLogged, "shopping", null),
                 new NotificationActionDefinition("Shopping expense", "{{event.title}}"))),
+        new("meeting-prep", "Prepare me before a meeting",
+            "Shortly before a calendar event Jarvis writes a prep note from your own records: open promises with the people there, decisions to review, and the project's next step.",
+            "Meetings",
+            _ => Make(new CalendarWindowTriggerDefinition(30, 15),
+                new TaskActionDefinition("Prepare me for the next meeting",
+                    "Find my next calendar event in the next 30 minutes. Use PrepareMeeting from my own records and write a short note with open promises, decisions to review and the project next step. Do not contact anyone.")),
+            "Before each meeting you find a short note with what is open with the people involved. Success: you open it at least once a week."),
+        new("document-follow-up", "Follow up on a document I upload",
+            "When you upload a file Jarvis lists the promises, dates and questions in it as suggestions. Nothing becomes a promise until you accept it.",
+            "Files",
+            _ => Make(new EventTriggerDefinition(AutomationEventKinds.FileUploaded, null, null),
+                new TaskActionDefinition("Follow-up points for {{event.title}}",
+                    "Read the file named in the event. List any promises, deadlines and open questions in it as suggestions only. Do not create reminders or contact anyone; the user decides.")),
+            "Each upload gives a short list of possible follow-ups you can accept or ignore. Success: you accept at least some of them."),
+        new("bill-reminder", "Weekly bills check",
+            "Every Friday morning Jarvis tells you which subscriptions and bills are due in the next week.",
+            "Money",
+            zone => Make(new ScheduleTriggerDefinition(new TimeOnly(9, 0), zone, 0b0010000),
+                new TaskActionDefinition("Bills due in the next 7 days",
+                    "Look at my subscriptions and recurring charges and list what is due in the next 7 days with the amount. Only read; do not pay, cancel or change anything.")),
+            "On Fridays you see what is coming up before the weekend. Success: nothing renews unnoticed."),
+        new("weekly-project-review", "Weekly project review",
+            "On Friday afternoon Jarvis reviews your active projects: the outcome, the next step, and which ones have gone quiet.",
+            "Projects",
+            zone => Make(new ScheduleTriggerDefinition(new TimeOnly(16, 0), zone, 0b0010000),
+                new TaskActionDefinition("Review my projects",
+                    "Look at my active projects. For each, say its outcome and next action, and flag any with no next action. Suggest one step per flagged project. Do not change anything.")),
+            "Every Friday you get one short review. Success: projects without a next step get one."),
     ];
 
     public static AutomationTemplate? Find(string? id) =>

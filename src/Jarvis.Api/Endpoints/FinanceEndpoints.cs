@@ -127,6 +127,20 @@ internal static class FinanceEndpoints
             return Results.Ok(report);
         }).WithName("ImportBankStatement");
 
+        group.MapGet("/imports", async (IFinanceService finance, ICurrentUser currentUser, CancellationToken ct) =>
+            Results.Ok(await finance.ListImportsAsync(currentUser.OwnerId, ct))).WithName("ListStatementImports");
+
+        group.MapPost("/imports/{id:guid}/undo", async (Guid id, IFinanceService finance, IAuditEventStore audit,
+            ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var result = await finance.UndoImportAsync(currentUser.OwnerId, id, ct);
+            if (!result.Succeeded) return Results.NotFound();
+            await EndpointHelpers.TryAppendAuditAsync(audit, logger, currentUser.OwnerId, "finance",
+                "finance.import_undone", "moderate", true, null,
+                JsonSerializer.Serialize(new { removed = result.Value!.Removed, kept = result.Value.KeptEdited }), ct);
+            return Results.Ok(result.Value);
+        }).WithName("UndoStatementImport");
+
         group.MapGet("/export", async (string? from, string? to, string? category, IFinanceService finance,
             ICurrentUser currentUser, CancellationToken ct) =>
         {

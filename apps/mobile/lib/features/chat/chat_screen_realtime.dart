@@ -322,6 +322,20 @@ mixin _ChatScreenRealtime on _ChatScreenController {
       }
       unawaited(_handleDeviceInvoke(invokeId, capability, event));
     });
+    _onHub(hub, 'voice.card', (arguments) {
+      final card = jsonObject(_payload(arguments)?['card']);
+      if (card == null || !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+        return;
+      }
+      setState(() {
+        _voiceCards = [
+          for (final existing in _voiceCards)
+            if (existing['kind'] != card['kind'] || existing['title'] != card['title'])
+              existing,
+          card,
+        ];
+      });
+    });
     _onHub(hub, 'voice.caption', (arguments) {
       final event = _payload(arguments);
       final text = asJsonString(event?['text']) ?? '';

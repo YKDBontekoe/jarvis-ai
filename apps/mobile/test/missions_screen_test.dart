@@ -140,10 +140,13 @@ void main() {
   });
 
   testWidgets('creating a mission posts the goal and opens the plan', (tester) async {
+    http.on('GET', '/api/v1/missions/templates', <Object>[]);
     http.on('POST', '/api/v1/missions', _mission('ready', _planned()), status: 201);
     await show(tester);
 
     await tester.tap(find.byKey(const Key('mission-new')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('starter-own')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('mission-goal')),
