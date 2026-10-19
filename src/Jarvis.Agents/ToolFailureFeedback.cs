@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
 namespace Jarvis.Agents;
@@ -85,7 +84,7 @@ internal static class ToolFailureFeedback
         for (var index = messages.Count - 1; index >= 0; index--)
         {
             var message = messages[index];
-            if (message.Role == ChatRole.User && message.GetAgentRequestMessageSourceType() == AgentRequestMessageSourceType.External)
+            if (message.Role == ChatRole.User && !string.IsNullOrWhiteSpace(message.Text) && !ToolGroups.IsInjectedContext(message))
                 break;
             count += message.Contents.OfType<FunctionCallContent>()
                 .Count(call => CallKey(call.Name, call.Arguments) == key);

@@ -46,9 +46,13 @@ public sealed class JarvisAgentFactory(
         if (toolGroups)
             tools.Add(ToolGroups.CreateLoadTools(tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal)));
 
+        var history = CreateHistoryProvider();
         List<AIContextProvider> contextProviders = [.. contextContributors
             .OrderBy(contributor => contributor.Order)
-            .SelectMany(contributor => contributor.CreateProviders(context))];
+            .SelectMany(contributor => contributor.CreateProviders(context).Select(provider =>
+                toolGroups && contributor is IGroupedContextContributor grouped
+                    ? new ToolGroupGatedContextProvider(provider, grouped.ToolGroupId, history)
+                    : provider))];
         contextProviders.Add(CreateCompactionProvider(loggerFactory, context.OwnerId));
 
         // Below function invocation: every tool stays callable, the model is shown the groups this turn needs.
@@ -65,7 +69,7 @@ public sealed class JarvisAgentFactory(
                 Tools = tools,
                 AllowMultipleToolCalls = false
             }),
-            ChatHistoryProvider = CreateHistoryProvider(),
+            ChatHistoryProvider = history,
             AIContextProviders = contextProviders
         }, loggerFactory, services);
         ToolFailureFeedback.Configure(agent.ChatClient.GetService<FunctionInvokingChatClient>(),
@@ -78,7 +82,7 @@ public sealed class JarvisAgentFactory(
     /// Context blocks are rebuilt every turn; storing them would resend and re-summarize stale copies forever, and
     /// would make keyword tool selection read them as the user's words on later turns.
     /// </summary>
-    internal static ChatHistoryProvider CreateHistoryProvider() =>
+    internal static InMemoryChatHistoryProvider CreateHistoryProvider() =>
         new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions
         {
             StorageInputRequestMessageFilter = messages => messages.Where(IsStoredRequestMessage)

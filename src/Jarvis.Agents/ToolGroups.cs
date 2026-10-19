@@ -189,9 +189,12 @@ public static partial class ToolGroups
         return active;
     }
 
-    /// <summary>Context blocks arrive as User messages; they are not the user's words and must not pick groups.</summary>
-    private static bool IsInjectedContext(ChatMessage message) =>
-        message.GetAgentRequestMessageSourceType() != AgentRequestMessageSourceType.External;
+    /// <summary>
+    /// Context blocks arrive as User messages; they are not the user's words and must not pick groups. Replayed history
+    /// is stamped differently and still counts.
+    /// </summary>
+    internal static bool IsInjectedContext(ChatMessage message) =>
+        message.GetAgentRequestMessageSourceType() == AgentRequestMessageSourceType.AIContextProvider;
 
     internal static IEnumerable<string> RequestedGroups(IDictionary<string, object?>? arguments)
     {
