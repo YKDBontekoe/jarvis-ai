@@ -91,6 +91,11 @@ public sealed class SkillRepository(JarvisDbContext db) : ISkillRepository
             return existing.ToRecord();
         }
 
+        // A skill the agent rewrites on its own goes back to review when the owner asked for review, instead of
+        // changing an active procedure behind their back. The previous text stays in the revision history.
+        if (source == SkillSources.Learned && statusForNew != SkillStatuses.Active &&
+            existing.Status == SkillStatuses.Active)
+            existing.Status = SkillStatuses.Proposed;
         existing.Description = draft.Description;
         existing.Instructions = draft.Instructions;
         existing.Version++;

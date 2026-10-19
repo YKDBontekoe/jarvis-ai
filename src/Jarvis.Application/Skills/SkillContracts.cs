@@ -32,7 +32,11 @@ public interface ISkillRepository
     Task<SkillRecord?> FindByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken);
     Task<IReadOnlyList<SkillRevisionRecord>> ListRevisionsAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
 
-    /// <summary>Creates a skill or appends a new revision when the name exists. Returns null when the name is locked.</summary>
+    /// <summary>
+    /// Creates a skill or appends a new revision when the name exists. Returns null when the name is locked. A learned
+    /// change to an active skill returns it to <c>proposed</c> unless <paramref name="statusForNew"/> is active, so the
+    /// owner's review setting also covers rewrites.
+    /// </summary>
     Task<SkillRecord?> UpsertAsync(Guid ownerId, SkillDraft draft, string source, string statusForNew,
         bool respectLock, string? changeNote, CancellationToken cancellationToken);
 
