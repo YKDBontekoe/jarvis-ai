@@ -139,6 +139,10 @@ Embeddings and graph persistence live in Infrastructure + `Jarvis.Memory` helper
 
 Owner-scoped `SKILL.md` documents import/export via `/api/v1/skills`. Agent loads skills with `LoadSkill` before following procedures. Continuous learning can auto-create skills when enabled.
 
+**Review.** A learned change to an *active* skill (reflection, `SaveSkill`) returns it to `proposed` unless the owner turned on *Activate new skills right away*; the earlier text stays in the revision history. Edits by the owner and accepted improvements keep it active.
+
+**How a skill is doing.** Each night `SkillOutcomeEngine` counts the turns older than 6 hours that loaded a skill, against its current version: a run goes well when it finished, none of its tools failed, and it was not rated down, asked for again or corrected (`TurnFeedback`). The counts (`outcome_runs`, `outcome_successes`) are kept on the skill, reset when its text changes, and returned by `GET /api/v1/skills` as `outcomeRuns` and `outcomeSuccesses`. The skill list shown to the model is ordered by the lower end of the Wilson interval of the share that went well once a skill has 3 runs; one with fewer sits at a neutral score, so proven skills rise and poor ones fall below untested ones.
+
 ## Persona
 
 Traits + custom instructions learned from user statements and reply ratings. Tools record traits (`PersonaAgentTools`); context injected each turn.
@@ -180,6 +184,7 @@ Jarvis learns from how replies land, not only from what the owner says. All of i
 | `skill` | **Skill miner**: a tool sequence of 2 to 5 tools that worked at least 3 times across at least 2 conversations in 30 days (fingerprint `seq:{tool>tool>tool}`). The background model drafts the instructions from tool names only; the draft is validated and screened for secrets; at most 2 drafts a night | Saves it as a learned, active skill. Undo disables it |
 | `review` | **Review miner**: a skill or memory present in at least 3 thumbs-down replies and at most 1 thumbs-up, or a tool failing at least 5 times with a failure rate above 50% over 7 days | `disable_skill` turns the skill off (undo turns it back on); `note` only records that the owner has seen it. Evidence only: retrieval ranking is never changed |
 | `lesson` | **Lesson miner**: a tool that was part of at least 2 turns in 7 days that went wrong (the tool failed, the owner corrected the reply, asked for it again, rated it down, or declined its approval). A correction is matched to the reply just before it in that conversation. The background model drafts one imperative sentence (240 characters at most) from the tool name, counts, reasons and error kinds only; at most 3 drafts a night, none for a tool that already has a lesson in force | Puts the lesson in force. At 3 or more incidents (confidence 0.8) and with `autoApplyLowRiskMemory` on it is `applied` at once and audited; otherwise it waits as `pending`. Undo takes it out. At most 20 are in force |
+| `skill_refine` | **Skill refiner**: an active, unlocked skill with at least 3 counted runs of which at most 60% went well. The background model redrafts its description and instructions from its own text plus, from the runs, tool names, counts and error kinds only; at most 2 redrafts a night; one proposal per skill version | Never applied on its own. Accepting rewrites the skill only while it is still at the version the redraft was written for; undo restores the earlier text as a new revision. Locked (owner-written) skills are never offered |
 
 Dismissed and undone fingerprints never come back (tool reports reopen after a month, since a tool can break again). Skill and review proposals never apply on their own.
 

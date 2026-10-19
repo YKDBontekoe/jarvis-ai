@@ -28,9 +28,11 @@ const sql = query => execFileSync('docker', ['exec', '-e', `PGPASSWORD=${passwor
   '-d', 'jarvis', '-At', '-c', query]).toString().trim();
 
 const conversation = await request('POST', '/conversations', { title: 'Skill fixture' });
+// The first model call after a cold start can outlast the redrafter's timeout, which stores nothing; warm it up.
+await request('POST', `/conversations/${conversation.id}/messages`, { content: 'Hello Jarvis' });
 const owner = sql(`select "OwnerId" from conversations where "Id" = '${conversation.id}'`);
 const skillId = randomUUID();
-sql(`insert into skills (id, owner_id, name, description, instructions, source, status, is_locked, version, use_count, ` +
+sql(`insert into skills ("Id", owner_id, name, description, instructions, source, status, is_locked, version, use_count, ` +
   `created_at, updated_at) values ('${skillId}', '${owner}', '${name}', 'Use when planning trips.', '${original}', ` +
   `'learned', 'active', false, 1, 0, now() - interval '5 days', now() - interval '5 days')`);
 sql(`insert into skill_revisions ("Id", skill_id, version, description, instructions, source, created_at) values ` +
@@ -58,7 +60,7 @@ try {
   assert.match(proposal.evidence, /FixtureSearch ×4/);
 
   console.log('Nothing changed until the owner accepts...');
-  assert.equal(sql(`select instructions from skills where id = '${skillId}'`), original);
+  assert.equal(sql(`select instructions from skills where "Id" = '${skillId}'`), original);
   assert.equal((await request('POST', '/improvements/refresh')).refinements, 0);
 
   console.log('Accepting rewrites the skill and starts its counts over...');
@@ -79,5 +81,5 @@ try {
   console.log(JSON.stringify({ passed: true, skill: name, runs: skill.outcomeRuns, wentWell: skill.outcomeSuccesses }));
 } finally {
   sql(`delete from turn_traces where conversation_id = '${conversation.id}'`);
-  sql(`delete from skills where id = '${skillId}'`);
+  sql(`delete from skills where "Id" = '${skillId}'`);
 }

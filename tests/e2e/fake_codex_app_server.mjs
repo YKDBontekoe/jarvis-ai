@@ -17,6 +17,7 @@ const CONTEXT_PREFIXES = [
   'Active condition watches',
   'An unrelated task',
   'Available skills',
+  'Lessons from your own earlier mistakes',
   'Learned persona',
   'Knowledge graph',
   'Connected devices',

@@ -30,6 +30,9 @@ const conversation = await request('POST', '/conversations', { title: 'Lesson fi
 const owner = sql(`select "OwnerId" from conversations where "Id" = '${conversation.id}'`);
 assert.match(owner, /^[0-9a-f-]{36}$/, `owner of the conversation: ${owner}`);
 
+// The first model call after a cold start can outlast the drafter's timeout, which stores nothing; warm it up.
+await request('POST', `/conversations/${conversation.id}/messages`, { content: 'Hello Jarvis' });
+
 const failures = [30, 26, 22];
 for (const hours of failures)
   sql(`insert into turn_traces ("Id", owner_id, conversation_id, kind, memory_ids_json, skills_json, tools_json, ` +
@@ -40,7 +43,7 @@ for (const hours of failures)
 try {
   console.log('Three failing turns become one lesson, put in force at once...');
   const mined = await request('POST', '/improvements/refresh');
-  assert.equal(mined.lessons, 1, JSON.stringify(mined));
+  assert.equal(mined.lessons, 1, `first refresh: ${JSON.stringify(mined)}`);
   const listed = await request('GET', '/improvements');
   const lesson = listed.find(item => item.kind === 'lesson' && item.title.includes(tool));
   assert.ok(lesson, `no lesson for ${tool}: ${JSON.stringify(listed).slice(0, 300)}`);
@@ -48,24 +51,29 @@ try {
   assert.equal(lesson.canUndo, true);
 
   console.log('A second refresh in the same month adds nothing...');
-  assert.equal((await request('POST', '/improvements/refresh')).lessons, 0);
+  const again = await request('POST', '/improvements/refresh');
+  assert.equal(again.lessons, 0, `second refresh: ${JSON.stringify(again)}`);
 
   console.log('A later turn is shown the lesson and its trace records the id...');
   await request('POST', `/conversations/${conversation.id}/messages`, { content: 'Hello Jarvis, are you there?' });
   const shown = () => Number(sql(`select count(*) from turn_traces where conversation_id = '${conversation.id}' ` +
     `and lesson_ids_json @> '["${lesson.id}"]'::jsonb`));
   for (let wait = 0; wait < 20 && shown() === 0; wait++) await new Promise(resolve => setTimeout(resolve, 500));
-  assert.equal(shown(), 1, 'expected exactly one trace that showed the lesson');
+  const afterFirst = shown();
+  assert.equal(afterFirst, 1, `expected exactly one trace that showed the lesson, saw ${afterFirst}`);
 
   console.log('Undoing the lesson stops it being shown...');
   await request('POST', `/improvements/${lesson.id}/undo`);
   await request('POST', `/conversations/${conversation.id}/messages`, { content: 'And one more hello' });
   await new Promise(resolve => setTimeout(resolve, 1500));
-  assert.equal(shown(), 1, 'the undone lesson must not appear on a new trace');
+  const afterUndo = shown();
+  assert.equal(afterUndo, 1, `the undone lesson must not appear on a new trace, saw ${afterUndo}`);
   const after = await request('GET', '/improvements');
   assert.ok(!after.some(item => item.id === lesson.id && item.canUndo), 'an undone lesson cannot be undone again');
 
   console.log(JSON.stringify({ passed: true, tool, lesson: lesson.title.slice(0, 80) }));
 } finally {
   sql(`delete from turn_traces where conversation_id = '${conversation.id}'`);
+  // A run that stopped half way must not leave a lesson in force for the next flow.
+  sql(`delete from improvement_proposals where kind = 'lesson' and fingerprint like 'lesson:tool:${tool}:%'`);
 }
