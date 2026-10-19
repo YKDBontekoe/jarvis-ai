@@ -134,6 +134,35 @@ public sealed class UsageDashboardTests
     }
 
     [Fact]
+    public async Task Chat_calls_add_to_the_turn_totals_and_background_calls_do_not()
+    {
+        var details = new UsageDetails { InputTokenCount = 1_000, OutputTokenCount = 50, CachedInputTokenCount = 800 };
+        var turn = new Jarvis.Application.Learning.TurnTraceCollector();
+        UsageRecordingChatClient Client(string purpose) => new(new UsageClient(details), new ListRecorder(),
+            new FixedPrice(null), Guid.CreateVersion7(), UsageProviders.Codex, purpose, NullLogger.Instance, turn);
+
+        await Client(UsagePurposes.Chat).GetResponseAsync([new ChatMessage(ChatRole.User, "one")]);
+        await Client(UsagePurposes.Chat).GetResponseAsync([new ChatMessage(ChatRole.User, "two")]);
+        await Client(UsagePurposes.Background).GetResponseAsync([new ChatMessage(ChatRole.User, "memory")]);
+
+        var total = turn.Usage();
+        Assert.Equal(2, total.ModelCalls);
+        Assert.Equal(2_000, total.InputTokens);
+        Assert.Equal(1_600, total.CachedInputTokens);
+        Assert.Equal(100, total.OutputTokens);
+        Assert.Equal(0.8, total.CacheHitRatio);
+    }
+
+    [Fact]
+    public void A_turn_with_no_model_calls_has_no_cache_ratio()
+    {
+        var usage = new Jarvis.Application.Learning.TurnTraceCollector().Usage();
+
+        Assert.Equal(0, usage.ModelCalls);
+        Assert.Null(usage.CacheHitRatio);
+    }
+
+    [Fact]
     public async Task Recording_client_keeps_a_failed_call_without_a_price()
     {
         var recorder = new ListRecorder();

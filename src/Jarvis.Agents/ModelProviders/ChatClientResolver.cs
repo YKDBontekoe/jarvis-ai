@@ -41,7 +41,8 @@ internal sealed class ChatClientResolver(
     IModelUsageRecorder usage,
     IModelPriceLookup prices,
     ILogger<ChatClientResolver> logger,
-    Jarvis.Agents.Learning.MemoryReviewClient? memoryReviewClient = null) : IChatClientResolver
+    Jarvis.Agents.Learning.MemoryReviewClient? memoryReviewClient = null,
+    Jarvis.Application.Learning.ITurnTraceCollector? turn = null) : IChatClientResolver
 {
     private readonly Dictionary<(Guid, ModelPurpose, string, string?, string?, string?), IChatClient> _chatClients = [];
     private readonly Dictionary<Guid, EmbeddingModel?> _embeddingModels = [];
@@ -89,7 +90,7 @@ internal sealed class ChatClientResolver(
         // Only the Codex client has process slots to share; other providers must not see the marker.
         if (purpose is ModelPurpose.Background && provider == UsageProviders.Codex)
             client = new BackgroundPriorityChatClient(client);
-        client = new UsageRecordingChatClient(client, usage, prices, ownerId, provider, PurposeName(purpose), logger);
+        client = new UsageRecordingChatClient(client, usage, prices, ownerId, provider, PurposeName(purpose), logger, turn);
         _chatClients[cacheKey] = client;
         return client;
     }

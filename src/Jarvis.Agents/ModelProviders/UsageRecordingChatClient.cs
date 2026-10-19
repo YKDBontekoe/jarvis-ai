@@ -17,7 +17,8 @@ internal sealed class UsageRecordingChatClient(
     Guid ownerId,
     string provider,
     string purpose,
-    ILogger logger) : IChatClient
+    ILogger logger,
+    Jarvis.Application.Learning.ITurnTraceCollector? turn = null) : IChatClient
 {
     public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
         CancellationToken cancellationToken = default)
@@ -94,6 +95,8 @@ internal sealed class UsageRecordingChatClient(
         try
         {
             var tokens = ModelUsageReader.Read(usage);
+            if (purpose == UsagePurposes.Chat)
+                turn?.ModelCallFinished(tokens.InputTokens, tokens.CachedInputTokens, tokens.OutputTokens);
             decimal? cost = null;
             if (outcome == UsageOutcomes.Completed && provider == UsageProviders.OpenRouter &&
                 !string.IsNullOrWhiteSpace(model))

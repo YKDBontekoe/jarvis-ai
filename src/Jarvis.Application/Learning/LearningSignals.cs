@@ -31,6 +31,18 @@ public static class ToolOutcomes
     public const string Failed = "failed";
 }
 
+/// <summary>
+/// Model calls and tokens one run spent on the conversation itself (not background work): every tool step is a call, so
+/// the totals show what a turn cost and how much of its prompt the provider served from cache.
+/// </summary>
+public sealed record TurnUsage(int ModelCalls, long InputTokens, long CachedInputTokens, long OutputTokens)
+{
+    public static TurnUsage Empty { get; } = new(0, 0, 0, 0);
+
+    /// <summary>Share of input tokens served from the provider's cache, or null when nothing was read.</summary>
+    public double? CacheHitRatio => InputTokens > 0 ? Math.Min(1.0, (double)CachedInputTokens / InputTokens) : null;
+}
+
 /// <summary>One tool call in a turn: its name, whether it worked, and how long it took.</summary>
 public sealed record TurnToolCall(string Tool, string Outcome, int Ms);
 
@@ -46,7 +58,8 @@ public sealed record TurnTraceDraft(
     IReadOnlyList<string> Skills,
     IReadOnlyList<TurnToolCall> Tools,
     int TotalMs,
-    string Outcome)
+    string Outcome,
+    TurnUsage? Usage = null)
 {
     /// <summary>A plain reply that used nothing is not worth a row.</summary>
     public bool IsWorthKeeping =>
@@ -58,7 +71,7 @@ public sealed record LearningSignalRecord(Guid Id, Guid OwnerId, string Kind, Gu
 
 public sealed record TurnTraceRecord(Guid Id, Guid OwnerId, Guid ConversationId, Guid? MessageId, Guid? ProfileId,
     string Kind, IReadOnlyList<Guid> MemoryIds, IReadOnlyList<string> Skills, IReadOnlyList<TurnToolCall> Tools,
-    int TotalMs, string Outcome, DateTimeOffset CreatedAt);
+    int TotalMs, string Outcome, DateTimeOffset CreatedAt, TurnUsage? Usage = null);
 
 /// <summary>
 /// Records learning signals and run traces without ever slowing or failing the turn that produced them. Calls return at
@@ -81,7 +94,12 @@ public interface ITurnTraceCollector
 {
     void MemoryInjected(Guid memoryId);
     void SkillLoaded(string name);
+
+    /// <summary>Adds the tokens of one finished chat model call to this turn.</summary>
+    void ModelCallFinished(long inputTokens, long cachedInputTokens, long outputTokens);
+
     (IReadOnlyList<Guid> Memories, IReadOnlyList<string> Skills) Snapshot();
+    TurnUsage Usage();
 }
 
 public sealed class TurnTraceCollector : ITurnTraceCollector
@@ -89,6 +107,19 @@ public sealed class TurnTraceCollector : ITurnTraceCollector
     private readonly object _gate = new();
     private readonly List<Guid> _memories = [];
     private readonly List<string> _skills = [];
+    private TurnUsage _usage = TurnUsage.Empty;
+
+    public void ModelCallFinished(long inputTokens, long cachedInputTokens, long outputTokens)
+    {
+        lock (_gate)
+            _usage = new TurnUsage(_usage.ModelCalls + 1, _usage.InputTokens + Math.Max(0, inputTokens),
+                _usage.CachedInputTokens + Math.Max(0, cachedInputTokens), _usage.OutputTokens + Math.Max(0, outputTokens));
+    }
+
+    public TurnUsage Usage()
+    {
+        lock (_gate) return _usage;
+    }
 
     public void MemoryInjected(Guid memoryId)
     {

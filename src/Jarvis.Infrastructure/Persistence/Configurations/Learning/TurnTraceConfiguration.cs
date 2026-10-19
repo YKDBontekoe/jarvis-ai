@@ -21,6 +21,10 @@ internal sealed class TurnTraceConfiguration : IEntityTypeConfiguration<TurnTrac
         builder.Property(x => x.TotalMs).HasColumnName("total_ms");
         builder.Property(x => x.Outcome).HasColumnName("outcome").HasMaxLength(30).IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");
+        builder.Property(x => x.ModelCalls).HasColumnName("model_calls");
+        builder.Property(x => x.InputTokens).HasColumnName("input_tokens");
+        builder.Property(x => x.CachedInputTokens).HasColumnName("cached_input_tokens");
+        builder.Property(x => x.OutputTokens).HasColumnName("output_tokens");
         builder.HasIndex(x => new { x.OwnerId, x.CreatedAt });
         builder.HasIndex(x => new { x.OwnerId, x.MessageId });
     }

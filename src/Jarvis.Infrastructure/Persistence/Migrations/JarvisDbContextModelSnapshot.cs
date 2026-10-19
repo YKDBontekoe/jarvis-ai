@@ -4666,6 +4666,10 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<long?>("CachedInputTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cached_input_tokens");
+
                     b.Property<Guid>("ConversationId")
                         .HasColumnType("uuid")
                         .HasColumnName("conversation_id");
@@ -4673,6 +4677,10 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<long?>("InputTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("input_tokens");
 
                     b.Property<string>("Kind")
                         .IsRequired()
@@ -4689,11 +4697,19 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("message_id");
 
+                    b.Property<int?>("ModelCalls")
+                        .HasColumnType("integer")
+                        .HasColumnName("model_calls");
+
                     b.Property<string>("Outcome")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("outcome");
+
+                    b.Property<long?>("OutputTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("output_tokens");
 
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")
