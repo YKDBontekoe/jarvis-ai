@@ -68,7 +68,9 @@ public sealed class JarvisAgentFactory(
             ChatHistoryProvider = CreateHistoryProvider(),
             AIContextProviders = contextProviders
         }, loggerFactory, services);
-        ToolFailureFeedback.Configure(agent.ChatClient.GetService<FunctionInvokingChatClient>());
+        ToolFailureFeedback.Configure(agent.ChatClient.GetService<FunctionInvokingChatClient>(),
+            configuration.GetValue("Jarvis:Agent:MaxToolResultChars", ToolFailureFeedback.DefaultMaxResultChars),
+            configuration.GetValue("Jarvis:Agent:MaxToolIterations", ToolFailureFeedback.DefaultMaxIterations));
         return agent;
     }
 
