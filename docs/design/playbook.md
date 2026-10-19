@@ -119,6 +119,7 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 | `NoticedCard`, `EveningCard`, `DayOneCard`, `BriefCard`, `AskBar` | `features/home/` | Home sections |
 | `HeroCard`, `FeatureRow`, `PillAction`, `GroupLabel`, `SoftButton`, `InkButton` | `ui/feature_kit.dart` | The vocabulary for feature screens. One `HeroCard` (ink card, caps label, headline, optional segmented progress, footer) leads the screen; everything under it is `FeatureRow`s (icon badge, caps caption, title, detail, trailing, pill actions; entrance stagger; stacks under the text at large sizes) grouped by a `GroupLabel` (caps, optional count). Actions are `PillAction` (ink when primary, tonal otherwise, `compact` for several per row, `onDark` on a hero). Never bare `TextButton`s in cards. |
 | `PersonPanel` | `features/whatsapp/person_panel.dart` | About a person, beside a chat on wide screens |
+| `UiSurfaceCard`, `DockedSurfaceBar` | `features/chat/generative_ui.dart` | Cards Jarvis renders with RenderUi. An open question docks in the composer's place (`pinned`); `DockedSurfaceBar` keeps it in view while the owner types instead |
 
 ## 7. Patterns
 
@@ -138,6 +139,13 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
   - Rows are two lines plus an optional context line. Relationship tags come from People, and drift ("Quiet lately · you usually talk weekly") shows only on read chats.
   - Hold a chat to preview it: a blurred backdrop, the last message, the catch-up, quick replies and four actions.
   - Press ⌘K / Ctrl+K to search.
+- **Questions from Jarvis (docked card).** When Jarvis asks a question with a card (choice or form), it docks above the keyboard in the composer's place, ChatGPT-style:
+  - the keyboard closes when a new question arrives, and the transcript stays scrolled to the latest message;
+  - options are equal rows in one rounded `surfaceMuted` group: number badge (hidden from 1.5× text), title, optional subtitle, ↗. One tap answers; there is no filled "first" option;
+  - the pencil in the header ("Type an answer instead") folds the options into a `DockedSurfaceBar` above the composer and focuses it; Options brings them back;
+  - while a turn is still running, the composer stays under the card so Stop is in reach;
+  - an answered card collapses to a one-line "Answered" receipt in the transcript;
+  - tapping the transcript closes the keyboard.
 - **People everywhere.** A chat linked to a person shows the relationship in Chats rows, Needs you, the hold preview, the chat header (instead of your own number) and the About panel.
 - **Navigation (approved design, not built yet).** See [mockups/home-header-nav.html](mockups/home-header-nav.html):
   - two floating glass pieces, a capsule for Home / Chats / Everything / You and a separate orb button;

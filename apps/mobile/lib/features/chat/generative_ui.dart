@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../../http_urls.dart';
@@ -38,6 +40,7 @@ class UiSurfaceCard extends StatefulWidget {
     this.onAction,
     this.pinned = false,
     this.errorText,
+    this.onTypeInstead,
     super.key,
   });
 
@@ -46,6 +49,9 @@ class UiSurfaceCard extends StatefulWidget {
   onAction;
   final bool pinned;
   final String? errorText;
+
+  /// Shown on the docked card: puts the options away and opens the composer.
+  final VoidCallback? onTypeInstead;
 
   @override
   State<UiSurfaceCard> createState() => _UiSurfaceCardState();
@@ -103,6 +109,7 @@ abstract class _UiSurfaceCardController extends State<UiSurfaceCard> {
   }
 
   Widget _header() {
+    final colors = JarvisColors.of(context);
     final (icon, eyebrow) = switch (_kind) {
       'choice' => (PhosphorIconsRegular.handTap, 'Choose one'),
       'form' => (
@@ -124,49 +131,87 @@ abstract class _UiSurfaceCardController extends State<UiSurfaceCard> {
       children: [
         Row(
           children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: JarvisColors.of(context).accentSoft,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(
-                icon,
-                size: 18,
-                color: JarvisColors.of(context).accentDeep,
+            Icon(icon, size: 15, color: colors.accent),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                eyebrow.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: JarvisType.capsOf(context),
               ),
             ),
-            const SizedBox(width: 10),
-            Text(
-              eyebrow.toUpperCase(),
-              style: TextStyle(
-                color: JarvisColors.of(context).accentDeep,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: .8,
-              ),
-            ),
+            if (widget.onTypeInstead != null)
+              _TypeInsteadButton(onPressed: widget.onTypeInstead!),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Text(
           title,
-          style: JarvisType.displayOf(
-            context,
-          ).copyWith(fontSize: 28, height: 1.12),
+          style: TextStyle(
+            fontFamily: 'Geist',
+            color: colors.ink,
+            fontSize: 20,
+            height: 1.2,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -.5,
+          ),
         ),
         if (body != null) ...[
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             body,
             style: TextStyle(
-              color: JarvisColors.of(context).inkSoft,
+              color: colors.inkSoft,
+              fontSize: 14.5,
               height: 1.4,
             ),
           ),
         ],
       ],
+    );
+  }
+}
+
+/// "Type instead": hides a docked card's options and opens the composer.
+class _TypeInsteadButton extends StatelessWidget {
+  const _TypeInsteadButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Semantics(
+      button: true,
+      label: 'Type an answer instead',
+      onTap: onPressed,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: 'Type an answer instead',
+        child: InkResponse(
+          onTap: onPressed,
+          radius: 22,
+          child: SizedBox.square(
+            dimension: 44,
+            child: Center(
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: colors.surfaceMuted,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  PhosphorIconsRegular.pencilSimple,
+                  size: 17,
+                  color: colors.inkSoft,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -177,26 +222,85 @@ class _UiSurfaceCardState extends _UiSurfaceCardController
   Widget build(BuildContext context) {
     if (!_interactive) return _receipt();
     final choosing = _kind == 'choice' && _items.isNotEmpty;
-    return Padding(
-      padding: EdgeInsets.only(bottom: widget.pinned ? 6 : 16),
-      child: SurfaceCard(
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _header(),
+        if (choosing) ..._choiceSection(),
+        if (!choosing)
+          for (var index = 0; index < _items.length; index++)
+            _listRow(_items[index], index),
+        for (var index = 0; index < _fields.length; index++)
+          _field(_fields[index], last: index == _fields.length - 1),
+        ..._confirmButtons(),
+        if (_hint != null) _note(_hint!, JarvisColors.of(context).warning),
+        if (widget.errorText != null)
+          _note(widget.errorText!, JarvisColors.of(context).danger),
+      ],
+    );
+    // Docked above the keyboard, the card takes the composer's place and
+    // reads as part of it rather than as one more bubble.
+    if (widget.pinned) {
+      return SurfaceCard(
         elevated: true,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _header(),
-            if (choosing) ..._choiceSection(),
-            if (!choosing)
-              for (var index = 0; index < _items.length; index++)
-                _listRow(_items[index], index),
-            for (var index = 0; index < _fields.length; index++)
-              _field(_fields[index], last: index == _fields.length - 1),
-            ..._confirmButtons(),
-            if (_hint != null) _note(_hint!, JarvisColors.of(context).warning),
-            if (widget.errorText != null)
-              _note(widget.errorText!, JarvisColors.of(context).danger),
-          ],
-        ),
+        radius: JarvisRadii.xl,
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
+        child: content,
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: SurfaceCard(elevated: true, child: content),
+    );
+  }
+}
+
+/// Sits above the composer while the owner types instead of tapping an option,
+/// so the question stays in view and the options are one tap away.
+class DockedSurfaceBar extends StatelessWidget {
+  const DockedSurfaceBar({
+    required this.surface,
+    required this.onShowOptions,
+    super.key,
+  });
+
+  final UiSurfaceEntry surface;
+  final VoidCallback onShowOptions;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final title = asString(surface.schema['title']) ?? surface.title;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        children: [
+          Icon(PhosphorIconsRegular.handTap, size: 16, color: colors.accent),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: colors.inkSoft,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          PillAction(
+            label: 'Options',
+            icon: PhosphorIconsRegular.caretUp,
+            compact: true,
+            onPressed: onShowOptions,
+          ),
+        ],
       ),
     );
   }

@@ -195,6 +195,9 @@ mixin _ChatScreenSession on _ChatScreenController {
     _scrollToBottom(jump: true, force: true);
     unawaited(_loadRecent());
     unawaited(_loadConversationSources(conversationId));
+    // An open question shows even when realtime cannot connect; the load
+    // after connecting picks up anything that changed in between.
+    unawaited(_loadConversationSurfaces(conversationId));
     if (!isCurrent() || !isLatestOpen() || _conversationId != conversationId) {
       return;
     }

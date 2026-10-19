@@ -39,6 +39,7 @@ abstract final class PhosphorIconsRegular {
   static const caretDown = IconData(0xe136, fontFamily: 'PhosphorRegular');
   static const caretLeft = IconData(0xe138, fontFamily: 'PhosphorRegular');
   static const caretRight = IconData(0xe13a, fontFamily: 'PhosphorRegular');
+  static const caretUp = IconData(0xe13c, fontFamily: 'PhosphorRegular');
   static const chartBar = IconData(0xe150, fontFamily: 'PhosphorRegular');
   static const chartLine = IconData(0xe154, fontFamily: 'PhosphorRegular');
   static const chatCenteredText = IconData(

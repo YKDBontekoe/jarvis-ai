@@ -740,6 +740,24 @@ Map<String, Object?> whatsAppChats() {
   };
 }
 
+/// An open choice card, as Jarvis's RenderUi tool leaves it.
+Map<String, Object?> questionSurface() => {
+  'id': 'surf-tone',
+  'title': 'Which tone do you want?',
+  'status': 'open',
+  'schema': {
+    'kind': 'choice',
+    'title': 'Which tone do you want?',
+    'body': 'You have been scrolling for an hour after saying you would go to the gym.',
+    'items': [
+      {'id': 'hard', 'title': 'Hard push', 'subtitle': 'Short and teasing'},
+      {'id': 'coach', 'title': 'Coach', 'subtitle': 'Firm, with a plan for the next 10 minutes'},
+      {'id': 'gentle', 'title': 'Gentle nudge', 'subtitle': 'Kind, no pressure'},
+      {'id': 'later', 'title': 'Not now', 'subtitle': 'Ask me again tonight'},
+    ],
+  },
+};
+
 Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   'GET /api/v1/conversations': conversations(),
   'GET /api/v1/conversations/$conversationId': {

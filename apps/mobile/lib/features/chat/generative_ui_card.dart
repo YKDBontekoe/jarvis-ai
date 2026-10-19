@@ -3,30 +3,142 @@ part of 'generative_ui.dart';
 mixin _UiSurfaceCardBody on _UiSurfaceCardController {
   List<Widget> _choiceSection() {
     final direct = _directActions();
-    final emphasizeFirst = direct.every(
-      (action) => (asString(action['style']) ?? 'secondary') != 'primary',
-    );
     return [
       for (final item in _looseItems()) _selectTile(item),
-      for (var index = 0; index < direct.length; index++)
-        _actionButton(
-          id: asString(direct[index]['id']) ?? '',
-          label:
-              asString(direct[index]['label']) ??
-              asString(
-                _itemById[asString(direct[index]['id']) ?? '']?['title'],
-              ) ??
-              '',
-          subtitle: asString(
-            _itemById[asString(direct[index]['id']) ?? '']?['subtitle'],
-          ),
-          style: emphasizeFirst && index == 0
-              ? 'primary'
-              : (asString(direct[index]['style']) ?? 'secondary'),
-          option: true,
-          solo: false,
-        ),
+      if (direct.isNotEmpty) _optionGroup(direct),
     ];
+  }
+
+  /// The tappable answers, one row each, in a single rounded group.
+  Widget _optionGroup(List<Map<String, dynamic>> options) {
+    final colors = JarvisColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: ColoredBox(
+          color: colors.surfaceMuted,
+          child: Column(
+            children: [
+              for (var index = 0; index < options.length; index++) ...[
+                if (index > 0)
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    indent: MediaQuery.textScalerOf(context).scale(1) < 1.5
+                        ? 54
+                        : 16,
+                    color: colors.outline,
+                  ),
+                _optionRow(options[index], index),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _optionRow(Map<String, dynamic> action, int index) {
+    final colors = JarvisColors.of(context);
+    final id = asString(action['id']) ?? '';
+    final item = _itemById[id];
+    final label = asString(action['label']) ?? asString(item?['title']) ?? id;
+    final subtitle = asString(item?['subtitle']);
+    final danger = asString(action['style']) == 'danger';
+    final busy = _busyAction != null;
+    final thisBusy = _busyAction == id;
+    // At large text the number gives its width to the label.
+    final numbered = MediaQuery.textScalerOf(context).scale(1) < 1.5;
+    final onTap = _interactive && !busy
+        ? () {
+            HapticFeedback.selectionClick();
+            unawaited(_run(id));
+          }
+        : null;
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      label: subtitle == null ? label : '$label, $subtitle',
+      onTap: onTap,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 56),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
+            child: Row(
+              children: [
+                if (numbered) ...[
+                  Container(
+                    width: 28,
+                    height: 28,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Text(
+                      '${index + 1}',
+                      style: TextStyle(
+                        color: colors.inkSoft,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                ] else
+                  const SizedBox(width: 4),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: danger ? colors.danger : colors.ink,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -.25,
+                        ),
+                      ),
+                      if (subtitle != null)
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            color: colors.inkSoft,
+                            fontSize: 13,
+                            height: 1.35,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                AnimatedSwitcher(
+                  duration: JarvisMotion.of(context, JarvisMotion.fast),
+                  child: thisBusy
+                      ? const SizedBox.square(
+                          key: ValueKey('busy'),
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          PhosphorIconsRegular.arrowUpRight,
+                          key: const ValueKey('go'),
+                          size: 16,
+                          color: busy ? colors.outlineStrong : colors.muted,
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   List<Widget> _confirmButtons() {
@@ -37,7 +149,6 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
           id: asString(action['id']) ?? '',
           label: asString(action['label']) ?? asString(action['id']) ?? '',
           style: asString(action['style']) ?? 'secondary',
-          option: false,
           solo: actions.length == 1,
         ),
     ];
@@ -332,8 +443,6 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
     required String id,
     required String label,
     required String style,
-    String? subtitle,
-    required bool option,
     required bool solo,
   }) {
     final busy = _busyAction != null;
@@ -341,47 +450,30 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
     final danger = style == 'danger';
     final filled = danger || style == 'primary' || solo;
     final onPressed = _interactive && !busy ? () => _run(id) : null;
-    final filledForeground = danger
-        ? Colors.white
-        : JarvisColors.of(context).onInk;
     final child = Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: option
-                ? CrossAxisAlignment.start
-                : CrossAxisAlignment.center,
-            children: [
-              Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-              if (subtitle != null)
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w400,
-                    color: filled
-                        ? filledForeground.withValues(alpha: .75)
-                        : JarvisColors.of(context).inkSoft,
-                  ),
-                ),
-            ],
+        Flexible(
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontFamily: 'Geist',
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
-        if (thisBusy)
+        if (thisBusy) ...[
+          const SizedBox(width: 10),
           const SizedBox.square(
             dimension: 16,
             child: CircularProgressIndicator(strokeWidth: 2),
-          )
-        else if (option)
-          Icon(
-            PhosphorIconsRegular.caretRight,
-            size: 16,
-            color: filled ? filledForeground : JarvisColors.of(context).muted,
           ),
+        ],
       ],
     );
     final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(999),
     );
     final button = filled
         ? FilledButton(
@@ -390,12 +482,13 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
               backgroundColor: danger
                   ? JarvisColors.of(context).danger
                   : JarvisColors.of(context).ink,
-              foregroundColor: filledForeground,
+              foregroundColor: danger
+                  ? Colors.white
+                  : JarvisColors.of(context).onInk,
               disabledBackgroundColor: JarvisColors.of(context).surfaceRaised,
-              minimumSize: const Size.fromHeight(52),
+              minimumSize: const Size.fromHeight(48),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               shape: shape,
-              alignment: option ? Alignment.centerLeft : Alignment.center,
             ),
             child: child,
           )
@@ -403,14 +496,13 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
             onPressed: onPressed,
             style: OutlinedButton.styleFrom(
               foregroundColor: JarvisColors.of(context).ink,
-              minimumSize: const Size.fromHeight(52),
+              minimumSize: const Size.fromHeight(48),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               shape: shape,
-              alignment: option ? Alignment.centerLeft : Alignment.center,
             ),
             child: child,
           );
-    return Padding(padding: const EdgeInsets.only(top: 8), child: button);
+    return Padding(padding: const EdgeInsets.only(top: 10), child: button);
   }
 
   Widget _note(String text, Color color) => Padding(

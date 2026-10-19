@@ -72,7 +72,7 @@ bool isNearTranscriptBottom(
   double threshold = 120,
 }) => maxScrollExtent - pixels <= threshold;
 
-/// Max height for the pinned question card so the transcript and composer keep
-/// room on small screens and with the keyboard open.
+/// Max height for the docked question card. It stands in for the composer, so
+/// it may take most of the screen while the transcript keeps a readable strip.
 double pinnedSurfaceMaxHeight(double availableHeight) =>
-    (availableHeight * .35).clamp(120.0, 360.0).toDouble();
+    (availableHeight * .62).clamp(160.0, 560.0).toDouble();

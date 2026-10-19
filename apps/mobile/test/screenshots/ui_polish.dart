@@ -187,4 +187,59 @@ void main() {
       }
     }
   }
+
+  // The docked question card stands in for the composer; it must fit the
+  // smallest phone at every text size without clipping its options.
+  for (final brightness in [Brightness.light, Brightness.dark]) {
+    for (final scale in [1.0, 2.0, 3.0]) {
+      screenshotTest(
+        '${brightness.name} docked question at 320pt, text $scale',
+        (tester) async {
+          usePhone(tester, size: const Size(320, 568));
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearAllTestValues);
+          final routes = fixtureRoutes(withApproval: false);
+          routes['GET /api/v1/home'] = {
+            ...home(),
+            'approvals': <Object>[],
+            'reminders': <Object>[],
+          };
+          routes['GET /api/v1/conversations/$conversationId/surfaces'] = [
+            questionSurface(),
+          ];
+          debugJarvisHttpAdapter = ScreenshotHttp(routes);
+          await tester.pumpWidget(
+            RepaintBoundary(
+              key: screenshotKey,
+              child: const JarvisApp(skipAuthentication: true),
+            ),
+          );
+          // Home is only passed through here; its own cases above check it.
+          for (var i = 0; i < 30; i++) {
+            await tester.pump(const Duration(milliseconds: 100));
+          }
+          tester.takeException();
+          await tester.tap(find.byKey(const Key('tab-jarvis')));
+          await settle(tester);
+          final last = find.text('Not now');
+          await tester.scrollUntilVisible(
+            last,
+            80,
+            scrollable: find
+                .ancestor(
+                  of: find.text('Hard push'),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await settle(tester);
+          await capture(
+            tester,
+            'polish-question-${brightness.name}-${scale.toStringAsFixed(0)}x',
+          );
+        },
+      );
+    }
+  }
 }

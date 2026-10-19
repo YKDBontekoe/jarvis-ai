@@ -64,7 +64,7 @@ void main() {
 
     expect(find.text('Pick a plan'), findsOneWidget);
     expect(find.text('Train'), findsWidgets);
-    await tester.tap(find.widgetWithText(FilledButton, 'Train'));
+    await tester.tap(find.text('Train'));
     await tester.pumpAndSettle();
     expect(submitted, isTrue);
   });
@@ -122,6 +122,39 @@ void main() {
       expect(surfaceAwaitsReply(surface), isTrue);
     },
   );
+
+  testWidgets('choice options can be chosen with a screen reader', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    String? chosen;
+    await show(
+      tester,
+      Scaffold(
+        body: UiSurfaceCard(
+          surface: const UiSurfaceEntry(
+            id: 'surf-a11y',
+            title: 'Which tone?',
+            status: 'open',
+            schema: {
+              'kind': 'choice',
+              'title': 'Which tone?',
+              'items': [
+                {'id': 'hard', 'title': 'Hard push', 'subtitle': 'Short'},
+                {'id': 'gentle', 'title': 'Gentle nudge'},
+              ],
+            },
+          ),
+          onAction: (action, values) async => chosen = action,
+        ),
+      ),
+    );
+
+    tester.semantics.tap(find.semantics.byLabel('Hard push, Short'));
+    await tester.pumpAndSettle();
+    expect(chosen, 'hard');
+    semantics.dispose();
+  });
 
   testWidgets('a choice card requires a pick before sharing', (tester) async {
     String? action;
@@ -224,7 +257,9 @@ void main() {
     expect(values?['day'], 'I walk the dog');
   });
 
-  testWidgets('secret fields stay obscured and submit the token', (tester) async {
+  testWidgets('secret fields stay obscured and submit the token', (
+    tester,
+  ) async {
     Map<String, String>? values;
     await show(
       tester,
@@ -299,7 +334,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Train'));
+    await tester.tap(find.text('Train'));
     await tester.pump();
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
