@@ -193,4 +193,43 @@ public sealed class ComparisonTests
         }).Field);
         Assert.Null(ComparisonValidator.Normalize(good with { ChosenOptionId = "nope" }).Definition!.ChosenOptionId);
     }
+
+    [Fact]
+    public void A_shareable_copy_drops_private_criteria_and_ranks_again_without_them()
+    {
+        var definition = new ComparisonDefinition("Boiler", "Which boiler?",
+            [new ComparisonCriterion("price", "Price", 5, Private: true), new ComparisonCriterion("quiet", "Quiet", 3)],
+            [new ComparisonOption("a", "Alpha", null, new Dictionary<string, ComparisonCell>
+                { ["price"] = new(9, "my budget is 2000 euro", "https://secret.example"), ["quiet"] = new(2) }),
+             new ComparisonOption("b", "Beta", null, new Dictionary<string, ComparisonCell>
+                { ["price"] = new(1), ["quiet"] = new(8) })],
+            ChosenOptionId: "a", DecisionId: Guid.NewGuid());
+
+        // Alpha leads for the owner (price counts), Beta leads once price is left out.
+        Assert.Equal("a", ComparisonCalculator.Evaluate(definition).LeaderId);
+        var (markdown, leftOut) = ComparisonCalculator.ToShareableMarkdown(definition);
+
+        Assert.True(leftOut);
+        Assert.DoesNotContain("Price", markdown);
+        Assert.DoesNotContain("2000", markdown);
+        Assert.DoesNotContain("secret.example", markdown);
+        Assert.Contains("Quiet", markdown);
+        Assert.Contains("| 1 | Beta |", markdown);
+        Assert.Contains("Some criteria were left out of this copy", markdown);
+    }
+
+    [Fact]
+    public void Nothing_private_means_the_copy_is_the_full_comparison_and_all_private_means_nothing_to_share()
+    {
+        var open = Definition([Option("a", "Alpha", ("price", 8))], ("price", 3));
+        var (full, leftOut) = ComparisonCalculator.ToShareableMarkdown(open);
+        Assert.False(leftOut);
+        Assert.Contains("PRICE", full);
+        Assert.DoesNotContain("left out of this copy", full);
+
+        var hidden = open with { Criteria = [new ComparisonCriterion("price", "Price", 3, Private: true)] };
+        var (empty, hiddenLeftOut) = ComparisonCalculator.ToShareableMarkdown(hidden);
+        Assert.True(hiddenLeftOut);
+        Assert.Contains("nothing to share", empty);
+    }
 }

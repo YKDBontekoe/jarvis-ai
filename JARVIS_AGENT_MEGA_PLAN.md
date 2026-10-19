@@ -420,3 +420,9 @@ Statuses: `planned`, `active`, `implemented-unverified`, `verified`, `blocked-ex
 - **What.** The ambient desk display used to show event and reminder titles to anyone in the room. It now shows the time and "an event" or "a reminder" until the owner turns names on with the eye button; the choice is remembered on that device only (a phone and a hallway tablet can differ). Approvals still show as a count, never by name.
 - **Tests.** Dart `modes_screen_test` (hidden by default, the toggle reveals them, a remembered choice is honoured).
 - **Not done in F35.3.** A chosen project's next action and an optional briefing summary on the display (both would need the same hide-by-default rule), and a quiet clock style.
+
+## Checkpoint 44: F26.8, a shareable comparison that leaves out private criteria
+
+- **What.** Each criterion has an eye toggle (private). "Copy a shareable version" in the comparison menu copies Markdown without private criteria, their notes and sources, with the choice cleared and the ranking worked out again without them, and says so in the copy. Only copied; nothing is sent.
+- **Tests.** .NET `ComparisonTests` (+2), `ComparisonServiceTests` (+1, owner scope), Dart `comparisons_test` (toggle sends `private`, copy calls export and puts the text on the clipboard). No real-stack e2e was run for the export endpoint.
+- **Not done in F26.** Live quotes, vendor watches.

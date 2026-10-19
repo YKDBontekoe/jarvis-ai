@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/comparisons/comparison_screen.dart';
 import 'package:jarvis_mobile/features/comparisons/comparisons_screen.dart';
@@ -309,4 +310,60 @@ void main() {
     );
     expect(find.text('This comparison is gone'), findsOneWidget);
   });
+
+  testWidgets(
+    'a criterion can be kept out of a shared copy, which is only copied',
+    (tester) async {
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      http
+        ..on('GET', '/api/v1/comparisons/$_id', _comparison())
+        ..on('PUT', '/api/v1/comparisons/$_id', _comparison())
+        ..on('GET', '/api/v1/comparisons/$_id/export', {
+          'markdown': '# Which boiler?',
+          'leftOut': true,
+        });
+      await show(
+        tester,
+        ComparisonScreen(http: http.client(), comparisonId: _id),
+      );
+
+      await tester.tap(find.byKey(const Key('comparison-private-price')));
+      await tester.pumpAndSettle();
+      final definition =
+          (http.sent('PUT', '/api/v1/comparisons/$_id').single.body
+                  as Map)['definition']
+              as Map;
+      final price = (definition['criteria'] as List).cast<Map>().firstWhere(
+        (c) => c['id'] == 'price',
+      );
+      expect(price['private'], true);
+
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Copy a shareable version'));
+      await tester.pumpAndSettle();
+
+      expect(http.sent('GET', '/api/v1/comparisons/$_id/export'), hasLength(1));
+      expect(copied, '# Which boiler?');
+      expect(
+        find.textContaining('Private criteria were left out'),
+        findsOneWidget,
+      );
+    },
+  );
 }

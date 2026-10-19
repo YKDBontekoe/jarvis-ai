@@ -33,8 +33,11 @@ public static class ComparisonRules
     }
 }
 
-/// <summary>What matters to the owner and how much, 0 (ignore) to 10.</summary>
-public sealed record ComparisonCriterion(string Id, string Name, int Weight);
+/// <summary>
+/// What matters to the owner and how much, 0 (ignore) to 10. A private criterion (a budget, say) is used for the
+/// owner's own ranking and left out of anything shareable.
+/// </summary>
+public sealed record ComparisonCriterion(string Id, string Name, int Weight, bool Private = false);
 
 /// <summary>
 /// One option's answer to one criterion. A null <see cref="Score"/> means unknown: it is never counted as zero.
@@ -162,6 +165,33 @@ public static class ComparisonCalculator
                 item.Score is null ? 0 : rank, tied, item.Score is not null && item.Coverage < ComparisonRules.ThinCoverage));
         }
         return rows;
+    }
+
+    /// <summary>
+    /// A copy the owner can share: private criteria and everything said about them are left out, and the ranking is
+    /// recomputed from what remains so no hidden criterion shapes the result. Says so, without naming what was kept back.
+    /// </summary>
+    public static (string Markdown, bool LeftOut) ToShareableMarkdown(ComparisonDefinition definition)
+    {
+        var kept = definition.Criteria.Where(criterion => !criterion.Private).ToArray();
+        var leftOut = kept.Length != definition.Criteria.Count;
+        if (kept.Length == 0)
+            return ("# " + definition.Title + "\n\nEvery criterion is private, so there is nothing to share.\n", leftOut);
+        var ids = kept.Select(criterion => criterion.Id).ToHashSet();
+        var shared = definition with
+        {
+            Criteria = kept,
+            Options = definition.Options.Select(option => option with
+            {
+                Cells = option.Cells.Where(cell => ids.Contains(cell.Key)).ToDictionary(cell => cell.Key, cell => cell.Value)
+            }).ToArray(),
+            ChosenOptionId = null,
+            DecisionId = null
+        };
+        var markdown = ToMarkdown(shared, Evaluate(shared));
+        return (leftOut
+            ? markdown.TrimEnd() + "\n\n_Some criteria were left out of this copy, and the ranking above was worked out without them._\n"
+            : markdown, leftOut);
     }
 
     /// <summary>The comparison as Markdown for the Library: assumptions, unknowns and dated sources stay visible.</summary>
@@ -342,6 +372,10 @@ public interface IComparisonService
 
     /// <summary>Saves the comparison as a Library report. Saving again updates nothing: it makes a new report.</summary>
     Task<ComparisonOperation<Guid>> SaveToLibraryAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
+
+    /// <summary>A copy without the private criteria, ranked again without them. Nothing is saved or sent.</summary>
+    Task<ComparisonOperation<(string Markdown, bool LeftOut)>> ExportShareableAsync(Guid id, Guid ownerId,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Records the owner's choice as a logged decision with a review date. Nothing is bought or sent; choosing twice

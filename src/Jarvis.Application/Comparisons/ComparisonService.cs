@@ -74,6 +74,15 @@ public sealed class ComparisonService(IComparisonRepository repository, ILibrary
     public Task<bool> DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
         repository.DeleteAsync(id, ownerId, cancellationToken);
 
+    public async Task<ComparisonOperation<(string Markdown, bool LeftOut)>> ExportShareableAsync(Guid id, Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        var current = await repository.GetAsync(id, ownerId, cancellationToken);
+        return current is null
+            ? ComparisonOperation<(string Markdown, bool LeftOut)>.NotFound()
+            : ComparisonOperation<(string Markdown, bool LeftOut)>.Ok(ComparisonCalculator.ToShareableMarkdown(current.Definition));
+    }
+
     public async Task<ComparisonOperation<Guid>> SaveToLibraryAsync(Guid id, Guid ownerId,
         CancellationToken cancellationToken)
     {

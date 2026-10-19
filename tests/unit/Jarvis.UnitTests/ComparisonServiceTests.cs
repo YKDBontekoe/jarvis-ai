@@ -208,4 +208,26 @@ public sealed class ComparisonServiceTests
         Assert.Equal(ComparisonFailure.Conflict, (await harness.Service.CreateAsync(Owner, Boilers(), null, default)).Failure);
         Assert.True((await harness.Service.CreateAsync(Other, Boilers(), null, default)).Succeeded);
     }
+
+    [Fact]
+    public async Task The_private_flag_survives_saving_and_the_shareable_copy_is_only_the_owners()
+    {
+        var harness = new Harness();
+        var service = harness.Service;
+        var definition = Boilers() with
+        {
+            Criteria = [new ComparisonCriterion("price", "Price", 8, Private: true), new ComparisonCriterion("quiet", "Noise", 2)]
+        };
+        var created = (await service.CreateAsync(Owner, definition, null, default)).Value!;
+
+        var read = (await service.GetAsync(created.Record.Id, Owner, default))!;
+        Assert.True(read.Record.Definition.Criteria.Single(c => c.Id == "price").Private);
+
+        var exported = await service.ExportShareableAsync(created.Record.Id, Owner, default);
+        Assert.True(exported.Succeeded);
+        Assert.True(exported.Value.LeftOut);
+        Assert.DoesNotContain("Price", exported.Value.Markdown);
+        Assert.Contains("Noise", exported.Value.Markdown);
+        Assert.False((await service.ExportShareableAsync(created.Record.Id, Other, default)).Succeeded);
+    }
 }

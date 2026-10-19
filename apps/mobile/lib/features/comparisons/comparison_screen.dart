@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
@@ -196,6 +197,43 @@ class _ComparisonScreenState extends State<ComparisonScreen> {
     await _save(definition);
   }
 
+  /// A copy without the criteria marked private, ranked again without them. Only copied; nothing is sent.
+  Future<void> _copyShareable() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final response = await widget.http.get<dynamic>('$_base/export');
+      final body = jsonObject(response.data);
+      await Clipboard.setData(
+        ClipboardData(text: asJsonString(body?['markdown']) ?? ''),
+      );
+      if (mounted) {
+        _say(
+          asJsonBool(body?['leftOut'])
+              ? 'Copied. Private criteria were left out and the ranking worked out without them.'
+              : 'Copied. Nothing was marked private, so this is the full comparison.',
+        );
+      }
+    } on DioException catch (error) {
+      if (mounted) {
+        _say(
+          firstProblemMessage(error.response?.data) ??
+              'Could not make a shareable copy.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _setPrivate(String criterionId, bool value) {
+    final definition = _copyDefinition();
+    for (final criterion in definition['criteria'] as List) {
+      if ((criterion as Map)['id'] == criterionId) criterion['private'] = value;
+    }
+    return _save(definition);
+  }
+
   Future<void> _saveToLibrary() async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -270,12 +308,18 @@ class _ComparisonScreenState extends State<ComparisonScreen> {
                   unawaited(_addNamed(option: false));
                 case 'library':
                   unawaited(_saveToLibrary());
+                case 'share':
+                  unawaited(_copyShareable());
               }
             },
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'option', child: Text('Add an option')),
               PopupMenuItem(value: 'criterion', child: Text('Add a criterion')),
               PopupMenuItem(value: 'library', child: Text('Save to Library')),
+              PopupMenuItem(
+                value: 'share',
+                child: Text('Copy a shareable version'),
+              ),
             ],
           ),
       ],
@@ -357,6 +401,8 @@ class _ComparisonScreenState extends State<ComparisonScreen> {
                   criterion: criterion,
                   onChanged: (weight) =>
                       unawaited(_setWeight(criterion['id'] as String, weight)),
+                  onPrivate: (value) =>
+                      unawaited(_setPrivate(criterion['id'] as String, value)),
                   onRemove: () => unawaited(
                     _remove(
                       'criteria',
@@ -522,10 +568,12 @@ class _WeightRow extends StatefulWidget {
     required this.criterion,
     required this.onChanged,
     required this.onRemove,
+    required this.onPrivate,
     super.key,
   });
 
   final Map<String, dynamic> criterion;
+  final ValueChanged<bool> onPrivate;
   final ValueChanged<int> onChanged;
   final VoidCallback onRemove;
 
@@ -576,6 +624,23 @@ class _WeightRowState extends State<_WeightRow> {
             '${_weight.round()}',
             textAlign: TextAlign.end,
             style: TextStyle(fontWeight: FontWeight.w600, color: colors.ink),
+          ),
+        ),
+        IconButton(
+          key: Key('comparison-private-${widget.criterion['id']}'),
+          tooltip: asJsonBool(widget.criterion['private'])
+              ? 'Private: left out of a shared copy. Tap to include it.'
+              : 'Shared. Tap to keep $name out of a shared copy.',
+          onPressed: () =>
+              widget.onPrivate(!asJsonBool(widget.criterion['private'])),
+          icon: Icon(
+            asJsonBool(widget.criterion['private'])
+                ? PhosphorIconsRegular.eyeSlash
+                : PhosphorIconsRegular.eye,
+            size: 18,
+            color: asJsonBool(widget.criterion['private'])
+                ? colors.accent
+                : colors.muted,
           ),
         ),
         IconButton(

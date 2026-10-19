@@ -9,6 +9,8 @@ public sealed record ComparisonCellRequest(string? Option, string? Criterion, Co
 
 public sealed record DecideComparisonRequest(string? OptionId, double? Probability, DateOnly? ReviewOn);
 
+public sealed record ComparisonExportDto(string Markdown, bool LeftOut);
+
 public sealed record ComparisonDto(Guid Id, ComparisonDefinition Definition, ComparisonResult Result,
     Guid? ProjectId, Guid? LibraryItemId, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 
@@ -63,6 +65,15 @@ internal static class ComparisonEndpoints
             CancellationToken ct) =>
             await comparisons.DeleteAsync(id, user.OwnerId, ct) ? Results.NoContent() : Results.NotFound())
             .WithName("DeleteComparison");
+
+        group.MapGet("/{id:guid}/export", async (Guid id, IComparisonService comparisons, ICurrentUser user,
+            CancellationToken ct) =>
+        {
+            var exported = await comparisons.ExportShareableAsync(id, user.OwnerId, ct);
+            return exported.Succeeded
+                ? Results.Ok(new ComparisonExportDto(exported.Value.Markdown, exported.Value.LeftOut))
+                : Failure(exported);
+        }).WithName("ExportComparison");
 
         group.MapPost("/{id:guid}/library", async (Guid id, IComparisonService comparisons, ICurrentUser user,
             CancellationToken ct) =>
