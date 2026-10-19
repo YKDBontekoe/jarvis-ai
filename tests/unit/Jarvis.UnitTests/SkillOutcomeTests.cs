@@ -1,4 +1,6 @@
+using Jarvis.Agents.Improvements;
 using Jarvis.Agents.Skills;
+using Jarvis.Application.Improvements;
 using Jarvis.Application.Learning;
 using Jarvis.Application.Skills;
 using Microsoft.Agents.AI;
@@ -135,5 +137,60 @@ public sealed class SkillOutcomeTests
             .Select(name => client.LastPrompt.IndexOf($"- {name}:", StringComparison.Ordinal)).ToArray();
         Assert.All(order, index => Assert.True(index >= 0));
         Assert.Equal(order.Order().ToArray(), order);
+    }
+
+    // ---- refinement evidence and drafts ----
+
+    [Fact]
+    public void Only_unlocked_active_skills_that_mostly_go_badly_are_candidates_worst_first()
+    {
+        var worst = Skill("worst", runs: 10, successes: 1);
+        var bad = Skill("bad", runs: 5, successes: 3);
+        var locked = Skill("locked", runs: 10, successes: 1) with { IsLocked = true };
+        var disabled = Skill("off", runs: 10, successes: 1) with { Status = SkillStatuses.Disabled };
+        var fine = Skill("fine", runs: 10, successes: 9);
+
+        var candidates = SkillRefineEngine.Candidates([bad, fine, locked, disabled, worst]);
+
+        Assert.Equal(["worst", "bad"], candidates.Select(skill => skill.Name));
+    }
+
+    [Fact]
+    public void Evidence_names_failing_tools_and_error_kinds_and_counts_badly_rated_runs_only()
+    {
+        var skill = Skill(runs: 4, successes: 1);
+        var down = Run(skill.Name, toolOutcome: ToolOutcomes.Failed);
+        var failing = Run(skill.Name, toolOutcome: ToolOutcomes.Failed);
+        var fine = Run(skill.Name);
+        var elsewhere = Run("another-skill", toolOutcome: ToolOutcomes.Failed);
+        var signals = new[]
+        {
+            Signal(LearningSignalKinds.ThumbsDown, down.MessageId),
+            new LearningSignalRecord(Guid.NewGuid(), Owner, LearningSignalKinds.ToolFailure, Guid.NewGuid(), null, null,
+                "SearchMemory", null, "input", Now.AddHours(-20))
+        };
+
+        var evidence = SkillRefineEngine.Collect(skill, [down, failing, fine, elsewhere], signals);
+
+        Assert.Equal((4, 1, 1), (evidence.Runs, evidence.Successes, evidence.BadlyRated));
+        Assert.Equal([new KeyValuePair<string, int>("SearchMemory", 2)], evidence.FailedTools);
+        Assert.Equal(["input"], evidence.ErrorKinds);
+    }
+
+    [Theory]
+    [InlineData("{\"description\": \"Use when planning trips.\", \"instructions\": \"1. Check the inputs first.\\n2. Ask for dates.\"}", true)]
+    [InlineData("```json\n{\"description\": \"Use when planning trips.\", \"instructions\": \"1. Check the inputs first.\"}\n```", true)]
+    [InlineData("{\"description\": \"Use when planning trips.\", \"instructions\": \"1. Ask dates.\"}", false)]
+    [InlineData("{\"description\": \"Use when planning trips.\", \"instructions\": \"1. See https://example.com for details.\"}", false)]
+    [InlineData("{\"description\": \"\", \"instructions\": \"\"}", false)]
+    [InlineData("not json", false)]
+    public void Redrafts_must_change_the_text_and_stay_clean(string reply, bool usable)
+    {
+        var skill = Skill() with { Instructions = "1. Ask dates." };
+
+        var draft = ModelSkillRefiner.Parse(skill, reply);
+
+        Assert.Equal(usable, draft is not null);
+        if (draft is not null) Assert.Equal(skill.Name, draft.Name);
     }
 }

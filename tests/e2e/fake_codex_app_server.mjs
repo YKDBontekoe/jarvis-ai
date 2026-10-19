@@ -118,6 +118,15 @@ function plan(prompt) {
   if (prompt.includes('You are Jarvis reflecting on recent work with your user'))
     return text(JSON.stringify(reflect(parseConversation(prompt).request)));
 
+  if (prompt.includes('You improve a reusable skill for the Jarvis assistant')) {
+    let skill = {};
+    try { skill = JSON.parse(parseConversation(prompt).request); } catch { /* keep an empty skill */ }
+    return text(JSON.stringify({
+      description: skill.description ?? 'Use when this skill applies.',
+      instructions: `1. Check the inputs first.\n2. ${String(skill.instructions ?? 'Do the task').replace(/^1\.\s*/, '')}`,
+    }));
+  }
+
   if (prompt.includes('You write one short lesson for the Jarvis assistant')) {
     let tool = 'the tool';
     try { tool = JSON.parse(parseConversation(prompt).request).tool ?? tool; } catch { /* keep the generic name */ }

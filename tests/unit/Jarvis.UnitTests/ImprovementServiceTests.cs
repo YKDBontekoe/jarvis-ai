@@ -525,6 +525,143 @@ public sealed class ImprovementServiceTests
         Assert.Equal((3, 2), (counted.OutcomeRuns, counted.OutcomeSuccesses));
     }
 
+    // ---- skill refinements ----
+
+    private static async Task<SkillRecord> BadSkill(World world, string name = "trip-planning", int runs = 6,
+        int successes = 2, bool locked = false)
+    {
+        var saved = (await world.Skills.UpsertAsync(Owner,
+            new SkillDraft(name, "Use when planning trips.", "1. Ask for dates and budget."), SkillSources.Learned,
+            SkillStatuses.Active, true, null, default))!;
+        var index = world.Skills.Items.FindIndex(item => item.Id == saved.Id);
+        world.Skills.Items[index] = saved with { OutcomeRuns = runs, OutcomeSuccesses = successes, IsLocked = locked };
+        return world.Skills.Items[index];
+    }
+
+    private static ImprovementMiner Miner(World world, StubLearningStore store, StubSkillRefiner refiner) =>
+        new(store, world.Repository, world.Service(), world.Skills, Fake<IMemoryService>.Create(),
+            Fake<ISkillDrafter>.Create(), world.Settings, new FixedTime(() => world.Now), null, refiner);
+
+    [Fact]
+    public async Task A_skill_that_mostly_goes_badly_gets_a_pending_redraft_that_never_applies_by_itself()
+    {
+        var world = new World();
+        var skill = await BadSkill(world);
+        var store = new StubLearningStore { Traces = [FailingTurnWithSkill("trip-planning", "SearchMail")] };
+        var refiner = new StubSkillRefiner();
+
+        var result = await Miner(world, store, refiner).RefreshAsync(Owner, default);
+
+        Assert.Equal(1, result.Refinements);
+        var proposal = Assert.Single(await world.Service().ListAsync(Owner, default), v => v.Kind == ImprovementKinds.SkillRefine);
+        Assert.Equal(ImprovementStatuses.Pending, proposal.Status);
+        Assert.Contains("2 of 7", proposal.Evidence); // the seeded failing turn was counted first
+        Assert.Contains("SearchMail", proposal.Evidence);
+        Assert.Equal("1. Ask for dates and budget.", world.Skills.Items.Single(item => item.Id == skill.Id).Instructions);
+        Assert.Equal(skill.Version, refiner.AskedVersions.Single());
+    }
+
+    [Theory]
+    [InlineData(6, 5, false)]
+    [InlineData(2, 0, false)]
+    [InlineData(6, 2, true)]
+    public async Task Only_skills_with_enough_runs_and_mostly_bad_ones_are_redrafted(int runs, int successes, bool offered)
+    {
+        var world = new World();
+        await BadSkill(world, runs: runs, successes: successes);
+
+        var result = await Miner(world, new StubLearningStore(), new StubSkillRefiner()).RefreshAsync(Owner, default);
+
+        Assert.Equal(offered ? 1 : 0, result.Refinements);
+    }
+
+    [Fact]
+    public async Task Locked_skills_are_not_redrafted_and_a_decided_version_is_not_offered_again()
+    {
+        var world = new World();
+        await BadSkill(world, "owner-written", locked: true);
+        await BadSkill(world, "agent-written");
+        var refiner = new StubSkillRefiner();
+        var miner = Miner(world, new StubLearningStore(), refiner);
+
+        await miner.RefreshAsync(Owner, default);
+        var proposal = Assert.Single(await world.Service().ListAsync(Owner, default), v => v.Kind == ImprovementKinds.SkillRefine);
+        await world.Service().DismissAsync(proposal.Id, Owner, default);
+        await miner.RefreshAsync(Owner, default);
+
+        Assert.Equal("agent-written", Assert.Single(refiner.Asked));
+        Assert.DoesNotContain(await world.Service().ListAsync(Owner, default), v => v.Kind == ImprovementKinds.SkillRefine && v.Status == ImprovementStatuses.Pending);
+    }
+
+    [Fact]
+    public async Task At_most_two_skills_are_redrafted_a_night()
+    {
+        var world = new World();
+        foreach (var name in new[] { "skill-a", "skill-b", "skill-c" }) await BadSkill(world, name);
+        var refiner = new StubSkillRefiner();
+
+        var result = await Miner(world, new StubLearningStore(), refiner).RefreshAsync(Owner, default);
+
+        Assert.Equal(SkillRefineRules.MaxDraftsPerRun, result.Refinements);
+        Assert.Equal(SkillRefineRules.MaxDraftsPerRun, refiner.Asked.Count);
+    }
+
+    [Fact]
+    public async Task Accepting_a_redraft_rewrites_the_skill_and_undo_puts_the_old_text_back()
+    {
+        var world = new World();
+        var skill = await BadSkill(world);
+        await Miner(world, new StubLearningStore(), new StubSkillRefiner()).RefreshAsync(Owner, default);
+        var proposal = Assert.Single(await world.Service().ListAsync(Owner, default), v => v.Kind == ImprovementKinds.SkillRefine);
+
+        var accepted = await world.Service().AcceptAsync(proposal.Id, Owner, default);
+
+        Assert.Equal(ImprovementStatuses.Accepted, accepted!.Status);
+        var rewritten = world.Skills.Items.Single(item => item.Id == skill.Id);
+        Assert.Contains("Check the inputs first", rewritten.Instructions);
+        Assert.Equal((skill.Version + 1, SkillStatuses.Active, 0), (rewritten.Version, rewritten.Status, rewritten.OutcomeRuns));
+
+        Assert.True(await world.Service().UndoAsync(proposal.Id, Owner, default));
+
+        var restored = world.Skills.Items.Single(item => item.Id == skill.Id);
+        Assert.Equal("1. Ask for dates and budget.", restored.Instructions);
+        Assert.Equal(skill.Version + 2, restored.Version);
+    }
+
+    [Fact]
+    public async Task A_redraft_written_for_an_older_version_is_refused()
+    {
+        var world = new World();
+        var skill = await BadSkill(world);
+        await Miner(world, new StubLearningStore(), new StubSkillRefiner()).RefreshAsync(Owner, default);
+        var proposal = Assert.Single(await world.Service().ListAsync(Owner, default), v => v.Kind == ImprovementKinds.SkillRefine);
+        await world.Skills.UpsertAsync(Owner, new SkillDraft(skill.Name, "Use when planning trips.", "1. Newer text by the owner."),
+            SkillSources.User, SkillStatuses.Active, false, null, default);
+
+        Assert.Null(await world.Service().AcceptAsync(proposal.Id, Owner, default));
+
+        Assert.Equal("1. Newer text by the owner.", world.Skills.Items.Single(item => item.Id == skill.Id).Instructions);
+    }
+
+    private static TurnTraceRecord FailingTurnWithSkill(string skill, string tool) =>
+        new(Guid.NewGuid(), Owner, Guid.NewGuid(), null, null, "interactive", [], [skill],
+            [new TurnToolCall(tool, ToolOutcomes.Failed, 40)], 200, "completed", Start.AddHours(-30));
+
+    private sealed class StubSkillRefiner : ISkillRefiner
+    {
+        public List<string> Asked { get; } = [];
+        public List<int> AskedVersions { get; } = [];
+
+        public Task<SkillDraft?> RefineAsync(Guid ownerId, SkillRecord skill, SkillRefineEvidence evidence,
+            CancellationToken cancellationToken)
+        {
+            Asked.Add(skill.Name);
+            AskedVersions.Add(skill.Version);
+            return Task.FromResult<SkillDraft?>(new SkillDraft(skill.Name, skill.Description,
+                "1. Check the inputs first.\n2. Ask for dates and budget."));
+        }
+    }
+
     [Fact]
     public async Task With_proposals_switched_off_the_miner_does_nothing()
     {

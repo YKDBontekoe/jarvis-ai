@@ -10,8 +10,9 @@ public static class ImprovementKinds
     public const string Skill = "skill";
     public const string Review = "review";
     public const string Lesson = "lesson";
+    public const string SkillRefine = "skill_refine";
 
-    public static bool IsValid(string? kind) => kind is Memory or Skill or Review or Lesson;
+    public static bool IsValid(string? kind) => kind is Memory or Skill or Review or Lesson or SkillRefine;
 }
 
 /// <summary>

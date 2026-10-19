@@ -293,6 +293,18 @@ public sealed class ImprovementService(
                     respectLock: true, "Accepted improvement", cancellationToken);
                 return saved?.Id;
             }
+            case ImprovementKinds.SkillRefine:
+            {
+                var payload = JsonSerializer.Deserialize<SkillRefinePayload>(proposal.PayloadJson, JsonOptions)
+                              ?? throw new JsonException("Empty refinement payload.");
+                var current = await skills.FindByNameAsync(ownerId, payload.Name, cancellationToken);
+                // The text it was written against must still be the text in use, or it would undo newer work.
+                if (current is null || current.IsLocked || current.Version != payload.BaseVersion) return null;
+                var draft = SkillMarkdown.Validate(new SkillDraft(payload.Name, payload.Description, payload.Instructions));
+                var saved = await skills.UpsertAsync(ownerId, draft, SkillSources.Learned, SkillStatuses.Active,
+                    respectLock: true, "Refined from how its runs went", cancellationToken);
+                return saved?.Id;
+            }
             case ImprovementKinds.Lesson:
                 // The proposal itself is the lesson: accepting puts it in force, undo takes it out again.
                 return ReadLesson(proposal) is null ? throw new JsonException("Empty lesson payload.") : proposal.Id;
@@ -327,7 +339,25 @@ public sealed class ImprovementService(
             case ImprovementKinds.Review:
                 await skills.SetStatusAsync(reference, ownerId, SkillStatuses.Active, cancellationToken);
                 break;
+            case ImprovementKinds.SkillRefine:
+                await RestoreSkillTextAsync(ownerId, proposal, reference, cancellationToken);
+                break;
         }
+    }
+
+    /// <summary>Puts back the text the skill had before a refinement was accepted, as a new revision.</summary>
+    private async Task RestoreSkillTextAsync(Guid ownerId, ImprovementProposal proposal, Guid skillId,
+        CancellationToken cancellationToken)
+    {
+        var payload = JsonSerializer.Deserialize<SkillRefinePayload>(proposal.PayloadJson, JsonOptions);
+        var skill = await skills.GetAsync(skillId, ownerId, cancellationToken);
+        if (payload is null || skill is null) return;
+        var previous = (await skills.ListRevisionsAsync(skillId, ownerId, cancellationToken))
+            .FirstOrDefault(revision => revision.Version == payload.BaseVersion);
+        if (previous is null) return;
+        await skills.UpsertAsync(ownerId, new SkillDraft(skill.Name, previous.Description, previous.Instructions),
+            SkillSources.Learned, SkillStatuses.Active, respectLock: false,
+            $"Undid the refinement; back to version {payload.BaseVersion}", cancellationToken);
     }
 
     private Task<Jarvis.Domain.Memory.MemoryRecord> CreateMemoryAsync(Guid ownerId, MemoryPayload payload,

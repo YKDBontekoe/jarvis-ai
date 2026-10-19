@@ -1,4 +1,6 @@
+using Jarvis.Application.Improvements;
 using Jarvis.Application.Skills;
+using Jarvis.Domain.Improvements;
 using Jarvis.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
@@ -117,6 +119,47 @@ public sealed class SkillReviewTests : IAsyncLifetime
         Assert.Equal((0, 0, 2), (rewritten.OutcomeRuns, rewritten.OutcomeSuccesses, rewritten.Version));
         Assert.True(rewritten.OutcomeCountedAt > DateTimeOffset.UtcNow.AddMinutes(-1));
     }
+
+    [Fact]
+    public async Task A_redraft_is_stored_applied_against_the_same_version_and_undone_from_the_revision_history()
+    {
+        var owner = Guid.CreateVersion7();
+        var skill = await Save(owner, Draft("trip-planning", "1. Ask for dates and budget."), SkillSources.Learned, SkillStatuses.Active);
+        var now = DateTimeOffset.UtcNow;
+        var payload = System.Text.Json.JsonSerializer.Serialize(
+            new SkillRefinePayload("trip-planning", "Use when planning trips.", "1. Check inputs.\n2. Ask for dates.", skill.Version),
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        var proposal = new ImprovementProposal(Guid.CreateVersion7(), owner, ImprovementKinds.SkillRefine,
+            SkillRefineRules.Fingerprint(skill), "Improve “trip-planning”", "Went well 1 of 5 times.", 0.7, payload,
+            ImprovementStatuses.Pending, null, now, now);
+        await using (var database = CreateDbContext())
+            await new ImprovementRepository(database).AddAsync(proposal, default);
+
+        await using (var database = CreateDbContext())
+        {
+            var service = Service(database);
+            var accepted = await service.AcceptAsync(proposal.Id, owner, default);
+            Assert.Equal(ImprovementStatuses.Accepted, accepted!.Status);
+        }
+
+        await using (var read = CreateDbContext())
+        {
+            var rewritten = (await new SkillRepository(read).GetAsync(skill.Id, owner, default))!;
+            Assert.Equal((2, SkillStatuses.Active), (rewritten.Version, rewritten.Status));
+            Assert.Contains("Check inputs", rewritten.Instructions);
+        }
+
+        await using (var database = CreateDbContext())
+            Assert.True(await Service(database).UndoAsync(proposal.Id, owner, default));
+
+        await using var after = CreateDbContext();
+        var restored = (await new SkillRepository(after).GetAsync(skill.Id, owner, default))!;
+        Assert.Equal((3, "1. Ask for dates and budget."), (restored.Version, restored.Instructions));
+    }
+
+    // Only the repositories a refinement touches are real; the other collaborators are never reached.
+    private static ImprovementService Service(JarvisDbContext database) =>
+        new(new ImprovementRepository(database), null!, new SkillRepository(database), null!, null!, null!);
 
     private JarvisDbContext CreateDbContext()
     {

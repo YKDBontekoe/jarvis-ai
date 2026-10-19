@@ -3114,7 +3114,7 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
 
                     b.ToTable("improvement_proposals", null, t =>
                         {
-                            t.HasCheckConstraint("ck_improvement_proposals_kind", "kind IN ('memory', 'skill', 'review', 'lesson')");
+                            t.HasCheckConstraint("ck_improvement_proposals_kind", "kind IN ('memory', 'skill', 'review', 'lesson', 'skill_refine')");
 
                             t.HasCheckConstraint("ck_improvement_proposals_status", "status IN ('pending', 'accepted', 'applied', 'dismissed', 'undone')");
                         });
