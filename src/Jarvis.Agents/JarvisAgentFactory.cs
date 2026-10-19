@@ -65,11 +65,26 @@ public sealed class JarvisAgentFactory(
                 Tools = tools,
                 AllowMultipleToolCalls = false
             }),
+            ChatHistoryProvider = CreateHistoryProvider(),
             AIContextProviders = contextProviders
         }, loggerFactory, services);
         ToolFailureFeedback.Configure(agent.ChatClient.GetService<FunctionInvokingChatClient>());
         return agent;
     }
+
+    /// <summary>
+    /// Context blocks are rebuilt every turn; storing them would resend and re-summarize stale copies forever, and
+    /// would make keyword tool selection read them as the user's words on later turns.
+    /// </summary>
+    internal static ChatHistoryProvider CreateHistoryProvider() =>
+        new InMemoryChatHistoryProvider(new InMemoryChatHistoryProviderOptions
+        {
+            StorageInputRequestMessageFilter = messages => messages.Where(IsStoredRequestMessage)
+        });
+
+    /// <summary>True for what the user (or a tool round) sent; false for blocks a context provider injected.</summary>
+    internal static bool IsStoredRequestMessage(ChatMessage message) =>
+        message.GetAgentRequestMessageSourceType() == AgentRequestMessageSourceType.External;
 
     /// <summary>The same Jarvis + MCP functions used in chat, collected for the voice MCP host.</summary>
     public IReadOnlyList<AIFunction> CollectFunctions(IEnumerable<AITool> mcpTools, AgentBuildContext context) =>

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
 namespace Jarvis.Agents;
@@ -165,7 +166,7 @@ public static partial class ToolGroups
         for (var index = messages.Count - 1; index >= 0; index--)
         {
             var message = messages[index];
-            if (message.Role == ChatRole.User && !string.IsNullOrWhiteSpace(message.Text))
+            if (message.Role == ChatRole.User && !string.IsNullOrWhiteSpace(message.Text) && !IsInjectedContext(message))
             {
                 // Only the user's latest words pick groups by keyword; older turns count through the tools they used.
                 if (latestUserText)
@@ -187,6 +188,10 @@ public static partial class ToolGroups
         }
         return active;
     }
+
+    /// <summary>Context blocks arrive as User messages; they are not the user's words and must not pick groups.</summary>
+    private static bool IsInjectedContext(ChatMessage message) =>
+        message.GetAgentRequestMessageSourceType() != AgentRequestMessageSourceType.External;
 
     internal static IEnumerable<string> RequestedGroups(IDictionary<string, object?>? arguments)
     {
