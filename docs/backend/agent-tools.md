@@ -15,7 +15,7 @@ Tools are exposed to the model through **Microsoft Agent Framework** `AITool` in
 | **WeekFollowThroughToolContributor** | `GetWeekFollowThrough` (read-only: the week's fulfilled / overdue promises, decisions next week, projects needing a step, at most three optional suggestions the user accepts in the app) |
 | **ProjectToolContributor** | `GetProjects`, `SetProjectOutcome`, `SetProjectNextAction` (a project's outcome, status and next action; a link must be the owner's own promise, decision, reminder or task). Group `projects` |
 | **KnowledgeGraphToolContributor** | Graph search and proposed writes (approval-gated) |
-| **SurfaceToolContributor** | `RenderUi` generative cards |
+| **SurfaceToolContributor** | `RenderUi` native cards: `choice` (optionally `multiSelect`), `form` (text, longtext, number, slider, date, time, toggle, choice, secret), `list`/`status` (items with `icon`, `value`, `badge`), and `custom`, which Jarvis composes from blocks (heading, text, stats, progress, bars, steps, pairs, chips, callout, divider, columns; at most 24, columns one level deep). Validated in `UiSurfaceSchema` / `UiSurfaceBlocks`; the app draws blocks natively, so no code, HTML or remote images |
 | **RemoteAgentToolContributor** | Delegate to registered HTTPS agents (approval-gated) |
 | **DeviceToolContributor** | Location, battery, clipboard, open URL, notifications on connected nodes |
 | **BrowserToolContributor** | `BrowseTheWeb` session + Playwright tools |

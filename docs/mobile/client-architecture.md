@@ -209,7 +209,7 @@ The audit fails on layout overflows and on toolbars squeezed below their height.
 
 ## Generative UI
 
-- `generative_ui.dart`, `generative_ui_card.dart` — native cards (`RenderUi`): choices, forms (including secret token fields), status, and lists. Authorization actions may open a public HTTPS URL.
+- `generative_ui.dart` (+ parts `generative_ui_card.dart`, `generative_ui_fields.dart`, `generative_ui_blocks.dart`) — native cards (`RenderUi`): single and multi-select choices, forms (chips, slider, date, time, long text, toggles, secret token fields), lists with icons/values/badges, and custom cards drawn from blocks (`SurfaceBlocks`). A card that asks something docks in the composer's place and folds to an answered receipt; a card that only shows something stays in the transcript. Authorization actions may open a public HTTPS URL. Gallery: `test/screenshots/generative_cards.dart`.
 - MCP setup starts in chat (`OfferMcpSetup`); Settings → Integrations is the encrypted vault. Any app can be pinned to Home from its detail screen as an `app:` tile (`features/tiles/app_tiles.dart`; the tile id carries the app key and name). Chat shows an `AppBuildCard` while Jarvis writes, tests and switches on an app.
 - Only the latest card is interactive; older cards collapse to receipts.
 - Actions: `POST /api/v1/ui-surfaces/{id}/actions`.

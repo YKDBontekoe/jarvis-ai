@@ -214,7 +214,14 @@ mixin _ChatScreenSend on _ChatScreenController {
       (entry) => entry is UiSurfaceEntry && entry.id == surface.id,
     );
     if (existing >= 0) {
-      _entries[existing] = surface;
+      final previous = _entries[existing] as UiSurfaceEntry;
+      // Realtime updates carry no answer; keep the one already shown.
+      _entries[existing] =
+          surface.answer == null &&
+              previous.answer != null &&
+              surface.status == previous.status
+          ? surface.copyWith(answer: previous.answer)
+          : surface;
     } else {
       _entries.add(surface);
     }
@@ -271,6 +278,10 @@ mixin _ChatScreenSend on _ChatScreenController {
     Map<String, String> values,
   ) async {
     _pendingQueryText = null;
+    final answer = UiSurfaceAnswer(
+      actionId: action,
+      values: redactSurfaceValues(surface.schema, values),
+    );
     if (mounted && _surfaceErrorFor == surface.id) {
       setState(() {
         _surfaceError = null;
@@ -285,7 +296,7 @@ mixin _ChatScreenSend on _ChatScreenController {
       );
       if (!mounted) return;
       setState(() {
-        _upsertSurface(surface.copyWith(status: 'completed'));
+        _upsertSurface(surface.copyWith(status: 'completed', answer: answer));
         _surfaceError = null;
         _surfaceErrorFor = null;
         _applyRunResult(response);
@@ -301,7 +312,7 @@ mixin _ChatScreenSend on _ChatScreenController {
           _sending = true;
           _error = null;
           _surfaceError = null;
-          _upsertSurface(surface.copyWith(status: 'completed'));
+          _upsertSurface(surface.copyWith(status: 'completed', answer: answer));
           _ensurePlaceholder();
         });
         unawaited(_catchUpRemoteQuery(conversationId));
@@ -641,8 +652,7 @@ mixin _ChatScreenSend on _ChatScreenController {
               ? current.copyWith(
                   status: ApprovalStatus.pending,
                   clearDecision: true,
-                  error:
-                      'Decide the earlier pending tool call first, or this one was already handled.',
+                  error: 'Decide the earlier pending tool call first, or this one was already handled.',
                 )
               : current.copyWith(
                   status: ApprovalStatus.failed,

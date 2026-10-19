@@ -10,8 +10,9 @@ public static class UiSurfaceKinds
     public const string Choice = "choice";
     public const string Status = "status";
     public const string List = "list";
+    public const string Custom = "custom";
 
-    public static readonly HashSet<string> All = [Card, Form, Choice, Status, List];
+    public static readonly HashSet<string> All = [Card, Form, Choice, Status, List, Custom];
 }
 
 public sealed record UiSurfaceRecord(
@@ -23,7 +24,9 @@ public sealed record UiSurfaceRecord(
     string SchemaJson,
     string Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? CompletedAction = null,
+    string? ValuesJson = null);
 
 public sealed record UiSurfaceAction(string ActionId, IReadOnlyDictionary<string, string> Values);
 
@@ -53,16 +56,17 @@ public static class UiSurfaceSchema
     public const int MaxFields = 8;
     public const int MaxActions = 6;
     public const int MaxActionUrl = 2_000;
-    private static readonly HashSet<string> FieldTypes = ["text", "number", "toggle", "choice", "secret"];
+    private static readonly HashSet<string> FieldTypes =
+        ["text", "longtext", "number", "slider", "date", "time", "toggle", "choice", "secret"];
     private static readonly HashSet<string> ActionStyles = ["primary", "secondary", "danger"];
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     public static string Normalize(string? kind, string? title, string? body, JsonElement? items, JsonElement? fields,
-        JsonElement? actions, string? credentialProvider = null)
+        JsonElement? actions, string? credentialProvider = null, JsonElement? blocks = null, bool multiSelect = false)
     {
         var normalizedKind = (kind ?? UiSurfaceKinds.Card).Trim().ToLowerInvariant();
         if (!UiSurfaceKinds.All.Contains(normalizedKind))
-            throw new ArgumentException("Use card, form, choice, status, or list as the UI kind.");
+            throw new ArgumentException("Use card, form, choice, status, list, or custom as the UI kind.");
         var normalizedTitle = (title ?? string.Empty).Trim();
         if (normalizedTitle.Length is 0 or > MaxTitle)
             throw new ArgumentException("Give the UI a title of 1 to 80 characters.");
@@ -71,16 +75,27 @@ public static class UiSurfaceSchema
             throw new ArgumentException("Keep the UI body under 2,000 characters.");
         var readFields = ReadFields(fields);
         var provider = NormalizeCredentialProvider(credentialProvider, readFields.Any(field => field.Type == "secret"));
+        var readBlocks = UiSurfaceBlocks.Read(blocks);
+        if (normalizedKind == UiSurfaceKinds.Custom && readBlocks.Length == 0)
+            throw new ArgumentException("A custom card needs blocks.");
+        var readItems = ReadItems(items);
+        var readActions = ReadActions(actions);
+        var multiple = multiSelect && normalizedKind == UiSurfaceKinds.Choice;
+        // Several picks need one button to send them; add it when Jarvis left it out.
+        if (multiple && !readActions.Any(action => !readItems.Any(item => item.Id == action.Id)))
+            readActions = [.. readActions, new UiSurfaceButton("done", "Done", "primary", null)];
 
         var document = new Dictionary<string, object?>
         {
             ["kind"] = normalizedKind,
             ["title"] = normalizedTitle,
             ["body"] = string.IsNullOrEmpty(normalizedBody) ? null : normalizedBody,
-            ["items"] = ReadItems(items),
+            ["items"] = readItems.Select(item => item.ToDocument()).ToArray(),
             ["fields"] = readFields.Select(field => field.ToDocument()).ToArray(),
-            ["actions"] = ReadActions(actions),
-            ["credentialProvider"] = provider
+            ["actions"] = readActions.Select(action => action.ToDocument()).ToArray(),
+            ["credentialProvider"] = provider,
+            ["blocks"] = readBlocks.Length == 0 ? null : readBlocks,
+            ["selection"] = multiple ? "multiple" : null
         };
         return JsonSerializer.Serialize(document, Json);
     }
@@ -100,25 +115,25 @@ public static class UiSurfaceSchema
         }
     }
 
-    private static object[] ReadItems(JsonElement? items)
+    private static List<UiSurfaceItem> ReadItems(JsonElement? items)
     {
         if (items is not { ValueKind: JsonValueKind.Array } array) return [];
         if (array.GetArrayLength() > MaxItems) throw new ArgumentException($"List at most {MaxItems} items.");
-        var result = new List<object>();
+        var result = new List<UiSurfaceItem>();
         foreach (var item in array.EnumerateArray())
         {
             if (item.ValueKind != JsonValueKind.Object) continue;
             var id = ReadString(item, "id", 40) ?? $"item-{result.Count + 1}";
-            var title = ReadString(item, "title", 120) ?? id;
-            result.Add(new
-            {
+            result.Add(new UiSurfaceItem(
                 id,
-                title,
-                subtitle = ReadString(item, "subtitle", 200),
-                detail = ReadString(item, "detail", 500)
-            });
+                ReadString(item, "title", 120) ?? id,
+                ReadString(item, "subtitle", 200),
+                ReadString(item, "detail", 500),
+                UiSurfaceBlocks.Icon(item),
+                ReadString(item, "value", 24),
+                ReadString(item, "badge", 24)));
         }
-        return [.. result];
+        return result;
     }
 
     private static List<UiSurfaceField> ReadFields(JsonElement? fields)
@@ -132,6 +147,7 @@ public static class UiSurfaceSchema
             var id = ReadString(field, "id", 40) ?? throw new ArgumentException("Each field needs an id.");
             var type = (ReadString(field, "type", 20) ?? "text").ToLowerInvariant();
             if (!FieldTypes.Contains(type)) throw new ArgumentException($"Unsupported field type '{type}'.");
+            var (min, max, step) = type == "slider" ? ReadRange(field) : (null, null, null);
             result.Add(new UiSurfaceField(
                 id,
                 ReadString(field, "label", 80) ?? id,
@@ -140,16 +156,18 @@ public static class UiSurfaceSchema
                 ReadStringList(field, "options", 12),
                 type == "secret"
                     ? ReadString(field, "secretName", 64) ?? IntegrationCredentialProviders.UserMcpTokenSecret
-                    : null));
+                    : null,
+                min, max, step,
+                type is "slider" or "number" ? ReadString(field, "unit", 12) : null));
         }
         return result;
     }
 
-    private static object[] ReadActions(JsonElement? actions)
+    private static List<UiSurfaceButton> ReadActions(JsonElement? actions)
     {
         if (actions is not { ValueKind: JsonValueKind.Array } array) return [];
         if (array.GetArrayLength() > MaxActions) throw new ArgumentException($"Use at most {MaxActions} actions.");
-        var result = new List<object>();
+        var result = new List<UiSurfaceButton>();
         foreach (var action in array.EnumerateArray())
         {
             if (action.ValueKind != JsonValueKind.Object) continue;
@@ -159,16 +177,27 @@ public static class UiSurfaceSchema
             var url = ReadString(action, "url", MaxActionUrl);
             if (url is not null && McpAuthorization.NormalizePublicHttpsUrl(url) is null)
                 throw new ArgumentException("Action urls must be public HTTPS.");
-            result.Add(new
-            {
-                id,
-                label = ReadString(action, "label", 40) ?? id,
-                style,
-                url = url is null ? null : McpAuthorization.NormalizePublicHttpsUrl(url)
-            });
+            result.Add(new UiSurfaceButton(id, ReadString(action, "label", 40) ?? id, style,
+                url is null ? null : McpAuthorization.NormalizePublicHttpsUrl(url)));
         }
-        return [.. result];
+        return result;
     }
+
+    private static (double? Min, double? Max, double? Step) ReadRange(JsonElement field)
+    {
+        var min = ReadNumber(field, "min") ?? 0;
+        var max = ReadNumber(field, "max") ?? 10;
+        if (max <= min) throw new ArgumentException("A slider needs a max above its min.");
+        var step = ReadNumber(field, "step");
+        if (step is not null && (step <= 0 || step > max - min)) step = null;
+        return (min, max, step);
+    }
+
+    private static double? ReadNumber(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number &&
+        value.TryGetDouble(out var number) && double.IsFinite(number)
+            ? number
+            : null;
 
     private static string? NormalizeCredentialProvider(string? credentialProvider, bool hasSecret)
     {
@@ -186,7 +215,8 @@ public static class UiSurfaceSchema
     }
 
     private readonly record struct UiSurfaceField(string Id, string Label, string Type, string? Placeholder,
-        string[] Options, string? SecretName)
+        string[] Options, string? SecretName, double? Min = null, double? Max = null, double? Step = null,
+        string? Unit = null)
     {
         public object ToDocument() => new
         {
@@ -195,8 +225,32 @@ public static class UiSurfaceSchema
             type = Type,
             placeholder = Placeholder,
             options = Options,
-            secretName = SecretName
+            secretName = SecretName,
+            min = Min,
+            max = Max,
+            step = Step,
+            unit = Unit
         };
+    }
+
+    private readonly record struct UiSurfaceItem(string Id, string Title, string? Subtitle, string? Detail,
+        string? Icon, string? Value, string? Badge)
+    {
+        public object ToDocument() => new
+        {
+            id = Id,
+            title = Title,
+            subtitle = Subtitle,
+            detail = Detail,
+            icon = Icon,
+            value = Value,
+            badge = Badge
+        };
+    }
+
+    private readonly record struct UiSurfaceButton(string Id, string Label, string Style, string? Url)
+    {
+        public object ToDocument() => new { id = Id, label = Label, style = Style, url = Url };
     }
 
     private static string? ReadString(JsonElement element, string name, int max)

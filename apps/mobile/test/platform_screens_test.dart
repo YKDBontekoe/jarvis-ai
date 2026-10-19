@@ -430,7 +430,7 @@ void main() {
       ),
     );
 
-    expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+    expect(find.byType(SurfaceChoiceChip), findsNothing);
     await tester.tap(find.widgetWithText(FilledButton, 'Share'));
     await tester.pump();
     expect(values, isNull);

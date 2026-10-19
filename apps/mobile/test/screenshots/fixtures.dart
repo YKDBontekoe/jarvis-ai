@@ -758,6 +758,88 @@ Map<String, Object?> questionSurface() => {
   },
 };
 
+/// A card Jarvis composed from blocks: a week at a glance.
+Map<String, Object?> weekSurface() => {
+  'id': 'surf-week',
+  'title': 'Your training week',
+  'status': 'open',
+  'schema': {
+    'kind': 'custom',
+    'title': 'Your training week',
+    'body': 'Three of five sessions done, with two easy ones left.',
+    'blocks': [
+      {'type': 'stats', 'items': [
+        {'label': 'Workouts', 'value': '3', 'delta': '+1 vs last week', 'trend': 'up'},
+        {'label': 'Distance', 'value': '18.5 km', 'delta': '-2 km', 'trend': 'down'},
+        {'label': 'Sleep', 'value': '7 h 10', 'delta': 'steady', 'trend': 'flat'},
+      ]},
+      {'type': 'progress', 'label': 'Weekly goal', 'value': 0.6, 'detail': '3 of 5 sessions'},
+      {'type': 'bars', 'unit': 'km', 'items': [
+        {'label': 'Mon', 'value': 5}, {'label': 'Wed', 'value': 8.5}, {'label': 'Sat', 'value': 5},
+      ]},
+      {'type': 'steps', 'items': [
+        {'title': 'Monday run', 'detail': '5 km easy', 'done': true},
+        {'title': 'Wednesday intervals', 'detail': '6 × 800 m', 'done': true},
+        {'title': 'Friday gym', 'detail': '18:00 · Borst & armen'},
+      ]},
+      {'type': 'callout', 'tone': 'success', 'text': 'You are ahead of last week. Keep Sunday as a rest day.'},
+    ],
+  },
+};
+
+/// A form with the richer fields: chips, a slider, a date, a toggle.
+Map<String, Object?> planSurface() => {
+  'id': 'surf-plan',
+  'title': 'Plan your next workout',
+  'status': 'open',
+  'schema': {
+    'kind': 'form',
+    'title': 'Plan your next workout',
+    'fields': [
+      {'id': 'kind', 'label': 'What kind?', 'type': 'choice', 'options': ['Run', 'Gym', 'Swim', 'Yoga']},
+      {'id': 'energy', 'label': 'Energy', 'type': 'slider', 'min': 1, 'max': 5, 'step': 1, 'unit': '/ 5'},
+      {'id': 'day', 'label': 'When?', 'type': 'date'},
+      {'id': 'buddy', 'label': 'Ask Rosa to join', 'type': 'toggle'},
+    ],
+    'actions': [{'id': 'plan', 'label': 'Plan it', 'style': 'primary'}],
+  },
+};
+
+/// A choice where several answers may be picked.
+Map<String, Object?> daysSurface() => {
+  'id': 'surf-days',
+  'title': 'Which days suit the gym?',
+  'status': 'open',
+  'schema': {
+    'kind': 'choice',
+    'title': 'Which days suit the gym?',
+    'selection': 'multiple',
+    'items': [
+      {'id': 'mon', 'title': 'Monday', 'subtitle': 'Free after 18:00', 'icon': 'calendar'},
+      {'id': 'wed', 'title': 'Wednesday', 'subtitle': 'Late meeting until 19:30', 'icon': 'calendar'},
+      {'id': 'fri', 'title': 'Friday', 'subtitle': 'Free all evening', 'icon': 'calendar'},
+    ],
+    'actions': [{'id': 'done', 'label': 'Done', 'style': 'primary'}],
+  },
+};
+
+/// A list with icons, values and badges.
+Map<String, Object?> billsSurface() => {
+  'id': 'surf-bills',
+  'title': 'Bills this week',
+  'status': 'open',
+  'schema': {
+    'kind': 'list',
+    'title': 'Bills this week',
+    'body': '3 payments, 1,027 euro in total.',
+    'items': [
+      {'id': 'rent', 'title': 'Rent', 'subtitle': 'Woonstad', 'icon': 'home', 'value': '€950', 'badge': 'Due Fri'},
+      {'id': 'gym', 'title': 'Gym', 'subtitle': 'Basic-Fit', 'icon': 'heart', 'value': '€29.99'},
+      {'id': 'phone', 'title': 'Phone', 'subtitle': 'Usage above plan', 'icon': 'phone', 'value': '€47.50', 'badge': 'Higher'},
+    ],
+  },
+};
+
 Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   'GET /api/v1/conversations': conversations(),
   'GET /api/v1/conversations/$conversationId': {

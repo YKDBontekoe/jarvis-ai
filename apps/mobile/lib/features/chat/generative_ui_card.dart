@@ -1,143 +1,48 @@
 part of 'generative_ui.dart';
 
+/// How a row in the option group behaves when tapped.
+enum _OptionMode {
+  /// Sends this option right away.
+  send,
+
+  /// Marks this one option; a button sends it.
+  pickOne,
+
+  /// Toggles this option; a button sends all marked ones.
+  pickMany,
+}
+
 mixin _UiSurfaceCardBody on _UiSurfaceCardController {
-  List<Widget> _choiceSection() {
+  Widget _choiceSection() {
+    if (_multiple) {
+      return _optionGroup([
+        for (final item in _items)
+          (id: asString(item['id']) ?? '', item: item, style: null),
+      ], _OptionMode.pickMany);
+    }
     final direct = _directActions();
-    return [
-      for (final item in _looseItems()) _selectTile(item),
-      if (direct.isNotEmpty) _optionGroup(direct),
-    ];
-  }
-
-  /// The tappable answers, one row each, in a single rounded group.
-  Widget _optionGroup(List<Map<String, dynamic>> options) {
-    final colors = JarvisColors.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: ColoredBox(
-          color: colors.surfaceMuted,
-          child: Column(
-            children: [
-              for (var index = 0; index < options.length; index++) ...[
-                if (index > 0)
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    indent: MediaQuery.textScalerOf(context).scale(1) < 1.5
-                        ? 54
-                        : 16,
-                    color: colors.outline,
-                  ),
-                _optionRow(options[index], index),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _optionRow(Map<String, dynamic> action, int index) {
-    final colors = JarvisColors.of(context);
-    final id = asString(action['id']) ?? '';
-    final item = _itemById[id];
-    final label = asString(action['label']) ?? asString(item?['title']) ?? id;
-    final subtitle = asString(item?['subtitle']);
-    final danger = asString(action['style']) == 'danger';
-    final busy = _busyAction != null;
-    final thisBusy = _busyAction == id;
-    // At large text the number gives its width to the label.
-    final numbered = MediaQuery.textScalerOf(context).scale(1) < 1.5;
-    final onTap = _interactive && !busy
-        ? () {
-            HapticFeedback.selectionClick();
-            unawaited(_run(id));
-          }
-        : null;
-    return Semantics(
-      button: true,
-      enabled: onTap != null,
-      label: subtitle == null ? label : '$label, $subtitle',
-      onTap: onTap,
-      excludeSemantics: true,
-      child: InkWell(
-        onTap: onTap,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 56),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
-            child: Row(
-              children: [
-                if (numbered) ...[
-                  Container(
-                    width: 28,
-                    height: 28,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: colors.surface,
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: Text(
-                      '${index + 1}',
-                      style: TextStyle(
-                        color: colors.inkSoft,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                ] else
-                  const SizedBox(width: 4),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        label,
-                        style: TextStyle(
-                          color: danger ? colors.danger : colors.ink,
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: -.25,
-                        ),
-                      ),
-                      if (subtitle != null)
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            color: colors.inkSoft,
-                            fontSize: 13,
-                            height: 1.35,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                AnimatedSwitcher(
-                  duration: JarvisMotion.of(context, JarvisMotion.fast),
-                  child: thisBusy
-                      ? const SizedBox.square(
-                          key: ValueKey('busy'),
-                          dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(
-                          PhosphorIconsRegular.arrowUpRight,
-                          key: const ValueKey('go'),
-                          size: 16,
-                          color: busy ? colors.outlineStrong : colors.muted,
-                        ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    final loose = _looseItems();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (loose.isNotEmpty)
+          _optionGroup([
+            for (final item in loose)
+              (id: asString(item['id']) ?? '', item: item, style: null),
+          ], _OptionMode.pickOne),
+        if (direct.isNotEmpty)
+          _optionGroup([
+            for (final action in direct)
+              (
+                id: asString(action['id']) ?? '',
+                item: {
+                  ...?_itemById[asString(action['id']) ?? ''],
+                  'title': ?asString(action['label']),
+                },
+                style: asString(action['style']),
+              ),
+          ], _OptionMode.send),
+      ],
     );
   }
 
@@ -194,72 +99,163 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
     return _actions;
   }
 
-  Widget _selectTile(Map<String, dynamic> item) {
-    final id = asString(item['id']) ?? '';
-    final title = asString(item['title']) ?? id;
-    final subtitle = asString(item['subtitle']);
-    final selected = _selectedItem == id;
+  /// The answers, one row each, in a single rounded group.
+  Widget _optionGroup(
+    List<({String id, Map<String, dynamic> item, String? style})> options,
+    _OptionMode mode,
+  ) {
+    final colors = JarvisColors.of(context);
+    final numbered = MediaQuery.textScalerOf(context).scale(1) < 1.5;
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Material(
-        color: selected
-            ? JarvisColors.of(context).accentSoft
-            : JarvisColors.of(context).surface,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: !_interactive || _busyAction != null
-              ? null
-              : () => setState(() {
-                  _selectedItem = id;
-                  _hint = null;
-                }),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: selected
-                    ? JarvisColors.of(context).accent
-                    : JarvisColors.of(context).outlineStrong,
-                width: selected ? 1.6 : 1,
+      padding: const EdgeInsets.only(top: 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: ColoredBox(
+          color: colors.surfaceMuted,
+          child: Column(
+            children: [
+              for (var index = 0; index < options.length; index++) ...[
+                if (index > 0)
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    indent: numbered ? 54 : 16,
+                    color: colors.outline,
+                  ),
+                _optionRow(options[index], index, mode, numbered: numbered),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _optionRow(
+    ({String id, Map<String, dynamic> item, String? style}) option,
+    int index,
+    _OptionMode mode, {
+    required bool numbered,
+  }) {
+    final colors = JarvisColors.of(context);
+    final id = option.id;
+    final label = asString(option.item['title']) ?? id;
+    final subtitle = asString(option.item['subtitle']);
+    final icon = surfaceIcon(asString(option.item['icon']));
+    final danger = option.style == 'danger';
+    final busy = _busyAction != null;
+    final thisBusy = mode == _OptionMode.send && _busyAction == id;
+    final selected = _selected.contains(id);
+    final onTap = !_interactive || busy
+        ? null
+        : switch (mode) {
+            _OptionMode.send => () {
+              HapticFeedback.selectionClick();
+              unawaited(_run(id));
+            },
+            _OptionMode.pickOne => () {
+              HapticFeedback.selectionClick();
+              setState(() {
+                _selected
+                  ..clear()
+                  ..add(id);
+                _hint = null;
+              });
+            },
+            _OptionMode.pickMany => () {
+              HapticFeedback.selectionClick();
+              setState(() {
+                if (!_selected.remove(id)) _selected.add(id);
+                _hint = null;
+              });
+            },
+          };
+    final Widget trailing = switch (mode) {
+      _OptionMode.send => AnimatedSwitcher(
+        duration: JarvisMotion.of(context, JarvisMotion.fast),
+        child: thisBusy
+            ? const SizedBox.square(
+                key: ValueKey('busy'),
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(
+                PhosphorIconsRegular.arrowUpRight,
+                key: const ValueKey('go'),
+                size: 16,
+                color: busy ? colors.outlineStrong : colors.muted,
               ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  selected
-                      ? PhosphorIconsFill.checkCircle
-                      : PhosphorIconsRegular.circle,
-                  size: 20,
-                  color: selected
-                      ? JarvisColors.of(context).accent
-                      : JarvisColors.of(context).muted,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
-                      ),
-                      if (subtitle != null)
+      ),
+      _OptionMode.pickOne || _OptionMode.pickMany => AnimatedSwitcher(
+        duration: JarvisMotion.of(context, JarvisMotion.fast),
+        transitionBuilder: (child, animation) =>
+            ScaleTransition(scale: animation, child: child),
+        child: Icon(
+          selected
+              ? PhosphorIconsFill.checkCircle
+              : PhosphorIconsRegular.circle,
+          key: ValueKey(selected),
+          size: 22,
+          color: selected ? colors.accent : colors.outlineStrong,
+        ),
+      ),
+    };
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      selected: mode == _OptionMode.send ? null : selected,
+      label: subtitle == null ? label : '$label, $subtitle',
+      onTap: onTap,
+      excludeSemantics: true,
+      child: AnimatedContainer(
+        duration: JarvisMotion.of(context, JarvisMotion.fast),
+        color: selected ? colors.accentSoft : colors.surfaceMuted,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
+              child: Row(
+                children: [
+                  if (numbered) ...[
+                    _leadingBadge(icon: icon, number: index + 1),
+                    const SizedBox(width: 14),
+                  ] else
+                    const SizedBox(width: 4),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          subtitle,
+                          label,
                           style: TextStyle(
-                            color: JarvisColors.of(context).inkSoft,
-                            fontSize: 13,
+                            color: danger
+                                ? colors.danger
+                                : selected
+                                ? colors.accentDeep
+                                : colors.ink,
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -.25,
                           ),
                         ),
-                    ],
+                        if (subtitle != null)
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              color: colors.inkSoft,
+                              fontSize: 13,
+                              height: 1.35,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  trailing,
+                ],
+              ),
             ),
           ),
         ),
@@ -267,170 +263,151 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
     );
   }
 
-  Widget _listRow(Map<String, dynamic> item, int index) {
+  /// The item's icon in a small tile, or its position when it has none.
+  Widget _leadingBadge({IconData? icon, required int number}) {
+    final colors = JarvisColors.of(context);
+    return Container(
+      width: 28,
+      height: 28,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: icon != null
+          ? Icon(icon, size: 16, color: colors.accent)
+          : Text(
+              '$number',
+              style: TextStyle(
+                color: colors.inkSoft,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+    );
+  }
+
+  /// Items of a list or status card: icon or number, text, and a trailing
+  /// value or badge.
+  Widget _itemList() {
+    final colors = JarvisColors.of(context);
+    final large = MediaQuery.textScalerOf(context).scale(1) >= 1.5;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        children: [
+          for (var index = 0; index < _items.length; index++) ...[
+            if (index > 0)
+              Divider(
+                height: 1,
+                thickness: 1,
+                indent: large ? 0 : 40,
+                color: colors.outline,
+              ),
+            _itemRow(_items[index], index, large: large),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _itemRow(Map<String, dynamic> item, int index, {required bool large}) {
+    final colors = JarvisColors.of(context);
     final title = asString(item['title']) ?? '';
     final subtitle = asString(item['subtitle']);
     final detail = asString(item['detail']);
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 26,
-            height: 26,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: JarvisColors.of(context).accentSoft,
-              borderRadius: BorderRadius.circular(8),
-            ),
+    final value = asString(item['value']);
+    final badge = asString(item['badge']);
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: colors.ink,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -.2,
+          ),
+        ),
+        if (subtitle != null)
+          Text(
+            subtitle,
+            style: TextStyle(color: colors.inkSoft, fontSize: 13, height: 1.35),
+          ),
+        if (detail != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
             child: Text(
-              '${index + 1}',
-              style: TextStyle(
-                color: JarvisColors.of(context).accentDeep,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
+              detail,
+              style: TextStyle(color: colors.muted, fontSize: 12.5),
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
+      ],
+    );
+    final trailing = [
+      if (value != null)
+        Text(
+          value,
+          style: TextStyle(
+            color: colors.ink,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      if (badge != null) SurfaceTag(label: badge),
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: large
+          ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                text,
+                if (trailing.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: trailing,
+                    ),
+                  ),
+              ],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: _leadingBadge(
+                    icon: surfaceIcon(asString(item['icon'])),
+                    number: index + 1,
+                  ),
                 ),
-                if (subtitle != null)
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: JarvisColors.of(context).inkSoft,
-                      fontSize: 13,
-                    ),
+                const SizedBox(width: 12),
+                Expanded(child: text),
+                if (trailing.isNotEmpty) ...[
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      for (var i = 0; i < trailing.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 4),
+                        trailing[i],
+                      ],
+                    ],
                   ),
-                if (detail != null)
-                  Text(
-                    detail,
-                    style: TextStyle(
-                      color: JarvisColors.of(context).muted,
-                      fontSize: 12.5,
-                    ),
-                  ),
+                ],
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _field(Map<String, dynamic> field, {required bool last}) {
-    final id = asString(field['id']) ?? '';
-    final label = asString(field['label']) ?? id;
-    final type = asString(field['type']) ?? 'text';
-    if (type == 'toggle') {
-      return SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: Text(label),
-        value: _values[id] == 'true',
-        onChanged: _interactive && _busyAction == null
-            ? (value) => setState(() => _values[id] = value.toString())
-            : null,
-      );
-    }
-    if (type == 'choice') {
-      final raw = field['options'];
-      final options = [
-        if (raw is List)
-          for (final option in raw)
-            if (option is String && option.isNotEmpty) option,
-      ];
-      final selected = options.contains(_values[id]) ? _values[id] : null;
-      return Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            DropdownButtonFormField<String>(
-              isExpanded: true,
-              initialValue: selected,
-              decoration: const InputDecoration(hintText: 'Choose'),
-              items: [
-                for (final option in options)
-                  DropdownMenuItem(value: option, child: Text(option)),
-              ],
-              onChanged: _interactive && _busyAction == null
-                  ? (value) {
-                      if (value != null) {
-                        setState(() {
-                          _values[id] = value;
-                          _hint = null;
-                        });
-                      }
-                    }
-                  : null,
-            ),
-          ],
-        ),
-      );
-    }
-    final controller = _controllers.putIfAbsent(
-      id,
-      () => TextEditingController(text: _values[id] ?? ''),
-    );
-    return Padding(
-      padding: const EdgeInsets.only(top: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 6),
-          Builder(
-            builder: (fieldContext) => TextField(
-              controller: controller,
-              enabled: _interactive && _busyAction == null,
-              obscureText: type == 'secret',
-              enableSuggestions: type != 'secret',
-              autocorrect: type != 'secret',
-              textInputAction: last
-                  ? TextInputAction.done
-                  : TextInputAction.next,
-              keyboardType: type == 'number'
-                  ? const TextInputType.numberWithOptions(decimal: true)
-                  : TextInputType.text,
-              decoration: InputDecoration(
-                hintText: asString(field['placeholder']) ?? 'Type your answer',
-              ),
-              onTap: () {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (!fieldContext.mounted) return;
-                  Scrollable.ensureVisible(
-                    fieldContext,
-                    alignment: 0.2,
-                    duration: const Duration(milliseconds: 180),
-                  );
-                });
-              },
-              onChanged: (_) {
-                if (_hint != null) setState(() => _hint = null);
-              },
-              onSubmitted: last
-                  ? (_) {
-                      final actionId = _submitActionId();
-                      if (actionId != null) unawaited(_run(actionId));
-                    }
-                  : null,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
+  @override
   String? _submitActionId() {
     final confirms = _confirmActions();
     if (confirms.isNotEmpty) return asString(confirms.first['id']);
@@ -513,10 +490,14 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
     ),
   );
 
+  /// A used or closed card folds to one line with what was answered; a tap
+  /// opens what it asked.
   Widget _receipt() {
+    final colors = JarvisColors.of(context);
     final title = asString(_schema['title']) ?? widget.surface.title;
     final body = asString(_schema['body']);
     final answered = widget.surface.status == 'completed';
+    final summary = answered ? surfaceAnswerSummary(widget.surface) : null;
     final label = switch (widget.surface.status) {
       'completed' => 'Answered',
       'open' => 'Open',
@@ -525,68 +506,79 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: JarvisColors.of(context).surfaceMuted,
-        borderRadius: BorderRadius.circular(14),
+        color: colors.surfaceMuted,
+        borderRadius: BorderRadius.circular(16),
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           onTap: () => setState(() => _expanded = !_expanded),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      answered
-                          ? PhosphorIconsRegular.checkCircle
-                          : PhosphorIconsRegular.x,
-                      size: 16,
-                      color: answered
-                          ? JarvisColors.of(context).success
-                          : JarvisColors.of(context).muted,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+            child: MotionSize(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        answered
+                            ? PhosphorIconsRegular.checkCircle
+                            : PhosphorIconsRegular.x,
+                        size: 16,
+                        color: answered ? colors.success : colors.muted,
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        color: JarvisColors.of(context).muted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                if (_expanded && body != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    body,
-                    style: TextStyle(
-                      color: JarvisColors.of(context).inkSoft,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-                if (_expanded)
-                  for (final item in _items)
-                    if (asString(item['title']) case final itemTitle?)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
+                      const SizedBox(width: 8),
+                      Expanded(
                         child: Text(
-                          itemTitle,
-                          style: const TextStyle(fontSize: 13),
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
-              ],
+                      const SizedBox(width: 8),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: colors.muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (summary != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 24, top: 2),
+                      child: Text(
+                        summary,
+                        maxLines: _expanded ? null : 2,
+                        overflow: _expanded ? null : TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.accentDeep,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  if (_expanded && body != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      body,
+                      style: TextStyle(color: colors.inkSoft, fontSize: 13),
+                    ),
+                  ],
+                  if (_expanded)
+                    for (final item in _items)
+                      if (asString(item['title']) case final itemTitle?)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            itemTitle,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                ],
+              ),
             ),
           ),
         ),
@@ -594,6 +586,7 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
     );
   }
 
+  @override
   Future<void> _run(String actionId) async {
     if (widget.onAction == null || _busyAction != null) return;
     Map<String, dynamic>? action;
@@ -624,21 +617,24 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
 
   String? _validationHint(String actionId) {
     final directChoice = _kind == 'choice' && _itemById.containsKey(actionId);
-    if (_kind == 'choice' &&
-        _looseItems().isNotEmpty &&
-        !directChoice &&
-        _selectedItem == null) {
-      return 'Pick one option first.';
+    if (_kind == 'choice' && !directChoice && _selected.isEmpty) {
+      if (_multiple) return 'Pick at least one option.';
+      if (_looseItems().isNotEmpty) return 'Pick one option first.';
     }
-    final textFields = [
+    final answerable = [
       for (final field in _fields)
-        if ((asString(field['type']) ?? 'text') == 'text' ||
-            (asString(field['type']) ?? 'text') == 'number' ||
-            (asString(field['type']) ?? 'text') == 'secret')
+        if (const {
+          'text',
+          'longtext',
+          'number',
+          'secret',
+          'date',
+          'time',
+        }.contains(asString(field['type']) ?? 'text'))
           field,
     ];
-    if (textFields.isNotEmpty &&
-        textFields.every(
+    if (answerable.isNotEmpty &&
+        answerable.every(
           (field) => _text(asString(field['id']) ?? '').trim().isEmpty,
         )) {
       return 'Add an answer first.';
@@ -661,26 +657,32 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
       final id = asString(field['id']) ?? '';
       if (id.isEmpty) continue;
       final type = asString(field['type']) ?? 'text';
-      if (type == 'toggle') {
-        payload[id] = _values[id] == 'true' ? 'true' : 'false';
-      } else {
-        final value = (type == 'choice' ? (_values[id] ?? '') : _text(id))
-            .trim();
-        if (value.isNotEmpty) {
-          payload[id] = _clip(value, type == 'secret' ? 8192 : 500);
-        }
+      final value = switch (type) {
+        'toggle' => _values[id] == 'true' ? 'true' : 'false',
+        'slider' => _sliderValue(field),
+        'choice' || 'date' || 'time' => _values[id] ?? '',
+        _ => _text(id),
+      }.trim();
+      if (value.isNotEmpty) {
+        payload[id] = _clip(value, type == 'secret' ? 8192 : 500);
       }
     }
-    final selected = _itemById.containsKey(actionId) ? actionId : _selectedItem;
-    if (selected != null && _itemById.containsKey(selected)) {
-      payload['choice'] = _clip(selected);
-      final label = asString(_itemById[selected]?['title']);
-      if (label != null) payload['label'] = _clip(label);
+    final picked = _itemById.containsKey(actionId)
+        ? [actionId]
+        : [
+            for (final item in _items)
+              if (_selected.contains(asString(item['id'])))
+                asString(item['id'])!,
+          ];
+    if (picked.isNotEmpty) {
+      payload['choice'] = _clip(picked.join(','));
+      final labels = [
+        for (final id in picked) ?asString(_itemById[id]?['title']),
+      ];
+      if (labels.isNotEmpty) payload['label'] = _clip(labels.join(', '));
     }
     return payload;
   }
-
-  String _text(String id) => _controllers[id]?.text ?? _values[id] ?? '';
 
   String _clip(String value, [int max = 500]) =>
       value.length <= max ? value : value.substring(0, max);

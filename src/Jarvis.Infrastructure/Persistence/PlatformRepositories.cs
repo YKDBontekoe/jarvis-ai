@@ -20,7 +20,7 @@ public sealed class UiSurfaceEntity
     public DateTimeOffset UpdatedAt { get; set; }
 
     public UiSurfaceRecord ToRecord() => new(Id, OwnerId, ConversationId, Kind, Title, SchemaJson, Status, CreatedAt,
-        UpdatedAt);
+        UpdatedAt, CompletedAction, ValuesJson);
 }
 
 public sealed class RemoteAgentEntity

@@ -247,6 +247,27 @@ function plan(prompt) {
     return text("I've started that as a background task. I'll notify you when the results are ready — you can follow along in **Tasks**.");
   }
 
+  if (/\b(summary|dashboard|overview)\b.*\bcard\b/.test(lower) && has('RenderUi')) {
+    if (results.length === 0) {
+      return call('RenderUi', {
+        kind: 'custom',
+        title: 'Your week',
+        blocksJson: JSON.stringify([
+          { type: 'stats', items: [
+            { label: 'Workouts', value: '3', delta: '+1', trend: 'up' },
+            { label: 'Sleep', value: '7 h', trend: 'flat' },
+          ] },
+          { type: 'progress', label: 'Weekly goal', value: 0.6, detail: '3 of 5' },
+          { type: 'steps', items: [
+            { title: 'Monday run', done: true },
+            { title: 'Friday gym' },
+          ] },
+        ]),
+      });
+    }
+    return text('Here is your week on a card.');
+  }
+
   if (/\b(show|render|pick|choose)\b.*\b(card|form|options|plan)\b/.test(lower) && has('RenderUi')) {
     if (results.length === 0) {
       return call('RenderUi', {

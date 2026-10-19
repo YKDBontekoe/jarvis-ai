@@ -120,6 +120,7 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 | `HeroCard`, `FeatureRow`, `PillAction`, `GroupLabel`, `SoftButton`, `InkButton` | `ui/feature_kit.dart` | The vocabulary for feature screens. One `HeroCard` (ink card, caps label, headline, optional segmented progress, footer) leads the screen; everything under it is `FeatureRow`s (icon badge, caps caption, title, detail, trailing, pill actions; entrance stagger; stacks under the text at large sizes) grouped by a `GroupLabel` (caps, optional count). Actions are `PillAction` (ink when primary, tonal otherwise, `compact` for several per row, `onDark` on a hero). Never bare `TextButton`s in cards. |
 | `PersonPanel` | `features/whatsapp/person_panel.dart` | About a person, beside a chat on wide screens |
 | `UiSurfaceCard`, `DockedSurfaceBar` | `features/chat/generative_ui.dart` | Cards Jarvis renders with RenderUi. An open question docks in the composer's place (`pinned`); `DockedSurfaceBar` keeps it in view while the owner types instead |
+| `SurfaceBlocks`, `SurfaceTag`, `SurfaceChoiceChip` | `features/chat/generative_ui_blocks.dart` | Custom cards Jarvis composes from blocks (stats, progress, bars, steps, pairs, chips, callout, heading, text, divider, columns); item tags; chip answers for short choice fields |
 
 ## 7. Patterns
 
@@ -144,8 +145,10 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
   - options are equal rows in one rounded `surfaceMuted` group: number badge (hidden from 1.5× text), title, optional subtitle, ↗. One tap answers; there is no filled "first" option;
   - the pencil in the header ("Type an answer instead") folds the options into a `DockedSurfaceBar` above the composer and focuses it; Options brings them back;
   - while a turn is still running, the composer stays under the card so Stop is in reach;
-  - an answered card collapses to a one-line "Answered" receipt in the transcript;
+  - an answered card collapses to a one-line "Answered" receipt that shows the answer ("Hard push", "Monday, Friday"; secrets read "Saved securely");
+  - multi-select rows toggle a check and fill `accentSoft`; Done sends them all. Short choice fields (up to 5 options) are chips, longer ones a menu; sliders show their value in `accentDeep` with tabular figures; dates and times open the platform pickers;
   - tapping the transcript closes the keyboard.
+- **Cards Jarvis composes (custom blocks).** A card that only shows something (a week summary, a bill list) stays readable in the transcript and never folds. Blocks use the tokens only: stat tiles on `surfaceMuted` (two a row, an odd last one full width, one a row from 1.5× text), progress and bars grow once with `JarvisMotion.slow` (instant with reduced motion), callouts take a tone's soft colour, columns stack below 150pt each or at large text. Up/down deltas pair an arrow icon with colour, never colour alone. Gallery: `test/screenshots/generative_cards.dart`.
 - **People everywhere.** A chat linked to a person shows the relationship in Chats rows, Needs you, the hold preview, the chat header (instead of your own number) and the About panel.
 - **Navigation (approved design, not built yet).** See [mockups/home-header-nav.html](mockups/home-header-nav.html):
   - two floating glass pieces, a capsule for Home / Chats / Everything / You and a separate orb button;

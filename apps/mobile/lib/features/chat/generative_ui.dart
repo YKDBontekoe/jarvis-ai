@@ -11,8 +11,10 @@ import '../../ui/phosphor_icons.dart';
 import '../../http_urls.dart';
 import 'chat_entries.dart';
 
-part 'generative_ui_card.dart';
+part 'generative_ui_blocks.dart';
 part 'generative_ui_browser.dart';
+part 'generative_ui_card.dart';
+part 'generative_ui_fields.dart';
 
 /// The newest card the user can still act on. Older open cards are ignored.
 UiSurfaceEntry? liveSurface(Iterable<ChatEntry> entries) {
@@ -24,13 +26,70 @@ UiSurfaceEntry? liveSurface(Iterable<ChatEntry> entries) {
 }
 
 /// True when the card is waiting for a tap or a typed answer.
-bool surfaceAwaitsReply(UiSurfaceEntry surface) {
-  if (surface.status != 'open') return false;
-  final fields = jsonMaps(surface.schema['fields']);
-  final actions = jsonMaps(surface.schema['actions']);
-  if (fields.isNotEmpty || actions.isNotEmpty) return true;
-  final kind = asString(surface.schema['kind']) ?? '';
-  return kind == 'choice' && jsonMaps(surface.schema['items']).isNotEmpty;
+bool surfaceAwaitsReply(UiSurfaceEntry surface) =>
+    surface.status == 'open' && surfaceAsksSomething(surface.schema);
+
+/// True when the card has something to answer, as opposed to a card that
+/// only shows information (a custom summary, a list).
+bool surfaceAsksSomething(Map<String, dynamic> schema) {
+  if (jsonMaps(schema['fields']).isNotEmpty) return true;
+  if (jsonMaps(schema['actions']).isNotEmpty) return true;
+  final kind = asString(schema['kind']) ?? '';
+  return kind == 'choice' && jsonMaps(schema['items']).isNotEmpty;
+}
+
+/// [values] as they may be kept on screen: secret fields never are.
+Map<String, String> redactSurfaceValues(
+  Map<String, dynamic> schema,
+  Map<String, String> values,
+) {
+  final secrets = {
+    for (final field in jsonMaps(schema['fields']))
+      if (asString(field['type']) == 'secret') ?asString(field['id']),
+  };
+  return {
+    for (final pair in values.entries)
+      pair.key: secrets.contains(pair.key) ? storedSecretMarker : pair.value,
+  };
+}
+
+/// Stands in for a secret on screen and in the transcript, as the server does.
+const storedSecretMarker = '(stored securely)';
+
+/// A one-line summary of what was answered on a used card, such as
+/// "Hard push" or "Energy 4 · Day Tue 20 Oct", or null when unknown.
+String? surfaceAnswerSummary(UiSurfaceEntry surface) {
+  final answer = surface.answer;
+  if (answer == null) return null;
+  final label = answer.values['label']?.trim();
+  if (label != null && label.isNotEmpty) return label;
+  final parts = <String>[];
+  for (final field in jsonMaps(surface.schema['fields'])) {
+    final id = asString(field['id']);
+    final value = answer.values[id]?.trim();
+    if (id == null || value == null || value.isEmpty) continue;
+    final type = asString(field['type']) ?? 'text';
+    if (type == 'secret' || value == storedSecretMarker) {
+      parts.add('Saved securely');
+      continue;
+    }
+    final shown = switch (type) {
+      'toggle' => value == 'true' ? 'Yes' : 'No',
+      'slider' || 'number' => [value, ?asString(field['unit'])].join(' '),
+      _ => value,
+    };
+    parts.add(shown);
+  }
+  if (parts.isNotEmpty) return parts.take(3).join(' · ');
+  for (final action in jsonMaps(surface.schema['actions'])) {
+    if (asString(action['id']) == answer.actionId) {
+      return asString(action['label']);
+    }
+  }
+  for (final item in jsonMaps(surface.schema['items'])) {
+    if (asString(item['id']) == answer.actionId) return asString(item['title']);
+  }
+  return null;
 }
 
 /// Native renderer for A2UI-style surfaces Jarvis emits with RenderUi.
@@ -61,7 +120,7 @@ class UiSurfaceCard extends StatefulWidget {
 abstract class _UiSurfaceCardController extends State<UiSurfaceCard> {
   final _values = <String, String>{};
   final _controllers = <String, TextEditingController>{};
-  String? _selectedItem;
+  final _selected = <String>{};
   String? _busyAction;
   String? _hint;
   bool _expanded = false;
@@ -79,6 +138,16 @@ abstract class _UiSurfaceCardController extends State<UiSurfaceCard> {
   bool get _interactive =>
       widget.surface.status == 'open' && widget.onAction != null;
 
+  // Shared between the body and field mixins.
+  Future<void> _run(String actionId);
+  String? _submitActionId();
+  String _text(String id);
+  String _sliderValue(Map<String, dynamic> field);
+
+  /// Several items may be picked before one button sends them.
+  bool get _multiple => asString(_schema['selection']) == 'multiple';
+  List<Map<String, dynamic>> get _blocks => jsonMaps(_schema['blocks']);
+
   @override
   void didUpdateWidget(UiSurfaceCard oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -90,7 +159,7 @@ abstract class _UiSurfaceCardController extends State<UiSurfaceCard> {
       return;
     }
     _values.clear();
-    _selectedItem = null;
+    _selected.clear();
     _hint = null;
     _busyAction = null;
     _expanded = false;
@@ -111,6 +180,7 @@ abstract class _UiSurfaceCardController extends State<UiSurfaceCard> {
   Widget _header() {
     final colors = JarvisColors.of(context);
     final (icon, eyebrow) = switch (_kind) {
+      'choice' when _multiple => (PhosphorIconsRegular.listChecks, 'Pick any'),
       'choice' => (PhosphorIconsRegular.handTap, 'Choose one'),
       'form' => (
         PhosphorIconsRegular.notePencil,
@@ -217,22 +287,28 @@ class _TypeInsteadButton extends StatelessWidget {
 }
 
 class _UiSurfaceCardState extends _UiSurfaceCardController
-    with _UiSurfaceCardBody {
+    with _UiSurfaceCardBody, _UiSurfaceCardFields {
   @override
   Widget build(BuildContext context) {
-    if (!_interactive) return _receipt();
+    final asks = surfaceAsksSomething(_schema);
+    // A used question folds to its answer; a card that only shows something
+    // stays readable for good.
+    if (asks && !_interactive) return _receipt();
     final choosing = _kind == 'choice' && _items.isNotEmpty;
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _header(),
-        if (choosing) ..._choiceSection(),
-        if (!choosing)
-          for (var index = 0; index < _items.length; index++)
-            _listRow(_items[index], index),
+        if (_blocks.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 14),
+            child: SurfaceBlocks(blocks: _blocks),
+          ),
+        if (choosing) _choiceSection(),
+        if (!choosing && _items.isNotEmpty) _itemList(),
         for (var index = 0; index < _fields.length; index++)
           _field(_fields[index], last: index == _fields.length - 1),
-        ..._confirmButtons(),
+        if (asks) ..._confirmButtons(),
         if (_hint != null) _note(_hint!, JarvisColors.of(context).warning),
         if (widget.errorText != null)
           _note(widget.errorText!, JarvisColors.of(context).danger),

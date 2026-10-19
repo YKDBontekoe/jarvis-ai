@@ -18,12 +18,16 @@ Future<void> main() async {
   // ignore: invalid_use_of_visible_for_testing_member
   debugJarvisHttpAdapter = ScreenshotHttp({
     ...fixtureRoutes(withApproval: false),
-    // An open question card, so the docked answer flow can be tried.
-    'GET /api/v1/conversations/$conversationId/surfaces': [questionSurface()],
-    'POST /api/v1/ui-surfaces/surf-tone/actions': {
-      'id': 'preview-tone',
+    // A composed summary card in the transcript and an open multi-select
+    // question, so the generative cards can be tried.
+    'GET /api/v1/conversations/$conversationId/surfaces': [
+      weekSurface(),
+      daysSurface(),
+    ],
+    'POST /api/v1/ui-surfaces/surf-days/actions': {
+      'id': 'preview-days',
       'role': 'assistant',
-      'content': 'Hard push it is. Shoes on, you have 10 minutes.',
+      'content': 'Monday and Friday it is. I will block 18:30 on both.',
     },
   });
   final appearance = AppearanceController(store: MemoryAppearanceStore('dark'));

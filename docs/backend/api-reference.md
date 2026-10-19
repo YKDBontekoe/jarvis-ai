@@ -213,7 +213,7 @@ Internal routes under `/voice/internal/{conversationId}/...` are for the voice r
 
 ## Surfaces (generative UI)
 
-`GET /conversations/{id}/surfaces`, `POST /ui-surfaces/{id}/actions`.
+`GET /conversations/{id}/surfaces`, `POST /ui-surfaces/{id}/actions`. A completed surface carries `answer` (`actionId`, `values`; secret values are already `(stored securely)`), so the app can show what was picked. Multi-select choices send `choice` as comma-separated ids and `label` as the joined titles.
 
 ## Home, devices, coding
 
