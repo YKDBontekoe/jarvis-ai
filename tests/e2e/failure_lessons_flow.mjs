@@ -27,7 +27,7 @@ const sql = query => execFileSync('docker', ['exec', '-e', `PGPASSWORD=${passwor
   '-d', 'jarvis', '-At', '-c', query]).toString().trim();
 
 const conversation = await request('POST', '/conversations', { title: 'Lesson fixture' });
-const owner = sql(`select owner_id from conversations where "Id" = '${conversation.id}'`);
+const owner = sql(`select "OwnerId" from conversations where "Id" = '${conversation.id}'`);
 assert.match(owner, /^[0-9a-f-]{36}$/, `owner of the conversation: ${owner}`);
 
 const failures = [30, 26, 22];

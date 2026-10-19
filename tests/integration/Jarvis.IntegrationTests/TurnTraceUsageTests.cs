@@ -1,4 +1,6 @@
+using Jarvis.Application.Improvements;
 using Jarvis.Application.Learning;
+using Jarvis.Domain.Improvements;
 using Jarvis.Domain.Conversations;
 using Jarvis.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -66,6 +68,27 @@ public sealed class TurnTraceUsageTests : IAsyncLifetime
 
         Assert.Equal(lessons, Assert.Single(traces, trace => trace.LessonIds.Count > 0).LessonIds);
         Assert.Single(traces, trace => trace.LessonIds.Count == 0);
+    }
+
+    [Fact]
+    public async Task A_lesson_proposal_can_be_stored_and_read_back()
+    {
+        var owner = Guid.CreateVersion7();
+        var now = DateTimeOffset.UtcNow;
+        var payload = System.Text.Json.JsonSerializer.Serialize(new LessonPayload("Check the inputs first.", ["SearchMail"]),
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        var proposal = new ImprovementProposal(Guid.CreateVersion7(), owner, ImprovementKinds.Lesson,
+            LessonRules.Fingerprint("SearchMail", now), "Lesson: Check the inputs first.", "It went wrong twice.", 0.8,
+            payload, ImprovementStatuses.Applied, null, now, now);
+        await using (var database = CreateDbContext())
+            await new ImprovementRepository(database).AddAsync(proposal with { ResultingRef = proposal.Id }, default);
+
+        await using var read = CreateDbContext();
+        var stored = Assert.Single(await new ImprovementRepository(read).ListAsync(owner, default));
+
+        Assert.Equal(ImprovementKinds.Lesson, stored.Kind);
+        Assert.Equal(proposal.Id, stored.ResultingRef);
+        Assert.Contains("Check the inputs first.", stored.PayloadJson);
     }
 
     private static TurnTraceRecord Record(Guid owner, Guid conversation, TurnUsage? usage, Guid[]? lessons = null) =>
