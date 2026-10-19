@@ -118,6 +118,12 @@ function plan(prompt) {
   if (prompt.includes('You are Jarvis reflecting on recent work with your user'))
     return text(JSON.stringify(reflect(parseConversation(prompt).request)));
 
+  if (prompt.includes('You write one short lesson for the Jarvis assistant')) {
+    let tool = 'the tool';
+    try { tool = JSON.parse(parseConversation(prompt).request).tool ?? tool; } catch { /* keep the generic name */ }
+    return text(JSON.stringify({ lesson: `Check the inputs before calling ${tool}, and try a narrower call first.` }));
+  }
+
   const conversation = parseConversation(prompt);
   const tools = new Set([...prompt.matchAll(/^- ([A-Za-z_]+): /gm)].map(match => match[1]));
   const request = conversation.request;

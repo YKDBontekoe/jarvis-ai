@@ -59,11 +59,13 @@ public sealed record TurnTraceDraft(
     IReadOnlyList<TurnToolCall> Tools,
     int TotalMs,
     string Outcome,
-    TurnUsage? Usage = null)
+    TurnUsage? Usage = null,
+    IReadOnlyList<Guid>? LessonIds = null)
 {
     /// <summary>A plain reply that used nothing is not worth a row.</summary>
     public bool IsWorthKeeping =>
-        MemoryIds.Count > 0 || Skills.Count > 0 || Tools.Count > 0 || Outcome != "completed";
+        MemoryIds.Count > 0 || Skills.Count > 0 || Tools.Count > 0 || Outcome != "completed" ||
+        LessonIds is { Count: > 0 };
 }
 
 public sealed record LearningSignalRecord(Guid Id, Guid OwnerId, string Kind, Guid ConversationId, Guid? MessageId,
@@ -71,7 +73,12 @@ public sealed record LearningSignalRecord(Guid Id, Guid OwnerId, string Kind, Gu
 
 public sealed record TurnTraceRecord(Guid Id, Guid OwnerId, Guid ConversationId, Guid? MessageId, Guid? ProfileId,
     string Kind, IReadOnlyList<Guid> MemoryIds, IReadOnlyList<string> Skills, IReadOnlyList<TurnToolCall> Tools,
-    int TotalMs, string Outcome, DateTimeOffset CreatedAt, TurnUsage? Usage = null);
+    int TotalMs, string Outcome, DateTimeOffset CreatedAt, TurnUsage? Usage = null,
+    IReadOnlyList<Guid>? LessonIdList = null)
+{
+    /// <summary>The lessons shown to the model in this run.</summary>
+    public IReadOnlyList<Guid> LessonIds => LessonIdList ?? [];
+}
 
 /// <summary>
 /// Records learning signals and run traces without ever slowing or failing the turn that produced them. Calls return at
@@ -94,6 +101,8 @@ public interface ITurnTraceCollector
 {
     void MemoryInjected(Guid memoryId);
     void SkillLoaded(string name);
+    void LessonInjected(Guid proposalId);
+    IReadOnlyList<Guid> Lessons();
 
     /// <summary>Adds the tokens of one finished chat model call to this turn.</summary>
     void ModelCallFinished(long inputTokens, long cachedInputTokens, long outputTokens);
@@ -107,7 +116,19 @@ public sealed class TurnTraceCollector : ITurnTraceCollector
     private readonly object _gate = new();
     private readonly List<Guid> _memories = [];
     private readonly List<string> _skills = [];
+    private readonly List<Guid> _lessons = [];
     private TurnUsage _usage = TurnUsage.Empty;
+
+    public void LessonInjected(Guid proposalId)
+    {
+        lock (_gate)
+            if (!_lessons.Contains(proposalId)) _lessons.Add(proposalId);
+    }
+
+    public IReadOnlyList<Guid> Lessons()
+    {
+        lock (_gate) return [.. _lessons];
+    }
 
     public void ModelCallFinished(long inputTokens, long cachedInputTokens, long outputTokens)
     {

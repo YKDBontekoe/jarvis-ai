@@ -4688,6 +4688,13 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("kind");
 
+                    b.Property<string>("LessonIdsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValue("[]")
+                        .HasColumnName("lesson_ids_json");
+
                     b.Property<string>("MemoryIdsJson")
                         .IsRequired()
                         .HasColumnType("jsonb")

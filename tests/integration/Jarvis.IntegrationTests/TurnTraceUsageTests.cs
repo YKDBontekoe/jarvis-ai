@@ -46,10 +46,32 @@ public sealed class TurnTraceUsageTests : IAsyncLifetime
         Assert.Equal(2.0 / 3.0, counted.Usage!.CacheHitRatio!.Value, 3);
     }
 
-    private static TurnTraceRecord Record(Guid owner, Guid conversation, TurnUsage? usage) =>
+    [Fact]
+    public async Task A_trace_keeps_the_lessons_that_were_shown_in_the_run()
+    {
+        var owner = Guid.CreateVersion7();
+        var lessons = new[] { Guid.CreateVersion7(), Guid.CreateVersion7() };
+        await using (var database = CreateDbContext())
+        {
+            var chat = new Conversation(owner, "Lessons");
+            database.Conversations.Add(chat);
+            await database.SaveChangesAsync();
+            var store = new LearningStore(database);
+            await store.AddTraceAsync(Record(owner, chat.Id, null, lessons), default);
+            await store.AddTraceAsync(Record(owner, chat.Id, null), default);
+        }
+
+        await using var read = CreateDbContext();
+        var traces = await new LearningStore(read).ListTracesAsync(owner, DateTimeOffset.UtcNow.AddDays(-1), 10, default);
+
+        Assert.Equal(lessons, Assert.Single(traces, trace => trace.LessonIds.Count > 0).LessonIds);
+        Assert.Single(traces, trace => trace.LessonIds.Count == 0);
+    }
+
+    private static TurnTraceRecord Record(Guid owner, Guid conversation, TurnUsage? usage, Guid[]? lessons = null) =>
         new(Guid.CreateVersion7(), owner, conversation, null, null, TurnKinds.Interactive, [], [],
             [new TurnToolCall("SearchMemory", ToolOutcomes.Completed, 50)], 1_200, "completed",
-            DateTimeOffset.UtcNow, usage);
+            DateTimeOffset.UtcNow, usage, lessons);
 
     private JarvisDbContext CreateDbContext()
     {

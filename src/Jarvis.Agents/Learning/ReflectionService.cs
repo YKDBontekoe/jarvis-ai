@@ -29,7 +29,8 @@ public sealed class ReflectionService(
     IAuditEventStore audit,
     IChatClientResolver chatClients,
     ILogger<ReflectionService> logger,
-    IImprovementService? improvements = null)
+    IImprovementService? improvements = null,
+    ILearningStore? learning = null)
 {
     internal const string PromptMarker = "You are Jarvis reflecting on recent work with your user";
     private const int MaxMessages = 60;
@@ -39,6 +40,29 @@ public sealed class ReflectionService(
     {
         PropertyNameCaseInsensitive = true
     };
+
+    /// <summary>Counts only, from the signals Jarvis already keeps; null when there is nothing to say.</summary>
+    private async Task<object?> ReplySignalsAsync(Guid ownerId, DateTimeOffset since, CancellationToken cancellationToken)
+    {
+        if (learning is null) return null;
+        try
+        {
+            var signals = await learning.ListSignalsAsync(ownerId, since, cancellationToken);
+            int Count(string kind) => signals.Count(signal => signal.Kind == kind);
+            var counts = new
+            {
+                corrections = Count(LearningSignalKinds.Correction),
+                regenerations = Count(LearningSignalKinds.Regenerate),
+                declined_approvals = Count(LearningSignalKinds.ApprovalDenied)
+            };
+            return counts.corrections + counts.regenerations + counts.declined_approvals == 0 ? null : counts;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogDebug(exception, "Reply signals could not be read for reflection.");
+            return null;
+        }
+    }
 
     public async Task<(ReflectionOutcome Outcome, DateTimeOffset? LatestMessageAt)> ReflectAsync(Guid ownerId,
         LearningSettings settings, DateTimeOffset since, CancellationToken cancellationToken)
@@ -50,6 +74,7 @@ public sealed class ReflectionService(
 
         var profile = await persona.GetAsync(ownerId, cancellationToken);
         var existingSkills = await skills.ListAsync(ownerId, cancellationToken);
+        var replySignals = await ReplySignalsAsync(ownerId, since, cancellationToken);
         var request = JsonSerializer.Serialize(new
         {
             recent_messages = messages.Select(message => new
@@ -61,6 +86,7 @@ public sealed class ReflectionService(
                     : message.Content[..MaxMessageCharacters] + "…"
             }),
             reply_feedback = ratings.Select(item => new { item.Rating, item.Note, reply = item.MessageExcerpt }),
+            reply_signals = replySignals,
             current_persona = profile.TraitList.Select(trait => new
             {
                 trait.Id, trait.Category, trait.Statement, trait.Pinned
@@ -82,6 +108,9 @@ public sealed class ReflectionService(
                 skills: at most 2 items {name, description, instructions, reason} for multi-step workflows you performed or
                   the user described that are likely to repeat. Use lowercase-hyphenated names, reuse an existing skill
                   name to improve it (unless locked), and write concise numbered Markdown steps. Skip one-off tasks.
+                reply_signals counts how often since the last review the user corrected a reply, asked for it again, or
+                  declined an approval. Treat the counts only as a hint about tone, format and how much to act unasked;
+                  never as a fact about the user.
                 memories: at most 5 items {kind, content, importance, confidence} with durable facts the user stated about
                   themselves or their projects. kind is one of preference, fact, decision, project, event, relationship,
                   technical, routine, other.

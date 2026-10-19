@@ -32,6 +32,7 @@ public sealed class TurnTraceEntity
     public string MemoryIdsJson { get; set; } = "[]";
     public string SkillsJson { get; set; } = "[]";
     public string ToolsJson { get; set; } = "[]";
+    public string LessonIdsJson { get; set; } = "[]";
     public int TotalMs { get; set; }
     public string Outcome { get; set; } = "completed";
     public DateTimeOffset CreatedAt { get; set; }
@@ -46,7 +47,8 @@ public sealed class TurnTraceEntity
 
     public TurnTraceRecord ToRecord() => new(Id, OwnerId, ConversationId, MessageId, ProfileId, Kind,
         Read<Guid>(MemoryIdsJson), Read<string>(SkillsJson), Read<TurnToolCall>(ToolsJson), TotalMs, Outcome, CreatedAt,
-        ModelCalls is { } calls ? new TurnUsage(calls, InputTokens ?? 0, CachedInputTokens ?? 0, OutputTokens ?? 0) : null);
+        ModelCalls is { } calls ? new TurnUsage(calls, InputTokens ?? 0, CachedInputTokens ?? 0, OutputTokens ?? 0) : null,
+        Read<Guid>(LessonIdsJson));
 
     public static string Write<T>(IReadOnlyList<T> items) => JsonSerializer.Serialize(items, Json);
 
@@ -83,6 +85,7 @@ public sealed class LearningStore(JarvisDbContext db) : ILearningStore
             SkillsJson = TurnTraceEntity.Write(trace.Skills.Select(name => Limit(name, 64)!).ToArray()),
             ToolsJson = TurnTraceEntity.Write(trace.Tools.Take(MaxToolsPerTrace)
                 .Select(call => call with { Tool = Limit(call.Tool, 120)! }).ToArray()),
+            LessonIdsJson = TurnTraceEntity.Write(trace.LessonIds),
             TotalMs = Math.Max(0, trace.TotalMs), Outcome = trace.Outcome, CreatedAt = trace.CreatedAt,
             ModelCalls = trace.Usage is { ModelCalls: > 0 } usage ? usage.ModelCalls : null,
             InputTokens = trace.Usage is { ModelCalls: > 0 } ? trace.Usage.InputTokens : null,

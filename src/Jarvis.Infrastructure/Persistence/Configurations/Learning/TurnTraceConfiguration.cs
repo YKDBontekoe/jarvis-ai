@@ -18,6 +18,7 @@ internal sealed class TurnTraceConfiguration : IEntityTypeConfiguration<TurnTrac
         builder.Property(x => x.MemoryIdsJson).HasColumnName("memory_ids_json").HasColumnType("jsonb").IsRequired();
         builder.Property(x => x.SkillsJson).HasColumnName("skills_json").HasColumnType("jsonb").IsRequired();
         builder.Property(x => x.ToolsJson).HasColumnName("tools_json").HasColumnType("jsonb").IsRequired();
+        builder.Property(x => x.LessonIdsJson).HasColumnName("lesson_ids_json").HasColumnType("jsonb").HasDefaultValue("[]").IsRequired();
         builder.Property(x => x.TotalMs).HasColumnName("total_ms");
         builder.Property(x => x.Outcome).HasColumnName("outcome").HasMaxLength(30).IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");

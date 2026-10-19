@@ -56,7 +56,7 @@ public sealed class LearningRecorder(IServiceScopeFactory scopes, ILogger<Learni
             await scope.ServiceProvider.GetRequiredService<ILearningStore>().AddTraceAsync(
                 new TurnTraceRecord(Guid.CreateVersion7(), ownerId, trace.ConversationId, trace.MessageId,
                     profile.ProfileId, trace.Kind, trace.MemoryIds, trace.Skills, trace.Tools, trace.TotalMs,
-                    trace.Outcome, _clock.GetUtcNow(), trace.Usage), CancellationToken.None);
+                    trace.Outcome, _clock.GetUtcNow(), trace.Usage, trace.LessonIds), CancellationToken.None);
         }
         catch (Exception exception)
         {

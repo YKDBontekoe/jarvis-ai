@@ -7,7 +7,7 @@ using Jarvis.Application.Skills;
 namespace Jarvis.Application.Improvements;
 
 /// <summary>How many proposals one mining pass added.</summary>
-public sealed record MiningResult(int Skills, int Reviews);
+public sealed record MiningResult(int Skills, int Reviews, int Lessons = 0);
 
 /// <summary>Drafts the instructions of a skill from a tool sequence Jarvis keeps repeating. Returns null if nothing usable.</summary>
 public interface ISkillDrafter
@@ -29,7 +29,8 @@ public sealed class ImprovementMiner(
     IMemoryService memories,
     ISkillDrafter drafter,
     IOwnerSettingsStore settings,
-    TimeProvider? timeProvider = null) : IImprovementMiner
+    TimeProvider? timeProvider = null,
+    ILessonDrafter? lessonDrafter = null) : IImprovementMiner
 {
     /// <summary>Each draft is a model call, so a night drafts at most this many.</summary>
     public const int MaxDraftsPerRun = 2;
@@ -48,8 +49,51 @@ public sealed class ImprovementMiner(
         var since = now.AddDays(-SkillMinerEngine.WindowDays);
         var traces = await learning.ListTracesAsync(ownerId, since, MaxTraces, cancellationToken);
         var signals = await learning.ListSignalsAsync(ownerId, since, cancellationToken);
+        // Count last night's lessons first, so one that hurt is out of force before new ones are weighed against it.
+        await CountLessonsAsync(ownerId, traces, signals, now, cancellationToken);
         var added = new MiningResult(await MineSkillsAsync(ownerId, traces, now, cancellationToken),
-            await MineReviewsAsync(ownerId, traces, signals, now, since, cancellationToken));
+            await MineReviewsAsync(ownerId, traces, signals, now, since, cancellationToken),
+            await MineLessonsAsync(ownerId, traces, signals, now, owner.AutoApplyLowRiskMemory, cancellationToken));
+        return added;
+    }
+
+    private async Task CountLessonsAsync(Guid ownerId, IReadOnlyList<TurnTraceRecord> traces,
+        IReadOnlyList<LearningSignalRecord> signals, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var inForce = await improvements.LessonsInForceAsync(ownerId, cancellationToken);
+        if (inForce.Count == 0) return;
+        var tallies = LessonCounterEngine.Tally(traces, signals,
+            inForce.ToDictionary(lesson => lesson.ProposalId, lesson => lesson.Payload), now);
+        await improvements.ApplyLessonTalliesAsync(ownerId, tallies, now, cancellationToken);
+    }
+
+    private async Task<int> MineLessonsAsync(Guid ownerId, IReadOnlyList<TurnTraceRecord> traces,
+        IReadOnlyList<LearningSignalRecord> signals, DateTimeOffset now, bool autoApply,
+        CancellationToken cancellationToken)
+    {
+        if (lessonDrafter is null) return 0;
+        var inForce = await improvements.LessonsInForceAsync(ownerId, cancellationToken);
+        if (inForce.Count >= LessonRules.MaxInForce) return 0;
+        var covered = inForce.SelectMany(lesson => lesson.Payload.Tools).ToHashSet(StringComparer.Ordinal);
+        var added = 0;
+        var drafts = 0;
+        foreach (var finding in LessonMinerEngine.Mine(traces, signals, now))
+        {
+            if (covered.Contains(finding.Tool)) continue;
+            var fingerprint = LessonRules.Fingerprint(finding.Tool, now);
+            if (await repository.FindByFingerprintAsync(ownerId, fingerprint, cancellationToken) is not null) continue;
+            if (drafts >= LessonRules.MaxDraftsPerRun) break;
+            drafts++;
+            var text = await lessonDrafter.DraftAsync(ownerId, finding, cancellationToken);
+            if (string.IsNullOrWhiteSpace(text)) continue;
+            var evidence = $"{finding.Tool} was part of {finding.Incidents} turns in the last {LessonRules.WindowDays} " +
+                           $"days that went wrong ({string.Join(", ", finding.Reasons.Select(reason => reason.Replace('_', ' ')))}).";
+            var candidate = new ProposalCandidate(ImprovementKinds.Lesson, fingerprint, $"Lesson: {text}", evidence,
+                LessonMinerEngine.Confidence(finding),
+                JsonSerializer.Serialize(new LessonPayload(text, [finding.Tool]), JsonOptions));
+            if (await improvements.ProposeLessonAsync(ownerId, candidate, autoApply, cancellationToken)) added++;
+        }
+
         return added;
     }
 

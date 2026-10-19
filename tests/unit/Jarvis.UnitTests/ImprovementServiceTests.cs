@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Improvements;
+using Jarvis.Application.Learning;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Skills;
 using Jarvis.Domain.Improvements;
@@ -302,6 +303,251 @@ public sealed class ImprovementServiceTests
         Assert.Equal("improvement.applied", entry.Action);
         Assert.DoesNotContain("peanuts", entry.Metadata);
         Assert.Contains("memory", entry.Metadata);
+    }
+
+    private static ProposalCandidate Lesson(string tool = "SearchMail", double confidence = 0.8,
+        string text = "Check the inputs first.") =>
+        new(ImprovementKinds.Lesson, LessonRules.Fingerprint(tool, Start), $"Lesson: {text}", "It went wrong twice.",
+            confidence, JsonSerializer.Serialize(new LessonPayload(text, [tool]),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+
+    [Fact]
+    public async Task A_confident_lesson_is_in_force_at_once_and_audited_without_its_text()
+    {
+        var world = new World();
+
+        Assert.True(await world.Service().ProposeLessonAsync(Owner, Lesson(), autoApply: true, default));
+
+        var lesson = Assert.Single(await world.Service().LessonsInForceAsync(Owner, default));
+        Assert.Equal("Check the inputs first.", lesson.Payload.Text);
+        Assert.Equal(["SearchMail"], lesson.Payload.Tools);
+        Assert.Empty(world.Notifications.Created);
+        var entry = Assert.Single(world.Audit.Entries);
+        Assert.Equal("improvement.applied", entry.Action);
+        Assert.DoesNotContain("Check the inputs", entry.Metadata);
+    }
+
+    [Fact]
+    public async Task A_lesson_waits_for_the_owner_when_auto_apply_is_off_or_confidence_is_low()
+    {
+        var world = new World();
+
+        Assert.True(await world.Service().ProposeLessonAsync(Owner, Lesson("A"), autoApply: false, default));
+        Assert.True(await world.Service().ProposeLessonAsync(Owner, Lesson("B", confidence: 0.7), autoApply: true, default));
+
+        Assert.Empty(await world.Service().LessonsInForceAsync(Owner, default));
+        var pending = (await world.Service().ListAsync(Owner, default)).Where(v => v.Kind == ImprovementKinds.Lesson).ToArray();
+        Assert.Equal(2, pending.Length);
+        Assert.All(pending, view => Assert.Equal(ImprovementStatuses.Pending, view.Status));
+
+        var accepted = await world.Service().AcceptAsync(pending[0].Id, Owner, default);
+
+        Assert.Equal(ImprovementStatuses.Accepted, accepted!.Status);
+        Assert.Single(await world.Service().LessonsInForceAsync(Owner, default));
+    }
+
+    [Fact]
+    public async Task A_lesson_the_owner_undid_or_declined_is_not_proposed_again()
+    {
+        var world = new World();
+        await world.Service().ProposeLessonAsync(Owner, Lesson(), true, default);
+        var view = Assert.Single(await world.Service().ListAsync(Owner, default));
+
+        Assert.True(await world.Service().UndoAsync(view.Id, Owner, default));
+
+        Assert.Empty(await world.Service().LessonsInForceAsync(Owner, default));
+        Assert.False(await world.Service().ProposeLessonAsync(Owner, Lesson(), true, default));
+    }
+
+    [Fact]
+    public async Task Only_a_lesson_fingerprint_and_kind_are_accepted_and_the_cap_on_lessons_in_force_holds()
+    {
+        var world = new World();
+        Assert.False(await world.Service().ProposeLessonAsync(Owner,
+            Lesson() with { Fingerprint = "review:tool:x" }, true, default));
+        Assert.False(await world.Service().ProposeLessonAsync(Owner, Lesson() with { Kind = ImprovementKinds.Review }, true, default));
+
+        for (var i = 0; i < LessonRules.MaxInForce + 2; i++)
+            await world.Service().ProposeLessonAsync(Owner, Lesson($"Tool{i}"), true, default);
+
+        Assert.Equal(LessonRules.MaxInForce, (await world.Service().LessonsInForceAsync(Owner, default)).Count);
+    }
+
+    [Fact]
+    public async Task Counts_add_up_and_a_lesson_that_hurt_more_than_it_helped_is_switched_off()
+    {
+        var world = new World();
+        await world.Service().ProposeLessonAsync(Owner, Lesson(), true, default);
+        var id = Assert.Single(await world.Service().LessonsInForceAsync(Owner, default)).ProposalId;
+
+        var first = await world.Service().ApplyLessonTalliesAsync(Owner,
+            new Dictionary<Guid, LessonTally> { [id] = new(2, 2, Start, Start) }, Start, default);
+        Assert.Equal(0, first);
+        var counted = Assert.Single(await world.Service().LessonsInForceAsync(Owner, default)).Payload;
+        Assert.Equal((2, 2, Start), (counted.Helpful, counted.Harmful, counted.CountedThrough));
+
+        var second = await world.Service().ApplyLessonTalliesAsync(Owner,
+            new Dictionary<Guid, LessonTally> { [id] = new(0, 3, Start, Start.AddDays(1)) }, Start.AddDays(1), default);
+
+        Assert.Equal(1, second);
+        Assert.Empty(await world.Service().LessonsInForceAsync(Owner, default));
+        Assert.Contains(world.Audit.Entries, entry => entry.Action == "improvement.lesson_disabled");
+    }
+
+    [Fact]
+    public async Task A_lesson_not_shown_for_two_months_is_retired()
+    {
+        var world = new World();
+        await world.Service().ProposeLessonAsync(Owner, Lesson(), true, default);
+        var id = Assert.Single(await world.Service().LessonsInForceAsync(Owner, default)).ProposalId;
+        var later = Start.AddDays(61);
+
+        var retired = await world.Service().ApplyLessonTalliesAsync(Owner,
+            new Dictionary<Guid, LessonTally> { [id] = new(0, 0, null, later) }, later, default);
+
+        Assert.Equal(1, retired);
+        Assert.Contains(world.Audit.Entries, entry => entry.Action == "improvement.lesson_retired");
+    }
+
+    // ---- the nightly miner, end to end over the real service ----
+
+    private static TurnTraceRecord FailingTurn(string tool, double hoursAgo = 24, Guid[]? lessons = null,
+        Guid? message = null) =>
+        new(Guid.NewGuid(), Owner, Guid.NewGuid(), message, null, "interactive", [], [],
+            [new TurnToolCall(tool, ToolOutcomes.Failed, 40)], 200, "completed", Start.AddHours(-hoursAgo), null, lessons);
+
+    private static ImprovementMiner Miner(World world, StubLearningStore store, StubLessonDrafter drafter) =>
+        new(store, world.Repository, world.Service(), world.Skills, Fake<IMemoryService>.Create(),
+            Fake<ISkillDrafter>.Create(), world.Settings, new FixedTime(() => world.Now), drafter);
+
+    [Fact]
+    public async Task The_miner_drafts_a_lesson_for_a_failing_tool_and_does_not_repeat_it_that_month()
+    {
+        var world = new World();
+        var store = new StubLearningStore { Traces = [FailingTurn("SearchMail"), FailingTurn("SearchMail", 30), FailingTurn("SearchMail", 40)] };
+        var drafter = new StubLessonDrafter();
+
+        var first = await Miner(world, store, drafter).RefreshAsync(Owner, default);
+        var second = await Miner(world, store, drafter).RefreshAsync(Owner, default);
+
+        Assert.Equal(1, first.Lessons);
+        Assert.Equal(0, second.Lessons);
+        Assert.Equal(["SearchMail"], drafter.Asked);
+        var lesson = Assert.Single(await world.Service().LessonsInForceAsync(Owner, default));
+        Assert.Equal(["SearchMail"], lesson.Payload.Tools);
+    }
+
+    [Fact]
+    public async Task Two_incidents_make_a_pending_lesson_not_one_in_force()
+    {
+        var world = new World();
+        var store = new StubLearningStore { Traces = [FailingTurn("SearchMail"), FailingTurn("SearchMail", 30)] };
+
+        await Miner(world, store, new StubLessonDrafter()).RefreshAsync(Owner, default);
+
+        Assert.Empty(await world.Service().LessonsInForceAsync(Owner, default));
+        Assert.Equal(ImprovementStatuses.Pending,
+            Assert.Single(await world.Service().ListAsync(Owner, default), v => v.Kind == ImprovementKinds.Lesson).Status);
+    }
+
+    [Fact]
+    public async Task A_tool_that_already_has_a_lesson_in_force_is_not_drafted_again()
+    {
+        var world = new World();
+        await world.Service().ProposeLessonAsync(Owner, Lesson("SearchMail") with
+        {
+            Fingerprint = LessonRules.Fingerprint("SearchMail", Start.AddMonths(-2))
+        }, true, default);
+        var store = new StubLearningStore { Traces = [FailingTurn("SearchMail"), FailingTurn("SearchMail", 30)] };
+        var drafter = new StubLessonDrafter();
+
+        var result = await Miner(world, store, drafter).RefreshAsync(Owner, default);
+
+        Assert.Equal(0, result.Lessons);
+        Assert.Empty(drafter.Asked);
+    }
+
+    [Fact]
+    public async Task A_night_drafts_at_most_three_lessons()
+    {
+        var world = new World();
+        var store = new StubLearningStore
+        {
+            Traces = new[] { "A", "B", "C", "D" }.SelectMany(tool => new[] { FailingTurn(tool), FailingTurn(tool, 30) }).ToList()
+        };
+        var drafter = new StubLessonDrafter();
+
+        var result = await Miner(world, store, drafter).RefreshAsync(Owner, default);
+
+        Assert.Equal(LessonRules.MaxDraftsPerRun, result.Lessons);
+        Assert.Equal(LessonRules.MaxDraftsPerRun, drafter.Asked.Count);
+    }
+
+    [Fact]
+    public async Task Last_nights_counts_are_applied_before_new_lessons_are_weighed()
+    {
+        var world = new World();
+        await world.Service().ProposeLessonAsync(Owner, Lesson("SearchMail") with
+        {
+            Fingerprint = LessonRules.Fingerprint("SearchMail", Start.AddMonths(-2))
+        }, true, default);
+        var id = Assert.Single(await world.Service().LessonsInForceAsync(Owner, default)).ProposalId;
+        var shown = Enumerable.Range(0, 3).Select(i => FailingTurn("SearchMail", 24 + i, [id], Guid.NewGuid())).ToList();
+        var store = new StubLearningStore
+        {
+            Traces = shown,
+            Signals = shown.Select(turn => new LearningSignalRecord(Guid.NewGuid(), Owner, LearningSignalKinds.ThumbsDown,
+                turn.ConversationId, turn.MessageId, null, null, null, null, Start.AddHours(-20))).ToList()
+        };
+
+        await Miner(world, store, new StubLessonDrafter()).RefreshAsync(Owner, default);
+
+        Assert.DoesNotContain(await world.Service().LessonsInForceAsync(Owner, default), l => l.ProposalId == id);
+        Assert.Contains(world.Audit.Entries, entry => entry.Action == "improvement.lesson_disabled");
+    }
+
+    [Fact]
+    public async Task With_proposals_switched_off_the_miner_does_nothing()
+    {
+        var world = new World();
+        await world.Settings.SaveAsync(Owner, Jarvis.Application.Settings.SettingsSections.Learning,
+            Jarvis.Application.Settings.LearningSettings.Default with { ProposeImprovements = false }, default);
+        var store = new StubLearningStore { Traces = [FailingTurn("SearchMail"), FailingTurn("SearchMail", 30)] };
+        var drafter = new StubLessonDrafter();
+
+        var result = await Miner(world, store, drafter).RefreshAsync(Owner, default);
+
+        Assert.Equal(new MiningResult(0, 0, 0), result);
+        Assert.Empty(drafter.Asked);
+    }
+
+    private sealed class StubLessonDrafter : ILessonDrafter
+    {
+        public List<string> Asked { get; } = [];
+
+        public Task<string?> DraftAsync(Guid ownerId, LessonFinding finding, CancellationToken cancellationToken)
+        {
+            Asked.Add(finding.Tool);
+            return Task.FromResult<string?>($"Check the inputs before calling {finding.Tool}.");
+        }
+    }
+
+    private sealed class StubLearningStore : Jarvis.Application.Learning.ILearningStore
+    {
+        public List<TurnTraceRecord> Traces { get; set; } = [];
+        public List<LearningSignalRecord> Signals { get; set; } = [];
+
+        public Task AddSignalAsync(LearningSignalRecord signal, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task AddTraceAsync(TurnTraceRecord trace, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<IReadOnlyList<LearningSignalRecord>> ListSignalsAsync(Guid ownerId, DateTimeOffset since,
+            CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LearningSignalRecord>>(Signals);
+
+        public Task<IReadOnlyList<TurnTraceRecord>> ListTracesAsync(Guid ownerId, DateTimeOffset since, int limit,
+            CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<TurnTraceRecord>>(Traces);
+
+        public Task<int> PruneAsync(Guid ownerId, DateTimeOffset tracesBefore, DateTimeOffset signalsBefore,
+            CancellationToken cancellationToken) => Task.FromResult(0);
     }
 
     private static ProposalCandidate Skill(string fingerprint, string payload, string title = "Skill idea",

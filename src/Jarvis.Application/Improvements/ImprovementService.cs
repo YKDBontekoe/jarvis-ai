@@ -132,6 +132,93 @@ public sealed class ImprovementService(
         return MemoryOutcome.Proposed;
     }
 
+    public async Task<bool> ProposeLessonAsync(Guid ownerId, ProposalCandidate candidate, bool autoApply,
+        CancellationToken cancellationToken)
+    {
+        if (candidate.Kind != ImprovementKinds.Lesson || string.IsNullOrWhiteSpace(candidate.Title) ||
+            !candidate.Fingerprint.StartsWith(LessonRules.FingerprintPrefix, StringComparison.Ordinal))
+            return false;
+        if (await repository.FindByFingerprintAsync(ownerId, candidate.Fingerprint, cancellationToken) is not null)
+            return false;
+        var all = await repository.ListAsync(ownerId, cancellationToken);
+        var now = _clock.GetUtcNow();
+        var apply = autoApply && Math.Round(candidate.Confidence, 2) >= LessonRules.AutoApplyMinConfidence &&
+                    all.Count(item => item.Kind == ImprovementKinds.Lesson && ImprovementStatuses.CanUndo(item.Status))
+                    < LessonRules.MaxInForce;
+        if (apply)
+        {
+            var proposal = NewProposal(ownerId, candidate, ImprovementStatuses.Applied, null, now);
+            proposal = proposal with { ResultingRef = proposal.Id };
+            await repository.AddAsync(proposal, cancellationToken);
+            await AuditAsync(ownerId, "improvement.applied", proposal.Id, proposal.Kind, proposal.Id, cancellationToken);
+            return true;
+        }
+
+        if (all.Count(item => item.Status == ImprovementStatuses.Pending) >= ImprovementRules.MaxPending) return false;
+        await repository.AddAsync(NewProposal(ownerId, candidate, ImprovementStatuses.Pending, null, now),
+            cancellationToken);
+        await NotifyAsync(ownerId, 1, cancellationToken);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<LessonEntry>> LessonsInForceAsync(Guid ownerId, CancellationToken cancellationToken)
+    {
+        var entries = new List<LessonEntry>();
+        foreach (var item in (await repository.ListAsync(ownerId, cancellationToken))
+                     .Where(item => item.Kind == ImprovementKinds.Lesson && ImprovementStatuses.CanUndo(item.Status)))
+        {
+            var payload = ReadLesson(item);
+            if (payload is not null) entries.Add(new LessonEntry(item.Id, payload, item.CreatedAt));
+        }
+
+        return entries;
+    }
+
+    public async Task<int> ApplyLessonTalliesAsync(Guid ownerId, IReadOnlyDictionary<Guid, LessonTally> tallies,
+        DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var switchedOff = 0;
+        foreach (var item in (await repository.ListAsync(ownerId, cancellationToken))
+                     .Where(item => item.Kind == ImprovementKinds.Lesson && ImprovementStatuses.CanUndo(item.Status) &&
+                                    tallies.ContainsKey(item.Id)))
+        {
+            if (ReadLesson(item) is not { } payload) continue;
+            var tally = tallies[item.Id];
+            var updated = payload with
+            {
+                Helpful = payload.Helpful + tally.Helpful, Harmful = payload.Harmful + tally.Harmful,
+                LastInjectedAt = tally.LastInjectedAt ?? payload.LastInjectedAt, CountedThrough = tally.CountedThrough
+            };
+            var hurt = updated.Harmful >= LessonRules.DisableAtHarmful && updated.Harmful > updated.Helpful;
+            var stale = now - (updated.LastInjectedAt ?? item.CreatedAt) > LessonRules.RetireAfter;
+            await repository.UpdateAsync(item with
+            {
+                PayloadJson = JsonSerializer.Serialize(updated, JsonOptions),
+                Status = hurt || stale ? ImprovementStatuses.Undone : item.Status,
+                UpdatedAt = now
+            }, cancellationToken);
+            if (!hurt && !stale) continue;
+            switchedOff++;
+            await AuditAsync(ownerId, hurt ? "improvement.lesson_disabled" : "improvement.lesson_retired", item.Id,
+                item.Kind, item.Id, cancellationToken);
+        }
+
+        return switchedOff;
+    }
+
+    private static LessonPayload? ReadLesson(ImprovementProposal proposal)
+    {
+        try
+        {
+            var payload = JsonSerializer.Deserialize<LessonPayload>(proposal.PayloadJson, JsonOptions);
+            return payload is { Text.Length: > 0 } ? payload : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     public async Task<ImprovementView?> AcceptAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
     {
         var proposal = await repository.GetAsync(id, ownerId, cancellationToken);
@@ -206,6 +293,9 @@ public sealed class ImprovementService(
                     respectLock: true, "Accepted improvement", cancellationToken);
                 return saved?.Id;
             }
+            case ImprovementKinds.Lesson:
+                // The proposal itself is the lesson: accepting puts it in force, undo takes it out again.
+                return ReadLesson(proposal) is null ? throw new JsonException("Empty lesson payload.") : proposal.Id;
             case ImprovementKinds.Review:
             {
                 var payload = JsonSerializer.Deserialize<ReviewPayload>(proposal.PayloadJson, JsonOptions)
