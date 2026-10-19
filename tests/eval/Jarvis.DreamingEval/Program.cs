@@ -15,6 +15,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 // applies the same filters as the deep phase to see which memories would be rewritten. Merge and supersede rewrite a
 // memory without review, so the main number is harmful rewrites: a rewrite the scenario neither requires nor allows.
 //   CODEX_HOME=... EXTRACTION_EVAL_CODEX=/path/to/codex dotnet run --project tests/eval/Jarvis.DreamingEval [-- --runs N]
+// The run exits 1 unless "--min-pass" (default 0.9) of the scenarios pass, "--min-required" (1.0) of the required
+// rewrites happen, and at most "--max-harmful" (0) harmful and "--max-sensitive" (0) sensitive proposals appear.
 var json = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 var scenarios = JsonSerializer.Deserialize<ScenarioFile>(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "scenarios.json")), json)!.Scenarios;
 var runsIndex = Array.IndexOf(args, "--runs");
@@ -90,6 +92,16 @@ foreach (var scenario in scenarios)
 Console.WriteLine();
 Console.WriteLine($"Scenarios passed {passed}/{total}; required rewrites {requiredHit}/{required}; harmful rewrites {harmful}; " +
                   $"sensitive proposals {sensitive}; rewrites applied {rewrites}");
+
+// Thresholds default to the recorded baseline (README): nearly everything passes, every required rewrite happens, and
+// nothing harmful or sensitive is proposed.
+if (!EvalGate.Report(Console.Out,
+        EvalGate.AtLeast("scenarios passed", total == 0 ? 0 : (double)passed / total, EvalGate.Option(args, "--min-pass", 0.9)),
+        EvalGate.AtLeast("required rewrites", required == 0 ? 1 : (double)requiredHit / required,
+            EvalGate.Option(args, "--min-required", 1.0)),
+        EvalGate.AtMost("harmful rewrites", harmful, EvalGate.Option(args, "--max-harmful", 0)),
+        EvalGate.AtMost("sensitive proposals", sensitive, EvalGate.Option(args, "--max-sensitive", 0))))
+    Environment.ExitCode = 1;
 
 static bool Matches(Expectation expectation, (string Target, string Content, string Action) write) =>
     expectation.Target == write.Target && (expectation.Contains ?? []).All(part =>

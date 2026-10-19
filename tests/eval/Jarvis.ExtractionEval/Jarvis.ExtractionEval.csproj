@@ -9,4 +9,7 @@
   <ItemGroup>
     <None Include="dataset.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\EvalGate.cs" Link="EvalGate.cs" />
+  </ItemGroup>
 </Project>
