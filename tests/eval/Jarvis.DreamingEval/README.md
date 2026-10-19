@@ -17,4 +17,6 @@ CODEX_HOME=/path/to/codex-home EXTRACTION_EVAL_CODEX=/path/to/codex dotnet run -
 |----------:|------------------:|-----------------:|--------------------:|
 | 20/20 | 4/4 | 0 | 0 |
 
-No change was needed; keep this green when the dreaming prompt or model changes.
+No change was needed; keep this green when the dreaming prompt or model changes. The run ends with a gate and exits 1
+unless at least `--min-pass` (default 0.9) of the scenarios pass, `--min-required` (1.0) of the required rewrites
+happen, and at most `--max-harmful` (0) harmful rewrites and `--max-sensitive` (0) sensitive proposals appear.

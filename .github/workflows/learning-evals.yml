@@ -1,0 +1,67 @@
+name: Learning evals
+
+# Not part of pull request CI: the model-backed evals cost money and vary run to run. This runs nightly and on demand.
+# Each eval exits 1 when it falls below its recorded baseline (see the README next to it), so a red run means a prompt
+# or model change made learning worse.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      extraction_min_pass:
+        description: Share of extraction cases that must pass (the baseline model scores 1.00; other models may score lower)
+        default: "0.9"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: learning-evals
+  cancel-in-progress: false
+
+jobs:
+  lessons:
+    name: Lesson rules (no model)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Lesson eval, mining, counting and selection
+        run: dotnet run --project tests/eval/Jarvis.LessonEval --configuration Release
+
+      - name: Extraction dataset is valid
+        run: dotnet run --project tests/eval/Jarvis.ExtractionEval --configuration Release -- --dry-run
+
+  extraction:
+    name: Memory extraction (OpenRouter)
+    runs-on: ubuntu-latest
+    # Fork pull requests and repositories without the key skip this job instead of failing.
+    env:
+      EXTRACTION_EVAL_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      EXTRACTION_EVAL_MODEL: ${{ vars.EXTRACTION_EVAL_MODEL || 'openai/gpt-5-mini' }}
+      MIN_PASS: ${{ inputs.extraction_min_pass || '0.9' }}
+    steps:
+      - name: Check for the API key
+        id: key
+        run: |
+          if [ -n "$EXTRACTION_EVAL_API_KEY" ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "OPENROUTER_API_KEY is not set; skipping." >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Checkout
+        if: steps.key.outputs.present == 'true'
+        uses: actions/checkout@v7
+
+      - name: Set up .NET
+        if: steps.key.outputs.present == 'true'
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Extraction eval
+        if: steps.key.outputs.present == 'true'
+        run: dotnet run --project tests/eval/Jarvis.ExtractionEval --configuration Release -- --min-pass "$MIN_PASS"

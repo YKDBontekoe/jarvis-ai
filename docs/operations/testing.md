@@ -83,6 +83,17 @@ PostgreSQL database, and `tests/eval/Jarvis.ExtractionEval` scores memory extrac
 only validates its dataset). `tests/eval/Jarvis.FileEval` scores file search (chunking, keyword and hybrid retrieval)
 against a scratch database.
 
+**Learning evals gate on their recorded baselines.** `Jarvis.ExtractionEval` and `Jarvis.DreamingEval` end with a gate
+(`EvalGate`, shared in `tests/eval/EvalGate.cs`) and exit 1 when a number falls below the baseline in their README
+(flags such as `--min-pass` and `--max-harmful` override the defaults, for a model that scores differently).
+`tests/eval/Jarvis.LessonEval` checks how failed turns become lessons: its mining, counting and selection scenarios
+need no model and run in seconds; `-- --model` adds lesson drafting with a real model. The nightly
+[`learning-evals.yml`](../../.github/workflows/learning-evals.yml) workflow (also manual) runs the lesson rules and the
+extraction eval; the Codex-backed dreaming and drafting evals are run by hand. They are not part of pull request CI.
+
+Lesson and skill-refinement flows that need seeded failures run against the smoke stack:
+`JARVIS_E2E_PG_CONTAINER=<postgres container> scripts/dev/smoke.sh test failure_lessons_flow.mjs skill_refinement_flow.mjs`.
+
 ## CI expectations
 
 [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs on every pull request to `main`: backend unit and integration tests (the backend job also publishes the AppHost and checks the generated production Compose with `tests/unit/compose/test_production_compose.py`), Python release/AltStore tests, Flutter analyze and widget tests, and API/worker image builds (no push). Release tags start `release.yml`, which checks `deploy-backend.yml` and `release-ios.yml` before the single production approval.
