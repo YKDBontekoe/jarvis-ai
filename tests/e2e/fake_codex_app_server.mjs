@@ -277,7 +277,8 @@ function plan(prompt) {
 }
 
 function parseConversation(prompt) {
-  const body = prompt.split('\nConversation:\n')[1]?.split('\nReturn only the JSON object')[0] ?? '';
+  const body = (prompt.split('\nConversation:\n')[1] ?? '').split('\nAvailable Jarvis functions')[0]
+    .split('\nReturn only the JSON object')[0];
   const blocks = [];
   for (const part of body.split(/\n\[(user|assistant|tool|system)\]\n/).slice(1).entries()) blocks.push(part[1]);
   const messages = [];

@@ -44,6 +44,22 @@ public sealed class AgentContextPlacementTests
         Assert.DoesNotContain("LogExpense", offered);
     }
 
+    [Fact]
+    public void The_prompt_prefix_does_not_change_when_the_offered_tools_change()
+    {
+        var messages = new[] { new ChatMessage(ChatRole.User, "hello") };
+        var options = new ChatOptions { Instructions = "Be brief." };
+        AIFunction Tool(string name) => AIFunctionFactory.Create(() => "ok", name);
+
+        var before = CodexCliChatClient.BuildPrompt(messages, options, [Tool("CreateReminder")], false).Text;
+        var after = CodexCliChatClient.BuildPrompt(messages, options, [Tool("CreateReminder"), Tool("LogExpense")], false).Text;
+
+        var conversationEnd = before.IndexOf("\nAvailable Jarvis functions", StringComparison.Ordinal);
+        Assert.True(conversationEnd > before.IndexOf("[user]", StringComparison.Ordinal));
+        Assert.Equal(before[..conversationEnd], after[..conversationEnd]);
+        Assert.EndsWith("Return only the JSON object required by the output schema.", before.TrimEnd());
+    }
+
     private static AIAgent CreateAgent(RecordingChatClient client, string contextText = ContextMarker)
     {
         List<AITool> tools =
