@@ -15,8 +15,9 @@ namespace Jarvis.Api.McpRunner;
 /// </summary>
 internal static partial class McpRunnerHost
 {
-    // Room for a self-built server's source (at most 64 KB) plus its keys.
-    private const int MaxLaunchBytes = 128 * 1024;
+    // Room for a self-built server's source (at most 64 KB), its saved state (at most 16,000 characters) and its keys.
+    private const int MaxLaunchBytes = 256 * 1024;
+    internal const string StateFileName = "jarvis-state.json";
     private const int MaxStderrTailBytes = 4 * 1024;
     internal const string ScriptFileName = "server.py";
     internal static readonly string[] ScriptArguments =
@@ -92,8 +93,13 @@ internal static partial class McpRunnerHost
 
         var workDirectory = Path.Combine(settings.WorkRoot, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workDirectory);
+        StateSync? stateSync = null;
         if (launch.Script is { } script)
+        {
             await File.WriteAllTextAsync(Path.Combine(workDirectory, ScriptFileName), script.Source, cancellationToken);
+            stateSync = new StateSync(Path.Combine(workDirectory, StateFileName), launch.State);
+            await stateSync.InitializeAsync(cancellationToken);
+        }
         using var process = new Process { StartInfo = StartInfo(launch, settings, workDirectory) };
         try
         {
@@ -113,7 +119,8 @@ internal static partial class McpRunnerHost
         lifetime.CancelAfter(settings.MaxSession);
         await using var stream = WebSocketStream.Create(socket, WebSocketMessageType.Binary, ownsWebSocket: false);
         var toConnector = PumpAsync(stream, process.StandardInput.BaseStream, lifetime.Token);
-        var fromConnector = PumpAsync(process.StandardOutput.BaseStream, stream, lifetime.Token);
+        var fromConnector = PumpAsync(process.StandardOutput.BaseStream, stream, lifetime.Token,
+            stateSync is null ? null : () => SendStateAsync(socket, stateSync, lifetime.Token));
         // Connector logs can contain whatever the package prints, including its own keys, so they are dropped.
         // A self-built server keeps a short tail, with its key values removed, so Jarvis can see why it stopped.
         var stderrTail = launch.Script is null ? null : new StderrTail(MaxStderrTailBytes);
@@ -138,6 +145,7 @@ internal static partial class McpRunnerHost
                     await Task.WhenAny(
                         Task.WhenAll(process.WaitForExitAsync(CancellationToken.None), Observe(drainErrors)),
                         Task.Delay(TimeSpan.FromSeconds(3), CancellationToken.None));
+                    if (stateSync is not null) await SendStateAsync(socket, stateSync, CancellationToken.None);
                     // Sent while the socket is still open: cancelling the pending receive below aborts it.
                     await SendDiagnosticsAsync(socket, new McpRunnerDiagnostics("diagnostics",
                         process.HasExited ? process.ExitCode : null,
@@ -202,8 +210,11 @@ internal static partial class McpRunnerHost
         if (!string.Equals(check.Sha256, script.Sha256, StringComparison.Ordinal))
             throw new ArgumentException("The server code does not match its approved hash.");
         var environment = ValidateEnvironment(launch.Environment);
+        var state = launch.State;
+        if (state is not null && (state.Length > McpRunnerState.MaxLength || state.Contains('\0')))
+            throw new ArgumentException("The saved state is not valid.");
         return new McpRunnerLaunch("uv", ScriptArguments, environment,
-            new McpRunnerScript("python", check.Source, check.Sha256));
+            new McpRunnerScript("python", check.Source, check.Sha256), string.IsNullOrEmpty(state) ? null : state);
     }
 
     private static IReadOnlyDictionary<string, string> ValidateEnvironment(IReadOnlyDictionary<string, string>? values)
@@ -223,6 +234,14 @@ internal static partial class McpRunnerHost
 
     internal static string Redact(string text, IEnumerable<string> secrets) =>
         McpSecretRedactor.Redact(text, secrets.Where(secret => secret.Length >= 4));
+
+    private static async Task SendStateAsync(WebSocket socket, StateSync sync, CancellationToken cancellationToken)
+    {
+        if (socket.State != WebSocketState.Open || await sync.ChangedAsync(cancellationToken) is not { } state) return;
+        var payload = JsonSerializer.SerializeToUtf8Bytes(new McpRunnerStateUpdate("state", state),
+            McpRunnerJsonContext.Default.McpRunnerStateUpdate);
+        await socket.SendAsync(payload, WebSocketMessageType.Text, endOfMessage: true, cancellationToken);
+    }
 
     private static async Task SendDiagnosticsAsync(WebSocket socket, McpRunnerDiagnostics diagnostics)
     {
@@ -258,6 +277,8 @@ internal static partial class McpRunnerHost
         start.Environment["HOME"] = workDirectory;
         start.Environment["TMPDIR"] = workDirectory;
         start.Environment["LANG"] = "C.UTF-8";
+        if (launch.Script is not null)
+            start.Environment[McpRunnerState.FileEnvironmentVariable] = Path.Combine(workDirectory, StateFileName);
         start.Environment["npm_config_cache"] = Path.Combine(settings.CacheRoot, "npm");
         start.Environment["npm_config_update_notifier"] = "false";
         start.Environment["npm_config_fund"] = "false";
@@ -267,12 +288,16 @@ internal static partial class McpRunnerHost
         return start;
     }
 
-    private static async Task PumpAsync(Stream source, Stream destination, CancellationToken cancellationToken)
+    /// <param name="beforeForward">Runs before each chunk is passed on, so a self-built server's state update
+    /// reaches Jarvis ahead of the tool reply that follows it.</param>
+    private static async Task PumpAsync(Stream source, Stream destination, CancellationToken cancellationToken,
+        Func<Task>? beforeForward = null)
     {
         var buffer = new byte[16 * 1024];
         int read;
         while ((read = await source.ReadAsync(buffer, cancellationToken)) > 0)
         {
+            if (beforeForward is not null) await beforeForward();
             await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
             await destination.FlushAsync(cancellationToken);
         }
@@ -321,6 +346,37 @@ internal static partial class McpRunnerHost
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "{Command} connector {Package} exited with code {ExitCode}.")]
     private static partial void LogExitFailure(ILogger logger, string command, string package, int exitCode);
+}
+
+/// <summary>
+/// A self-built server's state file. It starts with what Jarvis saved after the last run; whenever the server
+/// writes something different, <see cref="ChangedAsync"/> returns the new text (empty once the file is gone or
+/// emptied). A file over the size limit is ignored, so the previous state stays saved.
+/// </summary>
+internal sealed class StateSync(string path, string? initial)
+{
+    private string _last = initial ?? "";
+
+    public Task InitializeAsync(CancellationToken cancellationToken) =>
+        _last.Length == 0 ? Task.CompletedTask : File.WriteAllTextAsync(path, _last, cancellationToken);
+
+    public async Task<string?> ChangedAsync(CancellationToken cancellationToken)
+    {
+        string current;
+        try
+        {
+            var file = new FileInfo(path);
+            if (file.Exists && file.Length > McpRunnerState.MaxLength * 3L) return null;
+            current = file.Exists ? (await File.ReadAllTextAsync(path, cancellationToken)).Trim() : "";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+        if (current.Length > McpRunnerState.MaxLength || current == _last) return null;
+        _last = current;
+        return current;
+    }
 }
 
 /// <summary>Keeps the last bytes a process wrote to stderr.</summary>

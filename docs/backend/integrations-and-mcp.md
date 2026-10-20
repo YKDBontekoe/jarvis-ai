@@ -94,12 +94,24 @@ own, the runner sends one text frame `{type: "diagnostics", exitCode, stderrTail
 packages still have their stderr dropped. Live servers run the approved `active_source`; editing only changes the
 draft. Removing the registry entry (any screen or `RemoveMcpServer`) deletes the code too.
 
+**Saved state (staying logged in).** A run ends when the agent turn ends, so module variables and files in the
+temporary home are gone by the next tool call. A server that needs a session (a login, tokens, a device list) keeps
+it in the file named by `JARVIS_STATE_FILE`. Flow: the API sends the last saved text in the launch (`state`); the
+runner writes it to that file before starting the server; before forwarding each chunk of the server's output the
+runner re-reads the file and, if it changed, sends a text frame `{type: "state", state}` ahead of the MCP reply
+(empty when the file was deleted or emptied). `McpToolHost` keeps the newest value per server and saves it after
+each tool call and when the host is disposed as the `server_state` secret on the server's own credential provider,
+so it is encrypted with the keys, owner-scoped and removed with the server. It is limited to 16,000 characters
+(`McpRunnerState.MaxLength`; a larger file is ignored and the previous state stays), is never a declarable key,
+is not available as a `{{secret:…}}` placeholder, and is not given to test runs of a draft. Registry packages get no
+state file. `CustomMcpTemplate.Guidance` tells Jarvis to use it.
+
 ### MCP runner
 
 Owner-installed npm and PyPI connectors do not run inside the API or worker when `McpRunner:Url` is set. The
 `mcp-runner` service (the API image started as `Jarvis.Api.dll mcp-runner`) accepts one authenticated WebSocket
 per connection (`Authorization: Bearer <McpRunner:Token>`). The first text message is the launch spec
-`{command, arguments, environment}`. The runner validates it again (`npx`/`uvx` only, pinned package rules,
+`{command, arguments, environment}` (plus `script` and `state` for self-built servers). The runner validates it again (`npx`/`uvx` only, pinned package rules,
 the secret variable blocklist) and starts the package with a fresh temporary home and a clean environment that
 holds only that server's keys. MCP traffic then flows over the socket as it would over stdin/stdout. When the
 socket closes, or after `McpRunner:MaxSessionMinutes`, the whole process tree is killed and the home deleted.

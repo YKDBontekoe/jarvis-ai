@@ -18,6 +18,9 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
     ICustomMcpServerStore customServers) : IAsyncDisposable
 {
     private readonly List<IAsyncDisposable> _clients = [];
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _pendingState =
+        new(StringComparer.Ordinal);
+    private readonly SemaphoreSlim _stateGate = new(1, 1);
     private IReadOnlyList<AITool> _tools = [];
     private IReadOnlyList<McpServerConnectionStatus> _statuses = [];
     private bool _initialized;
@@ -281,6 +284,8 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             server.CustomServerId = customId;
             if (await customServers.GetActiveSourceAsync(currentUser.OwnerId, customId, cancellationToken) is { } active)
                 server.Script = new McpRunnerScript("python", active.Source, active.Sha256);
+            if (secrets?.GetValueOrDefault(IntegrationCredentialProviders.UserMcpStateSecret) is { Length: > 0 } state)
+                server.ScriptState = state;
         }
         foreach (var binding in userServer.SecretBindings ?? [])
         {
@@ -448,8 +453,42 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                 "not_activated" => "This self-built app has no approved code yet.",
                 _ => "This self-built app is not configured correctly."
             });
+        var provider = server.CredentialProvider!;
         return new McpRunnerClientTransport(McpRunnerOptions.From(configuration)!,
-            new McpRunnerLaunch("uv", [], RunnerEnvironment(server), server.Script), server.Name, loggerFactory);
+            new McpRunnerLaunch("uv", [], RunnerEnvironment(server), server.Script, server.ScriptState),
+            server.Name, loggerFactory, state => RememberScriptState(provider, state));
+    }
+
+    internal void RememberScriptState(string provider, string state) => _pendingState[provider] = state;
+
+    /// <summary>
+    /// Saves what a self-built server last wrote to its state file (a login session, say) next to its keys, so the
+    /// next run starts logged in. The runner reports a change just before the tool reply that follows it, so this
+    /// runs after each call and when the host is disposed. Saves go one at a time because the store shares one
+    /// database connection.
+    /// </summary>
+    internal async Task PersistScriptStateAsync(string provider, CancellationToken cancellationToken)
+    {
+        if (!_pendingState.TryRemove(provider, out var state)) return;
+        await _stateGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (state.Length == 0)
+                await credentialStore.DeleteSecretAsync(currentUser.OwnerId, provider,
+                    IntegrationCredentialProviders.UserMcpStateSecret, cancellationToken);
+            else
+                await credentialStore.SaveSecretAsync(currentUser.OwnerId, provider,
+                    IntegrationCredentialProviders.UserMcpStateSecret, state, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning("Could not save the state of MCP provider {Provider} ({FailureType}).",
+                provider, exception.GetType().Name);
+        }
+        finally
+        {
+            _stateGate.Release();
+        }
     }
 
     private static Dictionary<string, string> RunnerEnvironment(McpServerOptions server) =>
@@ -552,6 +591,8 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
     {
         foreach (var client in _clients)
             await client.DisposeAsync();
+        foreach (var provider in _pendingState.Keys.ToArray())
+            await PersistScriptStateAsync(provider, CancellationToken.None);
     }
 }
 
@@ -619,4 +660,8 @@ public sealed class McpServerOptions
 
     [System.Text.Json.Serialization.JsonIgnore]
     public McpRunnerScript? Script { get; set; }
+
+    /// <summary>What a self-built server saved on its last run. Never read from configuration.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? ScriptState { get; set; }
 }

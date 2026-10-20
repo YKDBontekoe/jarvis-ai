@@ -25,10 +25,11 @@ public sealed record McpRunnerOptions(Uri Url, string Token)
 
 /// <summary>
 /// What the runner starts for one connection. Sent once, as the first WebSocket message. A launch with
-/// <see cref="Script"/> runs a self-built server's Python source with uv instead of a registry package.
+/// <see cref="Script"/> runs a self-built server's Python source with uv instead of a registry package;
+/// <see cref="State"/> is what that server last saved, handed back to it as the file named by JARVIS_STATE_FILE.
 /// </summary>
 public sealed record McpRunnerLaunch(string Command, IReadOnlyList<string> Arguments,
-    IReadOnlyDictionary<string, string> Environment, McpRunnerScript? Script = null);
+    IReadOnlyDictionary<string, string> Environment, McpRunnerScript? Script = null, string? State = null);
 
 /// <summary>A self-built server's approved source. The runner checks the hash and the script rules again.</summary>
 public sealed record McpRunnerScript(string Language, string Source, string Sha256);
@@ -39,9 +40,25 @@ public sealed record McpRunnerScript(string Language, string Source, string Sha2
 /// </summary>
 public sealed record McpRunnerDiagnostics(string Type, int? ExitCode, string? StderrTail);
 
+/// <summary>
+/// Sent by the runner as a text message, ahead of the MCP reply that follows it, when a self-built server changed
+/// its state file. An empty <see cref="State"/> means the server cleared it.
+/// </summary>
+public sealed record McpRunnerStateUpdate(string Type, string State);
+
+/// <summary>The limits of a self-built server's saved state, which Jarvis keeps encrypted like its other keys.</summary>
+public static class McpRunnerState
+{
+    public const string FileEnvironmentVariable = "JARVIS_STATE_FILE";
+
+    /// <summary>The credential store refuses values over 16,384 characters.</summary>
+    public const int MaxLength = 16_000;
+}
+
 [System.Text.Json.Serialization.JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
 [System.Text.Json.Serialization.JsonSerializable(typeof(McpRunnerLaunch))]
 [System.Text.Json.Serialization.JsonSerializable(typeof(McpRunnerDiagnostics))]
+[System.Text.Json.Serialization.JsonSerializable(typeof(McpRunnerStateUpdate))]
 public sealed partial class McpRunnerJsonContext : System.Text.Json.Serialization.JsonSerializerContext;
 
 /// <summary>
@@ -50,7 +67,7 @@ public sealed partial class McpRunnerJsonContext : System.Text.Json.Serializatio
 /// stdio server. MCP messages then flow over the WebSocket exactly as they would over stdin and stdout.
 /// </summary>
 public sealed class McpRunnerClientTransport(McpRunnerOptions options, McpRunnerLaunch launch, string name,
-    ILoggerFactory loggerFactory) : IClientTransport
+    ILoggerFactory loggerFactory, Action<string>? onState = null) : IClientTransport
 {
     public string Name => name;
 
@@ -67,7 +84,7 @@ public sealed class McpRunnerClientTransport(McpRunnerOptions options, McpRunner
             await socket.ConnectAsync(options.Url, cancellationToken);
             var payload = JsonSerializer.SerializeToUtf8Bytes(launch, McpRunnerJsonContext.Default.McpRunnerLaunch);
             await socket.SendAsync(payload, WebSocketMessageType.Text, endOfMessage: true, cancellationToken);
-            var stream = new RunnerSocketStream(socket, diagnostics => Diagnostics = diagnostics);
+            var stream = new RunnerSocketStream(socket, diagnostics => Diagnostics = diagnostics, onState);
             return await new StreamClientTransport(stream, stream, loggerFactory).ConnectAsync(cancellationToken);
         }
         catch
@@ -79,12 +96,15 @@ public sealed class McpRunnerClientTransport(McpRunnerOptions options, McpRunner
 }
 
 /// <summary>
-/// MCP bytes travel as binary WebSocket messages. A text message from the runner is a diagnostics report, kept
-/// aside instead of being passed to the MCP client as protocol data.
+/// MCP bytes travel as binary WebSocket messages. A text message from the runner is a diagnostics report or a
+/// state update, kept aside instead of being passed to the MCP client as protocol data.
 /// </summary>
-internal sealed class RunnerSocketStream(WebSocket socket, Action<McpRunnerDiagnostics> onDiagnostics) : Stream
+internal sealed class RunnerSocketStream(WebSocket socket, Action<McpRunnerDiagnostics> onDiagnostics,
+    Action<string>? onState = null) : Stream
 {
     private const int MaxDiagnosticsBytes = 16 * 1024;
+    // Up to 16,000 characters of state, each at most three UTF-8 bytes, plus the JSON around it.
+    private const int MaxStateBytes = 64 * 1024;
 
     public override bool CanRead => true;
     public override bool CanSeek => false;
@@ -100,26 +120,38 @@ internal sealed class RunnerSocketStream(WebSocket socket, Action<McpRunnerDiagn
             var result = await socket.ReceiveAsync(buffer, cancellationToken);
             if (result.MessageType == WebSocketMessageType.Close) return 0;
             if (result.MessageType == WebSocketMessageType.Binary) return result.Count;
-            await ReadDiagnosticsAsync(buffer[..result.Count].ToArray(), result.EndOfMessage, cancellationToken);
+            await ReadTextMessageAsync(buffer[..result.Count].ToArray(), result.EndOfMessage, cancellationToken);
         }
     }
 
-    private async Task ReadDiagnosticsAsync(byte[] first, bool complete, CancellationToken cancellationToken)
+    private async Task ReadTextMessageAsync(byte[] first, bool complete, CancellationToken cancellationToken)
     {
         using var message = new MemoryStream();
         message.Write(first);
+        var overflow = first.Length > MaxStateBytes;
         var chunk = new byte[4096];
         while (!complete)
         {
             var result = await socket.ReceiveAsync(chunk, cancellationToken);
-            if (message.Length + result.Count <= MaxDiagnosticsBytes) message.Write(chunk, 0, result.Count);
+            if (message.Length + result.Count <= MaxStateBytes) message.Write(chunk, 0, result.Count);
+            else overflow = true;
             complete = result.EndOfMessage;
         }
+        if (overflow) return;
         try
         {
-            var diagnostics = JsonSerializer.Deserialize(message.ToArray(),
-                McpRunnerJsonContext.Default.McpRunnerDiagnostics);
-            if (diagnostics is { Type: "diagnostics" }) onDiagnostics(diagnostics);
+            using var document = JsonDocument.Parse(message.ToArray());
+            var type = document.RootElement.TryGetProperty("type", out var value) ? value.GetString() : null;
+            if (type == "diagnostics" && message.Length <= MaxDiagnosticsBytes)
+            {
+                var diagnostics = document.RootElement.Deserialize(McpRunnerJsonContext.Default.McpRunnerDiagnostics);
+                if (diagnostics is not null) onDiagnostics(diagnostics);
+            }
+            else if (type == "state" && onState is not null)
+            {
+                var update = document.RootElement.Deserialize(McpRunnerJsonContext.Default.McpRunnerStateUpdate);
+                if (update is { State.Length: <= McpRunnerState.MaxLength }) onState(update.State);
+            }
         }
         catch (JsonException) { }
     }

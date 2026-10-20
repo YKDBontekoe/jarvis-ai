@@ -63,7 +63,8 @@ public static partial class McpSecretBindings
         {
             var secretName = binding.SecretName?.Trim() ?? string.Empty;
             if (!SecretNamePattern().IsMatch(secretName) ||
-                secretName == IntegrationCredentialProviders.UserMcpConfigSecret)
+                secretName is IntegrationCredentialProviders.UserMcpConfigSecret
+                    or IntegrationCredentialProviders.UserMcpStateSecret)
                 throw new ArgumentException("Secret names must be 1 to 48 lowercase letters, numbers, or underscores.");
             if (binding.Target != expectedTarget)
                 throw new ArgumentException(transport == "stdio"
@@ -92,7 +93,8 @@ public static partial class McpSecretBindings
         var name = NonWord().Replace(key.Trim().ToLowerInvariant(), "_").Trim('_');
         if (name.Length == 0 || !char.IsAsciiLetterLower(name[0])) name = "secret_" + name;
         name = name.Length > 48 ? name[..48].TrimEnd('_') : name;
-        return name == IntegrationCredentialProviders.UserMcpConfigSecret ? "secret_config" : name;
+        if (name == IntegrationCredentialProviders.UserMcpConfigSecret) return "secret_config";
+        return name == IntegrationCredentialProviders.UserMcpStateSecret ? "secret_state" : name;
     }
 
     public static bool IsAllowedEnvironmentName(string name) =>
