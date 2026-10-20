@@ -116,7 +116,7 @@ public static class UiSurfaceBlocks
         {
             label = Required(item, "label", 40, "stat"),
             value = Required(item, "value", 24, "stat"),
-            delta = ReadString(item, "delta", 24),
+            delta = ReadString(item, "delta", 48),
             trend = trend is not null && Trends.Contains(trend) ? trend : null
         };
     }
@@ -179,6 +179,17 @@ public static class UiSurfaceBlocks
         if (!element.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.String) return null;
         var text = value.GetString()?.Trim();
         if (string.IsNullOrEmpty(text)) return null;
-        return text.Length <= max ? text : text[..max];
+        return Shorten(text, max);
+    }
+
+    /// <summary>Cuts text that runs long at a word boundary and marks the cut, so no word is left half shown.</summary>
+    public static string Shorten(string text, int max)
+    {
+        if (text.Length <= max) return text;
+        var cut = text[..(max - 1)];
+        var space = cut.LastIndexOf(' ');
+        // Drop a half-cut last word, unless the cut already ends on a word.
+        if (text[max - 1] != ' ' && space >= max / 2) cut = cut[..space];
+        return cut.TrimEnd(' ', ',', ';', ':', '·', '-') + "…";
     }
 }

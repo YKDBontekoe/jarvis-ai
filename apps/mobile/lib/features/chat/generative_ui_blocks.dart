@@ -444,17 +444,20 @@ class _Bars extends StatelessWidget {
       0,
       (max, value) => value > max ? value : max,
     );
-    final large = MediaQuery.textScalerOf(context).scale(1) >= 1.5;
+    // Labels sit above their bars when they would not fit beside them.
+    final stacked =
+        MediaQuery.textScalerOf(context).scale(1) >= 1.5 ||
+        items.any((item) => (asString(item['label']) ?? '').length > 10);
     return Column(
       children: [
         for (var index = 0; index < items.length; index++) ...[
-          if (index > 0) const SizedBox(height: 8),
+          if (index > 0) SizedBox(height: stacked ? 10 : 8),
           _barRow(
             colors,
             asString(items[index]['label']) ?? '',
             values[index],
             top,
-            large: large,
+            stacked: stacked,
           ),
         ],
       ],
@@ -466,7 +469,7 @@ class _Bars extends StatelessWidget {
     String label,
     double value,
     double top, {
-    required bool large,
+    required bool stacked,
   }) {
     final shown = [_formatNumber(value), ?unit].join(' ');
     final labelText = Text(
@@ -511,7 +514,7 @@ class _Bars extends StatelessWidget {
     return Semantics(
       label: '$label, $shown',
       excludeSemantics: true,
-      child: large
+      child: stacked
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -628,34 +631,55 @@ class _Pairs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
+    String text(int index, String key) => asString(items[index][key]) ?? '';
+    Widget label(int index) => Text(
+      text(index, 'label'),
+      style: TextStyle(color: colors.inkSoft, fontSize: 14),
+    );
+    Widget value(int index, TextAlign align) => Text(
+      text(index, 'value'),
+      textAlign: align,
+      style: TextStyle(
+        color: colors.ink,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    );
+    // One layout for the whole block: side by side when every row is short,
+    // otherwise each value goes under its label.
+    final stacked =
+        MediaQuery.textScalerOf(context).scale(1) >= 1.5 ||
+        [
+          for (var index = 0; index < items.length; index++)
+            text(index, 'label').length + text(index, 'value').length,
+        ].any((length) => length > 32);
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (var index = 0; index < items.length; index++) ...[
           if (index > 0)
             Divider(height: 1, thickness: 1, color: colors.outline),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              spacing: 12,
-              runSpacing: 2,
-              children: [
-                Text(
-                  asString(items[index]['label']) ?? '',
-                  style: TextStyle(color: colors.inkSoft, fontSize: 14),
-                ),
-                Text(
-                  asString(items[index]['value']) ?? '',
-                  textAlign: TextAlign.end,
-                  style: TextStyle(
-                    color: colors.ink,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+            child: stacked
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      label(index),
+                      const SizedBox(height: 2),
+                      value(index, TextAlign.start),
+                    ],
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Expanded(child: label(index)),
+                      const SizedBox(width: 12),
+                      value(index, TextAlign.end),
+                    ],
                   ),
-                ),
-              ],
-            ),
           ),
         ],
       ],

@@ -74,7 +74,7 @@ internal sealed class ComparisonAgentTools(IComparisonService comparisons, ICurr
                 return "asOf must be a date written yyyy-MM-dd.";
             date = parsed;
         }
-        var updated = await comparisons.SetCellAsync(currentUser.OwnerId, id, option, criterion,
+        var updated = await comparisons.SetCellAsync(id, currentUser.OwnerId, option, criterion,
             new ComparisonCell(score, note, source, date), cancellationToken);
         return updated.Succeeded ? "Saved." : updated.Failure == ComparisonFailure.NotFound
             ? "No such comparison."

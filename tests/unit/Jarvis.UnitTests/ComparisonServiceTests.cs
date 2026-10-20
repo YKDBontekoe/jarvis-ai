@@ -1,4 +1,7 @@
+using System.Text.RegularExpressions;
+using Jarvis.Agents.Comparisons;
 using Jarvis.Application.Comparisons;
+using Jarvis.Application.Conversations;
 using Jarvis.Application.Decisions;
 using Jarvis.Application.Library;
 using Jarvis.Domain.Library;
@@ -63,6 +66,25 @@ public sealed class ComparisonServiceTests
             })));
 
         private static LibraryItem Saved() => (LibraryItem)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(LibraryItem));
+    }
+
+    private sealed class OwnerUser : ICurrentUser
+    {
+        public Guid OwnerId => Owner;
+    }
+
+    [Fact]
+    public async Task The_agent_can_fill_in_a_comparison_it_created()
+    {
+        var harness = new Harness();
+        var tools = new ComparisonAgentTools(harness.Service, new OwnerUser());
+
+        var created = await tools.CreateComparisonAsync("Boiler", ["Alpha", "Beta"], ["Price:8"]);
+        var id = Regex.Match(created, "[0-9a-f]{8}-[0-9a-f-]{27}").Value;
+        var saved = await tools.SetComparisonCellAsync(id, "Alpha", "Price", 7, "€1,900 incl. fitting");
+
+        Assert.Equal("Saved.", saved);
+        Assert.Contains("Alpha", await tools.GetComparisonAsync(id));
     }
 
     [Fact]

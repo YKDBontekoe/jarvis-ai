@@ -840,6 +840,27 @@ Map<String, Object?> billsSurface() => {
   },
 };
 
+/// A comparison card as real Codex composed it (long label/value pairs).
+Map<String, Object?> laptopSurface() => {
+  'id': 'surf-laptop',
+  'title': 'Air 13 is the best travel fit',
+  'status': 'open',
+  'schema': {
+    'kind': 'custom',
+    'title': 'Air 13 is the best travel fit',
+    'body': 'Based on the specifications and prices you supplied; 1,300 euro is a hard limit.',
+    'blocks': [
+      {'type': 'pairs', 'items': [
+        {'label': 'Air 13 — recommended', 'value': '€1,199 · 1.24 kg · 18 h battery'},
+        {'label': 'Zen 14 — cheaper alternative', 'value': '€999 · 1.39 kg · 14 h battery'},
+        {'label': 'Carbon X1 — over budget', 'value': '€1,649 · 1.12 kg · 12 h battery'},
+      ]},
+      {'type': 'callout', 'icon': 'plane', 'tone': 'success', 'text': 'Choose Air 13: 200 euro more than Zen 14 buys 4 extra hours of battery and saves 150 g.'},
+      {'type': 'pairs', 'items': [{'label': 'Budget left', 'value': '€101'}]},
+    ],
+  },
+};
+
 Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   'GET /api/v1/conversations': conversations(),
   'GET /api/v1/conversations/$conversationId': {

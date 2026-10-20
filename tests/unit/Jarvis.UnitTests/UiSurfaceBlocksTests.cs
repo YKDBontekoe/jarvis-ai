@@ -61,6 +61,17 @@ public sealed class UiSurfaceBlocksTests
         Assert.Contains("24", error.Message);
     }
 
+    [Theory]
+    [InlineData("Slightly more than last week", 24, "Slightly more than last…")]
+    [InlineData("Supercalifragilisticexpialidocious", 12, "Supercalifr…")]
+    [InlineData("Short", 24, "Short")]
+    public void Long_text_is_cut_at_a_word_and_marked(string text, int max, string expected)
+    {
+        var shortened = UiSurfaceBlocks.Shorten(text, max);
+        Assert.Equal(expected, shortened);
+        Assert.True(shortened.Length <= max);
+    }
+
     [Fact]
     public void Items_carry_known_icons_values_and_badges()
     {

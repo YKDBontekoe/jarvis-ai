@@ -371,6 +371,8 @@ mixin _ChatScreenSend on _ChatScreenController {
           );
         }
       });
+      // Cards arrive after the messages; keep the newest one in view.
+      _scrollToBottom();
     } on DioException {
       // Chat still works if surfaces cannot be refreshed.
     } catch (_) {

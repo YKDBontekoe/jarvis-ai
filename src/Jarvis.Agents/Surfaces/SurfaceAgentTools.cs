@@ -19,7 +19,7 @@ internal sealed class SurfaceAgentTools(
         [Description("card, form, choice, status, list, or custom.")] string kind,
         [Description("Short title shown at the top of the card.")] string title,
         [Description("Optional supporting text under the title.")] string? body = null,
-        [Description("List items as JSON: [{id,title,subtitle,detail,icon,value,badge}]. value is a short trailing figure such as '€12' or '3 h'; badge is a short tag. icon is one of: " + IconNames + ".")] string? itemsJson = null,
+        [Description("List items as JSON: [{id,title,subtitle,detail,icon,value,badge}]. value is a short trailing figure such as '€12' or '3 h'; badge is a short tag only for what stands out (Due Fri, Higher), left out otherwise. icon is one of: " + IconNames + ".")] string? itemsJson = null,
         [Description("Form fields as JSON: [{id,label,type,placeholder,options,secretName,min,max,step,unit}]. type is text, longtext, number, slider (min, max, step, unit), date, time, toggle, choice (options; up to 5 show as chips), or secret.")] string? fieldsJson = null,
         [Description("Buttons as JSON: [{id,label,style,url}]. style is primary, secondary, or danger. url is an optional public HTTPS link to open.")] string? actionsJson = null,
         [Description("Credential provider slug when the form has a secret field, such as github or a jarvis-mcp- id.")] string? credentialProvider = null,
@@ -67,7 +67,8 @@ internal sealed class SurfaceContextProvider : MessageAIContextProvider
         const string text = Prefix +
             ": call RenderUi at most once per turn, and only when a tap, a short typed answer, or a visual summary beats Markdown. If a card is already open, wait for it. " +
             "Choices go in items with one action each (multiSelect for several). Typed answers go in form fields whose label is the question and whose placeholder is an example; use date, time, slider, or choice fields when they fit better than text. " +
-            "For numbers, progress, plans, and comparisons, compose a custom card from blocks instead of a Markdown table. " +
+            "Do not write Markdown tables: when a reply would need one (figures side by side, a comparison, progress, a plan), compose a custom card from blocks instead and keep the text to one sentence. " +
+            "When the owner asks to see several things that each carry an amount, a time, or a state (bills, appointments, orders), show them as a list card with value and badge rather than a Markdown list. " +
             "Tokens use type secret plus credentialProvider — never ask the user to paste a secret into chat. Authorization buttons may include a url. " +
             "The written reply is one short sentence; do not repeat the card.";
         return new ValueTask<IEnumerable<ChatMessage>>([new ChatMessage(ChatRole.User, text)]);

@@ -17,6 +17,7 @@ void main() {
 
   final cards = <String, UiSurfaceEntry Function()>{
     'custom': () => UiSurfaceEntry.fromJson(weekSurface())!,
+    'compare': () => UiSurfaceEntry.fromJson(laptopSurface())!,
     'form': () => UiSurfaceEntry.fromJson(planSurface())!,
     'multi': () => UiSurfaceEntry.fromJson(daysSurface())!,
     'list': () => UiSurfaceEntry.fromJson(billsSurface())!,
@@ -45,9 +46,8 @@ void main() {
             child: MaterialApp(
               debugShowCheckedModeBanner: false,
               builder: (context, child) => MediaQuery(
-                data: MediaQuery.of(
-                  context,
-                ).copyWith(textScaler: TextScaler.linear(scale)),
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(scale)),
                 child: child!,
               ),
               theme: buildJarvisTheme(
