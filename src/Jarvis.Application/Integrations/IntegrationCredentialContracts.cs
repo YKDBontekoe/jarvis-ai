@@ -13,6 +13,9 @@ public static class IntegrationCredentialProviders
     public const string UserMcpConfigSecret = "server_config";
     public const string UserMcpTokenSecret = "token";
 
+    /// <summary>What a self-built server saved between runs, such as a login session. Never a declared key.</summary>
+    public const string UserMcpStateSecret = "server_state";
+
     public static bool IsUserMcpManaged(string? provider) =>
         !string.IsNullOrEmpty(provider) &&
         provider.StartsWith(UserMcpPrefix, StringComparison.Ordinal);

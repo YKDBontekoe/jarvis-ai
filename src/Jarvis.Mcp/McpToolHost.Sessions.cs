@@ -474,7 +474,14 @@ public sealed partial class McpToolHost
         {
             if (!await host.IsToolPermittedAsync(serverKey, toolName, cancellationToken))
                 throw new InvalidOperationException($"'{toolName}' is not enabled on this MCP server.");
-            return await base.InvokeCoreAsync(arguments, cancellationToken);
+            try
+            {
+                return await base.InvokeCoreAsync(arguments, cancellationToken);
+            }
+            finally
+            {
+                await host.PersistScriptStateAsync(serverKey, CancellationToken.None);
+            }
         }
     }
 }

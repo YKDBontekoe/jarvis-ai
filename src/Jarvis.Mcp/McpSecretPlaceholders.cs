@@ -15,6 +15,7 @@ public static partial class McpSecretPlaceholders
     /// <summary>OAuth bookkeeping and the stored server definition are never handed to a tool as an argument.</summary>
     private static bool IsInternal(string name) =>
         name == IntegrationCredentialProviders.UserMcpConfigSecret ||
+        name == IntegrationCredentialProviders.UserMcpStateSecret ||
         name.StartsWith("oauth_", StringComparison.Ordinal);
 
     public static bool Contains(string? argumentsJson) =>

@@ -463,7 +463,13 @@ public static class CustomMcpTemplate
         - Write to stdout only through MCP. Print diagnostics to stderr if needed; Jarvis shows the last lines,
           with key values removed, when a test fails.
         - Keep network calls bounded with timeouts. The server runs in an isolated sandbox with no access to Jarvis,
-          its database or other apps, and a fresh temporary home on each start.
+          its database or other apps, and a fresh temporary home on each start. Module variables and files in the
+          home are gone after each run, so a login done in one tool call is lost for the next.
+        - To stay logged in, keep the session (tokens, device list, anything a login produces) in the file named by
+          the JARVIS_STATE_FILE environment variable. Read it on start and rewrite it whenever the session changes,
+          for example right after login. Jarvis saves it encrypted (at most 16,000 characters, so plain JSON) and
+          puts it back on the next start. Write the whole file at once, delete or empty it to log out, and never
+          return its contents from a tool.
         """;
 }
 
