@@ -82,6 +82,20 @@ internal static class SurfaceEndpoints
             return result.ToHttpResult();
         }).WithName("SubmitUiSurfaceAction");
 
+        // Closes a card the owner does not want to answer. Nothing is sent to Jarvis; the card just stops waiting.
+        api.MapPost("/ui-surfaces/{id:guid}/dismiss", async (Guid id, IUiSurfaceRepository surfaces,
+            ICurrentUser currentUser, IRealtimePublisher realtime, CancellationToken ct) =>
+        {
+            var surface = await surfaces.GetAsync(currentUser.OwnerId, id, ct);
+            if (surface is null) return Results.NotFound();
+            var dismissed = await surfaces.DismissAsync(currentUser.OwnerId, id, CancellationToken.None);
+            if (dismissed is null)
+                return Results.Conflict(new { message = "This card was already used." });
+            await realtime.PublishToConversationAsync(dismissed.ConversationId, "ui.surface", Payload(dismissed),
+                CancellationToken.None);
+            return Results.Ok(ToDto(dismissed));
+        }).WithName("DismissUiSurface");
+
         return api;
     }
 

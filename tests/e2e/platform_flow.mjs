@@ -148,6 +148,28 @@ if (process.env.JARVIS_PLATFORM_CHAT === '1') {
     assert.equal(after.body[0].answer.values.label, 'Option A');
   });
 
+  await check('an open card can be dismissed without answering', async () => {
+    const conversation = await call('/conversations', { method: 'POST', body: JSON.stringify({ title: 'Skip' }) });
+    const sent = await call(`/conversations/${conversation.body.id}/messages`, {
+      method: 'POST', body: JSON.stringify({ content: 'Show a choice card with travel options' }) });
+    assert.ok([200, 202].includes(sent.status), sent.text);
+    let surfaces;
+    for (const until = Date.now() + 20000; Date.now() < until;) {
+      surfaces = await call(`/conversations/${conversation.body.id}/surfaces`);
+      if (surfaces.body?.length) break;
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    const id = surfaces.body[0].id;
+    const dismissed = await call(`/ui-surfaces/${id}/dismiss`, { method: 'POST' });
+    assert.equal(dismissed.status, 200, dismissed.text);
+    assert.equal(dismissed.body.status, 'dismissed');
+    const again = await call(`/ui-surfaces/${id}/dismiss`, { method: 'POST' });
+    assert.equal(again.status, 409, again.text);
+    const answered = await call(`/ui-surfaces/${id}/actions`, {
+      method: 'POST', body: JSON.stringify({ actionId: 'a', values: {} }) });
+    assert.equal(answered.status, 409, answered.text);
+  });
+
   await check('RenderUi composes a custom card from blocks', async () => {
     const conversation = await call('/conversations', { method: 'POST', body: JSON.stringify({ title: 'Week' }) });
     const sent = await call(`/conversations/${conversation.body.id}/messages`, {

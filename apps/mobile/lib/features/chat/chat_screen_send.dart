@@ -58,6 +58,13 @@ mixin _ChatScreenSend on _ChatScreenController {
       _input.clear();
       _pendingPhotos = [];
     }
+    // Typing over a docked card answers it in words, so the card closes
+    // before the message goes out and Jarvis sees it as closed.
+    final answered = _liveSurface;
+    if (answered != null && _typingOverSurfaceId == answered.id) {
+      await _dismissSurface(answered);
+      if (!mounted) return false;
+    }
     _stopRequested = false;
     final shownContent = content.isEmpty
         ? (sentPhotos.length == 1
@@ -332,6 +339,32 @@ mixin _ChatScreenSend on _ChatScreenController {
       if (!mounted) return;
       setState(() {
         _surfaceError = 'Jarvis could not use this card. Try again.';
+        _surfaceErrorFor = surface.id;
+      });
+    }
+  }
+
+  /// Closes a card without answering it. The card folds at once; if the
+  /// server cannot be reached it comes back with a note.
+  Future<void> _dismissSurface(UiSurfaceEntry surface) async {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _upsertSurface(surface.copyWith(status: 'dismissed'));
+      _typingOverSurfaceId = null;
+      if (_surfaceErrorFor == surface.id) {
+        _surfaceError = null;
+        _surfaceErrorFor = null;
+      }
+    });
+    try {
+      await _http.post<dynamic>('/api/v1/ui-surfaces/${surface.id}/dismiss');
+    } on DioException catch (error) {
+      if (!mounted) return;
+      // 409: it was already answered or closed elsewhere; realtime will say how.
+      if (error.response?.statusCode == 409) return;
+      setState(() {
+        _upsertSurface(surface);
+        _surfaceError = 'Could not close this card. Try again.';
         _surfaceErrorFor = surface.id;
       });
     }

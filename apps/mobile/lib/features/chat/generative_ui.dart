@@ -100,6 +100,7 @@ class UiSurfaceCard extends StatefulWidget {
     this.pinned = false,
     this.errorText,
     this.onTypeInstead,
+    this.onDismiss,
     super.key,
   });
 
@@ -111,6 +112,9 @@ class UiSurfaceCard extends StatefulWidget {
 
   /// Shown on the docked card: puts the options away and opens the composer.
   final VoidCallback? onTypeInstead;
+
+  /// Shown on the docked card: closes it without answering.
+  final VoidCallback? onDismiss;
 
   @override
   State<UiSurfaceCard> createState() => _UiSurfaceCardState();
@@ -212,7 +216,17 @@ abstract class _UiSurfaceCardController extends State<UiSurfaceCard> {
               ),
             ),
             if (widget.onTypeInstead != null)
-              _TypeInsteadButton(onPressed: widget.onTypeInstead!),
+              _HeaderIconButton(
+                icon: PhosphorIconsRegular.pencilSimple,
+                label: 'Type an answer instead',
+                onPressed: widget.onTypeInstead!,
+              ),
+            if (widget.onDismiss != null)
+              _HeaderIconButton(
+                icon: PhosphorIconsRegular.x,
+                label: 'Dismiss card',
+                onPressed: widget.onDismiss!,
+              ),
           ],
         ),
         const SizedBox(height: 8),
@@ -243,10 +257,16 @@ abstract class _UiSurfaceCardController extends State<UiSurfaceCard> {
   }
 }
 
-/// "Type instead": hides a docked card's options and opens the composer.
-class _TypeInsteadButton extends StatelessWidget {
-  const _TypeInsteadButton({required this.onPressed});
+/// A round icon button in a docked card's header (type instead, dismiss).
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
 
+  final IconData icon;
+  final String label;
   final VoidCallback onPressed;
 
   @override
@@ -254,11 +274,11 @@ class _TypeInsteadButton extends StatelessWidget {
     final colors = JarvisColors.of(context);
     return Semantics(
       button: true,
-      label: 'Type an answer instead',
+      label: label,
       onTap: onPressed,
       excludeSemantics: true,
       child: Tooltip(
-        message: 'Type an answer instead',
+        message: label,
         child: InkResponse(
           onTap: onPressed,
           radius: 22,
@@ -272,11 +292,7 @@ class _TypeInsteadButton extends StatelessWidget {
                   color: colors.surfaceMuted,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  PhosphorIconsRegular.pencilSimple,
-                  size: 17,
-                  color: colors.inkSoft,
-                ),
+                child: Icon(icon, size: 17, color: colors.inkSoft),
               ),
             ),
           ),
@@ -337,18 +353,20 @@ class DockedSurfaceBar extends StatelessWidget {
   const DockedSurfaceBar({
     required this.surface,
     required this.onShowOptions,
+    this.onDismiss,
     super.key,
   });
 
   final UiSurfaceEntry surface;
   final VoidCallback onShowOptions;
+  final VoidCallback? onDismiss;
 
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     final title = asString(surface.schema['title']) ?? surface.title;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+      padding: EdgeInsets.fromLTRB(14, 6, onDismiss == null ? 6 : 0, 6),
       decoration: BoxDecoration(
         color: colors.surfaceMuted,
         borderRadius: BorderRadius.circular(999),
@@ -376,6 +394,12 @@ class DockedSurfaceBar extends StatelessWidget {
             compact: true,
             onPressed: onShowOptions,
           ),
+          if (onDismiss != null)
+            _HeaderIconButton(
+              icon: PhosphorIconsRegular.x,
+              label: 'Dismiss card',
+              onPressed: onDismiss!,
+            ),
         ],
       ),
     );

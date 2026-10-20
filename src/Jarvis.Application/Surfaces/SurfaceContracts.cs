@@ -43,6 +43,9 @@ public interface IUiSurfaceRepository
     Task<UiSurfaceRecord?> CompleteAsync(Guid ownerId, Guid id, string actionId, string valuesJson,
         CancellationToken cancellationToken);
 
+    /// <summary>Closes an open card without answering it; null when it is not the owner's or not open.</summary>
+    Task<UiSurfaceRecord?> DismissAsync(Guid ownerId, Guid id, CancellationToken cancellationToken);
+
     /// <summary>Reopens a completed card and closes any other open card in the same conversation.</summary>
     Task<IReadOnlyList<UiSurfaceRecord>> ReopenAsync(Guid ownerId, Guid id, CancellationToken cancellationToken);
 }

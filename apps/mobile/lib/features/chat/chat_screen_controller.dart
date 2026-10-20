@@ -276,6 +276,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
     String action,
     Map<String, String> values,
   );
+  Future<void> _dismissSurface(UiSurfaceEntry surface);
   Future<void> _loadConversationSurfaces(String conversationId);
   Future<void> _rate(MessageEntry message, String rating);
   Future<void> _retry(MessageEntry message);

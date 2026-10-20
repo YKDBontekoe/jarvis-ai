@@ -261,6 +261,48 @@ void main() {
     expect(find.text('Hard push'), findsOneWidget);
   });
 
+  testWidgets('a docked card and its bar can be dismissed', (tester) async {
+    var dismissed = 0;
+    final question = surface({
+      'kind': 'choice',
+      'title': 'Which tone?',
+      'items': [
+        {'id': 'hard', 'title': 'Hard push'},
+      ],
+    });
+    await show(
+      tester,
+      Column(
+        children: [
+          UiSurfaceCard(
+            surface: question,
+            pinned: true,
+            onAction: (_, _) async {},
+            onDismiss: () => dismissed++,
+          ),
+          DockedSurfaceBar(
+            surface: question,
+            onShowOptions: () {},
+            onDismiss: () => dismissed++,
+          ),
+        ],
+      ),
+    );
+
+    final buttons = find.byTooltip('Dismiss card');
+    expect(buttons, findsNWidgets(2));
+    await tester.tap(buttons.first);
+    await tester.tap(buttons.last);
+    expect(dismissed, 2);
+
+    await show(
+      tester,
+      UiSurfaceCard(surface: surface(question.schema, status: 'dismissed')),
+    );
+    expect(find.text('Dismissed'), findsOneWidget);
+    expect(find.text('Hard push'), findsNothing);
+  });
+
   test('answers never show a secret', () {
     final schema = {
       'kind': 'form',

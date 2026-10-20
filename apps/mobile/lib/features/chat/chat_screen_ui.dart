@@ -698,6 +698,7 @@ mixin _ChatScreenUi on _ChatScreenController {
                       _composerFocus.value++;
                       _scrollToBottom(force: true);
                     },
+                    onDismiss: () => unawaited(_dismissSurface(docked)),
                   ),
                 ],
               ),
@@ -735,6 +736,7 @@ mixin _ChatScreenUi on _ChatScreenController {
                       setState(() => _typingOverSurfaceId = null);
                       _scrollToBottom(force: true);
                     },
+                    onDismiss: () => unawaited(_dismissSurface(docked)),
                   ),
                 ),
               ),

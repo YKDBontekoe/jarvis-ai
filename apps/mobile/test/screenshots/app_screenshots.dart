@@ -115,6 +115,43 @@ void main() {
       await tester.tap(find.text('Options'));
       await settle(tester);
       expect(find.text('Hard push'), findsOneWidget);
+
+      http.routes['POST /api/v1/ui-surfaces/surf-tone/dismiss'] = {
+        'id': 'surf-tone',
+      };
+      await tester.tap(find.byTooltip('Dismiss card'));
+      await settle(tester);
+      expect(find.text('Hard push'), findsNothing);
+      expect(find.text('Dismissed'), findsOneWidget);
+      expect(find.text('Ask Jarvis anything'), findsOneWidget);
+      await capture(tester, '04d-chat-question-dismissed-$mode');
+    });
+
+    screenshotTest('chat question typed answer $mode', (tester) async {
+      usePhone(tester);
+      http.routes['GET /api/v1/conversations/$conversationId/surfaces'] = [
+        questionSurface(),
+      ];
+      http.routes['POST /api/v1/ui-surfaces/surf-tone/dismiss'] = {
+        'id': 'surf-tone',
+      };
+      http.routes['POST /api/v1/conversations/$conversationId/messages'] = {
+        'id': 'typed-reply',
+        'role': 'assistant',
+        'content': 'Hard push it is. Shoes on.',
+      };
+      await start(tester, dark: dark);
+      await openChat(tester);
+      await tester.tap(find.byTooltip('Type an answer instead'));
+      await settle(tester);
+      await tester.enterText(find.byType(TextField).last, 'A hard push please');
+      await settle(tester);
+      await tester.tap(find.byTooltip('Send'));
+      await settle(tester);
+      expect(find.text('Options'), findsNothing);
+      expect(find.text('Dismissed'), findsOneWidget);
+      expect(find.text('Hard push it is. Shoes on.'), findsOneWidget);
+      await capture(tester, '04e-chat-question-typed-$mode');
     });
 
     screenshotTest('chats $mode', (tester) async {

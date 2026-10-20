@@ -144,6 +144,7 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
   - the keyboard closes when a new question arrives, and the transcript stays scrolled to the latest message;
   - options are equal rows in one rounded `surfaceMuted` group: number badge (hidden from 1.5× text), title, optional subtitle, ↗. One tap answers; there is no filled "first" option;
   - the pencil in the header ("Type an answer instead") folds the options into a `DockedSurfaceBar` above the composer and focuses it; Options brings them back;
+  - the ✕ in the header and on the bar ("Dismiss card") closes the card without answering: it folds to a "Dismissed" receipt at once and the composer returns (it comes back with a note if the server cannot be reached). Sending a message while typing over a card closes it the same way, since that message is the answer;
   - while a turn is still running, the composer stays under the card so Stop is in reach;
   - an answered card collapses to a one-line "Answered" receipt that shows the answer ("Hard push", "Monday, Friday"; secrets read "Saved securely");
   - multi-select rows toggle a check and fill `accentSoft`; Done sends them all. Short choice fields (up to 5 options) are chips, longer ones a menu; sliders show their value in `accentDeep` with tabular figures; dates and times open the platform pickers;

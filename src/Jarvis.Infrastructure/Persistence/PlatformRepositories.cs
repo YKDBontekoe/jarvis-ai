@@ -135,6 +135,17 @@ public sealed class UiSurfaceRepository(JarvisDbContext db) : IUiSurfaceReposito
         return entity.ToRecord();
     }
 
+    public async Task<UiSurfaceRecord?> DismissAsync(Guid ownerId, Guid id, CancellationToken cancellationToken)
+    {
+        var entity = await db.UiSurfaces.SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId,
+            cancellationToken);
+        if (entity is null || entity.Status != "open") return null;
+        entity.Status = "dismissed";
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return entity.ToRecord();
+    }
+
     public async Task<IReadOnlyList<UiSurfaceRecord>> ReopenAsync(Guid ownerId, Guid id,
         CancellationToken cancellationToken)
     {

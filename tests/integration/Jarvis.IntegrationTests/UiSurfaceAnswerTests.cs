@@ -52,6 +52,31 @@ public sealed class UiSurfaceAnswerTests : IAsyncLifetime
         Assert.Null(reopened.ValuesJson);
     }
 
+    [Fact]
+    public async Task Only_the_owner_can_dismiss_an_open_card()
+    {
+        var owner = Guid.CreateVersion7();
+        var other = Guid.CreateVersion7();
+        var chat = new Conversation(owner, "Gym");
+        await using (var seed = CreateDbContext())
+        {
+            seed.Conversations.Add(chat);
+            await seed.SaveChangesAsync();
+        }
+
+        await using var database = CreateDbContext();
+        var surfaces = new UiSurfaceRepository(database);
+        var created = await surfaces.CreateAsync(owner, chat.Id, "choice", "Which days?", "{}",
+            CancellationToken.None);
+
+        Assert.Null(await surfaces.DismissAsync(other, created.Surface.Id, CancellationToken.None));
+        var dismissed = await surfaces.DismissAsync(owner, created.Surface.Id, CancellationToken.None);
+        Assert.Equal("dismissed", dismissed?.Status);
+        Assert.Null(await surfaces.DismissAsync(owner, created.Surface.Id, CancellationToken.None));
+        var stored = await surfaces.GetAsync(owner, created.Surface.Id, CancellationToken.None);
+        Assert.Equal("dismissed", stored!.Status);
+    }
+
     private JarvisDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<JarvisDbContext>()

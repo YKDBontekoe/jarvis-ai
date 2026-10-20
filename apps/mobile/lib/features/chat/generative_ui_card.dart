@@ -501,6 +501,7 @@ mixin _UiSurfaceCardBody on _UiSurfaceCardController {
     final label = switch (widget.surface.status) {
       'completed' => 'Answered',
       'open' => 'Open',
+      'dismissed' => 'Dismissed',
       _ => 'Closed',
     };
     return Padding(
