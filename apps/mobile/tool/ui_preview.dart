@@ -16,7 +16,20 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // This development entry point intentionally uses the fixture hook.
   // ignore: invalid_use_of_visible_for_testing_member
-  debugJarvisHttpAdapter = ScreenshotHttp(fixtureRoutes(withApproval: false));
+  debugJarvisHttpAdapter = ScreenshotHttp({
+    ...fixtureRoutes(withApproval: false),
+    // A composed summary card in the transcript and an open multi-select
+    // question, so the generative cards can be tried.
+    'GET /api/v1/conversations/$conversationId/surfaces': [
+      weekSurface(),
+      daysSurface(),
+    ],
+    'POST /api/v1/ui-surfaces/surf-days/actions': {
+      'id': 'preview-days',
+      'role': 'assistant',
+      'content': 'Monday and Friday it is. I will block 18:30 on both.',
+    },
+  });
   final appearance = AppearanceController(store: MemoryAppearanceStore('dark'));
   await appearance.load();
   runApp(JarvisApp(skipAuthentication: true, appearance: appearance));

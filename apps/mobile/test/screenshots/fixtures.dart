@@ -740,6 +740,127 @@ Map<String, Object?> whatsAppChats() {
   };
 }
 
+/// An open choice card, as Jarvis's RenderUi tool leaves it.
+Map<String, Object?> questionSurface() => {
+  'id': 'surf-tone',
+  'title': 'Which tone do you want?',
+  'status': 'open',
+  'schema': {
+    'kind': 'choice',
+    'title': 'Which tone do you want?',
+    'body': 'You have been scrolling for an hour after saying you would go to the gym.',
+    'items': [
+      {'id': 'hard', 'title': 'Hard push', 'subtitle': 'Short and teasing'},
+      {'id': 'coach', 'title': 'Coach', 'subtitle': 'Firm, with a plan for the next 10 minutes'},
+      {'id': 'gentle', 'title': 'Gentle nudge', 'subtitle': 'Kind, no pressure'},
+      {'id': 'later', 'title': 'Not now', 'subtitle': 'Ask me again tonight'},
+    ],
+  },
+};
+
+/// A card Jarvis composed from blocks: a week at a glance.
+Map<String, Object?> weekSurface() => {
+  'id': 'surf-week',
+  'title': 'Your training week',
+  'status': 'open',
+  'schema': {
+    'kind': 'custom',
+    'title': 'Your training week',
+    'body': 'Three of five sessions done, with two easy ones left.',
+    'blocks': [
+      {'type': 'stats', 'items': [
+        {'label': 'Workouts', 'value': '3', 'delta': '+1 vs last week', 'trend': 'up'},
+        {'label': 'Distance', 'value': '18.5 km', 'delta': '-2 km', 'trend': 'down'},
+        {'label': 'Sleep', 'value': '7 h 10', 'delta': 'steady', 'trend': 'flat'},
+      ]},
+      {'type': 'progress', 'label': 'Weekly goal', 'value': 0.6, 'detail': '3 of 5 sessions'},
+      {'type': 'bars', 'unit': 'km', 'items': [
+        {'label': 'Mon', 'value': 5}, {'label': 'Wed', 'value': 8.5}, {'label': 'Sat', 'value': 5},
+      ]},
+      {'type': 'steps', 'items': [
+        {'title': 'Monday run', 'detail': '5 km easy', 'done': true},
+        {'title': 'Wednesday intervals', 'detail': '6 × 800 m', 'done': true},
+        {'title': 'Friday gym', 'detail': '18:00 · Borst & armen'},
+      ]},
+      {'type': 'callout', 'tone': 'success', 'text': 'You are ahead of last week. Keep Sunday as a rest day.'},
+    ],
+  },
+};
+
+/// A form with the richer fields: chips, a slider, a date, a toggle.
+Map<String, Object?> planSurface() => {
+  'id': 'surf-plan',
+  'title': 'Plan your next workout',
+  'status': 'open',
+  'schema': {
+    'kind': 'form',
+    'title': 'Plan your next workout',
+    'fields': [
+      {'id': 'kind', 'label': 'What kind?', 'type': 'choice', 'options': ['Run', 'Gym', 'Swim', 'Yoga']},
+      {'id': 'energy', 'label': 'Energy', 'type': 'slider', 'min': 1, 'max': 5, 'step': 1, 'unit': '/ 5'},
+      {'id': 'day', 'label': 'When?', 'type': 'date'},
+      {'id': 'buddy', 'label': 'Ask Rosa to join', 'type': 'toggle'},
+    ],
+    'actions': [{'id': 'plan', 'label': 'Plan it', 'style': 'primary'}],
+  },
+};
+
+/// A choice where several answers may be picked.
+Map<String, Object?> daysSurface() => {
+  'id': 'surf-days',
+  'title': 'Which days suit the gym?',
+  'status': 'open',
+  'schema': {
+    'kind': 'choice',
+    'title': 'Which days suit the gym?',
+    'selection': 'multiple',
+    'items': [
+      {'id': 'mon', 'title': 'Monday', 'subtitle': 'Free after 18:00', 'icon': 'calendar'},
+      {'id': 'wed', 'title': 'Wednesday', 'subtitle': 'Late meeting until 19:30', 'icon': 'calendar'},
+      {'id': 'fri', 'title': 'Friday', 'subtitle': 'Free all evening', 'icon': 'calendar'},
+    ],
+    'actions': [{'id': 'done', 'label': 'Done', 'style': 'primary'}],
+  },
+};
+
+/// A list with icons, values and badges.
+Map<String, Object?> billsSurface() => {
+  'id': 'surf-bills',
+  'title': 'Bills this week',
+  'status': 'open',
+  'schema': {
+    'kind': 'list',
+    'title': 'Bills this week',
+    'body': '3 payments, 1,027 euro in total.',
+    'items': [
+      {'id': 'rent', 'title': 'Rent', 'subtitle': 'Woonstad', 'icon': 'home', 'value': '€950', 'badge': 'Due Fri'},
+      {'id': 'gym', 'title': 'Gym', 'subtitle': 'Basic-Fit', 'icon': 'heart', 'value': '€29.99'},
+      {'id': 'phone', 'title': 'Phone', 'subtitle': 'Usage above plan', 'icon': 'phone', 'value': '€47.50', 'badge': 'Higher'},
+    ],
+  },
+};
+
+/// A comparison card as real Codex composed it (long label/value pairs).
+Map<String, Object?> laptopSurface() => {
+  'id': 'surf-laptop',
+  'title': 'Air 13 is the best travel fit',
+  'status': 'open',
+  'schema': {
+    'kind': 'custom',
+    'title': 'Air 13 is the best travel fit',
+    'body': 'Based on the specifications and prices you supplied; 1,300 euro is a hard limit.',
+    'blocks': [
+      {'type': 'pairs', 'items': [
+        {'label': 'Air 13 — recommended', 'value': '€1,199 · 1.24 kg · 18 h battery'},
+        {'label': 'Zen 14 — cheaper alternative', 'value': '€999 · 1.39 kg · 14 h battery'},
+        {'label': 'Carbon X1 — over budget', 'value': '€1,649 · 1.12 kg · 12 h battery'},
+      ]},
+      {'type': 'callout', 'icon': 'plane', 'tone': 'success', 'text': 'Choose Air 13: 200 euro more than Zen 14 buys 4 extra hours of battery and saves 150 g.'},
+      {'type': 'pairs', 'items': [{'label': 'Budget left', 'value': '€101'}]},
+    ],
+  },
+};
+
 Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   'GET /api/v1/conversations': conversations(),
   'GET /api/v1/conversations/$conversationId': {

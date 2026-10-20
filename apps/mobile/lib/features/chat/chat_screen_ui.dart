@@ -499,6 +499,29 @@ mixin _ChatScreenUi on _ChatScreenController {
     return null;
   }
 
+  /// The open question card docked in the composer's place, if any.
+  UiSurfaceEntry? _dockedSurface() {
+    final live = _liveSurface;
+    if (live == null || !surfaceAwaitsReply(live)) return null;
+    // A new question puts the keyboard away so its options are in view.
+    if (_dockedSurfaceId != live.id) {
+      _dockedSurfaceId = live.id;
+      if (_typingOverSurfaceId != live.id) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _typingOverSurfaceId != live.id) _dismissKeyboard();
+        });
+        _scrollToBottom();
+      }
+    }
+    return live;
+  }
+
+  /// True while the owner types over the docked card instead of tapping.
+  bool get _typingOverDock {
+    final docked = _dockedSurface();
+    return docked != null && _typingOverSurfaceId == docked.id;
+  }
+
   Widget _chatBody() => SafeArea(
     child: LayoutBuilder(
       builder: (context, bodyConstraints) => Column(
@@ -554,47 +577,54 @@ mixin _ChatScreenUi on _ChatScreenController {
                         child: Stack(
                           children: [
                             Positioned.fill(
-                              child: ValueListenableBuilder<int>(
-                                valueListenable: _transcriptTick,
-                                builder: (context, _, _) => ListView.builder(
-                                  controller: _scroll,
-                                  keyboardDismissBehavior:
-                                      ScrollViewKeyboardDismissBehavior.onDrag,
-                                  padding: const EdgeInsets.fromLTRB(
-                                    18,
-                                    16,
-                                    18,
-                                    24,
-                                  ),
-                                  itemCount: _entries.length,
-                                  // The transcript can shrink between this build and layout (a sign-out or a
-                                  // conversation switch clears it), so a stale index must not read past the end.
-                                  itemBuilder: (context, index) =>
-                                      index >= _entries.length
-                                      ? const SizedBox.shrink()
-                                      : Align(
-                                          alignment: Alignment.topCenter,
-                                          child: ConstrainedBox(
-                                            constraints: const BoxConstraints(
-                                              maxWidth: 760,
-                                            ),
-                                            child: SizedBox(
-                                              width: double.infinity,
-                                              child: FadeSlideIn(
-                                                animate:
-                                                    index >= _settledEntries,
-                                                offset: 14,
-                                                scale: .94,
-                                                alignment: _entryOrigin(
-                                                  _entries[index],
-                                                ),
-                                                child: _entryView(
-                                                  _entries[index],
+                              child: GestureDetector(
+                                // Tapping the conversation puts the keyboard
+                                // away; taps on messages still reach them.
+                                behavior: HitTestBehavior.translucent,
+                                onTap: _dismissKeyboard,
+                                child: ValueListenableBuilder<int>(
+                                  valueListenable: _transcriptTick,
+                                  builder: (context, _, _) => ListView.builder(
+                                    controller: _scroll,
+                                    keyboardDismissBehavior:
+                                        ScrollViewKeyboardDismissBehavior
+                                            .onDrag,
+                                    padding: const EdgeInsets.fromLTRB(
+                                      18,
+                                      16,
+                                      18,
+                                      24,
+                                    ),
+                                    itemCount: _entries.length,
+                                    // The transcript can shrink between this build and layout (a sign-out or a
+                                    // conversation switch clears it), so a stale index must not read past the end.
+                                    itemBuilder: (context, index) =>
+                                        index >= _entries.length
+                                        ? const SizedBox.shrink()
+                                        : Align(
+                                            alignment: Alignment.topCenter,
+                                            child: ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                maxWidth: 760,
+                                              ),
+                                              child: SizedBox(
+                                                width: double.infinity,
+                                                child: FadeSlideIn(
+                                                  animate:
+                                                      index >= _settledEntries,
+                                                  offset: 14,
+                                                  scale: .94,
+                                                  alignment: _entryOrigin(
+                                                    _entries[index],
+                                                  ),
+                                                  child: _entryView(
+                                                    _entries[index],
+                                                  ),
                                                 ),
                                               ),
                                             ),
                                           ),
-                                        ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -644,7 +674,7 @@ mixin _ChatScreenUi on _ChatScreenController {
               ),
             ),
           ),
-          if (_liveSurface case final live? when surfaceAwaitsReply(live))
+          if (_dockedSurface() case final docked? when !_typingOverDock)
             ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: 788,
@@ -652,17 +682,23 @@ mixin _ChatScreenUi on _ChatScreenController {
               ),
               child: ListView(
                 shrinkWrap: true,
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
                 children: [
                   UiSurfaceCard(
-                    key: ValueKey('live-${live.id}'),
-                    surface: live,
+                    key: ValueKey('live-${docked.id}'),
+                    surface: docked,
                     pinned: true,
-                    errorText: _surfaceErrorFor == live.id
+                    errorText: _surfaceErrorFor == docked.id
                         ? _surfaceError
                         : null,
                     onAction: (action, values) =>
-                        _submitSurface(live, action, values),
+                        _submitSurface(docked, action, values),
+                    onTypeInstead: () {
+                      setState(() => _typingOverSurfaceId = docked.id);
+                      _composerFocus.value++;
+                      _scrollToBottom(force: true);
+                    },
+                    onDismiss: () => unawaited(_dismissSurface(docked)),
                   ),
                 ],
               ),
@@ -687,40 +723,64 @@ mixin _ChatScreenUi on _ChatScreenController {
                   )
                 : const SizedBox(width: double.infinity),
           ),
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 788),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
-                child: ChatComposer(
-                  controller: _input,
-                  onSend: () => unawaited(_send()),
-                  onCancel: _busy ? () => unawaited(_cancelActiveRun()) : null,
-                  onVoice:
-                      _conversationId == null ||
-                          (_busy && !_voiceActive && !_voiceStarting)
-                      ? null
-                      : () => _selectDestination(2),
-                  onAttach: _showQuickActions,
-                  sources: _sourceChips,
-                  onRemoveSource: _conversationId == null
-                      ? null
-                      : (source) => unawaited(_detachSource(source)),
-                  sending: _busy,
-                  awaitingApproval: _hasPendingApproval,
-                  voiceActive: _voiceActive,
-                  voiceStarting: _voiceStarting,
-                  focusRequests: _composerFocus,
-                  photos: _pendingPhotos,
-                  onRemovePhoto: _removePendingPhoto,
-                  onPhoto: _conversationId == null ? null : _showPhotoSources,
-                  onImages: _conversationId == null
-                      ? null
-                      : (images) => unawaited(_enqueueIncomingPhotos(images)),
+          if (_dockedSurface() case final docked? when _typingOverDock)
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 788),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+                  child: DockedSurfaceBar(
+                    surface: docked,
+                    onShowOptions: () {
+                      _dismissKeyboard();
+                      setState(() => _typingOverSurfaceId = null);
+                      _scrollToBottom(force: true);
+                    },
+                    onDismiss: () => unawaited(_dismissSurface(docked)),
+                  ),
                 ),
               ),
             ),
-          ),
+          // The docked card stands in for the composer until the owner
+          // answers it or chooses to type instead. A running turn keeps the
+          // composer so Stop stays in reach.
+          if (_dockedSurface() == null || _typingOverDock || _busy)
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 788),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+                  child: ChatComposer(
+                    controller: _input,
+                    onSend: () => unawaited(_send()),
+                    onCancel: _busy
+                        ? () => unawaited(_cancelActiveRun())
+                        : null,
+                    onVoice:
+                        _conversationId == null ||
+                            (_busy && !_voiceActive && !_voiceStarting)
+                        ? null
+                        : () => _selectDestination(2),
+                    onAttach: _showQuickActions,
+                    sources: _sourceChips,
+                    onRemoveSource: _conversationId == null
+                        ? null
+                        : (source) => unawaited(_detachSource(source)),
+                    sending: _busy,
+                    awaitingApproval: _hasPendingApproval,
+                    voiceActive: _voiceActive,
+                    voiceStarting: _voiceStarting,
+                    focusRequests: _composerFocus,
+                    photos: _pendingPhotos,
+                    onRemovePhoto: _removePendingPhoto,
+                    onPhoto: _conversationId == null ? null : _showPhotoSources,
+                    onImages: _conversationId == null
+                        ? null
+                        : (images) => unawaited(_enqueueIncomingPhotos(images)),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     ),

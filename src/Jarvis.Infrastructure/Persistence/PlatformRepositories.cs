@@ -20,7 +20,7 @@ public sealed class UiSurfaceEntity
     public DateTimeOffset UpdatedAt { get; set; }
 
     public UiSurfaceRecord ToRecord() => new(Id, OwnerId, ConversationId, Kind, Title, SchemaJson, Status, CreatedAt,
-        UpdatedAt);
+        UpdatedAt, CompletedAction, ValuesJson);
 }
 
 public sealed class RemoteAgentEntity
@@ -130,6 +130,17 @@ public sealed class UiSurfaceRepository(JarvisDbContext db) : IUiSurfaceReposito
         entity.Status = "completed";
         entity.CompletedAction = actionId;
         entity.ValuesJson = valuesJson;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return entity.ToRecord();
+    }
+
+    public async Task<UiSurfaceRecord?> DismissAsync(Guid ownerId, Guid id, CancellationToken cancellationToken)
+    {
+        var entity = await db.UiSurfaces.SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId,
+            cancellationToken);
+        if (entity is null || entity.Status != "open") return null;
+        entity.Status = "dismissed";
         entity.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         return entity.ToRecord();

@@ -58,6 +58,13 @@ mixin _ChatScreenSend on _ChatScreenController {
       _input.clear();
       _pendingPhotos = [];
     }
+    // Typing over a docked card answers it in words, so the card closes
+    // before the message goes out and Jarvis sees it as closed.
+    final answered = _liveSurface;
+    if (answered != null && _typingOverSurfaceId == answered.id) {
+      await _dismissSurface(answered);
+      if (!mounted) return false;
+    }
     _stopRequested = false;
     final shownContent = content.isEmpty
         ? (sentPhotos.length == 1
@@ -214,7 +221,14 @@ mixin _ChatScreenSend on _ChatScreenController {
       (entry) => entry is UiSurfaceEntry && entry.id == surface.id,
     );
     if (existing >= 0) {
-      _entries[existing] = surface;
+      final previous = _entries[existing] as UiSurfaceEntry;
+      // Realtime updates carry no answer; keep the one already shown.
+      _entries[existing] =
+          surface.answer == null &&
+              previous.answer != null &&
+              surface.status == previous.status
+          ? surface.copyWith(answer: previous.answer)
+          : surface;
     } else {
       _entries.add(surface);
     }
@@ -271,6 +285,10 @@ mixin _ChatScreenSend on _ChatScreenController {
     Map<String, String> values,
   ) async {
     _pendingQueryText = null;
+    final answer = UiSurfaceAnswer(
+      actionId: action,
+      values: redactSurfaceValues(surface.schema, values),
+    );
     if (mounted && _surfaceErrorFor == surface.id) {
       setState(() {
         _surfaceError = null;
@@ -285,7 +303,7 @@ mixin _ChatScreenSend on _ChatScreenController {
       );
       if (!mounted) return;
       setState(() {
-        _upsertSurface(surface.copyWith(status: 'completed'));
+        _upsertSurface(surface.copyWith(status: 'completed', answer: answer));
         _surfaceError = null;
         _surfaceErrorFor = null;
         _applyRunResult(response);
@@ -301,7 +319,7 @@ mixin _ChatScreenSend on _ChatScreenController {
           _sending = true;
           _error = null;
           _surfaceError = null;
-          _upsertSurface(surface.copyWith(status: 'completed'));
+          _upsertSurface(surface.copyWith(status: 'completed', answer: answer));
           _ensurePlaceholder();
         });
         unawaited(_catchUpRemoteQuery(conversationId));
@@ -321,6 +339,32 @@ mixin _ChatScreenSend on _ChatScreenController {
       if (!mounted) return;
       setState(() {
         _surfaceError = 'Jarvis could not use this card. Try again.';
+        _surfaceErrorFor = surface.id;
+      });
+    }
+  }
+
+  /// Closes a card without answering it. The card folds at once; if the
+  /// server cannot be reached it comes back with a note.
+  Future<void> _dismissSurface(UiSurfaceEntry surface) async {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _upsertSurface(surface.copyWith(status: 'dismissed'));
+      _typingOverSurfaceId = null;
+      if (_surfaceErrorFor == surface.id) {
+        _surfaceError = null;
+        _surfaceErrorFor = null;
+      }
+    });
+    try {
+      await _http.post<dynamic>('/api/v1/ui-surfaces/${surface.id}/dismiss');
+    } on DioException catch (error) {
+      if (!mounted) return;
+      // 409: it was already answered or closed elsewhere; realtime will say how.
+      if (error.response?.statusCode == 409) return;
+      setState(() {
+        _upsertSurface(surface);
+        _surfaceError = 'Could not close this card. Try again.';
         _surfaceErrorFor = surface.id;
       });
     }
@@ -360,6 +404,8 @@ mixin _ChatScreenSend on _ChatScreenController {
           );
         }
       });
+      // Cards arrive after the messages; keep the newest one in view.
+      _scrollToBottom();
     } on DioException {
       // Chat still works if surfaces cannot be refreshed.
     } catch (_) {
@@ -641,8 +687,7 @@ mixin _ChatScreenSend on _ChatScreenController {
               ? current.copyWith(
                   status: ApprovalStatus.pending,
                   clearDecision: true,
-                  error:
-                      'Decide the earlier pending tool call first, or this one was already handled.',
+                  error: 'Decide the earlier pending tool call first, or this one was already handled.',
                 )
               : current.copyWith(
                   status: ApprovalStatus.failed,

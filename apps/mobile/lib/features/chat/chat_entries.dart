@@ -361,12 +361,16 @@ class UiSurfaceEntry extends ChatEntry {
     required this.title,
     required this.status,
     required this.schema,
+    this.answer,
   });
 
   final String id;
   final String title;
   final String status;
   final Map<String, dynamic> schema;
+
+  /// What the owner picked or typed, once the card was used.
+  final UiSurfaceAnswer? answer;
 
   static UiSurfaceEntry? fromJson(Object? value) {
     if (value is! Map) return null;
@@ -378,15 +382,42 @@ class UiSurfaceEntry extends ChatEntry {
       title: value['title'] is String ? value['title'] as String : '',
       status: value['status'] is String ? value['status'] as String : 'open',
       schema: jsonObject(schema) ?? const <String, dynamic>{},
+      answer: UiSurfaceAnswer.fromJson(value['answer']),
     );
   }
 
-  UiSurfaceEntry copyWith({String? status}) => UiSurfaceEntry(
-    id: id,
-    title: title,
-    status: status ?? this.status,
-    schema: schema,
-  );
+  UiSurfaceEntry copyWith({String? status, UiSurfaceAnswer? answer}) =>
+      UiSurfaceEntry(
+        id: id,
+        title: title,
+        status: status ?? this.status,
+        schema: schema,
+        answer: answer ?? this.answer,
+      );
+}
+
+/// The action and values sent from a card; secrets arrive already redacted.
+class UiSurfaceAnswer {
+  const UiSurfaceAnswer({required this.actionId, this.values = const {}});
+
+  final String actionId;
+  final Map<String, String> values;
+
+  static UiSurfaceAnswer? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final actionId = value['actionId'];
+    if (actionId is! String || actionId.isEmpty) return null;
+    final raw = value['values'];
+    return UiSurfaceAnswer(
+      actionId: actionId,
+      values: {
+        if (raw is Map)
+          for (final pair in raw.entries)
+            if (pair.key is String && pair.value is String)
+              pair.key as String: pair.value as String,
+      },
+    );
+  }
 }
 
 List<MessageCitation> parseMessageCitations(Object? value) {

@@ -128,6 +128,13 @@ abstract class _ChatScreenController extends State<ChatScreen>
   /// Bumped to move keyboard focus into the composer.
   final _composerFocus = ValueNotifier<int>(0);
 
+  /// The docked question card the keyboard was last put away for.
+  String? _dockedSurfaceId;
+
+  /// The docked card the owner chose to answer by typing: its options fold
+  /// into a bar and the composer comes back.
+  String? _typingOverSurfaceId;
+
   Future<void> _openDrafts() async {
     final stored = await ComposerDrafts.open();
     if (!mounted || _signedOut) return;
@@ -269,6 +276,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
     String action,
     Map<String, String> values,
   );
+  Future<void> _dismissSurface(UiSurfaceEntry surface);
   Future<void> _loadConversationSurfaces(String conversationId);
   Future<void> _rate(MessageEntry message, String rating);
   Future<void> _retry(MessageEntry message);

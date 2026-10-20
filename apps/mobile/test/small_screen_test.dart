@@ -52,9 +52,9 @@ void main() {
     expect(isNearTranscriptBottom(400, 1000), isFalse);
   });
 
-  test('pinned question card leaves room on small screens', () {
-    expect(pinnedSurfaceMaxHeight(300), 120);
-    expect(pinnedSurfaceMaxHeight(600), 210);
-    expect(pinnedSurfaceMaxHeight(2000), 360);
+  test('docked question card leaves the transcript a strip', () {
+    expect(pinnedSurfaceMaxHeight(200), 160);
+    expect(pinnedSurfaceMaxHeight(600), 372);
+    expect(pinnedSurfaceMaxHeight(2000), 560);
   });
 }

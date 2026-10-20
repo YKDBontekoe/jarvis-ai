@@ -6,6 +6,7 @@ using Jarvis.Agents.Journal;
 using Jarvis.Agents.Planner;
 using Jarvis.Agents.Surfaces;
 using Jarvis.Agents.WhatsApp;
+using Jarvis.Application.Surfaces;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Xunit;
@@ -41,7 +42,7 @@ public sealed class ContextProviderStateKeyTests
             .. new JournalContextContributor().CreateProviders(context),
             .. new PlannerContextContributor().CreateProviders(context),
             .. new BrowserContextContributor().CreateProviders(context),
-            .. new SurfaceContextContributor().CreateProviders(context)
+            .. new SurfaceContextContributor(Fake<IUiSurfaceRepository>.Create()).CreateProviders(context)
         ];
         var keys = providers.SelectMany(provider => provider.StateKeys).ToArray();
         Assert.Equal(keys.Distinct(StringComparer.Ordinal).Count(), keys.Length);
@@ -58,6 +59,41 @@ public sealed class ContextProviderStateKeyTests
         Assert.Contains("Journaling:", response.Text);
         Assert.Contains("Day planner:", response.Text);
         Assert.Contains("hello", response.Text);
+    }
+
+    [Theory]
+    [InlineData("dismissed", "closed the card \"Which tone?\" instead of tapping it")]
+    [InlineData("open", "\"Which tone?\" is still open")]
+    [InlineData("completed", null)]
+    public async Task The_card_guidance_says_what_happened_to_the_latest_card(string status, string? expected)
+    {
+        var conversationId = Guid.CreateVersion7();
+        var surfaces = Fake<IUiSurfaceRepository>.Create(("ListForConversationAsync", args =>
+            (Guid)args[0]! == OwnerId && (Guid)args[1]! == conversationId
+                ? new[]
+                {
+                    new UiSurfaceRecord(Guid.CreateVersion7(), OwnerId, conversationId, "choice", "Which tone?", "{}",
+                        status, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)
+                }
+                : Array.Empty<UiSurfaceRecord>()));
+        var context = new AgentBuildContext(OwnerId, ExecutingTaskId: null, conversationId);
+        var agent = new ChatClientAgent(new EchoClient(), new ChatClientAgentOptions
+        {
+            AIContextProviders = [.. new SurfaceContextContributor(surfaces).CreateProviders(context)]
+        });
+
+        var text = (await agent.RunAsync("hello")).Text;
+
+        Assert.Contains("Generative UI", text);
+        if (expected is null)
+        {
+            Assert.DoesNotContain("closed the card", text);
+            Assert.DoesNotContain("still open", text);
+        }
+        else
+        {
+            Assert.Contains(expected, text);
+        }
     }
 
     private sealed class EchoClient : IChatClient

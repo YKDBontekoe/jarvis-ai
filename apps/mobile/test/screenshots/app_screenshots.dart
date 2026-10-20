@@ -97,6 +97,63 @@ void main() {
       await capture(tester, '04-chat-typing-$mode');
     });
 
+    screenshotTest('chat question $mode', (tester) async {
+      usePhone(tester);
+      http.routes['GET /api/v1/conversations/$conversationId/surfaces'] = [
+        questionSurface(),
+      ];
+      await start(tester, dark: dark);
+      await openChat(tester);
+      expect(find.text('Which tone do you want?'), findsOneWidget);
+      expect(find.text('Ask Jarvis anything'), findsNothing);
+      await capture(tester, '04b-chat-question-$mode');
+      await tester.tap(find.byTooltip('Type an answer instead'));
+      await settle(tester);
+      expect(find.text('Options'), findsOneWidget);
+      expect(find.text('Hard push'), findsNothing);
+      await capture(tester, '04c-chat-question-typing-$mode');
+      await tester.tap(find.text('Options'));
+      await settle(tester);
+      expect(find.text('Hard push'), findsOneWidget);
+
+      http.routes['POST /api/v1/ui-surfaces/surf-tone/dismiss'] = {
+        'id': 'surf-tone',
+      };
+      await tester.tap(find.byTooltip('Dismiss card'));
+      await settle(tester);
+      expect(find.text('Hard push'), findsNothing);
+      expect(find.text('Dismissed'), findsOneWidget);
+      expect(find.text('Ask Jarvis anything'), findsOneWidget);
+      await capture(tester, '04d-chat-question-dismissed-$mode');
+    });
+
+    screenshotTest('chat question typed answer $mode', (tester) async {
+      usePhone(tester);
+      http.routes['GET /api/v1/conversations/$conversationId/surfaces'] = [
+        questionSurface(),
+      ];
+      http.routes['POST /api/v1/ui-surfaces/surf-tone/dismiss'] = {
+        'id': 'surf-tone',
+      };
+      http.routes['POST /api/v1/conversations/$conversationId/messages'] = {
+        'id': 'typed-reply',
+        'role': 'assistant',
+        'content': 'Hard push it is. Shoes on.',
+      };
+      await start(tester, dark: dark);
+      await openChat(tester);
+      await tester.tap(find.byTooltip('Type an answer instead'));
+      await settle(tester);
+      await tester.enterText(find.byType(TextField).last, 'A hard push please');
+      await settle(tester);
+      await tester.tap(find.byTooltip('Send'));
+      await settle(tester);
+      expect(find.text('Options'), findsNothing);
+      expect(find.text('Dismissed'), findsOneWidget);
+      expect(find.text('Hard push it is. Shoes on.'), findsOneWidget);
+      await capture(tester, '04e-chat-question-typed-$mode');
+    });
+
     screenshotTest('chats $mode', (tester) async {
       usePhone(tester);
       await start(tester, dark: dark);
@@ -313,8 +370,7 @@ void main() {
                       const MessageBubble(
                         message: MessageEntry(
                           role: 'assistant',
-                          content:
-                              '**Tasca do Chico** in Bairro Alto keeps fado vadio nights — small, candle-lit',
+                          content: '**Tasca do Chico** in Bairro Alto keeps fado vadio nights — small, candle-lit',
                           pending: true,
                         ),
                       ),

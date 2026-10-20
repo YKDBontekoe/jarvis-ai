@@ -8,7 +8,10 @@ using Jarvis.Application.Surfaces;
 namespace Jarvis.Api.Endpoints;
 
 public sealed record UiSurfaceDto(Guid Id, Guid ConversationId, string Kind, string Title, string Status,
-    JsonElement Schema, DateTimeOffset CreatedAt);
+    JsonElement Schema, DateTimeOffset CreatedAt, UiSurfaceAnswerDto? Answer = null);
+
+/// <summary>What the owner picked or typed on a used card; secret values are already redacted.</summary>
+public sealed record UiSurfaceAnswerDto(string ActionId, Dictionary<string, string> Values);
 public sealed record UiSurfaceActionRequest(string? ActionId, Dictionary<string, string>? Values);
 
 internal static class SurfaceEndpoints
@@ -79,6 +82,20 @@ internal static class SurfaceEndpoints
             return result.ToHttpResult();
         }).WithName("SubmitUiSurfaceAction");
 
+        // Closes a card the owner does not want to answer. Nothing is sent to Jarvis; the card just stops waiting.
+        api.MapPost("/ui-surfaces/{id:guid}/dismiss", async (Guid id, IUiSurfaceRepository surfaces,
+            ICurrentUser currentUser, IRealtimePublisher realtime, CancellationToken ct) =>
+        {
+            var surface = await surfaces.GetAsync(currentUser.OwnerId, id, ct);
+            if (surface is null) return Results.NotFound();
+            var dismissed = await surfaces.DismissAsync(currentUser.OwnerId, id, CancellationToken.None);
+            if (dismissed is null)
+                return Results.Conflict(new { message = "This card was already used." });
+            await realtime.PublishToConversationAsync(dismissed.ConversationId, "ui.surface", Payload(dismissed),
+                CancellationToken.None);
+            return Results.Ok(ToDto(dismissed));
+        }).WithName("DismissUiSurface");
+
         return api;
     }
 
@@ -86,7 +103,22 @@ internal static class SurfaceEndpoints
     {
         using var document = JsonDocument.Parse(surface.SchemaJson);
         return new UiSurfaceDto(surface.Id, surface.ConversationId, surface.Kind, surface.Title, surface.Status,
-            document.RootElement.Clone(), surface.CreatedAt);
+            document.RootElement.Clone(), surface.CreatedAt, Answer(surface));
+    }
+
+    private static UiSurfaceAnswerDto? Answer(UiSurfaceRecord surface)
+    {
+        if (surface.Status != "completed" || string.IsNullOrEmpty(surface.CompletedAction)) return null;
+        Dictionary<string, string>? values = null;
+        try
+        {
+            if (!string.IsNullOrEmpty(surface.ValuesJson))
+                values = JsonSerializer.Deserialize<Dictionary<string, string>>(surface.ValuesJson);
+        }
+        catch (JsonException)
+        {
+        }
+        return new UiSurfaceAnswerDto(surface.CompletedAction, values ?? []);
     }
 
     private static object Payload(UiSurfaceRecord surface) => new

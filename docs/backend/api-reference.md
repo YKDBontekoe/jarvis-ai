@@ -213,7 +213,7 @@ Internal routes under `/voice/internal/{conversationId}/...` are for the voice r
 
 ## Surfaces (generative UI)
 
-`GET /conversations/{id}/surfaces`, `POST /ui-surfaces/{id}/actions`.
+`GET /conversations/{id}/surfaces`, `POST /ui-surfaces/{id}/actions`, `POST /ui-surfaces/{id}/dismiss` (closes an open card without answering and starts no turn; 409 when it is no longer open; the next turn's Generative UI context tells Jarvis the card was closed). A completed surface carries `answer` (`actionId`, `values`; secret values are already `(stored securely)`), so the app can show what was picked. Multi-select choices send `choice` as comma-separated ids and `label` as the joined titles.
 
 ## Home, devices, coding
 
